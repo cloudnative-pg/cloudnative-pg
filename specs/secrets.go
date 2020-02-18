@@ -1,0 +1,31 @@
+/*
+This file is part of Cloud Native PostgreSQL.
+
+Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
+*/
+
+package specs
+
+import (
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// CreateSecret create a secret with the PostgreSQL and the owner passwords
+func CreateSecret(
+	name string,
+	namespace string,
+	username string,
+	password string,
+) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		StringData: map[string]string{
+			"username": username,
+			"password": password,
+		},
+	}
+}

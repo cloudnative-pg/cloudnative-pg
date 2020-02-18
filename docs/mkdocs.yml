@@ -1,0 +1,20 @@
+# Documentation produced with MkDocs (https://www.mkdocs.org/)
+# You can use a pyenv virtual environment with PIP's requirements
+# defined in the `requirements.txt` file.
+#
+# Type `mkdocs build` to build the documentation in the `site` directory.
+# You can test the documentation by typing `mkdocs serve` and point your
+# browser to http://127.0.0.1:8000/.
+
+site_name: Cloud Native PostgreSQL
+site_author: 2ndQuadrant Ltd
+docs_dir: src
+
+theme: readthedocs
+
+markdown_extensions:
+    - admonition
+    - def_list
+
+nav:
+  - Cloud Native PostgreSQL: 'index.md'

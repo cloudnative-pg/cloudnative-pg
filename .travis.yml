@@ -1,0 +1,34 @@
+language: go
+
+cache:
+  directories:
+    - $HOME/.cache/go-build
+    - $GOPATH/pkg/mod
+
+os: linux
+
+go:
+  - "1.13"
+
+install: skip
+
+env:
+  global:
+    - KUBEBUILDER_VERSION=2.2.0
+    - GOLANGCI_LINT_VERSION=1.23.6
+
+jobs:
+  include:
+    - stage: testing
+      before_script:
+        - sudo install -d /usr/local/kubebuilder -o $(id -u) -g $(id -g)
+        - curl -L https://go.kubebuilder.io/dl/${KUBEBUILDER_VERSION}/$(go env GOOS)/$(go env GOARCH) | tar --strip-components=1 -xz -C /usr/local/kubebuilder
+        - export PATH=$PATH:/usr/local/kubebuilder/bin
+      script:
+        - make test
+
+    - stage: linting
+      before_script:
+        - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v${GOLANGCI_LINT_VERSION}
+      script:
+        - make lint

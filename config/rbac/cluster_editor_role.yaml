@@ -1,0 +1,26 @@
+# permissions to do edit clusters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-editor-role
+rules:
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
+  - clusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
+  - clusters/status
+  verbs:
+  - get
+  - patch
+  - update

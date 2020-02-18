@@ -1,0 +1,7 @@
+domain: k8s.2ndq.io
+repo: github.com/2ndquadrant/cloud-native-postgresql
+resources:
+- group: postgresql
+  kind: Cluster
+  version: v1alpha1
+version: "2"

@@ -1,0 +1,299 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.4
+  creationTimestamp: null
+  name: clusters.postgresql.k8s.2ndq.io
+spec:
+  group: postgresql.k8s.2ndq.io
+  names:
+    kind: Cluster
+    listKind: ClusterList
+    plural: clusters
+    singular: cluster
+  scope: Namespaced
+  subresources:
+    scale:
+      specReplicasPath: .spec.instances
+      statusReplicasPath: .status.instances
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: Cluster is the Schema for the postgresqls API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ClusterSpec defines the desired state of Cluster
+          properties:
+            affinity:
+              description: Affinity/Anti-affinity rules for Pods
+              properties:
+                enablePodAntiAffinity:
+                  description: Should we enable anti affinity or not?
+                  type: boolean
+                topologyKey:
+                  description: TopologyKey to use for anti-affinity configuration.
+                    See k8s documentation for more info on that
+                  type: string
+              required:
+              - enablePodAntiAffinity
+              type: object
+            applicationConfiguration:
+              description: Configuration from the application point of view
+              properties:
+                database:
+                  description: Name of the database used by the application
+                  minLength: 1
+                  type: string
+                owner:
+                  description: Name of the owner of the database in the instance to
+                    be used by applications.
+                  minLength: 1
+                  type: string
+              required:
+              - database
+              - owner
+              type: object
+            description:
+              description: Description of this PostgreSQL cluster
+              type: string
+            imageName:
+              description: Name of the container image
+              minLength: 0
+              type: string
+            imagePullSecret:
+              description: Secret for pulling the image. If empty no secret will be
+                used
+              type: string
+            instances:
+              description: Number of instances required in the cluster
+              format: int32
+              minimum: 1
+              type: integer
+            postgresql:
+              description: Configuration of the PostgreSQL server
+              properties:
+                parameters:
+                  description: PostgreSQL configuration options (postgresql.conf)
+                  items:
+                    type: string
+                  type: array
+                pg_hba:
+                  description: PostgreSQL Host Based Authentication rules (lines to
+                    be appended to the pg_hba.conf file)
+                  items:
+                    type: string
+                  type: array
+              required:
+              - parameters
+              - pg_hba
+              type: object
+            resources:
+              description: Resources requirements of every generated Pod
+              properties:
+                limits:
+                  additionalProperties:
+                    type: string
+                  description: 'Limits describes the maximum amount of compute resources
+                    allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                  type: object
+                requests:
+                  additionalProperties:
+                    type: string
+                  description: 'Requests describes the minimum amount of compute resources
+                    required. If Requests is omitted for a container, it defaults
+                    to Limits if that is explicitly specified, otherwise to an implementation-defined
+                    value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                  type: object
+              type: object
+            startDelay:
+              description: The time in seconds that is allowed for a PostgreSQL instance
+                to successfully start up (default 30)
+              format: int32
+              type: integer
+            stopDelay:
+              description: The time in seconds that is allowed for a PostgreSQL instance
+                node to gracefully shutdown (default 30)
+              format: int32
+              type: integer
+            storage:
+              description: Configuration of the storage of the instances
+              properties:
+                pvcTemplate:
+                  description: Template to be used to generate the Persistent Volume
+                    Claim
+                  properties:
+                    accessModes:
+                      description: 'AccessModes contains the desired access modes
+                        the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1'
+                      items:
+                        type: string
+                      type: array
+                    dataSource:
+                      description: This field requires the VolumeSnapshotDataSource
+                        alpha feature gate to be enabled and currently VolumeSnapshot
+                        is the only supported data source. If the provisioner can
+                        support VolumeSnapshot data source, it will create a new volume
+                        and data will be restored to the volume at the same time.
+                        If the provisioner does not support VolumeSnapshot data source,
+                        volume will not be created and the failure will be reported
+                        as an event. In the future, we plan to support more data source
+                        types and the behavior of the provisioner may change.
+                      properties:
+                        apiGroup:
+                          description: APIGroup is the group for the resource being
+                            referenced. If APIGroup is not specified, the specified
+                            Kind must be in the core API group. For any other third-party
+                            types, APIGroup is required.
+                          type: string
+                        kind:
+                          description: Kind is the type of resource being referenced
+                          type: string
+                        name:
+                          description: Name is the name of resource being referenced
+                          type: string
+                      required:
+                      - kind
+                      - name
+                      type: object
+                    resources:
+                      description: 'Resources represents the minimum resources the
+                        volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources'
+                      properties:
+                        limits:
+                          additionalProperties:
+                            type: string
+                          description: 'Limits describes the maximum amount of compute
+                            resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                          type: object
+                        requests:
+                          additionalProperties:
+                            type: string
+                          description: 'Requests describes the minimum amount of compute
+                            resources required. If Requests is omitted for a container,
+                            it defaults to Limits if that is explicitly specified,
+                            otherwise to an implementation-defined value. More info:
+                            https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
+                          type: object
+                      type: object
+                    selector:
+                      description: A label query over volumes to consider for binding.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: A label selector requirement is a selector
+                              that contains values, a key, and an operator that relates
+                              the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: operator represents a key's relationship
+                                  to a set of values. Valid operators are In, NotIn,
+                                  Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: values is an array of string values.
+                                  If the operator is In or NotIn, the values array
+                                  must be non-empty. If the operator is Exists or
+                                  DoesNotExist, the values array must be empty. This
+                                  array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: matchLabels is a map of {key,value} pairs.
+                            A single {key,value} in the matchLabels map is equivalent
+                            to an element of matchExpressions, whose key field is
+                            "key", the operator is "In", and the values array contains
+                            only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                    storageClassName:
+                      description: 'Name of the StorageClass required by the claim.
+                        More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1'
+                      type: string
+                    volumeMode:
+                      description: volumeMode defines what type of volume is required
+                        by the claim. Value of Filesystem is implied when not included
+                        in claim spec. This is a beta feature.
+                      type: string
+                    volumeName:
+                      description: VolumeName is the binding reference to the PersistentVolume
+                        backing this claim.
+                      type: string
+                  type: object
+                size:
+                  description: Size of the storage. Required if not already specified
+                    in the PVC template.
+                  type: string
+                storageClass:
+                  description: StorageClass to use for database data (PGDATA). Applied
+                    after evaluating the PVC template, if available.
+                  type: string
+              type: object
+          required:
+          - applicationConfiguration
+          - instances
+          - postgresql
+          type: object
+        status:
+          description: ClusterStatus defines the observed state of Cluster
+          properties:
+            imageName:
+              description: Name of the image used
+              type: string
+            instances:
+              description: Total number of intances in the cluster
+              format: int32
+              type: integer
+            latestGeneratedNode:
+              description: ID of the latest generated node (used to avoid node name
+                clashing)
+              format: int32
+              type: integer
+            masterInstance:
+              description: Current master
+              type: string
+            readyInstances:
+              description: Total number of ready instances in the cluster
+              format: int32
+              type: integer
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

@@ -1,0 +1,39 @@
+# Example of PostgreSQL cluster using emptyDir volumes
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: Cluster
+metadata:
+  name: postgresql-emptydir
+spec:
+  instances: 3
+
+  imageName: quay.io/2ndquadrant/cloud-native-postgresql:latest
+
+  # Configuration of the application that will be used by
+  # this PostgreSQL cluster
+  applicationConfiguration:
+    database: app
+    owner: app
+
+  # PostgreSQL server configuration
+  postgresql:
+    # Example of configuration parameters for PostgreSQL
+    parameters:
+      - max_worker_processes = 20
+      - max_parallel_workers = 20
+      - max_replication_slots = 20
+      - hot_standby = true
+
+    # Example of host based authentication directives
+    pg_hba:
+      # Grant local access
+      - local all all trust
+      # Grant local network access (within k8s cluster)
+      - host all all 10.0.0.0/8 trust
+      - host all all 172.0.0.0/8 trust
+      # Grant local network replication access (within k8s cluster)
+      - host replication all 10.0.0.0/8 trust
+      - host replication all 172.0.0.0/8 trust
+      # Require md5 authentication elsewhere
+      - host all all all md5
+      - host replication all all md5
+

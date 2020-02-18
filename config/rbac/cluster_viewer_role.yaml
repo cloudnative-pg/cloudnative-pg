@@ -1,0 +1,20 @@
+# permissions to do viewer clusters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-viewer-role
+rules:
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
+  - clusters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
+  - clusters/status
+  verbs:
+  - get
