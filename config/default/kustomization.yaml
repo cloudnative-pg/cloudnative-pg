@@ -28,6 +28,7 @@ patchesStrategicMerge:
   # Only one of manager_auth_proxy_patch.yaml and
   # manager_prometheus_metrics_patch.yaml should be enabled.
 - manager_auth_proxy_patch.yaml
+- manager_image_pull_secret.yaml
   # If you want your controller-manager to expose the /metrics
   # endpoint w/o any authn/z, uncomment the following line and
   # comment manager_auth_proxy_patch.yaml.

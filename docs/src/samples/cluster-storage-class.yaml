@@ -7,6 +7,7 @@ spec:
   instances: 3
 
   imageName: quay.io/2ndquadrant/cloud-native-postgresql:latest
+  imagePullSecret: 2ndquadrant-k8s-postgresql-poc-pull-secret
 
   # Configuration of the application that will be used by
   # this PostgreSQL cluster
