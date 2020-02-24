@@ -28,7 +28,7 @@ var (
 	apiGVString = v1alpha1.GroupVersion.String()
 )
 
-// ClusterReconciler reconciles a Cluster object
+// ClusterReconciler reconciles a Cluster objects
 type ClusterReconciler struct {
 	client.Client
 	Log    logr.Logger
@@ -36,7 +36,7 @@ type ClusterReconciler struct {
 }
 
 // +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters/status,verbs=get;watch;update;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;update
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=create
@@ -45,6 +45,9 @@ type ClusterReconciler struct {
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;create;delete;update;patch;list;watch
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=create;delete;get;list;watch;update;patch
+// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;patch;update
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=create;patch;update
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=create;patch;update
 
 func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()

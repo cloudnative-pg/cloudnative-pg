@@ -42,6 +42,21 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
+	err = r.createServiceAccount(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
+	err = r.createRole(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
+	err = r.createRoleBinding(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -126,6 +141,48 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 	err := r.Create(ctx, &targetPdb)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
 		r.Log.Error(err, "Unable to create PodDisruptionBugdet", "object", targetPdb)
+		return err
+	}
+
+	return nil
+}
+
+// createServiceAccount create the service account for this PostgreSQL cluster
+func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	serviceAccount := specs.CreateServiceAccount(*cluster)
+	utils.SetAsOwnedBy(&serviceAccount.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+
+	err := r.Create(ctx, &serviceAccount)
+	if err != nil && !apierrs.IsAlreadyExists(err) {
+		r.Log.Error(err, "Unable to create ServiceAccount", "object", serviceAccount)
+		return err
+	}
+
+	return nil
+}
+
+// createRole create the role
+func (r *ClusterReconciler) createRole(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	roleBinding := specs.CreateRole(*cluster)
+	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+
+	err := r.Create(ctx, &roleBinding)
+	if err != nil && !apierrs.IsAlreadyExists(err) {
+		r.Log.Error(err, "Unable to create the Role", "object", roleBinding)
+		return err
+	}
+
+	return nil
+}
+
+// createRoleBinding create the role binding
+func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	roleBinding := specs.CreateRoleBinding(*cluster)
+	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+
+	err := r.Create(ctx, &roleBinding)
+	if err != nil && !apierrs.IsAlreadyExists(err) {
+		r.Log.Error(err, "Unable to create the ServiceAccount", "object", roleBinding)
 		return err
 	}
 
