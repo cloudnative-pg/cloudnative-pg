@@ -63,7 +63,7 @@ func CreateClusterReadService(cluster v1alpha1.Cluster) *corev1.Service {
 	}
 }
 
-// CreateClusterReadWriteService create a service insisting on the master pod
+// CreateClusterReadWriteService create a service insisting on the primary pod
 func CreateClusterReadWriteService(cluster v1alpha1.Cluster) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -82,7 +82,7 @@ func CreateClusterReadWriteService(cluster v1alpha1.Cluster) *corev1.Service {
 			},
 			Selector: map[string]string{
 				"postgresql": cluster.Name,
-				"role":       "master",
+				"role":       "primary",
 			},
 		},
 	}

@@ -20,8 +20,8 @@ func getSacrificialPod(podList []corev1.Pod) *corev1.Pod {
 	var lastFoundSerial int
 
 	for idx, pod := range podList {
-		// Avoid parting non ready nodes, non active nodes, or master nodes
-		if !utils.IsPodReady(pod) || !utils.IsPodActive(pod) || specs.IsPodMaster(pod) {
+		// Avoid parting non ready nodes, non active nodes, or primary nodes
+		if !utils.IsPodReady(pod) || !utils.IsPodActive(pod) || specs.IsPodPrimary(pod) {
 			continue
 		}
 
@@ -44,11 +44,10 @@ func getSacrificialPod(podList []corev1.Pod) *corev1.Pod {
 	return &podList[resultIdx]
 }
 
-// getMasterPod get the Pod who is supposed to be master
-// master of this cluster
-func getMasterPod(podList []corev1.Pod) *corev1.Pod {
+// getPrimaryPod get the Pod which is supposed to be the primary of this cluster
+func getPrimaryPod(podList []corev1.Pod) *corev1.Pod {
 	for idx, pod := range podList {
-		if !specs.IsPodMaster(pod) {
+		if !specs.IsPodPrimary(pod) {
 			continue
 		}
 

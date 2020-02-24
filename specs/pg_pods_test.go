@@ -32,7 +32,7 @@ var _ = Describe("Serial ID of a PostgreSQL node", func() {
 			Namespace: clusterNamespace,
 		},
 	}
-	firstPod := CreateMasterPod(cluster, 1)
+	firstPod := CreatePrimaryPod(cluster, 1)
 
 	It("can be extracted from a Pod", func() {
 		result, error := GetNodeSerial(*firstPod)
@@ -55,7 +55,7 @@ var _ = Describe("Serial ID of a PostgreSQL node", func() {
 	})
 })
 
-var _ = Describe("Check if it a master or a replica", func() {
+var _ = Describe("Check if it a primary or a replica", func() {
 	clusterName := "clusterName"
 	clusterNamespace := "default"
 	cluster := v1alpha1.Cluster{
@@ -64,16 +64,16 @@ var _ = Describe("Check if it a master or a replica", func() {
 			Namespace: clusterNamespace,
 		},
 	}
-	masterPod := CreateMasterPod(cluster, 1)
+	primaryPod := CreatePrimaryPod(cluster, 1)
 	replicaPod := JoinReplicaInstance(cluster, 2)
 
-	It("a master is detected as a master", func() {
-		Expect(IsPodMaster(*masterPod)).To(BeTrue())
-		Expect(IsPodStandby(*masterPod)).To(BeFalse())
+	It("a primary is detected as a primary", func() {
+		Expect(IsPodPrimary(*primaryPod)).To(BeTrue())
+		Expect(IsPodStandby(*primaryPod)).To(BeFalse())
 	})
 
 	It("a replica is detected as a replica", func() {
-		Expect(IsPodMaster(*replicaPod)).To(BeFalse())
+		Expect(IsPodPrimary(*replicaPod)).To(BeFalse())
 		Expect(IsPodStandby(*replicaPod)).To(BeTrue())
 	})
 })

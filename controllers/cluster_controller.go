@@ -105,7 +105,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return ctrl.Result{}, err
 		}
 
-		return ctrl.Result{}, r.createMasterInstance(ctx, newNodeSerial, &cluster)
+		return ctrl.Result{}, r.createPrimaryInstance(ctx, newNodeSerial, &cluster)
 	}
 
 	// Find if we have Pods that are not ready

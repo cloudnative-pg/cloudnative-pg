@@ -94,8 +94,12 @@ type ClusterStatus struct {
 	// Total number of ready instances in the cluster
 	ReadyInstances int32 `json:"readyInstances,omitempty"`
 
-	// Current master
-	MasterInstance string `json:"masterInstance,omitempty"`
+	// Current primary instance
+	CurrentPrimary string `json:"currentPrimary,omitempty"`
+
+	// Target primary instance, this if different from the previous one
+	// during a switchover or a failover
+	TargetPrimary string `json:"targetPrimary,omitempty"`
 
 	// ID of the latest generated node (used to avoid node name clashing)
 	LatestGeneratedNode int32 `json:"latestGeneratedNode,omitempty"`

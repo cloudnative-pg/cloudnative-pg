@@ -265,6 +265,9 @@ spec:
         status:
           description: ClusterStatus defines the observed state of Cluster
           properties:
+            currentPrimary:
+              description: Current primary instance
+              type: string
             imageName:
               description: Name of the image used
               type: string
@@ -277,13 +280,14 @@ spec:
                 clashing)
               format: int32
               type: integer
-            masterInstance:
-              description: Current master
-              type: string
             readyInstances:
               description: Total number of ready instances in the cluster
               format: int32
               type: integer
+            targetPrimary:
+              description: Target primary instance, this if different from the previous
+                one during a switchover or a failover
+              type: string
           type: object
       type: object
   version: v1alpha1

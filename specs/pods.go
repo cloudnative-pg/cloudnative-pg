@@ -23,15 +23,15 @@ const (
 	ClusterSerialAnnotationName = "postgresql.k8s.2ndq.io/node_serial"
 )
 
-// CreateMasterPod create a new mater instance in a Pod
-func CreateMasterPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
+// CreatePrimaryPod create a new mater instance in a Pod
+func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				"postgresql": cluster.Name,
-				"role":       "master",
+				"role":       "primary",
 			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(int(nodeSerial)),

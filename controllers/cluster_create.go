@@ -133,7 +133,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	return nil
 }
 
-// createOrUpdatePodDisruptionBudget ensure that we have a PDB requiring the majority of masters to be available
+// createOrUpdatePodDisruptionBudget ensure that we have a PDB requiring to remove one node at a time
 func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	targetPdb := specs.CreatePodDisruptionBudget(*cluster)
 	utils.SetAsOwnedBy(&targetPdb.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
@@ -199,7 +199,7 @@ func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *v1a
 	return cluster.Status.LatestGeneratedNode, nil
 }
 
-func (r *ClusterReconciler) createMasterInstance(
+func (r *ClusterReconciler) createPrimaryInstance(
 	ctx context.Context,
 	nodeSerial int32,
 	cluster *v1alpha1.Cluster,
@@ -208,9 +208,9 @@ func (r *ClusterReconciler) createMasterInstance(
 	var pod *corev1.Pod
 	var err error
 
-	r.Log.Info("Creating new PostgreSQL master group", "namespace", cluster.Namespace, "name", cluster.Name)
+	r.Log.Info("Creating new PostgreSQL primary instance", "namespace", cluster.Namespace, "name", cluster.Name)
 
-	pod = specs.CreateMasterPod(*cluster, nodeSerial)
+	pod = specs.CreatePrimaryPod(*cluster, nodeSerial)
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
 		r.Log.Error(err, "Unable to set the owner reference for instance")
 		return err

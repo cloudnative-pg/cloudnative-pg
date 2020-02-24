@@ -29,17 +29,17 @@ func GetNodeSerial(pod corev1.Pod) (int, error) {
 	return result, nil
 }
 
-// IsPodMaster check if a certain pod belongs to a master
-func IsPodMaster(pod corev1.Pod) bool {
+// IsPodPrimary check if a certain pod belongs to a primary
+func IsPodPrimary(pod corev1.Pod) bool {
 	role, hasRole := pod.ObjectMeta.Labels["role"]
 	if !hasRole {
 		return false
 	}
 
-	return role == "master"
+	return role == "primary"
 }
 
 // IsPodStandby check if a certain pod belongs to a standby
 func IsPodStandby(pod corev1.Pod) bool {
-	return !IsPodMaster(pod)
+	return !IsPodPrimary(pod)
 }

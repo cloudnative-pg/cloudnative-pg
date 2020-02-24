@@ -16,7 +16,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Master detection", func() {
+var _ = Describe("Primary instance detection", func() {
 	car1 := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "car-1",
@@ -25,7 +25,7 @@ var _ = Describe("Master detection", func() {
 				specs.ClusterSerialAnnotationName: "1",
 			},
 			Labels: map[string]string{
-				"role": "master",
+				"role": "primary",
 			},
 		},
 		Status: corev1.PodStatus{
@@ -107,33 +107,33 @@ var _ = Describe("Master detection", func() {
 		},
 	}
 
-	It("detects no master if the list of Pods is empty", func() {
+	It("detects no primary if the list of Pods is empty", func() {
 		var podList []corev1.Pod
-		Expect(getMasterPod(podList)).To(BeNil())
+		Expect(getPrimaryPod(podList)).To(BeNil())
 	})
 
-	It("detects no master if we have not a ready Pod", func() {
+	It("detects no primary if we have not a ready Pod", func() {
 		podList := []corev1.Pod{foo, bar}
-		Expect(getMasterPod(podList)).To(BeNil())
+		Expect(getPrimaryPod(podList)).To(BeNil())
 	})
 
-	It("detects the master if it is the first available", func() {
+	It("detects the primary if it is the first available", func() {
 		podList := []corev1.Pod{foo, bar, car1, car2}
-		result := getMasterPod(podList)
+		result := getPrimaryPod(podList)
 		Expect(result).ToNot(BeNil())
 		Expect(result.Name).To(Equal("car-1"))
 	})
 
-	It("detects the lead master if it is not the first one", func() {
+	It("detects the primary if it is not the first one", func() {
 		podList := []corev1.Pod{car2, foo, bar, car1}
-		result := getMasterPod(podList)
+		result := getPrimaryPod(podList)
 		Expect(result).ToNot(BeNil())
 		Expect(result.Name).To(Equal("car-1"))
 	})
 
 	It("we don't own the container", func() {
 		podList := []corev1.Pod{foobar}
-		Expect(getMasterPod(podList)).To(BeNil())
+		Expect(getPrimaryPod(podList)).To(BeNil())
 	})
 })
 

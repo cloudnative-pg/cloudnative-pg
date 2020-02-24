@@ -15,7 +15,7 @@ import (
 )
 
 // CreatePodDisruptionBudget create a pud disruption budget telling
-// k8s to avoid removing more than one node
+// k8s to avoid removing more than one node at a time
 func CreatePodDisruptionBudget(cluster v1alpha1.Cluster) policyv1beta1.PodDisruptionBudget {
 	one := intstr.FromInt(1)
 
