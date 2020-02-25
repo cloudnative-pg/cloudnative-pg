@@ -82,7 +82,7 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 					},
 				},
 			},
-			Containers:         createPostgresContainers(cluster),
+			Containers:         createPostgresContainers(cluster, podName),
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
@@ -164,7 +164,7 @@ func createVolumeSource(cluster v1alpha1.Cluster, podName string) corev1.VolumeS
 
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every intance
-func createPostgresContainers(cluster v1alpha1.Cluster) []corev1.Container {
+func createPostgresContainers(cluster v1alpha1.Cluster, podName string) []corev1.Container {
 	return []corev1.Container{
 		{
 			Name:  "postgres",
@@ -173,6 +173,18 @@ func createPostgresContainers(cluster v1alpha1.Cluster) []corev1.Container {
 				{
 					Name:  "PGDATA",
 					Value: "/var/lib/postgresql/data/pgdata",
+				},
+				{
+					Name:  "POD_NAME",
+					Value: podName,
+				},
+				{
+					Name:  "NAMESPACE",
+					Value: cluster.Namespace,
+				},
+				{
+					Name:  "CLUSTER_NAME",
+					Value: cluster.Name,
 				},
 			},
 			VolumeMounts: []corev1.VolumeMount{
@@ -333,7 +345,7 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 					},
 				},
 			},
-			Containers:         createPostgresContainers(cluster),
+			Containers:         createPostgresContainers(cluster, podName),
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),

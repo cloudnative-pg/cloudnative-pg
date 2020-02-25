@@ -216,6 +216,11 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return err
 	}
 
+	if err = r.setPrimaryInstance(ctx, cluster, pod.Name); err != nil {
+		r.Log.Error(err, "Unable to set the primary instance name")
+		return err
+	}
+
 	if err = r.Create(ctx, pod); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.

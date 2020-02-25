@@ -56,3 +56,16 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	return nil
 }
+
+func (r *ClusterReconciler) setPrimaryInstance(
+	ctx context.Context,
+	cluster *v1alpha1.Cluster,
+	podName string) error {
+
+	cluster.Status.TargetPrimary = podName
+	if err := r.Status().Update(ctx, cluster); err != nil {
+		return err
+	}
+
+	return nil
+}
