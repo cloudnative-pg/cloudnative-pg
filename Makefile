@@ -3,7 +3,10 @@
 # Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 
 # Image URL to use all building/pushing image targets
-CONTROLLER_IMG ?= quay.io/2ndquadrant/cloud-native-postgresql-operator
+CONTROLLER_IMG ?= quay.io/2ndquadrant/cloud-native-postgresql-operator:latest
+BUILD_IMAGE ?= true
+export CONTROLLER_IMG BUILD_IMAGE
+
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
@@ -18,7 +21,11 @@ all: manager
 
 # Run tests
 test: generate fmt vet manifests
-	go test ./... -coverprofile cover.out
+	go test $$(go list ./... | grep -v e2e) -coverprofile cover.out
+
+# Run e2e tests
+e2e-test:
+	hack/e2e/run-e2e.sh
 
 # Build manager binary
 manager: generate fmt vet

@@ -1,0 +1,23 @@
+# This file is part of Cloud Native PostgreSQL.
+#
+# Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  apiServerAddress: "0.0.0.0"
+
+# add to the apiServer certSANs the name of the docker (dind) service in order to be able to reach the cluster through it
+kubeadmConfigPatchesJSON6902:
+  - group: kubeadm.k8s.io
+    version: v1beta2
+    kind: ClusterConfiguration
+    patch: |
+      - op: add
+        path: /apiServer/certSANs/-
+        value: docker
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+- role: worker

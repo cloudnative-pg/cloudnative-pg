@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/go-logr/logr v0.1.0
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
 	github.com/sethvargo/go-password v0.1.3
