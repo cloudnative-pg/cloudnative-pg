@@ -16,8 +16,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
-	"github.com/2ndquadrant/cloud-native-postgresql/specs"
-	"github.com/2ndquadrant/cloud-native-postgresql/utils"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/specs"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 )
 
 // createPostgresClusterObjects ensure that we have the required global objects

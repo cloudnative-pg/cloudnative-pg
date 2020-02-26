@@ -14,7 +14,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
-	"github.com/2ndquadrant/cloud-native-postgresql/utils"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

@@ -9,8 +9,8 @@ package controllers
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/specs"
-	"github.com/2ndquadrant/cloud-native-postgresql/utils"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/specs"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 )
 
 // getSacrificialPod get the Pod who is supposed to be deleted

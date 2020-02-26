@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
-	"github.com/2ndquadrant/cloud-native-postgresql/utils"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 )
 
 func (r *ClusterReconciler) getManagedPods(
@@ -60,8 +60,8 @@ func (r *ClusterReconciler) updateResourceStatus(
 func (r *ClusterReconciler) setPrimaryInstance(
 	ctx context.Context,
 	cluster *v1alpha1.Cluster,
-	podName string) error {
-
+	podName string,
+) error {
 	cluster.Status.TargetPrimary = podName
 	if err := r.Status().Update(ctx, cluster); err != nil {
 		return err
