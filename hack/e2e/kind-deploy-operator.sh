@@ -26,6 +26,11 @@ build_and_load_operator() {
     kind load -v 1 docker-image --name "${KIND_CLUSTER_NAME}" "${OPERATOR_IMG}"
 }
 
+build_and_load_postgres() {
+    docker build -t "${POSTGRES_IMG}" -f "${ROOT_DIR}/Dockerfile-postgresql"  "${ROOT_DIR}"
+    kind load -v 1 docker-image --name "${KIND_CLUSTER_NAME}" "${POSTGRES_IMG}"
+}
+
 upload_image_to_kind() {
     SRC_IMG=$1
     DST_IMG=${2:-${SRC_IMG}}
@@ -50,10 +55,11 @@ main() {
     if [ "${BUILD_IMAGE}" != false ]
     then
         build_and_load_operator
+        build_and_load_postgres
     else
         upload_image_to_kind "${CONTROLLER_IMG}" "${OPERATOR_IMG}"
+        upload_image_to_kind "${POSTGRES_IMG}"
     fi
-    upload_image_to_kind "${POSTGRES_IMG}"
     deploy_operator
 }
 

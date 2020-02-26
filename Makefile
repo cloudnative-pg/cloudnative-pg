@@ -17,7 +17,7 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-all: manager
+all: build
 
 # Run tests
 test: generate fmt vet manifests
@@ -27,9 +27,10 @@ test: generate fmt vet manifests
 e2e-test:
 	hack/e2e/run-e2e.sh
 
-# Build manager binary
-manager: generate fmt vet
+# Build binaries
+build: generate fmt vet
 	go build -o bin/manager ./cmd/manager
+	go build -o bin/pgk ./cmd/pgk
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
