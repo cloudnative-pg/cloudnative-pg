@@ -7,19 +7,12 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package utils
 
 import (
-	"testing"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
-
-func TestPodConditions(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Pod conditions test suite")
-}
 
 var _ = Describe("Pod conditions test suite", func() {
 	Describe("Must check for Running PODs", func() {

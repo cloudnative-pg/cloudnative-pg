@@ -88,7 +88,7 @@ type ClusterStatus struct {
 	// Name of the image used
 	ImageName string `json:"imageName,omitempty"`
 
-	// Total number of intances in the cluster
+	// Total number of instances in the cluster
 	Instances int32 `json:"instances,omitempty"`
 
 	// Total number of ready instances in the cluster
@@ -97,7 +97,7 @@ type ClusterStatus struct {
 	// Current primary instance
 	CurrentPrimary string `json:"currentPrimary,omitempty"`
 
-	// Target primary instance, this if different from the previous one
+	// Target primary instance, this is different from the previous one
 	// during a switchover or a failover
 	TargetPrimary string `json:"targetPrimary,omitempty"`
 

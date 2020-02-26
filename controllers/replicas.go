@@ -7,11 +7,127 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package controllers
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"context"
+	"encoding/json"
+	"sort"
+	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/postgres"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/specs"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 )
+
+// updateTargetPrimaryFromPods set the name of the target master from the Pods status if needed
+func (r *ClusterReconciler) updateTargetPrimaryFromPods(
+	ctx context.Context,
+	cluster *v1alpha1.Cluster,
+	pods corev1.PodList) error {
+	// Only work on Pods which can still become active in the future
+	filteredPods := utils.FilterActivePods(pods.Items)
+	if len(filteredPods) == 0 {
+		// No instances to control
+		return nil
+	}
+
+	status, err := r.extractIntancesStatus(ctx, filteredPods)
+	if err != nil {
+		return err
+	}
+
+	if len(status.Items) == 0 {
+		// Still no ready instances
+		return nil
+	}
+
+	sort.Sort(&status)
+
+	// Set targetMaster to do a failover if needed
+	if !status.Items[0].IsPrimary {
+		// No primary, no party. Failover please!
+		return r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
+	}
+
+	return nil
+}
+
+// Make sure that only the currentMaster has the label forward write traffic to him
+func (r *ClusterReconciler) updateLabelsOnPods(
+	ctx context.Context,
+	cluster *v1alpha1.Cluster,
+	pods corev1.PodList) error {
+	// No current primary, no work to do
+	if cluster.Status.CurrentPrimary == "" {
+		return nil
+	}
+
+	for idx := range pods.Items {
+		pod := &pods.Items[idx]
+
+		if pod.Name == cluster.Status.CurrentPrimary && !specs.IsPodPrimary(pods.Items[idx]) {
+			patch := client.MergeFrom(pod.DeepCopy())
+			pod.Labels[specs.ClusterRoleLabelName] = specs.ClusterRoleLabelPrimary
+			if err := r.Patch(ctx, pod, patch); err != nil {
+				return err
+			}
+		}
+
+		if pod.Name != cluster.Status.CurrentPrimary && specs.IsPodPrimary(pods.Items[idx]) {
+			patch := client.MergeFrom(pod.DeepCopy())
+			delete(pod.Labels, specs.ClusterRoleLabelName)
+			if err := r.Patch(ctx, pod, patch); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) getReplicaStatusFromPod(
+	ctx context.Context,
+	pod corev1.Pod) (postgres.PostgresqlStatus, error) {
+	var result postgres.PostgresqlStatus
+
+	twoSeconds := time.Second * 2
+	stdout, _, err := utils.ExecCommand(ctx, pod, "postgres", &twoSeconds, "/pgk", "status")
+	if err != nil {
+		return result, err
+	}
+
+	err = json.Unmarshal([]byte(stdout), &result)
+	if err != nil {
+		return result, err
+	}
+
+	result.PodName = pod.Name
+	return result, nil
+}
+
+func (r *ClusterReconciler) extractIntancesStatus(
+	ctx context.Context,
+	filteredPods []corev1.Pod) (postgres.PostgresqlStatusList, error) {
+	var result postgres.PostgresqlStatusList
+
+	for idx := range filteredPods {
+		if utils.IsPodReady(filteredPods[idx]) {
+			instanceStatus, err := r.getReplicaStatusFromPod(ctx, filteredPods[idx])
+			if err != nil {
+				r.Log.Error(err, "Error while extracting instance status",
+					"name", filteredPods[idx].Name,
+					"namespace", filteredPods[idx].Namespace)
+				return result, err
+			}
+
+			result.Items = append(result.Items, instanceStatus)
+		}
+	}
+
+	return result, nil
+}
 
 // getSacrificialPod get the Pod who is supposed to be deleted
 // when the cluster is scaled down

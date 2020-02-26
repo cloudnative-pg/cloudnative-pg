@@ -21,6 +21,12 @@ const (
 	// ClusterSerialAnnotationName is the name of the annotation containing the
 	// serial number of the node
 	ClusterSerialAnnotationName = "postgresql.k8s.2ndq.io/node_serial"
+
+	// This label is applied to Pods to mark primary ones
+	ClusterRoleLabelName = "role"
+
+	// This value is written in labels to represent primary servers
+	ClusterRoleLabelPrimary = "primary"
 )
 
 // CreatePrimaryPod create a new mater instance in a Pod
@@ -30,8 +36,8 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				"postgresql": cluster.Name,
-				"role":       "primary",
+				"postgresql":         cluster.Name,
+				ClusterRoleLabelName: ClusterRoleLabelPrimary,
 			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(int(nodeSerial)),

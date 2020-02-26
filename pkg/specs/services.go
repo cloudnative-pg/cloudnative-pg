@@ -81,8 +81,8 @@ func CreateClusterReadWriteService(cluster v1alpha1.Cluster) *corev1.Service {
 				},
 			},
 			Selector: map[string]string{
-				"postgresql": cluster.Name,
-				"role":       "primary",
+				"postgresql":         cluster.Name,
+				ClusterRoleLabelName: ClusterRoleLabelPrimary,
 			},
 		},
 	}

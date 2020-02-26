@@ -41,6 +41,6 @@ var _ = Describe("Services specification", func() {
 		Expect(service.Name).To(Equal("clustername-rw"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector["postgresql"]).To(Equal("clustername"))
-		Expect(service.Spec.Selector["role"]).To(Equal("primary"))
+		Expect(service.Spec.Selector[ClusterRoleLabelName]).To(Equal(ClusterRoleLabelPrimary))
 	})
 })

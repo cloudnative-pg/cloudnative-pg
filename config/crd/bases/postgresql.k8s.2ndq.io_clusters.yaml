@@ -272,7 +272,7 @@ spec:
               description: Name of the image used
               type: string
             instances:
-              description: Total number of intances in the cluster
+              description: Total number of instances in the cluster
               format: int32
               type: integer
             latestGeneratedNode:
@@ -285,7 +285,7 @@ spec:
               format: int32
               type: integer
             targetPrimary:
-              description: Target primary instance, this if different from the previous
+              description: Target primary instance, this is different from the previous
                 one during a switchover or a failover
               type: string
           type: object

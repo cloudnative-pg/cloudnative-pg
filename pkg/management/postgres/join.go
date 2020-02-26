@@ -13,7 +13,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/log"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/log"
 )
 
 // JoinInfo contains the information needed to bootstrap a new

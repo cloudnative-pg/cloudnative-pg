@@ -11,7 +11,9 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -21,7 +23,12 @@ import (
 )
 
 // ExecCommand executes arbitrary command inside the pod, and returns his result
-func ExecCommand(pod corev1.Pod, containerName string, command ...string) (string, string, error) {
+func ExecCommand(
+	ctx context.Context,
+	pod corev1.Pod,
+	containerName string,
+	timeout *time.Duration,
+	command ...string) (string, string, error) {
 	config := ctrl.GetConfigOrDie()
 
 	// creates the clientset
@@ -47,7 +54,13 @@ func ExecCommand(pod corev1.Pod, containerName string, command ...string) (strin
 		Resource("pods").
 		Name(pod.Name).
 		Namespace(pod.Namespace).
-		SubResource("exec")
+		SubResource("exec").
+		Context(ctx)
+
+	if timeout != nil {
+		req.Timeout(*timeout)
+	}
+
 	req.VersionedParams(&corev1.PodExecOptions{
 		Container: pod.Spec.Containers[targetContainer].Name,
 		Command:   command,

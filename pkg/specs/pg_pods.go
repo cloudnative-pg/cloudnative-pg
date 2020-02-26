@@ -31,12 +31,12 @@ func GetNodeSerial(pod corev1.Pod) (int, error) {
 
 // IsPodPrimary check if a certain pod belongs to a primary
 func IsPodPrimary(pod corev1.Pod) bool {
-	role, hasRole := pod.ObjectMeta.Labels["role"]
+	role, hasRole := pod.ObjectMeta.Labels[ClusterRoleLabelName]
 	if !hasRole {
 		return false
 	}
 
-	return role == "primary"
+	return role == ClusterRoleLabelPrimary
 }
 
 // IsPodStandby check if a certain pod belongs to a standby

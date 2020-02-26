@@ -14,8 +14,8 @@ import (
 	"os"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/fileutils"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/log"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/postgres"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/log"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/postgres"
 )
 
 var (

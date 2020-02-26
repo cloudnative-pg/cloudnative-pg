@@ -25,7 +25,7 @@ var _ = Describe("Primary instance detection", func() {
 				specs.ClusterSerialAnnotationName: "1",
 			},
 			Labels: map[string]string{
-				"role": "primary",
+				specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
 			},
 		},
 		Status: corev1.PodStatus{

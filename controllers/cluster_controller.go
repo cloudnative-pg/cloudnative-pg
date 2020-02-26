@@ -85,7 +85,17 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Update the status section of this Cluster resource
-	if err := r.updateResourceStatus(ctx, &cluster, childPods); err != nil {
+	if err = r.updateResourceStatus(ctx, &cluster, childPods); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Update the target primary name from the Pods status
+	if err = r.updateTargetPrimaryFromPods(ctx, &cluster, childPods); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Update the labels for the -rw service to work correctly
+	if err = r.updateLabelsOnPods(ctx, &cluster, childPods); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -117,14 +127,17 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	// TODO failing nodes?
 
-	// Are there missing nodes? Let's create one.
-	if cluster.Status.Instances < cluster.Spec.Instances {
-		newNodeSerial, err := r.generateNodeSerial(ctx, &cluster)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+	// Are there missing nodes? Let's create one,
+	// but only if no failover/switchover is running
+	if cluster.Status.CurrentPrimary == cluster.Status.TargetPrimary {
+		if cluster.Status.Instances < cluster.Spec.Instances {
+			newNodeSerial, err := r.generateNodeSerial(ctx, &cluster)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
 
-		return r.joinReplicaInstance(ctx, newNodeSerial, &cluster)
+			return r.joinReplicaInstance(ctx, newNodeSerial, &cluster)
+		}
 	}
 
 	// Are there nodes to be removed? Remove one of them

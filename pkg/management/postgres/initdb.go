@@ -16,7 +16,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/fileutils"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/log"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/log"
 )
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL:O

@@ -17,8 +17,8 @@ import (
 
 	apiv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/log"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/postgres/webserver"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/log"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/postgres/webserver"
 )
 
 var (

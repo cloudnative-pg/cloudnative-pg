@@ -14,7 +14,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/postgres"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/postgres"
 )
 
 var instance *postgres.Instance
