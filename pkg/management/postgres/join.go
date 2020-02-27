@@ -19,6 +19,9 @@ import (
 // JoinInfo contains the information needed to bootstrap a new
 // PostgreSQL replica
 type JoinInfo struct {
+	// The generated node name
+	PodName string
+
 	// Where the new instance must be written
 	PgData string
 

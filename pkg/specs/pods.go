@@ -328,6 +328,10 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 							Name:  "PGDATA",
 							Value: "/var/lib/postgresql/data/pgdata",
 						},
+						{
+							Name:  "POD_NAME",
+							Value: podName,
+						},
 					},
 					Command: []string{
 						"/pgk",

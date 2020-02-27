@@ -21,7 +21,7 @@ import (
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 )
 
-// updateTargetPrimaryFromPods set the name of the target master from the Pods status if needed
+// updateTargetPrimaryFromPods set the name of the target primary from the Pods status if needed
 func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	ctx context.Context,
 	cluster *v1alpha1.Cluster,
@@ -45,7 +45,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 
 	sort.Sort(&status)
 
-	// Set targetMaster to do a failover if needed
+	// Set targetPrimary to do a failover if needed
 	if !status.Items[0].IsPrimary {
 		// No primary, no party. Failover please!
 		return r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
@@ -54,7 +54,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	return nil
 }
 
-// Make sure that only the currentMaster has the label forward write traffic to him
+// Make sure that only the currentPrimary has the label forward write traffic to him
 func (r *ClusterReconciler) updateLabelsOnPods(
 	ctx context.Context,
 	cluster *v1alpha1.Cluster,

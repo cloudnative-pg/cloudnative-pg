@@ -23,6 +23,7 @@ spec:
       - max_parallel_workers = 20
       - max_replication_slots = 20
       - hot_standby = true
+      - wal_keep_segments = 8
 
     # Example of host based authentication directives
     pg_hba:

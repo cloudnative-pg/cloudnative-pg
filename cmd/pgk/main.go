@@ -53,6 +53,8 @@ func main() {
 	joinCommand := flag.NewFlagSet("join", flag.ExitOnError)
 	joinCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
 	joinCommand.StringVar(&parentNode, "parent-node", "", "The origin node")
+	joinCommand.StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
+		"be checked against the cluster stater")
 
 	runCommand := flag.NewFlagSet("run", flag.ExitOnError)
 	runCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
@@ -97,6 +99,7 @@ func main() {
 		info := postgres.JoinInfo{
 			PgData:     pgData,
 			ParentNode: parentNode,
+			PodName:    podName,
 		}
 		joinSubCommand(info)
 	case "run":
@@ -122,7 +125,7 @@ func initSubCommand(info postgres.InitInfo) {
 	status, err := fileutils.FileExists(info.PgData)
 	if err != nil {
 		log.Log.Error(err, "Error while checking for an existent PGData")
-		return
+		os.Exit(1)
 	}
 	if status {
 		log.Log.Info("PGData already exists, no need to init")
@@ -133,13 +136,13 @@ func initSubCommand(info postgres.InitInfo) {
 	if err != nil {
 		log.Log.Error(err, "Configuration not valid",
 			"info", info)
-		return
+		os.Exit(1)
 	}
 
 	err = info.Bootstrap()
 	if err != nil {
 		log.Log.Error(err, "Error while bootstrapping data directory")
-		return
+		os.Exit(1)
 	}
 }
 
@@ -147,7 +150,7 @@ func joinSubCommand(info postgres.JoinInfo) {
 	status, err := fileutils.FileExists(info.PgData)
 	if err != nil {
 		log.Log.Error(err, "Error while checking for an existent PGData")
-		return
+		os.Exit(1)
 	}
 	if status {
 		log.Log.Info("PGData already exists, no need to init")
@@ -157,7 +160,7 @@ func joinSubCommand(info postgres.JoinInfo) {
 	err = info.Join()
 	if err != nil {
 		log.Log.Error(err, "Error joining node")
-		return
+		os.Exit(1)
 	}
 }
 

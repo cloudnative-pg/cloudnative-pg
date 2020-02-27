@@ -1,7 +1,0 @@
-apiVersion: postgresql.k8s.2ndq.io/v1alpha1
-kind: Cluster
-metadata:
-  name: cluster-sample
-spec:
-  # Add fields here
-  foo: bar
