@@ -27,6 +27,9 @@ const (
 
 	// This value is written in labels to represent primary servers
 	ClusterRoleLabelPrimary = "primary"
+
+	// This label is applied to Pods to link them to the owning cluster
+	ClusterLabelName = "postgresql"
 )
 
 // CreatePrimaryPod create a new mater instance in a Pod
@@ -36,7 +39,7 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				"postgresql":         cluster.Name,
+				ClusterLabelName:     cluster.Name,
 				ClusterRoleLabelName: ClusterRoleLabelPrimary,
 			},
 			Annotations: map[string]string{
@@ -269,7 +272,7 @@ func CreateAffinitySection(clusterName string, config v1alpha1.AffinityConfigura
 						LabelSelector: &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{
 								{
-									Key:      "postgresql",
+									Key:      ClusterLabelName,
 									Operator: metav1.LabelSelectorOpIn,
 									Values: []string{
 										clusterName,
@@ -305,7 +308,7 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				"postgresql": cluster.Name,
+				ClusterLabelName: cluster.Name,
 			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(int(nodeSerial)),

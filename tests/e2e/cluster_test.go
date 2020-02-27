@@ -8,12 +8,15 @@ package e2e
 
 import (
 	"fmt"
+	"sort"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/specs"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -191,6 +194,151 @@ var _ = Describe("Cluster", func() {
 					}
 					return cr.Status.ReadyInstances
 				}, timeout).Should(BeEquivalentTo(3))
+			})
+		})
+	})
+
+	Context("Failover", func() {
+		const namespace = "failover-e2e"
+		const sampleFile = samplesDir + "/cluster-emptydir.yaml"
+		const clusterName = "postgresql-emptydir"
+		var pods []string
+		var currentPrimary, targetPrimary, pausedReplica string
+		BeforeEach(func() {
+			if err := createNamespace(ctx, namespace); err != nil {
+				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
+			}
+		})
+		AfterEach(func() {
+			if err := deleteNamespace(ctx, namespace); err != nil {
+				Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
+			}
+		})
+		It("react to master failure", func() {
+			By(fmt.Sprintf("having a %v namespace", namespace), func() {
+				// Creating a namespace should be quick
+				timeout := 20
+				cr := &corev1.Namespace{}
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      namespace,
+				}
+
+				Eventually(func() string {
+					if err := client.Get(ctx, namespacedName, cr); err != nil {
+						Fail("Unable to get namespace " + namespace)
+					}
+					return cr.GetName()
+				}, timeout).Should(BeEquivalentTo(namespace))
+			})
+			By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
+				_, _, err := run("kubectl create -n " + namespace + " -f " + sampleFile)
+				Expect(err).To(BeNil())
+			})
+			By("having a Cluster with 3 masters ready", func() {
+				// Setting up a cluster with three pods is slow, usually 200-300s
+				timeout := 400
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				cr := &clusterv1alpha1.Cluster{}
+
+				Eventually(func() int32 {
+					if err := client.Get(ctx, namespacedName, cr); err != nil {
+						Fail("Unable to get Cluster " + clusterName)
+					}
+					return cr.Status.ReadyInstances
+				}, timeout).Should(BeEquivalentTo(3))
+			})
+			By("checking that CurrentPrimary and TargetPrimary are the same", func() {
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				cr := &clusterv1alpha1.Cluster{}
+				if err := client.Get(ctx, namespacedName, cr); err != nil {
+					Fail("Unable to get Cluster " + clusterName)
+				}
+				Expect(cr.Status.CurrentPrimary).To(BeEquivalentTo(cr.Status.TargetPrimary))
+				currentPrimary = cr.Status.CurrentPrimary
+
+				// Gather pod names
+				var podList corev1.PodList
+				if err := client.List(ctx, &podList,
+					ctrlclient.InNamespace(namespace),
+					ctrlclient.MatchingLabels{specs.ClusterLabelName: clusterName},
+				); err != nil {
+					Fail("Unable to list Pods in Cluster " + clusterName)
+				}
+				Expect(len(podList.Items)).To(BeEquivalentTo(3))
+				for _, p := range podList.Items {
+					pods = append(pods, p.Name)
+				}
+				sort.Strings(pods)
+				Expect(pods[0]).To(BeEquivalentTo(currentPrimary))
+				pausedReplica = pods[1]
+				targetPrimary = pods[2]
+			})
+			By("pausing the replication on the 2nd node of the Cluster", func() {
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      pausedReplica,
+				}
+				pausedPod := corev1.Pod{}
+				if err := client.Get(ctx, namespacedName, &pausedPod); err != nil {
+					Fail("Unable to get Pod " + pausedReplica)
+				}
+				twoSeconds := time.Second * 2
+				_, _, err := utils.ExecCommand(ctx, pausedPod, "postgres", &twoSeconds,
+					"psql", "-c", "SELECT pg_wal_replay_pause()")
+				Expect(err).To(BeNil())
+			})
+			By("generating some WAL traffic in the Cluster", func() {
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      currentPrimary,
+				}
+				primaryPod := corev1.Pod{}
+				if err := client.Get(ctx, namespacedName, &primaryPod); err != nil {
+					Fail("Unable to get Pod " + pausedReplica)
+				}
+				twoSeconds := time.Second * 2
+				_, _, err := utils.ExecCommand(ctx, primaryPod, "postgres", &twoSeconds,
+					"psql", "-c", "CHECKPOINT; SELECT pg_switch_wal()")
+				Expect(err).To(BeNil())
+			})
+			By("deleting the CurrentPrimary node to trigger a failover", func() {
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				// Delete the primary
+				err := deletePod(ctx, namespace, currentPrimary)
+				Expect(err).To(BeNil())
+				timeout := 30
+				cr := &clusterv1alpha1.Cluster{}
+				Eventually(func() string {
+					if err := client.Get(ctx, namespacedName, cr); err != nil {
+						Fail("Unable to get Cluster " + clusterName)
+					}
+					return cr.Status.TargetPrimary
+				}, timeout).ShouldNot(BeEquivalentTo(currentPrimary))
+				Expect(cr.Status.TargetPrimary).To(BeEquivalentTo(targetPrimary))
+			})
+			By("waiting that the TargetPrimary become also CurrentPrimary", func() {
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				timeout := 30
+				cr := &clusterv1alpha1.Cluster{}
+				Eventually(func() string {
+					if err := client.Get(ctx, namespacedName, cr); err != nil {
+						Fail("Unable to get Cluster " + clusterName)
+					}
+					return cr.Status.CurrentPrimary
+				}, timeout).Should(BeEquivalentTo(targetPrimary))
 			})
 		})
 	})

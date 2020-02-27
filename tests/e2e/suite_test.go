@@ -75,6 +75,20 @@ func deleteNamespace(ctx context.Context, name string) error {
 	return client.Delete(ctx, u)
 }
 
+// deletePod deletes a pod if existent
+func deletePod(ctx context.Context, namespace string, name string) error {
+	u := &unstructured.Unstructured{}
+	u.SetName(name)
+	u.SetNamespace(namespace)
+	u.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "Pod",
+	})
+
+	return client.Delete(ctx, u)
+}
+
 func TestE2ESuite(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Cloud Native PostgreSQL Operator E2E")
