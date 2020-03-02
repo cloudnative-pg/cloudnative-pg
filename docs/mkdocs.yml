@@ -18,3 +18,10 @@ markdown_extensions:
 
 nav:
   - Cloud Native PostgreSQL: 'index.md'
+  - Before you start: 'before_you_start.md'
+  - Architecture: 'architecture.md'
+  - Quickstart: 'quickstart.md'
+  - Custom Resource Definitions: 'crd.md'
+  - Configuration samples: 'samples.md'
+  - End-to-end tests: 'e2e.md'
+  - Credits and license: 'credits.md'
