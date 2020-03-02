@@ -3,6 +3,7 @@ This file is part of Cloud Native PostgreSQL.
 
 Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 */
+
 package main
 
 import (
@@ -40,6 +41,19 @@ func runSubCommand() {
 	startWebServer()
 	startReconciler()
 	registerSignalHandler()
+
+	// Print the content of PostgreSQL control data, for debugging and tracing
+	pgControlData := exec.Command("pg_controldata")
+	pgControlData.Env = os.Environ()
+	pgControlData.Env = append(pgControlData.Env, "PGDATA="+instance.PgData)
+	pgControlData.Stdout = os.Stdout
+	pgControlData.Stderr = os.Stderr
+	err = pgControlData.Run()
+
+	if err != nil {
+		log.Log.Error(err, "Error printing the control information of this PostgreSQL instance")
+		return
+	}
 
 	postgresCommand, err = instance.Run()
 	if err != nil {

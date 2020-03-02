@@ -42,6 +42,9 @@ type InitInfo struct {
 
 	// The configuration to append to the one PostgreSQL already produces
 	PostgreSQLConfigFile string
+
+	// The parent node, used to fill primary_conninfo
+	ParentNode string
 }
 
 // VerifyConfiguration verify if the passed configuration is OK and returns an error otherwise
@@ -184,6 +187,14 @@ func (info InitInfo) ConfigureApplicationEnvironment(db *sql.DB) error {
 	return nil
 }
 
+// ConfigureReplica set the `primary_conninfo` field in the PostgreSQL system
+func (info InitInfo) ConfigureReplica(db *sql.DB) error {
+	primaryConnInfo := fmt.Sprintf("host=%v dbname=%v", info.ParentNode, "postgres")
+
+	_, err := db.Exec(fmt.Sprintf("ALTER SYSTEM SET primary_conninfo TO %v", pq.QuoteLiteral(primaryConnInfo)))
+	return err
+}
+
 // Bootstrap create and configure this new PostgreSQL instance
 func (info InitInfo) Bootstrap() error {
 	err := info.CreateDataDirectory()
@@ -198,6 +209,12 @@ func (info InitInfo) Bootstrap() error {
 			return nil
 		}
 
-		return info.ConfigureApplicationEnvironment(db)
+		err = info.ConfigureApplicationEnvironment(db)
+		if err != nil {
+			return nil
+		}
+
+		err = info.ConfigureReplica(db)
+		return err
 	})
 }

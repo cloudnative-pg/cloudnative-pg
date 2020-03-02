@@ -71,6 +71,7 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 						"-app-pw-file", "/etc/app-secret/password",
 						"-hba-rules-file", "/etc/configuration/postgresHBA",
 						"-postgresql-config-file", "/etc/configuration/postgresConfiguration",
+						"-parent-node", cluster.GetServiceReadWriteName(),
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{

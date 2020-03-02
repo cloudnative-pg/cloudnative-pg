@@ -56,3 +56,41 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 
 	return &result, nil
 }
+
+// IsWALReceiverActive check if the WAL receiver process is active by looking
+// at the number of records in the `pg_stat_wal_receiver` table
+func (instance *Instance) IsWALReceiverActive() (bool, error) {
+	var result bool
+
+	superUserDb, err := instance.GetSuperuserDB()
+	if err != nil {
+		return false, err
+	}
+
+	row := superUserDb.QueryRow("SELECT COUNT(*) FROM pg_stat_wal_receiver")
+	err = row.Scan(&result)
+	if err != nil {
+		return false, err
+	}
+
+	return result, nil
+}
+
+// GetWALApplyLag gets the amount of bytes of transaction log info need
+// still to be applied
+func (instance *Instance) GetWALApplyLag() (int64, error) {
+	var result int64
+
+	superUserDb, err := instance.GetSuperuserDB()
+	if err != nil {
+		return -1, err
+	}
+
+	row := superUserDb.QueryRow("SELECT pg_last_wal_receive_lsn() - pg_last_wal_replay_lsn()")
+	err = row.Scan(&result)
+	if err != nil {
+		return -1, err
+	}
+
+	return result, nil
+}

@@ -97,6 +97,12 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
+	if cluster.Status.CurrentPrimary != "" && cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+		r.Log.Info("Switchover initiated by PGK, waiting for the cluster to align")
+		// TODO: check if the TargetPrimary is active, otherwise recovery?
+		return ctrl.Result{}, err
+	}
+
 	// Update the status section of this Cluster resource
 	if err = r.updateResourceStatus(ctx, &cluster, childPods); err != nil {
 		return ctrl.Result{}, err

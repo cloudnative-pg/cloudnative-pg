@@ -47,6 +47,8 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 
 	// Set targetPrimary to do a failover if needed
 	if !status.Items[0].IsPrimary {
+		r.Log.Info("Current master isn't valid, failing over",
+			"newPrimary", status.Items[0].PodName)
 		// No primary, no party. Failover please!
 		return r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
 	}

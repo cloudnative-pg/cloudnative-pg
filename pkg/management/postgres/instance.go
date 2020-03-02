@@ -207,3 +207,14 @@ func (instance *Instance) IsPrimary() (bool, error) {
 
 	return !result, nil
 }
+
+// CreateStandbySignalFile create a standby.signal file instructing this
+// instance to follow an existing master
+func (instance *Instance) CreateStandbySignalFile() error {
+	emptyFile, err := os.Create(filepath.Join(instance.PgData, "standby.signal"))
+	if emptyFile != nil {
+		_ = emptyFile.Close()
+	}
+
+	return err
+}

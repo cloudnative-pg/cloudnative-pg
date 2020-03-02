@@ -49,6 +49,7 @@ func main() {
 	initCommand.StringVar(&postgresConfig, "postgresql-config-file", "",
 		"The file containing the PostgreSQL configuration to add")
 	initCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
+	initCommand.StringVar(&parentNode, "parent-node", "", "The origin node")
 
 	joinCommand := flag.NewFlagSet("join", flag.ExitOnError)
 	joinCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
@@ -91,6 +92,7 @@ func main() {
 			ApplicationPasswordFile: appPwFile,
 			HBARulesFile:            postgresHBARules,
 			PostgreSQLConfigFile:    postgresConfig,
+			ParentNode:              parentNode,
 		}
 		initSubCommand(info)
 	case "join":

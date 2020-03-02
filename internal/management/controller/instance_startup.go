@@ -11,8 +11,11 @@ import (
 
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
 
 	apiv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 )
 
 // VerifyPgDataCoherence check if this cluster exist in k8s and panic if this
@@ -33,34 +36,42 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 		return err
 	}
 
+	r.log.Info("Instance type", "isPrimary", isPrimary)
+
 	if isPrimary {
-		currentPrimary, err := getCurrentPrimary(cluster)
-		if err != nil {
-			return err
-		}
+		return r.verifyPgDataCoherenceForPrimary(cluster)
+	}
 
-		targetPrimary, err := getTargetPrimary(cluster)
-		if err != nil {
-			return err
-		}
+	return nil
+}
 
-		isCurrentPrimary := r.instance.PodName == currentPrimary
-		isTargetPrimary := r.instance.PodName == targetPrimary
+// This function will abort the execution if the current server is a primary
+// one from the PGDATA viewpoint, but is not classified as the target nor the
+// current primary
+func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructured.Unstructured) error {
+	currentPrimary, err := utils.GetCurrentPrimary(cluster)
+	if err != nil {
+		return err
+	}
 
-		if !isCurrentPrimary && !isTargetPrimary {
-			r.log.Info("Safety measure failed. This PGDATA belongs to "+
-				"a primary instance, but this instance is neither primary "+
-				"nor target primary",
-				"currentPrimary", currentPrimary,
-				"targetPrimary", targetPrimary,
-				"podName", r.instance.PodName)
-			return errors.Errorf("This PGDATA belongs to a primary but " +
-				"this instance is neither the current primary nor the target primary. " +
-				"Aborting")
-		}
+	targetPrimary, err := utils.GetTargetPrimary(cluster)
+	if err != nil {
+		return err
+	}
 
+	r.log.Info("Cluster status",
+		"currentPrimary", currentPrimary,
+		"targetPrimary", targetPrimary)
+
+	switch {
+	case targetPrimary == r.instance.PodName:
 		if currentPrimary == "" {
-			err = setCurrentPrimary(cluster, r.instance.PodName)
+			// This means that this cluster has been just started up and the
+			// current master still need to be written
+			r.log.Info("First master instance bootstrap, marking myself as master",
+				"currentPrimary", currentPrimary,
+				"targetPrimary", targetPrimary)
+			err = utils.SetCurrentPrimary(cluster, r.instance.PodName)
 			if err != nil {
 				return err
 			}
@@ -72,6 +83,78 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
+		}
+		return nil
+
+	default:
+		// I'm an old master and not the current one. I need to wait for
+		// the switchover procedure to finish and then I can demote myself
+		// and start following the new master
+		r.log.Info("This is an old primary instance, waiting for the "+
+			"switchover to finish",
+			"currentPrimary", currentPrimary,
+			"targetPrimary", targetPrimary)
+
+		err = r.waitForSwitchoverToBeCompleted()
+		if err != nil {
+			return err
+		}
+
+		// Now I can demote myself
+		return r.instance.CreateStandbySignalFile()
+	}
+}
+
+// waitForSwitchoverToBeCompleted is supposed to be called when `targetPrimary`
+// is different from `currentPrimary`, meaning that a switchover procedure is in
+// progress. The function will create a watch on the cluster resource and wait
+// until the switchover is completed
+func (r *InstanceReconciler) waitForSwitchoverToBeCompleted() error {
+	switchoverWatch, err := r.client.
+		Resource(apiv1alpha1.ClusterGVK).
+		Namespace(r.instance.Namespace).
+		Watch(metav1.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName).String(),
+		})
+	if err != nil {
+		return err
+	}
+
+	channel := switchoverWatch.ResultChan()
+	for {
+		// TODO Retry with exponential back-off
+
+		event, ok := <-channel
+		if !ok {
+			return errors.Errorf("Watch expired while waiting for switchover to complete")
+		}
+
+		object, err := objectToUnstructured(event.Object)
+		if err != nil {
+			return errors.Wrap(err, "Error while decoding runtime.Object data from watch")
+		}
+
+		targetPrimary, err := utils.GetTargetPrimary(object)
+		if err != nil {
+			return errors.Wrapf(err, "Error while extracting the targetPrimary from the cluster status: %v",
+				object)
+		}
+		currentPrimary, err := utils.GetCurrentPrimary(object)
+		if err != nil {
+			return errors.Wrapf(err, "Error while extracting the currentPrimary from the cluster status: %v",
+				object)
+		}
+
+		if targetPrimary == currentPrimary {
+			r.log.Info("Switchover completed",
+				"targetPrimary", targetPrimary,
+				"currentPrimary", currentPrimary)
+			switchoverWatch.Stop()
+			break
+		} else {
+			r.log.Info("Switchover in progress",
+				"targetPrimary", targetPrimary,
+				"currentPrimary", currentPrimary)
 		}
 	}
 

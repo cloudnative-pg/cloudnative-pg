@@ -31,6 +31,7 @@ e2e-test:
 build: generate fmt vet
 	go build -o bin/manager ./cmd/manager
 	go build -o bin/pgk ./cmd/pgk
+	go build -o bin/kubectl-cnp ./cmd/kubectl-cnp
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests

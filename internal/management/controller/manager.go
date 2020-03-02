@@ -73,7 +73,7 @@ func (r *InstanceReconciler) Run() error {
 		err = r.Reconcile(&event)
 		if err != nil {
 			r.log.Error(err, "Reconciliation error")
-			// TODO Retry? Quit?
+			// TODO Retry with exponential back-off
 		}
 	}
 
