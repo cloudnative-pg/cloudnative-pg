@@ -13,6 +13,7 @@ type PostgresqlStatus struct {
 	IsPrimary   bool   `json:"isPrimary"`
 	ReceivedLsn LSN    `json:"receivedLsn,omitempty"`
 	ReplayLsn   LSN    `json:"replayLsn,omitempty"`
+	SystemID    string `json:"systemID,omitempty"`
 }
 
 // A list of PostgreSQL instances status, useful to be easily sorted

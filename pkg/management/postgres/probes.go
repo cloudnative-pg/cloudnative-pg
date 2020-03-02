@@ -33,6 +33,13 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	result := postgres.PostgresqlStatus{}
 
 	row := superUserDb.QueryRow(
+		"SELECT system_identifier FROM pg_control_system()")
+	err = row.Scan(&result.SystemID)
+	if err != nil {
+		return nil, err
+	}
+
+	row = superUserDb.QueryRow(
 		"SELECT NOT pg_is_in_recovery()")
 	err = row.Scan(&result.IsPrimary)
 	if err != nil {
