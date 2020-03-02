@@ -6,12 +6,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 
 package postgres
 
-// PostgresqlStatus is the data type of the PostgreSQL probes
-type PostgresqlStatus struct {
-	IsPrimary   bool   `json:"isPrimary"`
-	ReceivedLsn string `json:"receivedLsn,omitempty"`
-	ReplayLsn   string `json:"replayLsn,omitempty"`
-}
+import "github.com/2ndquadrant/cloud-native-postgresql/pkg/postgres"
 
 // IsHealthy check if the instance can really accept connections
 func (instance *Instance) IsHealthy() error {
@@ -29,13 +24,13 @@ func (instance *Instance) IsHealthy() error {
 }
 
 // GetStatus Extract the status of this PostgreSQL database
-func (instance *Instance) GetStatus() (*PostgresqlStatus, error) {
+func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	superUserDb, err := instance.GetSuperuserDB()
 	if err != nil {
 		return nil, err
 	}
 
-	result := PostgresqlStatus{}
+	result := postgres.PostgresqlStatus{}
 
 	row := superUserDb.QueryRow(
 		"SELECT NOT pg_is_in_recovery()")
