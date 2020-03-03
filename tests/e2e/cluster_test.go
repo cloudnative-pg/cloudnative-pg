@@ -9,6 +9,7 @@ package e2e
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -49,7 +50,7 @@ var _ = Describe("Cluster", func() {
 				_, _, err := run("kubectl create -n " + namespace + " -f " + sample)
 				Expect(err).To(BeNil())
 			})
-			By("having a Cluster with 3 masters ready", func() {
+			By("having a Cluster with 3 nodes ready", func() {
 				// Setting up a cluster with three pods is slow, usually 200-300s
 				timeout := 400
 				namespacedName := types.NamespacedName{
@@ -147,7 +148,7 @@ var _ = Describe("Cluster", func() {
 				_, _, err := run("kubectl create -n " + namespace + " -f " + sampleFile)
 				Expect(err).To(BeNil())
 			})
-			By("having a Cluster with 3 masters ready", func() {
+			By("having a Cluster with 3 nodes ready", func() {
 				// Setting up a cluster with three pods is slow, usually 200-300s
 				timeout := 400
 				namespacedName := types.NamespacedName{
@@ -214,7 +215,7 @@ var _ = Describe("Cluster", func() {
 				Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
 			}
 		})
-		It("react to master failure", func() {
+		It("react to primary failure", func() {
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
 				// Creating a namespace should be quick
 				timeout := 20
@@ -235,7 +236,7 @@ var _ = Describe("Cluster", func() {
 				_, _, err := run("kubectl create -n " + namespace + " -f " + sampleFile)
 				Expect(err).To(BeNil())
 			})
-			By("having a Cluster with 3 masters ready", func() {
+			By("having a Cluster with 3 nodes ready", func() {
 				// Setting up a cluster with three pods is slow, usually 200-300s
 				timeout := 400
 				namespacedName := types.NamespacedName{
@@ -339,6 +340,149 @@ var _ = Describe("Cluster", func() {
 					}
 					return cr.Status.CurrentPrimary
 				}, timeout).Should(BeEquivalentTo(targetPrimary))
+			})
+		})
+	})
+
+	Context("Switchover", func() {
+		const namespace = "switchover-e2e"
+		const sampleFile = samplesDir + "/cluster-emptydir.yaml"
+		const clusterName = "postgresql-emptydir"
+		var pods []string
+		var oldPrimary, targetPrimary string
+		BeforeEach(func() {
+			if err := createNamespace(ctx, namespace); err != nil {
+				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
+			}
+		})
+		AfterEach(func() {
+			if err := deleteNamespace(ctx, namespace); err != nil {
+				Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
+			}
+		})
+		It("react to switchover requests", func() {
+			By(fmt.Sprintf("having a %v namespace", namespace), func() {
+				// Creating a namespace should be quick
+				timeout := 20
+				cr := &corev1.Namespace{}
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      namespace,
+				}
+
+				Eventually(func() string {
+					if err := client.Get(ctx, namespacedName, cr); err != nil {
+						Fail("Unable to get namespace " + namespace)
+					}
+					return cr.GetName()
+				}, timeout).Should(BeEquivalentTo(namespace))
+			})
+			By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
+				_, _, err := run("kubectl create -n " + namespace + " -f " + sampleFile)
+				Expect(err).To(BeNil())
+			})
+			By("having a Cluster with 3 nodes ready", func() {
+				// Setting up a cluster with three pods is slow, usually 200-300s
+				timeout := 400
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				cr := &clusterv1alpha1.Cluster{}
+
+				Eventually(func() int32 {
+					if err := client.Get(ctx, namespacedName, cr); err != nil {
+						Fail("Unable to get Cluster " + clusterName)
+					}
+					return cr.Status.ReadyInstances
+				}, timeout).Should(BeEquivalentTo(3))
+			})
+			By("checking that CurrentPrimary and TargetPrimary are the same", func() {
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				cr := &clusterv1alpha1.Cluster{}
+				if err := client.Get(ctx, namespacedName, cr); err != nil {
+					Fail("Unable to get Cluster " + clusterName)
+				}
+				Expect(cr.Status.CurrentPrimary).To(BeEquivalentTo(cr.Status.TargetPrimary))
+				oldPrimary = cr.Status.CurrentPrimary
+
+				// Gather pod names
+				var podList corev1.PodList
+				if err := client.List(ctx, &podList,
+					ctrlclient.InNamespace(namespace),
+					ctrlclient.MatchingLabels{specs.ClusterLabelName: clusterName},
+				); err != nil {
+					Fail("Unable to list Pods in Cluster " + clusterName)
+				}
+				Expect(len(podList.Items)).To(BeEquivalentTo(3))
+				for _, p := range podList.Items {
+					pods = append(pods, p.Name)
+				}
+				sort.Strings(pods)
+				Expect(pods[0]).To(BeEquivalentTo(oldPrimary))
+				targetPrimary = pods[1]
+			})
+			By("setting the TargetPrimary node to trigger a switchover", func() {
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				cr := &clusterv1alpha1.Cluster{}
+				if err := client.Get(ctx, namespacedName, cr); err != nil {
+					Fail("Unable to get Cluster " + clusterName)
+				}
+				cr.Status.TargetPrimary = targetPrimary
+				Expect(client.Status().Update(ctx, cr)).To(BeNil())
+			})
+			By("waiting that the TargetPrimary become also CurrentPrimary", func() {
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				timeout := 45
+				cr := &clusterv1alpha1.Cluster{}
+				Eventually(func() string {
+					if err := client.Get(ctx, namespacedName, cr); err != nil {
+						Fail("Unable to get Cluster " + clusterName)
+					}
+					return cr.Status.CurrentPrimary
+				}, timeout).Should(BeEquivalentTo(targetPrimary))
+			})
+			By("waiting that the old primary become ready", func() {
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      oldPrimary,
+				}
+				timeout := 45
+				pod := corev1.Pod{}
+				Eventually(func() bool {
+					if err := client.Get(ctx, namespacedName, &pod); err != nil {
+						Fail("Unable to get Pod " + oldPrimary)
+					}
+					return utils.IsPodReady(pod)
+				}, timeout).Should(BeTrue())
+			})
+			By("waiting that the old primary become a standby", func() {
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      oldPrimary,
+				}
+				timeout := 45
+				pod := corev1.Pod{}
+				// TODO: returning `specs.IsPodStandby(pod)` should be enough,
+				// but it seems the client has cache issues. Investigate.
+				// ExecCommand creates a new client, working around the issue.
+				Eventually(func() (string, error) {
+					if err := client.Get(ctx, namespacedName, &pod); err != nil {
+						Fail("Unable to get Pod " + oldPrimary)
+					}
+					second := time.Second
+					out, _, err := utils.ExecCommand(ctx, pod, "postgres", &second, "psql", "-tAc", "SELECT pg_is_in_recovery()")
+					return strings.TrimSpace(out), err
+				}, timeout).Should(BeEquivalentTo("t"))
 			})
 		})
 	})
