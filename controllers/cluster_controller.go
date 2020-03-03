@@ -37,6 +37,7 @@ type ClusterReconciler struct {
 
 // +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters/status,verbs=get;watch;update;patch
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;update
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=create
@@ -67,6 +68,17 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 		// This is a real error, maybe the RBAC configuration is wrong?
 		return ctrl.Result{}, err
+	}
+
+	var namespace corev1.Namespace
+	if err := r.Get(ctx, client.ObjectKey{Namespace: "", Name: req.Namespace}, &namespace); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if !namespace.DeletionTimestamp.IsZero() {
+		// This happens when you delete a namespace containing a Cluster resource. If that's the case,
+		// let's just wait for the Kubernetes to remove all object in the namespace.
+		return ctrl.Result{}, nil
 	}
 
 	// Ensure we have one the required global objects
