@@ -76,7 +76,7 @@ func deleteNamespace(ctx context.Context, name string) error {
 }
 
 // deletePod deletes a pod if existent
-func deletePod(ctx context.Context, namespace string, name string) error {
+func deletePod(ctx context.Context, namespace string, name string, opts ...ctrlclient.DeleteOption) error {
 	u := &unstructured.Unstructured{}
 	u.SetName(name)
 	u.SetNamespace(namespace)
@@ -86,7 +86,7 @@ func deletePod(ctx context.Context, namespace string, name string) error {
 		Kind:    "Pod",
 	})
 
-	return client.Delete(ctx, u)
+	return client.Delete(ctx, u, opts...)
 }
 
 func TestE2ESuite(t *testing.T) {
