@@ -85,7 +85,8 @@ main() {
     go install github.com/onsi/ginkgo/ginkgo
     # Create at most 4 testing nodes. Using -p instead of --nodes
     # would create CPUs-1 nodes and saturate the testing server
-    ginkgo --nodes=4 --slowSpecThreshold=30 -v "${TEST_DIR}/..."
+    # Unset DEBUG to prevent k8s from spamming messages
+    DEBUG= ginkgo --nodes=4 --slowSpecThreshold=30 -v "${TEST_DIR}/..."
 }
 
 main
