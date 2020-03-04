@@ -1,5 +1,4 @@
 resources:
 - manager.yaml
-- 2ndquadrant-k8s-postgresql-poc-secret.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization

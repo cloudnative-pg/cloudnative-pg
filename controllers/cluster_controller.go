@@ -39,7 +39,7 @@ type ClusterReconciler struct {
 // +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters/status,verbs=get;watch;update;patch
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=create
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;update
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=create
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
