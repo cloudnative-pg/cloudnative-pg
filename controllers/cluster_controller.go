@@ -50,6 +50,7 @@ type ClusterReconciler struct {
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=create;patch;update
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=create;patch;update
 
+// Reconcile is the operator reconciler loop
 func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	_ = r.Log.WithValues("postgresql", req.NamespacedName)
@@ -175,6 +176,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
+// SetupWithManager creates a ClusterReconciler
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by this controller

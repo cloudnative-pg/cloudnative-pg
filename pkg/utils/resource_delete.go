@@ -15,8 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// deleteObject removes an object from the API server, given its objectKey and kind info, without
-// getting it first. It the object don't exist, the error is skipped
+// DeleteObjectIfExists removes an object from the API server, given its
+// objectKey and kind info, without getting it first. It the object doesn't
+// exist, the error is skipped
 func DeleteObjectIfExists(
 	ctx context.Context,
 	client client.Client,

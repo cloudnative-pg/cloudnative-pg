@@ -33,7 +33,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 		return nil
 	}
 
-	status, err := r.extractIntancesStatus(ctx, filteredPods)
+	status, err := r.extractInstancesStatus(ctx, filteredPods)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (r *ClusterReconciler) getReplicaStatusFromPod(
 	return result, nil
 }
 
-func (r *ClusterReconciler) extractIntancesStatus(
+func (r *ClusterReconciler) extractInstancesStatus(
 	ctx context.Context,
 	filteredPods []corev1.Pod) (postgres.PostgresqlStatusList, error) {
 	var result postgres.PostgresqlStatusList

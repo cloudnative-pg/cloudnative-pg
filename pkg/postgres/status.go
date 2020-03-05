@@ -3,6 +3,7 @@ This file is part of Cloud Native PostgreSQL.
 
 Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 */
+
 package postgres
 
 import corev1 "k8s.io/api/core/v1"
@@ -16,7 +17,8 @@ type PostgresqlStatus struct {
 	SystemID    string `json:"systemID,omitempty"`
 }
 
-// A list of PostgreSQL instances status, useful to be easily sorted
+// PostgresqlStatusList is a list of PostgreSQL instances status, useful to
+// be easily sorted
 type PostgresqlStatusList struct {
 	Items []PostgresqlStatus
 }
@@ -62,7 +64,7 @@ func (list PostgresqlStatusList) Less(i, j int) bool {
 	return list.Items[i].PodName < list.Items[j].PodName
 }
 
-// Get a certain Pod from a Pod list
+// ExtractPodFromList gets a certain Pod from a Pod list
 func ExtractPodFromList(pods []corev1.Pod, podName string) *corev1.Pod {
 	for idx := range pods {
 		if pods[idx].Name == podName {

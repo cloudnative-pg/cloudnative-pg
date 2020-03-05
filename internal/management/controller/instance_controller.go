@@ -16,7 +16,7 @@ import (
 	apiv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
 )
 
-// Main reconciliation loop
+// Reconcile is the main reconciliation loop for the instance
 func (r *InstanceReconciler) Reconcile(event *watch.Event) error {
 	// Nothing I can do, here
 	if event.Type != watch.Modified {

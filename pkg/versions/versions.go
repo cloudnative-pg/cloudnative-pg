@@ -9,8 +9,11 @@ package versions
 import "os"
 
 const (
+	// Version is the version of the operator
 	Version = "0.0.1"
 
+	// DefaultImageName is the image used by default by the operator to create
+	// pods.
 	DefaultImageName = "2ndq.io/release/k8s/postgresql:12.1"
 
 	postgresImageNameEnvVar = "POSTGRES_IMAGE_NAME"

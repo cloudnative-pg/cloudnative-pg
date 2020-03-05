@@ -3,7 +3,7 @@
 **Cloud Native PostgreSQL** is a stack designed by [2ndQuadrant](https://www.2ndquadrant.com) to manage PostgreSQL
 workloads on Kubernetes, particularly optimised for Private Cloud environments with Local Persistent Volumes (PV).
 
-# Quickstart for local testing (TODO)
+## Quickstart for local testing (TODO)
 
 Temporary information on how to test PG Operator using private images on Quay.io:
 

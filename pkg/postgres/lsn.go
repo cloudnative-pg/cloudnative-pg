@@ -16,7 +16,7 @@ import (
 // LSN is a string composed by two hexadecimal numbers, separated by "/"
 type LSN string
 
-// Compares two LSNs
+// Less compares two LSNs
 func (lsn LSN) Less(other LSN) bool {
 	p1, err := lsn.Parse()
 	if err != nil {

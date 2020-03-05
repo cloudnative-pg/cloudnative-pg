@@ -8,8 +8,8 @@ package utils
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-// Set the controlled object as owned by a certain other controller
-// object with his type information
+// SetAsOwnedBy sets the controlled object as owned by a certain other
+// controller object with his type information
 func SetAsOwnedBy(controlled *metav1.ObjectMeta, controller metav1.ObjectMeta, typeMeta metav1.TypeMeta) {
 	controlled.SetOwnerReferences([]metav1.OwnerReference{
 		{

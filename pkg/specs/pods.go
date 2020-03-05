@@ -22,13 +22,14 @@ const (
 	// serial number of the node
 	ClusterSerialAnnotationName = "postgresql.k8s.2ndq.io/node_serial"
 
-	// This label is applied to Pods to mark primary ones
+	// ClusterRoleLabelName label is applied to Pods to mark primary ones
 	ClusterRoleLabelName = "role"
 
-	// This value is written in labels to represent primary servers
+	// ClusterRoleLabelPrimary is written in labels to represent primary servers
 	ClusterRoleLabelPrimary = "primary"
 
-	// This label is applied to Pods to link them to the owning cluster
+	// ClusterLabelName label is applied to Pods to link them to the owning
+	// cluster
 	ClusterLabelName = "postgresql"
 )
 
@@ -172,7 +173,7 @@ func createVolumeSource(cluster v1alpha1.Cluster, podName string) corev1.VolumeS
 }
 
 // createPostgresContainers create the PostgreSQL containers that are
-// used for every intance
+// used for every instance
 func createPostgresContainers(cluster v1alpha1.Cluster, podName string) []corev1.Container {
 	return []corev1.Container{
 		{
