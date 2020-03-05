@@ -172,7 +172,9 @@ func statusSubCommand() {
 		log.Log.Error(err, "Error while requesting instance status")
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != 200 {
 		log.Log.Info("Error while extracting status", "statusCode", resp.StatusCode, "body", resp.Body)

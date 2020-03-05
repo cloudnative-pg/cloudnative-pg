@@ -70,7 +70,7 @@ func (instance Instance) Startup() error {
 	log.Log.Info("Starting up instance",
 		"pgdata", instance.PgData)
 
-	cmd := exec.Command("pg_ctl", options...)
+	cmd := exec.Command("pg_ctl", options...) // #nosec
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -111,7 +111,7 @@ func (instance *Instance) Shutdown() error {
 	log.Log.Info("Shutting down instance",
 		"pgdata", instance.PgData)
 
-	cmd := exec.Command("pg_ctl", options...)
+	cmd := exec.Command("pg_ctl", options...) // #nosec
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
@@ -129,7 +129,7 @@ func (instance Instance) Run() (*exec.Cmd, error) {
 		"-D", instance.PgData,
 	}
 
-	cmd := exec.Command("postgres", options...)
+	cmd := exec.Command("postgres", options...) // #nosec
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}

@@ -37,7 +37,7 @@ func (info JoinInfo) Join() error {
 		"-R",
 		"-d", fmt.Sprintf("host=%v dbname=%v", info.ParentNode, "postgres"),
 	}
-	cmd := exec.Command("pg_basebackup", options...)
+	cmd := exec.Command("pg_basebackup", options...) // #nosec
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

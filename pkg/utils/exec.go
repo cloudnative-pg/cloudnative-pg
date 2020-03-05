@@ -4,6 +4,8 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 */
 
+// Package utils contains otherwise uncategorized kubernetes
+// relative functions
 package utils
 
 // Look here: https://github.com/kubernetes/kubernetes/blob/release-1.17/test/e2e/framework/exec_util.go

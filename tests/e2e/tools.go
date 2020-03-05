@@ -4,6 +4,8 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 */
 
+// Package e2e contains the e2e test suite of the cloud native PostgreSQL
+// operator
 package e2e
 
 import (

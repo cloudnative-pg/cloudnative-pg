@@ -59,3 +59,4 @@ issues:
     - linters:
       - lll
       source: "^//\\s*\\+"
+  exclude-use-default: false
