@@ -44,17 +44,16 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(func(o *zap.Options) {
-		o.Development = true
-	}))
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	setupLog.Info("Starting Cloud Native PostgreSQL Operator", "version", versions.Version)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
-		LeaderElection:     enableLeaderElection,
 		Port:               9443,
+		LeaderElection:     enableLeaderElection,
+		LeaderElectionID:   "db9c8771.k8s.2ndq.io",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

@@ -8,14 +8,14 @@ cache:
 os: linux
 
 go:
-  - "1.13"
+  - "1.14"
 
 install: skip
 
 env:
   global:
-    - KUBEBUILDER_VERSION=2.2.0
-    - GOLANGCI_LINT_VERSION=1.23.6
+    - KUBEBUILDER_VERSION=2.3.0
+    - GOLANGCI_LINT_VERSION=1.23.8
     - KUSTOMIZE_VERSION=3.5.4
     - KIND_VERSION=0.7.0
   jobs:
