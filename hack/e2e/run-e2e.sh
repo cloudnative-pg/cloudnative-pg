@@ -46,12 +46,12 @@ trap cleanup EXIT
 
 install_kubectl() {
     # Requires 'tr' for Darwin vs darwin issue
-    curl -s -L "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/$(uname | tr '[:upper:]' '[:lower:]')/amd64/kubectl" -o "${KUBECTL}"
+    curl -s -L "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION#v}/bin/$(uname | tr '[:upper:]' '[:lower:]')/amd64/kubectl" -o "${KUBECTL}"
     chmod +x "${KUBECTL}"
 }
 
 install_kind() {
-    curl -s -L "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-$(uname)-amd64" -o "${KIND}"
+    curl -s -L "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION#v}/kind-$(uname)-amd64" -o "${KIND}"
     chmod +x "${KIND}"
 }
 
