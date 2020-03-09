@@ -21,7 +21,7 @@ all: build
 
 # Run tests
 test: generate fmt vet manifests
-	go test $$(go list ./... | grep -v e2e) -coverprofile cover.out
+	go test ./api/... ./cmd/... ./controllers/... ./pkg... -coverprofile cover.out
 
 # Run e2e tests
 e2e-test:

@@ -15,7 +15,7 @@ K8S_VERSION=${K8S_VERSION:-1.17.2}
 
 # Define the directories used by the tests
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
-TEST_DIR="${ROOT_DIR}/tests/e2e"
+TEST_DIR="${ROOT_DIR}/tests"
 HACK_DIR="${ROOT_DIR}/hack/e2e"
 TEMP_DIR="$(mktemp -d)"
 
@@ -83,10 +83,14 @@ main() {
 
     # Install ginkgo cli for better control on tests
     go install github.com/onsi/ginkgo/ginkgo
+
+    # Unset DEBUG to prevent k8s from spamming messages
+    unset DEBUG
+
     # Create at most 4 testing nodes. Using -p instead of --nodes
     # would create CPUs-1 nodes and saturate the testing server
     # Unset DEBUG to prevent k8s from spamming messages
-    DEBUG= ginkgo --nodes=4 --slowSpecThreshold=30 -v "${TEST_DIR}/..."
+    ginkgo --nodes=4 --slowSpecThreshold=30 -v "${TEST_DIR}/e2e/..."
 }
 
 main

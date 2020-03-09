@@ -4,9 +4,9 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 */
 
-// Package e2e contains the e2e test suite of the cloud native PostgreSQL
+// Package tests contains the e2e test infrastructure of the cloud native PostgreSQL
 // operator
-package e2e
+package tests
 
 import (
 	"bytes"
@@ -16,8 +16,9 @@ import (
 	"github.com/google/shlex"
 )
 
+// Run executes a command and process the information
 //nolint:unparam,gosec
-func run(command string) (stdout string, stderr string, err error) {
+func Run(command string) (stdout string, stderr string, err error) {
 	tokens, err := shlex.Split(command)
 	if err != nil {
 		log.Printf("Error parsing command `%v`: %v\n", command, err)

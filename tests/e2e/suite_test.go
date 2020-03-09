@@ -7,18 +7,13 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package e2e
 
 import (
-	"context"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	//+kubebuilder:scaffold:imports
 	clusterv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+	"github.com/2ndquadrant/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -32,62 +27,13 @@ const (
 	operatorNamespace = "postgresql-operator-system"
 )
 
-var restClientConfig = ctrl.GetConfigOrDie()
-var client ctrlclient.Client
-var ctx = context.Background()
-var scheme = runtime.NewScheme()
+var env = tests.NewTestingEnvironment()
 
 var _ = BeforeSuite(func() {
-	_ = k8sscheme.AddToScheme(scheme)
-	_ = clusterv1alpha1.AddToScheme(scheme)
+	_ = k8sscheme.AddToScheme(env.Scheme)
+	_ = clusterv1alpha1.AddToScheme(env.Scheme)
 	//+kubebuilder:scaffold:scheme
-
-	var err error
-	client, err = ctrlclient.New(restClientConfig, ctrlclient.Options{Scheme: scheme})
-	if err != nil {
-		Fail(err.Error())
-	}
 })
-
-// createNamespace creates a namespace
-func createNamespace(ctx context.Context, name string) error {
-	u := &unstructured.Unstructured{}
-	u.SetName(name)
-	u.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Namespace",
-	})
-
-	return client.Create(ctx, u)
-}
-
-// deleteNamespace deletes a namespace if existent
-func deleteNamespace(ctx context.Context, name string) error {
-	u := &unstructured.Unstructured{}
-	u.SetName(name)
-	u.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Namespace",
-	})
-
-	return client.Delete(ctx, u)
-}
-
-// deletePod deletes a pod if existent
-func deletePod(ctx context.Context, namespace string, name string, opts ...ctrlclient.DeleteOption) error {
-	u := &unstructured.Unstructured{}
-	u.SetName(name)
-	u.SetNamespace(namespace)
-	u.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Pod",
-	})
-
-	return client.Delete(ctx, u, opts...)
-}
 
 func TestE2ESuite(t *testing.T) {
 	RegisterFailHandler(Fail)

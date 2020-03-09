@@ -27,9 +27,9 @@ var _ = Describe("PostgreSQL Operator", func() {
 		It("sets up the operator", func() {
 			By("having a pod for postgresql-operator-controller-manager in state ready", func() {
 				timeout := 120
-				podList := &corev1.PodList{}
 				Eventually(func() int {
-					if err := client.List(ctx, podList, ctrlclient.InNamespace(operatorNamespace)); err != nil {
+					podList := &corev1.PodList{}
+					if err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace)); err != nil {
 						Fail(fmt.Sprintf("Unable to get %v pods", postgreSQLOperatorDeploymentName))
 					}
 					return utils.CountReadyPods(podList.Items)
@@ -42,7 +42,7 @@ var _ = Describe("PostgreSQL Operator", func() {
 				}
 				cr := &appsv1.Deployment{}
 
-				if err := client.Get(ctx, namespacedName, cr); err != nil {
+				if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
 					Fail(fmt.Sprintf("Unable to get %v deployment", postgreSQLOperatorDeploymentName))
 				}
 				Expect(cr.Status.ReadyReplicas).Should(BeEquivalentTo(1))
