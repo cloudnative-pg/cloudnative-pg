@@ -9,7 +9,6 @@ package e2e
 import (
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,13 +32,13 @@ var _ = Describe("Cluster", func() {
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
 				// Creating a namespace should be quick
 				timeout := 20
-				cr := &corev1.Namespace{}
 				namespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      namespace,
 				}
 
 				Eventually(func() string {
+					cr := &corev1.Namespace{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get namespace " + namespace)
 					}
@@ -57,9 +56,9 @@ var _ = Describe("Cluster", func() {
 					Namespace: namespace,
 					Name:      clusterName,
 				}
-				cr := &clusterv1alpha1.Cluster{}
 
 				Eventually(func() int32 {
+					cr := &clusterv1alpha1.Cluster{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get Cluster " + clusterName)
 					}
@@ -131,13 +130,13 @@ var _ = Describe("Cluster", func() {
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
 				// Creating a namespace should be quick
 				timeout := 20
-				cr := &corev1.Namespace{}
 				namespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      namespace,
 				}
 
 				Eventually(func() string {
+					cr := &corev1.Namespace{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get namespace " + namespace)
 					}
@@ -155,9 +154,9 @@ var _ = Describe("Cluster", func() {
 					Namespace: namespace,
 					Name:      clusterName,
 				}
-				cr := &clusterv1alpha1.Cluster{}
 
 				Eventually(func() int32 {
+					cr := &clusterv1alpha1.Cluster{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get Cluster " + clusterName)
 					}
@@ -172,8 +171,8 @@ var _ = Describe("Cluster", func() {
 					Namespace: namespace,
 					Name:      clusterName,
 				}
-				cr := &clusterv1alpha1.Cluster{}
 				Eventually(func() int32 {
+					cr := &clusterv1alpha1.Cluster{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get Cluster " + clusterName)
 					}
@@ -188,8 +187,8 @@ var _ = Describe("Cluster", func() {
 					Namespace: namespace,
 					Name:      clusterName,
 				}
-				cr := &clusterv1alpha1.Cluster{}
 				Eventually(func() int32 {
+					cr := &clusterv1alpha1.Cluster{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get Cluster " + clusterName)
 					}
@@ -219,13 +218,13 @@ var _ = Describe("Cluster", func() {
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
 				// Creating a namespace should be quick
 				timeout := 20
-				cr := &corev1.Namespace{}
 				namespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      namespace,
 				}
 
 				Eventually(func() string {
+					cr := &corev1.Namespace{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get namespace " + namespace)
 					}
@@ -243,9 +242,9 @@ var _ = Describe("Cluster", func() {
 					Namespace: namespace,
 					Name:      clusterName,
 				}
-				cr := &clusterv1alpha1.Cluster{}
 
 				Eventually(func() int32 {
+					cr := &clusterv1alpha1.Cluster{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get Cluster " + clusterName)
 					}
@@ -318,8 +317,9 @@ var _ = Describe("Cluster", func() {
 				err := deletePod(ctx, namespace, currentPrimary)
 				Expect(err).To(BeNil())
 				timeout := 30
-				cr := &clusterv1alpha1.Cluster{}
+				var cr *clusterv1alpha1.Cluster
 				Eventually(func() string {
+					cr = &clusterv1alpha1.Cluster{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get Cluster " + clusterName)
 					}
@@ -333,8 +333,8 @@ var _ = Describe("Cluster", func() {
 					Name:      clusterName,
 				}
 				timeout := 30
-				cr := &clusterv1alpha1.Cluster{}
 				Eventually(func() string {
+					cr := &clusterv1alpha1.Cluster{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get Cluster " + clusterName)
 					}
@@ -364,13 +364,13 @@ var _ = Describe("Cluster", func() {
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
 				// Creating a namespace should be quick
 				timeout := 20
-				cr := &corev1.Namespace{}
 				namespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      namespace,
 				}
 
 				Eventually(func() string {
+					cr := &corev1.Namespace{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get namespace " + namespace)
 					}
@@ -388,9 +388,9 @@ var _ = Describe("Cluster", func() {
 					Namespace: namespace,
 					Name:      clusterName,
 				}
-				cr := &clusterv1alpha1.Cluster{}
 
 				Eventually(func() int32 {
+					cr := &clusterv1alpha1.Cluster{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get Cluster " + clusterName)
 					}
@@ -443,8 +443,8 @@ var _ = Describe("Cluster", func() {
 					Name:      clusterName,
 				}
 				timeout := 45
-				cr := &clusterv1alpha1.Cluster{}
 				Eventually(func() string {
+					cr := &clusterv1alpha1.Cluster{}
 					if err := client.Get(ctx, namespacedName, cr); err != nil {
 						Fail("Unable to get Cluster " + clusterName)
 					}
@@ -457,8 +457,8 @@ var _ = Describe("Cluster", func() {
 					Name:      oldPrimary,
 				}
 				timeout := 45
-				pod := corev1.Pod{}
 				Eventually(func() bool {
+					pod := corev1.Pod{}
 					if err := client.Get(ctx, namespacedName, &pod); err != nil {
 						Fail("Unable to get Pod " + oldPrimary)
 					}
@@ -471,18 +471,13 @@ var _ = Describe("Cluster", func() {
 					Name:      oldPrimary,
 				}
 				timeout := 45
-				pod := corev1.Pod{}
-				// TODO: returning `specs.IsPodStandby(pod)` should be enough,
-				// but it seems the client has cache issues. Investigate.
-				// ExecCommand creates a new client, working around the issue.
-				Eventually(func() (string, error) {
+				Eventually(func() bool {
+					pod := corev1.Pod{}
 					if err := client.Get(ctx, namespacedName, &pod); err != nil {
 						Fail("Unable to get Pod " + oldPrimary)
 					}
-					second := time.Second
-					out, _, err := utils.ExecCommand(ctx, pod, "postgres", &second, "psql", "-tAc", "SELECT pg_is_in_recovery()")
-					return strings.TrimSpace(out), err
-				}, timeout).Should(BeEquivalentTo("t"))
+					return specs.IsPodStandby(pod)
+				}, timeout).Should(BeTrue())
 			})
 		})
 	})
