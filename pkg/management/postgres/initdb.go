@@ -48,6 +48,9 @@ type InitInfo struct {
 
 	// The parent node, used to fill primary_conninfo
 	ParentNode string
+
+	// The cluster name to assign to
+	ClusterName string
 }
 
 // VerifyConfiguration verify if the passed configuration is OK and returns an error otherwise
@@ -183,6 +186,12 @@ func (info InitInfo) ConfigureApplicationEnvironment(db *sql.DB) error {
 	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
 		pq.QuoteIdentifier(info.ApplicationDatabase),
 		pq.QuoteIdentifier(info.ApplicationUser)))
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(fmt.Sprintf("ALTER SYSTEM SET cluster_name TO %v",
+		pq.QuoteIdentifier(info.ClusterName)))
 	if err != nil {
 		return err
 	}

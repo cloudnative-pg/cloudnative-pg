@@ -50,6 +50,8 @@ func main() {
 		"The file containing the PostgreSQL configuration to add")
 	initCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
 	initCommand.StringVar(&parentNode, "parent-node", "", "The origin node")
+	initCommand.StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
+		"current cluster in k8s, used to coordinate switchover and failover")
 
 	joinCommand := flag.NewFlagSet("join", flag.ExitOnError)
 	joinCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
@@ -93,6 +95,7 @@ func main() {
 			HBARulesFile:            postgresHBARules,
 			PostgreSQLConfigFile:    postgresConfig,
 			ParentNode:              parentNode,
+			ClusterName:             clusterName,
 		}
 		initSubCommand(info)
 	case "join":
