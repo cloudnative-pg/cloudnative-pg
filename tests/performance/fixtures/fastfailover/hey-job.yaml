@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: testcluster-job
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsUser: 1000
+      containers:
+      - name: hey
+        image: ricoli/hey
+        command:
+         - "/go/bin/hey"
+         - "-z"
+         - "2m"
+         - "-c"
+         - "5"
+         - "-m"
+         - "POST"
+         - "-T"
+         - "application/json"
+         - "-d"
+         - '{ "source": "hey" }'
+         - "http://postgrest:3000/tl"
+      restartPolicy: Never

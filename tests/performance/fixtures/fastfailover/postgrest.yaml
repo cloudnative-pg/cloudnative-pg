@@ -1,0 +1,43 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgrest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgrest
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: postgrest
+    spec:
+      containers:
+      - image: postgrest/postgrest:v6.0.2
+        name: postgrest
+        resources: {}
+        env:
+          - name: PGRST_DB_URI
+            value: "postgres://postgres@cluster-emptydir-rw/app?sslmode=disable"
+          - name: PGRST_DB_SCHEMA
+            value: tps
+          - name: PGRST_DB_ANON_ROLE
+            value: postgres
+        ports:
+          - name: http
+            containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgrest
+spec:
+  ports:
+  - port: 3000
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: postgrest
+  type: ClusterIP

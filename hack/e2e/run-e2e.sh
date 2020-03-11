@@ -91,6 +91,9 @@ main() {
     # would create CPUs-1 nodes and saturate the testing server
     # Unset DEBUG to prevent k8s from spamming messages
     ginkgo --nodes=4 --slowSpecThreshold=30 -v "${TEST_DIR}/e2e/..."
+
+    # Performance tests need to run on a single node to avoid concurrency
+    ginkgo --nodes=1 --slowSpecThreshold=30 -v "${TEST_DIR}/performance/..."
 }
 
 main

@@ -20,4 +20,5 @@ E2E tests are performed on that cluster:
 * Scale-up of a `Cluster`;
 * Scale-down of a `Cluster`;
 * Failover;
-* Switchover.
+* Switchover;
+* Primary endpoint switch in case of failure.
