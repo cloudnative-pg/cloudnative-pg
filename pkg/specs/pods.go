@@ -33,6 +33,10 @@ const (
 	// ClusterLabelName label is applied to Pods to link them to the owning
 	// cluster
 	ClusterLabelName = "postgresql"
+
+	// PostgresContainerName is the name of the container executing PostgreSQL
+	// inside one Pod
+	PostgresContainerName = "postgres"
 )
 
 // CreatePrimaryPod create a new mater instance in a Pod
@@ -181,7 +185,7 @@ func createVolumeSource(cluster v1alpha1.Cluster, podName string) corev1.VolumeS
 func createPostgresContainers(cluster v1alpha1.Cluster, podName string) []corev1.Container {
 	return []corev1.Container{
 		{
-			Name:  "postgres",
+			Name:  PostgresContainerName,
 			Image: cluster.GetImageName(),
 			Env: []corev1.EnvVar{
 				{

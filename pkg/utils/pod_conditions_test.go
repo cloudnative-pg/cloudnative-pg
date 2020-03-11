@@ -123,4 +123,96 @@ var _ = Describe("Pod conditions test suite", func() {
 			Expect(CountReadyPods(podList)).To(Equal(2))
 		})
 	})
+
+	Describe("Must check for Pods which are being upgraded", func() {
+		alignedPod := corev1.Pod{
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "postgres",
+						Image: "postgres:12.1",
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name:  "postgres",
+						Image: "postgres:12.1",
+					},
+				},
+			},
+		}
+
+		upgradingPod := corev1.Pod{
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "postgres",
+						Image: "postgres:12.2",
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				ContainerStatuses: []corev1.ContainerStatus{
+					{
+						Name:  "postgres",
+						Image: "postgres:12.1",
+					},
+				},
+			},
+		}
+
+		It("classifies an empty for as not upgrading", func() {
+			Expect(IsPodUpgrading(corev1.Pod{})).To(BeFalse())
+		})
+
+		It("classifies as not upgrading an aligned Pod", func() {
+			Expect(IsPodUpgrading(alignedPod)).To(BeFalse())
+		})
+
+		It("classifies as upgrading a Pod which is being upgraded", func() {
+			Expect(IsPodUpgrading(upgradingPod)).To(BeTrue())
+		})
+
+		It("classifies as upgrading a Pod which is missing a requested container", func() {
+			podMissingContainer := corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "postgres",
+							Image: "postgres:12.2",
+						},
+					},
+				},
+				Status: corev1.PodStatus{},
+			}
+
+			Expect(IsPodUpgrading(podMissingContainer)).To(BeTrue())
+		})
+
+		It("classified as upgrading a Pod which have a container to be terminated", func() {
+			podWithTerminatingContainer := corev1.Pod{
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name:  "postgres",
+							Image: "postgres:12.1",
+						},
+					},
+				},
+			}
+
+			Expect(IsPodUpgrading(podWithTerminatingContainer)).To(BeTrue())
+		})
+
+		It("counts pods being upgraded in a list", func() {
+			podList := []corev1.Pod{
+				upgradingPod,
+				alignedPod,
+			}
+
+			Expect(CountUpgradingPods(podList)).To(Equal(1))
+		})
+	})
 })

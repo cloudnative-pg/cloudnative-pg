@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/versions"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -24,12 +25,10 @@ func TestPodProperties(t *testing.T) {
 }
 
 var _ = Describe("Serial ID of a PostgreSQL node", func() {
-	clusterName := "clusterName"
-	clusterNamespace := "default"
 	cluster := v1alpha1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      clusterName,
-			Namespace: clusterNamespace,
+			Name:      "clusterName",
+			Namespace: "default",
 		},
 	}
 	firstPod := CreatePrimaryPod(cluster, 1)
@@ -56,12 +55,10 @@ var _ = Describe("Serial ID of a PostgreSQL node", func() {
 })
 
 var _ = Describe("Check if it a primary or a replica", func() {
-	clusterName := "clusterName"
-	clusterNamespace := "default"
 	cluster := v1alpha1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      clusterName,
-			Namespace: clusterNamespace,
+			Name:      "clusterName",
+			Namespace: "default",
 		},
 	}
 	primaryPod := CreatePrimaryPod(cluster, 1)
@@ -75,5 +72,19 @@ var _ = Describe("Check if it a primary or a replica", func() {
 	It("a replica is detected as a replica", func() {
 		Expect(IsPodPrimary(*replicaPod)).To(BeFalse())
 		Expect(IsPodStandby(*replicaPod)).To(BeTrue())
+	})
+})
+
+var _ = Describe("Extract the used image name", func() {
+	cluster := v1alpha1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "clusterName",
+			Namespace: "default",
+		},
+	}
+	pod := CreatePrimaryPod(cluster, 1)
+
+	It("extract the default image name", func() {
+		Expect(GetPostgreSQLImageName(*pod)).To(Equal(versions.GetDefaultImageName()))
 	})
 })
