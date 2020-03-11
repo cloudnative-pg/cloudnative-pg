@@ -173,6 +173,9 @@ func (instance *Instance) GetSuperuserDB() (*sql.DB, error) {
 		return nil, errors.Wrap(err, "Can't create connection pool")
 	}
 
+	db.SetMaxOpenConns(2)
+	db.SetMaxIdleConns(0)
+
 	instance.superUserDb = db
 	return instance.superUserDb, nil
 }
@@ -190,6 +193,9 @@ func (instance *Instance) GetApplicationDB() (*sql.DB, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't create connection pool")
 	}
+
+	db.SetMaxOpenConns(2)
+	db.SetMaxIdleConns(0)
 
 	instance.applicationDb = db
 	return instance.applicationDb, nil
