@@ -1,4 +1,4 @@
-# permissions to do edit clusters.
+# permissions for end users to edit clusters.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
