@@ -83,7 +83,7 @@ var _ = Describe("Cluster", func() {
 	Context("Cluster setup using emptydir", func() {
 		const namespace = "pg-emptydir-e2e"
 		const sampleFile = samplesDir + "/cluster-emptydir.yaml"
-		const clusterName = "postgresql-emptydir"
+		const clusterName = "cluster-emptydir"
 		BeforeEach(func() {
 			if err := env.CreateNamespace(namespace); err != nil {
 				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
@@ -203,7 +203,7 @@ var _ = Describe("Cluster", func() {
 	Context("Failover", func() {
 		const namespace = "failover-e2e"
 		const sampleFile = samplesDir + "/cluster-emptydir.yaml"
-		const clusterName = "postgresql-emptydir"
+		const clusterName = "cluster-emptydir"
 		var pods []string
 		var currentPrimary, targetPrimary, pausedReplica string
 		BeforeEach(func() {
@@ -363,7 +363,7 @@ var _ = Describe("Cluster", func() {
 	Context("Switchover", func() {
 		const namespace = "switchover-e2e"
 		const sampleFile = samplesDir + "/cluster-emptydir.yaml"
-		const clusterName = "postgresql-emptydir"
+		const clusterName = "cluster-emptydir"
 		var pods []string
 		var oldPrimary, targetPrimary string
 		BeforeEach(func() {

@@ -84,7 +84,6 @@ You can verify that with:
 kubectl get deploy -n postgresql-operator-system postgresql-operator-controller-manager
 ```
 
-
 ## Part 3 - Deploy a PostgreSQL cluster
 
 As with any other deployment in Kubernetes, in order to deploy a PostgreSQL cluster
@@ -98,7 +97,7 @@ defines a simple `Cluster` with an `emptyDir` local volume:
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
 kind: Cluster
 metadata:
-  name: postgresql-emptydir
+  name: cluster-emptydir
 spec:
   instances: 3
 
@@ -151,4 +150,3 @@ You can check that the pods are being created with the `get pods` command:
 ```sh
 kubectl get pods
 ```
-
