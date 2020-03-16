@@ -37,4 +37,4 @@ before_script:
 script:
   - make test
   - make lint
-  - make e2e-test
+  - DEBUG=true make e2e-test
