@@ -22,6 +22,7 @@ A PostgreSQL cluster object can be defined through the following parameters avai
 - `imageName`: name of the container image for PostgreSQL
 - `imagePullSecretName`: secret for pulling the PostgreSQL image
 - `instances`: number of instances required in the cluster, with `instances - 1` replicas (**required**)
+- `masterUpdateStrategy`: strategy to update the master, it can wait for a manual switchover or a automatically do it
 - `postgresql`: configuration of the PostgreSQL server (*required*)
 - `resources`: resources requirements of every generated Pod
 - `startDelay`: allowed time in seconds for a PostgreSQL instance to successfully start up (default 30)

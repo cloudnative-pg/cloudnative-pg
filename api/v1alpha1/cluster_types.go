@@ -81,18 +81,28 @@ type ClusterSpec struct {
 	// Resources requirements of every generated Pod
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Whenever to wait for the user to issue a switchover request or directly
+	// switchover to another replica and then update the last instance
+	MasterUpdateStrategy MasterUpdateStrategy `json:"masterUpdateStrategy,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
-	// Name of the image used
-	ImageName string `json:"imageName,omitempty"`
-
 	// Total number of instances in the cluster
 	Instances int32 `json:"instances,omitempty"`
 
 	// Total number of ready instances in the cluster
 	ReadyInstances int32 `json:"readyInstances,omitempty"`
+
+	// Total number of instances which are being updated
+	InstancesBeingUpdated int32 `json:"instancesBeingUpdated,omitempty"`
+
+	// ID of the latest generated node (used to avoid node name clashing)
+	LatestGeneratedNode int32 `json:"latestGeneratedNode,omitempty"`
+
+	// Name of the image used
+	ImageName string `json:"imageName,omitempty"`
 
 	// Current primary instance
 	CurrentPrimary string `json:"currentPrimary,omitempty"`
@@ -101,9 +111,24 @@ type ClusterStatus struct {
 	// during a switchover or a failover
 	TargetPrimary string `json:"targetPrimary,omitempty"`
 
-	// ID of the latest generated node (used to avoid node name clashing)
-	LatestGeneratedNode int32 `json:"latestGeneratedNode,omitempty"`
+	// The status of the current updated servers
+	RollingUpdateStatus map[string]RollingUpdateStatus `json:"rollingUpdateStatus,omitempty"`
 }
+
+// MasterUpdateStrategy contains the strategy available to apply an update
+// to the master server of the cluster
+type MasterUpdateStrategy string
+
+const (
+	// MasterUpdateStrategyWait means that the operator need to wait for the
+	// user to manually issue a switchover request before updating the master
+	// server
+	MasterUpdateStrategyWait = "wait"
+
+	// MasterUpdateStrategySwitchover means that the operator will switchover
+	// to another updated replica and then update the master server
+	MasterUpdateStrategySwitchover = "switchover"
+)
 
 // PostgresConfiguration defines the PostgreSQL configuration
 type PostgresConfiguration struct {
@@ -153,6 +178,16 @@ type AffinityConfiguration struct {
 	// for more info on that
 	// +optional
 	TopologyKey string `json:"topologyKey"`
+}
+
+// RollingUpdateStatus contains the information about an instance which is
+// being updated
+type RollingUpdateStatus struct {
+	// The image which we put into the Pod
+	ImageName string `json:"imageName"`
+
+	// When the update has been started
+	StartedAt metav1.Time `json:"startedAt,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -245,6 +280,17 @@ func (cluster *Cluster) GetMaxStopDelay() int32 {
 		return cluster.Spec.MaxStopDelay
 	}
 	return 30
+}
+
+// GetMasterUpdateStrategy get the cluster master update strategy,
+// defaulting to switchover
+func (cluster *Cluster) GetMasterUpdateStrategy() MasterUpdateStrategy {
+	strategy := cluster.Spec.MasterUpdateStrategy
+	if strategy == "" {
+		return MasterUpdateStrategySwitchover
+	}
+
+	return strategy
 }
 
 func init() {

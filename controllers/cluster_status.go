@@ -10,10 +10,10 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/specs"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 )
 
@@ -39,22 +39,31 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster *v1alpha1.Cluster,
 	childPods corev1.PodList,
 ) error {
+	// If the image name to be used by the Cluster is not specified
+	// in its status, write it
+	if len(cluster.Status.ImageName) == 0 {
+		cluster.Status.ImageName = cluster.GetImageName()
+	}
+
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones
 	filteredPods := utils.FilterActivePods(childPods.Items)
-	cluster.Status.Instances = int32(len(filteredPods))
-	cluster.Status.ReadyInstances = int32(utils.CountReadyPods(filteredPods))
 
-	if err := r.Status().Update(ctx, cluster); err != nil {
-		if apierrs.IsConflict(err) {
-			r.Log.V(1).Info("Stale cache found while updating Pod status")
-		} else {
-			r.Log.Error(err, "unable to update Cluster status")
-			return err
-		}
+	// Look for updating Pods
+	ProcessUpgradingPods(cluster.Status.RollingUpdateStatus, filteredPods)
+	for podName := range cluster.Status.RollingUpdateStatus {
+		r.Log.Info("Detected Pod which is being upgraded",
+			"clusterName", cluster.Name,
+			"podName", podName,
+			"namespace", cluster.Namespace)
 	}
 
-	return nil
+	// Count pods
+	cluster.Status.Instances = int32(len(filteredPods))
+	cluster.Status.ReadyInstances = int32(utils.CountReadyPods(filteredPods))
+	cluster.Status.InstancesBeingUpdated = int32(len(cluster.Status.RollingUpdateStatus))
+
+	return r.Status().Update(ctx, cluster)
 }
 
 func (r *ClusterReconciler) setPrimaryInstance(
@@ -68,4 +77,23 @@ func (r *ClusterReconciler) setPrimaryInstance(
 	}
 
 	return nil
+}
+
+// ProcessUpgradingPods counts the number of Pods which are being upgraded to
+// a different image
+func ProcessUpgradingPods(
+	rollingUpdateStatus map[string]v1alpha1.RollingUpdateStatus,
+	podList []corev1.Pod,
+) {
+	for podName, podStatus := range rollingUpdateStatus {
+		for _, pod := range podList {
+			if pod.Name != podName {
+				continue
+			}
+
+			if !utils.IsContainerStartedBefore(pod, specs.PostgresContainerName, podStatus.StartedAt.Time) {
+				delete(rollingUpdateStatus, podName)
+			}
+		}
+	}
 }

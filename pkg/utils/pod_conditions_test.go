@@ -7,6 +7,8 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package utils
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -124,8 +126,8 @@ var _ = Describe("Pod conditions test suite", func() {
 		})
 	})
 
-	Describe("Must check for Pods which are being upgraded", func() {
-		alignedPod := corev1.Pod{
+	Describe("Must check for Pods which have been started after a certain time", func() {
+		nonRunningPod := corev1.Pod{
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
@@ -144,12 +146,12 @@ var _ = Describe("Pod conditions test suite", func() {
 			},
 		}
 
-		upgradingPod := corev1.Pod{
+		runningPod := corev1.Pod{
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
 						Name:  "postgres",
-						Image: "postgres:12.2",
+						Image: "postgres:12.1",
 					},
 				},
 			},
@@ -158,61 +160,31 @@ var _ = Describe("Pod conditions test suite", func() {
 					{
 						Name:  "postgres",
 						Image: "postgres:12.1",
+						State: corev1.ContainerState{
+							Running: &corev1.ContainerStateRunning{
+								StartedAt: metav1.Time{
+									Time: time.Now(),
+								},
+							},
+						},
 					},
 				},
 			},
 		}
 
-		It("classifies an empty for as not upgrading", func() {
-			Expect(IsPodUpgrading(corev1.Pod{})).To(BeFalse())
+		It("works on Pod which are not running", func() {
+			Expect(IsContainerStartedBefore(nonRunningPod, "postgres", time.Now().Add(-time.Hour))).To(BeFalse())
+			Expect(IsContainerStartedBefore(nonRunningPod, "postgres", time.Now().Add(time.Hour))).To(BeFalse())
 		})
 
-		It("classifies as not upgrading an aligned Pod", func() {
-			Expect(IsPodUpgrading(alignedPod)).To(BeFalse())
+		It("works on Pod on which the requested container isn't defined", func() {
+			Expect(IsContainerStartedBefore(nonRunningPod, "testContainer", time.Now().Add(-time.Hour))).To(BeFalse())
+			Expect(IsContainerStartedBefore(nonRunningPod, "testContainer", time.Now().Add(time.Hour))).To(BeFalse())
 		})
 
-		It("classifies as upgrading a Pod which is being upgraded", func() {
-			Expect(IsPodUpgrading(upgradingPod)).To(BeTrue())
-		})
-
-		It("classifies as upgrading a Pod which is missing a requested container", func() {
-			podMissingContainer := corev1.Pod{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "postgres",
-							Image: "postgres:12.2",
-						},
-					},
-				},
-				Status: corev1.PodStatus{},
-			}
-
-			Expect(IsPodUpgrading(podMissingContainer)).To(BeTrue())
-		})
-
-		It("classified as upgrading a Pod which have a container to be terminated", func() {
-			podWithTerminatingContainer := corev1.Pod{
-				Status: corev1.PodStatus{
-					ContainerStatuses: []corev1.ContainerStatus{
-						{
-							Name:  "postgres",
-							Image: "postgres:12.1",
-						},
-					},
-				},
-			}
-
-			Expect(IsPodUpgrading(podWithTerminatingContainer)).To(BeTrue())
-		})
-
-		It("counts pods being upgraded in a list", func() {
-			podList := []corev1.Pod{
-				upgradingPod,
-				alignedPod,
-			}
-
-			Expect(CountUpgradingPods(podList)).To(Equal(1))
+		It("works on Pod which are running", func() {
+			Expect(IsContainerStartedBefore(runningPod, "postgres", time.Now().Add(-time.Hour))).To(BeFalse())
+			Expect(IsContainerStartedBefore(runningPod, "postgres", time.Now().Add(time.Hour))).To(BeTrue())
 		})
 	})
 })

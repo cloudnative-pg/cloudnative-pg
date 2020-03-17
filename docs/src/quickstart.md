@@ -107,6 +107,11 @@ spec:
     database: app
     owner: app
 
+  # Example update strategy:
+  # wait: wait for a manual update of the master
+  # switchover: switchover the master and update the old master
+  masterUpdateStrategy: switchover
+
   # PostgreSQL server configuration
   postgresql:
     # Example of configuration parameters for PostgreSQL

@@ -13,6 +13,10 @@ spec:
   applicationConfiguration:
     database: app
     owner: app
+  # Example update strategy:
+  # wait: wait for a manual switchover of master
+  # switchover: switchover the master and update the old master
+  masterUpdateStrategy: switchover
 
   # PostgreSQL server configuration
   postgresql:

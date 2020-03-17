@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/postgres"
 )
 
 const (
@@ -99,18 +100,38 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	if cluster.Status.CurrentPrimary != "" && cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		r.Log.Info("Switchover initiated by PGK, waiting for the cluster to align")
+		r.Log.Info("Switchover in progress, waiting for the cluster to align")
 		// TODO: check if the TargetPrimary is active, otherwise recovery?
 		return ctrl.Result{}, err
 	}
 
 	// Update the status section of this Cluster resource
 	if err = r.updateResourceStatus(ctx, &cluster, childPods); err != nil {
+		if apierrs.IsConflict(err) {
+			// Let's wait for another reconciler loop, since the
+			// status already changed
+			return ctrl.Result{}, nil
+		}
+
+		return ctrl.Result{}, err
+	}
+
+	// Find if we have Pods that we are upgrading
+	if cluster.Status.InstancesBeingUpdated != 0 {
+		r.Log.V(2).Info("There are nodes being upgraded, waiting for the new image to be applied",
+			"clusterName", cluster.Name,
+			"namespace", cluster.Namespace)
+		return ctrl.Result{}, nil
+	}
+
+	// Get the replication status
+	var instancesStatus postgres.PostgresqlStatusList
+	if instancesStatus, err = r.getStatusFromInstances(ctx, childPods); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Update the target primary name from the Pods status
-	if err = r.updateTargetPrimaryFromPods(ctx, &cluster, childPods); err != nil {
+	if err = r.updateTargetPrimaryFromPods(ctx, &cluster, instancesStatus); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -141,41 +162,43 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// Find if we have Pods that are not ready
 	if cluster.Status.ReadyInstances != cluster.Status.Instances {
 		// A pod is not ready, let's retry
-		r.Log.Info("Waiting for node to be ready")
+		r.Log.V(2).Info("Waiting for node to be ready",
+			"clusterName", cluster.Name,
+			"namespace", cluster.Namespace)
 		return ctrl.Result{}, nil
 	}
 
-	// TODO failing nodes?
+	// Is there a switchover or failover in progress?
+	// Let's wait for it to terminate before applying the
+	// following operations
+	if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary {
+		r.Log.V(2).Info("There is a switchover or a failover "+
+			"in progress, waiting for the operation to complete",
+			"clusterName", cluster.Name,
+			"namespace", cluster.Namespace,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary)
+		return ctrl.Result{}, nil
+	}
 
-	// Are there missing nodes? Let's create one,
-	// but only if no failover/switchover is running
-	if cluster.Status.CurrentPrimary == cluster.Status.TargetPrimary {
-		if cluster.Status.Instances < cluster.Spec.Instances {
-			newNodeSerial, err := r.generateNodeSerial(ctx, &cluster)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-
-			return r.joinReplicaInstance(ctx, newNodeSerial, &cluster)
+	// Are there missing nodes? Let's create one
+	if cluster.Status.Instances < cluster.Spec.Instances {
+		newNodeSerial, err := r.generateNodeSerial(ctx, &cluster)
+		if err != nil {
+			return ctrl.Result{}, err
 		}
+
+		return ctrl.Result{}, r.joinReplicaInstance(ctx, newNodeSerial, &cluster)
 	}
 
 	// Are there nodes to be removed? Remove one of them
 	if cluster.Status.Instances > cluster.Spec.Instances {
-		// Is there one pod to be deleted?
-		sacrificialPod := getSacrificialPod(childPods.Items)
-		if sacrificialPod == nil {
-			r.Log.Info("There are no instances to be sacrificed. Wait for the next sync loop")
-			return ctrl.Result{}, nil
-		}
+		return ctrl.Result{}, r.scaleDownCluster(ctx, &cluster, childPods)
+	}
 
-		r.Log.Info("Too many nodes for cluster, deleting an instance",
-			"cluster", cluster.Name,
-			"namespace", cluster.Namespace,
-			"pod", sacrificialPod.Name)
-		err = r.Delete(ctx, sacrificialPod)
-		if err != nil {
-			r.Log.Error(err, "Cannot kill the Pod to scale down")
+	// Check if we need to handle a rolling upgrade
+	if cluster.Status.ImageName != cluster.Spec.ImageName {
+		if err = r.upgradeCluster(ctx, &cluster, childPods, instancesStatus); err != nil {
 			return ctrl.Result{}, err
 		}
 	}

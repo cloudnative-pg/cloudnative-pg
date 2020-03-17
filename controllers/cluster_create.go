@@ -76,7 +76,7 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 	return nil
 }
 
-// createImagePullSecret will create a secret to download the images for Postgres BDR, if such a secret
+// createImagePullSecret will create a secret to download the images for Postgres, if such a secret
 // already exist in the namespace of the operator.
 func (r *ClusterReconciler) createImagePullSecret(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	// Do not create ImagePullSecret if it has been specified by the user
@@ -267,8 +267,6 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	var pod *corev1.Pod
 	var err error
 
-	r.Log.Info("Creating new PostgreSQL primary instance", "namespace", cluster.Namespace, "name", cluster.Name)
-
 	pod = specs.CreatePrimaryPod(*cluster, nodeSerial)
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
 		r.Log.Error(err, "Unable to set the owner reference for instance")
@@ -279,6 +277,12 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		r.Log.Error(err, "Unable to set the primary instance name")
 		return err
 	}
+
+	r.Log.Info("Creating new Pod",
+		"namespace", cluster.Namespace,
+		"clusterName", cluster.Name,
+		"podName", pod.Name,
+		"master", true)
 
 	if err = r.Create(ctx, pod); err != nil {
 		if apierrs.IsAlreadyExists(err) {
@@ -307,20 +311,21 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	ctx context.Context,
 	nodeSerial int32,
 	cluster *v1alpha1.Cluster,
-) (ctrl.Result, error) {
+) error {
 	var pod *corev1.Pod
 	var err error
 
 	pod = specs.JoinReplicaInstance(*cluster, nodeSerial)
 
 	r.Log.Info("Creating new Pod",
-		"name", cluster.Name,
+		"clusterName", cluster.Name,
 		"namespace", cluster.Namespace,
-		"podName", pod.Name)
+		"podName", pod.Name,
+		"master", false)
 
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
 		r.Log.Error(err, "Unable to set the owner reference for joined PostgreSQL node")
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if err = r.Create(ctx, pod); err != nil {
@@ -328,11 +333,11 @@ func (r *ClusterReconciler) joinReplicaInstance(
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
 			r.Log.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
-			return ctrl.Result{}, nil
+			return nil
 		}
 
 		r.Log.Error(err, "Unable to create Pod", "pod", pod)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if cluster.IsUsingPersistentStorage() {
@@ -348,9 +353,9 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 		if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
 			r.Log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
-			return ctrl.Result{}, err
+			return err
 		}
 	}
 
-	return ctrl.Result{}, nil
+	return nil
 }

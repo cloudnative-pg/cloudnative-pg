@@ -7,6 +7,8 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package utils
 
 import (
+	"time"
+
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -32,29 +34,20 @@ func IsPodActive(p corev1.Pod) bool {
 		p.DeletionTimestamp == nil
 }
 
-// IsPodUpgrading check if a new image is being applied
+// IsContainerStartedBefore check if a new image is being applied
 // to a Pod
-func IsPodUpgrading(p corev1.Pod) bool {
-	desiredImages := make(map[string]string)
-	currentImages := make(map[string]string)
-
-	for _, container := range p.Spec.Containers {
-		desiredImages[container.Name] = container.Image
-	}
-
+func IsContainerStartedBefore(p corev1.Pod, containerName string, t time.Time) bool {
 	for _, container := range p.Status.ContainerStatuses {
-		currentImages[container.Name] = container.Image
-		if specImage, ok := desiredImages[container.Name]; !ok || !IsImageNameEqual(specImage, container.Image) {
-			// We have a container running with a different image name
-			return true
+		if container.Name != containerName {
+			continue
 		}
-	}
 
-	for name := range desiredImages {
-		if _, ok := currentImages[name]; !ok {
-			// We have a container which is yet to be started
-			return true
+		if container.State.Running == nil {
+			// Container is not started
+			return false
 		}
+
+		return container.State.Running.StartedAt.Time.Before(t)
 	}
 
 	return false
@@ -86,16 +79,4 @@ func CountReadyPods(podList []corev1.Pod) int {
 		}
 	}
 	return readyPods
-}
-
-// CountUpgradingPods counts the number of Pods which are being upgraded to
-// a different image
-func CountUpgradingPods(podList []corev1.Pod) int {
-	upgradingPods := 0
-	for _, pod := range podList {
-		if IsPodUpgrading(pod) {
-			upgradingPods++
-		}
-	}
-	return upgradingPods
 }

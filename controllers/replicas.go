@@ -25,35 +25,46 @@ import (
 func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	ctx context.Context,
 	cluster *v1alpha1.Cluster,
-	pods corev1.PodList) error {
-	// Only work on Pods which can still become active in the future
-	filteredPods := utils.FilterActivePods(pods.Items)
-	if len(filteredPods) == 0 {
-		// No instances to control
-		return nil
-	}
-
-	status, err := r.extractInstancesStatus(ctx, filteredPods)
-	if err != nil {
-		return err
-	}
-
+	status postgres.PostgresqlStatusList,
+) error {
 	if len(status.Items) == 0 {
 		// Still no ready instances
 		return nil
 	}
 
-	sort.Sort(&status)
-
 	// Set targetPrimary to do a failover if needed
 	if !status.Items[0].IsPrimary {
 		r.Log.Info("Current master isn't valid, failing over",
-			"newPrimary", status.Items[0].PodName)
+			"newPrimary", status.Items[0].PodName,
+			"clusterStatus", status)
 		// No primary, no party. Failover please!
 		return r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
 	}
 
 	return nil
+}
+
+// getStatusFromInstances get the replication status from the PostgreSQL instances,
+// the returned list is sorted in order to have the master as the first element
+// and the other instances in their election order
+func (r *ClusterReconciler) getStatusFromInstances(
+	ctx context.Context,
+	pods corev1.PodList,
+) (postgres.PostgresqlStatusList, error) {
+	// Only work on Pods which can still become active in the future
+	filteredPods := utils.FilterActivePods(pods.Items)
+	if len(filteredPods) == 0 {
+		// No instances to control
+		return postgres.PostgresqlStatusList{}, nil
+	}
+
+	status, err := r.extractInstancesStatus(ctx, filteredPods)
+	if err != nil {
+		return postgres.PostgresqlStatusList{}, err
+	}
+
+	sort.Sort(&status)
+	return status, nil
 }
 
 // Make sure that only the currentPrimary has the label forward write traffic to him
