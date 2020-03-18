@@ -21,4 +21,5 @@ E2E tests are performed on that cluster:
 * Scale-down of a `Cluster`;
 * Failover;
 * Switchover;
-* Primary endpoint switch in case of failure.
+* Primary endpoint switch in case of failure in less then 5 seconds;
+* Recover from degraded state in less then 30 seconds.

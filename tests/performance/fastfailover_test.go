@@ -165,6 +165,10 @@ var _ = Describe("Cluster", func() {
 				err := env.DeletePod(namespace, lm, forceDelete)
 				Expect(err).To(BeNil())
 			})
+
+			// Take the time when the pod was deleted
+			start := time.Now()
+
 			By("waiting for the first write with on timeline 2", func() {
 				// One of the standbys will be promoted and the rw service
 				// should point to it. We'll be able to recognise the records
@@ -222,8 +226,30 @@ var _ = Describe("Cluster", func() {
 					&fiveSeconds, "psql", "app", "-tAc", query)
 				switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
 				Expect(err).To(BeNil())
-				fmt.Printf("Failover performed in %v seconds", switchTime)
+				fmt.Printf("Failover performed in %v seconds\n", switchTime)
 				Expect(switchTime).Should(BeNumerically("<", 5))
+			})
+
+			By("recovering from degraded state having a cluster with 3 instances ready", func() {
+				// Recreating an instance usually takes 15s`
+				timeout := 45
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				var elapsed time.Duration
+				Eventually(func() int32 {
+					cr := &clusterv1alpha1.Cluster{}
+					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
+						Fail("Unable to get cluster " + clusterName)
+					}
+					elapsed = time.Since(start)
+					return cr.Status.ReadyInstances
+				}, timeout).Should(BeEquivalentTo(3))
+
+				fmt.Printf("Cluster has been in a degraded state for %v seconds\n", elapsed)
+
+				Expect(elapsed / time.Second).Should(BeNumerically("<", 30))
 			})
 		})
 	})
