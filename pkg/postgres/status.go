@@ -10,11 +10,12 @@ import corev1 "k8s.io/api/core/v1"
 
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {
-	PodName     string `json:"podName"`
-	IsPrimary   bool   `json:"isPrimary"`
-	ReceivedLsn LSN    `json:"receivedLsn,omitempty"`
-	ReplayLsn   LSN    `json:"replayLsn,omitempty"`
-	SystemID    string `json:"systemID,omitempty"`
+	PodName      string `json:"podName"`
+	ReceivedLsn  LSN    `json:"receivedLsn,omitempty"`
+	ReplayLsn    LSN    `json:"replayLsn,omitempty"`
+	SystemID     string `json:"systemID,omitempty"`
+	IsPrimary    bool   `json:"isPrimary"`
+	ReplayPaused bool   `json:"replayPaused,omitempty"`
 }
 
 // PostgresqlStatusList is a list of PostgreSQL instances status, useful to

@@ -47,8 +47,9 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	}
 
 	if !result.IsPrimary {
-		row = superUserDb.QueryRow("SELECT pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn()")
-		err = row.Scan(&result.ReceivedLsn, &result.ReplayLsn)
+		row = superUserDb.QueryRow(
+			"SELECT pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), pg_is_wal_replay_paused()")
+		err = row.Scan(&result.ReceivedLsn, &result.ReplayLsn, &result.ReplayPaused)
 		if err != nil {
 			return nil, err
 		}
