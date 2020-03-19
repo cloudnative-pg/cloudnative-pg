@@ -30,7 +30,9 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 		return nil, err
 	}
 
-	result := postgres.PostgresqlStatus{}
+	result := postgres.PostgresqlStatus{
+		PodName: instance.PodName,
+	}
 
 	row := superUserDb.QueryRow(
 		"SELECT system_identifier FROM pg_control_system()")

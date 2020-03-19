@@ -57,14 +57,14 @@ func main() {
 	joinCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
 	joinCommand.StringVar(&parentNode, "parent-node", "", "The origin node")
 	joinCommand.StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
-		"be checked against the cluster stater")
+		"be checked against the cluster state")
 
 	runCommand := flag.NewFlagSet("run", flag.ExitOnError)
 	runCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
 	runCommand.StringVar(&appDbName, "app-db-name", "app",
 		"The name of the application containing the database")
 	runCommand.StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
-		"be checked against the cluster stater")
+		"be checked against the cluster state")
 	runCommand.StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
 		"current cluster in k8s, used to coordinate switchover and failover")
 	runCommand.StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
