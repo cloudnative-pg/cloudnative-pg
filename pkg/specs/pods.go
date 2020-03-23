@@ -39,7 +39,7 @@ const (
 	PostgresContainerName = "postgres"
 )
 
-// CreatePrimaryPod create a new mater instance in a Pod
+// CreatePrimaryPod create a new primary instance in a Pod
 func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 
@@ -367,6 +367,37 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 					},
 				},
 			},
+			Containers:         createPostgresContainers(cluster, podName),
+			ImagePullSecrets:   createImagePullSecrets(cluster),
+			Volumes:            createPostgresVolumes(cluster, podName),
+			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
+			SecurityContext:    CreatePostgresSecurityContext(),
+			ServiceAccountName: cluster.Name,
+		},
+	}
+
+	return pod
+}
+
+// PodWithExistingStorage create a new instance with an existing storage
+func PodWithExistingStorage(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
+	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				ClusterLabelName:     cluster.Name,
+				ClusterRoleLabelName: ClusterRoleLabelPrimary,
+			},
+			Annotations: map[string]string{
+				ClusterSerialAnnotationName: strconv.Itoa(int(nodeSerial)),
+			},
+			Name:      podName,
+			Namespace: cluster.Namespace,
+		},
+		Spec: corev1.PodSpec{
+			Hostname:           podName,
+			Subdomain:          cluster.GetServiceAnyName(),
 			Containers:         createPostgresContainers(cluster, podName),
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),

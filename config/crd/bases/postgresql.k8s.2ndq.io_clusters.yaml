@@ -293,15 +293,14 @@ spec:
             currentPrimary:
               description: Current primary instance
               type: string
-            imageName:
-              description: Name of the image used
-              type: string
+            danglingPVC:
+              description: List of all the PVCs created by this bdrGroup and still
+                available which are not attached to a Pod
+              items:
+                type: string
+              type: array
             instances:
               description: Total number of instances in the cluster
-              format: int32
-              type: integer
-            instancesBeingUpdated:
-              description: Total number of instances which are being updated
               format: int32
               type: integer
             latestGeneratedNode:
@@ -313,23 +312,6 @@ spec:
               description: Total number of ready instances in the cluster
               format: int32
               type: integer
-            rollingUpdateStatus:
-              additionalProperties:
-                description: RollingUpdateStatus contains the information about an
-                  instance which is being updated
-                properties:
-                  imageName:
-                    description: The image which we put into the Pod
-                    type: string
-                  startedAt:
-                    description: When the update has been started
-                    format: date-time
-                    type: string
-                required:
-                - imageName
-                type: object
-              description: The status of the current updated servers
-              type: object
             targetPrimary:
               description: Target primary instance, this is different from the previous
                 one during a switchover or a failover

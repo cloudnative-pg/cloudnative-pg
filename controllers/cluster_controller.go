@@ -24,6 +24,7 @@ import (
 
 const (
 	podOwnerKey = ".metadata.controller"
+	pvcOwnerKey = ".metadata.controller"
 )
 
 var (
@@ -42,7 +43,7 @@ type ClusterReconciler struct {
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;update
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=create
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
@@ -95,7 +96,13 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	childPods, err = r.getManagedPods(ctx, cluster)
 	if err != nil {
-		r.Log.Error(err, "Cannot create extract the list of managed Pods")
+		r.Log.Error(err, "Cannot extract the list of managed Pods")
+		return ctrl.Result{}, err
+	}
+
+	childPVCs, err := r.getManagedPVCs(ctx, cluster)
+	if err != nil {
+		r.Log.Error(err, "Cannot extract the list of managed PVCs")
 		return ctrl.Result{}, err
 	}
 
@@ -106,7 +113,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Update the status section of this Cluster resource
-	if err = r.updateResourceStatus(ctx, &cluster, childPods); err != nil {
+	if err = r.updateResourceStatus(ctx, &cluster, childPods, childPVCs); err != nil {
 		if apierrs.IsConflict(err) {
 			// Let's wait for another reconciler loop, since the
 			// status already changed
@@ -114,14 +121,6 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}
 
 		return ctrl.Result{}, err
-	}
-
-	// Find if we have Pods that we are upgrading
-	if cluster.Status.InstancesBeingUpdated != 0 {
-		r.Log.V(2).Info("There are nodes being upgraded, waiting for the new image to be applied",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace)
-		return ctrl.Result{}, nil
 	}
 
 	// Get the replication status
@@ -181,6 +180,11 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, nil
 	}
 
+	// Recreate missing Pods
+	if len(cluster.Status.DanglingPVC) > 0 {
+		return ctrl.Result{}, r.reattachDanglingPVC(ctx, &cluster)
+	}
+
 	// Are there missing nodes? Let's create one
 	if cluster.Status.Instances < cluster.Spec.Instances {
 		newNodeSerial, err := r.generateNodeSerial(ctx, &cluster)
@@ -197,32 +201,47 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Check if we need to handle a rolling upgrade
-	if cluster.Status.ImageName != cluster.Spec.ImageName {
-		if err = r.upgradeCluster(ctx, &cluster, childPods, instancesStatus); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, r.upgradeCluster(ctx, &cluster, childPods, instancesStatus)
 }
 
 // SetupWithManager creates a ClusterReconciler
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by this controller
-	if err := mgr.GetFieldIndexer().IndexField(&corev1.Pod{}, podOwnerKey, func(rawObj runtime.Object) []string {
-		pod := rawObj.(*corev1.Pod)
-		owner := metav1.GetControllerOf(pod)
-		if owner == nil {
-			return nil
-		}
+	if err := mgr.GetFieldIndexer().IndexField(
+		&corev1.Pod{},
+		podOwnerKey, func(rawObj runtime.Object) []string {
+			pod := rawObj.(*corev1.Pod)
+			owner := metav1.GetControllerOf(pod)
+			if owner == nil {
+				return nil
+			}
 
-		if owner.APIVersion != apiGVString || owner.Kind != "Cluster" {
-			return nil
-		}
+			if owner.APIVersion != apiGVString || owner.Kind != "Cluster" {
+				return nil
+			}
 
-		return []string{owner.Name}
-	}); err != nil {
+			return []string{owner.Name}
+		}); err != nil {
+		return err
+	}
+
+	// Create a new indexed field on PVCs.
+	if err := mgr.GetFieldIndexer().IndexField(
+		&corev1.PersistentVolumeClaim{},
+		pvcOwnerKey, func(rawObj runtime.Object) []string {
+			persistentVolumeClaim := rawObj.(*corev1.PersistentVolumeClaim)
+			owner := metav1.GetControllerOf(persistentVolumeClaim)
+			if owner == nil {
+				return nil
+			}
+
+			if owner.APIVersion != apiGVString || owner.Kind != "Cluster" {
+				return nil
+			}
+
+			return []string{owner.Name}
+		}); err != nil {
 		return err
 	}
 

@@ -8,11 +8,18 @@ package specs
 
 import (
 	"fmt"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+)
+
+const (
+	// PvcUnusableAnnotation masks PVC when whey are not usable and permanently
+	// failed
+	PvcUnusableAnnotation = "k8s.2ndq.io/pvcUnusable"
 )
 
 // CreatePVC create spec of a PVC, given its name and the storage configuration
@@ -28,6 +35,9 @@ func CreatePVC(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
 			Namespace: namespace,
+			Annotations: map[string]string{
+				ClusterSerialAnnotationName: strconv.Itoa(int(nodeSerial)),
+			},
 		},
 	}
 

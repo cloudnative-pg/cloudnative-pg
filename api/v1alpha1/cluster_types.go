@@ -95,14 +95,8 @@ type ClusterStatus struct {
 	// Total number of ready instances in the cluster
 	ReadyInstances int32 `json:"readyInstances,omitempty"`
 
-	// Total number of instances which are being updated
-	InstancesBeingUpdated int32 `json:"instancesBeingUpdated,omitempty"`
-
 	// ID of the latest generated node (used to avoid node name clashing)
 	LatestGeneratedNode int32 `json:"latestGeneratedNode,omitempty"`
-
-	// Name of the image used
-	ImageName string `json:"imageName,omitempty"`
 
 	// Current primary instance
 	CurrentPrimary string `json:"currentPrimary,omitempty"`
@@ -111,8 +105,9 @@ type ClusterStatus struct {
 	// during a switchover or a failover
 	TargetPrimary string `json:"targetPrimary,omitempty"`
 
-	// The status of the current updated servers
-	RollingUpdateStatus map[string]RollingUpdateStatus `json:"rollingUpdateStatus,omitempty"`
+	// List of all the PVCs created by this bdrGroup and still available
+	// which are not attached to a Pod
+	DanglingPVC []string `json:"danglingPVC,omitempty"`
 }
 
 // MasterUpdateStrategy contains the strategy available to apply an update
@@ -215,10 +210,6 @@ type ClusterList struct {
 // GetImageName get the name of the image that should be used
 // to create the pods
 func (cluster *Cluster) GetImageName() string {
-	if len(cluster.Status.ImageName) > 0 {
-		return cluster.Status.ImageName
-	}
-
 	if len(cluster.Spec.ImageName) > 0 {
 		return cluster.Spec.ImageName
 	}

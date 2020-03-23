@@ -8,8 +8,10 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
 )
@@ -39,6 +41,22 @@ func (r *ClusterReconciler) scaleDownCluster(
 			"namespace", cluster.Namespace,
 			"pod", sacrificialPod.Name)
 		return err
+	}
+
+	if !cluster.IsUsingPersistentStorage() {
+		return nil
+	}
+
+	// Let's drop the PVC too
+	pvc := v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      sacrificialPod.Name,
+			Namespace: sacrificialPod.Namespace,
+		},
+	}
+	err = r.Delete(ctx, &pvc)
+	if err != nil {
+		return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialPod.Name, err)
 	}
 
 	return nil

@@ -9,15 +9,9 @@ package controllers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sort"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/postgres"
@@ -25,10 +19,6 @@ import (
 )
 
 var (
-	// ErrorCannotFindPostgresContainer is returned when the rolling update logic cannot find
-	// the container to update
-	ErrorCannotFindPostgresContainer = errors.New("cannot find 'postgres' container")
-
 	// ErrorInconsistentClusterStatus is raised when the current cluster has no primary nor
 	// the sufficient number of nodes to issue a switchover
 	ErrorInconsistentClusterStatus = errors.New("inconsistent cluster status")
@@ -40,7 +30,7 @@ func (r *ClusterReconciler) upgradeCluster(
 	cluster *v1alpha1.Cluster,
 	podList v1.PodList, clusterStatus postgres.PostgresqlStatusList,
 ) error {
-	targetImageName := cluster.Spec.ImageName
+	targetImageName := cluster.GetImageName()
 
 	// Sort sortedPodList in reverse order
 	sortedPodList := podList.Items
@@ -70,19 +60,7 @@ func (r *ClusterReconciler) upgradeCluster(
 	}
 
 	if masterIdx == -1 {
-		// The master has been updated too, let's declare the
-		// rolling update done
-
-		r.Log.Info("Rolling update done",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
-			"from", cluster.Status.ImageName,
-			"to", cluster.Spec.ImageName)
-		cluster.Status.ImageName = cluster.Spec.ImageName
-		if err := r.Status().Update(ctx, cluster); !apierrors.IsConflict(err) {
-			return err
-		}
-
+		// The master has been updated too, everything is OK
 		return nil
 	}
 
@@ -114,74 +92,13 @@ func (r *ClusterReconciler) upgradeCluster(
 
 // updatePod update an instance to a newer image version
 func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *v1alpha1.Cluster, pod *v1.Pod) error {
-	patch := client.MergeFrom(pod.DeepCopy())
-
-	oldImage := ""
-	for idx := len(pod.Spec.Containers) - 1; idx >= 0; idx-- {
-		if pod.Spec.Containers[idx].Name == specs.PostgresContainerName {
-			oldImage = pod.Spec.Containers[idx].Image
-			pod.Spec.Containers[idx].Image = cluster.Spec.ImageName
-			break
-		}
-	}
-
-	if oldImage == "" {
-		r.Log.Info("Cannot find PostgreSQL container on pod",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
-			"podName", pod.Name)
-		return ErrorCannotFindPostgresContainer
-	}
-
-	currentTime := time.Now()
-
-	// Upgrading Pod
-	r.Log.Info("Upgrading Pod",
+	r.Log.Info("Deleting old Pod",
 		"clusterName", cluster.Name,
 		"podName", pod.Name,
 		"namespace", cluster.Namespace,
-		"to", cluster.Spec.ImageName,
-		"from", oldImage)
+		"to", cluster.Spec.ImageName)
 
-	err := r.Patch(ctx, pod, patch)
-	if err != nil {
-		return err
-	}
-
-	// The following operation is really important to distinguish
-	// between instances waiting an upgrade and the other ones. This
-	// is the reason why in this case it's retried without waiting
-	// for another reconciliation loop.
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var updatedCluster v1alpha1.Cluster
-
-		// Get the latest version of the cluster
-		err := r.Get(ctx, client.ObjectKey{
-			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
-		}, &updatedCluster)
-		if err != nil {
-			return err
-		}
-
-		// Record current time and operation into
-		// the cluster status
-		if cluster.Status.RollingUpdateStatus == nil {
-			cluster.Status.RollingUpdateStatus = make(map[string]v1alpha1.RollingUpdateStatus)
-		}
-
-		delete(cluster.Status.RollingUpdateStatus, pod.Name)
-		cluster.Status.RollingUpdateStatus[pod.Name] = v1alpha1.RollingUpdateStatus{
-			ImageName: cluster.Spec.ImageName,
-			StartedAt: metav1.Time{Time: currentTime},
-		}
-
-		// Update the cluster status to remember that
-		// we are upgrading a certain instance
-		return r.Status().Update(ctx, cluster)
-	})
-	if err != nil {
-		err = fmt.Errorf("marking pod as upgraded: %v", err)
-	}
-	return err
+	// Let's wait for this Pod to be recloned or recreated using the
+	// same storage
+	return r.Delete(ctx, pod)
 }

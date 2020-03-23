@@ -7,8 +7,6 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package utils
 
 import (
-	"time"
-
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -32,25 +30,6 @@ func IsPodActive(p corev1.Pod) bool {
 	return corev1.PodSucceeded != p.Status.Phase &&
 		corev1.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil
-}
-
-// IsContainerStartedBefore check if a new image is being applied
-// to a Pod
-func IsContainerStartedBefore(p corev1.Pod, containerName string, t time.Time) bool {
-	for _, container := range p.Status.ContainerStatuses {
-		if container.Name != containerName {
-			continue
-		}
-
-		if container.State.Running == nil {
-			// Container is not started
-			return false
-		}
-
-		return container.State.Running.StartedAt.Time.Before(t)
-	}
-
-	return false
 }
 
 // FilterActivePods returns pods that have not terminated.

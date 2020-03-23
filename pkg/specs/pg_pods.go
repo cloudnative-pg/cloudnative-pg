@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -20,10 +21,10 @@ var (
 	ErrorContainerNotFound = errors.New("container not found")
 )
 
-// GetNodeSerial get the serial number of a Pod created by the operator
+// GetNodeSerial get the serial number of an object created by the operator
 // for a Cluster
-func GetNodeSerial(pod corev1.Pod) (int, error) {
-	nodeSerial, ok := pod.Annotations[ClusterSerialAnnotationName]
+func GetNodeSerial(object metav1.ObjectMeta) (int, error) {
+	nodeSerial, ok := object.Annotations[ClusterSerialAnnotationName]
 	if !ok {
 		return 0, fmt.Errorf("missing node serial annotation")
 	}

@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/specs"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 )
 
@@ -34,34 +33,41 @@ func (r *ClusterReconciler) getManagedPods(
 	return childPods, nil
 }
 
+func (r *ClusterReconciler) getManagedPVCs(
+	ctx context.Context,
+	cluster v1alpha1.Cluster,
+) (corev1.PersistentVolumeClaimList, error) {
+	var childPVCs corev1.PersistentVolumeClaimList
+	if err := r.List(ctx, &childPVCs,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingFields{pvcOwnerKey: cluster.Name},
+	); err != nil {
+		r.Log.Error(err, "Unable to list child PVCs",
+			"namespace", cluster.Namespace, "name", cluster.Name)
+		return corev1.PersistentVolumeClaimList{}, err
+	}
+
+	return childPVCs, nil
+}
+
 func (r *ClusterReconciler) updateResourceStatus(
 	ctx context.Context,
 	cluster *v1alpha1.Cluster,
 	childPods corev1.PodList,
+	childPVCs corev1.PersistentVolumeClaimList,
 ) error {
-	// If the image name to be used by the Cluster is not specified
-	// in its status, write it
-	if len(cluster.Status.ImageName) == 0 {
-		cluster.Status.ImageName = cluster.GetImageName()
-	}
-
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones
 	filteredPods := utils.FilterActivePods(childPods.Items)
 
-	// Look for updating Pods
-	ProcessUpgradingPods(cluster.Status.RollingUpdateStatus, filteredPods)
-	for podName := range cluster.Status.RollingUpdateStatus {
-		r.Log.Info("Detected Pod which is being upgraded",
-			"clusterName", cluster.Name,
-			"podName", podName,
-			"namespace", cluster.Namespace)
+	// Fill the list of dangling PVCs
+	if cluster.IsUsingPersistentStorage() {
+		cluster.Status.DanglingPVC = utils.DetectDanglingPVCs(filteredPods, childPVCs.Items)
 	}
 
 	// Count pods
 	cluster.Status.Instances = int32(len(filteredPods))
 	cluster.Status.ReadyInstances = int32(utils.CountReadyPods(filteredPods))
-	cluster.Status.InstancesBeingUpdated = int32(len(cluster.Status.RollingUpdateStatus))
 
 	return r.Status().Update(ctx, cluster)
 }
@@ -77,23 +83,4 @@ func (r *ClusterReconciler) setPrimaryInstance(
 	}
 
 	return nil
-}
-
-// ProcessUpgradingPods counts the number of Pods which are being upgraded to
-// a different image
-func ProcessUpgradingPods(
-	rollingUpdateStatus map[string]v1alpha1.RollingUpdateStatus,
-	podList []corev1.Pod,
-) {
-	for podName, podStatus := range rollingUpdateStatus {
-		for _, pod := range podList {
-			if pod.Name != podName {
-				continue
-			}
-
-			if !utils.IsContainerStartedBefore(pod, specs.PostgresContainerName, podStatus.StartedAt.Time) {
-				delete(rollingUpdateStatus, podName)
-			}
-		}
-	}
 }

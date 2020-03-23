@@ -7,8 +7,6 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package utils
 
 import (
-	"time"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -123,68 +121,6 @@ var _ = Describe("Pod conditions test suite", func() {
 			podList := []corev1.Pod{car2, foo, bar, car1}
 
 			Expect(CountReadyPods(podList)).To(Equal(2))
-		})
-	})
-
-	Describe("Must check for Pods which have been started after a certain time", func() {
-		nonRunningPod := corev1.Pod{
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name:  "postgres",
-						Image: "postgres:12.1",
-					},
-				},
-			},
-			Status: corev1.PodStatus{
-				ContainerStatuses: []corev1.ContainerStatus{
-					{
-						Name:  "postgres",
-						Image: "postgres:12.1",
-					},
-				},
-			},
-		}
-
-		runningPod := corev1.Pod{
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name:  "postgres",
-						Image: "postgres:12.1",
-					},
-				},
-			},
-			Status: corev1.PodStatus{
-				ContainerStatuses: []corev1.ContainerStatus{
-					{
-						Name:  "postgres",
-						Image: "postgres:12.1",
-						State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{
-								StartedAt: metav1.Time{
-									Time: time.Now(),
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-
-		It("works on Pod which are not running", func() {
-			Expect(IsContainerStartedBefore(nonRunningPod, "postgres", time.Now().Add(-time.Hour))).To(BeFalse())
-			Expect(IsContainerStartedBefore(nonRunningPod, "postgres", time.Now().Add(time.Hour))).To(BeFalse())
-		})
-
-		It("works on Pod on which the requested container isn't defined", func() {
-			Expect(IsContainerStartedBefore(nonRunningPod, "testContainer", time.Now().Add(-time.Hour))).To(BeFalse())
-			Expect(IsContainerStartedBefore(nonRunningPod, "testContainer", time.Now().Add(time.Hour))).To(BeFalse())
-		})
-
-		It("works on Pod which are running", func() {
-			Expect(IsContainerStartedBefore(runningPod, "postgres", time.Now().Add(-time.Hour))).To(BeFalse())
-			Expect(IsContainerStartedBefore(runningPod, "postgres", time.Now().Add(time.Hour))).To(BeTrue())
 		})
 	})
 })

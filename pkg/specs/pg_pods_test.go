@@ -34,23 +34,23 @@ var _ = Describe("Serial ID of a PostgreSQL node", func() {
 	firstPod := CreatePrimaryPod(cluster, 1)
 
 	It("can be extracted from a Pod", func() {
-		result, error := GetNodeSerial(*firstPod)
-		Expect(error).To(BeNil())
+		result, err := GetNodeSerial(firstPod.ObjectMeta)
+		Expect(err).To(BeNil())
 		Expect(result).To(Equal(1))
 	})
 
 	It("cannot be extracted if the Pod is not created by the operator", func() {
 		pod := corev1.Pod{}
-		_, error := GetNodeSerial(pod)
-		Expect(error).ToNot(BeNil())
+		_, err := GetNodeSerial(pod.ObjectMeta)
+		Expect(err).ToNot(BeNil())
 	})
 
 	It("cannot be extracted if the Pod is created by the operator but has a wrong label", func() {
 		brokenPod := firstPod.DeepCopy()
 		brokenPod.Annotations[ClusterSerialAnnotationName] = "thisisatest"
 
-		_, error := GetNodeSerial(*brokenPod)
-		Expect(error).ToNot(BeNil())
+		_, err := GetNodeSerial(brokenPod.ObjectMeta)
+		Expect(err).ToNot(BeNil())
 	})
 })
 

@@ -154,7 +154,7 @@ func getSacrificialPod(podList []corev1.Pod) *corev1.Pod {
 			continue
 		}
 
-		podSerial, err := specs.GetNodeSerial(pod)
+		podSerial, err := specs.GetNodeSerial(pod.ObjectMeta)
 
 		// This isn't one of our Pods, since I can't get the node serial
 		if err != nil {
@@ -184,7 +184,7 @@ func getPrimaryPod(podList []corev1.Pod) *corev1.Pod {
 			continue
 		}
 
-		_, err := specs.GetNodeSerial(pod)
+		_, err := specs.GetNodeSerial(pod.ObjectMeta)
 
 		// This isn't one of our Pods, since I can't get the node serial
 		if err != nil {

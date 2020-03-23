@@ -8,6 +8,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
@@ -342,19 +343,56 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 	if cluster.IsUsingPersistentStorage() {
 		pvcSpec := specs.CreatePVC(*cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
-		pvcSpec.SetOwnerReferences([]metav1.OwnerReference{
-			{
-				APIVersion: "v1",
-				Kind:       "Pod",
-				Name:       cluster.Name,
-				UID:        cluster.UID,
-			},
-		})
-
+		utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 		if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
 			r.Log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 			return err
 		}
+	}
+
+	return nil
+}
+
+// reattachDanglingPVC reattach a dangling PVC
+func (r *ClusterReconciler) reattachDanglingPVC(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	if len(cluster.Status.DanglingPVC) == 0 {
+		return nil
+	}
+
+	pvc := corev1.PersistentVolumeClaim{}
+	err := r.Get(ctx, client.ObjectKey{Name: cluster.Status.DanglingPVC[0], Namespace: cluster.Namespace}, &pvc)
+	if err != nil {
+		return fmt.Errorf("error while reattaching PVC: %v", err)
+	}
+
+	nodeSerial, err := specs.GetNodeSerial(pvc.ObjectMeta)
+	if err != nil {
+		return fmt.Errorf("cannot detect serial from PVC %v: %v", pvc.Name, err)
+	}
+
+	pod := specs.PodWithExistingStorage(*cluster, int32(nodeSerial))
+
+	r.Log.Info("Creating new Pod to reattach a PVC",
+		"name", cluster.Name,
+		"namespace", cluster.Namespace,
+		"podName", pod.Name,
+		"pvcName", pvc.Name)
+
+	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
+		r.Log.Error(err, "Unable to set the owner reference for the Pod")
+		return err
+	}
+
+	if err := r.Create(ctx, pod); err != nil {
+		if apierrs.IsAlreadyExists(err) {
+			// This Pod was already created, maybe the cache is stale.
+			// Let's reconcile another time
+			r.Log.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
+			return nil
+		}
+
+		r.Log.Error(err, "Unable to create Pod", "pod", pod)
+		return err
 	}
 
 	return nil
