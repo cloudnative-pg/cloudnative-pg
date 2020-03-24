@@ -21,6 +21,7 @@ nav:
   - Before you start: 'before_you_start.md'
   - Architecture: 'architecture.md'
   - Quickstart: 'quickstart.md'
+  - Security: 'security.md'
   - Custom Resource Definitions: 'crd.md'
   - Configuration samples: 'samples.md'
   - Exposing Postgres services: 'expose_pg_services.md'
