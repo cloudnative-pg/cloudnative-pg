@@ -29,6 +29,9 @@ spec:
         - --enable-leader-election
         image: controller:latest
         name: manager
+        env:
+        - name: OPERATOR_IMAGE_NAME
+          value: $(OPERATOR_IMAGE_NAME)
         resources:
           limits:
             cpu: 100m

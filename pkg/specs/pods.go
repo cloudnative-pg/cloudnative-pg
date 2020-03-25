@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/versions"
 )
 
 const (
@@ -60,6 +61,21 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 			Subdomain: cluster.GetServiceAnyName(),
 			InitContainers: []corev1.Container{
 				{
+					Name:  "bootstrap-controller",
+					Image: versions.GetDefaultOperatorImageName(),
+					Command: []string{
+						"/manager",
+						"bootstrap",
+						"/controller/manager",
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "controller",
+							MountPath: "/controller",
+						},
+					},
+				},
+				{
 					Name:  "bootstrap-instance",
 					Image: cluster.GetImageName(),
 					Env: []corev1.EnvVar{
@@ -69,7 +85,8 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 						},
 					},
 					Command: []string{
-						"/pgk",
+						"/controller/manager",
+						"instance",
 						"init",
 						"-pw-file", "/etc/superuser-secret/password",
 						"-app-db-name", cluster.Spec.ApplicationConfiguration.Database,
@@ -96,6 +113,10 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 						{
 							Name:      "app-secret",
 							MountPath: "/etc/app-secret",
+						},
+						{
+							Name:      "controller",
+							MountPath: "/controller",
 						},
 					},
 				},
@@ -158,6 +179,12 @@ func createPostgresVolumes(cluster v1alpha1.Cluster, podName string) []corev1.Vo
 				},
 			},
 		},
+		{
+			Name: "controller",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
 	}
 }
 
@@ -210,6 +237,10 @@ func createPostgresContainers(cluster v1alpha1.Cluster, podName string) []corev1
 					Name:      "pgdata",
 					MountPath: "/var/lib/postgresql/data",
 				},
+				{
+					Name:      "controller",
+					MountPath: "/controller",
+				},
 			},
 			ReadinessProbe: &corev1.Probe{
 				TimeoutSeconds: 5,
@@ -250,7 +281,8 @@ func createPostgresContainers(cluster v1alpha1.Cluster, podName string) []corev1
 				},
 			},
 			Command: []string{
-				"/pgk",
+				"/controller/manager",
+				"instance",
 				"run",
 				"-app-db-name", cluster.Spec.ApplicationConfiguration.Database,
 			},
@@ -330,6 +362,21 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 			Subdomain: cluster.GetServiceAnyName(),
 			InitContainers: []corev1.Container{
 				{
+					Name:  "bootstrap-controller",
+					Image: versions.GetDefaultOperatorImageName(),
+					Command: []string{
+						"/manager",
+						"bootstrap",
+						"/controller/manager",
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "controller",
+							MountPath: "/controller",
+						},
+					},
+				},
+				{
 					Name:  "bootstrap-replica",
 					Image: cluster.GetImageName(),
 					Env: []corev1.EnvVar{
@@ -343,7 +390,8 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 						},
 					},
 					Command: []string{
-						"/pgk",
+						"/controller/manager",
+						"instance",
 						"join",
 						"-parent-node", cluster.GetServiceReadWriteName(),
 					},
@@ -363,6 +411,10 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 						{
 							Name:      "app-secret",
 							MountPath: "/etc/app-secret",
+						},
+						{
+							Name:      "controller",
+							MountPath: "/controller",
 						},
 					},
 				},

@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 */
 
-package main
+package app
 
 import (
 	"flag"
@@ -22,7 +22,10 @@ var (
 	instance postgres.Instance
 )
 
-func main() {
+// InstanceManagerCommand is the command handling the management of a
+// certain instance and it's meant to be executed inside the PostgreSQL
+// image
+func InstanceManagerCommand(args []string) {
 	var pwFile string
 	var appDbName string
 	var appUser string
@@ -72,8 +75,8 @@ func main() {
 
 	statusCommand := flag.NewFlagSet("status", flag.ExitOnError)
 
-	if len(os.Args) == 1 {
-		fmt.Println("usage: pgk <command> <args>")
+	if len(args) == 0 {
+		fmt.Println("usage: manager instance <command> <args>")
 		fmt.Println("Available commands:")
 		fmt.Println("  init    Bootstrap the first instance of a PostgreSQL cluster")
 		fmt.Println("  join    Bootstrap a new node by joining an existing node")
@@ -82,10 +85,10 @@ func main() {
 		return
 	}
 
-	switch os.Args[1] {
+	switch args[0] {
 	case "init":
 		// Ignore errors; initCommand is set for ExitOnError.
-		_ = initCommand.Parse(os.Args[2:])
+		_ = initCommand.Parse(args[1:])
 		info := postgres.InitInfo{
 			PgData:                  pgData,
 			PasswordFile:            pwFile,
@@ -100,7 +103,7 @@ func main() {
 		initSubCommand(info)
 	case "join":
 		// Ignore errors; joinCommand is set for ExitOnError.
-		_ = joinCommand.Parse(os.Args[2:])
+		_ = joinCommand.Parse(args[1:])
 		info := postgres.JoinInfo{
 			PgData:     pgData,
 			ParentNode: parentNode,
@@ -109,7 +112,7 @@ func main() {
 		joinSubCommand(info)
 	case "run":
 		// Ignore errors; runCommand is set for ExitOnError.
-		_ = runCommand.Parse(os.Args[2:])
+		_ = runCommand.Parse(args[1:])
 		instance.PgData = pgData
 		instance.ApplicationDatabase = appDbName
 		instance.Port = 5432
@@ -119,10 +122,11 @@ func main() {
 		runSubCommand()
 	case "status":
 		// Ignore errors; statusCommand is set for ExitOnError
-		_ = statusCommand.Parse(os.Args[2:])
+		_ = statusCommand.Parse(args[1:])
 		statusSubCommand()
 	default:
-		fmt.Printf("%v is not a valid command\n", os.Args[1])
+		fmt.Printf("%v is not a valid command\n", args[0])
+		os.Exit(1)
 	}
 }
 

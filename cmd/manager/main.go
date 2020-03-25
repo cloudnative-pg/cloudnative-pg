@@ -10,8 +10,6 @@ import (
 	"flag"
 	"os"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/versions"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -19,7 +17,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	postgresqlv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+	"github.com/2ndquadrant/cloud-native-postgresql/cmd/manager/app"
 	"github.com/2ndquadrant/cloud-native-postgresql/controllers"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/versions"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -35,7 +35,30 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+// This is the main procedure of the operator, and is used as the
+// controller-manager of the operator and as the controller of a certain
+// PostgreSQL instance.
+//
+// This code really belongs to app/controller_manager.go but we can't put
+// it here to respect the project layout created by kubebuilder.
+//
+// TODO this code wants to be replaced by using Cobra. Please evaluate if
+// there are cons using Cobra with kubebuilder
 func main() {
+	// If we are about to handle a subcommand, let's do that
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "instance":
+			app.InstanceManagerCommand(os.Args[2:])
+			return
+
+		case "bootstrap":
+			app.BootstrapInto(os.Args[0], os.Args[2:])
+			return
+		}
+	}
+
+	// No subcommand invoked, let's start the operator
 	var metricsAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")

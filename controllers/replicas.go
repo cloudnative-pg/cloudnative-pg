@@ -106,7 +106,12 @@ func (r *ClusterReconciler) getReplicaStatusFromPod(
 	var result postgres.PostgresqlStatus
 
 	twoSeconds := time.Second * 2
-	stdout, _, err := utils.ExecCommand(ctx, pod, specs.PostgresContainerName, &twoSeconds, "/pgk", "status")
+	stdout, _, err := utils.ExecCommand(
+		ctx,
+		pod,
+		specs.PostgresContainerName,
+		&twoSeconds,
+		"/controller/manager", "instance", "status")
 	if err != nil {
 		return result, err
 	}

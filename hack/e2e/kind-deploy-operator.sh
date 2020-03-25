@@ -13,7 +13,6 @@ KIND_CLUSTER_NAME=${1}
 DEBUG=${DEBUG:-false}
 BUILD_IMAGE=${BUILD_IMAGE:-true}
 OPERATOR_IMG="quay.io/2ndquadrant/cloud-native-postgresql-operator:e2e"
-POSTGRES_IMG="quay.io/2ndquadrant/cloud-native-postgresql:12"
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 
 if [ "${DEBUG}" = true ]
@@ -24,11 +23,6 @@ fi
 build_and_load_operator() {
     docker build -t "${OPERATOR_IMG}" "${ROOT_DIR}"
     kind load -v 1 docker-image --name "${KIND_CLUSTER_NAME}" "${OPERATOR_IMG}"
-}
-
-build_and_load_postgres() {
-    docker build -t "${POSTGRES_IMG}" -f "${ROOT_DIR}/Dockerfile-postgresql"  "${ROOT_DIR}"
-    kind load -v 1 docker-image --name "${KIND_CLUSTER_NAME}" "${POSTGRES_IMG}"
 }
 
 upload_image_to_kind() {
@@ -55,10 +49,8 @@ main() {
     if [ "${BUILD_IMAGE}" != false ]
     then
         build_and_load_operator
-        build_and_load_postgres
     else
         upload_image_to_kind "${CONTROLLER_IMG}" "${OPERATOR_IMG}"
-        upload_image_to_kind "${POSTGRES_IMG}"
     fi
     deploy_operator
 }

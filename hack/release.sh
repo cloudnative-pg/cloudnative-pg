@@ -60,7 +60,9 @@ fi
 mkdir -p releases/
 release_manifest="releases/postgresql-operator-${release_version}.yaml"
 
-sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" pkg/versions/versions.go
+sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
+    -e "/DefaultOperatorImageName *= *.*/Is/\"\(.*\):.*\"/\"\1:${release_version}\"/" \
+    pkg/versions/versions.go
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
 (

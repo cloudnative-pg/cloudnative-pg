@@ -18,7 +18,17 @@ const (
 	// pods.
 	DefaultImageName = "2ndq.io/release/k8s/cloud-native-postgresql:12"
 
+	// DefaultOperatorImageName used to bootstrap the controller in the Pods running
+	// PostgreSQL
+	DefaultOperatorImageName = "2ndq.io/release/cloud-native-postgresql-operator:0.0.1"
+
+	// postgresImageNameEnvVar is the environment variable that allow overriding the default image used
+	// for PostgreSQL
 	postgresImageNameEnvVar = "POSTGRES_IMAGE_NAME"
+
+	// operatorImageNameEnvVar is the environment variable that allow overriding the default image used
+	// for the PostgreSQL operator
+	operatorImageNameEnvVar = "OPERATOR_IMAGE_NAME"
 )
 
 // GetDefaultImageName gets the name of the image that will be used
@@ -28,6 +38,17 @@ func GetDefaultImageName() string {
 	result := os.Getenv(postgresImageNameEnvVar)
 	if len(result) == 0 {
 		result = DefaultImageName
+	}
+
+	return result
+}
+
+// GetDefaultOperatorImageName gets the name of the image of the
+// operator.
+func GetDefaultOperatorImageName() string {
+	result := os.Getenv(operatorImageNameEnvVar)
+	if len(result) == 0 {
+		return DefaultOperatorImageName
 	}
 
 	return result

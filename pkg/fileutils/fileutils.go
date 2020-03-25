@@ -9,6 +9,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package fileutils
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 )
@@ -54,4 +55,31 @@ func FileExists(fileName string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// CopyFile copy a file from a location to another one
+func CopyFile(source, destination string) error {
+	in, err := os.Open(source) // #nosec
+	if err != nil {
+		return err
+	}
+	defer func() {
+		closeError := in.Close()
+		if closeError != nil {
+			err = closeError
+		}
+	}()
+
+	out, err := os.Create(destination)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+
+	err = out.Close()
+	return err
 }
