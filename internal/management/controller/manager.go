@@ -9,12 +9,16 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package controller
 
 import (
+	"time"
+
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 
 	apiv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/log"
@@ -50,7 +54,23 @@ func NewInstanceReconciler(instance *postgres.Instance) (*InstanceReconciler, er
 }
 
 // Run runs the reconciliation loop for this resource
-func (r *InstanceReconciler) Run() error {
+func (r *InstanceReconciler) Run() {
+	for {
+		// Retry with exponential back-off unless it is a connection refused error
+		err := retry.OnError(retry.DefaultBackoff, func(err error) bool {
+			r.log.Error(err, "Error calling Watch", "cluster", r.instance.ClusterName)
+			return !utilnet.IsConnectionRefused(err)
+		}, r.Watch)
+		if err != nil {
+			// If this is "connection refused" error, it means that most likely apiserver is not responsive.
+			// If that's the case wait and resend watch request.
+			time.Sleep(time.Second)
+		}
+	}
+}
+
+// Watch contains the main reconciler loop
+func (r *InstanceReconciler) Watch() error {
 	var err error
 
 	// This is an example of how to watch a certain object
@@ -72,13 +92,15 @@ func (r *InstanceReconciler) Run() error {
 			break
 		}
 
-		err = r.Reconcile(&event)
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return r.Reconcile(&event)
+		})
 		if err != nil {
 			r.log.Error(err, "Reconciliation error")
-			// TODO Retry with exponential back-off
 		}
 	}
 
+	r.instanceWatch.Stop()
 	return nil
 }
 

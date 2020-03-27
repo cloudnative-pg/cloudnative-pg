@@ -78,12 +78,7 @@ func startWebServer() {
 
 // startReconciler start the reconciliation loop
 func startReconciler() {
-	go func() {
-		err := reconciler.Run()
-		if err != nil {
-			log.Log.Error(err, "Error while starting the controller")
-		}
-	}()
+	go reconciler.Run()
 }
 
 // registerSignalHandler handles signals from k8s, notifying postgres as
