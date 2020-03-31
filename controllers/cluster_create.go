@@ -20,6 +20,7 @@ import (
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/specs"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/versions"
 )
 
 const (
@@ -108,6 +109,7 @@ func (r *ClusterReconciler) createImagePullSecret(ctx context.Context, cluster *
 		Type: operatorSecret.Type,
 	}
 	utils.SetAsOwnedBy(&secret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&secret.ObjectMeta, versions.Version)
 
 	// Another sync loop may have already created the service. Let's check that
 	if err := r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
@@ -123,6 +125,7 @@ func (r *ClusterReconciler) createImagePullSecret(ctx context.Context, cluster *
 func (r *ClusterReconciler) createPostgresConfigMap(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	configMap := specs.CreatePostgresConfigMap(cluster)
 	utils.SetAsOwnedBy(&configMap.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&configMap.ObjectMeta, versions.Version)
 	if err := r.Create(ctx, configMap); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			return nil
@@ -145,6 +148,7 @@ func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *
 
 	postgresSecret := specs.CreateSecret(cluster.GetSuperuserSecretName(), cluster.Namespace, "postgres", postgresPassword)
 	utils.SetAsOwnedBy(&postgresSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&postgresSecret.ObjectMeta, versions.Version)
 	if err := r.Create(ctx, postgresSecret); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			return nil
@@ -155,6 +159,7 @@ func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *
 	appSecret := specs.CreateSecret(cluster.GetApplicationSecretName(), cluster.Namespace,
 		cluster.Spec.ApplicationConfiguration.Owner, appPassword)
 	utils.SetAsOwnedBy(&appSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&appSecret.ObjectMeta, versions.Version)
 	if err := r.Create(ctx, appSecret); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			return nil
@@ -168,6 +173,7 @@ func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *
 func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	anyService := specs.CreateClusterAnyService(*cluster)
 	utils.SetAsOwnedBy(&anyService.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&anyService.ObjectMeta, versions.Version)
 	if err := r.Create(ctx, anyService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
 			return err
@@ -176,6 +182,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 
 	readService := specs.CreateClusterReadService(*cluster)
 	utils.SetAsOwnedBy(&readService.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&readService.ObjectMeta, versions.Version)
 	if err := r.Create(ctx, readService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
 			return err
@@ -184,6 +191,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 
 	readWriteService := specs.CreateClusterReadWriteService(*cluster)
 	utils.SetAsOwnedBy(&readWriteService.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&readWriteService.ObjectMeta, versions.Version)
 	if err := r.Create(ctx, readWriteService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
 			return err
@@ -197,6 +205,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	targetPdb := specs.CreatePodDisruptionBudget(*cluster)
 	utils.SetAsOwnedBy(&targetPdb.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&targetPdb.ObjectMeta, versions.Version)
 
 	err := r.Create(ctx, &targetPdb)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -211,6 +220,7 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	serviceAccount := specs.CreateServiceAccount(*cluster)
 	utils.SetAsOwnedBy(&serviceAccount.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&serviceAccount.ObjectMeta, versions.Version)
 
 	err := r.Create(ctx, &serviceAccount)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -225,6 +235,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v
 func (r *ClusterReconciler) createRole(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	roleBinding := specs.CreateRole(*cluster)
 	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&roleBinding.ObjectMeta, versions.Version)
 
 	err := r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -239,6 +250,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *v1alpha1.Cl
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	roleBinding := specs.CreateRoleBinding(*cluster)
 	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&roleBinding.ObjectMeta, versions.Version)
 
 	err := r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -285,6 +297,8 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		"podName", pod.Name,
 		"master", true)
 
+	specs.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
+
 	if err = r.Create(ctx, pod); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
@@ -299,6 +313,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	if cluster.IsUsingPersistentStorage() {
 		pvcSpec := specs.CreatePVC(*cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
 		utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+		specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
 		if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
 			r.Log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 			return err
@@ -329,6 +344,8 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return err
 	}
 
+	specs.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
+
 	if err = r.Create(ctx, pod); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
@@ -344,6 +361,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	if cluster.IsUsingPersistentStorage() {
 		pvcSpec := specs.CreatePVC(*cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
 		utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+		specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
 		if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
 			r.Log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 			return err
@@ -382,6 +400,8 @@ func (r *ClusterReconciler) reattachDanglingPVC(ctx context.Context, cluster *v1
 		r.Log.Error(err, "Unable to set the owner reference for the Pod")
 		return err
 	}
+
+	specs.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
 
 	if err := r.Create(ctx, pod); err != nil {
 		if apierrs.IsAlreadyExists(err) {
