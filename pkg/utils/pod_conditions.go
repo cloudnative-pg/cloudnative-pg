@@ -7,12 +7,11 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package utils
 
 import (
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-var log logr.Logger = zap.Logger(true).WithName("omnidb")
+var log = zap.Logger(true).WithName("omnidb")
 
 // IsPodReady check if a Pod is ready or not
 func IsPodReady(pod corev1.Pod) bool {
