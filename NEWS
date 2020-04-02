@@ -1,0 +1,36 @@
+Cloud Native PostgreSQL  - History of user-visible changes
+Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
+
+Version 0.1.0 -  3 Apr 2020
+
+- Reuse of existing persistent storage with Pods (required for rolling updates)
+- Independence between operator container image and PostgreSQL container image
+  (required by rolling updates) - this enables usage of Community PostgreSQL images
+- Rolling updates for the update of the operator and the entire cluster
+  to a new version of PostgreSQL, by updating all the replicas first;
+  switchover can be entirely managed by Kubernetes once replicas have been
+  updated (`switchover` option), or manually triggered by the user (`wait` option)
+- Check framework for update-in-progress of a Pod
+- Improvements in cluster status information
+- E2E tests for Kubernetes 1.18
+- E2E performance tests for failover (< 5 seconds)
+- Improvements in E2E tests for switchover
+- Support for PostgreSQL's `cluster_name` GUC
+- New documentation section `Exposing Postgres services`
+- New documentation section `Security`
+
+Version 0.0.1 -  5 Mar 2020
+
+Prototype of PostgreSQL Operator with:
+
+* PostgreSQL 12.2 container image
+* Self-Healing capability, through:
+    * failover of the primary instance, by promoting the most aligned replica
+    * automated recreation of a replica
+* Planned switchover of the primary instance, by promoting a selected replica
+* Scale up/down capabilities
+* Definition of an arbitrary number of instances (minimum 1 - one primary server)
+* Definition of the *read-write* service, to connect your applications to the only primary server of the cluster
+* Definition of the *read-only* service, to connect your applications to any of the instances for read workloads
+* Support for Local Persistent Volumes with PVC templates
+* Standard output logging of PostgreSQL error messages
