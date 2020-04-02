@@ -23,6 +23,8 @@ Kubernetes 1.15 or higher, tested on AWS, Google, Azure (with multiple availabil
 * Definition of the *read-write* service, to connect your applications to the only primary server of the cluster
 * Definition of the *read-only* service, to connect your applications to any of the instances for read workloads
 * Support for Local Persistent Volumes with PVC templates
+* Reuse of Persistent Volumes storage in Pods
+* Rolling updates for PostgreSQL minor versions and operator upgrades
 * Standard output logging of PostgreSQL error messages
 
 ## About this guide

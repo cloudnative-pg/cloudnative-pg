@@ -22,6 +22,7 @@ nav:
   - Architecture: 'architecture.md'
   - Quickstart: 'quickstart.md'
   - Security: 'security.md'
+  - Rolling updates: 'rolling_update.md'
   - Custom Resource Definitions: 'crd.md'
   - Configuration samples: 'samples.md'
   - Exposing Postgres services: 'expose_pg_services.md'
