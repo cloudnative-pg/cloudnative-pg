@@ -6,7 +6,7 @@ attribute of the cluster. The operator starts upgrading all the
 replicas, one Pod at a time, starting from the one with the highest
 serial.
 The primary is the last node to be upgraded. This operation
-is configurable and managed by the `masterUpdateStrategy` option,
+is configurable and managed by the `primaryUpdateStrategy` option,
 accepting these two values:
 
 * `switchover`: the rolling update process is managed by Kubernetes

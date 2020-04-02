@@ -84,11 +84,6 @@ spec:
               format: int32
               minimum: 1
               type: integer
-            masterUpdateStrategy:
-              description: Whenever to wait for the user to issue a switchover request
-                or directly switchover to another replica and then update the last
-                instance
-              type: string
             postgresql:
               description: Configuration of the PostgreSQL server
               properties:
@@ -107,6 +102,11 @@ spec:
               - parameters
               - pg_hba
               type: object
+            primaryUpdateStrategy:
+              description: 'Strategy to follow to upgrade the primary server during
+                a rolling update procedure, after all replicas have been successfully
+                updated: it can be automated (`switchover` - default) or manual (`wait`)'
+              type: string
             resources:
               description: Resources requirements of every generated Pod
               properties:

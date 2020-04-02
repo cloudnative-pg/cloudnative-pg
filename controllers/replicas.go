@@ -34,7 +34,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 
 	// Set targetPrimary to do a failover if needed
 	if !status.Items[0].IsPrimary {
-		r.Log.Info("Current master isn't valid, failing over",
+		r.Log.Info("Current primary isn't valid, failing over",
 			"newPrimary", status.Items[0].PodName,
 			"clusterStatus", status)
 		// No primary, no party. Failover please!
@@ -45,7 +45,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 }
 
 // getStatusFromInstances get the replication status from the PostgreSQL instances,
-// the returned list is sorted in order to have the master as the first element
+// the returned list is sorted in order to have the primary as the first element
 // and the other instances in their election order
 func (r *ClusterReconciler) getStatusFromInstances(
 	ctx context.Context,

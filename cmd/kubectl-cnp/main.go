@@ -30,7 +30,7 @@ var (
 
 	promoteCmd = &cobra.Command{
 		Use:   "promote [cluster] [server]",
-		Short: "Promote a certain server as a master",
+		Short: "Promote a certain server as a primary",
 		Args:  cobra.ExactArgs(2),
 		Run:   promote,
 	}

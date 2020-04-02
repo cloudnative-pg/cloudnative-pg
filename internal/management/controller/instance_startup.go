@@ -67,8 +67,8 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructur
 	case targetPrimary == r.instance.PodName:
 		if currentPrimary == "" {
 			// This means that this cluster has been just started up and the
-			// current master still need to be written
-			r.log.Info("First master instance bootstrap, marking myself as master",
+			// current primary still need to be written
+			r.log.Info("First primary instance bootstrap, marking myself as primary",
 				"currentPrimary", currentPrimary,
 				"targetPrimary", targetPrimary)
 			err = utils.SetCurrentPrimary(cluster, r.instance.PodName)
@@ -87,9 +87,9 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructur
 		return nil
 
 	default:
-		// I'm an old master and not the current one. I need to wait for
+		// I'm an old primary and not the current one. I need to wait for
 		// the switchover procedure to finish and then I can demote myself
-		// and start following the new master
+		// and start following the new primary
 		r.log.Info("This is an old primary instance, waiting for the "+
 			"switchover to finish",
 			"currentPrimary", currentPrimary,

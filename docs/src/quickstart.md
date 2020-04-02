@@ -108,9 +108,9 @@ spec:
     owner: app
 
   # Example update strategy:
-  # wait: wait for a manual update of the master
-  # switchover: switchover the master and update the old master
-  masterUpdateStrategy: switchover
+  # wait: wait for a manual update of the primary
+  # switchover: switchover the primary and update the old primary
+  primaryUpdateStrategy: switchover
 
   # PostgreSQL server configuration
   postgresql:

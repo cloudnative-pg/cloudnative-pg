@@ -38,7 +38,7 @@ func (r *ClusterReconciler) upgradeCluster(
 		return sortedPodList[i].Name > sortedPodList[j].Name
 	})
 
-	masterIdx := -1
+	primaryIdx := -1
 	for idx, pod := range sortedPodList {
 		usedImageName, err := specs.GetPostgreSQLImageName(pod)
 		if err != nil {
@@ -51,26 +51,26 @@ func (r *ClusterReconciler) upgradeCluster(
 
 		if usedImageName != targetImageName {
 			if cluster.Status.CurrentPrimary == pod.Name {
-				// This is the master, and we cannot upgrade it on the fly
-				masterIdx = idx
+				// This is the primary, and we cannot upgrade it on the fly
+				primaryIdx = idx
 			} else {
 				return r.upgradePod(ctx, cluster, &pod)
 			}
 		}
 	}
 
-	if masterIdx == -1 {
-		// The master has been updated too, everything is OK
+	if primaryIdx == -1 {
+		// The primary has been updated too, everything is OK
 		return nil
 	}
 
-	// We still need to upgrade the master server, let's see
+	// We still need to upgrade the primary server, let's see
 	// if the user prefer to do it manually
-	if cluster.GetMasterUpdateStrategy() == v1alpha1.MasterUpdateStrategyWait {
+	if cluster.GetPrimaryUpdateStrategy() == v1alpha1.PrimaryUpdateStrategyWait {
 		r.Log.Info("Waiting for the user to issue a switchover to complete the rolling update",
 			"clusterName", cluster.Name,
 			"namespace", cluster.Namespace,
-			"masterPod", sortedPodList[masterIdx].Name)
+			"primaryPod", sortedPodList[primaryIdx].Name)
 		return nil
 	}
 

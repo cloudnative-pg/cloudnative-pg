@@ -134,7 +134,7 @@ and apply it to the `nginx-ingress-controller deployment`:
 kubectl patch deployment nginx-ingress-controller --patch "$(cat patch.yaml)" -n kube-system
 ```
 
-You can access the master from your machine running:
+You can access the primary from your machine running:
 
 ```sh
 psql -h $(minikube ip) -p 5432 -U postgres

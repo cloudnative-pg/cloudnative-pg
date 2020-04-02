@@ -29,7 +29,7 @@ var _ = Describe("Cluster", func() {
 	// We test this setting up an application pointing to the rw service,
 	// forcing a failover and measuring how much time passes between the
 	// last row written on timeline 1 and the first one on timeline 2
-	Context("Cluster master fails over in less than five seconds", func() {
+	Context("Cluster primary fails over in less than five seconds", func() {
 		const namespace = "primary-failover-time"
 		const sampleFile = samplesDir + "/cluster-emptydir.yaml"
 		const clusterName = "cluster-emptydir"

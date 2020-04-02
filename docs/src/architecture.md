@@ -18,11 +18,11 @@ Cloud Native PostgreSQL currently supports clusters based on asynchronous stream
 Applications can decide to connect to the PostgreSQL instance elected as *current primary*
 by the Kubernetes operator, as depicted in the following diagram:
 
-![Applications writing to the single master](./images/architecture-rw.png)
+![Applications writing to the single primary](./images/architecture-rw.png)
 
 Applications can simply use the `-rw` suffix service.
 
-In case of temporary or permanent unavailability of the master, Kubernetes
+In case of temporary or permanent unavailability of the primary, Kubernetes
 will move the `-rw` to another instance of the cluster for high availability
 purposes.
 

@@ -295,7 +295,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		"namespace", cluster.Namespace,
 		"clusterName", cluster.Name,
 		"podName", pod.Name,
-		"master", true)
+		"primary", true)
 
 	specs.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
 
@@ -337,7 +337,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		"clusterName", cluster.Name,
 		"namespace", cluster.Namespace,
 		"podName", pod.Name,
-		"master", false)
+		"primary", false)
 
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
 		r.Log.Error(err, "Unable to set the owner reference for joined PostgreSQL node")

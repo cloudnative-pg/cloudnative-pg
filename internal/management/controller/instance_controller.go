@@ -126,7 +126,7 @@ func (r *InstanceReconciler) reconcileReplica() error {
 
 	// I was the primary, but now I'm not the primary anymore.
 	// Here we need to invoke a fast shutdown on the instance, and wait the the pod
-	// restart to demote as a replica of the new master
+	// restart to demote as a replica of the new primary
 	return r.instance.Shutdown()
 }
 

@@ -82,9 +82,10 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// Whenever to wait for the user to issue a switchover request or directly
-	// switchover to another replica and then update the last instance
-	MasterUpdateStrategy MasterUpdateStrategy `json:"masterUpdateStrategy,omitempty"`
+	// Strategy to follow to upgrade the primary server during a rolling
+	// update procedure, after all replicas have been successfully updated:
+	// it can be automated (`switchover` - default) or manual (`wait`)
+	PrimaryUpdateStrategy PrimaryUpdateStrategy `json:"primaryUpdateStrategy,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -110,19 +111,19 @@ type ClusterStatus struct {
 	DanglingPVC []string `json:"danglingPVC,omitempty"`
 }
 
-// MasterUpdateStrategy contains the strategy available to apply an update
-// to the master server of the cluster
-type MasterUpdateStrategy string
+// PrimaryUpdateStrategy contains the strategy to follow when upgrading
+// the primary server of the cluster as part of rolling updates
+type PrimaryUpdateStrategy string
 
 const (
-	// MasterUpdateStrategyWait means that the operator need to wait for the
-	// user to manually issue a switchover request before updating the master
+	// PrimaryUpdateStrategyWait means that the operator need to wait for the
+	// user to manually issue a switchover request before updating the primary
 	// server
-	MasterUpdateStrategyWait = "wait"
+	PrimaryUpdateStrategyWait = "wait"
 
-	// MasterUpdateStrategySwitchover means that the operator will switchover
-	// to another updated replica and then update the master server
-	MasterUpdateStrategySwitchover = "switchover"
+	// PrimaryUpdateStrategySwitchover means that the operator will switchover
+	// to another updated replica and then update the primary server
+	PrimaryUpdateStrategySwitchover = "switchover"
 )
 
 // PostgresConfiguration defines the PostgreSQL configuration
@@ -273,12 +274,12 @@ func (cluster *Cluster) GetMaxStopDelay() int32 {
 	return 30
 }
 
-// GetMasterUpdateStrategy get the cluster master update strategy,
+// GetPrimaryUpdateStrategy get the cluster primary update strategy,
 // defaulting to switchover
-func (cluster *Cluster) GetMasterUpdateStrategy() MasterUpdateStrategy {
-	strategy := cluster.Spec.MasterUpdateStrategy
+func (cluster *Cluster) GetPrimaryUpdateStrategy() PrimaryUpdateStrategy {
+	strategy := cluster.Spec.PrimaryUpdateStrategy
 	if strategy == "" {
-		return MasterUpdateStrategySwitchover
+		return PrimaryUpdateStrategySwitchover
 	}
 
 	return strategy
