@@ -6,6 +6,7 @@ Moreover, the following Kubernetes versions are tested for each commit,
 ensuring failure and bugs detection at an early stage of the development
 process:
 
+* 1.18
 * 1.17
 * 1.16
 * 1.15

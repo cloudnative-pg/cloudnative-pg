@@ -22,6 +22,7 @@ env:
     - K8S_VERSION=1.15.7
     - K8S_VERSION=1.16.4
     - K8S_VERSION=1.17.2
+    - K8S_VERSION=1.18.0
 
 services:
   - docker
