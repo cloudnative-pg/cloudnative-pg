@@ -23,7 +23,7 @@ import (
 const (
 	// ClusterSerialAnnotationName is the name of the annotation containing the
 	// serial number of the node
-	ClusterSerialAnnotationName = "postgresql.k8s.2ndq.io/node_serial"
+	ClusterSerialAnnotationName = "k8s.2ndq.io/nodeSerial"
 
 	// ClusterRoleLabelName label is applied to Pods to mark primary ones
 	ClusterRoleLabelName = "role"
