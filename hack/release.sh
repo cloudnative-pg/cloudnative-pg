@@ -61,13 +61,13 @@ mkdir -p releases/
 release_manifest="releases/postgresql-operator-${release_version}.yaml"
 
 sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
-    -e "/DefaultOperatorImageName *= *.*/Is/\"\(.*\):.*\"/\"\1:${release_version}\"/" \
+    -e "/DefaultOperatorImageName *= *.*/Is/\"\(.*\):.*\"/\"\1:v${release_version}\"/" \
     pkg/versions/versions.go
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
 (
     cd "${CONFIG_TMP_DIR}/manager"
-    kustomize edit set image controller="2ndq.io/release/k8s/cloud-native-postgresql-operator:${release_version}"
+    kustomize edit set image controller="2ndq.io/release/k8s/cloud-native-postgresql-operator:v${release_version}"
 )
 
 kustomize build "${CONFIG_TMP_DIR}/default" > "${release_manifest}"
@@ -87,7 +87,7 @@ EOF
 
 git add pkg/versions/versions.go "${release_manifest}"
 git commit -sm "Version tag to ${release_version}"
-git tag -sam "Release ${release_version}" "${release_version}"
+git tag -sam "Release ${release_version}" "v${release_version}"
 
 cat <<EOF
 Generated release manifest ${release_manifest}
@@ -95,5 +95,5 @@ Tagged version ${release_version}
 
 Remember to push tags as well:
 
-git push origin master ${release_version}
+git push origin master v${release_version}
 EOF
