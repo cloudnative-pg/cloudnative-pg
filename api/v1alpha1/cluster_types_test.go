@@ -71,16 +71,16 @@ var _ = Describe("Detect persistent storage", func() {
 var _ = Describe("Primary update strategy", func() {
 	It("defaults to switchover", func() {
 		emptyCluster := Cluster{}
-		Expect(emptyCluster.GetPrimaryUpdateStrategy()).To(BeEquivalentTo(PrimaryUpdateStrategySwitchover))
+		Expect(emptyCluster.GetPrimaryUpdateStrategy()).To(BeEquivalentTo(PrimaryUpdateStrategyUnsupervised))
 	})
 
 	It("respect the preference of the user", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Instances:             0,
-				PrimaryUpdateStrategy: PrimaryUpdateStrategyWait,
+				PrimaryUpdateStrategy: PrimaryUpdateStrategySupervised,
 			},
 		}
-		Expect(cluster.GetPrimaryUpdateStrategy()).To(BeEquivalentTo(PrimaryUpdateStrategyWait))
+		Expect(cluster.GetPrimaryUpdateStrategy()).To(BeEquivalentTo(PrimaryUpdateStrategySupervised))
 	})
 })

@@ -12,7 +12,7 @@ accepting these two values:
 * `switchover`: the rolling update process is managed by Kubernetes
   and is entirely automated, with the *switchover* operation
   starting once all the replicas have been upgraded
-* `wait`: the rolling update process is suspended immediately
+* `manual`: the rolling update process is suspended immediately
   after all replicas have been upgraded, and can only be completed
   with a manual switchover triggered by an administrator with:
   ```sh

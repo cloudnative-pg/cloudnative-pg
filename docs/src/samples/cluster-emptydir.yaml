@@ -13,10 +13,12 @@ spec:
     database: app
     owner: app
 
-  # Example update strategy:
-  # wait: wait for a manual switchover of primary
-  # switchover: switchover the primary and update the old primary
-  primaryUpdateStrategy: switchover
+  # Example of rolling update strategy:
+  # - unsupervised: automated update of the primary once all
+  #                 replicas have been upgraded (default)
+  # - supervised: requires manual supervision to perform
+  #               the switchover of the primary
+  primaryUpdateStrategy: unsupervised
 
   # PostgreSQL server configuration
   postgresql:

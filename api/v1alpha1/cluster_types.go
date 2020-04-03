@@ -84,7 +84,7 @@ type ClusterSpec struct {
 
 	// Strategy to follow to upgrade the primary server during a rolling
 	// update procedure, after all replicas have been successfully updated:
-	// it can be automated (`switchover` - default) or manual (`wait`)
+	// it can be automated (`unsupervised` - default) or manual (`supervised`)
 	PrimaryUpdateStrategy PrimaryUpdateStrategy `json:"primaryUpdateStrategy,omitempty"`
 }
 
@@ -116,14 +116,15 @@ type ClusterStatus struct {
 type PrimaryUpdateStrategy string
 
 const (
-	// PrimaryUpdateStrategyWait means that the operator need to wait for the
+	// PrimaryUpdateStrategySupervised means that the operator need to wait for the
 	// user to manually issue a switchover request before updating the primary
-	// server
-	PrimaryUpdateStrategyWait = "wait"
+	// server (`supervised`)
+	PrimaryUpdateStrategySupervised = "supervised"
 
-	// PrimaryUpdateStrategySwitchover means that the operator will switchover
-	// to another updated replica and then update the primary server
-	PrimaryUpdateStrategySwitchover = "switchover"
+	// PrimaryUpdateStrategyUnsupervised means that the operator will switchover
+	// to another updated replica and then automatically update the primary server
+	// (`unsupervised`, default)
+	PrimaryUpdateStrategyUnsupervised = "unsupervised"
 )
 
 // PostgresConfiguration defines the PostgreSQL configuration
@@ -279,7 +280,7 @@ func (cluster *Cluster) GetMaxStopDelay() int32 {
 func (cluster *Cluster) GetPrimaryUpdateStrategy() PrimaryUpdateStrategy {
 	strategy := cluster.Spec.PrimaryUpdateStrategy
 	if strategy == "" {
-		return PrimaryUpdateStrategySwitchover
+		return PrimaryUpdateStrategyUnsupervised
 	}
 
 	return strategy

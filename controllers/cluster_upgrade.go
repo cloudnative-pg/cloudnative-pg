@@ -66,8 +66,8 @@ func (r *ClusterReconciler) upgradeCluster(
 
 	// We still need to upgrade the primary server, let's see
 	// if the user prefer to do it manually
-	if cluster.GetPrimaryUpdateStrategy() == v1alpha1.PrimaryUpdateStrategyWait {
-		r.Log.Info("Waiting for the user to issue a switchover to complete the rolling update",
+	if cluster.GetPrimaryUpdateStrategy() == v1alpha1.PrimaryUpdateStrategySupervised {
+		r.Log.Info("Waiting for the user to issue a supervised switchover to complete the rolling update",
 			"clusterName", cluster.Name,
 			"namespace", cluster.Namespace,
 			"primaryPod", sortedPodList[primaryIdx].Name)

@@ -23,8 +23,8 @@ A PostgreSQL cluster object can be defined through the following parameters avai
 - `imagePullSecretName`: secret for pulling the PostgreSQL image
 - `instances`: number of instances required in the cluster, with `instances - 1` replicas (**required**)
 - `postgresql`: configuration of the PostgreSQL server (*required*)
-- `primaryUpdateStrategy`: strategy to update the primary as part of a rolling update: automated (`switchover`)
-   or manually triggered (`wait`)
+- `primaryUpdateStrategy`: strategy to update the primary as part of a rolling update: automated (`unsupervised`)
+   or manually triggered (`supervised`)
 - `resources`: resources requirements of every generated Pod
 - `startDelay`: allowed time in seconds for a PostgreSQL instance to successfully start up (default 30)
 - `stopDelay`: allowed time in seconds for a PostgreSQL instance to gracefully shut down (default 30)

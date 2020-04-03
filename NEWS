@@ -9,7 +9,7 @@ Version 0.1.0 -  3 Apr 2020
 - Rolling updates for the update of the operator and the entire cluster
   to a new version of PostgreSQL, by updating all the replicas first;
   switchover can be entirely managed by Kubernetes once replicas have been
-  updated (`switchover` option), or manually triggered by the user (`wait` option)
+  updated (`unsupervised` option), or manually triggered by the user (`supervised` option)
 - Check framework for update-in-progress of a Pod
 - Improvements in cluster status information
 - E2E tests for Kubernetes 1.18
