@@ -16,7 +16,7 @@ const (
 
 	// DefaultImageName is the image used by default by the operator to create
 	// pods.
-	DefaultImageName = "2ndq.io/release/k8s/cloud-native-postgresql:12"
+	DefaultImageName = "postgres:12.2"
 
 	// DefaultOperatorImageName used to bootstrap the controller in the Pods running
 	// PostgreSQL
