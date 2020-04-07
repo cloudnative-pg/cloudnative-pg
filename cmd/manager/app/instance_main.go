@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -184,7 +185,10 @@ func statusSubCommand() {
 	}()
 
 	if resp.StatusCode != 200 {
-		log.Log.Info("Error while extracting status", "statusCode", resp.StatusCode, "body", resp.Body)
+		bytes, _ := ioutil.ReadAll(resp.Body)
+		log.Log.Info(
+			"Error while extracting status",
+			"statusCode", resp.StatusCode, "body", string(bytes))
 		os.Exit(1)
 	}
 

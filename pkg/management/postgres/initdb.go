@@ -151,6 +151,15 @@ func (info InitInfo) CreateDataDirectory() error {
 		}
 	}
 
+	// Always enable archive_mode and attach the instance
+	// controller to it
+	err = fileutils.AppendStringToFile(
+		path.Join(info.PgData, "postgresql.conf"),
+		"archive_mode = on\narchive_command = '/controller/manager wal-archive %p'")
+	if err != nil {
+		return errors.Wrap(err, "appending to postgresql.conf file resulted in an error")
+	}
+
 	return nil
 }
 

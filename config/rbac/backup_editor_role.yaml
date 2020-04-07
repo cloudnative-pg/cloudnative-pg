@@ -1,0 +1,24 @@
+# permissions for end users to edit backups.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backup-editor-role
+rules:
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
+  - backups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
+  - backups/status
+  verbs:
+  - get

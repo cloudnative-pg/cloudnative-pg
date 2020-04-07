@@ -53,6 +53,30 @@ func CreateRole(cluster v1alpha1.Cluster) rbacv1.Role {
 					cluster.Name,
 				},
 			},
+			{
+				APIGroups: []string{
+					"postgresql.k8s.2ndq.io",
+				},
+				Resources: []string{
+					"backups",
+				},
+				Verbs: []string{
+					"get",
+				},
+			},
+			{
+				APIGroups: []string{
+					"postgresql.k8s.2ndq.io",
+				},
+				Resources: []string{
+					"backups/status",
+				},
+				Verbs: []string{
+					"get",
+					"patch",
+					"update",
+				},
+			},
 		},
 	}
 }

@@ -86,6 +86,9 @@ type ClusterSpec struct {
 	// update procedure, after all replicas have been successfully updated:
 	// it can be automated (`unsupervised` - default) or manual (`supervised`)
 	PrimaryUpdateStrategy PrimaryUpdateStrategy `json:"primaryUpdateStrategy,omitempty"`
+
+	// The configuration to be used for backups
+	Backup *BackupConfiguration `json:"backup,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -185,6 +188,97 @@ type RollingUpdateStatus struct {
 
 	// When the update has been started
 	StartedAt metav1.Time `json:"startedAt,omitempty"`
+}
+
+// CompressionType encapsulates the available types of compression
+type CompressionType string
+
+const (
+	// CompressionTypeNone means no compression is performed
+	CompressionTypeNone = ""
+
+	// CompressionTypeGzip means gzip compression is performed
+	CompressionTypeGzip = "gzip"
+
+	// CompressionTypeBzip2 means bzip2 compression is performed
+	CompressionTypeBzip2 = "bzip2"
+)
+
+// EncryptionType encapsulated the available types of encryption
+type EncryptionType string
+
+const (
+	// EncryptionTypeNone means just use the bucket configuration
+	EncryptionTypeNone = ""
+
+	// EncryptionTypeAES256 means to use AES256 encryption
+	EncryptionTypeAES256 = "AES256"
+
+	// EncryptionTypeNoneAWSKMS means to use aws:kms encryption
+	EncryptionTypeNoneAWSKMS = "aws:kms"
+)
+
+// BackupConfiguration contains the backup configuration when the backup
+// is available
+type BackupConfiguration struct {
+	// The credentials to use to upload data to S3
+	S3Credentials S3Credentials `json:"s3Credentials"`
+
+	// The path where to store the backup (i.e. s3://bucket/path/to/folder)
+	// this path, with different destination folders, will be used for WALs
+	// and for data
+	//+kubebuilder:validation:MinLength=1
+	DestinationPath string `json:"destinationPath"`
+
+	// The server name on S3, the cluster name is used if this
+	// parameter is omitted
+	ServerName string `json:"serverName,omitempty"`
+
+	// The configuration for the backup of the WAL stream
+	Wal *WalBackupConfiguration `json:"wal,omitempty"`
+
+	// The configuration to be used to backup the data files
+	Data *DataBackupConfiguration `json:"data,omitempty"`
+}
+
+// WalBackupConfiguration is the configuration of the backup of the
+// WAL stream
+type WalBackupConfiguration struct {
+	// Whenever to compress files or not
+	Compression CompressionType `json:"compression,omitempty"`
+
+	// Whenever to force the encryption of files (if the bucket is
+	// not already configured for that)
+	Encryption EncryptionType `json:"encryption,omitempty"`
+}
+
+// DataBackupConfiguration is the configuration of the backup of
+// the data directory
+type DataBackupConfiguration struct {
+	// Whenever to compress files or not
+	Compression CompressionType `json:"compression,omitempty"`
+
+	// Whenever to force the encryption of files (if the bucket is
+	// not already configured for that)
+	Encryption EncryptionType `json:"encryption,omitempty"`
+
+	// Whenever to force the initial checkpoint to be done as quickly
+	// as possible
+	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
+
+	// The number of jobs to be used to upload the backup, defaults
+	// to 2
+	Jobs *int32 `json:"jobs,omitempty"`
+}
+
+// S3Credentials is the type for the credentials to be used to upload
+// files to S3
+type S3Credentials struct {
+	// The reference to the access key id
+	AccessKeyIDReference corev1.SecretKeySelector `json:"accessKeyId"`
+
+	// The reference to the secret access key
+	SecretAccessKeyReference corev1.SecretKeySelector `json:"secretAccessKey"`
 }
 
 // +kubebuilder:object:root=true

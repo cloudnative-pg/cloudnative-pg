@@ -14,8 +14,33 @@ import (
 	"os"
 )
 
+// AppendStringToFile append the content of the given string to the
+// end of the target file prepending new data with a carriage return
+func AppendStringToFile(targetFile string, content string) error {
+	stream, err := os.OpenFile(
+		targetFile,
+		os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		closeError := stream.Close()
+		if closeError != nil {
+			err = closeError
+		}
+	}()
+
+	_, err = stream.WriteString("\n")
+	if err != nil {
+		return err
+	}
+
+	_, err = stream.WriteString(content)
+	return err
+}
+
 // AppendFile append the content of the source file to the end of the target file
-// pretending new data with a carriage return
+// prepending new data with a carriage return
 func AppendFile(targetFile string, sourceFile string) error {
 	// TODO: append the file using the Reader / Writer interface,
 	// or better avoid appending the file at all

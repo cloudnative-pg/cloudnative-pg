@@ -15,10 +15,10 @@ import (
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/fileutils"
 )
 
-// BootstrapInto is called by the controller manager to copy the operator executable
+// BootstrapIntoCommand is called by the controller manager to copy the operator executable
 // inside a certain location. This is useful to insert the controller in a
 // volume to be used by the actual PostgreSQL controller
-func BootstrapInto(executablePath string, args []string) {
+func BootstrapIntoCommand(executablePath string, args []string) {
 	if len(args) != 1 {
 		fmt.Println("Usage: manager bootstrap <target>")
 		os.Exit(1)

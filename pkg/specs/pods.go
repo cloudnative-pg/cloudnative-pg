@@ -83,6 +83,18 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 							Name:  "PGDATA",
 							Value: "/var/lib/postgresql/data/pgdata",
 						},
+						{
+							Name:  "POD_NAME",
+							Value: podName,
+						},
+						{
+							Name:  "CLUSTER_NAME",
+							Value: cluster.Name,
+						},
+						{
+							Name:  "NAMESPACE",
+							Value: cluster.Namespace,
+						},
 					},
 					Command: []string{
 						"/controller/manager",
@@ -94,7 +106,6 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 						"-app-pw-file", "/etc/app-secret/password",
 						"-hba-rules-file", "/etc/configuration/postgresHBA",
 						"-postgresql-config-file", "/etc/configuration/postgresConfiguration",
-						"-cluster-name", cluster.Name,
 						"-parent-node", cluster.GetServiceReadWriteName(),
 					},
 					VolumeMounts: []corev1.VolumeMount{
@@ -121,7 +132,7 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 					},
 				},
 			},
-			Containers:         createPostgresContainers(cluster, podName),
+			Containers:         createPostgresContainers(cluster, podName, cluster.Spec.Backup),
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
@@ -209,7 +220,11 @@ func createVolumeSource(cluster v1alpha1.Cluster, podName string) corev1.VolumeS
 
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
-func createPostgresContainers(cluster v1alpha1.Cluster, podName string) []corev1.Container {
+func createPostgresContainers(
+	cluster v1alpha1.Cluster,
+	podName string,
+	backupConfiguration *v1alpha1.BackupConfiguration,
+) []corev1.Container {
 	return []corev1.Container{
 		{
 			Name:  PostgresContainerName,
@@ -231,6 +246,8 @@ func createPostgresContainers(cluster v1alpha1.Cluster, podName string) []corev1
 					Name:  "CLUSTER_NAME",
 					Value: cluster.Name,
 				},
+				CreateAccessKeyIDEnvVar(backupConfiguration),
+				CreateSecretAccessKeyEnvVar(backupConfiguration),
 			},
 			VolumeMounts: []corev1.VolumeMount{
 				{
@@ -287,6 +304,42 @@ func createPostgresContainers(cluster v1alpha1.Cluster, podName string) []corev1
 				"-app-db-name", cluster.Spec.ApplicationConfiguration.Database,
 			},
 			Resources: cluster.Spec.Resources,
+		},
+	}
+}
+
+// CreateAccessKeyIDEnvVar create the environment variable giving
+// the AWS access key ID
+func CreateAccessKeyIDEnvVar(backupConfiguration *v1alpha1.BackupConfiguration) corev1.EnvVar {
+	if backupConfiguration == nil {
+		return corev1.EnvVar{
+			Name:  "AWS_ACCESS_KEY_ID",
+			Value: "",
+		}
+	}
+
+	return corev1.EnvVar{
+		Name: "AWS_ACCESS_KEY_ID",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &backupConfiguration.S3Credentials.AccessKeyIDReference,
+		},
+	}
+}
+
+// CreateSecretAccessKeyEnvVar create the environment variable giving
+// the AWS access key ID
+func CreateSecretAccessKeyEnvVar(backupConfiguration *v1alpha1.BackupConfiguration) corev1.EnvVar {
+	if backupConfiguration == nil {
+		return corev1.EnvVar{
+			Name:  "AWS_SECRET_ACCESS_KEY",
+			Value: "",
+		}
+	}
+
+	return corev1.EnvVar{
+		Name: "AWS_SECRET_ACCESS_KEY",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &backupConfiguration.S3Credentials.SecretAccessKeyReference,
 		},
 	}
 }
@@ -419,7 +472,7 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 					},
 				},
 			},
-			Containers:         createPostgresContainers(cluster, podName),
+			Containers:         createPostgresContainers(cluster, podName, cluster.Spec.Backup),
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
@@ -467,7 +520,7 @@ func PodWithExistingStorage(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.
 					},
 				},
 			},
-			Containers:         createPostgresContainers(cluster, podName),
+			Containers:         createPostgresContainers(cluster, podName, cluster.Spec.Backup),
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),

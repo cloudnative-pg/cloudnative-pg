@@ -2,7 +2,7 @@
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
 kind: Cluster
 metadata:
-  name: postgresql-storage-class
+  name: postgresql-bkp
 spec:
   instances: 3
   imageName: postgres:12.2
@@ -48,3 +48,16 @@ spec:
   storage:
     storageClass: standard
     size: 1Gi
+
+  # Backup properties
+  backup:
+    destinationPath: s3://BUCKET_NAME/path/to/folder
+    s3Credentials:
+      accessKeyId:
+        name: aws-creds
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: aws-creds
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: gzip

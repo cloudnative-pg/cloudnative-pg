@@ -9,19 +9,29 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package webserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os/exec"
+	"time"
 
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/log"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/postgres"
 )
 
 var instance *postgres.Instance
 var server *http.Server
 
+// This is the readiness probe
 func isServerHealthy(w http.ResponseWriter, r *http.Request) {
 	err := instance.IsHealthy()
 	if err != nil {
@@ -32,6 +42,7 @@ func isServerHealthy(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprint(w, "OK")
 }
 
+// This probe is for the instance status, including replication
 func pgStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := instance.GetStatus()
 	if err != nil {
@@ -49,17 +60,149 @@ func pgStatus(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(js)
 }
 
+// This function schedule a backup
+func requestBackup(typedClient client.Client, w http.ResponseWriter, r *http.Request) {
+	var cluster apiv1alpha1.Cluster
+	var backup apiv1alpha1.Backup
+
+	ctx := context.Background()
+
+	backupName := r.URL.Query().Get("name")
+	if len(backupName) == 0 {
+		http.Error(w, "Missing backup name parameter", 400)
+		return
+	}
+
+	err := typedClient.Get(ctx, client.ObjectKey{
+		Namespace: instance.Namespace,
+		Name:      instance.ClusterName,
+	}, &cluster)
+	if err != nil {
+		http.Error(
+			w,
+			fmt.Sprintf("error while getting cluster: %v", err.Error()),
+			500)
+		return
+	}
+
+	err = typedClient.Get(ctx, client.ObjectKey{
+		Namespace: instance.Namespace,
+		Name:      backupName,
+	}, &backup)
+	if err != nil {
+		http.Error(
+			w,
+			fmt.Sprintf("error while getting backup: %v", err.Error()),
+			500)
+		return
+	}
+
+	if cluster.Spec.Backup == nil || len(cluster.Spec.Backup.DestinationPath) == 0 {
+		http.Error(w, "Backup not configured in the cluster", http.StatusConflict)
+		return
+	}
+
+	var options []string
+	if cluster.Spec.Backup.Data != nil {
+		if len(cluster.Spec.Backup.Data.Compression) != 0 {
+			options = append(
+				options,
+				fmt.Sprintf("--%v", cluster.Spec.Backup.Data.Compression))
+		}
+		if len(cluster.Spec.Backup.Data.Encryption) != 0 {
+			options = append(
+				options,
+				"-e",
+				string(cluster.Spec.Backup.Data.Encryption))
+		}
+	}
+	serverName := instance.ClusterName
+	if len(cluster.Spec.Backup.ServerName) != 0 {
+		serverName = cluster.Spec.Backup.ServerName
+	}
+	options = append(
+		options,
+		cluster.Spec.Backup.DestinationPath,
+		serverName)
+
+	// Mark the backup as running
+	backup.Status.Phase = apiv1alpha1.BackupPhaseRunning
+	backup.Status.StartedAt = &metav1.Time{
+		Time: time.Now(),
+	}
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		return typedClient.Status().Update(ctx, &backup)
+	})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Can't set backup as running: %v", err), 500)
+		return
+	}
+
+	// Run the actual backup process
+	go func() {
+		log.Log.Info("Backup started",
+			"options",
+			options,
+			"name", backup.Name,
+			"namespace", backup.Namespace)
+
+		cmd := exec.Command("barman-cloud-backup", options...) // #nosec G204
+		var stdoutBuffer bytes.Buffer
+		var stderrBuffer bytes.Buffer
+		cmd.Stdout = &stdoutBuffer
+		cmd.Stderr = &stderrBuffer
+		err := cmd.Run()
+		log.Log.Info("Backup completed",
+			"err", err,
+			"name", backup.Name,
+			"namespace", backup.Namespace)
+
+		if err != nil {
+			backup.SetAsFailed(stdoutBuffer.String(), stderrBuffer.String(), err)
+		} else {
+			backup.SetAsCompleted(stdoutBuffer.String(), stderrBuffer.String())
+		}
+		backup.Status.StoppedAt = &metav1.Time{
+			Time: time.Now(),
+		}
+
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return typedClient.Status().Update(ctx, &backup)
+		})
+		if err != nil {
+			log.Log.Error(err,
+				"Can't mark backup as done",
+				"namespace", instance.Namespace,
+				"name", backup.Name,
+				"stdout", stdoutBuffer.String(),
+				"stderr", stderrBuffer.String())
+		}
+	}()
+
+	_, _ = fmt.Fprint(w, "OK")
+}
+
 // ListenAndServe starts a the web server handling probes
 func ListenAndServe(serverInstance *postgres.Instance) error {
 	instance = serverInstance
+
+	typedClient, err := management.NewClient()
+	if err != nil {
+		return fmt.Errorf("creating k8s client: %v", err)
+	}
 
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc("/healthz", isServerHealthy)
 	serveMux.HandleFunc("/readyz", isServerHealthy)
 	serveMux.HandleFunc("/pg/status", pgStatus)
+	serveMux.HandleFunc("/pg/backup",
+		func(w http.ResponseWriter, r *http.Request) {
+			requestBackup(typedClient, w, r)
+		},
+	)
 
 	server = &http.Server{Addr: ":8000", Handler: serveMux}
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 
 	// The server has been shut down. Ok
 	if err == http.ErrServerClosed {

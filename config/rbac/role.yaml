@@ -102,6 +102,26 @@ rules:
 - apiGroups:
   - postgresql.k8s.2ndq.io
   resources:
+  - backups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
+  - backups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
   - clusters
   verbs:
   - create

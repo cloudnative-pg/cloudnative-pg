@@ -53,7 +53,15 @@ func main() {
 			return
 
 		case "bootstrap":
-			app.BootstrapInto(os.Args[0], os.Args[2:])
+			app.BootstrapIntoCommand(os.Args[0], os.Args[2:])
+			return
+
+		case "wal-archive":
+			app.WalArchiveCommand(os.Args[2:])
+			return
+
+		case "backup":
+			app.BackupCommand(os.Args[2:])
 			return
 		}
 	}
@@ -89,6 +97,14 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
+		os.Exit(1)
+	}
+	if err = (&controllers.BackupReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("Backup"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
