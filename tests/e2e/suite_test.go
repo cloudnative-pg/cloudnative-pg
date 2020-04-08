@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	samplesDir = "../../docs/src/samples"
+	samplesDir  = "../../docs/src/samples"
+	fixturesDir = "./fixtures"
 )
 
 const (

@@ -13,6 +13,7 @@ KIND_CLUSTER_NAME=${1}
 DEBUG=${DEBUG:-false}
 BUILD_IMAGE=${BUILD_IMAGE:-true}
 OPERATOR_IMG="quay.io/2ndquadrant/cloud-native-postgresql-operator:e2e"
+PG_IMG_UPDATE="k8s/postgresql:e2e-update"
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 
 if [ "${DEBUG}" = true ]
@@ -45,6 +46,17 @@ deploy_operator() {
       postgresql-operator-controller-manager
 }
 
+# Create an image with a different hash from the current PostgreSQL to test
+# rolling updates
+build_pg_image_pseudoupdate() {
+    (
+    cat << EOF
+FROM postgres:12
+ENV noop noop
+EOF
+    )| docker build -t "${PG_IMG_UPDATE}" -
+}
+
 main() {
     if [ "${BUILD_IMAGE}" != false ]
     then
@@ -52,6 +64,8 @@ main() {
     else
         upload_image_to_kind "${CONTROLLER_IMG}" "${OPERATOR_IMG}"
     fi
+    build_pg_image_pseudoupdate
+    upload_image_to_kind "${PG_IMG_UPDATE}"
     deploy_operator
 }
 
