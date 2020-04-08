@@ -30,129 +30,164 @@ var _ = Describe("Cluster", func() {
 
 	// AssertSetup tests that the pods that should have been created by the sample
 	// are there and are in ready state
-	AssertSetup := func(namespace string, clusterName string, sample string) {
-		It("sets up a cluster", func() {
-			By(fmt.Sprintf("having a %v namespace", namespace), func() {
-				// Creating a namespace should be quick
-				timeout := 20
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      namespace,
-				}
+	AssertCreateCluster := func(namespace string, clusterName string, sample string) {
+		By(fmt.Sprintf("having a %v namespace", namespace), func() {
+			// Creating a namespace should be quick
+			timeout := 20
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      namespace,
+			}
 
-				Eventually(func() string {
-					cr := &corev1.Namespace{}
-					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
-						Fail("Unable to get namespace " + namespace)
-					}
-					return cr.GetName()
-				}, timeout).Should(BeEquivalentTo(namespace))
-			})
-			By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
-				_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + sample)
-				Expect(err).To(BeNil())
-			})
-			By("having a Cluster with 3 nodes ready", func() {
-				// Setting up a cluster with three pods is slow, usually 200-300s
-				timeout := 400
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      clusterName,
+			Eventually(func() string {
+				cr := &corev1.Namespace{}
+				if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
+					Fail("Unable to get namespace " + namespace)
 				}
+				return cr.GetName()
+			}, timeout).Should(BeEquivalentTo(namespace))
+		})
+		By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
+			_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + sample)
+			Expect(err).To(BeNil())
+		})
+		By("having a Cluster with 3 nodes ready", func() {
+			// Setting up a cluster with three pods is slow, usually 200-300s
+			timeout := 400
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      clusterName,
+			}
 
-				Eventually(func() int32 {
-					cr := &clusterv1alpha1.Cluster{}
-					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
-						Fail("Unable to get Cluster " + clusterName)
-					}
-					return cr.Status.ReadyInstances
-				}, timeout).Should(BeEquivalentTo(3))
-			})
-			By("having three PostgreSQL pods with status ready", func() {
-				podList := &corev1.PodList{}
-				if err := env.Client.List(
-					env.Ctx, podList, ctrlclient.InNamespace(namespace),
-					ctrlclient.MatchingLabels{"postgresql": clusterName},
-				); err != nil {
-					Fail(fmt.Sprintf("Unable to get %v Cluster pods", clusterName))
+			Eventually(func() int32 {
+				cr := &clusterv1alpha1.Cluster{}
+				if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
+					Fail("Unable to get Cluster " + clusterName)
 				}
-				Expect(utils.CountReadyPods(podList.Items)).Should(BeEquivalentTo(3))
-			})
+				return cr.Status.ReadyInstances
+			}, timeout).Should(BeEquivalentTo(3))
 		})
 	}
 
-	Context("Cluster setup using emptydir", func() {
-		const namespace = "pg-emptydir-e2e"
-		const sampleFile = samplesDir + "/cluster-emptydir.yaml"
-		const clusterName = "cluster-emptydir"
-		BeforeEach(func() {
-			if err := env.CreateNamespace(namespace); err != nil {
-				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
-			}
-		})
-		AfterEach(func() {
-			if err := env.DeleteNamespace(namespace); err != nil {
-				Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
-			}
-		})
-		AssertSetup(namespace, clusterName, sampleFile)
-	})
+	Context("Cluster setup", func() {
 
-	Context("Cluster setup using storage class", func() {
-		const namespace = "cluster-storageclass-e2e"
-		const sampleFile = samplesDir + "/cluster-storage-class.yaml"
-		const clusterName = "postgresql-storage-class"
-		BeforeEach(func() {
-			if err := env.CreateNamespace(namespace); err != nil {
-				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
-			}
-		})
-		AfterEach(func() {
-			if err := env.DeleteNamespace(namespace); err != nil {
-				Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
-			}
-		})
-		AssertSetup(namespace, clusterName, sampleFile)
-	})
+		AssertSetup := func(namespace string, clusterName string, sample string) {
+			It("sets up a cluster", func() {
+				AssertCreateCluster(namespace, clusterName, sample)
 
-	FContext("Cluster scale up and down", func() {
-
-		AssertCreateCluster := func(namespace string, clusterName string, sampleFile string) {
-			By(fmt.Sprintf("having a %v namespace", namespace), func() {
-				// Creating a namespace should be quick
-				timeout := 20
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      namespace,
-				}
-
-				Eventually(func() (string, error) {
-					cr := &corev1.Namespace{}
-					err := env.Client.Get(env.Ctx, namespacedName, cr)
-					return cr.GetName(), err
-				}, timeout).Should(BeEquivalentTo(namespace))
-			})
-			By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
-				_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + sampleFile)
-				Expect(err).To(BeNil())
-			})
-			By("having a Cluster with 3 instances ready", func() {
-				// Setting up a cluster with three pods is slow, usually 200-300s
-				timeout := 400
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      clusterName,
-				}
-
-				Eventually(func() int32 {
-					cr := &clusterv1alpha1.Cluster{}
-					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
-						Fail("Unable to get Cluster " + clusterName)
+				By("having three PostgreSQL pods with status ready", func() {
+					podList := &corev1.PodList{}
+					if err := env.Client.List(
+						env.Ctx, podList, ctrlclient.InNamespace(namespace),
+						ctrlclient.MatchingLabels{"postgresql": clusterName},
+					); err != nil {
+						Fail(fmt.Sprintf("Unable to get %v Cluster pods", clusterName))
 					}
-					return cr.Status.ReadyInstances
-				}, timeout).Should(BeEquivalentTo(3))
+					Expect(utils.CountReadyPods(podList.Items)).Should(BeEquivalentTo(3))
+				})
+
+				By("being able to restart a killed pod without losing it", func() {
+					aSecond := time.Second
+					timeout := 60
+					podName := clusterName + "-1"
+					pod := &corev1.Pod{}
+					namespacedName := types.NamespacedName{
+						Namespace: namespace,
+						Name:      podName,
+					}
+					if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
+						Fail("Unable to get Pod " + podName)
+					}
+
+					// Put something in the database. We'll check later if it
+					// still exists
+					query := "CREATE TABLE test (id bigserial PRIMARY KEY, t text)"
+					_, _, err := utils.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
+						"psql", "app", "-tAc", query)
+					Expect(err).To(BeNil())
+
+					// We kill the pid 1 process.
+					// The pod should be restarted and the count of the restarts
+					// should increase by one
+					restart := int32(-1)
+					for _, data := range pod.Status.ContainerStatuses {
+						if data.Name == specs.PostgresContainerName {
+							restart = data.RestartCount
+						}
+					}
+					_, _, err = utils.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
+						"kill", "1")
+					Expect(err).To(BeNil())
+					Eventually(func() int32 {
+						pod := &corev1.Pod{}
+						if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
+							Fail("Unable to get Cluster " + clusterName)
+						}
+
+						for _, data := range pod.Status.ContainerStatuses {
+							if data.Name == specs.PostgresContainerName {
+								return data.RestartCount
+							}
+						}
+
+						return int32(-1)
+					}, timeout).Should(BeEquivalentTo(restart + 1))
+
+					// That pod should also be ready
+					Eventually(func() bool {
+						pod := &corev1.Pod{}
+						if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
+							Fail("Unable to get Cluster " + clusterName)
+						}
+						return utils.IsPodReady(*pod)
+					}, timeout).Should(BeTrue())
+
+					// And it should still contain the table we created before,
+					// so an empty SELECT would work
+					query = "SELECT * FROM test"
+					_, _, err = utils.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
+						"psql", "app", "-tAc", query)
+					Expect(err).To(BeNil())
+				})
 			})
 		}
+
+		Context("Emptydir", func() {
+			const namespace = "pg-emptydir-e2e"
+			const sampleFile = samplesDir + "/cluster-emptydir.yaml"
+			const clusterName = "cluster-emptydir"
+			BeforeEach(func() {
+				if err := env.CreateNamespace(namespace); err != nil {
+					Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
+				}
+			})
+			AfterEach(func() {
+				if err := env.DeleteNamespace(namespace); err != nil {
+					Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
+				}
+			})
+			AssertSetup(namespace, clusterName, sampleFile)
+		})
+		Context("Storage class", func() {
+			const namespace = "cluster-storageclass-e2e"
+			const sampleFile = samplesDir + "/cluster-storage-class.yaml"
+			const clusterName = "postgresql-storage-class"
+			BeforeEach(func() {
+				if err := env.CreateNamespace(namespace); err != nil {
+					Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
+				}
+			})
+			AfterEach(func() {
+				if err := env.DeleteNamespace(namespace); err != nil {
+					Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
+				}
+			})
+			AssertSetup(namespace, clusterName, sampleFile)
+		})
+	})
+
+	Context("Cluster scale up and down", func() {
+
 		// This set of tests should run in the same way whether the group
 		// uses pvc or emptydir.
 		AssertScale := func(namespace string, clusterName string) {
@@ -250,42 +285,7 @@ var _ = Describe("Cluster", func() {
 			}
 		})
 		It("react to primary failure", func() {
-			By(fmt.Sprintf("having a %v namespace", namespace), func() {
-				// Creating a namespace should be quick
-				timeout := 20
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      namespace,
-				}
-
-				Eventually(func() string {
-					cr := &corev1.Namespace{}
-					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
-						Fail("Unable to get namespace " + namespace)
-					}
-					return cr.GetName()
-				}, timeout).Should(BeEquivalentTo(namespace))
-			})
-			By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
-				_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + sampleFile)
-				Expect(err).To(BeNil())
-			})
-			By("having a Cluster with 3 nodes ready", func() {
-				// Setting up a cluster with three pods is slow, usually 200-300s
-				timeout := 400
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      clusterName,
-				}
-
-				Eventually(func() int32 {
-					cr := &clusterv1alpha1.Cluster{}
-					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
-						Fail("Unable to get Cluster " + clusterName)
-					}
-					return cr.Status.ReadyInstances
-				}, timeout).Should(BeEquivalentTo(3))
-			})
+			AssertCreateCluster(namespace, clusterName, sampleFile)
 			// First we check that the starting situation is the expected one
 			By("checking that CurrentPrimary and TargetPrimary are the same", func() {
 				namespacedName := types.NamespacedName{
@@ -410,42 +410,7 @@ var _ = Describe("Cluster", func() {
 			}
 		})
 		It("reacts to switchover requests", func() {
-			By(fmt.Sprintf("having a %v namespace", namespace), func() {
-				// Creating a namespace should be quick
-				timeout := 20
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      namespace,
-				}
-
-				Eventually(func() string {
-					cr := &corev1.Namespace{}
-					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
-						Fail("Unable to get namespace " + namespace)
-					}
-					return cr.GetName()
-				}, timeout).Should(BeEquivalentTo(namespace))
-			})
-			By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
-				_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + sampleFile)
-				Expect(err).To(BeNil())
-			})
-			By("having a Cluster with 3 nodes ready", func() {
-				// Setting up a cluster with three pods is slow, usually 200-300s
-				timeout := 400
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      clusterName,
-				}
-
-				Eventually(func() int32 {
-					cr := &clusterv1alpha1.Cluster{}
-					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
-						Fail("Unable to get Cluster " + clusterName)
-					}
-					return cr.Status.ReadyInstances
-				}, timeout).Should(BeEquivalentTo(3))
-			})
+			AssertCreateCluster(namespace, clusterName, sampleFile)
 			// First we check that the starting situation is the expected one
 			By("checking that CurrentPrimary and TargetPrimary are the same", func() {
 				namespacedName := types.NamespacedName{
@@ -583,42 +548,6 @@ var _ = Describe("Cluster", func() {
 			}, timeout).Should(BeEquivalentTo(3))
 		}
 
-		AssertSetup := func(namespace string, clusterName string, sampleFile string) {
-			By(fmt.Sprintf("having a %v namespace", namespace), func() {
-				// Creating a namespace should be quick
-				timeout := 20
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      namespace,
-				}
-
-				Eventually(func() (string, error) {
-					cr := &corev1.Namespace{}
-					err := env.Client.Get(env.Ctx, namespacedName, cr)
-					return cr.GetName(), err
-				}, timeout).Should(BeEquivalentTo(namespace))
-			})
-			By(fmt.Sprintf("creating a cluster in the %v namespace", namespace), func() {
-				_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + sampleFile)
-				Expect(err).To(BeNil())
-			})
-			By("having a cluster with 3 instances ready", func() {
-				// Setting up a cluster with three pods is slow, usually 200-300s
-				timeout := 400
-				Eventually(func() int32 {
-					cr := &clusterv1alpha1.Cluster{}
-					namespacedName := types.NamespacedName{
-						Namespace: namespace,
-						Name:      clusterName,
-					}
-					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
-						Fail("Unable to get Cluster " + clusterName)
-					}
-					return cr.Status.ReadyInstances
-				}, timeout).Should(BeEquivalentTo(3))
-			})
-		}
-
 		AssertChangedNames := func(namespace string, clusterName string,
 			originalPodNames []string, expectedUnchangedNames int) {
 			podList := &corev1.PodList{}
@@ -730,7 +659,7 @@ var _ = Describe("Cluster", func() {
 				var originalPodUID []types.UID
 				var originalPVCUID []types.UID
 
-				AssertSetup(namespace, clusterName, sampleFile)
+				AssertCreateCluster(namespace, clusterName, sampleFile)
 				By("Gathering info on the current state", func() {
 					podList := &corev1.PodList{}
 					if err := env.Client.List(
@@ -829,7 +758,7 @@ var _ = Describe("Cluster", func() {
 				var originalPodNames []string
 				var originalPodUID []types.UID
 
-				AssertSetup(namespace, clusterName, sampleFile)
+				AssertCreateCluster(namespace, clusterName, sampleFile)
 				By("Gathering info on the current state", func() {
 					podList := &corev1.PodList{}
 					if err := env.Client.List(
