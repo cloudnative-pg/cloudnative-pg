@@ -800,4 +800,120 @@ var _ = Describe("Cluster", func() {
 			})
 		})
 	})
+	Context("PVC Deletion", func() {
+		const namespace = "cluster-pvc-deletion"
+		const sampleFile = samplesDir + "/cluster-storage-class.yaml"
+		const clusterName = "postgresql-storage-class"
+		BeforeEach(func() {
+			if err := env.CreateNamespace(namespace); err != nil {
+				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
+			}
+		})
+		AfterEach(func() {
+			if err := env.DeleteNamespace(namespace); err != nil {
+				Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
+			}
+		})
+		It("correctly manages PVCs", func() {
+			AssertCreateCluster(namespace, clusterName, sampleFile)
+			// Reuse the same pvc after a deletion
+			By("recreating a pod with the same PVC after it's deleted", func() {
+				// Get a pod we want to delete
+				podName := clusterName + "-3"
+				pod := &corev1.Pod{}
+				podNamespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      podName,
+				}
+				err := env.Client.Get(env.Ctx, podNamespacedName, pod)
+				Expect(err).To(BeNil())
+
+				// Get the UID of the pod
+				pvcName := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
+				pvc := &corev1.PersistentVolumeClaim{}
+				namespacedPVCName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      pvcName,
+				}
+				err = env.Client.Get(env.Ctx, namespacedPVCName, pvc)
+				Expect(err).To(BeNil())
+				originalPVCUID := pvc.GetUID()
+
+				// Delete the pod
+				_, _, err = tests.Run(fmt.Sprintf("kubectl delete -n %v pod/%v", namespace, podName))
+				Expect(err).To(BeNil())
+
+				// The pod should be back
+				timeout := 120
+				Eventually(func() (bool, error) {
+					pod := &corev1.Pod{}
+					err := env.Client.Get(env.Ctx, podNamespacedName, pod)
+					return utils.IsPodReady(*pod), err
+				}, timeout).Should(BeTrue())
+
+				// The pod should have the same PVC
+				pod = &corev1.Pod{}
+				err = env.Client.Get(env.Ctx, podNamespacedName, pod)
+				Expect(err).To(BeNil())
+				pvc = &corev1.PersistentVolumeClaim{}
+				err = env.Client.Get(env.Ctx, namespacedPVCName, pvc)
+				Expect(err).To(BeNil())
+				Expect(pvc.GetUID()).To(BeEquivalentTo(originalPVCUID))
+			})
+			By("removing an annotated PVC if the pod is deleted", func() {
+				// Get a pod we want to delete
+				podName := clusterName + "-3"
+				pod := &corev1.Pod{}
+				podNamespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      podName,
+				}
+				err := env.Client.Get(env.Ctx, podNamespacedName, pod)
+				Expect(err).To(BeNil())
+
+				// Get the UID of the pod
+				pvcName := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
+				pvc := &corev1.PersistentVolumeClaim{}
+				namespacedPVCName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      pvcName,
+				}
+				err = env.Client.Get(env.Ctx, namespacedPVCName, pvc)
+				Expect(err).To(BeNil())
+				originalPVCUID := pvc.GetUID()
+
+				// Annotate the PVC as unusable
+				_, _, err = tests.Run(fmt.Sprintf("kubectl annotate -n %v pvc/%v k8s.2ndq.io/pvcUnusable=true", namespace, pvcName))
+				Expect(err).To(BeNil())
+				// Delete the pod
+				_, _, err = tests.Run(fmt.Sprintf("kubectl delete -n %v pod/%v", namespace, podName))
+				Expect(err).To(BeNil())
+				// A new pod should be created
+				timeout := 180
+				newPodName := clusterName + "-4"
+				newPodNamespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      newPodName,
+				}
+				Eventually(func() (bool, error) {
+					newPod := &corev1.Pod{}
+					err := env.Client.Get(env.Ctx, newPodNamespacedName, newPod)
+					return utils.IsPodReady(*newPod), err
+				}, timeout).Should(BeTrue())
+				// The pod should have a different PVC
+				newPod := &corev1.Pod{}
+				err = env.Client.Get(env.Ctx, newPodNamespacedName, newPod)
+				Expect(err).To(BeNil())
+				newPvcName := newPod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
+				newPvc := &corev1.PersistentVolumeClaim{}
+				newNamespacedPVCName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      newPvcName,
+				}
+				err = env.Client.Get(env.Ctx, newNamespacedPVCName, newPvc)
+				Expect(err).To(BeNil())
+				Expect(newPvc.GetUID()).NotTo(BeEquivalentTo(originalPVCUID))
+			})
+		})
+	})
 })
