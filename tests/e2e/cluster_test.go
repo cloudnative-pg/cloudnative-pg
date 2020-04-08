@@ -115,21 +115,9 @@ var _ = Describe("Cluster", func() {
 		AssertSetup(namespace, clusterName, sampleFile)
 	})
 
-	Context("Cluster scale up and down", func() {
-		const namespace = "cluster-scale-e2e"
-		const sampleFile = samplesDir + "/cluster-storage-class.yaml"
-		const clusterName = "postgresql-storage-class"
-		BeforeEach(func() {
-			if err := env.CreateNamespace(namespace); err != nil {
-				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
-			}
-		})
-		AfterEach(func() {
-			if err := env.DeleteNamespace(namespace); err != nil {
-				Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
-			}
-		})
-		It("can scale the cluster size", func() {
+	FContext("Cluster scale up and down", func() {
+
+		AssertCreateCluster := func(namespace string, clusterName string, sampleFile string) {
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
 				// Creating a namespace should be quick
 				timeout := 20
@@ -138,19 +126,17 @@ var _ = Describe("Cluster", func() {
 					Name:      namespace,
 				}
 
-				Eventually(func() string {
+				Eventually(func() (string, error) {
 					cr := &corev1.Namespace{}
-					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
-						Fail("Unable to get namespace " + namespace)
-					}
-					return cr.GetName()
+					err := env.Client.Get(env.Ctx, namespacedName, cr)
+					return cr.GetName(), err
 				}, timeout).Should(BeEquivalentTo(namespace))
 			})
 			By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
 				_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + sampleFile)
 				Expect(err).To(BeNil())
 			})
-			By("having a Cluster with 3 nodes ready", func() {
+			By("having a Cluster with 3 instances ready", func() {
 				// Setting up a cluster with three pods is slow, usually 200-300s
 				timeout := 400
 				namespacedName := types.NamespacedName{
@@ -166,7 +152,13 @@ var _ = Describe("Cluster", func() {
 					return cr.Status.ReadyInstances
 				}, timeout).Should(BeEquivalentTo(3))
 			})
-			By("adding a node to the cluster", func() {
+		}
+		// This set of tests should run in the same way whether the group
+		// uses pvc or emptydir.
+		AssertScale := func(namespace string, clusterName string) {
+			// Add a node to the cluster and verify the cluster has one more
+			// element
+			By("adding an instance to the cluster", func() {
 				_, _, err := tests.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).To(BeNil())
 				timeout := 200
@@ -182,7 +174,9 @@ var _ = Describe("Cluster", func() {
 					return cr.Status.ReadyInstances
 				}, timeout).Should(BeEquivalentTo(4))
 			})
-			By("removing a node from the cluster", func() {
+			// Remove a node from the cluster and verify the cluster has one
+			// element less
+			By("removing an instance from the cluster", func() {
 				_, _, err := tests.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).To(BeNil())
 				timeout := 30
@@ -197,6 +191,44 @@ var _ = Describe("Cluster", func() {
 					}
 					return cr.Status.ReadyInstances
 				}, timeout).Should(BeEquivalentTo(3))
+			})
+		}
+		Context("Storage Class", func() {
+			const namespace = "cluster-scale-e2e-storage-class"
+			const sampleFile = samplesDir + "/cluster-storage-class.yaml"
+			const clusterName = "postgresql-storage-class"
+			BeforeEach(func() {
+				if err := env.CreateNamespace(namespace); err != nil {
+					Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
+				}
+			})
+			AfterEach(func() {
+				if err := env.DeleteNamespace(namespace); err != nil {
+					Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
+				}
+			})
+			It("can scale the cluster size", func() {
+				AssertCreateCluster(namespace, clusterName, sampleFile)
+				AssertScale(namespace, clusterName)
+			})
+		})
+		Context("Emptydir", func() {
+			const namespace = "cluster-scale-e2e-emptydir"
+			const sampleFile = samplesDir + "/cluster-emptydir.yaml"
+			const clusterName = "cluster-emptydir"
+			BeforeEach(func() {
+				if err := env.CreateNamespace(namespace); err != nil {
+					Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
+				}
+			})
+			AfterEach(func() {
+				if err := env.DeleteNamespace(namespace); err != nil {
+					Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
+				}
+			})
+			It("can scale the cluster size", func() {
+				AssertCreateCluster(namespace, clusterName, sampleFile)
+				AssertScale(namespace, clusterName)
 			})
 		})
 	})
