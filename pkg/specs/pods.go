@@ -448,8 +448,25 @@ func PodWithExistingStorage(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.
 			Namespace: cluster.Namespace,
 		},
 		Spec: corev1.PodSpec{
-			Hostname:           podName,
-			Subdomain:          cluster.GetServiceAnyName(),
+			Hostname:  podName,
+			Subdomain: cluster.GetServiceAnyName(),
+			InitContainers: []corev1.Container{
+				{
+					Name:  "bootstrap-controller",
+					Image: versions.GetDefaultOperatorImageName(),
+					Command: []string{
+						"/manager",
+						"bootstrap",
+						"/controller/manager",
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "controller",
+							MountPath: "/controller",
+						},
+					},
+				},
+			},
 			Containers:         createPostgresContainers(cluster, podName),
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
