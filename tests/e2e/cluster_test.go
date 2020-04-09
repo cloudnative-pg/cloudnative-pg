@@ -480,7 +480,7 @@ var _ = Describe("Cluster", func() {
 					if err := env.Client.Get(env.Ctx, namespacedName, &pod); err != nil {
 						Fail("Unable to get Pod " + oldPrimary)
 					}
-					return utils.IsPodReady(pod)
+					return utils.IsPodActive(pod)
 				}, timeout).Should(BeTrue())
 			})
 			By("waiting that the old primary become a standby", func() {
@@ -523,7 +523,7 @@ var _ = Describe("Cluster", func() {
 					// We need to check if a pod is ready, otherwise we
 					// may end up asking the status of a container that
 					// doesn't exist yet
-					if utils.IsPodReady(pod) {
+					if utils.IsPodActive(pod) {
 						for _, data := range pod.Status.ContainerStatuses {
 							imageName := data.Image
 							if data.Name != specs.PostgresContainerName {
@@ -597,9 +597,11 @@ var _ = Describe("Cluster", func() {
 			Expect(err).To(BeNil())
 			matchingNames := 0
 			for _, pod := range podList.Items {
-				for _, oldName := range originalPodNames {
-					if pod.GetName() == oldName {
-						matchingNames++
+				if utils.IsPodActive(pod) {
+					for _, oldName := range originalPodNames {
+						if pod.GetName() == oldName {
+							matchingNames++
+						}
 					}
 				}
 			}
@@ -616,9 +618,11 @@ var _ = Describe("Cluster", func() {
 			Expect(err).To(BeNil())
 			matchingUID := 0
 			for _, pod := range podList.Items {
-				for _, oldUID := range originalPodUID {
-					if pod.GetUID() == oldUID {
-						matchingUID++
+				if utils.IsPodActive(pod) {
+					for _, oldUID := range originalPodUID {
+						if pod.GetUID() == oldUID {
+							matchingUID++
+						}
 					}
 				}
 			}
