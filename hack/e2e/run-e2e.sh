@@ -22,7 +22,7 @@ TEMP_DIR="$(mktemp -d)"
 # Get the latest releases of kind and kubectl unless specified in the environment
 KIND="${TEMP_DIR}/kind"
 KUBECTL="${TEMP_DIR}/kubectl"
-KIND_VERSION=${KIND_VERSION:-$(curl --silent https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | grep '"tag_name"' | cut -d \" -f 4)}
+KIND_VERSION=${KIND_VERSION:-$(curl -s -LH "Accept:application/json" https://github.com/kubernetes-sigs/kind/releases/latest | sed 's/.*"tag_name":"\([^"]\+\)".*/\1/')}
 KUBECTL_VERSION=${KUBECTL_VERSION:-$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)}
 
 KIND_CLUSTER_NAME=pg-operator-e2e-${K8S_VERSION}
