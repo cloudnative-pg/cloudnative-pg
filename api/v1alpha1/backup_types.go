@@ -107,6 +107,16 @@ func (backup *Backup) SetAsCompleted(
 	backup.Status.Error = ""
 }
 
+// IsDone check if a backup is completed or still in progress
+func (backup *Backup) IsDone() bool {
+	return backup.Status.Phase == BackupPhaseCompleted || backup.Status.Phase == BackupPhaseFailed
+}
+
+// IsInProgress check if a certain backup is in progress or not
+func (backup *Backup) IsInProgress() bool {
+	return !backup.IsDone()
+}
+
 func init() {
 	SchemeBuilder.Register(&Backup{}, &BackupList{})
 }

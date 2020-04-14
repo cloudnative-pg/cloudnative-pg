@@ -1,0 +1,80 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.5
+  creationTimestamp: null
+  name: scheduledbackups.postgresql.k8s.2ndq.io
+spec:
+  group: postgresql.k8s.2ndq.io
+  names:
+    kind: ScheduledBackup
+    listKind: ScheduledBackupList
+    plural: scheduledbackups
+    singular: scheduledbackup
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: ScheduledBackup is the Schema for the scheduledbackups API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ScheduledBackupSpec defines the desired state of ScheduledBackup
+          properties:
+            cluster:
+              description: The cluster to backup
+              properties:
+                name:
+                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    TODO: Add other useful fields. apiVersion, kind, uid?'
+                  type: string
+              type: object
+            schedule:
+              description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+              type: string
+            suspend:
+              description: If this backup is suspended of not
+              type: boolean
+          required:
+          - schedule
+          type: object
+        status:
+          description: ScheduledBackupStatus defines the observed state of ScheduledBackup
+          properties:
+            lastCheckTime:
+              description: The latest time the schedule
+              format: date-time
+              type: string
+            lastScheduleTime:
+              description: Information when was the last time that backup was successfully
+                scheduled.
+              format: date-time
+              type: string
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

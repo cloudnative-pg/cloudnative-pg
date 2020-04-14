@@ -141,6 +141,26 @@ rules:
   - update
   - watch
 - apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
+  - scheduledbackups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
+  - scheduledbackups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - rolebindings

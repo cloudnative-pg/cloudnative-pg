@@ -123,7 +123,28 @@ Events:        <none>
 
 # Scheduled backups
 
-TODO
+You can also schedule your backups periodically by creating a
+resource named `ScheduledBackup`. The latter is similar to a
+`Backup` but with an added field, named `schedule`.
+
+This field is a [Cron](https://en.wikipedia.org/wiki/Cron) schedule
+specification with a prepended seconds field. This schedule format
+is the same used in Kubernetes CronJobs.
+
+This is an example of a scheduled backup:
+
+```
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: ScheduledBackup
+metadata:
+  name: backup-example
+spec:
+  schedule: "0 0 0 * * *"
+  cluster:
+    name: postgresql-bkp
+```
+
+The proposed specification will schedule a backup every day at midnight.
 
 # WAL archiving
 

@@ -7,4 +7,7 @@ resources:
 - group: postgresql
   kind: Backup
   version: v1alpha1
+- group: postgresql
+  kind: ScheduledBackup
+  version: v1alpha1
 version: "2"

@@ -295,6 +295,7 @@ type Cluster struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // ClusterList contains a list of Cluster
 type ClusterList struct {

@@ -1,0 +1,24 @@
+# permissions for end users to edit scheduledbackups.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: scheduledbackup-editor-role
+rules:
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
+  - scheduledbackups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
+  - scheduledbackups/status
+  verbs:
+  - get

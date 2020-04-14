@@ -1,0 +1,8 @@
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: ScheduledBackup
+metadata:
+  name: backup-example
+spec:
+  schedule: "0 0 * * * *"
+  cluster:
+    name: postgresql-bkp

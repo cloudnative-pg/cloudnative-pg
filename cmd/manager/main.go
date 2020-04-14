@@ -107,6 +107,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		os.Exit(1)
 	}
+	if err = (&controllers.ScheduledBackupReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ScheduledBackup"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
