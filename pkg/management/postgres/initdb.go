@@ -225,7 +225,7 @@ func (info InitInfo) Bootstrap() error {
 
 	instance := info.GetInstance()
 	return instance.WithActiveInstance(func() error {
-		db, err := instance.GetSuperuserDB()
+		db, err := instance.GetSuperUserDB()
 		if err != nil {
 			return nil
 		}

@@ -112,7 +112,7 @@ var _ = Describe("Cluster", func() {
 					", PRIMARY KEY (id)" +
 					")"
 
-				fiveSeconds := time.Second * 5
+				commandTimeout := time.Second * 5
 				lm := clusterName + "-1"
 				lmCr := &corev1.Pod{}
 				lmNamespacedName := types.NamespacedName{
@@ -122,7 +122,7 @@ var _ = Describe("Cluster", func() {
 				err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
 				Expect(err).To(BeNil())
 				_, _, err = utils.ExecCommand(env.Ctx, *lmCr, "postgres",
-					&fiveSeconds, "psql", "app", "-tAc", query)
+					&commandTimeout, "psql", "app", "-tAc", query)
 				Expect(err).To(BeNil())
 			})
 			By("starting load", func() {
@@ -139,7 +139,7 @@ var _ = Describe("Cluster", func() {
 					" -f ./fixtures/fastfailover/hey-job.yaml")
 				Expect(err).To(BeNil())
 
-				twoSeconds := time.Second * 2
+				commandTimeout := time.Second * 2
 				timeout := 60
 				lm := clusterName + "-1"
 				lmNamespacedName := types.NamespacedName{
@@ -150,7 +150,7 @@ var _ = Describe("Cluster", func() {
 					lmCr := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
 					out, _, _ := utils.ExecCommand(env.Ctx, *lmCr, "postgres",
-						&twoSeconds, "psql", "app", "-tAc",
+						&commandTimeout, "psql", "app", "-tAc",
 						"SELECT count(*) > 0 FROM tps.tl")
 					return strings.TrimSpace(out), err
 				}, timeout).Should(BeEquivalentTo("t"))
@@ -176,7 +176,7 @@ var _ = Describe("Cluster", func() {
 				// with timeline '00000002'. There should be one of them
 				// in the database soon.
 
-				twoSeconds := time.Second * 2
+				commandTimeout := time.Second * 2
 				timeout := 10
 				lm := clusterName + "-2"
 				lmNamespacedName := types.NamespacedName{
@@ -187,7 +187,7 @@ var _ = Describe("Cluster", func() {
 					lmCr := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
 					out, _, _ := utils.ExecCommand(env.Ctx, *lmCr, "postgres",
-						&twoSeconds, "psql", "app", "-tAc",
+						&commandTimeout, "psql", "app", "-tAc",
 						"SELECT count(*) > 0 FROM tps.tl "+
 							"WHERE timeline = '00000002'")
 					return strings.TrimSpace(out), err
@@ -218,12 +218,12 @@ var _ = Describe("Cluster", func() {
 					Name:      lm,
 				}
 				var switchTime float64
-				fiveSeconds := time.Second * 5
+				commandTimeout := time.Second * 5
 				lmCr := &corev1.Pod{}
 				err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
 				Expect(err).To(BeNil())
 				out, _, _ := utils.ExecCommand(env.Ctx, *lmCr, "postgres",
-					&fiveSeconds, "psql", "app", "-tAc", query)
+					&commandTimeout, "psql", "app", "-tAc", query)
 				switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
 				Expect(err).To(BeNil())
 				fmt.Printf("Failover performed in %v seconds\n", switchTime)

@@ -20,6 +20,7 @@ linters:
     - gofmt
     - goimports
     - golint
+    - gomodguard
     - goprintffuncname
     - gosec
     - gosimple
@@ -30,6 +31,7 @@ linters:
     - maligned
     - misspell
     - nakedret
+    - nestif
     - prealloc
     - rowserrcheck
     - scopelint
@@ -47,8 +49,10 @@ linters:
   # - funlen
   # - gochecknoglobals
   # - gochecknoinits
+  # - godot
   # - godox
   # - gomnd
+  # - testpackage
   # - wsl
 
 run:

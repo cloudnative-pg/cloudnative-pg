@@ -8,11 +8,11 @@ package postgres
 
 // PromoteAndWait promotes this instance, and wait 60 seconds for it to happen
 func (instance *Instance) PromoteAndWait() error {
-	superUserDb, err := instance.GetSuperuserDB()
+	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return err
 	}
 
-	_, err = superUserDb.Exec("SELECT pg_promote(true)")
+	_, err = superUserDB.Exec("SELECT pg_promote(true)")
 	return err
 }

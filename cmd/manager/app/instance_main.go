@@ -28,7 +28,7 @@ var (
 // image
 func InstanceManagerCommand(args []string) {
 	var pwFile string
-	var appDbName string
+	var appDBName string
 	var appUser string
 	var appPwFile string
 	var postgresHBARules string
@@ -42,7 +42,7 @@ func InstanceManagerCommand(args []string) {
 	initCommand := flag.NewFlagSet("init", flag.ExitOnError)
 	initCommand.StringVar(&pwFile, "pw-file", "/etc/secret/postgresPassword",
 		"The file containing the PostgreSQL superuser password to use during the init phase")
-	initCommand.StringVar(&appDbName, "app-db-name", "app",
+	initCommand.StringVar(&appDBName, "app-db-name", "app",
 		"The name of the application containing the database")
 	initCommand.StringVar(&appUser, "app-user", "app",
 		"The name of the application user")
@@ -65,7 +65,7 @@ func InstanceManagerCommand(args []string) {
 
 	runCommand := flag.NewFlagSet("run", flag.ExitOnError)
 	runCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
-	runCommand.StringVar(&appDbName, "app-db-name", "app",
+	runCommand.StringVar(&appDBName, "app-db-name", "app",
 		"The name of the application containing the database")
 	runCommand.StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
 		"be checked against the cluster state")
@@ -93,7 +93,7 @@ func InstanceManagerCommand(args []string) {
 		info := postgres.InitInfo{
 			PgData:                  pgData,
 			PasswordFile:            pwFile,
-			ApplicationDatabase:     appDbName,
+			ApplicationDatabase:     appDBName,
 			ApplicationUser:         appUser,
 			ApplicationPasswordFile: appPwFile,
 			HBARulesFile:            postgresHBARules,
@@ -115,7 +115,7 @@ func InstanceManagerCommand(args []string) {
 		// Ignore errors; runCommand is set for ExitOnError.
 		_ = runCommand.Parse(args[1:])
 		instance.PgData = pgData
-		instance.ApplicationDatabase = appDbName
+		instance.ApplicationDatabase = appDBName
 		instance.Port = 5432
 		instance.Namespace = namespace
 		instance.PodName = podName

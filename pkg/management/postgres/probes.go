@@ -25,7 +25,7 @@ func (instance *Instance) IsHealthy() error {
 
 // GetStatus Extract the status of this PostgreSQL database
 func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
-	superUserDb, err := instance.GetSuperuserDB()
+	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return nil, err
 	}
@@ -34,14 +34,14 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 		PodName: instance.PodName,
 	}
 
-	row := superUserDb.QueryRow(
+	row := superUserDB.QueryRow(
 		"SELECT system_identifier FROM pg_control_system()")
 	err = row.Scan(&result.SystemID)
 	if err != nil {
 		return nil, err
 	}
 
-	row = superUserDb.QueryRow(
+	row = superUserDB.QueryRow(
 		"SELECT NOT pg_is_in_recovery()")
 	err = row.Scan(&result.IsPrimary)
 	if err != nil {
@@ -49,7 +49,7 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	}
 
 	if !result.IsPrimary {
-		row = superUserDb.QueryRow(
+		row = superUserDB.QueryRow(
 			"SELECT pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), pg_is_wal_replay_paused()")
 		err = row.Scan(&result.ReceivedLsn, &result.ReplayLsn, &result.ReplayPaused)
 		if err != nil {
@@ -74,12 +74,12 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 func (instance *Instance) IsWALReceiverActive() (bool, error) {
 	var result bool
 
-	superUserDb, err := instance.GetSuperuserDB()
+	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return false, err
 	}
 
-	row := superUserDb.QueryRow("SELECT COUNT(*) FROM pg_stat_wal_receiver")
+	row := superUserDB.QueryRow("SELECT COUNT(*) FROM pg_stat_wal_receiver")
 	err = row.Scan(&result)
 	if err != nil {
 		return false, err
@@ -93,12 +93,12 @@ func (instance *Instance) IsWALReceiverActive() (bool, error) {
 func (instance *Instance) GetWALApplyLag() (int64, error) {
 	var result int64
 
-	superUserDb, err := instance.GetSuperuserDB()
+	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return -1, err
 	}
 
-	row := superUserDb.QueryRow("SELECT pg_last_wal_receive_lsn() - pg_last_wal_replay_lsn()")
+	row := superUserDB.QueryRow("SELECT pg_last_wal_receive_lsn() - pg_last_wal_replay_lsn()")
 	err = row.Scan(&result)
 	if err != nil {
 		return -1, err

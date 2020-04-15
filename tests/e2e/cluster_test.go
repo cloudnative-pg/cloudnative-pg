@@ -327,8 +327,8 @@ var _ = Describe("Cluster", func() {
 				if err := env.Client.Get(env.Ctx, namespacedName, &pausedPod); err != nil {
 					Fail("Unable to get Pod " + pausedReplica)
 				}
-				twoSeconds := time.Second * 2
-				_, _, err := utils.ExecCommand(env.Ctx, pausedPod, "postgres", &twoSeconds,
+				timeout := time.Second * 2
+				_, _, err := utils.ExecCommand(env.Ctx, pausedPod, "postgres", &timeout,
 					"psql", "-c", "SELECT pg_wal_replay_pause()")
 				Expect(err).To(BeNil())
 			})
@@ -343,8 +343,8 @@ var _ = Describe("Cluster", func() {
 				if err := env.Client.Get(env.Ctx, namespacedName, &primaryPod); err != nil {
 					Fail("Unable to get Pod " + pausedReplica)
 				}
-				twoSeconds := time.Second * 2
-				_, _, err := utils.ExecCommand(env.Ctx, primaryPod, "postgres", &twoSeconds,
+				timeout := time.Second * 2
+				_, _, err := utils.ExecCommand(env.Ctx, primaryPod, "postgres", &timeout,
 					"psql", "-c", "CHECKPOINT; SELECT pg_switch_wal()")
 				Expect(err).To(BeNil())
 			})

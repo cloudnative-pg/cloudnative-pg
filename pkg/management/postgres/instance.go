@@ -37,10 +37,10 @@ type Instance struct {
 	Port int
 
 	// Connection pool pointing to the superuser database
-	superUserDb *sql.DB
+	superUserDB *sql.DB
 
 	// Connection pool pointing to the application database
-	applicationDb *sql.DB
+	applicationDB *sql.DB
 
 	// The namespace of the k8s object representing this cluster
 	Namespace string
@@ -83,14 +83,14 @@ func (instance Instance) Startup() error {
 
 // ShutdownConnections tears down database connections
 func (instance *Instance) ShutdownConnections() {
-	if instance.applicationDb != nil {
-		_ = instance.applicationDb.Close()
-		instance.applicationDb = nil
+	if instance.applicationDB != nil {
+		_ = instance.applicationDB.Close()
+		instance.applicationDB = nil
 	}
 
-	if instance.superUserDb != nil {
-		_ = instance.superUserDb.Close()
-		instance.superUserDb = nil
+	if instance.superUserDB != nil {
+		_ = instance.superUserDB.Close()
+		instance.superUserDB = nil
 	}
 }
 
@@ -159,11 +159,11 @@ func (instance Instance) WithActiveInstance(inner func() error) error {
 	return inner()
 }
 
-// GetSuperuserDB gets the connection pool pointing to this instance, possibly creating
+// GetSuperUserDB gets the connection pool pointing to this instance, possibly creating
 // it if needed
-func (instance *Instance) GetSuperuserDB() (*sql.DB, error) {
-	if instance.superUserDb != nil {
-		return instance.superUserDb, nil
+func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
+	if instance.superUserDB != nil {
+		return instance.superUserDB, nil
 	}
 
 	db, err := sql.Open(
@@ -176,15 +176,15 @@ func (instance *Instance) GetSuperuserDB() (*sql.DB, error) {
 	db.SetMaxOpenConns(2)
 	db.SetMaxIdleConns(0)
 
-	instance.superUserDb = db
-	return instance.superUserDb, nil
+	instance.superUserDB = db
+	return instance.superUserDB, nil
 }
 
 // GetApplicationDB gets the connection pool pointing to this instance, possibly creating
 // it if needed
 func (instance *Instance) GetApplicationDB() (*sql.DB, error) {
-	if instance.applicationDb != nil {
-		return instance.applicationDb, nil
+	if instance.applicationDB != nil {
+		return instance.applicationDB, nil
 	}
 
 	db, err := sql.Open(
@@ -197,8 +197,8 @@ func (instance *Instance) GetApplicationDB() (*sql.DB, error) {
 	db.SetMaxOpenConns(2)
 	db.SetMaxIdleConns(0)
 
-	instance.applicationDb = db
-	return instance.applicationDb, nil
+	instance.applicationDB = db
+	return instance.applicationDB, nil
 }
 
 // IsPrimary check if the data directory belongs to a primary server or to a
