@@ -218,7 +218,7 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 
 // createServiceAccount create the service account for this PostgreSQL cluster
 func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	serviceAccount := specs.CreateServiceAccount(*cluster)
+	serviceAccount := specs.CreateServiceAccount(cluster.ObjectMeta, cluster.GetImagePullSecret())
 	utils.SetAsOwnedBy(&serviceAccount.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&serviceAccount.ObjectMeta, versions.Version)
 
@@ -248,7 +248,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *v1alpha1.Cl
 
 // createRoleBinding create the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	roleBinding := specs.CreateRoleBinding(*cluster)
+	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
 	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&roleBinding.ObjectMeta, versions.Version)
 

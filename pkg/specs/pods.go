@@ -132,7 +132,7 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 					},
 				},
 			},
-			Containers:         createPostgresContainers(cluster, podName, cluster.Spec.Backup),
+			Containers:         createPostgresContainers(cluster, podName),
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
@@ -223,7 +223,6 @@ func createVolumeSource(cluster v1alpha1.Cluster, podName string) corev1.VolumeS
 func createPostgresContainers(
 	cluster v1alpha1.Cluster,
 	podName string,
-	backupConfiguration *v1alpha1.BackupConfiguration,
 ) []corev1.Container {
 	return []corev1.Container{
 		{
@@ -246,8 +245,8 @@ func createPostgresContainers(
 					Name:  "CLUSTER_NAME",
 					Value: cluster.Name,
 				},
-				CreateAccessKeyIDEnvVar(backupConfiguration),
-				CreateSecretAccessKeyEnvVar(backupConfiguration),
+				CreateAccessKeyIDEnvVar(cluster.Spec.Backup),
+				CreateSecretAccessKeyEnvVar(cluster.Spec.Backup),
 			},
 			VolumeMounts: []corev1.VolumeMount{
 				{
@@ -472,7 +471,7 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 					},
 				},
 			},
-			Containers:         createPostgresContainers(cluster, podName, cluster.Spec.Backup),
+			Containers:         createPostgresContainers(cluster, podName),
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
@@ -520,7 +519,7 @@ func PodWithExistingStorage(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.
 					},
 				},
 			},
-			Containers:         createPostgresContainers(cluster, podName, cluster.Spec.Backup),
+			Containers:         createPostgresContainers(cluster, podName),
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),

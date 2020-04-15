@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
+	"github.com/2ndquadrant/cloud-native-postgresql/pkg/specs"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 )
 
@@ -62,7 +63,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	// Fill the list of dangling PVCs
 	if cluster.IsUsingPersistentStorage() {
-		cluster.Status.DanglingPVC = utils.DetectDanglingPVCs(filteredPods, childPVCs.Items)
+		cluster.Status.DanglingPVC = specs.DetectDanglingPVCs(filteredPods, childPVCs.Items)
 	}
 
 	// Count pods

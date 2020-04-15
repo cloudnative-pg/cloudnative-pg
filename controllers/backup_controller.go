@@ -8,14 +8,11 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -40,7 +37,7 @@ type BackupReconciler struct {
 // Reconcile is the main reconciliation loop
 func (r *BackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	_ = r.Log.WithValues("backup", req.NamespacedName)
+	log := r.Log.WithValues("backup", req.NamespacedName)
 
 	var backup postgresqlv1alpha1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
@@ -65,8 +62,8 @@ func (r *BackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		Name:      clusterName,
 	}, &cluster); err != nil {
 		if apierrs.IsNotFound(err) {
-			backup.SetAsFailed("Unknown cluster", "", err)
-			return ctrl.Result{}, r.UpdateAndRetry(ctx, &backup)
+			backup.Status.SetAsFailed("Unknown cluster", "", err)
+			return ctrl.Result{}, r.Status().Update(ctx, &backup)
 		}
 		return ctrl.Result{}, err
 	}
@@ -78,22 +75,32 @@ func (r *BackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		Name:      cluster.Status.TargetPrimary,
 	}, &pod)
 	if err != nil {
-		backup.SetAsFailed("Unknown pod", "", err)
-		return ctrl.Result{}, r.UpdateAndRetry(ctx, &backup)
+		backup.Status.SetAsFailed("Unknown pod", "", err)
+		return ctrl.Result{}, r.Status().Update(ctx, &backup)
 	}
 
-	r.Log.Info("Starting backup",
-		"name", backup.Name,
-		"namespace", backup.Namespace,
+	log.Info("Starting backup",
 		"cluster", cluster.Name,
 		"pod", pod.Name)
 
 	// This backup has been started
-	backup.Status.Phase = postgresqlv1alpha1.BackupPhaseStarted
-	err = r.UpdateAndRetry(ctx, &backup)
-	if err != nil {
-		backup.SetAsFailed("Unknown pod", "", err)
-		return ctrl.Result{}, r.UpdateAndRetry(ctx, &backup)
+	err = StartBackup(ctx, r, &backup, pod)
+	return ctrl.Result{}, err
+}
+
+// StartBackup request a backup in a Pod and marks the backup started
+// or failed if needed
+func StartBackup(
+	ctx context.Context,
+	client client.StatusClient,
+	backup postgresqlv1alpha1.BackupCommon,
+	pod corev1.Pod,
+) error {
+	// This backup has been started
+	backup.GetStatus().Phase = postgresqlv1alpha1.BackupPhaseStarted
+	if err := utils.UpdateStatusAndRetry(ctx, client, backup.GetKubernetesObject()); err != nil {
+		backup.GetStatus().SetAsFailed("Can't update backup", "", err)
+		return err
 	}
 
 	stdout, stderr, err := utils.ExecCommand(
@@ -103,13 +110,13 @@ func (r *BackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		nil,
 		"/controller/manager",
 		"backup",
-		backup.Name)
+		backup.GetName())
 	if err != nil {
-		backup.SetAsFailed(stdout, stderr, err)
-		return ctrl.Result{}, r.UpdateAndRetry(ctx, &backup)
+		backup.GetStatus().SetAsFailed(stdout, stderr, err)
+		return utils.UpdateStatusAndRetry(ctx, client, backup.GetKubernetesObject())
 	}
 
-	return ctrl.Result{}, nil
+	return nil
 }
 
 // SetupWithManager sets up this controller given a controller manager
@@ -117,26 +124,4 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&postgresqlv1alpha1.Backup{}).
 		Complete(r)
-}
-
-// UpdateAndRetry update a certain backup in the k8s database
-// retrying when conflicts are detected
-func (r *BackupReconciler) UpdateAndRetry(
-	ctx context.Context,
-	backup *postgresqlv1alpha1.Backup,
-) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return r.Update(ctx, backup)
-	})
-}
-
-// MarkAsStarted marks a certain backup as invalid
-func (r *BackupReconciler) MarkAsStarted(ctx context.Context, backup *postgresqlv1alpha1.Backup) error {
-	backup.Status.Phase = postgresqlv1alpha1.BackupPhaseStarted
-	backup.Status.StartedAt = &metav1.Time{
-		Time: time.Now(),
-	}
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return r.Update(ctx, backup)
-	})
 }

@@ -9,17 +9,15 @@ package specs
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
 )
 
 // CreateServiceAccount create the serviceaccount that will be used in every Pod
-func CreateServiceAccount(cluster v1alpha1.Cluster) corev1.ServiceAccount {
+func CreateServiceAccount(cluster metav1.ObjectMeta, imagePullSecret string) corev1.ServiceAccount {
 	var imagePullSecrets []corev1.LocalObjectReference
 
-	if cluster.GetImagePullSecret() != "" {
+	if imagePullSecret != "" {
 		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{
-			Name: cluster.GetImagePullSecret(),
+			Name: imagePullSecret,
 		})
 	}
 

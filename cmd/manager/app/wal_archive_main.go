@@ -13,23 +13,12 @@ import (
 	"os"
 	"os/exec"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	client "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management"
 	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/log"
 )
-
-var (
-	scheme = runtime.NewScheme()
-)
-
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-	_ = apiv1alpha1.AddToScheme(scheme)
-}
 
 // WalArchiveCommand archives a certain WAL into the cloud
 // using barman-wal-archive

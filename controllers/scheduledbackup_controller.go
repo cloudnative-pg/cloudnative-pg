@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	postgresqlv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
 )
 
 const (
@@ -41,7 +40,7 @@ type ScheduledBackupReconciler struct {
 // Reconcile is the main reconciler logic
 func (r *ScheduledBackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	_ = r.Log.WithValues("scheduledbackup", req.NamespacedName)
+	log := r.Log.WithValues("scheduledbackup", req.NamespacedName)
 
 	var scheduledBackup postgresqlv1alpha1.ScheduledBackup
 	if err := r.Get(ctx, req.NamespacedName, &scheduledBackup); err != nil {
@@ -53,26 +52,57 @@ func (r *ScheduledBackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		return ctrl.Result{}, err
 	}
 
-	// Let's check
-	schedule, err := cron.Parse(scheduledBackup.Spec.Schedule)
+	// We are supposed to start a new backup. Let's extract
+	// the list of backups we already taken to see if anything
+	// is running now
+	childBackups, err := r.GetChildBackups(ctx, scheduledBackup)
 	if err != nil {
-		r.Log.Info("Detected an invalid cron schedule",
-			"schedule", scheduledBackup.Spec.Schedule,
-			"namespace", scheduledBackup.Namespace,
-			"name", scheduledBackup.Name)
+		log.Error(err,
+			"Cannot extract the list of created backups")
+		return ctrl.Result{}, err
+	}
+
+	// We are supposed to start a new backup. Let's extract
+	// the list of backups we already taken to see if anything
+	// is running now
+	for _, backup := range childBackups {
+		if backup.GetStatus().IsInProgress() {
+			log.Info(
+				"The system is already taking a scheduledBackup, skipping this one",
+				"backupName", backup.GetName(),
+				"backupPhase", backup.GetStatus().Phase)
+			return ctrl.Result{}, nil
+		}
+	}
+
+	return ReconcileScheduledBackup(ctx, r, log, &scheduledBackup)
+}
+
+// ReconcileScheduledBackup is the main reconciliation logic for a scheduled backup
+func ReconcileScheduledBackup(
+	ctx context.Context,
+	client client.Client,
+	log logr.Logger,
+	scheduledBackup postgresqlv1alpha1.ScheduledBackupCommon,
+) (ctrl.Result, error) {
+	// Let's check
+	schedule, err := cron.Parse(scheduledBackup.GetSchedule())
+	if err != nil {
+		log.Info("Detected an invalid cron schedule",
+			"schedule", scheduledBackup.GetSchedule())
 		return ctrl.Result{}, err
 	}
 
 	now := time.Now()
 
-	if scheduledBackup.Status.LastCheckTime == nil {
+	if scheduledBackup.GetStatus().LastCheckTime == nil {
 		// This is the first time we check this schedule,
 		// let's wait until the first job will be actually
 		// scheduled
-		scheduledBackup.Status.LastCheckTime = &metav1.Time{
+		scheduledBackup.GetStatus().LastCheckTime = &metav1.Time{
 			Time: now,
 		}
-		err := r.Status().Update(ctx, &scheduledBackup)
+		err := client.Status().Update(ctx, scheduledBackup.GetKubernetesObject())
 		if err != nil {
 			if apierrs.IsConflict(err) {
 				// Retry later, the cache is stale
@@ -81,76 +111,42 @@ func (r *ScheduledBackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 			return ctrl.Result{}, err
 		}
 
-		nextTime := schedule.Next(scheduledBackup.Status.LastCheckTime.Time)
+		nextTime := schedule.Next(scheduledBackup.GetStatus().LastCheckTime.Time)
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
-	// This scheduledBackup has already been scheduled, let's check if
-	// we are supposed to start a new backup.
-	nextTime := schedule.Next(scheduledBackup.Status.LastCheckTime.Time)
+	// Let's check if we are supposed to start a new backup.
+	nextTime := schedule.Next(scheduledBackup.GetStatus().LastCheckTime.Time)
 	if now.Before(nextTime) {
 		// No need to schedule a new backup, let's wait a bit
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
-	// We are supposed to start a new backup. Let's extract
-	// the list of backups we already taken to see if anything
-	// is running now
-	childBackups, err := r.GetChildBackups(ctx, scheduledBackup)
-	if err != nil {
-		r.Log.Error(err,
-			"Cannot extract the list of created backups",
-			"namespace", scheduledBackup.Namespace,
-			"name", scheduledBackup.Name)
-		return ctrl.Result{}, err
-	}
-
-	for _, backup := range childBackups {
-		if backup.IsInProgress() {
-			r.Log.Info(
-				"The system is already taking a scheduledBackup, skipping this one",
-				"namespace", scheduledBackup.Namespace,
-				"name", scheduledBackup.Name,
-				"backupName", backup.Name,
-				"backupPhase", backup.Status.Phase)
-			return ctrl.Result{}, nil
-		}
-	}
-
 	// So we have no backup running, let's create a backup.
 	// Let's have deterministic names to avoid creating the job two
 	// times
-	name := fmt.Sprintf("%s-%d", scheduledBackup.Name, nextTime.Unix())
-	backup := postgresqlv1alpha1.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: scheduledBackup.Namespace,
-		},
-		Spec: postgresqlv1alpha1.BackupSpec{
-			Cluster: scheduledBackup.Spec.Cluster,
-		},
-	}
-	utils.SetAsOwnedBy(&backup.ObjectMeta, scheduledBackup.ObjectMeta, scheduledBackup.TypeMeta)
+	name := fmt.Sprintf("%s-%d", scheduledBackup.GetName(), nextTime.Unix())
+	backup := scheduledBackup.CreateBackup(name)
 
-	r.Log.Info("Creating backup",
-		"name", scheduledBackup.Name,
-		"namespace", scheduledBackup.Namespace,
-		"backupName", backup.Name)
-	if err = r.Create(ctx, &backup); err != nil {
+	log.Info("Creating backup",
+		"name", scheduledBackup.GetName(),
+		"namespace", scheduledBackup.GetNamespace(),
+		"backupName", backup.GetName())
+	if err = client.Create(ctx, backup.GetKubernetesObject()); err != nil {
 		if !apierrs.IsConflict(err) {
-			r.Log.Error(err, "Error while creating backup object",
-				"name", scheduledBackup.Name,
-				"namespace", scheduledBackup.Namespace,
-				"backupName", backup.Name)
+			log.Error(err, "Error while creating backup object",
+				"name", scheduledBackup.GetName(),
+				"namespace", scheduledBackup.GetNamespace(),
+				"backupName", backup.GetName())
 			return ctrl.Result{}, err
 		}
 	}
 
 	// Ok, now update the latest check to now
-	scheduledBackup.Status.LastCheckTime = &metav1.Time{
+	scheduledBackup.GetStatus().LastCheckTime = &metav1.Time{
 		Time: now,
 	}
-	if err = r.Status().Update(ctx, &scheduledBackup); err != nil {
+	if err = client.Status().Update(ctx, scheduledBackup.GetKubernetesObject()); err != nil {
 		if apierrs.IsConflict(err) {
 			// Retry later, the cache is stale
 			return ctrl.Result{}, nil
@@ -194,7 +190,7 @@ func (r *ScheduledBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return nil
 			}
 
-			if owner.APIVersion != apiGVString || owner.Kind != "ScheduledBackup" {
+			if owner.APIVersion != apiGVString || owner.Kind != "Backup" {
 				return nil
 			}
 

@@ -9,6 +9,7 @@ package v1alpha1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -80,41 +81,61 @@ type BackupList struct {
 }
 
 // SetAsFailed marks a certain backup as invalid
-func (backup *Backup) SetAsFailed(
+func (backupStatus *BackupStatus) SetAsFailed(
 	stdout string,
 	stderr string,
 	err error,
 ) {
-	backup.Status.Phase = BackupPhaseFailed
-	backup.Status.CommandOutput = stdout
-	backup.Status.CommandError = stderr
+	backupStatus.Phase = BackupPhaseFailed
+	backupStatus.CommandOutput = stdout
+	backupStatus.CommandError = stderr
 
 	if err != nil {
-		backup.Status.Error = err.Error()
+		backupStatus.Error = err.Error()
 	} else {
-		backup.Status.Error = ""
+		backupStatus.Error = ""
 	}
 }
 
 // SetAsCompleted marks a certain backup as invalid
-func (backup *Backup) SetAsCompleted(
+func (backupStatus *BackupStatus) SetAsCompleted(
 	stdout string,
 	stderr string,
 ) {
-	backup.Status.Phase = BackupPhaseCompleted
-	backup.Status.CommandOutput = stdout
-	backup.Status.CommandError = stderr
-	backup.Status.Error = ""
+	backupStatus.Phase = BackupPhaseCompleted
+	backupStatus.CommandOutput = stdout
+	backupStatus.CommandError = stderr
+	backupStatus.Error = ""
 }
 
 // IsDone check if a backup is completed or still in progress
-func (backup *Backup) IsDone() bool {
-	return backup.Status.Phase == BackupPhaseCompleted || backup.Status.Phase == BackupPhaseFailed
+func (backupStatus *BackupStatus) IsDone() bool {
+	return backupStatus.Phase == BackupPhaseCompleted || backupStatus.Phase == BackupPhaseFailed
 }
 
 // IsInProgress check if a certain backup is in progress or not
-func (backup *Backup) IsInProgress() bool {
-	return !backup.IsDone()
+func (backupStatus *BackupStatus) IsInProgress() bool {
+	return !backupStatus.IsDone()
+}
+
+// GetStatus gets the backup status
+func (backup *Backup) GetStatus() *BackupStatus {
+	return &backup.Status
+}
+
+// GetName get the backup name
+func (backup *Backup) GetName() string {
+	return backup.Name
+}
+
+// GetNamespace get the backup namespace
+func (backup *Backup) GetNamespace() string {
+	return backup.Namespace
+}
+
+// GetKubernetesObject get the kubernetes object
+func (backup *Backup) GetKubernetesObject() runtime.Object {
+	return backup
 }
 
 func init() {

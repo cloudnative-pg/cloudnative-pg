@@ -56,11 +56,18 @@ linters:
   # - wsl
 
 run:
-  skip-files: zz_generated.*.go
+  skip-files: "zz_generated.*"
 
 issues:
   exclude-rules:
+    # Exclude lll issues for lines with long annotations
     - linters:
       - lll
-      source: "^//\\s*\\+"
+      source: "//\\s*\\+"
+    # We have no control of this in zz_generated files and it looks like that excluding those files is not enough
+    # so we disable "ST1016: methods on the same type should have the same receiver name" in api directory
+    - linters:
+      - stylecheck
+      text: "ST1016:"
+      path: api/
   exclude-use-default: false

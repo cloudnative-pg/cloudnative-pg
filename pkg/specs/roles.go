@@ -13,7 +13,7 @@ import (
 	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
 )
 
-// CreateRole create a role with the permissions needed by PGK
+// CreateRole create a role with the permissions needed by the instance manager
 func CreateRole(cluster v1alpha1.Cluster) rbacv1.Role {
 	return rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
