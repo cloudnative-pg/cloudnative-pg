@@ -139,7 +139,7 @@ var _ = Describe("Cluster", func() {
 						if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
 							Fail("Unable to get Cluster " + clusterName)
 						}
-						return utils.IsPodReady(*pod)
+						return utils.IsPodActive(*pod)
 					}, timeout).Should(BeTrue())
 
 					// And it should still contain the table we created before,
@@ -848,7 +848,7 @@ var _ = Describe("Cluster", func() {
 				Eventually(func() (bool, error) {
 					pod := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, podNamespacedName, pod)
-					return utils.IsPodReady(*pod), err
+					return utils.IsPodActive(*pod), err
 				}, timeout).Should(BeTrue())
 
 				// The pod should have the same PVC
@@ -898,7 +898,7 @@ var _ = Describe("Cluster", func() {
 				Eventually(func() (bool, error) {
 					newPod := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, newPodNamespacedName, newPod)
-					return utils.IsPodReady(*newPod), err
+					return utils.IsPodActive(*newPod), err
 				}, timeout).Should(BeTrue())
 				// The pod should have a different PVC
 				newPod := &corev1.Pod{}
