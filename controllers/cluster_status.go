@@ -21,13 +21,14 @@ func (r *ClusterReconciler) getManagedPods(
 	ctx context.Context,
 	cluster v1alpha1.Cluster,
 ) (corev1.PodList, error) {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	var childPods corev1.PodList
 	if err := r.List(ctx, &childPods,
 		client.InNamespace(cluster.Namespace),
 		client.MatchingFields{podOwnerKey: cluster.Name},
 	); err != nil {
-		r.Log.Error(err, "Unable to list child pods resource",
-			"namespace", cluster.Namespace, "name", cluster.Name)
+		log.Error(err, "Unable to list child pods resource")
 		return corev1.PodList{}, err
 	}
 
@@ -38,13 +39,14 @@ func (r *ClusterReconciler) getManagedPVCs(
 	ctx context.Context,
 	cluster v1alpha1.Cluster,
 ) (corev1.PersistentVolumeClaimList, error) {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	var childPVCs corev1.PersistentVolumeClaimList
 	if err := r.List(ctx, &childPVCs,
 		client.InNamespace(cluster.Namespace),
 		client.MatchingFields{pvcOwnerKey: cluster.Name},
 	); err != nil {
-		r.Log.Error(err, "Unable to list child PVCs",
-			"namespace", cluster.Namespace, "name", cluster.Name)
+		log.Error(err, "Unable to list child PVCs")
 		return corev1.PersistentVolumeClaimList{}, err
 	}
 

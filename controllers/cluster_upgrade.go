@@ -30,6 +30,8 @@ func (r *ClusterReconciler) upgradeCluster(
 	cluster *v1alpha1.Cluster,
 	podList v1.PodList, clusterStatus postgres.PostgresqlStatusList,
 ) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	targetImageName := cluster.GetImageName()
 
 	// Sort sortedPodList in reverse order
@@ -42,10 +44,7 @@ func (r *ClusterReconciler) upgradeCluster(
 	for idx, pod := range sortedPodList {
 		usedImageName, err := specs.GetPostgreSQLImageName(pod)
 		if err != nil {
-			r.Log.Error(err,
-				"podName", pod.Name,
-				"clusterName", cluster.Name,
-				"namespace", cluster.Namespace)
+			log.Error(err, "pod", pod.Name)
 			continue
 		}
 
@@ -67,9 +66,8 @@ func (r *ClusterReconciler) upgradeCluster(
 	// We still need to upgrade the primary server, let's see
 	// if the user prefer to do it manually
 	if cluster.GetPrimaryUpdateStrategy() == v1alpha1.PrimaryUpdateStrategySupervised {
-		r.Log.Info("Waiting for the user to issue a supervised switchover to complete the rolling update",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
+		log.Info(
+			"Waiting for the user to issue a supervised switchover to complete the rolling update",
 			"primaryPod", sortedPodList[primaryIdx].Name)
 		return nil
 	}
@@ -81,9 +79,7 @@ func (r *ClusterReconciler) upgradeCluster(
 	}
 
 	// Let's switch over to this server
-	r.Log.Info("Switching over to a replica to complete the rolling update",
-		"clusterName", cluster.Name,
-		"namespace", cluster.Namespace,
+	log.Info("Switching over to a replica to complete the rolling update",
 		"oldPrimary", cluster.Status.TargetPrimary,
 		"newPrimary", clusterStatus.Items[1].PodName,
 		"status", clusterStatus)
@@ -92,10 +88,10 @@ func (r *ClusterReconciler) upgradeCluster(
 
 // updatePod update an instance to a newer image version
 func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *v1alpha1.Cluster, pod *v1.Pod) error {
-	r.Log.Info("Deleting old Pod",
-		"clusterName", cluster.Name,
-		"podName", pod.Name,
-		"namespace", cluster.Namespace,
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
+	log.Info("Deleting old Pod",
+		"pod", pod.Name,
 		"to", cluster.Spec.ImageName)
 
 	// Let's wait for this Pod to be recloned or recreated using the

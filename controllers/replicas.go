@@ -27,6 +27,8 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	cluster *v1alpha1.Cluster,
 	status postgres.PostgresqlStatusList,
 ) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	if len(status.Items) == 0 {
 		// Still no ready instances
 		return nil
@@ -34,7 +36,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 
 	// Set targetPrimary to do a failover if needed
 	if !status.Items[0].IsPrimary {
-		r.Log.Info("Current primary isn't valid, failing over",
+		log.Info("Current primary isn't valid, failing over",
 			"newPrimary", status.Items[0].PodName,
 			"clusterStatus", status)
 		// No primary, no party. Failover please!
@@ -127,7 +129,8 @@ func (r *ClusterReconciler) getReplicaStatusFromPod(
 
 func (r *ClusterReconciler) extractInstancesStatus(
 	ctx context.Context,
-	filteredPods []corev1.Pod) (postgres.PostgresqlStatusList, error) {
+	filteredPods []corev1.Pod,
+) (postgres.PostgresqlStatusList, error) {
 	var result postgres.PostgresqlStatusList
 
 	for idx := range filteredPods {

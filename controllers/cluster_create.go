@@ -30,13 +30,12 @@ const (
 
 // createPostgresClusterObjects ensure that we have the required global objects
 func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	// Ensure we have the secret that allow us to download the image of
 	// PostgreSQL
 	if err := r.createImagePullSecret(ctx, cluster); err != nil {
-		r.Log.Error(err,
-			"Can't generate the image pull secret",
-			"namespace", cluster.Namespace,
-			"name", cluster.Name)
+		log.Error(err, "Can't generate the image pull secret")
 		return err
 	}
 
@@ -203,13 +202,15 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 
 // createOrUpdatePodDisruptionBudget ensure that we have a PDB requiring to remove one node at a time
 func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	targetPdb := specs.CreatePodDisruptionBudget(*cluster)
 	utils.SetAsOwnedBy(&targetPdb.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&targetPdb.ObjectMeta, versions.Version)
 
 	err := r.Create(ctx, &targetPdb)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
-		r.Log.Error(err, "Unable to create PodDisruptionBugdet", "object", targetPdb)
+		log.Error(err, "Unable to create PodDisruptionBugdet", "object", targetPdb)
 		return err
 	}
 
@@ -218,13 +219,15 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 
 // createServiceAccount create the service account for this PostgreSQL cluster
 func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	serviceAccount := specs.CreateServiceAccount(cluster.ObjectMeta, cluster.GetImagePullSecret())
 	utils.SetAsOwnedBy(&serviceAccount.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&serviceAccount.ObjectMeta, versions.Version)
 
 	err := r.Create(ctx, &serviceAccount)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
-		r.Log.Error(err, "Unable to create ServiceAccount", "object", serviceAccount)
+		log.Error(err, "Unable to create ServiceAccount", "object", serviceAccount)
 		return err
 	}
 
@@ -233,13 +236,15 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v
 
 // createRole create the role
 func (r *ClusterReconciler) createRole(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	roleBinding := specs.CreateRole(*cluster)
 	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&roleBinding.ObjectMeta, versions.Version)
 
 	err := r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
-		r.Log.Error(err, "Unable to create the Role", "object", roleBinding)
+		log.Error(err, "Unable to create the Role", "object", roleBinding)
 		return err
 	}
 
@@ -248,13 +253,15 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *v1alpha1.Cl
 
 // createRoleBinding create the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
 	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&roleBinding.ObjectMeta, versions.Version)
 
 	err := r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
-		r.Log.Error(err, "Unable to create the ServiceAccount", "object", roleBinding)
+		log.Error(err, "Unable to create the ServiceAccount", "object", roleBinding)
 		return err
 	}
 
@@ -276,25 +283,25 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	nodeSerial int32,
 	cluster *v1alpha1.Cluster,
 ) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	// We are bootstrapping a cluster and in need to create the first node
 	var pod *corev1.Pod
 	var err error
 
 	pod = specs.CreatePrimaryPod(*cluster, nodeSerial)
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
-		r.Log.Error(err, "Unable to set the owner reference for instance")
+		log.Error(err, "Unable to set the owner reference for instance")
 		return err
 	}
 
 	if err = r.setPrimaryInstance(ctx, cluster, pod.Name); err != nil {
-		r.Log.Error(err, "Unable to set the primary instance name")
+		log.Error(err, "Unable to set the primary instance name")
 		return err
 	}
 
-	r.Log.Info("Creating new Pod",
-		"namespace", cluster.Namespace,
-		"clusterName", cluster.Name,
-		"podName", pod.Name,
+	log.Info("Creating new Pod",
+		"name", pod.Name,
 		"primary", true)
 
 	specs.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
@@ -306,7 +313,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			return nil
 		}
 
-		r.Log.Error(err, "Unable to create pod", "pod", pod)
+		log.Error(err, "Unable to create pod", "pod", pod)
 		return err
 	}
 
@@ -315,7 +322,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 		specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
 		if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-			r.Log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
+			log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 			return err
 		}
 	}
@@ -328,19 +335,19 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	nodeSerial int32,
 	cluster *v1alpha1.Cluster,
 ) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	var pod *corev1.Pod
 	var err error
 
 	pod = specs.JoinReplicaInstance(*cluster, nodeSerial)
 
-	r.Log.Info("Creating new Pod",
-		"clusterName", cluster.Name,
-		"namespace", cluster.Namespace,
-		"podName", pod.Name,
+	log.Info("Creating new Pod",
+		"pod", pod.Name,
 		"primary", false)
 
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
-		r.Log.Error(err, "Unable to set the owner reference for joined PostgreSQL node")
+		log.Error(err, "Unable to set the owner reference for joined PostgreSQL node")
 		return err
 	}
 
@@ -350,11 +357,11 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
-			r.Log.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
+			log.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
 			return nil
 		}
 
-		r.Log.Error(err, "Unable to create Pod", "pod", pod)
+		log.Error(err, "Unable to create Pod", "pod", pod)
 		return err
 	}
 
@@ -363,7 +370,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 		specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
 		if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-			r.Log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
+			log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 			return err
 		}
 	}
@@ -373,6 +380,8 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 // reattachDanglingPVC reattach a dangling PVC
 func (r *ClusterReconciler) reattachDanglingPVC(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	if len(cluster.Status.DanglingPVC) == 0 {
 		return nil
 	}
@@ -390,14 +399,12 @@ func (r *ClusterReconciler) reattachDanglingPVC(ctx context.Context, cluster *v1
 
 	pod := specs.PodWithExistingStorage(*cluster, int32(nodeSerial))
 
-	r.Log.Info("Creating new Pod to reattach a PVC",
-		"name", cluster.Name,
-		"namespace", cluster.Namespace,
-		"podName", pod.Name,
-		"pvcName", pvc.Name)
+	log.Info("Creating new Pod to reattach a PVC",
+		"pod", pod.Name,
+		"pvc", pvc.Name)
 
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
-		r.Log.Error(err, "Unable to set the owner reference for the Pod")
+		log.Error(err, "Unable to set the owner reference for the Pod")
 		return err
 	}
 
@@ -407,11 +414,11 @@ func (r *ClusterReconciler) reattachDanglingPVC(ctx context.Context, cluster *v1
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
-			r.Log.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
+			log.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
 			return nil
 		}
 
-		r.Log.Error(err, "Unable to create Pod", "pod", pod)
+		log.Error(err, "Unable to create Pod", "pod", pod)
 		return err
 	}
 

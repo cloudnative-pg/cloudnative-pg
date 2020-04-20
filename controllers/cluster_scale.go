@@ -23,22 +23,20 @@ func (r *ClusterReconciler) scaleDownCluster(
 	cluster *v1alpha1.Cluster,
 	childPods v1.PodList,
 ) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	// Is there one pod to be deleted?
 	sacrificialPod := getSacrificialPod(childPods.Items)
 	if sacrificialPod == nil {
-		r.Log.Info("There are no instances to be sacrificed. Wait for the next sync loop")
+		log.Info("There are no instances to be sacrificed. Wait for the next sync loop")
 		return nil
 	}
 
-	r.Log.Info("Too many nodes for cluster, deleting an instance",
-		"cluster", cluster.Name,
-		"namespace", cluster.Namespace,
+	log.Info("Too many nodes for cluster, deleting an instance",
 		"pod", sacrificialPod.Name)
 	err := r.Delete(ctx, sacrificialPod)
 	if err != nil {
-		r.Log.Error(err, "Cannot kill the Pod to scale down",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
+		log.Error(err, "Cannot kill the Pod to scale down",
 			"pod", sacrificialPod.Name)
 		return err
 	}

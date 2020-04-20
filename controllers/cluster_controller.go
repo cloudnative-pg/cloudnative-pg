@@ -56,16 +56,15 @@ type ClusterReconciler struct {
 // Reconcile is the operator reconciler loop
 func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	_ = r.Log.WithValues("postgresql", req.NamespacedName)
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", req.Namespace, "name", req.Name)
 
-	r.Log.V(4).Info("Reconciling", "namespace", req.Namespace, "name", req.Name)
 	var cluster v1alpha1.Cluster
 	if err := r.Get(ctx, req.NamespacedName, &cluster); err != nil {
 		// This also happens when you delete a Cluster resource in k8s. If
 		// that's the case, let's just wait for the Kubernetes garbage collector
 		// to remove all the Pods of the cluster.
 		if apierrs.IsNotFound(err) {
-			r.Log.Info("Resource has been deleted", "namespace", req.Namespace, "name", req.Name)
+			log.Info("Resource has been deleted")
 
 			return ctrl.Result{}, nil
 		}
@@ -96,18 +95,18 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	childPods, err = r.getManagedPods(ctx, cluster)
 	if err != nil {
-		r.Log.Error(err, "Cannot extract the list of managed Pods")
+		log.Error(err, "Cannot extract the list of managed Pods")
 		return ctrl.Result{}, err
 	}
 
 	childPVCs, err := r.getManagedPVCs(ctx, cluster)
 	if err != nil {
-		r.Log.Error(err, "Cannot extract the list of managed PVCs")
+		log.Error(err, "Cannot extract the list of managed PVCs")
 		return ctrl.Result{}, err
 	}
 
 	if cluster.Status.CurrentPrimary != "" && cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		r.Log.Info("Switchover in progress, waiting for the cluster to align")
+		log.Info("Switchover in progress, waiting for the cluster to align")
 		// TODO: check if the TargetPrimary is active, otherwise recovery?
 		return ctrl.Result{}, err
 	}
@@ -161,9 +160,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// Find if we have Pods that are not ready
 	if cluster.Status.ReadyInstances != cluster.Status.Instances {
 		// A pod is not ready, let's retry
-		r.Log.V(2).Info("Waiting for node to be ready",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace)
+		log.V(2).Info("Waiting for node to be ready")
 		return ctrl.Result{}, nil
 	}
 
@@ -171,10 +168,8 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// Let's wait for it to terminate before applying the
 	// following operations
 	if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary {
-		r.Log.V(2).Info("There is a switchover or a failover "+
+		log.V(2).Info("There is a switchover or a failover "+
 			"in progress, waiting for the operation to complete",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
 		return ctrl.Result{}, nil
