@@ -97,6 +97,10 @@ spec:
                     WALs and for data
                   minLength: 1
                   type: string
+                endpointURL:
+                  description: Endpoint to be used to upload data to the cloud, overriding
+                    the automatic endpoint discovery
+                  type: string
                 s3Credentials:
                   description: The credentials to use to upload data to S3
                   properties:

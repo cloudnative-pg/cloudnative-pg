@@ -4,12 +4,12 @@ of using the classical architecture with a Barman server which
 backup many PostgreSQL instances, the operator will use the
 `barman-cloud-wal-archive` and `barman-cloud-backup` tools.
 
-To that, an image containing Barman installed is needed. The
+For this it is required an image with `barman-cli-cloud` installed. The
 image named `2ndquadrant/postgresql` can be used for this scope,
 as it is composed by a community PostgreSQL image and the latest
-Barman package. 
+`barman-cli-cloud` package.
 
-# How to manage your cloud credentials
+## Cloud credentials
 
 The backup files can be archived in any service whose API is compatible
 with AWS S3. You will need the following information about your
@@ -24,12 +24,18 @@ The access key used must have the permission to upload files in
 the bucket. Given that, you must create a k8s secret with the
 credentials, and you can do that with the following command:
 
-    kubectl create secret generic aws-creds \ 
-      --from-literal=ACCESS_KEY_ID=<access key here> \
-      --from-literal=ACCESS_SECRET_KEY=<secret key here>
+```sh
+kubectl create secret generic aws-creds \
+  --from-literal=ACCESS_KEY_ID=<access key here> \
+  --from-literal=ACCESS_SECRET_KEY=<secret key here>
+```
 
-The credentials will be stored inside Kubernetes and encrypted
-if supported by your installation.
+The credentials will be stored inside Kubernetes and will be encrypted
+if encryption at rest is configured in your installation.
+
+## Configuring the Cluster
+
+### S3
 
 Given that secret, your can configure your cluster like in
 the following example:
@@ -51,10 +57,31 @@ spec:
 ```
 
 The destination path can be every URL pointing to a folder where
-the instance can upload the WAL files, i.e.
+the instance can upload the WAL files, e.g.
 `s3://BUCKET_NAME/path/to/folder`.
 
-# On demand backups
+### Other S3-compatible Object Storages providers
+
+In case you're using an S3-compatible object storage, like minio or
+Linode Object Storage, you can specify an endpoint instead of using the
+default S3 one.
+
+In this example it will use the `bucket` bucket of Linode in the region
+`us-east1`.
+
+```yaml
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: Cluster
+[...]
+spec:
+  backup:
+    destinationPath: "<destination path here>"
+    endpointURL: bucket.us-east1.linodeobjects.com
+    s3Credentials:
+      [...]
+```
+
+## On demand backups
 
 To request a new backup you need to create a new Backup resource
 like the following one:
@@ -120,20 +147,19 @@ Status:
 Events:        <none>
 ```
 
-
-# Scheduled backups
+## Scheduled backups
 
 You can also schedule your backups periodically by creating a
 resource named `ScheduledBackup`. The latter is similar to a
 `Backup` but with an added field, named `schedule`.
 
 This field is a [Cron](https://en.wikipedia.org/wiki/Cron) schedule
-specification with a prepended seconds field. This schedule format
+specification with a prepended field for seconds. This schedule format
 is the same used in Kubernetes CronJobs.
 
 This is an example of a scheduled backup:
 
-```
+```yaml
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
 kind: ScheduledBackup
 metadata:
@@ -146,7 +172,7 @@ spec:
 
 The proposed specification will schedule a backup every day at midnight.
 
-# WAL archiving
+## WAL archiving
 
 WAL archiving is enabled as soon as you choose a destination path
 and you configure your cloud credentials.
@@ -169,4 +195,3 @@ spec:
 The encryption can be configured directly in your bucket, and if
 you don't specify otherwise in the cluster, the operator will use
 that one.
-

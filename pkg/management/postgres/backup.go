@@ -44,6 +44,12 @@ func (instance *Instance) Backup(
 				string(configuration.Data.Encryption))
 		}
 	}
+	if len(configuration.EndpointURL) > 0 {
+		options = append(
+			options,
+			"--endpoint-url",
+			configuration.EndpointURL)
+	}
 	serverName := instance.ClusterName
 	if len(configuration.ServerName) != 0 {
 		serverName = configuration.ServerName

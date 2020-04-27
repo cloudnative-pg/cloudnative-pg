@@ -89,6 +89,12 @@ func WalArchiveCommand(args []string) {
 				string(cluster.Spec.Backup.Wal.Encryption))
 		}
 	}
+	if len(cluster.Spec.Backup.EndpointURL) > 0 {
+		options = append(
+			options,
+			"--endpoint-url",
+			cluster.Spec.Backup.EndpointURL)
+	}
 	serverName := clusterName
 	if len(cluster.Spec.Backup.ServerName) != 0 {
 		serverName = cluster.Spec.Backup.ServerName

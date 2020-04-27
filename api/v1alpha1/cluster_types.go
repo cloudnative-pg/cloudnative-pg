@@ -224,6 +224,10 @@ type BackupConfiguration struct {
 	// The credentials to use to upload data to S3
 	S3Credentials S3Credentials `json:"s3Credentials"`
 
+	// Endpoint to be used to upload data to the cloud,
+	// overriding the automatic endpoint discovery
+	EndpointURL string `json:"endpointURL,omitempty"`
+
 	// The path where to store the backup (i.e. s3://bucket/path/to/folder)
 	// this path, with different destination folders, will be used for WALs
 	// and for data
