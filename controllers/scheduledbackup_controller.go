@@ -68,10 +68,10 @@ func (r *ScheduledBackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	for _, backup := range childBackups {
 		if backup.GetStatus().IsInProgress() {
 			log.Info(
-				"The system is already taking a scheduledBackup, skipping this one",
+				"The system is already taking a scheduledBackup, retrying in 60 seconds",
 				"backupName", backup.GetName(),
 				"backupPhase", backup.GetStatus().Phase)
-			return ctrl.Result{}, nil
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
 	}
 
