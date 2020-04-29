@@ -112,11 +112,13 @@ func ReconcileScheduledBackup(
 		}
 
 		nextTime := schedule.Next(scheduledBackup.GetStatus().LastCheckTime.Time)
+		log.Info("Next backup schedule", "next", nextTime)
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
 	// Let's check if we are supposed to start a new backup.
 	nextTime := schedule.Next(scheduledBackup.GetStatus().LastCheckTime.Time)
+	log.Info("Next backup schedule", "next", nextTime)
 	if now.Before(nextTime) {
 		// No need to schedule a new backup, let's wait a bit
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
@@ -128,23 +130,25 @@ func ReconcileScheduledBackup(
 	name := fmt.Sprintf("%s-%d", scheduledBackup.GetName(), nextTime.Unix())
 	backup := scheduledBackup.CreateBackup(name)
 
-	log.Info("Creating backup",
-		"name", scheduledBackup.GetName(),
-		"namespace", scheduledBackup.GetNamespace(),
-		"backupName", backup.GetName())
+	log.Info("Creating backup", "backupName", backup.GetName())
 	if err = client.Create(ctx, backup.GetKubernetesObject()); err != nil {
-		if !apierrs.IsConflict(err) {
-			log.Error(err, "Error while creating backup object",
-				"name", scheduledBackup.GetName(),
-				"namespace", scheduledBackup.GetNamespace(),
-				"backupName", backup.GetName())
-			return ctrl.Result{}, err
+		if apierrs.IsConflict(err) {
+			// Retry later, the cache is stale
+			return ctrl.Result{}, nil
 		}
+
+		log.Error(
+			err, "Error while creating backup object",
+			"backupName", backup.GetName())
+		return ctrl.Result{}, err
 	}
 
 	// Ok, now update the latest check to now
 	scheduledBackup.GetStatus().LastCheckTime = &metav1.Time{
 		Time: now,
+	}
+	scheduledBackup.GetStatus().LastScheduleTime = &metav1.Time{
+		Time: nextTime,
 	}
 	if err = client.Status().Update(ctx, scheduledBackup.GetKubernetesObject()); err != nil {
 		if apierrs.IsConflict(err) {
@@ -154,7 +158,9 @@ func ReconcileScheduledBackup(
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, nil
+	nextTime = schedule.Next(now)
+	log.Info("Next backup schedule", "next", nextTime)
+	return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 }
 
 // GetChildBackups gets all the backups scheduled by a certain scheduler
