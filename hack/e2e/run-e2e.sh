@@ -27,6 +27,9 @@ KUBECTL_VERSION=${KUBECTL_VERSION:-$(curl -s https://storage.googleapis.com/kube
 
 KIND_CLUSTER_NAME=pg-operator-e2e-${K8S_VERSION}
 
+# Detect the images used from the operator
+export POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME:-$(grep 'DefaultImageName.*=' "${OPERATOR_ROOT}/pkg/versions/versions.go" | cut -f 2 -d \")}
+
 if [ "${DEBUG}" = true ]; then
     set -x
 fi

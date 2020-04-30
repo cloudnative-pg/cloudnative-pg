@@ -5,7 +5,8 @@
 # Image URL to use all building/pushing image targets
 CONTROLLER_IMG ?= quay.io/2ndquadrant/cloud-native-postgresql-operator:latest
 BUILD_IMAGE ?= true
-export CONTROLLER_IMG BUILD_IMAGE
+POSTGRES_IMAGE_NAME ?= quay.io/2ndquadrant/postgres:latest
+export CONTROLLER_IMG BUILD_IMAGE POSTGRES_IMAGE_NAME
 
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
@@ -52,6 +53,9 @@ deploy: manifests
 	{ \
 	    cd $$CONFIG_TMP_DIR/manager ;\
 	    kustomize edit set image controller=${CONTROLLER_IMG} ;\
+	    kustomize edit add patch env_override.yaml ;\
+	    kustomize edit add configmap controller-manager-env \
+	        --from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME} ;\
 	} ;\
 	kustomize build $$CONFIG_TMP_DIR/default | kubectl apply -f - ;\
 	rm -fr $$CONFIG_TMP_DIR

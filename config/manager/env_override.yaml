@@ -1,0 +1,14 @@
+# This patch merges the environment with the values read from the controller-manager-env config map
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        envFrom:
+        - configMapRef:
+            name: controller-manager-env

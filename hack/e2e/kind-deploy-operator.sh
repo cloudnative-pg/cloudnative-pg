@@ -13,7 +13,8 @@ KIND_CLUSTER_NAME=${1}
 DEBUG=${DEBUG:-false}
 BUILD_IMAGE=${BUILD_IMAGE:-true}
 OPERATOR_IMG="quay.io/2ndquadrant/cloud-native-postgresql-operator:e2e"
-PG_IMG_UPDATE="quay.io/2ndquadrant/postgres:e2e-update"
+POSTGRES_IMG="quay.io/2ndquadrant/postgres:e2e"
+POSTGRES_IMG_UPDATE="quay.io/2ndquadrant/postgres:e2e-update"
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 
 if [ "${DEBUG}" = true ]
@@ -40,7 +41,7 @@ upload_image_to_kind() {
 
 # Deploy the operator and wait for the deployment to be complete
 deploy_operator() {
-    make -C "${ROOT_DIR}" deploy CONTROLLER_IMG="${OPERATOR_IMG}"
+    make -C "${ROOT_DIR}" deploy CONTROLLER_IMG="${OPERATOR_IMG}" POSTGRES_IMAGE_NAME="${POSTGRES_IMG}"
     kubectl wait --for=condition=Available --timeout=2m \
       -n postgresql-operator-system deployments \
       postgresql-operator-controller-manager
@@ -51,10 +52,10 @@ deploy_operator() {
 build_pg_image_pseudoupdate() {
     (
     cat << EOF
-FROM quay.io/2ndquadrant/postgres:12
+FROM ${POSTGRES_IMAGE_NAME}
 ENV noop noop
 EOF
-    )| docker build -t "${PG_IMG_UPDATE}" -
+    )| docker build -t "${POSTGRES_IMG_UPDATE}" -
 }
 
 main() {
@@ -64,8 +65,9 @@ main() {
     else
         upload_image_to_kind "${CONTROLLER_IMG}" "${OPERATOR_IMG}"
     fi
+    upload_image_to_kind "${POSTGRES_IMAGE_NAME}" "${POSTGRES_IMG}"
     build_pg_image_pseudoupdate
-    upload_image_to_kind "${PG_IMG_UPDATE}"
+    upload_image_to_kind "${POSTGRES_IMG_UPDATE}"
     deploy_operator
 }
 
