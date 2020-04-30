@@ -22,5 +22,7 @@ E2E tests are performed on that cluster:
 * Scale-down of a `Cluster`;
 * Failover;
 * Switchover;
+* Rolling updates when changing PostgreSQL images;
+* Backup and ScheduledBackups execution;
 * Primary endpoint switch in case of failure in less than 5 seconds;
 * Recover from degraded state in less than 30 seconds.

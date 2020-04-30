@@ -10,9 +10,12 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -59,12 +62,10 @@ var _ = Describe("Cluster", func() {
 				Name:      clusterName,
 			}
 
-			Eventually(func() int32 {
+			Eventually(func() (int32, error) {
 				cr := &clusterv1alpha1.Cluster{}
-				if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
-					Fail("Unable to get Cluster " + clusterName)
-				}
-				return cr.Status.ReadyInstances
+				err := env.Client.Get(env.Ctx, namespacedName, cr)
+				return cr.Status.ReadyInstances, err
 			}, timeout).Should(BeEquivalentTo(3))
 		})
 	}
@@ -913,6 +914,227 @@ var _ = Describe("Cluster", func() {
 				err = env.Client.Get(env.Ctx, newNamespacedPVCName, newPvc)
 				Expect(err).To(BeNil())
 				Expect(newPvc.GetUID()).NotTo(BeEquivalentTo(originalPVCUID))
+			})
+		})
+	})
+
+	Context("Backup", func() {
+		const namespace = "cluster-backup"
+		const sampleFile = fixturesDir + "/backup/cluster-with-backup.yaml"
+		const clusterName = "postgresql-bkp"
+		BeforeEach(func() {
+			if err := env.CreateNamespace(namespace); err != nil {
+				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
+			}
+		})
+		AfterEach(func() {
+			if err := env.DeleteNamespace(namespace); err != nil {
+				Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
+			}
+		})
+		It("backs up the cluster", func() {
+
+			// First we create the secrets for minio
+			By("creating the cloud storage credentials", func() {
+				secretFile := fixturesDir + "/backup/aws-creds.yaml"
+				_, _, err := tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+					namespace, secretFile))
+				Expect(err).To(BeNil())
+			})
+
+			By("setting up minio to hold the backups", func() {
+				// Create a PVC-based deployment for the minio version
+				// minio/minio:RELEASE.2020-04-23T00-58-49Z
+				minioPVCFile := fixturesDir + "/backup/minio-pvc.yaml"
+				minioDeploymentFile := fixturesDir +
+					"/backup/minio-deployment.yaml"
+				_, _, err := tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+					namespace, minioPVCFile))
+				Expect(err).To(BeNil())
+				_, _, err = tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+					namespace, minioDeploymentFile))
+				Expect(err).To(BeNil())
+
+				// Wait for the minio pod to be ready
+				timeout := 300
+				deploymentName := "minio"
+				deploymentNamespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      deploymentName,
+				}
+				Eventually(func() (int32, error) {
+					deployment := &appsv1.Deployment{}
+					err := env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
+					return deployment.Status.ReadyReplicas, err
+				}, timeout).Should(BeEquivalentTo(1))
+
+				// Create a minio service
+				serviceFile := fixturesDir + "/backup/minio-service.yaml"
+				_, _, err = tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+					namespace, serviceFile))
+				Expect(err).To(BeNil())
+			})
+
+			// Create the minio client pod and wait for it to be ready.
+			// We'll use it to check if everything is archived correctly.
+			By("setting up minio client pod", func() {
+				clientFile := fixturesDir + "/backup/minio-client.yaml"
+				_, _, err := tests.Run(fmt.Sprintf(
+					"kubectl apply -n %v -f %v",
+					namespace, clientFile))
+				Expect(err).To(BeNil())
+				timeout := 180
+				mcName := "mc"
+				mcNamespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      mcName,
+				}
+				Eventually(func() (bool, error) {
+					mc := &corev1.Pod{}
+					err := env.Client.Get(env.Ctx, mcNamespacedName, mc)
+					return utils.IsPodReady(*mc), err
+				}, timeout).Should(BeTrue())
+			})
+
+			// Create the Cluster
+			AssertCreateCluster(namespace, clusterName, sampleFile)
+
+			// Create a WAL on the lead-master and check if it arrives on
+			// minio within a short time.
+			By("archiving WALs on minio", func() {
+				primary := clusterName + "-1"
+				switchWalCmd := "psql app -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"
+				out, _, err := tests.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primary,
+					switchWalCmd))
+				Expect(err).To(BeNil())
+				latestWAL := strings.TrimSpace(out)
+
+				mcName := "mc"
+				timeout := 30
+				Eventually(func() (int, error) {
+					// In the fixture WALs are compressed with gzip
+					findCmd := fmt.Sprintf(
+						"sh -c 'mc find  minio --name %v.gz | wc -l'",
+						latestWAL)
+					out, _, err := tests.Run(fmt.Sprintf(
+						"kubectl exec -n %v %v -- %v",
+						namespace,
+						mcName,
+						findCmd))
+					if err != nil {
+						return 0, err
+					}
+					return strconv.Atoi(strings.Trim(out, "\n"))
+				}, timeout).Should(BeEquivalentTo(1))
+			})
+
+			By("uploading a backup on minio", func() {
+				// We create a Backup
+				backupFile := fixturesDir + "/backup/backup.yaml"
+				_, _, err := tests.Run(fmt.Sprintf(
+					"kubectl apply -n %v -f %v",
+					namespace, backupFile))
+				Expect(err).To(BeNil())
+
+				// After a while the Backup should be completed
+				timeout := 180
+				backupName := "cluster-backup"
+				backupNamespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      backupName,
+				}
+				Eventually(func() (clusterv1alpha1.BackupPhase, error) {
+					backup := &clusterv1alpha1.Backup{}
+					err := env.Client.Get(env.Ctx, backupNamespacedName, backup)
+					return backup.GetStatus().Phase, err
+				}, timeout).Should(BeEquivalentTo(clusterv1alpha1.BackupPhaseCompleted))
+
+				// A file called data.tar should be available on minio
+				mcName := "mc"
+				timeout = 30
+				Eventually(func() (int, error) {
+					findCmd := "sh -c 'mc find  minio --name data.tar | wc -l'"
+					out, _, err := tests.Run(fmt.Sprintf(
+						"kubectl exec -n %v %v -- %v",
+						namespace,
+						mcName,
+						findCmd))
+					if err != nil {
+						return 0, err
+					}
+					return strconv.Atoi(strings.Trim(out, "\n"))
+				}, timeout).Should(BeEquivalentTo(1))
+			})
+
+			By("scheduling backups", func() {
+				// We create a ScheduledBackup
+				backupFile := fixturesDir + "/backup/scheduled-backup.yaml"
+				_, _, err := tests.Run(fmt.Sprintf(
+					"kubectl apply -n %v -f %v",
+					namespace, backupFile))
+				Expect(err).To(BeNil())
+
+				// We expect the scheduled backup to be scheduled before a
+				// timeout
+				timeout := 180
+				scheduledBackupName := "scheduled-backup"
+				scheduledBackupNamespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      scheduledBackupName,
+				}
+				Eventually(func() (*v1.Time, error) {
+					scheduledBackup := &clusterv1alpha1.ScheduledBackup{}
+					err := env.Client.Get(env.Ctx,
+						scheduledBackupNamespacedName, scheduledBackup)
+					return scheduledBackup.GetStatus().LastScheduleTime, err
+				}, timeout).ShouldNot(BeNil())
+
+				// Within a few minutes we should have at least two backups
+				Eventually(func() (int, error) {
+					// Get all the backups children of the ScheduledBackup
+					scheduledBackup := &clusterv1alpha1.ScheduledBackup{}
+					if err := env.Client.Get(env.Ctx,
+						scheduledBackupNamespacedName,
+						scheduledBackup); err != nil {
+						return 0, err
+					}
+					// Get all the backups children of the ScheduledBackup
+					backups := &clusterv1alpha1.BackupList{}
+					if err := env.Client.List(env.Ctx, backups,
+						ctrlclient.InNamespace(namespace),
+					); err != nil {
+						return 0, err
+					}
+					completed := 0
+					for _, backup := range backups.Items {
+						for _, owner := range backup.GetObjectMeta().GetOwnerReferences() {
+							if owner.Name == scheduledBackup.Name &&
+								backup.GetStatus().Phase == clusterv1alpha1.BackupPhaseCompleted {
+								completed++
+							}
+						}
+					}
+					return completed, nil
+				}, timeout).Should(BeEquivalentTo(2))
+
+				// Two more data.tar files should be on minio
+				mcName := "mc"
+				timeout = 30
+				Eventually(func() (int, error) {
+					findCmd := "sh -c 'mc find  minio --name data.tar | wc -l'"
+					out, _, err := tests.Run(fmt.Sprintf(
+						"kubectl exec -n %v %v -- %v",
+						namespace,
+						mcName,
+						findCmd))
+					if err != nil {
+						return 0, err
+					}
+					return strconv.Atoi(strings.Trim(out, "\n"))
+				}, timeout).Should(BeEquivalentTo(3))
 			})
 		})
 	})

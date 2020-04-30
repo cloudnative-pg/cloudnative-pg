@@ -1,0 +1,7 @@
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: Backup
+metadata:
+  name: cluster-backup
+spec:
+  cluster:
+    name: postgresql-bkp
