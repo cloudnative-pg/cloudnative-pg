@@ -17,8 +17,10 @@ environment:
 
 - `ACCESS_KEY_ID`: the ID of the access key that will be used
   to upload files in S3
-  
+
 - `ACCESS_SECRET_KEY`: the secret part of the previous access key
+
+- `ACCESS_SESSION_TOKEN`: the optional session token in case it is required
 
 The access key used must have the permission to upload files in
 the bucket. Given that, you must create a k8s secret with the
@@ -28,6 +30,7 @@ credentials, and you can do that with the following command:
 kubectl create secret generic aws-creds \
   --from-literal=ACCESS_KEY_ID=<access key here> \
   --from-literal=ACCESS_SECRET_KEY=<secret key here>
+# --from-literal=ACCESS_SESSION_TOKEN=<session token here> # if required
 ```
 
 The credentials will be stored inside Kubernetes and will be encrypted
@@ -62,7 +65,7 @@ the instance can upload the WAL files, e.g.
 
 ### Other S3-compatible Object Storages providers
 
-In case you're using an S3-compatible object storage, like minio or
+In case you're using an S3-compatible object storage, like MinIO or
 Linode Object Storage, you can specify an endpoint instead of using the
 default S3 one.
 
@@ -80,6 +83,126 @@ spec:
     s3Credentials:
       [...]
 ```
+
+### MinIO Gateway
+
+Optionally, MinIO Gateway can be used as a common interface which
+relays backup objects to other cloud storage solutions, like S3, GCS or
+Azure. For more information, please refer to [MinIO official documentation](https://docs.min.io/).
+
+Specifically, the Cloud Native PostgreSQL cluster can directly point to a local
+MinIO Gateway as an endpoint, using previously created credentials and service.
+
+MinIO secrets will be used by both the PostgreSQL cluster and the MinIO instance.
+Therefore they must be created in the same namespace:
+
+```sh
+kubectl create secret generic minio-creds \
+  --from-literal=MINIO_ACCESS_KEY=<minio access key here> \
+  --from-literal=MINIO_SECRET_KEY=<minio secret key here>
+```
+
+!!! NOTE "Note"
+    Cloud Object Storage credentials will be used only by MinIO Gateway in this case.
+
+!!! Important
+    In order to allow PostgreSQL reach MinIO Gateway, it is necessary to create a
+    `ClusterIP` service on port `9000` bound to the MinIO Gateway instance.
+
+For example:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-gateway-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9000
+      targetPort: 9000
+      protocol: TCP
+  selector:
+    app: minio
+```
+
+!!! Warning
+    At the time of writing this documentation, the official [MinIO Operator](https://github.com/minio/minio-operator/issues/71)
+    for Kubernetes does not support the gateway feature. As such, we will use a
+    `deployment` instead.
+
+The MinIO deployment will the use cloud storage credentials to upload objects to the
+remote bucket and relay backup files to different locations.
+
+Here is an example using AWS S3 as Cloud Object Storage:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+[...]
+    spec:
+      containers:
+      - name: minio
+        image: minio/minio:RELEASE.2020-06-03T22-13-49Z
+        args:
+        - gateway
+        - s3
+        env:
+        # MinIO access key and secret key
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-creds
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-creds
+              key: MINIO_SECRET_KEY
+        # AWS credentials
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-creds
+              key: ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-creds
+              key: ACCESS_SECRET_KEY
+# Uncomment the below section if session token is required
+#        - name: AWS_SESSION_TOKEN
+#          valueFrom:
+#            secretKeyRef:
+#              name: aws-creds
+#              key: ACCESS_SESSION_TOKEN
+        ports:
+        - containerPort: 9000
+```
+
+Proceed by configuring MinIO Gateway service as the `endpointURL` in the `Cluster`
+definition, then choose a bucket name to replace `BUCKET_NAME`:
+
+```yaml
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: Cluster
+[...]
+spec:
+  backup:
+    destinationPath: s3://BUCKET_NAME/
+    endpointURL: http://minio-gateway-service:9000
+    s3Credentials:
+      accessKeyId:
+        name: minio-creds
+        key: MINIO_ACCESS_KEY
+      secretAccessKey:
+        name: minio-creds
+        key: MINIO_SECRET_KEY
+  [...]
+```
+
+Verify on `s3://BUCKET_NAME/` the presence of archived WAL files before
+proceeding with a backup.
 
 ## On demand backups
 
