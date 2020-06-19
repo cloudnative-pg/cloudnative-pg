@@ -53,6 +53,7 @@ func (r *ClusterReconciler) upgradeCluster(
 				// This is the primary, and we cannot upgrade it on the fly
 				primaryIdx = idx
 			} else {
+				pod := pod // pin the variable before taking its reference
 				return r.upgradePod(ctx, cluster, &pod)
 			}
 		}
