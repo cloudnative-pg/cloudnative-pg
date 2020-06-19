@@ -5,7 +5,7 @@ metadata:
   name: postgresql-pvc-template
 spec:
   instances: 3
-  imageName: postgres:12.2
+  imageName: quay.io/2ndquadrant/postgres:12.3
 
   # Configuration of the application that will be used by
   # this PostgreSQL cluster

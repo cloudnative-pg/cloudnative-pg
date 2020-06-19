@@ -16,7 +16,7 @@ const (
 
 	// DefaultImageName is the image used by default by the operator to create
 	// pods.
-	DefaultImageName = "postgres:12.2"
+	DefaultImageName = "quay.io/2ndquadrant/postgres:12.3"
 
 	// DefaultOperatorImageName used to bootstrap the controller in the Pods running
 	// PostgreSQL

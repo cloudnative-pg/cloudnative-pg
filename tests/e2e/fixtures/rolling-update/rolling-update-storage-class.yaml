@@ -5,7 +5,7 @@ metadata:
   name: postgresql-storage-class
 spec:
   instances: 3
-  imageName: k8s/postgresql:e2e-update
+  imageName: quay.io/2ndquadrant/postgres:e2e-update
 
   # Configuration of the application that will be used by
   # this PostgreSQL cluster

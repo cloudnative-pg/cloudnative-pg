@@ -13,7 +13,7 @@ KIND_CLUSTER_NAME=${1}
 DEBUG=${DEBUG:-false}
 BUILD_IMAGE=${BUILD_IMAGE:-true}
 OPERATOR_IMG="quay.io/2ndquadrant/cloud-native-postgresql-operator:e2e"
-PG_IMG_UPDATE="k8s/postgresql:e2e-update"
+PG_IMG_UPDATE="quay.io/2ndquadrant/postgres:e2e-update"
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 
 if [ "${DEBUG}" = true ]
@@ -51,7 +51,7 @@ deploy_operator() {
 build_pg_image_pseudoupdate() {
     (
     cat << EOF
-FROM postgres:12
+FROM quay.io/2ndquadrant/postgres:12
 ENV noop noop
 EOF
     )| docker build -t "${PG_IMG_UPDATE}" -

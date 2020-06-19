@@ -527,7 +527,7 @@ var _ = Describe("Cluster", func() {
 								continue
 							}
 
-							if imageName == "docker.io/k8s/postgresql:e2e-update" {
+							if imageName == "quay.io/2ndquadrant/postgres:e2e-update" {
 								updatedPods++
 							}
 						}
