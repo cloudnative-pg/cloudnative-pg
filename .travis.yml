@@ -19,10 +19,10 @@ env:
     - KUSTOMIZE_VERSION=3.5.4
     - KIND_VERSION=0.7.0
   jobs:
-    - K8S_VERSION=1.15.7
-    - K8S_VERSION=1.16.4
-    - K8S_VERSION=1.17.2
-    - K8S_VERSION=1.18.0
+    - K8S_VERSION=1.15.11
+    - K8S_VERSION=1.16.9
+    - K8S_VERSION=1.17.5
+    - K8S_VERSION=1.18.4
 
 services:
   - docker

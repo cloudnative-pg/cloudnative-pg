@@ -11,7 +11,7 @@ set -eEuo pipefail;
 
 PRESERVE_CLUSTER=${PRESERVE_CLUSTER:-false}
 DEBUG=${DEBUG:-false}
-K8S_VERSION=${K8S_VERSION:-1.17.2}
+K8S_VERSION=${K8S_VERSION:-1.18.4}
 
 # Define the directories used by the tests
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
