@@ -140,7 +140,7 @@ var _ = Describe("Cluster", func() {
 						if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
 							Fail("Unable to get Cluster " + clusterName)
 						}
-						return utils.IsPodActive(*pod)
+						return utils.IsPodActive(*pod) && utils.IsPodReady(*pod)
 					}, timeout).Should(BeTrue())
 
 					// And it should still contain the table we created before,
@@ -478,7 +478,7 @@ var _ = Describe("Cluster", func() {
 					if err := env.Client.Get(env.Ctx, namespacedName, &pod); err != nil {
 						Fail("Unable to get Pod " + oldPrimary)
 					}
-					return utils.IsPodActive(pod)
+					return utils.IsPodActive(pod) && utils.IsPodReady(pod)
 				}, timeout).Should(BeTrue())
 			})
 			By("waiting that the old primary become a standby", func() {
@@ -521,7 +521,7 @@ var _ = Describe("Cluster", func() {
 					// We need to check if a pod is ready, otherwise we
 					// may end up asking the status of a container that
 					// doesn't exist yet
-					if utils.IsPodActive(pod) {
+					if utils.IsPodActive(pod) && utils.IsPodReady(pod) {
 						for _, data := range pod.Status.ContainerStatuses {
 							imageName := data.Image
 							if data.Name != specs.PostgresContainerName {
@@ -559,7 +559,7 @@ var _ = Describe("Cluster", func() {
 			Expect(err).To(BeNil())
 			matchingNames := 0
 			for _, pod := range podList.Items {
-				if utils.IsPodActive(pod) {
+				if utils.IsPodActive(pod) && utils.IsPodReady(pod) {
 					for _, oldName := range originalPodNames {
 						if pod.GetName() == oldName {
 							matchingNames++
@@ -580,7 +580,7 @@ var _ = Describe("Cluster", func() {
 			Expect(err).To(BeNil())
 			matchingUID := 0
 			for _, pod := range podList.Items {
-				if utils.IsPodActive(pod) {
+				if utils.IsPodActive(pod) && utils.IsPodReady(pod) {
 					for _, oldUID := range originalPodUID {
 						if pod.GetUID() == oldUID {
 							matchingUID++
@@ -849,7 +849,7 @@ var _ = Describe("Cluster", func() {
 				Eventually(func() (bool, error) {
 					pod := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, podNamespacedName, pod)
-					return utils.IsPodActive(*pod), err
+					return utils.IsPodActive(*pod) && utils.IsPodReady(*pod), err
 				}, timeout).Should(BeTrue())
 
 				// The pod should have the same PVC
@@ -899,7 +899,7 @@ var _ = Describe("Cluster", func() {
 				Eventually(func() (bool, error) {
 					newPod := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, newPodNamespacedName, newPod)
-					return utils.IsPodActive(*newPod), err
+					return utils.IsPodActive(*pod) && utils.IsPodReady(*pod), err
 				}, timeout).Should(BeTrue())
 				// The pod should have a different PVC
 				newPod := &corev1.Pod{}
