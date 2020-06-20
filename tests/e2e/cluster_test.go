@@ -117,7 +117,7 @@ var _ = Describe("Cluster", func() {
 						}
 					}
 					_, _, err = utils.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
-						"kill", "1")
+						"sh", "-c", "kill 1")
 					Expect(err).To(BeNil())
 					Eventually(func() int32 {
 						pod := &corev1.Pod{}
