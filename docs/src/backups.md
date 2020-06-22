@@ -5,7 +5,7 @@ backup many PostgreSQL instances, the operator will use the
 `barman-cloud-wal-archive` and `barman-cloud-backup` tools.
 
 For this it is required an image with `barman-cli-cloud` installed. The
-image named `2ndquadrant/postgresql` can be used for this scope,
+image `quay.io/2ndquadrant/postgres` can be used for this scope,
 as it is composed by a community PostgreSQL image and the latest
 `barman-cli-cloud` package.
 
