@@ -22,6 +22,8 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
+      securityContext:
+        runAsUser: 65534
       containers:
       - command:
         - /manager

@@ -636,6 +636,8 @@ spec:
             memory: 20Mi
       imagePullSecrets:
       - name: postgresql-operator-pull-secret
+      securityContext:
+        runAsUser: 65534
       terminationGracePeriodSeconds: 10
 ---
 apiVersion: v1
