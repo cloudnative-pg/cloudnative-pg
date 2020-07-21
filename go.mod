@@ -1,6 +1,6 @@
 module github.com/2ndquadrant/cloud-native-postgresql
 
-go 1.14
+go 1.13
 
 require (
 	github.com/go-logr/logr v0.1.0

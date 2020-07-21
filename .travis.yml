@@ -8,7 +8,7 @@ cache:
 os: linux
 
 go:
-  - "1.14"
+  - "1.13"
 
 install: skip
 
