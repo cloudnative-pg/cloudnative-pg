@@ -9,4 +9,4 @@ vars:
       name: controller-manager
       apiVersion: apps/v1
     fieldref:
-      fieldpath: spec.template.spec.containers[1].image
+      fieldpath: spec.template.spec.containers[0].image
