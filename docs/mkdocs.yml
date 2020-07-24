@@ -27,5 +27,6 @@ nav:
   - Custom Resource Definitions: 'crd.md'
   - Configuration samples: 'samples.md'
   - Exposing Postgres services: 'expose_pg_services.md'
+  - Kubernetes Upgrade: 'kubernetes_upgrade.md'
   - End-to-end tests: 'e2e.md'
   - Credits and license: 'credits.md'

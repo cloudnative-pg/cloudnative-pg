@@ -179,6 +179,19 @@ spec:
               format: int32
               minimum: 1
               type: integer
+            nodeMaintenanceWindow:
+              description: Define a maintenance window for the Kubernetes nodes
+              properties:
+                inProgress:
+                  description: Is there a node maintenance activity in progress?
+                  type: boolean
+                reusePVC:
+                  description: Reuse the existing PVC (wait for the node to come up
+                    again) or not (recreate it elsewhere)
+                  type: boolean
+              required:
+              - inProgress
+              type: object
             postgresql:
               description: Configuration of the PostgreSQL server
               properties:

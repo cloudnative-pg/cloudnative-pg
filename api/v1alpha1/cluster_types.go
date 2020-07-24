@@ -89,6 +89,9 @@ type ClusterSpec struct {
 
 	// The configuration to be used for backups
 	Backup *BackupConfiguration `json:"backup,omitempty"`
+
+	// Define a maintenance window for the Kubernetes nodes
+	NodeMaintenanceWindow *NodeMaintenanceWindow `json:"nodeMaintenanceWindow,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -112,6 +115,38 @@ type ClusterStatus struct {
 	// List of all the PVCs created by this bdrGroup and still available
 	// which are not attached to a Pod
 	DanglingPVC []string `json:"danglingPVC,omitempty"`
+}
+
+// KubernetesUpgradeStrategy tells the operator if the user want to
+// allocate more space while upgrading a k8s node which is hosting
+// the PostgreSQL Pods or just wait for the node to come up
+type KubernetesUpgradeStrategy string
+
+const (
+	// KubernetesUpgradeStrategyAllocateSpace means that the operator
+	// should allocate more disk space to host data belonging to the
+	// k8s node that is being updated
+	KubernetesUpgradeStrategyAllocateSpace = "allocateSpace"
+
+	// KubernetesUpgradeStrategyWaitForNode means that the operator
+	// should just recreate stuff and wait for the upgraded node
+	// to be ready
+	KubernetesUpgradeStrategyWaitForNode = "waitForNode"
+)
+
+// NodeMaintenanceWindow contains information that the operator
+// will use while upgrading the underlying node.
+//
+// This option is only useful when using local storage, as the Pods
+// can't be freely moved between nodes in that configuration.
+type NodeMaintenanceWindow struct {
+	// Is there a node maintenance activity in progress?
+	InProgress bool `json:"inProgress"`
+
+	// Reuse the existing PVC (wait for the node to come
+	// up again) or not (recreate it elsewhere)
+	// +optional
+	ReusePVC *bool `json:"reusePVC"`
 }
 
 // PrimaryUpdateStrategy contains the strategy to follow when upgrading
@@ -383,6 +418,39 @@ func (cluster *Cluster) GetPrimaryUpdateStrategy() PrimaryUpdateStrategy {
 	}
 
 	return strategy
+}
+
+// IsNodeMaintenanceWindowInProgress check if the upgrade mode is active or not
+func (cluster *Cluster) IsNodeMaintenanceWindowInProgress() bool {
+	return cluster.Spec.NodeMaintenanceWindow != nil && cluster.Spec.NodeMaintenanceWindow.InProgress
+}
+
+// IsNodeMaintenanceWindowReusePVC check if we are in a recovery window and
+// we should reuse PVCs
+func (cluster *Cluster) IsNodeMaintenanceWindowReusePVC() bool {
+	if !cluster.IsNodeMaintenanceWindowInProgress() {
+		return false
+	}
+
+	reusePVC := true
+	if cluster.Spec.NodeMaintenanceWindow.ReusePVC != nil {
+		reusePVC = *cluster.Spec.NodeMaintenanceWindow.ReusePVC
+	}
+	return reusePVC
+}
+
+// IsNodeMaintenanceWindowNotReusePVC check if we are in a recovery window and
+// should avoid reusing PVCs
+func (cluster *Cluster) IsNodeMaintenanceWindowNotReusePVC() bool {
+	if !cluster.IsNodeMaintenanceWindowInProgress() {
+		return false
+	}
+
+	reusePVC := true
+	if cluster.Spec.NodeMaintenanceWindow.ReusePVC != nil {
+		reusePVC = *cluster.Spec.NodeMaintenanceWindow.ReusePVC
+	}
+	return !reusePVC
 }
 
 func init() {

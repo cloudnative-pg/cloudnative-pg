@@ -10,8 +10,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/policy/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -54,7 +56,13 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
-	err = r.createPodDisruptionBudget(ctx, cluster)
+	// The PDB should not be enforced if we are inside a maintenance
+	// windows and we chose to don't allocate more space
+	if cluster.IsNodeMaintenanceWindowReusePVC() {
+		err = r.deletePodDisruptionBudget(ctx, cluster)
+	} else {
+		err = r.createPodDisruptionBudget(ctx, cluster)
+	}
 	if err != nil {
 		return err
 	}
@@ -217,6 +225,26 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 	return nil
 }
 
+// removeOrUpdatePodDisruptionBudget ensure that we delete the PDB requiring to remove one node at a time
+func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	// If we have a PDB, we need to delete it
+	var targetPdb v1beta1.PodDisruptionBudget
+	err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &targetPdb)
+	if apierrs.IsNotFound(err) {
+		// Nothing to do here
+		return nil
+	}
+	if err != nil {
+		return errors.Wrap(err, "Unable to Get PDB")
+	}
+
+	err = r.Delete(ctx, &targetPdb)
+	if err != nil {
+		return errors.Wrap(err, "Can't delete PDB while cluster is in upgrade mode.")
+	}
+	return nil
+}
+
 // createServiceAccount create the service account for this PostgreSQL cluster
 func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
@@ -280,16 +308,18 @@ func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *v1a
 
 func (r *ClusterReconciler) createPrimaryInstance(
 	ctx context.Context,
-	nodeSerial int32,
 	cluster *v1alpha1.Cluster,
 ) error {
 	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
-	// We are bootstrapping a cluster and in need to create the first node
-	var pod *corev1.Pod
-	var err error
+	// Generate a new node serial
+	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
+	if err != nil {
+		return err
+	}
 
-	pod = specs.CreatePrimaryPod(*cluster, nodeSerial)
+	// We are bootstrapping a cluster and in need to create the first node
+	pod := specs.CreatePrimaryPod(*cluster, nodeSerial)
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
 		log.Error(err, "Unable to set the owner reference for instance")
 		return err
@@ -378,13 +408,20 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	return nil
 }
 
-// reattachDanglingPVC reattach a dangling PVC
-func (r *ClusterReconciler) reattachDanglingPVC(ctx context.Context, cluster *v1alpha1.Cluster) error {
+// handleDanglingPVC reattach a dangling PVC
+func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	pvcToReattach := electPvcToReattach(cluster)
 	if pvcToReattach == "" {
 		return nil
+	}
+
+	if cluster.IsNodeMaintenanceWindowNotReusePVC() {
+		log.V(2).Info(
+			"Detected dangling PVC during a recovery window upgrade mode," +
+				"removing them")
+		return r.removeDanglingPVCs(ctx, cluster)
 	}
 
 	pvc := corev1.PersistentVolumeClaim{}
@@ -440,4 +477,23 @@ func electPvcToReattach(cluster *v1alpha1.Cluster) string {
 	}
 
 	return cluster.Status.DanglingPVC[0]
+}
+
+// removeDanglingPVCs will remove dangling PVCs
+func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	for _, pvcName := range cluster.Status.DanglingPVC {
+		var pvc corev1.PersistentVolumeClaim
+
+		err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: pvcName}, &pvc)
+		if err != nil {
+			return err
+		}
+
+		err = r.Delete(ctx, &pvc)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

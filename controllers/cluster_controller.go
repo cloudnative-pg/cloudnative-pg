@@ -43,7 +43,7 @@ type ClusterReconciler struct {
 // +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
@@ -87,7 +87,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, nil
 	}
 
-	// Ensure we have one the required global objects
+	// Ensure we have the required global objects
 	if err := r.createPostgresClusterObjects(ctx, &cluster); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -135,13 +135,13 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	// Recreate missing Pods
 	if len(cluster.Status.DanglingPVC) > 0 {
-		if cluster.Status.ReadyInstances != cluster.Status.Instances {
+		if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
 			// A pod is not ready, let's retry
 			log.V(2).Info("Waiting for node to be ready before attaching PVCs")
 			return ctrl.Result{}, nil
 		}
 
-		return ctrl.Result{}, r.reattachDanglingPVC(ctx, &cluster)
+		return ctrl.Result{}, r.handleDanglingPVC(ctx, &cluster)
 	}
 
 	// Update the target primary name from the Pods status
@@ -165,38 +165,47 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// 3 - We have already some Pods, all they all ready ==> we can create the other
 	// pods joining the node that we already have.
 	if cluster.Status.Instances == 0 {
-		newNodeSerial, err := r.generateNodeSerial(ctx, &cluster)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{}, r.createPrimaryInstance(ctx, newNodeSerial, &cluster)
+		return ctrl.Result{}, r.createPrimaryInstance(ctx, &cluster)
 	}
 
-	// Find if we have Pods that are not ready
-	if cluster.Status.ReadyInstances != cluster.Status.Instances {
-		// A pod is not ready, let's retry
-		log.V(2).Info("Waiting for node to be ready")
-		return ctrl.Result{}, nil
-	}
-
-	// Are there missing nodes? Let's create one
-	if cluster.Status.Instances < cluster.Spec.Instances {
-		newNodeSerial, err := r.generateNodeSerial(ctx, &cluster)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{}, r.joinReplicaInstance(ctx, newNodeSerial, &cluster)
-	}
-
-	// Are there nodes to be removed? Remove one of them
-	if cluster.Status.Instances > cluster.Spec.Instances {
-		return ctrl.Result{}, r.scaleDownCluster(ctx, &cluster, childPods)
+	if cluster.Status.ReadyInstances != cluster.Status.Instances ||
+		cluster.Status.Instances != cluster.Spec.Instances {
+		return ctrl.Result{}, r.ReconcilePods(ctx, req, &cluster, childPods)
 	}
 
 	// Check if we need to handle a rolling upgrade
 	return ctrl.Result{}, r.upgradeCluster(ctx, &cluster, childPods, instancesStatus)
+}
+
+// ReconcilePods decides when to create, scale up/down or wait for pods
+func (r *ClusterReconciler) ReconcilePods(ctx context.Context,
+	req ctrl.Request, cluster *v1alpha1.Cluster, childPods corev1.PodList) error {
+	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", req.Namespace, "name", req.Name)
+
+	// Find if we have Pods that are not ready, this is OK
+	// only if we are in upgrade mode and we have choose to just
+	// wait for the node to come up
+	if !cluster.IsNodeMaintenanceWindowReusePVC() && cluster.Status.ReadyInstances < cluster.Status.Instances {
+		// A pod is not ready, let's retry
+		log.V(2).Info("Waiting for Pod to be ready")
+		return nil
+	}
+
+	// Are there missing nodes? Let's create one
+	if cluster.Status.Instances < cluster.Spec.Instances {
+		newNodeSerial, err := r.generateNodeSerial(ctx, cluster)
+		if err != nil {
+			return err
+		}
+		return r.joinReplicaInstance(ctx, newNodeSerial, cluster)
+	}
+
+	// Are there nodes to be removed? Remove one of them
+	if cluster.Status.Instances > cluster.Spec.Instances {
+		return r.scaleDownCluster(ctx, cluster, childPods)
+	}
+
+	return nil
 }
 
 // SetupWithManager creates a ClusterReconciler

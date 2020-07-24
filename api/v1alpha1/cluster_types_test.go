@@ -84,3 +84,38 @@ var _ = Describe("Primary update strategy", func() {
 		Expect(cluster.GetPrimaryUpdateStrategy()).To(BeEquivalentTo(PrimaryUpdateStrategySupervised))
 	})
 })
+
+var _ = Describe("Node maintenance window", func() {
+	It("default maintenance not in progress", func() {
+		cluster := Cluster{}
+		Expect(cluster.IsNodeMaintenanceWindowInProgress()).To(BeFalse())
+		Expect(cluster.IsNodeMaintenanceWindowReusePVC()).To(BeFalse())
+	})
+
+	It("is enabled when specified, and by default ReusePVC is enabled", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				NodeMaintenanceWindow: &NodeMaintenanceWindow{
+					InProgress: true,
+				},
+			},
+		}
+		Expect(cluster.IsNodeMaintenanceWindowInProgress()).To(BeTrue())
+		Expect(cluster.IsNodeMaintenanceWindowReusePVC()).To(BeTrue())
+	})
+
+	It("is enabled and you required to reuse PVC", func() {
+		falseVal := false
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				NodeMaintenanceWindow: &NodeMaintenanceWindow{
+					InProgress: true,
+					ReusePVC:   &falseVal,
+				},
+			},
+		}
+
+		Expect(cluster.IsNodeMaintenanceWindowInProgress()).To(BeTrue())
+		Expect(cluster.IsNodeMaintenanceWindowReusePVC()).To(BeFalse())
+	})
+})
