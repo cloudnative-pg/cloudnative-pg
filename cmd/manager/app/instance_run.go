@@ -29,13 +29,13 @@ func runSubCommand() {
 	reconciler, err = controller.NewInstanceReconciler(&instance)
 	if err != nil {
 		log.Log.Error(err, "Error while starting reconciler")
-		return
+		os.Exit(1)
 	}
 
 	err = reconciler.VerifyPgDataCoherence(context.Background())
 	if err != nil {
 		log.Log.Error(err, "Error while checking Kubernetes cluster status")
-		return
+		os.Exit(1)
 	}
 
 	startWebServer()
@@ -52,16 +52,18 @@ func runSubCommand() {
 
 	if err != nil {
 		log.Log.Error(err, "Error printing the control information of this PostgreSQL instance")
-		return
+		os.Exit(1)
 	}
 
 	postgresCommand, err = instance.Run()
 	if err != nil {
 		log.Log.Error(err, "Unable to start PostgreSQL up")
+		os.Exit(1)
 	}
 
 	if err = postgresCommand.Wait(); err != nil {
 		log.Log.Error(err, "PostgreSQL exited with errors")
+		os.Exit(1)
 	}
 }
 
