@@ -104,7 +104,7 @@ var _ = Describe("Cluster", func() {
 					// still exists
 					query := "CREATE TABLE test (id bigserial PRIMARY KEY, t text)"
 					_, _, err := utils.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
-						"psql", "app", "-tAc", query)
+						"psql", "-U", "postgres", "app", "-tAc", query)
 					Expect(err).To(BeNil())
 
 					// We kill the pid 1 process.
@@ -147,7 +147,7 @@ var _ = Describe("Cluster", func() {
 					// so an empty SELECT would work
 					query = "SELECT * FROM test"
 					_, _, err = utils.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
-						"psql", "app", "-tAc", query)
+						"psql", "-U", "postgres", "app", "-tAc", query)
 					Expect(err).To(BeNil())
 				})
 			})
@@ -330,7 +330,7 @@ var _ = Describe("Cluster", func() {
 				}
 				timeout := time.Second * 2
 				_, _, err := utils.ExecCommand(env.Ctx, pausedPod, "postgres", &timeout,
-					"psql", "-c", "SELECT pg_wal_replay_pause()")
+					"psql", "-U", "postgres", "-c", "SELECT pg_wal_replay_pause()")
 				Expect(err).To(BeNil())
 			})
 			// And now we do a checkpoint and a switch wal, so we're sure
@@ -346,7 +346,7 @@ var _ = Describe("Cluster", func() {
 				}
 				timeout := time.Second * 2
 				_, _, err := utils.ExecCommand(env.Ctx, primaryPod, "postgres", &timeout,
-					"psql", "-c", "CHECKPOINT; SELECT pg_switch_wal()")
+					"psql", "-U", "postgres", "-c", "CHECKPOINT; SELECT pg_switch_wal()")
 				Expect(err).To(BeNil())
 			})
 			// Force-delete the primary. Eventually the cluster should elect a
@@ -1003,7 +1003,7 @@ var _ = Describe("Cluster", func() {
 			// minio within a short time.
 			By("archiving WALs on minio", func() {
 				primary := clusterName + "-1"
-				switchWalCmd := "psql app -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"
+				switchWalCmd := "psql -U postgres app -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"
 				out, _, err := tests.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,

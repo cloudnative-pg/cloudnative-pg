@@ -122,7 +122,7 @@ var _ = Describe("Cluster", func() {
 				err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
 				Expect(err).To(BeNil())
 				_, _, err = utils.ExecCommand(env.Ctx, *lmCr, "postgres",
-					&commandTimeout, "psql", "app", "-tAc", query)
+					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 				Expect(err).To(BeNil())
 			})
 			By("starting load", func() {
@@ -150,7 +150,7 @@ var _ = Describe("Cluster", func() {
 					lmCr := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
 					out, _, _ := utils.ExecCommand(env.Ctx, *lmCr, "postgres",
-						&commandTimeout, "psql", "app", "-tAc",
+						&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
 						"SELECT count(*) > 0 FROM tps.tl")
 					return strings.TrimSpace(out), err
 				}, timeout).Should(BeEquivalentTo("t"))
@@ -187,7 +187,7 @@ var _ = Describe("Cluster", func() {
 					lmCr := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
 					out, _, _ := utils.ExecCommand(env.Ctx, *lmCr, "postgres",
-						&commandTimeout, "psql", "app", "-tAc",
+						&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
 						"SELECT count(*) > 0 FROM tps.tl "+
 							"WHERE timeline = '00000002'")
 					return strings.TrimSpace(out), err
@@ -223,7 +223,7 @@ var _ = Describe("Cluster", func() {
 				err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
 				Expect(err).To(BeNil())
 				out, _, _ := utils.ExecCommand(env.Ctx, *lmCr, "postgres",
-					&commandTimeout, "psql", "app", "-tAc", query)
+					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 				switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
 				Expect(err).To(BeNil())
 				fmt.Printf("Failover performed in %v seconds\n", switchTime)
