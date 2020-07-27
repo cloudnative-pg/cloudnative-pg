@@ -10,6 +10,7 @@ package specs
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -142,9 +143,13 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
 			ServiceAccountName: cluster.Name,
 		},
+	}
+
+	// Enable security context management only in plain K8s
+	if os.Getenv("OPENSHIFT_MODE") == "" {
+		pod.Spec.SecurityContext = CreatePostgresSecurityContext(postgresUser, postgresGroup)
 	}
 
 	return pod
@@ -478,9 +483,13 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
 			ServiceAccountName: cluster.Name,
 		},
+	}
+
+	// Enable security context management only in plain K8s
+	if os.Getenv("OPENSHIFT_MODE") == "" {
+		pod.Spec.SecurityContext = CreatePostgresSecurityContext(postgresUser, postgresGroup)
 	}
 
 	return pod
@@ -526,9 +535,13 @@ func PodWithExistingStorage(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
 			ServiceAccountName: cluster.Name,
 		},
+	}
+
+	// Enable security context management only in plain K8s
+	if os.Getenv("OPENSHIFT_MODE") == "" {
+		pod.Spec.SecurityContext = CreatePostgresSecurityContext(postgresUser, postgresGroup)
 	}
 
 	return pod

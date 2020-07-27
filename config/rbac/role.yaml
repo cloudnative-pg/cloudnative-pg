@@ -134,6 +134,12 @@ rules:
 - apiGroups:
   - postgresql.k8s.2ndq.io
   resources:
+  - clusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - postgresql.k8s.2ndq.io
+  resources:
   - clusters/status
   verbs:
   - get

@@ -1,0 +1,16 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      securityContext:
+      containers:
+      - name: manager
+        resources:
+        env:
+          - name: OPENSHIFT_MODE
+            value: "true"
