@@ -40,10 +40,10 @@ const (
 	PostgresContainerName = "postgres"
 
 	// postgresUser is the default UID which is used by PostgreSQL
-	postgresUser = 999
+	postgresUser = 26
 
 	// postgresGroup is the default GID which is used by PostgreSQL
-	postgresGroup = 999
+	postgresGroup = 26
 )
 
 // CreatePrimaryPod create a new primary instance in a Pod
