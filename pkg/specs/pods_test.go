@@ -12,7 +12,7 @@ import (
 )
 
 var _ = Describe("The PostgreSQL security context", func() {
-	securityContext := CreatePostgresSecurityContext()
+	securityContext := CreatePostgresSecurityContext(postgresUser, postgresGroup)
 
 	It("allows the container to create its own PGDATA", func() {
 		Expect(securityContext.RunAsUser).To(Equal(securityContext.FSGroup))

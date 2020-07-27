@@ -38,6 +38,12 @@ const (
 	// PostgresContainerName is the name of the container executing PostgreSQL
 	// inside one Pod
 	PostgresContainerName = "postgres"
+
+	// postgresUser is the default UID which is used by PostgreSQL
+	postgresUser = 999
+
+	// postgresGroup is the default GID which is used by PostgreSQL
+	postgresGroup = 999
 )
 
 // CreatePrimaryPod create a new primary instance in a Pod
@@ -136,7 +142,7 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-			SecurityContext:    CreatePostgresSecurityContext(),
+			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
 			ServiceAccountName: cluster.Name,
 		},
 	}
@@ -383,10 +389,7 @@ func CreateAffinitySection(clusterName string, config v1alpha1.AffinityConfigura
 
 // CreatePostgresSecurityContext defines the security context under which
 // the PostgreSQL containers are running
-func CreatePostgresSecurityContext() *corev1.PodSecurityContext {
-	postgresUser := int64(999)
-	postgresGroup := int64(999)
-
+func CreatePostgresSecurityContext(postgresUser, postgresGroup int64) *corev1.PodSecurityContext {
 	return &corev1.PodSecurityContext{
 		RunAsUser:  &postgresUser,
 		RunAsGroup: &postgresGroup,
@@ -475,7 +478,7 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-			SecurityContext:    CreatePostgresSecurityContext(),
+			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
 			ServiceAccountName: cluster.Name,
 		},
 	}
@@ -523,7 +526,7 @@ func PodWithExistingStorage(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.
 			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-			SecurityContext:    CreatePostgresSecurityContext(),
+			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
 			ServiceAccountName: cluster.Name,
 		},
 	}
