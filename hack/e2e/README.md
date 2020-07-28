@@ -15,6 +15,8 @@ of the tests:
 
 * `BUILD_IMAGE`: if `false` skip image building and just use existing `IMG`
 * `CONTROLLER_IMG`: The image name to pull if `BUILD_IMAGE=false`
+* `POSTGRES_IMAGE_NAME`: The image used to run PostgreSQL pods (default
+   from `pkg/versions/versions.go`)
 * `PRESERVE_CLUSTER`: do not remove the `kind` cluster after the end of the
   tests (default: `false`);
 * `KIND_VERSION`: use a specific version of `kind` (default: use the latest);
