@@ -1,0 +1,97 @@
+stages:
+  - test
+  - build
+  - e2e
+
+variables:
+  CI_DEBUG_TRACE: "false"
+  KUBEBUILDER_VERSION: "2.3.0"
+  GOLANG_VERSION: "1.13"
+  GOLANGCI_LINT_VERSION: "1.25.0"
+  KUSTOMIZE_VERSION: "3.5.4"
+
+before_script:
+  - |
+    if [ -n "${CI_COMMIT_TAG}" ]
+    then
+        export TARGET_IMAGE="${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
+    elif [ "${CI_COMMIT_REF_SLUG}" = master ]
+    then
+        export TARGET_IMAGE="${CI_REGISTRY_IMAGE}:latest"
+    else
+        export TARGET_IMAGE="${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}"
+    fi
+
+build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination "${TARGET_IMAGE}"
+
+test:
+  stage: test
+  image:
+    name: golang:$GOLANG_VERSION
+  script:
+    - mkdir -p /usr/local/kubebuilder
+    - curl -L https://go.kubebuilder.io/dl/$KUBEBUILDER_VERSION/$(go env GOOS)/$(go env GOARCH) | tar --strip-components=1 -xz -C /usr/local/kubebuilder
+    - export PATH=$PATH:/usr/local/kubebuilder/bin
+    - make test
+
+lint:
+  stage: test
+  image:
+    name: golang:$GOLANG_VERSION
+  script:
+    - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v${GOLANGCI_LINT_VERSION}
+    - make lint
+
+.e2e_template:
+  stage: e2e
+  image: docker:stable-git
+  tags:
+    - privileged
+  variables:
+    # DinD configuration, see https://gitlab.com/gitlab-org/gitlab-runner/issues/4501
+    #
+    # When using dind, it's wise to use the overlayfs driver for
+    # improved performance.
+    DOCKER_DRIVER: overlay2
+    # Specify to Docker where to create the certificates, Docker will
+    # create them automatically on boot, and will create
+    # `/certs/client` that will be shared between the service and
+    # build container.
+    DOCKER_TLS_CERTDIR: "/certs"
+    # Display verbose e2e test output
+    DEBUG: "true"
+  services:
+    - docker:stable-dind
+  script:
+    - apk add make bash curl go
+    - curl -sSfL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz | tar -xz -C /usr/local/bin
+    - echo $CI_JOB_TOKEN | docker login -u gitlab-ci-token --password-stdin $CI_REGISTRY
+    - export BDR_IMAGE_NAME OMNIDB_IMAGE_NAME
+    - make e2e-test CONTROLLER_IMG="${TARGET_IMAGE}" BUILD_IMAGE=false
+
+e2e-1.15:
+  extends: .e2e_template
+  variables:
+    K8S_VERSION: 1.15.11
+
+e2e-1.16:
+  extends: .e2e_template
+  variables:
+    K8S_VERSION: 1.16.9
+
+e2e-1.17:
+  extends: .e2e_template
+  variables:
+    K8S_VERSION: 1.17.5
+
+e2e-1.18:
+  extends: .e2e_template
+  variables:
+    K8S_VERSION: 1.18.2
