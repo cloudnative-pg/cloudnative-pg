@@ -101,7 +101,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructur
 		}
 
 		// Now I can demote myself
-		return r.instance.CreateStandbySignalFile()
+		return r.instance.Demote()
 	}
 }
 

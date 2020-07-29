@@ -224,7 +224,13 @@ func (info InitInfo) Bootstrap() error {
 	}
 
 	instance := info.GetInstance()
+
 	return instance.WithActiveInstance(func() error {
+		majorVersion, err := instance.GetMajorVersion()
+		if err != nil {
+			return nil
+		}
+
 		db, err := instance.GetSuperUserDB()
 		if err != nil {
 			return nil
@@ -235,7 +241,11 @@ func (info InitInfo) Bootstrap() error {
 			return nil
 		}
 
-		err = info.ConfigureReplica(db)
-		return err
+		if majorVersion >= 12 {
+			err = info.ConfigureReplica(db)
+			return err
+		}
+
+		return nil
 	})
 }

@@ -8,12 +8,17 @@ package postgres
 
 import (
 	"database/sql"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
@@ -210,13 +215,71 @@ func (instance *Instance) IsPrimary() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if result {
+		return false, nil
+	}
 
-	return !result, nil
+	result, err = fileutils.FileExists(filepath.Join(instance.PgData, "recovery.conf"))
+	if err != nil {
+		return false, err
+	}
+	if result {
+		return false, nil
+	}
+
+	return true, nil
 }
 
-// CreateStandbySignalFile create a standby.signal file instructing this
-// instance to follow an existing primary
-func (instance *Instance) CreateStandbySignalFile() error {
+// GetMajorVersion read the PG_VERSION file in the data directory
+func (instance *Instance) GetMajorVersion() (int, error) {
+	content, err := ioutil.ReadFile(path.Join(instance.PgData, "PG_VERSION"))
+	if err != nil {
+		return 0, err
+	}
+
+	return strconv.Atoi(strings.TrimSpace(string(content)))
+}
+
+// Demote demote an existing PostgreSQL instance
+func (instance *Instance) Demote() error {
+	major, err := instance.GetMajorVersion()
+	if err != nil {
+		return errors.Wrap(err, "Cannot detect major version")
+	}
+
+	if major < 12 {
+		return instance.createRecoveryConf()
+	}
+
+	return instance.createStandbySignal()
+}
+
+// createRecoveryConf create a recovery.conf file for PostgreSQL 11 and earlier
+func (instance *Instance) createRecoveryConf() error {
+	primaryConnInfo := fmt.Sprintf(
+		"host=%v-rw user=postgres dbname=%v",
+		instance.ClusterName,
+		"postgres")
+
+	f, err := os.Create(filepath.Join(instance.PgData, "recovery.conf"))
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		err = f.Close()
+	}()
+	_, err = f.WriteString("standby_mode = 'on'\n" +
+		"primary_conninfo = " + pq.QuoteLiteral(primaryConnInfo))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// createStandbySignal creates a standby.signal file for PostgreSQL 12 and beyond
+func (instance *Instance) createStandbySignal() error {
 	emptyFile, err := os.Create(filepath.Join(instance.PgData, "standby.signal"))
 	if emptyFile != nil {
 		_ = emptyFile.Close()
