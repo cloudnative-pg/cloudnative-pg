@@ -21,9 +21,28 @@ COPY --chown=1001 . /workspace
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager ./cmd/manager
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
+# Use UBI Minimal image as base https://developers.redhat.com/products/rhel/ubi
 FROM registry.access.redhat.com/ubi8/ubi-minimal
+
+ENV SUMMARY="Cloud Native PostgreSQL container images." \
+    DESCRIPTION="This Docker image contains Cloud Native PostgreSQL and Barman Cloud \
+based RedHat Universal Binary Images (UBI) 8."
+
+# TODO - automate version?
+# For Certified Operator Image Dockerfile labels and license(s) are required
+# See: https://redhat-connect.gitbook.io/certified-operator-guide/helm-operators/building-a-helm-operator/dockerfile-requirements-helm
+LABEL summary="$SUMMARY" \
+      description="$DESCRIPTION" \
+      io.k8s.display-name="$SUMMARY" \
+      io.k8s.description="$DESCRIPTION" \
+      name="Cloud Native PostgreSQL Operator" \
+      vendor="2ndQuadrant" \
+      url="https://www.2ndquadrant.com/" \
+      version="0.1.0" \
+      release="1"
+
+COPY LICENSE /licenses/
+
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 1001
