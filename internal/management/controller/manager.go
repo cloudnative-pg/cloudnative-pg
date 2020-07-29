@@ -20,9 +20,9 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 
-	apiv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/log"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/postgres"
+	apiv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/postgres"
 )
 
 // InstanceReconciler can reconcile the status of the PostgreSQL cluster with

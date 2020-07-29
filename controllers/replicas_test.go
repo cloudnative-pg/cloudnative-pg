@@ -10,7 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/specs"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

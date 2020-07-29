@@ -6,7 +6,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 
 package postgres
 
-import "github.com/2ndquadrant/cloud-native-postgresql/pkg/postgres"
+import "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
 
 // IsHealthy check if the instance can really accept connections
 func (instance *Instance) IsHealthy() error {

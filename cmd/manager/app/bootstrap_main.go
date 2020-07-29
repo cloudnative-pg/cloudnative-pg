@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/fileutils"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
 )
 
 // BootstrapIntoCommand is called by the controller manager to copy the operator executable

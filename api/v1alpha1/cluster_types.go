@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/versions"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
 )
 
 const (

@@ -13,9 +13,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/postgres"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/specs"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
 )
 
 var (

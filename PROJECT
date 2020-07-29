@@ -1,5 +1,5 @@
 domain: k8s.2ndq.io
-repo: github.com/2ndquadrant/cloud-native-postgresql
+repo: gitlab.2ndquadrant.com/k8s/cloud-native-postgresql
 resources:
 - group: postgresql
   kind: Cluster

@@ -16,8 +16,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/fileutils"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/management/log"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
 )
 
 // Instance represent a PostgreSQL instance to be executed

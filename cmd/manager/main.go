@@ -16,10 +16,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	postgresqlv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
-	"github.com/2ndquadrant/cloud-native-postgresql/cmd/manager/app"
-	"github.com/2ndquadrant/cloud-native-postgresql/controllers"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/versions"
+	postgresqlv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/cmd/manager/app"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/controllers"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
 	// +kubebuilder:scaffold:imports
 )
 

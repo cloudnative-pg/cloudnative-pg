@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

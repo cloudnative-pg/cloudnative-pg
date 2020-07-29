@@ -19,11 +19,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/specs"
-	"github.com/2ndquadrant/cloud-native-postgresql/pkg/utils"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 
-	clusterv1alpha1 "github.com/2ndquadrant/cloud-native-postgresql/api/v1alpha1"
-	"github.com/2ndquadrant/cloud-native-postgresql/tests"
+	clusterv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
