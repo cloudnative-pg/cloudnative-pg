@@ -76,22 +76,38 @@ lint:
     - export BDR_IMAGE_NAME OMNIDB_IMAGE_NAME
     - make e2e-test CONTROLLER_IMG="${TARGET_IMAGE}" BUILD_IMAGE=false
 
-e2e-1.15:
+e2e-1.15-pg12:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.15.11
+    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:12
 
-e2e-1.16:
+e2e-1.16-pg12:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.16.9
+    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:12
 
-e2e-1.17:
+e2e-1.17-pg12:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.17.5
+    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:12
 
-e2e-1.18:
+e2e-1.18-pg12:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.18.2
+    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:12
+
+e2e-1.18-pg11:
+  extends: .e2e_template
+  variables:
+    K8S_VERSION: 1.18.2
+    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:11
+
+e2e-1.18-pg10:
+  extends: .e2e_template
+  variables:
+    K8S_VERSION: 1.18.2
+    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:10

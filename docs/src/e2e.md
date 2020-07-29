@@ -11,9 +11,15 @@ process:
 * 1.16
 * 1.15
 
-For each tested version of Kubernetes, a Kubernetes cluster is created
-using [kind](https://kind.sigs.k8s.io/), and the following suite of
-E2E tests are performed on that cluster:
+The following PostgreSQL versions are tested:
+
+* PostgreSQL 12
+* PostgreSQL 11
+* PostgreSQL 10
+
+For each tested version of Kubernetes and PostgreSQL, a Kubernetes
+cluster is created using [kind](https://kind.sigs.k8s.io/),
+and the following suite of E2E tests are performed on that cluster:
 
 * Installation of the operator;
 * Creation of a `Cluster`;
@@ -26,3 +32,4 @@ E2E tests are performed on that cluster:
 * Backup and ScheduledBackups execution;
 * Primary endpoint switch in case of failure in less than 5 seconds;
 * Recover from degraded state in less than 30 seconds.
+
