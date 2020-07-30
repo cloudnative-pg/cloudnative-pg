@@ -12,7 +12,7 @@ set -eEuo pipefail
 KIND_CLUSTER_NAME=${1}
 DEBUG=${DEBUG:-false}
 BUILD_IMAGE=${BUILD_IMAGE:-true}
-OPERATOR_IMG="quay.io/2ndquadrant/cloud-native-postgresql-operator:e2e"
+OPERATOR_IMG="internal.2ndq.io/k8s/cloud-native-postgresql:e2e"
 POSTGRES_IMG="quay.io/2ndquadrant/postgres:e2e"
 POSTGRES_IMG_UPDATE="quay.io/2ndquadrant/postgres:e2e-update"
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")

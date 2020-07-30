@@ -3,7 +3,7 @@
 # Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 
 # Image URL to use all building/pushing image targets
-CONTROLLER_IMG ?= quay.io/2ndquadrant/cloud-native-postgresql-operator:latest
+CONTROLLER_IMG ?= internal.2ndq.io/k8s/cloud-native-postgresql:latest
 BUILD_IMAGE ?= true
 OPENSHIFT_MODE ?= false
 POSTGRES_IMAGE_NAME ?= quay.io/2ndquadrant/postgres:latest

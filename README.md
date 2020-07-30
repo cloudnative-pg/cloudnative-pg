@@ -9,7 +9,7 @@ Temporary information on how to test PG Operator using private images on Quay.io
 
 ```bash
 kind create cluster --name pg
-make deploy CONTROLLER_IMG=quay.io/2ndquadrant/cloud-native-postgresql-operator:$(git symbolic-ref --short HEAD | tr / _)
+make deploy CONTROLLER_IMG=internal.2ndq.io/k8s/cloud-native-postgresql:$(git symbolic-ref --short HEAD | tr / _)
 kubectl apply -f config/manager/2ndquadrant-k8s-postgresql-poc-secret.yaml
 kubectl apply -f docs/src/samples/cluster-emptydir.yaml
 ```
