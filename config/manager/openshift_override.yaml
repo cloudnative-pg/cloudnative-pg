@@ -8,9 +8,14 @@ spec:
   template:
     spec:
       securityContext:
+      serviceAccountName: postgresql-operator-manager-role
       containers:
       - name: manager
         resources:
         env:
           - name: OPENSHIFT_MODE
             value: "true"
+          - name: WATCH_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['olm.targetNamespaces']

@@ -5,9 +5,14 @@
 # Image URL to use all building/pushing image targets
 CONTROLLER_IMG ?= internal.2ndq.io/k8s/cloud-native-postgresql:latest
 BUILD_IMAGE ?= true
-OPENSHIFT_MODE ?= false
 POSTGRES_IMAGE_NAME ?= quay.io/2ndquadrant/postgres:latest
-export CONTROLLER_IMG BUILD_IMAGE POSTGRES_IMAGE_NAME OPENSHIFT_MODE
+
+# RedHat Operator Hub references / indexes
+OPERATOR_HUB_VERSION=0.0.36
+BUNDLE_IMAGE=internal.2ndq.io/k8s/cloud-native-postgresql:${OPERATOR_HUB_VERSION}-bundle
+INDEX_IMAGE=internal.2ndq.io/k8s/cloud-native-postgresql:${OPERATOR_HUB_VERSION}-index
+
+export CONTROLLER_IMG BUILD_IMAGE POSTGRES_IMAGE_NAME BUNDLE_IMAGE INDEX_IMAGE
 
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
@@ -57,9 +62,6 @@ deploy: manifests
 	    kustomize edit add patch env_override.yaml ;\
 	    kustomize edit add configmap controller-manager-env \
 	        --from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME} ;\
-	        if [ "${OPENSHIFT_MODE}" = "true" ]; then \
-	            kustomize edit add patch openshift_override.yaml; \
-	        fi ; \
 	} ;\
 	kustomize build $$CONFIG_TMP_DIR/default | kubectl apply -f - ;\
 	rm -fr $$CONFIG_TMP_DIR
@@ -92,16 +94,37 @@ docker-build: test
 docker-push:
 	docker push ${CONTROLLER_IMG}
 
+# OLM bundle
+olm-bundle:
+	set -xe ;\
+	PROJECT_DIR=$$(pwd) ;\
+	CONFIG_TMP_DIR=$$(mktemp -d) ;\
+	cp -r config/* $$CONFIG_TMP_DIR ;\
+	{ \
+	    cd $$CONFIG_TMP_DIR/manager ;\
+	    kustomize edit set image controller=${CONTROLLER_IMG} ;\
+	    kustomize edit add patch openshift_override.yaml ;\
+	} ;\
+	kustomize build $$CONFIG_TMP_DIR/default | (cd $$PROJECT_DIR; operator-sdk generate bundle --overwrite --channels alpha,beta,stable --default-channel beta --version ${OPERATOR_HUB_VERSION}) ;\
+	rm -fr $$CONFIG_TMP_DIR ;\
+	cd $$PROJECT_DIR ;\
+	docker build --no-cache -f bundle.Dockerfile -t ${BUNDLE_IMAGE} . ;\
+
+olm-bundle-push: olm-bundle
+	docker push ${BUNDLE_IMAGE}
+	opm index add --bundles ${BUNDLE_IMAGE} --tag ${INDEX_IMAGE} --build-tool docker
+	docker push ${INDEX_IMAGE}
+
 # find or download controller-gen
 # download controller-gen if necessary
 controller-gen:
-ifneq ($(shell controller-gen --version), Version: v0.2.5)
+ifneq ($(shell controller-gen --version), Version: v0.3.0)
 	@{ \
 	set -e ;\
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.5 ;\
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(GOBIN)/controller-gen

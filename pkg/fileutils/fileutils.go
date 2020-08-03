@@ -19,7 +19,7 @@ import (
 func AppendStringToFile(targetFile string, content string) error {
 	stream, err := os.OpenFile(
 		targetFile,
-		os.O_APPEND|os.O_WRONLY, 0600)
+		os.O_APPEND|os.O_WRONLY, 0600) // #nosec
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func AppendFile(targetFile string, sourceFile string) error {
 
 	stream, err := os.OpenFile(
 		targetFile,
-		os.O_APPEND|os.O_WRONLY, 0600)
+		os.O_APPEND|os.O_WRONLY, 0600) // #nosec
 	if err != nil {
 		return err
 	}

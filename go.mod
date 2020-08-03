@@ -5,15 +5,16 @@ go 1.13
 require (
 	github.com/go-logr/logr v0.1.0
 	github.com/go-logr/zapr v0.1.0
+	github.com/golangci/golangci-lint v1.30.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/lib/pq v1.3.0
-	github.com/onsi/ginkgo v1.11.0
-	github.com/onsi/gomega v1.8.1
-	github.com/pkg/errors v0.8.1
+	github.com/onsi/ginkgo v1.13.0
+	github.com/onsi/gomega v1.10.1
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/common v0.4.1
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.1.3
-	github.com/spf13/cobra v0.0.5
+	github.com/spf13/cobra v1.0.0
 	go.uber.org/zap v1.10.0
 	k8s.io/api v0.17.3
 	k8s.io/apimachinery v0.17.3

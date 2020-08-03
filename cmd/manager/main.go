@@ -79,12 +79,16 @@ func main() {
 
 	setupLog.Info("Starting Cloud Native PostgreSQL Operator", "version", versions.Version)
 
+	watchNamespace := os.Getenv("WATCH_NAMESPACE")
+	setupLog.Info("Listening for changes", "watchNamespace", watchNamespace)
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "db9c8771.k8s.2ndq.io",
+		Namespace:          watchNamespace,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
