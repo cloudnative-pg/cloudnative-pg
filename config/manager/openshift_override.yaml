@@ -8,7 +8,7 @@ spec:
   template:
     spec:
       securityContext:
-      serviceAccountName: postgresql-operator-manager-role
+      serviceAccountName: postgresql-operator-manager
       containers:
       - name: manager
         resources:
