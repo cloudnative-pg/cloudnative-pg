@@ -5,4 +5,4 @@ metadata:
   namespace: openshift-marketplace
 spec:
   sourceType: grpc
-  image: internal.2ndq.io/k8s/cloud-native-postgresql:0.0.47-index
+  image: internal.2ndq.io/k8s/cloud-native-postgresql:0.0.52-index

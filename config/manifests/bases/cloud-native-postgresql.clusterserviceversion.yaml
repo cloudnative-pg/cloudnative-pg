@@ -58,9 +58,15 @@ spec:
     url: https://www.2ndquadrant.com
   maintainers:
   - email: leonardo.cecchi@2ndquadrant.it
-    name: leonardo.cecchi
+    name: Leonardo Cecchi
   - email: jonathan.gonzalez@2ndquadrant.com
-    name: jonathan.gonzalez
+    name: Jonathan Gonzalez
+  - email: gabriele.bartolini@2ndquadrant.com
+    name: Gabriele Bartolini
+  - email: marco.nenciarini@2ndquadrant.it
+    name: Marco Nenciarini
+  - email: francesco.canovai@2ndquadrant.it
+    name: Francesco Canovai
   maturity: beta
   provider:
     name: 2ndQuadrant

@@ -8,7 +8,7 @@ BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/2ndquadrant/postgres:latest
 
 # RedHat Operator Hub references / indexes
-OPERATOR_HUB_VERSION=0.0.47
+OPERATOR_HUB_VERSION=0.0.52
 BUNDLE_IMAGE=internal.2ndq.io/k8s/cloud-native-postgresql:${OPERATOR_HUB_VERSION}-bundle
 INDEX_IMAGE=internal.2ndq.io/k8s/cloud-native-postgresql:${OPERATOR_HUB_VERSION}-index
 
@@ -95,7 +95,7 @@ docker-push:
 	docker push ${CONTROLLER_IMG}
 
 # OLM bundle
-olm-bundle:
+olm-bundle: manifests
 	set -xe ;\
 	PROJECT_DIR=$$(pwd) ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
@@ -104,6 +104,8 @@ olm-bundle:
 	    cd $$CONFIG_TMP_DIR/manager ;\
 	    kustomize edit set image controller=${CONTROLLER_IMG} ;\
 	    kustomize edit add patch openshift_override.yaml ;\
+	    cd $$CONFIG_TMP_DIR/rbac ;\
+	    cat kustomization.openshift.yaml >> kustomization.yaml ;\
 	} ;\
 	kustomize build $$CONFIG_TMP_DIR/default | (cd $$PROJECT_DIR; operator-sdk generate bundle --overwrite --channels alpha,beta,stable --default-channel beta --version ${OPERATOR_HUB_VERSION}) ;\
 	rm -fr $$CONFIG_TMP_DIR ;\
