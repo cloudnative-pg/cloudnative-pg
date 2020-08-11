@@ -94,6 +94,11 @@ docker-build: test
 docker-push:
 	docker push ${CONTROLLER_IMG}
 
+# Generate the licenses folder
+licenses:
+	GOPRIVATE="gitlab.2ndquadrant.com/*" ~/go/bin/go-licenses save gitlab.2ndquadrant.com/k8s/cloud-native-postgresql --save_path licenses/go-licenses --force
+	chmod a+rw -R licenses/go-licenses
+
 # OLM bundle
 olm-bundle: manifests
 	set -xe ;\

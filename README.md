@@ -13,3 +13,14 @@ make deploy CONTROLLER_IMG=internal.2ndq.io/k8s/cloud-native-postgresql:$(git sy
 kubectl apply -f config/manager/2ndquadrant-k8s-postgresql-poc-secret.yaml
 kubectl apply -f docs/src/samples/cluster-emptydir.yaml
 ```
+
+# How to upgrade the list of licenses
+
+To generate the `licenses` folder you'll need **go-licenses**, and you can
+install it with:
+
+	go get github.com/google/go-licenses
+
+Then, simply:
+
+	make licenses
