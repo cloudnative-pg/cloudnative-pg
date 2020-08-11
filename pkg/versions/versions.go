@@ -12,7 +12,7 @@ import "os"
 
 const (
 	// Version is the version of the operator
-	Version = "0.1.0"
+	Version = "0.2.0"
 
 	// DefaultImageName is the image used by default by the operator to create
 	// pods.
@@ -20,7 +20,7 @@ const (
 
 	// DefaultOperatorImageName used to bootstrap the controller in the Pods running
 	// PostgreSQL
-	DefaultOperatorImageName = "2ndq.io/release/cloud-native-postgresql-operator:v0.1.0"
+	DefaultOperatorImageName = "2ndq.io/release/cloud-native-postgresql-operator:v0.2.0"
 
 	// postgresImageNameEnvVar is the environment variable that allow overriding the default image used
 	// for PostgreSQL

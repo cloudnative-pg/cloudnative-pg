@@ -1,6 +1,17 @@
 Cloud Native PostgreSQL  - History of user-visible changes
 Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 
+Version 0.2.0 - 11 Aug 2020
+
+- PostgreSQL 10 and 11 are now supported, in addition to PostgreSQL 12
+- Usage of UBI as base image of the operator (OpenShift support)
+- New Backup and ScheduledBackup CRD, allowing users to take a physical backup
+  of the cluster in an object store that complies with the S3 protocol (such as
+  AWS S3, MinIO, MinIO Gateway)
+- Support for WAL archiving to an object store that complies with the S3 protocol
+- Improvements in the E2e tests infrastructure
+- Bug fixes and minor improvements
+
 Version 0.1.0 -  3 Apr 2020
 
 - Reuse of existing persistent storage with Pods (required for rolling updates)

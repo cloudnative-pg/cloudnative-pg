@@ -24,9 +24,9 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager 
 # Use UBI Minimal image as base https://developers.redhat.com/products/rhel/ubi
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 
-ENV SUMMARY="Cloud Native PostgreSQL container images." \
-    DESCRIPTION="This Docker image contains Cloud Native PostgreSQL and Barman Cloud \
-based RedHat Universal Binary Images (UBI) 8."
+ENV SUMMARY="Cloud Native PostgreSQL Operator Container Image." \
+    DESCRIPTION="This Docker image contains Cloud Native PostgreSQL Operator \
+based on RedHat Universal Base Images (UBI) 8."
 
 # TODO - automate version?
 # For Certified Operator Image Dockerfile labels and license(s) are required
@@ -38,7 +38,7 @@ LABEL summary="$SUMMARY" \
       name="Cloud Native PostgreSQL Operator" \
       vendor="2ndQuadrant" \
       url="https://www.2ndquadrant.com/" \
-      version="0.1.0" \
+      version="0.2.0" \
       release="1"
 
 COPY licenses /licenses

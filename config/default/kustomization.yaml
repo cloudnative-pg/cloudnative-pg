@@ -24,7 +24,6 @@ bases:
 #- ../prometheus
 
 patchesStrategicMerge:
-- manager_image_pull_secret.yaml
   # Protect the /metrics endpoint by putting it behind auth.
   # If you want your controller-manager to expose the /metrics
   # endpoint w/o any authn/z, please comment the following line.

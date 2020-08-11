@@ -7,7 +7,7 @@ metadata:
     categories: Database
     operators.operatorframework.io/builder: operator-sdk-v0.19.2
     operators.operatorframework.io/project_layout: ""
-  name: cloud-native-postgresql.v0.1.0
+  name: cloud-native-postgresql.v0.2.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -71,4 +71,4 @@ spec:
   provider:
     name: 2ndQuadrant
     url: https://www.2ndquadrant.com/
-  version: 0.1.0
+  version: 0.2.0

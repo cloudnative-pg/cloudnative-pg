@@ -3,6 +3,7 @@
 # Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 
 # Image URL to use all building/pushing image targets
+OPERATOR_VERSION ?= latest
 CONTROLLER_IMG ?= internal.2ndq.io/k8s/cloud-native-postgresql:latest
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/2ndquadrant/postgres:latest
@@ -51,20 +52,28 @@ install: manifests
 uninstall: manifests
 	kustomize build config/crd | kubectl delete -f -
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests
+# Output the current YAML manifest
+yaml_manifest: manifests
 	set -e ;\
+	PROJECT_DIR=$$(pwd) ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
 	cp -r config/* $$CONFIG_TMP_DIR ;\
 	{ \
+	    cd $$CONFIG_TMP_DIR/default ;\
+	    kustomize edit add patch manager_image_pull_secret.yaml ;\
 	    cd $$CONFIG_TMP_DIR/manager ;\
 	    kustomize edit set image controller=${CONTROLLER_IMG} ;\
 	    kustomize edit add patch env_override.yaml ;\
 	    kustomize edit add configmap controller-manager-env \
 	        --from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME} ;\
 	} ;\
-	kustomize build $$CONFIG_TMP_DIR/default | kubectl apply -f - ;\
-	rm -fr $$CONFIG_TMP_DIR
+	kustomize build $$CONFIG_TMP_DIR/default > $$PROJECT_DIR/releases/postgresql-operator-${OPERATOR_VERSION}.yaml ;\
+	cat $$PROJECT_DIR/releases/portal-secret.yaml >> $$PROJECT_DIR/releases/postgresql-operator-${OPERATOR_VERSION}.yaml ;\
+	rm -fr $$CONFIG_TMP_DIR ;\
+
+# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+deploy: yaml_manifest
+	kubectl apply -f releases/postgresql-operator-$$OPERATOR_VERSION.yaml
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
