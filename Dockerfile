@@ -41,7 +41,8 @@ LABEL summary="$SUMMARY" \
       version="0.1.0" \
       release="1"
 
-COPY LICENSE /licenses/
+COPY licenses /licenses
+COPY LICENSE /licenses
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
