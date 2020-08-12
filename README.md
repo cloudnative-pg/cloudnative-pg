@@ -66,3 +66,25 @@ git push --tags
 
 * Create the release on the Portal and upload the manifest generated in
   the previous point in `releases/postgresql-operator-0.2.0.yaml`
+
+* Update the official documentation by updating the
+  [cnp-docs-packaging](ssh://git@git.2ndquadrant.com/it/ci/packaging/cnp-docs-packaging.git)
+  source and creating a new tag named after the version and the packaging version
+  (i.e. `v0.2.0-1`). Then, run a new build from
+  [Jenkins](https://ci.2ndquadrant.com/jenkins/job/cloud-native-postgresql-docs/job/cloud-native-postgresql-docs/)
+  (you can reuse an existing release build task and change the tag name).
+
+* Add the new release to `releases.map` in the [k8s-release
+  repo](https://gitlab.2ndquadrant.com/release/k8s) and update the
+  metadata about the latest image:
+
+```
+# CNP <VERSION>
+k8s/cloud-native-postgresql:<VERSION>=cloud-native-postgresql-operator:<VERSION>
+
+# Meta
+k8s/cloud-native-postgresql:<VERSION>=cloud-native-postgresql-operator:latest
+```
+
+  When you commit the new file GitLab will copy the images to the production
+  repository.
