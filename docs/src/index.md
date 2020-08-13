@@ -25,6 +25,7 @@ Kubernetes 1.15 or higher, tested on AWS, Google, Azure (with multiple availabil
 * Support for Local Persistent Volumes with PVC templates
 * Reuse of Persistent Volumes storage in Pods
 * Rolling updates for PostgreSQL minor versions and operator upgrades
+* Continuous backup to an S3 compatible object store
 * Standard output logging of PostgreSQL error messages
 
 ## About this guide
