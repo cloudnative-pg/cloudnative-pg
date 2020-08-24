@@ -11,7 +11,120 @@ metadata:
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
-  customresourcedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - kind: Backup
+      name: backups.postgresql.k8s.2ndq.io
+      displayName: Backups
+      description: PostgreSQL backup manager
+      version: v1alpha1
+      specDescriptors:
+      - path: cluster.name
+        displayName: Cluster Name
+        description: The PostgreSQL cluster to backup
+        x-descriptors:
+          - 'urn:alm:descriptor:io.kubernetes:Cluster'
+    - kind: Cluster
+      name: clusters.postgresql.k8s.2ndq.io
+      version: v1alpha1
+      displayName: Cluster
+      description: PostgreSQL cluster manager
+      specDescriptors:
+      - path: instances
+        displayName: Instances
+        description: Number of instances required in the cluster
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:podCount'
+      - path: startDelay
+        displayName: Maximum Start Delay
+        description: The time in seconds that is allowed for a PostgreSQL instance
+          to successfully start up (default 30)
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: stopDelay
+        displayName: Maximum Stop Delay
+        description: The time in seconds that is allowed for a PostgreSQL instance
+          node to gracefully shutdown (default 30)
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: imagePullSecret
+        displayName: Image Pull Secret
+        description: Secret for pulling the image. If empty no secret will be used
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+          - 'urn:alm:descriptor:io.kubernetes:Secret'
+      - path: imageName
+        displayName: Image Name
+        description: Name of the container image
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: primaryUpdateStrategy
+        displayName: Primary Update Strategy
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+          - 'urn:alm:descriptor:com.tectonic.ui:select:supervised'
+          - 'urn:alm:descriptor:com.tectonic.ui:select:unsupervised'
+      - path: description
+        displayName: Description
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - displayName: Storage Class
+        path: storage.storageClass
+        description: StorageClass to use for database data (PGDATA).
+          Applied after evaluating the PVC template, if available.
+        x-descriptors:
+        - 'urn:alm:descriptor:io.kubernetes:StorageClass'
+      - displayName: PVC template
+        description: Template to be used to generate the Persistent Volume Claim
+        path: storage.pvcTemplate
+        x-descriptors:
+        - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: backup.endpointURL
+        displayName: Object Storage Endpoint
+        description: S3-compatible object storage Endpoint. If empty S3 default it's used
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: backup.s3Credentials.accessKeyId
+        displayName: Access Key ID
+        description: Access Key ID
+        x-descriptors:
+          - 'urn:alm:descriptor:io.kubernetes:Secret'
+      - path: backup.s3Credentials.secretAccessKey
+        displayName: Secret Access Key
+        description: Secret Access Key
+        x-descriptors:
+          - 'urn:alm:descriptor:io.kubernetes:Secret'
+      - path: postgresql.pg_hba[0]
+        displayName: pg_hba rule
+      - path: postgresql.parameters[0]
+        displayName: PostgreSQL configuration parameter
+      - path: backup.s3Credentials.secretAccessKey.name
+        x-descriptors:
+          - 'urn:alm:descriptor:io.kubernetes:Secret'
+      - path: backup.s3Credentials.accessKeyId.name
+        x-descriptors:
+          - 'urn:alm:descriptor:io.kubernetes:Secret'
+    - kind: ScheduledBackup
+      name: scheduledbackups.postgresql.k8s.2ndq.io
+      displayName: Scheduled Backups
+      description: PostgreSQL backups schedule
+      version: v1alpha1
+      specDescriptors:
+      - path: cluster.name
+        description: The PostgreSQL cluster to backup
+        displayName: Cluster name
+        x-descriptors:
+          - 'urn:alm:descriptor:io.kubernetes:Cluster'
+      - path: schedule
+        displayName: Schedule
+        description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+      - path: suspend
+        displayName: Schedule is suspended
+        description: If this is true, the schedule is suspended, defaults to False
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
   description: "Cloud Native PostgreSQL (aka PostgreSQL Operator) is a stack designed
     by 2ndQuadrant to manage PostgreSQL workloads on Kubernetes, particularly optimised
     for Private Cloud environments with Local Persistent Volumes (PV). Cloud Native
