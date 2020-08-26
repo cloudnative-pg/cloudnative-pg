@@ -5,7 +5,7 @@
 # Image URL to use all building/pushing image targets
 CONTROLLER_IMG ?= internal.2ndq.io/k8s/cloud-native-postgresql:latest
 BUILD_IMAGE ?= true
-POSTGRES_IMAGE_NAME ?= quay.io/2ndquadrant/postgres:latest
+POSTGRES_IMAGE_NAME ?= quay.io/2ndquadrant/postgres:12
 
 # RedHat Operator Hub references / indexes
 OPERATOR_HUB_VERSION=0.0.65

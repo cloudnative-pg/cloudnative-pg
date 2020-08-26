@@ -13,8 +13,8 @@ KIND_CLUSTER_NAME=${1}
 DEBUG=${DEBUG:-false}
 BUILD_IMAGE=${BUILD_IMAGE:-true}
 OPERATOR_IMG="internal.2ndq.io/k8s/cloud-native-postgresql:e2e"
-POSTGRES_IMG="quay.io/2ndquadrant/postgres:e2e"
-POSTGRES_IMG_UPDATE="quay.io/2ndquadrant/postgres:e2e-update"
+POSTGRES_IMG="${POSTGRES_IMAGE_NAME}-e2e"
+POSTGRES_IMG_UPDATE="${POSTGRES_IMG}-update"
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 
 if [ "${DEBUG}" = true ]

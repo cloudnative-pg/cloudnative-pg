@@ -501,12 +501,39 @@ var _ = Describe("Cluster", func() {
 	Context("Cluster rolling updates", func() {
 		// Tests will be shared between emptydir and pvc setups, so we
 		// declare them in assertions
-		AssertUpdateImage := func(namespace string, clusterName string, updatedSample string) {
+		AssertUpdateImage := func(namespace string, clusterName string) {
 			timeout := 400
+
+			// Detect initial image name
+			var initialImageName string
+			podList := &corev1.PodList{}
+			err := env.Client.List(
+				env.Ctx, podList, ctrlclient.InNamespace(namespace),
+				ctrlclient.MatchingLabels{"postgresql": clusterName},
+			)
+			Expect(err).To(BeNil())
+			Expect(len(podList.Items) > 0).To(BeTrue())
+			pod := podList.Items[0]
+			for _, data := range pod.Status.ContainerStatuses {
+				if data.Name != specs.PostgresContainerName {
+					continue
+				}
+				initialImageName = data.Image
+				break
+			}
+			updatedImageName := initialImageName + "-update"
+
 			// We should be able to apply the conf containing the new
 			// image
-			_, _, err := tests.Run("kubectl apply -n " + namespace +
-				" -f " + updatedSample)
+			cr := &clusterv1alpha1.Cluster{}
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      clusterName,
+			}
+			err = env.Client.Get(env.Ctx, namespacedName, cr)
+			Expect(err).To(BeNil())
+			cr.Spec.ImageName = updatedImageName
+			err = env.Client.Update(env.Ctx, cr)
 			Expect(err).To(BeNil())
 
 			// All the postgres containers should have the updated image
@@ -528,7 +555,7 @@ var _ = Describe("Cluster", func() {
 								continue
 							}
 
-							if imageName == "quay.io/2ndquadrant/postgres:e2e-update" {
+							if imageName == updatedImageName {
 								updatedPods++
 							}
 						}
@@ -644,7 +671,6 @@ var _ = Describe("Cluster", func() {
 			const namespace = "cluster-rolling-e2e-storage-class"
 			const sampleFile = samplesDir + "/cluster-storage-class.yaml"
 			const clusterName = "postgresql-storage-class"
-			fixtureFile := fixturesDir + "/rolling-update/rolling-update-storage-class.yaml"
 			BeforeEach(func() {
 				if err := env.CreateNamespace(namespace); err != nil {
 					Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
@@ -685,7 +711,7 @@ var _ = Describe("Cluster", func() {
 					}
 				})
 				By("updating the cluster definition", func() {
-					AssertUpdateImage(namespace, clusterName, fixtureFile)
+					AssertUpdateImage(namespace, clusterName)
 				})
 				// Since we're using a pvc, after the update the pods should
 				// have been created with the same name using the same pvc.
@@ -744,7 +770,6 @@ var _ = Describe("Cluster", func() {
 			const namespace = "cluster-rolling-e2e-emptydir"
 			const sampleFile = samplesDir + "/cluster-emptydir.yaml"
 			const clusterName = "cluster-emptydir"
-			fixtureFile := fixturesDir + "/rolling-update/rolling-update-emptydir.yaml"
 			BeforeEach(func() {
 				if err := env.CreateNamespace(namespace); err != nil {
 					Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
@@ -774,7 +799,7 @@ var _ = Describe("Cluster", func() {
 					}
 				})
 				By("updating the cluster definition", func() {
-					AssertUpdateImage(namespace, clusterName, fixtureFile)
+					AssertUpdateImage(namespace, clusterName)
 				})
 				// Since we're using emptydir, pod should be created again from
 				// scratch. Here we check that the names we've saved at the
