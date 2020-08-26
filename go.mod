@@ -5,7 +5,6 @@ go 1.13
 require (
 	github.com/go-logr/logr v0.1.0
 	github.com/go-logr/zapr v0.1.0
-	github.com/golangci/golangci-lint v1.30.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/lib/pq v1.3.0
 	github.com/onsi/ginkgo v1.13.0

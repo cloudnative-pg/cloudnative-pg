@@ -15,7 +15,7 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-release_version=$1
+release_version=${1#v}
 
 require_clean_work_tree () {
     git rev-parse --verify HEAD >/dev/null || exit 1
@@ -63,9 +63,18 @@ release_manifest="releases/postgresql-operator-${release_version}.yaml"
 sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
     -e "/DefaultOperatorImageName *= *.*/Is/\"\(.*\):.*\"/\"\1:v${release_version}\"/" \
     pkg/versions/versions.go
+
+sed -i -e "s/version=\".*\"/version=\"${release_version}\"/" \
+    Dockerfile
+
+sed -i -e "s/name: cloud-native-postgresql\.v.*/name: cloud-native-postgresql.v${release_version}/" \
+    config/manifests/bases/cloud-native-postgresql.clusterserviceversion.yaml
+
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
 (
+    cd "${CONFIG_TMP_DIR}/default"
+    kustomize edit add patch manager_image_pull_secret.yaml
     cd "${CONFIG_TMP_DIR}/manager"
     kustomize edit set image controller="2ndq.io/release/k8s/cloud-native-postgresql-operator:v${release_version}"
 )
@@ -85,7 +94,11 @@ metadata:
 type: kubernetes.io/dockerconfigjson
 EOF
 
-git add pkg/versions/versions.go "${release_manifest}"
+git add \
+    pkg/versions/versions.go \
+    Dockerfile \
+    config/manifests/bases/cloud-native-postgresql.clusterserviceversion.yaml \
+    "${release_manifest}"
 git commit -sm "Version tag to ${release_version}"
 git tag -sam "Release ${release_version}" "v${release_version}"
 

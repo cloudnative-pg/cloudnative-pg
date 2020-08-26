@@ -17,14 +17,7 @@ kubectl apply -f docs/src/samples/cluster-emptydir.yaml
 
 # How to upgrade the list of licenses
 
-To generate the `licenses` folder you'll need **go-licenses**, and you can
-install it with:
-
-```bash
-go get github.com/google/go-licenses
-```
-
-Then, simply:
+To generate or update the `licenses` folder run the following command:
 
 ```bash
 make licenses
@@ -36,33 +29,8 @@ make licenses
   `git log --pretty=oneline v0.1.0..master` where `v0.1.0`
   is the latest released version will be useful.
 
-* Update the version number in `pkg/versions/versions.go`, inside
-  the `Version` and the `DefaultOperatorImageName` constants.
-
-* Update the `version` tag in `Dockerfile` `LABEL` command with
-  the new version (without the starting `v`). Update also the
-  `revision` tag if appropriate.
-
-* Update the OpenShift ClusterServiceVersion object in
-  `config/manifests/bases/cloud-native-postgresql.clusterserviceversion.yaml`
-  file with the new version.
-
-* Create a new YAML definition for the new version and add it to the
-  commit:
-
-```
-# If 0.2.0 is the version to be released:
-export OPERATOR_VERSION=0.2.0
-export CONTROLLER_IMG=2ndq.io/release/k8s/cloud-native-postgresql-operator:v0.2.0
-make yaml_manifest
-```
-
-* Create a Git tag and wait for the CI to build the operator image:
-
-```
-git tag -sam "Release 0.2.0" v0.2.0
-git push --tags
-```
+* run `hack/release.sh v0.2.0` where `v0.2.0`
+  is the new version to be released.
 
 * Create the release on the Portal and upload the manifest generated in
   the previous point in `releases/postgresql-operator-0.2.0.yaml`

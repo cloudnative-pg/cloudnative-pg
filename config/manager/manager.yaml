@@ -4,13 +4,11 @@ metadata:
   labels:
     control-plane: controller-manager
   name: system
-
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: manager
-
 ---
 apiVersion: apps/v1
 kind: Deployment
