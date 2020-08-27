@@ -24,10 +24,7 @@ import (
 
 // Reconcile is the main reconciliation loop for the instance
 func (r *InstanceReconciler) Reconcile(event *watch.Event) error {
-	// Nothing I can do, here
-	if event.Type != watch.Modified {
-		return nil
-	}
+	r.log.Info("Reconciliation loop", "eventType", event.Type)
 
 	object, err := objectToUnstructured(event.Object)
 	if err != nil {
@@ -149,7 +146,7 @@ func (r *InstanceReconciler) waitForApply() error {
 			return err
 		}
 
-		if lag == 0 {
+		if lag <= 0 {
 			break
 		}
 

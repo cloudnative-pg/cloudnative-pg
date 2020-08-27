@@ -382,12 +382,13 @@ func (r *ClusterReconciler) joinReplicaInstance(
 func (r *ClusterReconciler) reattachDanglingPVC(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
-	if len(cluster.Status.DanglingPVC) == 0 {
+	pvcToReattach := electPvcToReattach(cluster)
+	if pvcToReattach == "" {
 		return nil
 	}
 
 	pvc := corev1.PersistentVolumeClaim{}
-	err := r.Get(ctx, client.ObjectKey{Name: cluster.Status.DanglingPVC[0], Namespace: cluster.Namespace}, &pvc)
+	err := r.Get(ctx, client.ObjectKey{Name: pvcToReattach, Namespace: cluster.Namespace}, &pvc)
 	if err != nil {
 		return fmt.Errorf("error while reattaching PVC: %v", err)
 	}
@@ -423,4 +424,20 @@ func (r *ClusterReconciler) reattachDanglingPVC(ctx context.Context, cluster *v1
 	}
 
 	return nil
+}
+
+// electPvcToReattach will choose a PVC between the dangling ones that should be reattached to the cluster,
+// giving precedence to the target master if between the set
+func electPvcToReattach(cluster *v1alpha1.Cluster) string {
+	if len(cluster.Status.DanglingPVC) == 0 {
+		return ""
+	}
+
+	for _, name := range cluster.Status.DanglingPVC {
+		if name == cluster.Status.TargetPrimary {
+			return name
+		}
+	}
+
+	return cluster.Status.DanglingPVC[0]
 }

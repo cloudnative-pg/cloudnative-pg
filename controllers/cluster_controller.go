@@ -109,8 +109,10 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	if cluster.Status.CurrentPrimary != "" && cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		log.Info("Switchover in progress, waiting for the cluster to align")
-		// TODO: check if the TargetPrimary is active, otherwise recovery?
+		log.Info("There is a switchover or a failover "+
+			"in progress, waiting for the operation to complete",
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary)
 		return ctrl.Result{}, err
 	}
 
@@ -129,6 +131,17 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	var instancesStatus postgres.PostgresqlStatusList
 	if instancesStatus, err = r.getStatusFromInstances(ctx, childPods); err != nil {
 		return ctrl.Result{}, err
+	}
+
+	// Recreate missing Pods
+	if len(cluster.Status.DanglingPVC) > 0 {
+		if cluster.Status.ReadyInstances != cluster.Status.Instances {
+			// A pod is not ready, let's retry
+			log.V(2).Info("Waiting for node to be ready before attaching PVCs")
+			return ctrl.Result{}, nil
+		}
+
+		return ctrl.Result{}, r.reattachDanglingPVC(ctx, &cluster)
 	}
 
 	// Update the target primary name from the Pods status
@@ -165,22 +178,6 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		// A pod is not ready, let's retry
 		log.V(2).Info("Waiting for node to be ready")
 		return ctrl.Result{}, nil
-	}
-
-	// Is there a switchover or failover in progress?
-	// Let's wait for it to terminate before applying the
-	// following operations
-	if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary {
-		log.V(2).Info("There is a switchover or a failover "+
-			"in progress, waiting for the operation to complete",
-			"currentPrimary", cluster.Status.CurrentPrimary,
-			"targetPrimary", cluster.Status.TargetPrimary)
-		return ctrl.Result{}, nil
-	}
-
-	// Recreate missing Pods
-	if len(cluster.Status.DanglingPVC) > 0 {
-		return ctrl.Result{}, r.reattachDanglingPVC(ctx, &cluster)
 	}
 
 	// Are there missing nodes? Let's create one
