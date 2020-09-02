@@ -73,41 +73,40 @@ lint:
     - apk add make bash curl go
     - curl -sSfL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz | tar -xz -C /usr/local/bin
     - echo $CI_JOB_TOKEN | docker login -u gitlab-ci-token --password-stdin $CI_REGISTRY
-    - export BDR_IMAGE_NAME OMNIDB_IMAGE_NAME
-    - make e2e-test CONTROLLER_IMG="${TARGET_IMAGE}" BUILD_IMAGE=false
+    - make e2e-test CONTROLLER_IMG="${TARGET_IMAGE}" BUILD_IMAGE=false POSTGRES_IMAGE_NAME="quay.io/2ndquadrant/postgres:${POSTGRESQL_VERSION}"
 
 e2e-1.15-pg12:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.15.11
-    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:12
+    POSTGRESQL_VERSION: 12
 
 e2e-1.16-pg12:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.16.9
-    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:12
+    POSTGRESQL_VERSION: 12
 
 e2e-1.17-pg12:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.17.5
-    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:12
+    POSTGRESQL_VERSION: 12
 
 e2e-1.18-pg12:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.18.2
-    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:12
+    POSTGRESQL_VERSION: 12
 
 e2e-1.18-pg11:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.18.2
-    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:11
+    POSTGRESQL_VERSION: 11
 
 e2e-1.18-pg10:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.18.2
-    POSTGRESQL_IMAGE_NAME: quay.io/2ndquadrant/postgres:10
+    POSTGRESQL_VERSION: 10
