@@ -19,6 +19,8 @@ of the tests:
    from `pkg/versions/versions.go`)
 * `PRESERVE_CLUSTER`: do not remove the `kind` cluster after the end of the
   tests (default: `false`);
+* `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
+  the tests. Only useful if specified with `PRESERVE_CLUSTER=true`.
 * `KIND_VERSION`: use a specific version of `kind` (default: use the latest);
 * `KUBECTL_VERSION`: use a specific version of `kubectl` (default: use the
   latest);

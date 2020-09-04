@@ -8,6 +8,8 @@ package tests
 
 import (
 	"context"
+	"os"
+	"strings"
 
 	"github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -20,10 +22,11 @@ import (
 
 // TestingEnvironment struct for operator testing
 type TestingEnvironment struct {
-	RestClientConfig *rest.Config
-	Client           client.Client
-	Ctx              context.Context
-	Scheme           *runtime.Scheme
+	RestClientConfig   *rest.Config
+	Client             client.Client
+	Ctx                context.Context
+	Scheme             *runtime.Scheme
+	PreserveNamespaces []string
 }
 
 // NewTestingEnvironment creates the environment for testing
@@ -38,6 +41,11 @@ func NewTestingEnvironment() *TestingEnvironment {
 	if err != nil {
 		ginkgo.Fail(err.Error())
 	}
+
+	if preserveNamespaces := os.Getenv("PRESERVE_NAMESPACES"); preserveNamespaces != "" {
+		env.PreserveNamespaces = strings.Fields(preserveNamespaces)
+	}
+
 	return &env
 }
 
@@ -56,6 +64,13 @@ func (env TestingEnvironment) CreateNamespace(name string, opts ...client.Create
 
 // DeleteNamespace deletes a namespace if existent
 func (env TestingEnvironment) DeleteNamespace(name string, opts ...client.DeleteOption) error {
+	// Exit immediately if if the namespace is listed in PreserveNamespaces
+	for _, v := range env.PreserveNamespaces {
+		if v == name {
+			return nil
+		}
+	}
+
 	u := &unstructured.Unstructured{}
 	u.SetName(name)
 	u.SetGroupVersionKind(schema.GroupVersionKind{
