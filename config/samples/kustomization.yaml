@@ -1,4 +1,0 @@
-resources:
-- postgresql_v1alpha1_cluster.yaml
-- postgresql_v1alpha1_backup.yaml
-- postgresql_v1alpha1_scheduledbackup.yaml

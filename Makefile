@@ -7,12 +7,7 @@ CONTROLLER_IMG ?= internal.2ndq.io/k8s/cloud-native-postgresql:latest
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/2ndquadrant/postgres:12
 
-# RedHat Operator Hub references / indexes
-OPERATOR_HUB_VERSION=0.0.65
-BUNDLE_IMAGE=internal.2ndq.io/k8s/cloud-native-postgresql:${OPERATOR_HUB_VERSION}-bundle
-INDEX_IMAGE=internal.2ndq.io/k8s/cloud-native-postgresql:${OPERATOR_HUB_VERSION}-index
-
-export CONTROLLER_IMG BUILD_IMAGE POSTGRES_IMAGE_NAME BUNDLE_IMAGE INDEX_IMAGE
+export CONTROLLER_IMG BUILD_IMAGE POSTGRES_IMAGE_NAME
 
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
@@ -103,44 +98,6 @@ licenses: go-licenses
 		save gitlab.2ndquadrant.com/k8s/cloud-native-postgresql \
 		--save_path licenses/go-licenses --force
 	chmod a+rw -R licenses/go-licenses
-
-# OLM bundle
-olm-bundle: manifests opm
-	set -xe ;\
-	CONFIG_TMP_DIR=$$(mktemp -d) ;\
-	cp -r config/* $$CONFIG_TMP_DIR ;\
-	( \
-	    cd $$CONFIG_TMP_DIR/manager ;\
-	    kustomize edit set image controller=${CONTROLLER_IMG} ;\
-	    kustomize edit add patch openshift_override.yaml ;\
-	    cd $$CONFIG_TMP_DIR/rbac ;\
-	    cat kustomization.openshift.yaml >> kustomization.yaml ;\
-	) ;\
-	(kustomize build $$CONFIG_TMP_DIR/default; echo '---'; kustomize build $$CONFIG_TMP_DIR/samples) | \
-	operator-sdk generate bundle --verbose --overwrite --channels alpha,beta,stable --default-channel beta --version ${OPERATOR_HUB_VERSION} ;\
-	rm -fr $$CONFIG_TMP_DIR ;\
-	docker build --no-cache -f bundle.Dockerfile -t ${BUNDLE_IMAGE} . ;\
-	$(OPM) index add --bundles ${BUNDLE_IMAGE} --tag ${INDEX_IMAGE} --build-tool docker --pull-tool none
-
-olm-bundle-push: olm-bundle
-	docker push ${BUNDLE_IMAGE}
-	docker push ${INDEX_IMAGE}
-
-# find or download opm
-.PHONY: opm
-opm:
-# download opm if necessary
-ifeq (, $(shell which opm))
-	@{ \
-	set -e ;\
-	OPM_VERSION=$$(curl -s -LH "Accept:application/json" https://github.com/operator-framework/operator-registry/releases/latest | sed 's/.*"tag_name":"\([^"]\+\)".*/\1/') ;\
-	curl -s -L "https://github.com/operator-framework/operator-registry/releases/download/$${OPM_VERSION}/$$(uname | tr '[:upper:]' '[:lower:]')-amd64-opm" -o "$(GOBIN)/opm" ;\
-	chmod +x "$(GOBIN)/opm" ;\
-	}
-OPM=$(GOBIN)/opm
-else
-OPM=$(shell which opm)
-endif
 
 # find or download controller-gen
 .PHONY: controller-gen

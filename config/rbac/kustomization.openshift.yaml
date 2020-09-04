@@ -1,7 +1,0 @@
-patchesJson6902:
-  - target:
-      group: rbac.authorization.k8s.io
-      version: v1
-      kind: ClusterRole
-      name: manager
-    path: openshift_override.yaml

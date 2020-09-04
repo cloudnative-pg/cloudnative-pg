@@ -67,9 +67,6 @@ sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
 sed -i -e "s/version=\".*\"/version=\"${release_version}\"/" \
     Dockerfile
 
-sed -i -e "s/name: cloud-native-postgresql\.v.*/name: cloud-native-postgresql.v${release_version}/" \
-    config/manifests/bases/cloud-native-postgresql.clusterserviceversion.yaml
-
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
 (
@@ -97,7 +94,6 @@ EOF
 git add \
     pkg/versions/versions.go \
     Dockerfile \
-    config/manifests/bases/cloud-native-postgresql.clusterserviceversion.yaml \
     "${release_manifest}"
 git commit -sm "Version tag to ${release_version}"
 git tag -sam "Release ${release_version}" "v${release_version}"

@@ -18,7 +18,3 @@
 *.swp
 *.swo
 *~
-
-# Opm output
-/bundle.Dockerfile
-/bundle/

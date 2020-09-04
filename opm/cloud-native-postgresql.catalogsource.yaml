@@ -1,9 +1,0 @@
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: cloud-native-postgresql-manifests
-  namespace: openshift-marketplace
-
-spec:
-  sourceType: grpc
-  image: internal.2ndq.io/k8s/cloud-native-postgresql:0.0.65-index
