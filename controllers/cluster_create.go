@@ -417,10 +417,14 @@ func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *v1al
 		return nil
 	}
 
-	if cluster.IsNodeMaintenanceWindowNotReusePVC() {
-		log.V(2).Info(
-			"Detected dangling PVC during a recovery window upgrade mode," +
-				"removing them")
+	if cluster.IsNodeMaintenanceWindowNotReusePVC() || cluster.Spec.Instances <= cluster.Status.Instances {
+		log.Info(
+			"Detected unneeded PVCs, removing them",
+			"statusInstances", cluster.Status.Instances,
+			"specInstances", cluster.Spec.Instances,
+			"maintenanceWindow", cluster.IsNodeMaintenanceWindowInProgress(),
+			"maintenanceWindowReusePVC", cluster.IsNodeMaintenanceWindowReusePVC(),
+			"danglingPVCs", cluster.Status.DanglingPVC)
 		return r.removeDanglingPVCs(ctx, cluster)
 	}
 
