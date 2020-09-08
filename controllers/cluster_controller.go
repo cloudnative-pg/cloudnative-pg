@@ -87,11 +87,6 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, nil
 	}
 
-	// Ensure we have the required global objects
-	if err := r.createPostgresClusterObjects(ctx, &cluster); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	// Update the status of this resource
 	childPods, err := r.getManagedPods(ctx, cluster)
 	if err != nil {
@@ -121,6 +116,11 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return ctrl.Result{}, nil
 		}
 
+		return ctrl.Result{}, err
+	}
+
+	// Ensure we have the required global objects
+	if err := r.createPostgresClusterObjects(ctx, &cluster); err != nil {
 		return ctrl.Result{}, err
 	}
 

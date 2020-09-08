@@ -139,7 +139,6 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 				},
 			},
 			Containers:         createPostgresContainers(cluster, podName),
-			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
@@ -148,20 +147,6 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 	}
 
 	return pod
-}
-
-func createImagePullSecrets(cluster v1alpha1.Cluster) []corev1.LocalObjectReference {
-	var result []corev1.LocalObjectReference
-
-	if len(cluster.GetImagePullSecret()) == 0 {
-		return result
-	}
-
-	result = append(result, corev1.LocalObjectReference{
-		Name: cluster.GetImagePullSecret(),
-	})
-
-	return result
 }
 
 func createPostgresVolumes(cluster v1alpha1.Cluster, podName string) []corev1.Volume {
@@ -472,7 +457,6 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 				},
 			},
 			Containers:         createPostgresContainers(cluster, podName),
-			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
@@ -520,7 +504,6 @@ func PodWithExistingStorage(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.
 				},
 			},
 			Containers:         createPostgresContainers(cluster, podName),
-			ImagePullSecrets:   createImagePullSecrets(cluster),
 			Volumes:            createPostgresVolumes(cluster, podName),
 			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),

@@ -170,10 +170,6 @@ spec:
               description: Name of the container image
               minLength: 0
               type: string
-            imagePullSecret:
-              description: Secret for pulling the image. If empty no secret will be
-                used
-              type: string
             instances:
               description: Number of instances required in the cluster
               format: int32

@@ -12,21 +12,12 @@ import (
 )
 
 // CreateServiceAccount create the serviceaccount that will be used in every Pod
-func CreateServiceAccount(cluster metav1.ObjectMeta, imagePullSecret string) corev1.ServiceAccount {
-	var imagePullSecrets []corev1.LocalObjectReference
-
-	if imagePullSecret != "" {
-		imagePullSecrets = append(imagePullSecrets, corev1.LocalObjectReference{
-			Name: imagePullSecret,
-		})
-	}
-
+func CreateServiceAccount(cluster metav1.ObjectMeta) corev1.ServiceAccount {
 	serviceAccount := corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
 		},
-		ImagePullSecrets: imagePullSecrets,
 	}
 
 	return serviceAccount

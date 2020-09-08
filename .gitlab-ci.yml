@@ -2,6 +2,7 @@ stages:
   - test
   - build
   - e2e
+  - ocp
 
 variables:
   CI_DEBUG_TRACE: "false"
@@ -115,3 +116,10 @@ e2e-1.19-pg10:
   variables:
     K8S_VERSION: 1.19.1
     POSTGRESQL_VERSION: 10
+
+trigger-ocp:
+  stage: ocp
+  trigger: k8s/cloud-native-postgresql-ocp-certified
+  variables:
+    UPSTREAM_COMMIT: $CI_COMMIT_SHA
+    UPSTREAM_PIPELINE_ID: $CI_PIPELINE_ID

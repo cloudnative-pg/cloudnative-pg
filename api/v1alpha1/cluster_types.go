@@ -48,10 +48,6 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinLength=0
 	ImageName string `json:"imageName,omitempty"`
 
-	// Secret for pulling the image. If empty
-	// no secret will be used
-	ImagePullSecret string `json:"imagePullSecret,omitempty"`
-
 	// Number of instances required in the cluster
 	// +kubebuilder:validation:Minimum=1
 	Instances int32 `json:"instances"`
@@ -353,12 +349,6 @@ func (cluster *Cluster) GetImageName() string {
 	}
 
 	return versions.GetDefaultImageName()
-}
-
-// GetImagePullSecret get the name of the pull secret to use
-// to download the PostgreSQL image
-func (cluster *Cluster) GetImagePullSecret() string {
-	return cluster.Spec.ImagePullSecret
 }
 
 // GetSuperuserSecretName get the secret name of the PostgreSQL superuser

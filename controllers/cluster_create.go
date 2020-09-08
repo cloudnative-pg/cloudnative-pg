@@ -15,7 +15,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -25,22 +24,8 @@ import (
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
 )
 
-const (
-	operatorDeployNamespace = "postgresql-operator-system"
-	operatorSecretName      = "postgresql-operator-pull-secret" //nolint:gosec
-)
-
 // createPostgresClusterObjects ensure that we have the required global objects
 func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
-
-	// Ensure we have the secret that allow us to download the image of
-	// PostgreSQL
-	if err := r.createImagePullSecret(ctx, cluster); err != nil {
-		log.Error(err, "Can't generate the image pull secret")
-		return err
-	}
-
 	err := r.createPostgresConfigMap(ctx, cluster)
 	if err != nil {
 		return err
@@ -81,50 +66,6 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 	if err != nil {
 		return err
 	}
-
-	return nil
-}
-
-// createImagePullSecret will create a secret to download the images for Postgres, if such a secret
-// already exist in the namespace of the operator.
-func (r *ClusterReconciler) createImagePullSecret(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	// Do not create ImagePullSecret if it has been specified by the user
-	if len(cluster.Spec.ImagePullSecret) > 0 {
-		return nil
-	}
-
-	// Let's find the operator secret
-	var operatorSecret corev1.Secret
-	if err := r.Get(ctx, client.ObjectKey{
-		Name:      operatorSecretName,
-		Namespace: operatorDeployNamespace,
-	}, &operatorSecret); err != nil {
-		if apierrs.IsNotFound(err) {
-			// There is no secret like that, probably because we are running in our development environment
-			return nil
-		}
-		return err
-	}
-
-	// Let's create the secret with the required info
-	secret := corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Name + "-pull-secret",
-		},
-		Data: operatorSecret.Data,
-		Type: operatorSecret.Type,
-	}
-	utils.SetAsOwnedBy(&secret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
-	specs.SetOperatorVersion(&secret.ObjectMeta, versions.Version)
-
-	// Another sync loop may have already created the service. Let's check that
-	if err := r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
-		return err
-	}
-
-	// Set the secret name in the Spec to be used when creating a Pod
-	cluster.Spec.ImagePullSecret = secret.Name
 
 	return nil
 }
@@ -260,7 +201,7 @@ func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, clust
 func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
-	serviceAccount := specs.CreateServiceAccount(cluster.ObjectMeta, cluster.GetImagePullSecret())
+	serviceAccount := specs.CreateServiceAccount(cluster.ObjectMeta)
 	utils.SetAsOwnedBy(&serviceAccount.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&serviceAccount.ObjectMeta, versions.Version)
 
