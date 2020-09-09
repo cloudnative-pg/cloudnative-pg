@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 
 	apiv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 )
 
@@ -28,6 +29,10 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 		Namespace(r.instance.Namespace).
 		Get(r.instance.ClusterName, metav1.GetOptions{})
 	if err != nil {
+		return err
+	}
+
+	if err := fileutils.EnsurePgDataPerms(r.instance.PgData); err != nil {
 		return err
 	}
 

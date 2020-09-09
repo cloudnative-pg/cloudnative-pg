@@ -108,3 +108,13 @@ func CopyFile(source, destination string) error {
 	err = out.Close()
 	return err
 }
+
+// EnsurePgDataPerms ensure PGDATA has 0700 permissions, which are
+// required for PostgreSQL to successfully startup
+func EnsurePgDataPerms(pgData string) error {
+	_, err := os.Stat(pgData)
+	if err != nil {
+		return err
+	}
+	return os.Chmod(pgData, 0700) // #nosec
+}
