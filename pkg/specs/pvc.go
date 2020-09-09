@@ -21,10 +21,6 @@ func DetectDanglingPVCs(
 	for _, pvc := range pvcList {
 		found := false
 
-		if !IsPvcAvailable(pvc) {
-			continue
-		}
-
 		for idx := range podList {
 			if podList[idx].Name == pvc.Name {
 				found = true

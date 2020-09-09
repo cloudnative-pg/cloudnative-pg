@@ -886,7 +886,7 @@ var _ = Describe("Cluster", func() {
 				Expect(err).To(BeNil())
 				Expect(pvc.GetUID()).To(BeEquivalentTo(originalPVCUID))
 			})
-			By("removing an annotated PVC if the pod is deleted", func() {
+			By("removing a PVC if and delete the Pod", func() {
 				// Get a pod we want to delete
 				podName := clusterName + "-3"
 				pod := &corev1.Pod{}
@@ -908,8 +908,8 @@ var _ = Describe("Cluster", func() {
 				Expect(err).To(BeNil())
 				originalPVCUID := pvc.GetUID()
 
-				// Annotate the PVC as unusable
-				_, _, err = tests.Run(fmt.Sprintf("kubectl annotate -n %v pvc/%v k8s.2ndq.io/pvcUnusable=true", namespace, pvcName))
+				// Delete the PVC, this will set the PVC as terminated
+				_, _, err = tests.Run(fmt.Sprintf("kubectl delete -n %v pvc/%v --wait=false", namespace, pvcName))
 				Expect(err).To(BeNil())
 				// Delete the pod
 				_, _, err = tests.Run(fmt.Sprintf("kubectl delete -n %v pod/%v", namespace, podName))
