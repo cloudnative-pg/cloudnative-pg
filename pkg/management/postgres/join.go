@@ -10,10 +10,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 
-	"github.com/pkg/errors"
-
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
 )
 
 // JoinInfo contains the information needed to bootstrap a new
@@ -43,9 +44,28 @@ func (info JoinInfo) Join() error {
 
 	log.Log.Info("Starting pg_basebackup", "options", options)
 	err := cmd.Run()
-
 	if err != nil {
-		return errors.Wrap(err, "Error in pg_basebackup")
+		return fmt.Errorf("error in pg_basebackup, %w", err)
+	}
+
+	// The generated recovery.conf / postgresql.auto.conf doesn't instruct
+	// the instance to follow the timeline changes of the master, so we
+	// need to include another parameter in the configuration.
+	major, err := postgres.GetMajorVersion(info.PgData)
+	if err != nil {
+		return err
+	}
+
+	targetFile := "postgresql.auto.conf"
+	if major < 12 {
+		targetFile = "recovery.conf"
+	}
+	targetFile = path.Join(info.PgData, targetFile)
+
+	// Append the required configuration parameter
+	err = fileutils.AppendStringToFile(targetFile, "recovery_target_timeline = 'latest'\n")
+	if err != nil {
+		return err
 	}
 
 	return nil

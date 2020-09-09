@@ -20,6 +20,7 @@ import (
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
 )
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL:O
@@ -209,11 +210,26 @@ func (info InitInfo) ConfigureApplicationEnvironment(db *sql.DB) error {
 }
 
 // ConfigureReplica set the `primary_conninfo` field in the PostgreSQL system
+// This must be invoked only on PostgreSQL version >= 12
 func (info InitInfo) ConfigureReplica(db *sql.DB) error {
 	primaryConnInfo := fmt.Sprintf("host=%v user=postgres dbname=%v", info.ParentNode, "postgres")
 
-	_, err := db.Exec(fmt.Sprintf("ALTER SYSTEM SET primary_conninfo TO %v", pq.QuoteLiteral(primaryConnInfo)))
-	return err
+	_, err := db.Exec(
+		fmt.Sprintf("ALTER SYSTEM SET primary_conninfo TO %v",
+			pq.QuoteLiteral(primaryConnInfo)))
+	if err != nil {
+		return err
+	}
+
+	// This parameter will be used when this master will be degraded.
+	// PostgreSQL <= 11 will have this parameter written to the
+	// 'recovery.conf' when needed.
+	_, err = db.Exec("ALTER SYSTEM SET recovery_target_timeline TO 'latest'")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Bootstrap create and configure this new PostgreSQL instance
@@ -225,12 +241,12 @@ func (info InitInfo) Bootstrap() error {
 
 	instance := info.GetInstance()
 
-	return instance.WithActiveInstance(func() error {
-		majorVersion, err := instance.GetMajorVersion()
-		if err != nil {
-			return nil
-		}
+	majorVersion, err := postgres.GetMajorVersion(instance.PgData)
+	if err != nil {
+		return nil
+	}
 
+	return instance.WithActiveInstance(func() error {
 		db, err := instance.GetSuperUserDB()
 		if err != nil {
 			return nil

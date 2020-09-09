@@ -8,6 +8,8 @@ package postgres
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -70,4 +72,15 @@ func GetPostgresMajorVersion(parsedVersion int) int {
 // toVersion
 func IsUpgradePossible(fromVersion, toVersion int) bool {
 	return GetPostgresMajorVersion(fromVersion) == GetPostgresMajorVersion(toVersion)
+}
+
+// GetMajorVersion read the PG_VERSION file in the data directory
+// returning the major version of the database
+func GetMajorVersion(pgData string) (int, error) {
+	content, err := ioutil.ReadFile(path.Join(pgData, "PG_VERSION")) // #nosec
+	if err != nil {
+		return 0, err
+	}
+
+	return strconv.Atoi(strings.TrimSpace(string(content)))
 }

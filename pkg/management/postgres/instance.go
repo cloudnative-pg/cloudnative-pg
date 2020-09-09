@@ -9,13 +9,10 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/lib/pq"
@@ -23,6 +20,7 @@ import (
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
 )
 
 // Instance represent a PostgreSQL instance to be executed
@@ -230,19 +228,9 @@ func (instance *Instance) IsPrimary() (bool, error) {
 	return true, nil
 }
 
-// GetMajorVersion read the PG_VERSION file in the data directory
-func (instance *Instance) GetMajorVersion() (int, error) {
-	content, err := ioutil.ReadFile(path.Join(instance.PgData, "PG_VERSION"))
-	if err != nil {
-		return 0, err
-	}
-
-	return strconv.Atoi(strings.TrimSpace(string(content)))
-}
-
 // Demote demote an existing PostgreSQL instance
 func (instance *Instance) Demote() error {
-	major, err := instance.GetMajorVersion()
+	major, err := postgres.GetMajorVersion(instance.PgData)
 	if err != nil {
 		return errors.Wrap(err, "Cannot detect major version")
 	}
@@ -270,7 +258,8 @@ func (instance *Instance) createRecoveryConf() error {
 		err = f.Close()
 	}()
 	_, err = f.WriteString("standby_mode = 'on'\n" +
-		"primary_conninfo = " + pq.QuoteLiteral(primaryConnInfo))
+		"primary_conninfo = " + pq.QuoteLiteral(primaryConnInfo) + "\n" +
+		"recovery_target_timeline = 'latest'\n")
 	if err != nil {
 		return err
 	}
