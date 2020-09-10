@@ -180,19 +180,18 @@ func statusSubCommand() {
 		log.Log.Error(err, "Error while requesting instance status")
 		os.Exit(1)
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
 
 	if resp.StatusCode != 200 {
 		bytes, _ := ioutil.ReadAll(resp.Body)
 		log.Log.Info(
 			"Error while extracting status",
 			"statusCode", resp.StatusCode, "body", string(bytes))
+		_ = resp.Body.Close()
 		os.Exit(1)
 	}
 
 	_, err = io.Copy(os.Stdout, resp.Body)
+	_ = resp.Body.Close()
 	if err != nil {
 		log.Log.Error(err, "Error while showing status info")
 		os.Exit(1)

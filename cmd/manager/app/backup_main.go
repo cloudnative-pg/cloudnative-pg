@@ -28,9 +28,6 @@ func BackupCommand(args []string) {
 		log.Log.Error(err, "Error while requesting backup")
 		os.Exit(1)
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
 
 	if resp.StatusCode != 200 {
 		bytes, _ := ioutil.ReadAll(resp.Body)
@@ -38,10 +35,12 @@ func BackupCommand(args []string) {
 			"Error while requesting backup",
 			"statusCode", resp.StatusCode,
 			"body", string(bytes))
+		_ = resp.Body.Close()
 		os.Exit(1)
 	}
 
 	_, err = io.Copy(os.Stderr, resp.Body)
+	_ = resp.Body.Close()
 	if err != nil {
 		log.Log.Error(err, "Error while starting a backup")
 		os.Exit(1)

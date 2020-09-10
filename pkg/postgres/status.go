@@ -31,9 +31,7 @@ func (list PostgresqlStatusList) Len() int {
 
 // Swap swaps two elements, implements sort.Interface
 func (list *PostgresqlStatusList) Swap(i, j int) {
-	t := list.Items[i]
-	list.Items[i] = list.Items[j]
-	list.Items[j] = t
+	list.Items[i], list.Items[j] = list.Items[j], list.Items[i]
 }
 
 // Less compare two elements. Primary instances always go first, ordered by their Pod
