@@ -11,7 +11,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,7 +32,7 @@ type TestingEnvironment struct {
 }
 
 // NewTestingEnvironment creates the environment for testing
-func NewTestingEnvironment() *TestingEnvironment {
+func NewTestingEnvironment() (*TestingEnvironment, error) {
 	var env TestingEnvironment
 	env.RestClientConfig = controllerruntime.GetConfigOrDie()
 	env.Ctx = context.Background()
@@ -42,14 +41,14 @@ func NewTestingEnvironment() *TestingEnvironment {
 	var err error
 	env.Client, err = client.New(env.RestClientConfig, client.Options{Scheme: env.Scheme})
 	if err != nil {
-		ginkgo.Fail(err.Error())
+		return nil, err
 	}
 
 	if preserveNamespaces := os.Getenv("PRESERVE_NAMESPACES"); preserveNamespaces != "" {
 		env.PreserveNamespaces = strings.Fields(preserveNamespaces)
 	}
 
-	return &env
+	return &env, nil
 }
 
 // CreateNamespace creates a namespace

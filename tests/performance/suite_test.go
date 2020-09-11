@@ -23,9 +23,14 @@ const (
 	samplesDir = "../../docs/src/samples"
 )
 
-var env = tests.NewTestingEnvironment()
+var env *tests.TestingEnvironment
 
 var _ = BeforeSuite(func() {
+	var err error
+	env, err = tests.NewTestingEnvironment()
+	if err != nil {
+		Fail(err.Error())
+	}
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = clusterv1alpha1.AddToScheme(env.Scheme)
 	//+kubebuilder:scaffold:scheme
