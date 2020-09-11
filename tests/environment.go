@@ -18,6 +18,9 @@ import (
 	"k8s.io/client-go/rest"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	// Import the client auth plugin package to allow use gke or ake to run tests
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 // TestingEnvironment struct for operator testing
