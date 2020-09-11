@@ -93,10 +93,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Update the status of this resource
-	var childPods corev1.PodList
-	var err error
-
-	childPods, err = r.getManagedPods(ctx, cluster)
+	childPods, err := r.getManagedPods(ctx, cluster)
 	if err != nil {
 		log.Error(err, "Cannot extract the list of managed Pods")
 		return ctrl.Result{}, err

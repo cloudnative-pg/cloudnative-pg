@@ -886,7 +886,7 @@ var _ = Describe("Cluster", func() {
 				Expect(err).To(BeNil())
 				Expect(pvc.GetUID()).To(BeEquivalentTo(originalPVCUID))
 			})
-			By("removing a PVC if and delete the Pod", func() {
+			By("removing a PVC and delete the Pod", func() {
 				// Get a pod we want to delete
 				podName := clusterName + "-3"
 				pod := &corev1.Pod{}

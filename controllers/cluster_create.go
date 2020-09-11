@@ -225,7 +225,7 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 	return nil
 }
 
-// removeOrUpdatePodDisruptionBudget ensure that we delete the PDB requiring to remove one node at a time
+// deletePodDisruptionBudget ensure that we delete the PDB requiring to remove one node at a time
 func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	// If we have a PDB, we need to delete it
 	var targetPdb v1beta1.PodDisruptionBudget
