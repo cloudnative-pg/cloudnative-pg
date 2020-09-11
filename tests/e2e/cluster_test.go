@@ -153,22 +153,6 @@ var _ = Describe("Cluster", func() {
 			})
 		}
 
-		Context("Emptydir", func() {
-			const namespace = "pg-emptydir-e2e"
-			const sampleFile = samplesDir + "/cluster-emptydir.yaml"
-			const clusterName = "cluster-emptydir"
-			BeforeEach(func() {
-				if err := env.CreateNamespace(namespace); err != nil {
-					Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
-				}
-			})
-			AfterEach(func() {
-				if err := env.DeleteNamespace(namespace); err != nil {
-					Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
-				}
-			})
-			AssertSetup(namespace, clusterName, sampleFile)
-		})
 		Context("Storage class", func() {
 			const namespace = "cluster-storageclass-e2e"
 			const sampleFile = samplesDir + "/cluster-storage-class.yaml"
@@ -188,9 +172,6 @@ var _ = Describe("Cluster", func() {
 	})
 
 	Context("Cluster scale up and down", func() {
-
-		// This set of tests should run in the same way whether the group
-		// uses pvc or emptydir.
 		AssertScale := func(namespace string, clusterName string) {
 			// Add a node to the cluster and verify the cluster has one more
 			// element
@@ -248,31 +229,12 @@ var _ = Describe("Cluster", func() {
 				AssertScale(namespace, clusterName)
 			})
 		})
-		Context("Emptydir", func() {
-			const namespace = "cluster-scale-e2e-emptydir"
-			const sampleFile = samplesDir + "/cluster-emptydir.yaml"
-			const clusterName = "cluster-emptydir"
-			BeforeEach(func() {
-				if err := env.CreateNamespace(namespace); err != nil {
-					Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
-				}
-			})
-			AfterEach(func() {
-				if err := env.DeleteNamespace(namespace); err != nil {
-					Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
-				}
-			})
-			It("can scale the cluster size", func() {
-				AssertCreateCluster(namespace, clusterName, sampleFile)
-				AssertScale(namespace, clusterName)
-			})
-		})
 	})
 
 	Context("Failover", func() {
 		const namespace = "failover-e2e"
-		const sampleFile = samplesDir + "/cluster-emptydir.yaml"
-		const clusterName = "cluster-emptydir"
+		const sampleFile = samplesDir + "/cluster-example.yaml"
+		const clusterName = "cluster-example"
 		var pods []string
 		var currentPrimary, targetPrimary, pausedReplica string
 		BeforeEach(func() {
@@ -396,8 +358,8 @@ var _ = Describe("Cluster", func() {
 
 	Context("Switchover", func() {
 		const namespace = "switchover-e2e"
-		const sampleFile = samplesDir + "/cluster-emptydir.yaml"
-		const clusterName = "cluster-emptydir"
+		const sampleFile = samplesDir + "/cluster-example.yaml"
+		const clusterName = "cluster-example"
 		var pods []string
 		var oldPrimary, targetPrimary string
 		BeforeEach(func() {
@@ -499,8 +461,6 @@ var _ = Describe("Cluster", func() {
 	})
 
 	Context("Cluster rolling updates", func() {
-		// Tests will be shared between emptydir and pvc setups, so we
-		// declare them in assertions
 		AssertUpdateImage := func(namespace string, clusterName string) {
 			timeout := 400
 
@@ -762,65 +722,6 @@ var _ = Describe("Cluster", func() {
 				})
 				// Check that the new pods are included in the endpoint
 				By("having each pod included in the -r service", func() {
-					AssertReadyEndpoint(namespace, clusterName, 3)
-				})
-			})
-		})
-		Context("Emptydir", func() {
-			const namespace = "cluster-rolling-e2e-emptydir"
-			const sampleFile = samplesDir + "/cluster-emptydir.yaml"
-			const clusterName = "cluster-emptydir"
-			BeforeEach(func() {
-				if err := env.CreateNamespace(namespace); err != nil {
-					Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
-				}
-			})
-			AfterEach(func() {
-				if err := env.DeleteNamespace(namespace); err != nil {
-					Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
-				}
-			})
-			It("can do a rolling update", func() {
-				var originalPodNames []string
-				var originalPodUID []types.UID
-
-				AssertCreateCluster(namespace, clusterName, sampleFile)
-				By("Gathering info on the current state", func() {
-					podList := &corev1.PodList{}
-					if err := env.Client.List(
-						env.Ctx, podList, ctrlclient.InNamespace(namespace),
-						ctrlclient.MatchingLabels{"postgresql": clusterName},
-					); err != nil {
-						Fail("Unable to get pods in Cluster " + clusterName)
-					}
-					for _, pod := range podList.Items {
-						originalPodNames = append(originalPodNames, pod.GetName())
-						originalPodUID = append(originalPodUID, pod.GetUID())
-					}
-				})
-				By("updating the cluster definition", func() {
-					AssertUpdateImage(namespace, clusterName)
-				})
-				// Since we're using emptydir, pod should be created again from
-				// scratch. Here we check that the names we've saved at the
-				// beginning of the It are different from the current ones.
-				By("checking that the names of the pods have changed", func() {
-					AssertChangedNames(namespace, clusterName, originalPodNames, 0)
-				})
-				// Pods are new, so they have different UIDs. Here we check that
-				// the UIDs we've saved at the beginning of the It don't match
-				// the current ones.
-				By("checking that the pods are new ones", func() {
-					AssertNewPodsUID(namespace, clusterName, originalPodUID, 0)
-				})
-				// The operator should update the primary last, so the last
-				// to be updated is node1, and the primary role should go
-				// to node4
-				By("having the current primary on node4", func() {
-					AssertPrimary(namespace, clusterName, 4)
-				})
-				// Check that the new pods are included in the endpoint
-				By("having each pod included in the -ready service", func() {
 					AssertReadyEndpoint(namespace, clusterName, 3)
 				})
 			})

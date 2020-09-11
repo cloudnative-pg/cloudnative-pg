@@ -64,9 +64,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	filteredPods := utils.FilterActivePods(childPods.Items)
 
 	// Fill the list of dangling PVCs
-	if cluster.IsUsingPersistentStorage() {
-		cluster.Status.DanglingPVC = specs.DetectDanglingPVCs(filteredPods, childPVCs.Items)
-	}
+	cluster.Status.DanglingPVC = specs.DetectDanglingPVCs(filteredPods, childPVCs.Items)
 
 	// Count pods
 	cluster.Status.Instances = int32(len(filteredPods))

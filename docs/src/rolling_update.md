@@ -25,14 +25,8 @@ Every version of the operator comes with a default PostgreSQL image version.
 If a cluster doesn't have `imageName` specified, the operator will upgrade
 it to match its default.
 
-If you are using persistent storage, which is a requirement for
-a production environment, the upgrade keeps the Cloud Native PostgreSQL
-identity and do not reclone the data.
-
-If you are using emptyDir based storage, which is meaningful only for
-a development environment, the operator cannot preserve the node
-data directory and must create new nodes and part those with
-the old version.
+The upgrade keeps the Cloud Native PostgreSQL identity and do not
+reclone the data.
 
 During the rolling update procedure, the services endpoints move to reflect
 the status of the cluster, so the applications ignore the node that

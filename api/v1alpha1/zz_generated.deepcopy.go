@@ -231,11 +231,7 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 	*out = *in
 	in.PostgresConfiguration.DeepCopyInto(&out.PostgresConfiguration)
 	out.ApplicationConfiguration = in.ApplicationConfiguration
-	if in.StorageConfiguration != nil {
-		in, out := &in.StorageConfiguration, &out.StorageConfiguration
-		*out = new(StorageConfiguration)
-		(*in).DeepCopyInto(*out)
-	}
+	in.StorageConfiguration.DeepCopyInto(&out.StorageConfiguration)
 	out.Affinity = in.Affinity
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.Backup != nil {
@@ -489,11 +485,7 @@ func (in *StorageConfiguration) DeepCopyInto(out *StorageConfiguration) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.Size != nil {
-		in, out := &in.Size, &out.Size
-		x := (*in).DeepCopy()
-		*out = &x
-	}
+	out.Size = in.Size.DeepCopy()
 	if in.PersistentVolumeClaimTemplate != nil {
 		in, out := &in.PersistentVolumeClaimTemplate, &out.PersistentVolumeClaimTemplate
 		*out = new(v1.PersistentVolumeClaimSpec)

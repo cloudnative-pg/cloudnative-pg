@@ -64,7 +64,7 @@ type ClusterSpec struct {
 
 	// Configuration of the storage of the instances
 	// +optional
-	StorageConfiguration *StorageConfiguration `json:"storage,omitempty"`
+	StorageConfiguration StorageConfiguration `json:"storage,omitempty"`
 
 	// The time in seconds that is allowed for a PostgreSQL instance to
 	// successfully start up (default 30)
@@ -191,12 +191,13 @@ type ApplicationConfiguration struct {
 type StorageConfiguration struct {
 	// StorageClass to use for database data (PGDATA). Applied after
 	// evaluating the PVC template, if available.
+	// If not specified, generated PVCs will be satisfied by the
+	// default storage class
 	// +optional
 	StorageClass *string `json:"storageClass"`
 
 	// Size of the storage. Required if not already specified in the PVC template.
-	// +optional
-	Size *resource.Quantity `json:"size"`
+	Size resource.Quantity `json:"size"`
 
 	// Template to be used to generate the Persistent Volume Claim
 	// +optional
@@ -385,12 +386,6 @@ func (cluster *Cluster) GetServiceReadName() string {
 // read-write transactions
 func (cluster *Cluster) GetServiceReadWriteName() string {
 	return fmt.Sprintf("%v%v", cluster.Name, ServiceReadWriteSuffix)
-}
-
-// IsUsingPersistentStorage check if this cluster will use persistent storage
-// or not
-func (cluster *Cluster) IsUsingPersistentStorage() bool {
-	return cluster.Spec.StorageConfiguration != nil
 }
 
 // GetMaxStartDelay get the amount of time of startDelay config option

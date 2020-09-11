@@ -49,25 +49,6 @@ var _ = Describe("PostgreSQL services name", func() {
 	})
 })
 
-var _ = Describe("Detect persistent storage", func() {
-	It("by defaults work with emptyDir storage", func() {
-		var cluster = Cluster{}
-		Expect(cluster.IsUsingPersistentStorage()).To(BeFalse())
-	})
-
-	It("consider the presence of storage configuration", func() {
-		var storageClassName = "default-storage-class"
-		var cluster = Cluster{
-			Spec: ClusterSpec{
-				StorageConfiguration: &StorageConfiguration{
-					StorageClass: &storageClassName,
-				},
-			},
-		}
-		Expect(cluster.IsUsingPersistentStorage()).To(BeTrue())
-	})
-})
-
 var _ = Describe("Primary update strategy", func() {
 	It("defaults to switchover", func() {
 		emptyCluster := Cluster{}

@@ -89,15 +89,16 @@ kubectl get deploy -n postgresql-operator-system postgresql-operator-controller-
 As with any other deployment in Kubernetes, in order to deploy a PostgreSQL cluster
 you need to apply a configuration file that defines your desired `Cluster`.
 
-The [`cluster-emptydir.yaml`](samples/cluster-emptydir.yaml) sample file
-defines a simple `Cluster` with an `emptyDir` local volume:
+The [`cluster-example.yaml`](samples/cluster-example.yaml) sample file
+defines a simple `Cluster` using the default storage class to allocate
+disk space:
 
 ```yaml
-# Example of PostgreSQL cluster using emptyDir volumes
+# Example of PostgreSQL cluster
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
 kind: Cluster
 metadata:
-  name: cluster-emptydir
+  name: cluster-example
 spec:
   instances: 3
 
@@ -137,9 +138,13 @@ spec:
       # Require md5 authentication elsewhere
       - host all all all md5
       - host replication all all md5
+
+  # Require 1Gi of space
+  storage:
+    size: 1Gi
 ```
 
-This will create a `Cluster` called `cluster-emptydir` with a PostgreSQL
+This will create a `Cluster` called `cluster-example` with a PostgreSQL
 primary, two replicas, and a database called `app` owned by the `app` PostgreSQL user.
 
 !!! Note "There's more"
@@ -149,7 +154,7 @@ primary, two replicas, and a database called `app` owned by the `app` PostgreSQL
 In order to create the 3-node PostgreSQL cluster, you need to run the following command:
 
 ```sh
-kubectl apply -f cluster-emptydir.yaml
+kubectl apply -f cluster-example.yaml
 ```
 
 You can check that the pods are being created with the `get pods` command:

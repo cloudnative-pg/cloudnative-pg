@@ -5,15 +5,26 @@
 workloads on Kubernetes, particularly optimised for Private Cloud environments
 with Local Persistent Volumes (PV).
 
-## Quickstart for local testing (TODO)
+## Quickstart for local testing of a git branch
 
-Temporary information on how to test PG Operator using private images on Quay.io:
+If you want to deploy a cluster using the operator from your current git branch,
+you can use the following commands:
 
 ```bash
 kind create cluster --name pg
+kubectl create namespace postgresql-operator-system
+kubectl create secret docker-registry \
+    -n postgresql-operator-system \
+    postgresql-operator-pull-secret \
+    --docker-server=internal.2ndq.io \
+    --docker-username=$GITLAB_TOKEN_USERNAME \
+    --docker-password=$GITLAB_TOKEN_PASSWORD
 make deploy CONTROLLER_IMG=internal.2ndq.io/k8s/cloud-native-postgresql:$(git symbolic-ref --short HEAD | tr / _)
-kubectl apply -f docs/src/samples/cluster-emptydir.yaml
+kubectl apply -f docs/src/samples/cluster-example.yaml
 ```
+
+Replace `$GITLAB_TOKEN_USERNAME` and `$GITLAB_TOKEN_PASSWORD` with one with the permission to pull
+from the gitlab docker registry.
 
 # How to upgrade the list of licenses
 

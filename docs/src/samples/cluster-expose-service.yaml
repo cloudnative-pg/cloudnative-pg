@@ -5,7 +5,7 @@ metadata:
   name: tcp-services
   namespace: ingress-nginx
 data:
-  5432: default/cluster-emptydir-lead-primary:5432
+  5432: default/cluster-example-lead-primary:5432
 
 ---
 apiVersion: v1

@@ -20,7 +20,7 @@ spec:
         resources: {}
         env:
           - name: PGRST_DB_URI
-            value: "postgres://postgres@cluster-emptydir-rw/app?sslmode=disable"
+            value: "postgres://postgres@cluster-example-rw/app?sslmode=disable"
           - name: PGRST_DB_SCHEMA
             value: tps
           - name: PGRST_DB_ANON_ROLE

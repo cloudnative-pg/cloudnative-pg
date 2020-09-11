@@ -31,8 +31,8 @@ var _ = Describe("Cluster", func() {
 	// last row written on timeline 1 and the first one on timeline 2
 	Context("Cluster primary fails over in less than five seconds", func() {
 		const namespace = "primary-failover-time"
-		const sampleFile = samplesDir + "/cluster-emptydir.yaml"
-		const clusterName = "cluster-emptydir"
+		const sampleFile = samplesDir + "/cluster-example.yaml"
+		const clusterName = "cluster-example"
 		BeforeEach(func() {
 			if err := env.CreateNamespace(namespace); err != nil {
 				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))

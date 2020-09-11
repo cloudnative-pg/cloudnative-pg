@@ -45,13 +45,11 @@ func CreatePVC(
 		result.Spec.StorageClassName = storageConfiguration.StorageClass
 	}
 
-	// If the customer specified a storage requirement, let's use it
-	if storageConfiguration.Size != nil {
-		result.Spec.Resources = corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				"storage": *storageConfiguration.Size,
-			},
-		}
+	// Insert the storage requirement
+	result.Spec.Resources = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			"storage": storageConfiguration.Size,
+		},
 	}
 
 	if len(result.Spec.AccessModes) == 0 {

@@ -167,8 +167,12 @@ func createImagePullSecrets(cluster v1alpha1.Cluster) []corev1.LocalObjectRefere
 func createPostgresVolumes(cluster v1alpha1.Cluster, podName string) []corev1.Volume {
 	return []corev1.Volume{
 		{
-			Name:         "pgdata",
-			VolumeSource: createVolumeSource(cluster, podName),
+			Name: "pgdata",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: podName,
+				},
+			},
 		},
 		{
 			Name: "config",
@@ -203,25 +207,6 @@ func createPostgresVolumes(cluster v1alpha1.Cluster, podName string) []corev1.Vo
 			},
 		},
 	}
-}
-
-// createVolumeSource create the VolumeSource environment that is used
-// when starting a container
-func createVolumeSource(cluster v1alpha1.Cluster, podName string) corev1.VolumeSource {
-	var pgDataVolumeSource corev1.VolumeSource
-	if cluster.IsUsingPersistentStorage() {
-		pgDataVolumeSource = corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: podName,
-			},
-		}
-	} else {
-		pgDataVolumeSource = corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{},
-		}
-	}
-
-	return pgDataVolumeSource
 }
 
 // createPostgresContainers create the PostgreSQL containers that are

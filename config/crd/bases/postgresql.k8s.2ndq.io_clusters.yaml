@@ -388,8 +388,11 @@ spec:
                   x-kubernetes-int-or-string: true
                 storageClass:
                   description: StorageClass to use for database data (PGDATA). Applied
-                    after evaluating the PVC template, if available.
+                    after evaluating the PVC template, if available. If not specified,
+                    generated PVCs will be satisfied by the default storage class
                   type: string
+              required:
+              - size
               type: object
           required:
           - applicationConfiguration

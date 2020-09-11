@@ -1,8 +1,8 @@
-# Example of PostgreSQL cluster using emptyDir volumes
+# Example of PostgreSQL cluster
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
 kind: Cluster
 metadata:
-  name: cluster-emptydir
+  name: cluster-example
 spec:
   instances: 3
 
@@ -42,3 +42,7 @@ spec:
       # Require md5 authentication elsewhere
       - host all all all md5
       - host replication all all md5
+
+  # Require 1Gi of space
+  storage:
+    size: 1Gi

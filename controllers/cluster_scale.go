@@ -41,10 +41,6 @@ func (r *ClusterReconciler) scaleDownCluster(
 		return err
 	}
 
-	if !cluster.IsUsingPersistentStorage() {
-		return nil
-	}
-
 	// Let's drop the PVC too
 	pvc := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{

@@ -347,14 +347,12 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return err
 	}
 
-	if cluster.IsUsingPersistentStorage() {
-		pvcSpec := specs.CreatePVC(*cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
-		utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
-		specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
-		if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-			log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
-			return err
-		}
+	pvcSpec := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
+	utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
+	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
+		log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
+		return err
 	}
 
 	return nil
@@ -395,14 +393,12 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return err
 	}
 
-	if cluster.IsUsingPersistentStorage() {
-		pvcSpec := specs.CreatePVC(*cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
-		utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
-		specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
-		if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-			log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
-			return err
-		}
+	pvcSpec := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
+	utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
+	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
+		log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
+		return err
 	}
 
 	return nil

@@ -4,7 +4,7 @@ NGINX Ingress Controller.
 
 If you followed the [QuickStart](/quickstart), you should have by now
 a database that can be accessed inside the cluster via the
-`cluster-emptydir-rw` (primary) and `cluster-emptydir-r` (read-only)
+`cluster-example-rw` (primary) and `cluster-example-r` (read-only)
 services in the `default` namespace. Both services use port `5432`.
 
 Let's assume that you want to make the primary instance accessible from external
@@ -49,7 +49,7 @@ metadata:
   name: tcp-services
   namespace: ingress-nginx
 data:
-  5432: default/cluster-emptydir-rw:5432
+  5432: default/cluster-example-rw:5432
 ```
 
 Then, if you've installed NGINX Ingress Controller as suggested in their
@@ -111,7 +111,7 @@ connections on port 5432 of the Ingress:
 
 ```sh
 kubectl patch configmap tcp-services -n kube-system \
-  --patch '{"data":{"5432":"default/cluster-emptydir-rw:5432"}}'
+  --patch '{"data":{"5432":"default/cluster-example-rw:5432"}}'
 ```
 
 You can then patch the deployment to allow access on port 5432.
