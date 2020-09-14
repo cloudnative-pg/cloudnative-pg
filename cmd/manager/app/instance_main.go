@@ -38,6 +38,7 @@ func InstanceManagerCommand(args []string) {
 	var podName string
 	var clusterName string
 	var namespace string
+	var pgpass string
 
 	initCommand := flag.NewFlagSet("init", flag.ExitOnError)
 	initCommand.StringVar(&pwFile, "pw-file", "/etc/secret/postgresPassword",
@@ -62,9 +63,11 @@ func InstanceManagerCommand(args []string) {
 	joinCommand.StringVar(&parentNode, "parent-node", "", "The origin node")
 	joinCommand.StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
 		"be checked against the cluster state")
+	joinCommand.StringVar(&pgpass, "pgpass", os.Getenv("PGPASS"), "The .pgpass file to be used "+
+		"to connect to the rest of the nodes")
 
 	runCommand := flag.NewFlagSet("run", flag.ExitOnError)
-	runCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
+	runCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be started up")
 	runCommand.StringVar(&appDBName, "app-db-name", "app",
 		"The name of the application containing the database")
 	runCommand.StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
@@ -73,6 +76,8 @@ func InstanceManagerCommand(args []string) {
 		"current cluster in k8s, used to coordinate switchover and failover")
 	runCommand.StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and of the Pod in k8s")
+	runCommand.StringVar(&pgpass, "pgpass", os.Getenv("PGPASS"), "The .pgpass file to be used "+
+		"to connect to the rest of the nodes")
 
 	statusCommand := flag.NewFlagSet("status", flag.ExitOnError)
 
@@ -84,6 +89,17 @@ func InstanceManagerCommand(args []string) {
 		fmt.Println("  run     Run the PostgreSQL instance")
 		fmt.Println("  status  Print the instance status")
 		return
+	}
+
+	// Install pgpass if available in $HOME/.pgpass
+	// We operate this way because the input file comes from a secret and we do not have
+	// control on ownership and permissions
+	if pgpass != "" {
+		if err := postgres.InstallPgPass(pgpass); err != nil {
+			log.Log.Error(err, "Cannot install pgpass file",
+				"pgpass", pgpass)
+			os.Exit(1)
+		}
 	}
 
 	switch args[0] {

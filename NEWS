@@ -6,6 +6,10 @@ Version 0.3.0 - TODO
 - Remove EmptyDir storage support
 - Remove "unusable" annotation support, now PVC can just be removed followed
   by a deletion of the corresponding Pod
+- Use MD5 as authentication method for inter-cluster communication, "trust"
+  authentication method isn't needed anymore
+- `spec.postgresql.pg_hba` is now optional, defaulting to MD5 authentication
+  required for communication between Pods and `peer` for in-Pod communication
 
 Version 0.2.0 - 11 Aug 2020
 

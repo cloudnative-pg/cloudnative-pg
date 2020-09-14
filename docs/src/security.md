@@ -60,8 +60,5 @@ Currently, the operator allows administrators to add `pg_hba.conf` lines directl
 `pg_hba` section of the `postgresql` configuration. Therefore, your applications should properly manage the password
 file to connect to the cluster.
 
-The examples in the [quickstart](quickstart.md) contain `trust` authentication methods within the cluster private network.
-This means that connections are allowed unconditionally, without the need to specify a password.
-
 !!! Important
     Examples assume that the Kubernetes cluster runs in a private and secure network.

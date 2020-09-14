@@ -208,7 +208,6 @@ spec:
                   type: array
               required:
               - parameters
-              - pg_hba
               type: object
             primaryUpdateStrategy:
               description: 'Strategy to follow to upgrade the primary server during

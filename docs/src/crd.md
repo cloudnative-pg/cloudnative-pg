@@ -39,10 +39,10 @@ Application oriented information, such as database name, is delegated to the `ap
 
 ## PostgreSQL server configuration
 
-Each PostgreSQL instance can be configured in the `postgresql` section of the manifest, through the following mandatory options:
+Each PostgreSQL instance can be configured in the `postgresql` section of the manifest, through the following options:
 
-- `parameters`: PostgreSQL configuration options to be added to the `postgresql.conf` file
-- `pg_hba`: PostgreSQL Host Based Authentication rules, as an array of lines to be appended to the `pg_hba.conf` file
+- `parameters`: PostgreSQL configuration options to be added to the `postgresql.conf` file (mandatory)
+- `pg_hba`: PostgreSQL Host Based Authentication rules, as an array of lines to be appended to the `pg_hba.conf` file (optional)
 
 ## Resources
 

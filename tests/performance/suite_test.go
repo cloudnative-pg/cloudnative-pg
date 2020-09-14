@@ -19,10 +19,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const (
-	samplesDir = "../../docs/src/samples"
-)
-
 var env *tests.TestingEnvironment
 
 var _ = BeforeSuite(func() {

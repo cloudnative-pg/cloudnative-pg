@@ -236,6 +236,10 @@ func createPostgresContainers(
 					Name:  "CLUSTER_NAME",
 					Value: cluster.Name,
 				},
+				{
+					Name:  "PGPASS",
+					Value: "/etc/superuser-secret/pgpass",
+				},
 				CreateAccessKeyIDEnvVar(cluster.Spec.Backup),
 				CreateSecretAccessKeyEnvVar(cluster.Spec.Backup),
 			},
@@ -247,6 +251,10 @@ func createPostgresContainers(
 				{
 					Name:      "controller",
 					MountPath: "/controller",
+				},
+				{
+					Name:      "superuser-secret",
+					MountPath: "/etc/superuser-secret",
 				},
 			},
 			ReadinessProbe: &corev1.Probe{
@@ -427,6 +435,10 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 						{
 							Name:  "POD_NAME",
 							Value: podName,
+						},
+						{
+							Name:  "PGPASS",
+							Value: "/etc/superuser-secret/pgpass",
 						},
 					},
 					Command: []string{

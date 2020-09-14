@@ -7,6 +7,8 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package specs
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -15,6 +17,8 @@ import (
 func CreateSecret(
 	name string,
 	namespace string,
+	hostname string,
+	dbname string,
 	username string,
 	password string,
 ) *corev1.Secret {
@@ -26,6 +30,13 @@ func CreateSecret(
 		StringData: map[string]string{
 			"username": username,
 			"password": password,
+			"pgpass": fmt.Sprintf(
+				"%v:%v:%v:%v:%v\n",
+				hostname,
+				5432,
+				dbname,
+				username,
+				password),
 		},
 	}
 }

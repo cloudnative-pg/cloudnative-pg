@@ -153,7 +153,13 @@ func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *
 		return err
 	}
 
-	postgresSecret := specs.CreateSecret(cluster.GetSuperuserSecretName(), cluster.Namespace, "postgres", postgresPassword)
+	postgresSecret := specs.CreateSecret(
+		cluster.GetSuperuserSecretName(),
+		cluster.Namespace,
+		cluster.GetServiceReadWriteName(),
+		"*",
+		"postgres",
+		postgresPassword)
 	utils.SetAsOwnedBy(&postgresSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&postgresSecret.ObjectMeta, versions.Version)
 	if err := r.Create(ctx, postgresSecret); err != nil {
@@ -163,8 +169,13 @@ func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *
 		return err
 	}
 
-	appSecret := specs.CreateSecret(cluster.GetApplicationSecretName(), cluster.Namespace,
-		cluster.Spec.ApplicationConfiguration.Owner, appPassword)
+	appSecret := specs.CreateSecret(
+		cluster.GetApplicationSecretName(),
+		cluster.Namespace,
+		cluster.GetServiceReadWriteName(),
+		cluster.Spec.ApplicationConfiguration.Database,
+		cluster.Spec.ApplicationConfiguration.Owner,
+		appPassword)
 	utils.SetAsOwnedBy(&appSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&appSecret.ObjectMeta, versions.Version)
 	if err := r.Create(ctx, appSecret); err != nil {

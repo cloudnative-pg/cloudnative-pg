@@ -125,20 +125,6 @@ spec:
       - hot_standby = true
       - wal_keep_segments = 8
 
-    # Example of host based authentication directives
-    pg_hba:
-      # Grant local access
-      - local all all trust
-      # Grant local network access (within k8s cluster)
-      - host all all 10.0.0.0/8 trust
-      - host all all 172.0.0.0/8 trust
-      # Grant local network replication access (within k8s cluster)
-      - host replication all 10.0.0.0/8 trust
-      - host replication all 172.0.0.0/8 trust
-      # Require md5 authentication elsewhere
-      - host all all all md5
-      - host replication all all md5
-
   # Require 1Gi of space
   storage:
     size: 1Gi

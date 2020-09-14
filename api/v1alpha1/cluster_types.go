@@ -172,7 +172,8 @@ type PostgresConfiguration struct {
 
 	// PostgreSQL Host Based Authentication rules (lines to be appended
 	// to the pg_hba.conf file)
-	PgHBA []string `json:"pg_hba"`
+	// +optional
+	PgHBA []string `json:"pg_hba,omitempty"`
 }
 
 // ApplicationConfiguration is the configuration required by the application

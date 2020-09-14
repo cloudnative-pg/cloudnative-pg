@@ -1,7 +1,8 @@
+# Example of PostgreSQL cluster
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
 kind: Cluster
 metadata:
-  name: postgresql-bkp
+  name: cluster-example
 spec:
   instances: 3
 
@@ -28,20 +29,20 @@ spec:
       - hot_standby = true
       - wal_keep_segments = 8
 
-  # Persistent storage configuration
-  storage:
-    storageClass: standard
-    size: 1Gi
+      # Example of host based authentication directives
+    pg_hba:
+     # Grant local access
+     - local all all trust
+     # Grant local network access (within k8s cluster)
+     - host all all 10.0.0.0/8 trust
+     - host all all 172.0.0.0/8 trust
+     # Grant local network replication access (within k8s cluster)
+     - host replication all 10.0.0.0/8 trust
+     - host replication all 172.0.0.0/8 trust
+     # Require md5 authentication elsewhere
+     - host all all all md5
+     - host replication all all md5
 
-  backup:
-    destinationPath: s3://cluster-backups/
-    endpointURL: http://minio-service:9000
-    s3Credentials:
-      accessKeyId:
-        name: aws-creds
-        key: ACCESS_KEY_ID
-      secretAccessKey:
-        name: aws-creds
-        key: ACCESS_SECRET_KEY
-    wal:
-      compression: gzip
+  # Require 1Gi of space
+  storage:
+    size: 1Gi
