@@ -185,10 +185,15 @@ func (info InitInfo) ConfigureApplicationEnvironment(db *sql.DB) error {
 		return err
 	}
 
+	ApplicationPassword, err := fileutils.ReadFile(info.ApplicationPasswordFile)
+	if err != nil {
+		return err
+	}
+
 	_, err = db.Exec(fmt.Sprintf(
 		"ALTER USER %v PASSWORD %v",
 		pq.QuoteIdentifier(info.ApplicationUser),
-		pq.QuoteLiteral(info.ApplicationPasswordFile)))
+		pq.QuoteLiteral(ApplicationPassword)))
 	if err != nil {
 		return err
 	}

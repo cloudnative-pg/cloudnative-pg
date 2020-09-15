@@ -109,6 +109,20 @@ func CopyFile(source, destination string) error {
 	return err
 }
 
+// ReadFile Read source file and output the content as string
+func ReadFile(fileName string) (string, error) {
+	if _, err := FileExists(fileName); err != nil {
+		return "", err
+	}
+
+	content, err := ioutil.ReadFile(fileName) // #nosec
+	if err != nil {
+		return "", err
+	}
+
+	return string(content), nil
+}
+
 // EnsurePgDataPerms ensure PGDATA has 0700 permissions, which are
 // required for PostgreSQL to successfully startup
 func EnsurePgDataPerms(pgData string) error {
