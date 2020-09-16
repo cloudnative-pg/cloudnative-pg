@@ -6,6 +6,7 @@
 CONTROLLER_IMG ?= internal.2ndq.io/k8s/cloud-native-postgresql:latest
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/2ndquadrant/postgres:12
+KUSTOMIZE_VERSION=v3.5.4
 
 export CONTROLLER_IMG BUILD_IMAGE POSTGRES_IMAGE_NAME
 
@@ -39,28 +40,28 @@ run: generate fmt vet manifests
 	go run ./cmd/manager
 
 # Install CRDs into a cluster
-install: manifests
-	kustomize build config/crd | kubectl apply -f -
+install: manifests kustomize
+	$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
 # Uninstall CRDs from a cluster
-uninstall: manifests
-	kustomize build config/crd | kubectl delete -f -
+uninstall: manifests kustomize
+	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests
+deploy: manifests kustomize
 	set -e ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
 	cp -r config/* $$CONFIG_TMP_DIR ;\
 	{ \
 	    cd $$CONFIG_TMP_DIR/default ;\
-	    kustomize edit add patch manager_image_pull_secret.yaml ;\
+	    $(KUSTOMIZE) edit add patch manager_image_pull_secret.yaml ;\
 	    cd $$CONFIG_TMP_DIR/manager ;\
-	    kustomize edit set image controller=${CONTROLLER_IMG} ;\
-	    kustomize edit add patch env_override.yaml ;\
-	    kustomize edit add configmap controller-manager-env \
+	    $(KUSTOMIZE) edit set image controller=${CONTROLLER_IMG} ;\
+	    $(KUSTOMIZE) edit add patch env_override.yaml ;\
+	    $(KUSTOMIZE) edit add configmap controller-manager-env \
 	        --from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME} ;\
 	} ;\
-	kustomize build $$CONFIG_TMP_DIR/default | kubectl apply -f - ;\
+	$(KUSTOMIZE) build $$CONFIG_TMP_DIR/default | kubectl apply -f - ;\
 	rm -fr $$CONFIG_TMP_DIR
 
 # Generate manifests e.g. CRD, RBAC etc.
@@ -133,4 +134,18 @@ ifeq (, $(shell which go-licenses))
 GO_LICENSES=$(GOBIN)/go-licenses
 else
 GO_LICENSES=$(shell which go-licenses)
+endif
+
+# find or download kustomize
+.PHONY: kustomize
+kustomize:
+ifneq ($(shell PATH="$(GOBIN):$${PATH}" kustomize version --short | awk -F '[/ ]' '{print $$2}'), $(KUSTOMIZE_VERSION))
+	@{ \
+	set -e ;\
+	curl -sSfL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_$$(uname | tr '[:upper:]' '[:lower:]')_amd64.tar.gz | \
+	tar -xz -C ${GOBIN} ;\
+	}
+KUSTOMIZE=$(GOBIN)/kustomize
+else
+KUSTOMIZE=$(shell PATH="$(GOBIN):$${PATH}" which kustomize)
 endif

@@ -5,6 +5,30 @@
 workloads on Kubernetes, particularly optimised for Private Cloud environments
 with Local Persistent Volumes (PV).
 
+## How to create a development environment
+
+To develop the BDR operator, you will need an UNIX based operating system that
+support the following softwares, which must be available in the `PATH`
+environment variable:
+
+- Go 1.13+ compiler
+- GNU Make
+- [Kind](https://kind.sigs.k8s.io/)
+- [golangci-lint](https://github.com/golangci/golangci-lint)
+
+On Mac OS X, you can install the above components through `brew`:
+
+    brew install go kind golangci/tap/golangci-lint
+
+You can invoke the compilation procedure with:
+
+    make
+
+!!! note
+    Kustomize version v3.8.2 and greater is not compatible with the current version
+    of the build system. In case you have it installed it is advised to remove it
+    and let the build system to download a compatible version of the software.
+
 ## Quickstart for local testing of a git branch
 
 If you want to deploy a cluster using the operator from your current git branch,

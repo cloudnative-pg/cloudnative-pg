@@ -57,6 +57,16 @@ else
     exit 1
 fi
 
+if [ -z "$(go env GOBIN)" ]
+then
+    GOBIN="$(go env GOPATH)/bin"
+else
+    GOBIN=$( go env GOBIN)
+fi
+
+make kustomize
+KUSTOMIZE=$(PATH="${GOBIN}:${PATH}" which kustomize)
+
 mkdir -p releases/
 release_manifest="releases/postgresql-operator-${release_version}.yaml"
 
@@ -71,12 +81,12 @@ CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
 (
     cd "${CONFIG_TMP_DIR}/default"
-    kustomize edit add patch manager_image_pull_secret.yaml
+    "${KUSTOMIZE}" edit add patch manager_image_pull_secret.yaml
     cd "${CONFIG_TMP_DIR}/manager"
-    kustomize edit set image controller="2ndq.io/release/k8s/cloud-native-postgresql-operator:v${release_version}"
+    "${KUSTOMIZE}" edit set image controller="2ndq.io/release/k8s/cloud-native-postgresql-operator:v${release_version}"
 )
 
-kustomize build "${CONFIG_TMP_DIR}/default" > "${release_manifest}"
+"${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${release_manifest}"
 rm -fr "${CONFIG_TMP_DIR}"
 
 cat >> "${release_manifest}" << EOF

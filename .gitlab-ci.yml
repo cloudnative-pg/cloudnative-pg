@@ -8,7 +8,6 @@ variables:
   KUBEBUILDER_VERSION: "2.3.0"
   GOLANG_VERSION: "1.13"
   GOLANGCI_LINT_VERSION: "1.25.0"
-  KUSTOMIZE_VERSION: "3.5.4"
 
 before_script:
   - |
@@ -71,7 +70,6 @@ lint:
     - docker:stable-dind
   script:
     - apk add make bash curl go
-    - curl -sSfL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz | tar -xz -C /usr/local/bin
     - echo $CI_JOB_TOKEN | docker login -u gitlab-ci-token --password-stdin $CI_REGISTRY
     - make e2e-test CONTROLLER_IMG="${TARGET_IMAGE}" BUILD_IMAGE=false POSTGRES_IMAGE_NAME="quay.io/2ndquadrant/postgres:${POSTGRESQL_VERSION}"
 
