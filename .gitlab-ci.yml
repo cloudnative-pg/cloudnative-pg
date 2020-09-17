@@ -76,35 +76,42 @@ lint:
 e2e-1.15-pg12:
   extends: .e2e_template
   variables:
-    K8S_VERSION: 1.15.11
+    K8S_VERSION: 1.15.12
     POSTGRESQL_VERSION: 12
 
 e2e-1.16-pg12:
   extends: .e2e_template
   variables:
-    K8S_VERSION: 1.16.9
+    K8S_VERSION: 1.16.15
     POSTGRESQL_VERSION: 12
 
 e2e-1.17-pg12:
   extends: .e2e_template
   variables:
-    K8S_VERSION: 1.17.5
+    K8S_VERSION: 1.17.11
     POSTGRESQL_VERSION: 12
 
 e2e-1.18-pg12:
   extends: .e2e_template
   variables:
-    K8S_VERSION: 1.18.2
+    K8S_VERSION: 1.18.8
     POSTGRESQL_VERSION: 12
 
-e2e-1.18-pg11:
+e2e-1.19-pg12:
   extends: .e2e_template
   variables:
-    K8S_VERSION: 1.18.2
+    K8S_VERSION: 1.19.1
+    POSTGRESQL_VERSION: 12
+
+
+e2e-1.19-pg11:
+  extends: .e2e_template
+  variables:
+    K8S_VERSION: 1.19.1
     POSTGRESQL_VERSION: 11
 
-e2e-1.18-pg10:
+e2e-1.19-pg10:
   extends: .e2e_template
   variables:
-    K8S_VERSION: 1.18.2
+    K8S_VERSION: 1.19.1
     POSTGRESQL_VERSION: 10

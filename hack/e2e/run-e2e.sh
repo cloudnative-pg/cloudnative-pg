@@ -11,7 +11,7 @@ set -eEuo pipefail;
 
 PRESERVE_CLUSTER=${PRESERVE_CLUSTER:-false}
 DEBUG=${DEBUG:-false}
-K8S_VERSION=${K8S_VERSION:-1.18.4}
+K8S_VERSION=${K8S_VERSION:-1.19.1}
 
 # Define the directories used by the tests
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
@@ -39,6 +39,7 @@ cleanup() {
         "${KIND}" delete cluster --name "${KIND_CLUSTER_NAME}" || true
         rm -rf "${TEMP_DIR}"
     else
+        set +x
         echo "You've chosen not to delete the Kubernetes cluster."
         echo "You can delete it manually later running:"
         echo "${KIND} delete cluster --name '${KIND_CLUSTER_NAME}'"
