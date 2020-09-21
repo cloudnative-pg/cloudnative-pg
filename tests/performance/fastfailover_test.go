@@ -25,11 +25,11 @@ import (
 
 var _ = Describe("Cluster", func() {
 	// Confirm that a standby closely following the primary doesn't need more
-	// than 5 seconds to be promoted and be able to start inserting records.
+	// than 10 seconds to be promoted and be able to start inserting records.
 	// We test this setting up an application pointing to the rw service,
 	// forcing a failover and measuring how much time passes between the
 	// last row written on timeline 1 and the first one on timeline 2
-	Context("Cluster primary fails over in less than five seconds", func() {
+	Context("Cluster primary fails over in less than ten seconds", func() {
 		const namespace = "primary-failover-time"
 		const sampleFile = "./fixtures/fastfailover/cluster-example.yaml"
 		const clusterName = "cluster-example"
@@ -43,7 +43,7 @@ var _ = Describe("Cluster", func() {
 				Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
 			}
 		})
-		It("can fail over in less than five seconds", func() {
+		It("can fail over in less than ten seconds", func() {
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
 				// Creating a namespace should be quick
 				timeout := 20
@@ -65,7 +65,7 @@ var _ = Describe("Cluster", func() {
 				Expect(err).To(BeNil())
 			})
 			By("having a Cluster with three instances ready", func() {
-				timeout := 60
+				timeout := 300
 				namespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      clusterName,
@@ -177,7 +177,7 @@ var _ = Describe("Cluster", func() {
 				// in the database soon.
 
 				commandTimeout := time.Second * 2
-				timeout := 10
+				timeout := 60
 				lm := clusterName + "-2"
 				lmNamespacedName := types.NamespacedName{
 					Namespace: namespace,
@@ -196,7 +196,7 @@ var _ = Describe("Cluster", func() {
 			By("resuming writing in less than 5 sec", func() {
 				// We measure the difference between the last entry with
 				// timeline 1 and the first one with timeline 2.
-				// It should be less than 5 seconds.
+				// It should be less than 10 seconds.
 				query := "WITH a AS ( " +
 					"  SELECT * " +
 					"  , t-lag(t) OVER (order by t) AS timediff " +
@@ -227,7 +227,7 @@ var _ = Describe("Cluster", func() {
 				switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
 				Expect(err).To(BeNil())
 				fmt.Printf("Failover performed in %v seconds\n", switchTime)
-				Expect(switchTime).Should(BeNumerically("<", 5))
+				Expect(switchTime).Should(BeNumerically("<", 10))
 			})
 
 			By("recovering from degraded state having a cluster with 3 instances ready", func() {

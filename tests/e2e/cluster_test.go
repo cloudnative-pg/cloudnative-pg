@@ -8,6 +8,7 @@ package e2e
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -122,7 +123,7 @@ var _ = Describe("Cluster", func() {
 					Eventually(func() int32 {
 						pod := &corev1.Pod{}
 						if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
-							Fail("Unable to get Cluster " + clusterName)
+							Fail("Unable to get Pod " + podName)
 						}
 
 						for _, data := range pod.Status.ContainerStatuses {
@@ -138,7 +139,7 @@ var _ = Describe("Cluster", func() {
 					Eventually(func() bool {
 						pod := &corev1.Pod{}
 						if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
-							Fail("Unable to get Cluster " + clusterName)
+							Fail("Unable to get Pod " + podName)
 						}
 						return utils.IsPodActive(*pod) && utils.IsPodReady(*pod)
 					}, timeout).Should(BeTrue())
@@ -155,7 +156,7 @@ var _ = Describe("Cluster", func() {
 
 		Context("Storage class", func() {
 			const namespace = "cluster-storageclass-e2e"
-			const sampleFile = samplesDir + "/cluster-storage-class.yaml"
+			const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
 			const clusterName = "postgresql-storage-class"
 			BeforeEach(func() {
 				if err := env.CreateNamespace(namespace); err != nil {
@@ -212,7 +213,7 @@ var _ = Describe("Cluster", func() {
 		}
 		Context("Storage Class", func() {
 			const namespace = "cluster-scale-e2e-storage-class"
-			const sampleFile = samplesDir + "/cluster-storage-class.yaml"
+			const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
 			const clusterName = "postgresql-storage-class"
 			BeforeEach(func() {
 				if err := env.CreateNamespace(namespace); err != nil {
@@ -474,14 +475,16 @@ var _ = Describe("Cluster", func() {
 			Expect(err).To(BeNil())
 			Expect(len(podList.Items) > 0).To(BeTrue())
 			pod := podList.Items[0]
-			for _, data := range pod.Status.ContainerStatuses {
+			for _, data := range pod.Spec.Containers {
 				if data.Name != specs.PostgresContainerName {
 					continue
 				}
 				initialImageName = data.Image
 				break
 			}
-			updatedImageName := initialImageName + "-update"
+			// Update to the latest minor
+			var re = regexp.MustCompile(`^(.*:\d+).*$`)
+			updatedImageName := re.ReplaceAllString(initialImageName, `$1`)
 
 			// We should be able to apply the conf containing the new
 			// image
@@ -509,13 +512,12 @@ var _ = Describe("Cluster", func() {
 					// may end up asking the status of a container that
 					// doesn't exist yet
 					if utils.IsPodActive(pod) && utils.IsPodReady(pod) {
-						for _, data := range pod.Status.ContainerStatuses {
-							imageName := data.Image
+						for _, data := range pod.Spec.Containers {
 							if data.Name != specs.PostgresContainerName {
 								continue
 							}
 
-							if imageName == updatedImageName {
+							if data.Image == updatedImageName {
 								updatedPods++
 							}
 						}
@@ -629,7 +631,11 @@ var _ = Describe("Cluster", func() {
 
 		Context("Storage Class", func() {
 			const namespace = "cluster-rolling-e2e-storage-class"
-			const sampleFile = samplesDir + "/cluster-storage-class.yaml"
+			// We set up a cluster with a previous release of the same PG major
+			// The yaml has been previously generated from a template and
+			// the image name has to be tagged as foo:MAJ.MIN. We'll update
+			// it to foo:MAJ, representing the latest minor.
+			const sampleFile = fixturesDir + "/rolling_updates/cluster-storage-class.yaml"
 			const clusterName = "postgresql-storage-class"
 			BeforeEach(func() {
 				if err := env.CreateNamespace(namespace); err != nil {
@@ -729,7 +735,7 @@ var _ = Describe("Cluster", func() {
 	})
 	Context("PVC Deletion", func() {
 		const namespace = "cluster-pvc-deletion"
-		const sampleFile = samplesDir + "/cluster-storage-class.yaml"
+		const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
 		const clusterName = "postgresql-storage-class"
 		BeforeEach(func() {
 			if err := env.CreateNamespace(namespace); err != nil {

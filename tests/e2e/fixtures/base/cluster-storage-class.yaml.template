@@ -1,0 +1,25 @@
+# Example of PostgreSQL cluster using a storage class
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: Cluster
+metadata:
+  name: postgresql-storage-class
+spec:
+  instances: 3
+
+  # Configuration of the application that will be used by
+  # this PostgreSQL cluster
+  applicationConfiguration:
+    database: app
+    owner: app
+
+  # Example of rolling update strategy:
+  # - unsupervised: automated update of the primary once all
+  #                 replicas have been upgraded (default)
+  # - supervised: requires manual supervision to perform
+  #               the switchover of the primary
+  primaryUpdateStrategy: unsupervised
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi

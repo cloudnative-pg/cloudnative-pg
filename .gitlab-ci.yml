@@ -9,6 +9,10 @@ variables:
   KUBEBUILDER_VERSION: "2.3.0"
   GOLANG_VERSION: "1.13"
   GOLANGCI_LINT_VERSION: "1.25.0"
+  RUN_KIND_E2E: "true"
+  RUN_GKE_E2E: "false"
+  RUN_AKS_E2E: "false"
+  RUN_EKS_E2E: "false"
 
 before_script:
   - |
@@ -49,11 +53,16 @@ lint:
     - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v${GOLANGCI_LINT_VERSION}
     - make lint
 
-.e2e_template:
+kind_e2e:
   stage: e2e
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$RUN_KIND_E2E == "true"'
   image: docker:stable-git
   tags:
     - privileged
+  services:
+    - docker:stable-dind
   variables:
     # DinD configuration, see https://gitlab.com/gitlab-org/gitlab-runner/issues/4501
     #
@@ -67,64 +76,181 @@ lint:
     DOCKER_TLS_CERTDIR: "/certs"
     # Display verbose e2e test output
     DEBUG: "true"
-  services:
-    - docker:stable-dind
+    DOCKER_SERVER: $CI_REGISTRY
+    DOCKER_USERNAME: gitlab-ci-token
+    DOCKER_PASSWORD: $CI_JOB_TOKEN
+    KIND_VERSION: v0.9.0
+    E2E_DEFAULT_STORAGE_CLASS: standard
+  parallel:
+    matrix:
+      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:13
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:13.0
+        K8S_VERSION:
+          - v1.19.1
+          - v1.18.8
+          - v1.17.11
+          - v1.16.9
+          - v1.15.12
+      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:12
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:12.4
+        K8S_VERSION:
+          - v1.19.1
+      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:11
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:11.9
+        K8S_VERSION:
+          - v1.19.1
+      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:10
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:10.14
+        K8S_VERSION:
+          - v1.19.1
   script:
-    - apk add make bash curl go
-    - echo $CI_JOB_TOKEN | docker login -u gitlab-ci-token --password-stdin $CI_REGISTRY
-    - make e2e-test CONTROLLER_IMG="${TARGET_IMAGE}" BUILD_IMAGE=false POSTGRES_IMAGE_NAME="quay.io/2ndquadrant/postgres:${POSTGRESQL_VERSION}"
+    - apk add make bash curl go gettext
+    - CONTROLLER_IMG="${TARGET_IMAGE}" BUILD_IMAGE=false hack/e2e/run-e2e-kind.sh
 
-e2e-1.15-pg13:
-  extends: .e2e_template
+gke_e2e:
+  stage: e2e
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$RUN_GKE_E2E == "true"'
+  image:
+    name: google/cloud-sdk:alpine
   variables:
-    K8S_VERSION: 1.15.12
-    POSTGRESQL_VERSION: 13
+    DOCKER_SERVER: $CI_REGISTRY
+    DOCKER_USERNAME: gitlab-ci-token
+    DOCKER_PASSWORD: $CI_JOB_TOKEN
+    E2E_DEFAULT_STORAGE_CLASS: standard
+    PROJECT: openshift-285518
+    ZONE: europe-west3-a
+  parallel:
+    matrix:
+      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:13
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:13.0
+        K8S_VERSION:
+          - 1.17.9-gke.1504
+          - 1.16.13-gke.401
+          - 1.15.12-gke.20
+  script:
+    - export CONTROLLER_IMG="${TARGET_IMAGE}"
+    - apk add go make gettext
+    - export PATH="/root/go/bin:$PATH"
+    # Install tools avoiding to pollute go.mod
+    - |
+      (
+        GO_TMP_DIR=$(mktemp -d); cd "${GO_TMP_DIR}"
+        go mod init tmp
+        go get -u sigs.k8s.io/kubetest2/...@latest
+        go get -u github.com/onsi/ginkgo/ginkgo
+        cd -; rm -rf "${GO_TMP_DIR}"
+      )
+    - gcloud components install --quiet kubectl
+    # We can't test a using kubectl version 1.15.x
+    # need to raise the version to 1.16.x
+    # see https://github.com/kubernetes/kubernetes/issues/80515
+    - |
+      if [ "${K8S_VERSION#1.15}" != "${K8S_VERSION}" ]; then
+        cp -f $(which kubectl.1.16) $(which kubectl)
+      fi
+    - gcloud auth activate-service-account --key-file="${GCP_SERVICE_ACCOUNT}"
+    - kubetest2 gke --version "${K8S_VERSION}" --ignore-gcp-ssh-key --project "${PROJECT}"  --cluster-name "cnp-test-$CI_PIPELINE_ID-$CI_NODE_INDEX" --zone "${ZONE}" --up --down -v 10 --test exec -- hack/e2e/run-e2e.sh
+  after_script:
+    # Remove stale Persistent Volumes remaining from the test run
+    - |
+      IDS=$(gcloud compute disks list --filter="name~cnp-test-${CI_PIPELINE_ID}-${CI_NODE_INDEX} zone~${ZONE}" --format="value(id)" --project="${PROJECT}")
+      for ID in ${IDS}
+      do
+        gcloud compute disks delete --project="${PROJECT}" --zone "${ZONE}" --quiet "${ID}"
+      done
 
-e2e-1.16-pg13:
-  extends: .e2e_template
+eks_e2e:
+  stage: e2e
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$RUN_EKS_E2E == "true"'
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
   variables:
-    K8S_VERSION: 1.16.15
-    POSTGRESQL_VERSION: 13
+    DOCKER_SERVER: $CI_REGISTRY
+    DOCKER_USERNAME: gitlab-ci-token
+    DOCKER_PASSWORD: $CI_JOB_TOKEN
+    E2E_DEFAULT_STORAGE_CLASS: gp2
+    REGION: eu-central-1
+  parallel:
+    matrix:
+      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:13
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:13.0
+        K8S_VERSION:
+          - "1.17"
+          - "1.16"
+          - "1.15"
+  script:
+    - export CONTROLLER_IMG="${TARGET_IMAGE}"
+    - yum install -y golang make tar gzip git gettext
+    - export PATH="/root/go/bin:${PATH}"
+    - curl -sL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /usr/local/bin
+    # Get the same version of kubectl and k8s
+    # but use version 1.16.x instead of 1.15.x
+    # due to https://github.com/kubernetes/kubernetes/issues/80515
+    - |
+      KUBECTL_VERSION=$(git -c 'versionsort.suffix=-' ls-remote --refs --sort='version:refname' --tags https://github.com/kubernetes/kubernetes.git | cut --delimiter='/' --fields=3 | grep "^v${K8S_VERSION/1.15/1.16}.[0-9]\+$"|tail -n 1)
+      curl -sL "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -o /usr/local/bin/kubectl
+      chmod +x /usr/local/bin/kubectl
+    # Install tools avoiding to pollute go.mod
+    - |
+      (
+        GO_TMP_DIR=$(mktemp -d); cd "${GO_TMP_DIR}"
+        go mod init tmp
+        go get -u github.com/onsi/ginkgo/ginkgo
+        cd -; rm -rf "${GO_TMP_DIR}"
+      )
+    - eksctl create cluster -n cnp-test-$CI_PIPELINE_ID-$CI_NODE_INDEX -r "${REGION}" --version "${K8S_VERSION}" --nodes 3
+    - hack/e2e/run-e2e.sh
+  after_script:
+    - eksctl delete cluster -n cnp-test-$CI_PIPELINE_ID-$CI_NODE_INDEX -r "${REGION}" -w
 
-e2e-1.17-pg13:
-  extends: .e2e_template
+aks_e2e:
+  stage: e2e
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$RUN_AKS_E2E == "true"'
+  image:
+    name: mcr.microsoft.com/azure-cli:latest
   variables:
-    K8S_VERSION: 1.17.11
-    POSTGRESQL_VERSION: 13
-
-e2e-1.18-pg13:
-  extends: .e2e_template
-  variables:
-    K8S_VERSION: 1.18.8
-    POSTGRESQL_VERSION: 13
-
-e2e-1.19-pg13:
-  extends: .e2e_template
-  variables:
-    K8S_VERSION: 1.19.1
-    POSTGRESQL_VERSION: 13
-
-e2e-1.19-pg12:
-  extends: .e2e_template
-  variables:
-    K8S_VERSION: 1.19.1
-    POSTGRESQL_VERSION: 12
-
-e2e-1.19-pg11:
-  extends: .e2e_template
-  variables:
-    K8S_VERSION: 1.19.1
-    POSTGRESQL_VERSION: 11
-
-e2e-1.19-pg10:
-  extends: .e2e_template
-  variables:
-    K8S_VERSION: 1.19.1
-    POSTGRESQL_VERSION: 10
+    DOCKER_SERVER: $CI_REGISTRY
+    DOCKER_USERNAME: gitlab-ci-token
+    DOCKER_PASSWORD: $CI_JOB_TOKEN
+    E2E_DEFAULT_STORAGE_CLASS: default
+  parallel:
+    matrix:
+      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:13
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:13.0
+        K8S_VERSION:
+          - "1.18.8"
+          - "1.17.11"
+          - "1.16.15"
+  script:
+    - export CONTROLLER_IMG="${TARGET_IMAGE}"
+    - apk add go gettext
+    - export PATH="/root/go/bin:${PATH}"
+    # Install tools avoiding to pollute go.mod
+    - |
+      (
+        GO_TMP_DIR=$(mktemp -d); cd "${GO_TMP_DIR}"
+        go mod init tmp
+        go get -u github.com/onsi/ginkgo/ginkgo
+        cd -; rm -rf "${GO_TMP_DIR}"
+      )
+    - az login --service-principal --username $AZURE_K8S_APP_ID --password $AZURE_K8S_PASSWORD --tenant $AZURE_K8S_TENANT_ID
+    - az aks install-cli --client-version ${K8S_VERSION}
+    - az aks create --resource-group cnp-test --name cnp-test-${CI_PIPELINE_ID}-${CI_NODE_INDEX} --node-count 3 -k ${K8S_VERSION} --generate-ssh-keys --service-principal $AZURE_K8S_APP_ID --client-secret $AZURE_K8S_PASSWORD
+    - az aks get-credentials --resource-group cnp-test --name cnp-test-${CI_PIPELINE_ID}-${CI_NODE_INDEX}
+    - hack/e2e/run-e2e.sh
+  after_script:
+    - az aks delete --resource-group cnp-test --name cnp-test-${CI_PIPELINE_ID}-${CI_NODE_INDEX} -y
 
 trigger-ocp:
-  stage: ocp
-  trigger: k8s/cloud-native-postgresql-ocp-certified
-  variables:
-    UPSTREAM_COMMIT: $CI_COMMIT_SHA
-    UPSTREAM_PIPELINE_ID: $CI_PIPELINE_ID
+ stage: ocp
+ trigger: k8s/cloud-native-postgresql-ocp-certified
+ variables:
+   UPSTREAM_COMMIT: $CI_COMMIT_SHA
+   UPSTREAM_PIPELINE_ID: $CI_PIPELINE_ID
