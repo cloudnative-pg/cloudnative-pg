@@ -18,3 +18,6 @@
 *.swp
 *.swo
 *~
+
+# Testing artifacts
+_artifacts/

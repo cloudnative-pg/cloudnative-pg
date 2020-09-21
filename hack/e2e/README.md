@@ -1,28 +1,40 @@
 # E2E testing
 
-The E2E tests create a `kind` instance and run the tests inside it.
-The tests can be run executing
+E2E testing is performing running the `run-e2e.sh` script after setting
+up a Kubernetes cluster and configuring `kubectl` to use it.
+
+The script can be configured through the following environment variables:
+
+* `CONTROLLER_IMG`: the controller image to deploy on K8s
+* `POSTGRES_IMG`: the postgresql image used by default in the clusters
+* `E2E_PRE_ROLLING_UPDATE_IMG`: test a rolling upgrade from this version to the
+     latest minor
+* `E2E_DEFAULT_STORAGE_CLASS`: default storage class, depending on the provider
+
+If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
+the following variables to create a pull secret:
+
+* `DOCKER_SERVER`: the registry containing the image
+* `DOCKER_USERNAME`: the registry username
+* `DOCKER_PASSWORD`: the registry password
+
+## Local test on Kind
+
+You can test the operator locally on kind running
 
 ``` bash
-make e2e-test
+run-e2e-kind.sh
 ```
 
-from the project root directory if the host is allowed to run privileged
-docker containers and to pull required images.
+It will take care of creating a Kind cluster and run the tests on it.
+In addition to the environment variables for the script,
+the following ones can be defined:
 
-The following environment variables can be exported to change the behaviour
-of the tests:
+* `PRESERVE_CLUSTER`: true to prevent K8S from destroying the kind cluster.
+    Default: `false`.
+* `K8S_VERSION`: the version of K8S to run. Default: `v1.19.1`.
+* `KIND_VERSION`: the version of Kind. Defaults to the latest release.
+* `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
+    false to get the image from a registry. Default: `false`.
 
-* `BUILD_IMAGE`: if `false` skip image building and just use existing `IMG`
-* `CONTROLLER_IMG`: The image name to pull if `BUILD_IMAGE=false`
-* `POSTGRES_IMAGE_NAME`: The image used to run PostgreSQL pods (default
-   from `pkg/versions/versions.go`)
-* `PRESERVE_CLUSTER`: do not remove the `kind` cluster after the end of the
-  tests (default: `false`);
-* `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
-  the tests. Only useful if specified with `PRESERVE_CLUSTER=true`.
-* `KIND_VERSION`: use a specific version of `kind` (default: use the latest);
-* `KUBECTL_VERSION`: use a specific version of `kubectl` (default: use the
-  latest);
-* `K8S_VERSION`: the version of Kubernetes we are testing
-* `DEBUG`: display the `bash` commands executed (default: `false`).
+`run-e2e-kind.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard`

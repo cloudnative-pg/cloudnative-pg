@@ -7,97 +7,48 @@
 ##
 
 # standard bash error handling
-set -eEuo pipefail;
+set -eEuo pipefail
 
-PRESERVE_CLUSTER=${PRESERVE_CLUSTER:-false}
-DEBUG=${DEBUG:-false}
-K8S_VERSION=${K8S_VERSION:-1.19.1}
-
-# Define the directories used by the tests
-ROOT_DIR=$(realpath "$(dirname "$0")/../../")
-TEST_DIR="${ROOT_DIR}/tests"
-HACK_DIR="${ROOT_DIR}/hack/e2e"
-TEMP_DIR="$(mktemp -d)"
-
-# Get the latest releases of kind and kubectl unless specified in the environment
-KIND="${TEMP_DIR}/kind"
-KUBECTL="${TEMP_DIR}/kubectl"
-KIND_VERSION=${KIND_VERSION:-$(curl -s -LH "Accept:application/json" https://github.com/kubernetes-sigs/kind/releases/latest | sed 's/.*"tag_name":"\([^"]\+\)".*/\1/')}
-KUBECTL_VERSION=${KUBECTL_VERSION:-$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)}
-
-KIND_CLUSTER_NAME=pg-operator-e2e-${K8S_VERSION}
-
-# Detect the images used from the operator
-export POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME:-$(grep 'DefaultImageName.*=' "${OPERATOR_ROOT}/pkg/versions/versions.go" | cut -f 2 -d \")}
-
-if [ "${DEBUG}" = true ]; then
+if [ "${DEBUG-}" = true ]; then
     set -x
 fi
 
-cleanup() {
-    if [ "${PRESERVE_CLUSTER}" = false ]; then
-        "${KIND}" delete cluster --name "${KIND_CLUSTER_NAME}" || true
-        rm -rf "${TEMP_DIR}"
-    else
-        set +x
-        echo "You've chosen not to delete the Kubernetes cluster."
-        echo "You can delete it manually later running:"
-        echo "${KIND} delete cluster --name '${KIND_CLUSTER_NAME}'"
-        echo "rm -rf ${TEMP_DIR}"
-    fi
-}
-trap cleanup EXIT
+ROOT_DIR=$(realpath "$(dirname "$0")/../../")
+CONTROLLER_IMG=${CONTROLLER_IMG:-internal.2ndq.io/k8s/cloud-native-postgresql:latest}
+POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 
-install_kubectl() {
-    # Requires 'tr' for Darwin vs darwin issue
-    curl -s -L "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION#v}/bin/$(uname | tr '[:upper:]' '[:lower:]')/amd64/kubectl" -o "${KUBECTL}"
-    chmod +x "${KUBECTL}"
-}
+# Process the e2e templates
+export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG}.0}
+export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-standard}
+find "${ROOT_DIR}"/tests/*/fixtures -name "*.template" | \
+while read -r f; do
+  envsubst <"${f}" >"${f%.template}"
+done
 
-install_kind() {
-    curl -s -L "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION#v}/kind-$(uname)-amd64" -o "${KIND}"
-    chmod +x "${KIND}"
-}
+# Getting the operator images need a pull secret
+kubectl create namespace postgresql-operator-system
+if [ -n "${DOCKER_SERVER-}" ] && [ -n "${DOCKER_USERNAME-}" ] && [ -n "${DOCKER_PASSWORD-}" ]; then
+  kubectl create secret docker-registry \
+    -n postgresql-operator-system \
+    postgresql-operator-pull-secret \
+    --docker-server="${DOCKER_SERVER}" \
+    --docker-username="${DOCKER_USERNAME}" \
+    --docker-password="${DOCKER_PASSWORD}"
+fi
 
-main() {
-    # Add kubectl, kind and ginkgo to the path
-    export PATH="${TEMP_DIR}:$(go env GOPATH)/bin:${PATH}"
+CONTROLLER_IMG="${CONTROLLER_IMG}" \
+  POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+  make -C "${ROOT_DIR}" deploy
+kubectl wait --for=condition=Available --timeout=2m \
+  -n postgresql-operator-system deployments \
+  postgresql-operator-controller-manager
 
-    install_kubectl
-    install_kind
+# Unset DEBUG to prevent k8s from spamming messages
+unset DEBUG
 
-    # Set kind verbosity
-    if [ "${DEBUG}" = true ]; then
-        verbosity='-v 1'
-    else
-        verbosity='-q'
-    fi
+# Create at most 4 testing nodes. Using -p instead of --nodes
+# would create CPUs-1 nodes and saturate the testing server
+ginkgo --nodes=4 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/e2e/..."
 
-    "${KIND}" create cluster ${verbosity} \
-        --config "${HACK_DIR}/kind-config.yaml" \
-        --name "${KIND_CLUSTER_NAME}" --image=kindest/node:v${K8S_VERSION}
-
-    # Support for docker:dind service
-    if [ "${DOCKER_HOST:-}" == "tcp://docker:2376" ]
-    then
-        sed -i -E -e 's/0\.0\.0\.0/docker/g' "${HOME}/.kube/config"
-    fi
-
-    "${HACK_DIR}/kind-deploy-operator.sh" "${KIND_CLUSTER_NAME}"
-
-    # Install ginkgo cli for better control on tests
-    go install github.com/onsi/ginkgo/ginkgo
-
-    # Unset DEBUG to prevent k8s from spamming messages
-    unset DEBUG
-
-    # Create at most 4 testing nodes. Using -p instead of --nodes
-    # would create CPUs-1 nodes and saturate the testing server
-    # Unset DEBUG to prevent k8s from spamming messages
-    ginkgo --nodes=4 --slowSpecThreshold=30 -v "${TEST_DIR}/e2e/..."
-
-    # Performance tests need to run on a single node to avoid concurrency
-    ginkgo --nodes=1 --slowSpecThreshold=30 -v "${TEST_DIR}/performance/..."
-}
-
-main
+# Performance tests need to run on a single node to avoid concurrency
+ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/performance/..."

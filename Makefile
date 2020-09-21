@@ -26,9 +26,9 @@ all: build
 test: generate fmt vet manifests
 	go test ./api/... ./cmd/... ./controllers/... ./pkg... -coverprofile cover.out
 
-# Run e2e tests
-e2e-test:
-	hack/e2e/run-e2e.sh
+# Run e2e tests locally using kind
+e2e-test-kind:
+	hack/e2e/run-e2e-kind.sh
 
 # Build binaries
 build: generate fmt vet
