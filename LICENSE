@@ -1,6 +1,7 @@
-Copyright (2019-2020) 2ndQuadrant Limited (https://2ndQuadrant.com)
+Cloud Native PostgreSQL (Operator for Kubernetes/OpenShift)
 
-All rights reserved.
+Copyright (C) 2015-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 
-Cloud Native PostgreSQL (Operator for Kubernetes/OpenShift) requires
-a valid and active Product Usage License Agreement with 2ndQuadrant.
+The 2ndQuadrant End User License Agreement  (2Q-EULA) is contained within the
+/licenses/2ndquadrant folder of the container image. If it is not visible
+please see https://licenses.2ndq.io/2Q-EULA.
