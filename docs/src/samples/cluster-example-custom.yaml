@@ -1,8 +1,8 @@
-# Example of PostgreSQL cluster using a storage class
+# Example of PostgreSQL cluster
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
 kind: Cluster
 metadata:
-  name: postgresql-storage-class
+  name: cluster-example-custom
 spec:
   instances: 3
 
@@ -12,6 +12,14 @@ spec:
     database: app
     owner: app
 
+  # Parameters and pg_hba configuration will be append
+  # to the default ones to make the cluster work
+  postgresql:
+    parameters:
+      max_worker_processes: "60"
+    pg_hba:
+      - host all all all trust
+
   # Example of rolling update strategy:
   # - unsupervised: automated update of the primary once all
   #                 replicas have been upgraded (default)
@@ -19,7 +27,6 @@ spec:
   #               the switchover of the primary
   primaryUpdateStrategy: unsupervised
 
-  # Persistent storage configuration
+  # Require 1Gi of space
   storage:
-    storageClass: standard
     size: 1Gi

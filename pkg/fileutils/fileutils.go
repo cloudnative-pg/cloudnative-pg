@@ -132,3 +132,14 @@ func EnsurePgDataPerms(pgData string) error {
 	}
 	return os.Chmod(pgData, 0700) // #nosec
 }
+
+// CreateEmptyFile create an empty file or return an error if
+// the file already exist
+func CreateEmptyFile(fileName string) error {
+	file, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	_ = file.Close()
+	return nil
+}

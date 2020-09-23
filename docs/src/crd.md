@@ -22,7 +22,7 @@ A PostgreSQL cluster object can be defined through the following parameters avai
 - `imageName`: name of the container image for PostgreSQL
 - `imagePullSecretName`: secret for pulling the PostgreSQL image
 - `instances`: number of instances required in the cluster, with `instances - 1` replicas (**required**)
-- `postgresql`: configuration of the PostgreSQL server (*required*)
+- `postgresql`: configuration of the PostgreSQL server
 - `primaryUpdateStrategy`: strategy to update the primary as part of a rolling update: automated (`unsupervised`)
    or manually triggered (`supervised`)
 - `resources`: resources requirements of every generated Pod
@@ -41,7 +41,7 @@ Application oriented information, such as database name, is delegated to the `ap
 
 Each PostgreSQL instance can be configured in the `postgresql` section of the manifest, through the following options:
 
-- `parameters`: PostgreSQL configuration options to be added to the `postgresql.conf` file (mandatory)
+- `parameters`: PostgreSQL configuration options to be added to the `postgresql.conf` file (optional)
 - `pg_hba`: PostgreSQL Host Based Authentication rules, as an array of lines to be appended to the `pg_hba.conf` file (optional)
 
 ## Resources

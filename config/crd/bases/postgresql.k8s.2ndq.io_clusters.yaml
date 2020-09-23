@@ -192,18 +192,16 @@ spec:
               description: Configuration of the PostgreSQL server
               properties:
                 parameters:
-                  description: PostgreSQL configuration options (postgresql.conf)
-                  items:
+                  additionalProperties:
                     type: string
-                  type: array
+                  description: PostgreSQL configuration options (postgresql.conf)
+                  type: object
                 pg_hba:
                   description: PostgreSQL Host Based Authentication rules (lines to
                     be appended to the pg_hba.conf file)
                   items:
                     type: string
                   type: array
-              required:
-              - parameters
               type: object
             primaryUpdateStrategy:
               description: 'Strategy to follow to upgrade the primary server during
@@ -392,7 +390,6 @@ spec:
           required:
           - applicationConfiguration
           - instances
-          - postgresql
           type: object
         status:
           description: ClusterStatus defines the observed state of Cluster

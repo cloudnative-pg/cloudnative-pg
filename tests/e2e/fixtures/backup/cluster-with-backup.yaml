@@ -18,16 +18,6 @@ spec:
   #               the switchover of the primary
   primaryUpdateStrategy: unsupervised
 
-  # PostgreSQL server configuration
-  postgresql:
-    # Example of configuration parameters for PostgreSQL
-    parameters:
-      - max_worker_processes = 20
-      - max_parallel_workers = 20
-      - max_replication_slots = 20
-      - hot_standby = true
-      - wal_keep_segments = 8
-
   # Persistent storage configuration
   storage:
     storageClass: standard

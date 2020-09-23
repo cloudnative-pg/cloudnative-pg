@@ -110,8 +110,6 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 						"-app-db-name", cluster.Spec.ApplicationConfiguration.Database,
 						"-app-user", cluster.Spec.ApplicationConfiguration.Owner,
 						"-app-pw-file", "/etc/app-secret/password",
-						"-hba-rules-file", "/etc/configuration/postgresHBA",
-						"-postgresql-config-file", "/etc/configuration/postgresConfiguration",
 						"-parent-node", cluster.GetServiceReadWriteName(),
 					},
 					VolumeMounts: []corev1.VolumeMount{
@@ -225,6 +223,14 @@ func createPostgresContainers(
 					Name:  "PGPASS",
 					Value: "/etc/superuser-secret/pgpass",
 				},
+				{
+					Name:  "PGCONF",
+					Value: "/etc/configuration/postgresConfiguration",
+				},
+				{
+					Name:  "PGHBA",
+					Value: "/etc/configuration/postgresHBA",
+				},
 				CreateAccessKeyIDEnvVar(cluster.Spec.Backup),
 				CreateSecretAccessKeyEnvVar(cluster.Spec.Backup),
 			},
@@ -240,6 +246,10 @@ func createPostgresContainers(
 				{
 					Name:      "superuser-secret",
 					MountPath: "/etc/superuser-secret",
+				},
+				{
+					Name:      "config",
+					MountPath: "/etc/configuration",
 				},
 			},
 			ReadinessProbe: &corev1.Probe{
