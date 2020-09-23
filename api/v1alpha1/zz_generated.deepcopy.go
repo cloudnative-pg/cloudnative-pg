@@ -321,8 +321,10 @@ func (in *PostgresConfiguration) DeepCopyInto(out *PostgresConfiguration) {
 	*out = *in
 	if in.Parameters != nil {
 		in, out := &in.Parameters, &out.Parameters
-		*out = make([]string, len(*in))
-		copy(*out, *in)
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	if in.PgHBA != nil {
 		in, out := &in.PgHBA, &out.PgHBA

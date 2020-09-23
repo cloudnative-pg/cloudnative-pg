@@ -53,7 +53,8 @@ type ClusterSpec struct {
 	Instances int32 `json:"instances"`
 
 	// Configuration of the PostgreSQL server
-	PostgresConfiguration PostgresConfiguration `json:"postgresql"`
+	// +optional
+	PostgresConfiguration PostgresConfiguration `json:"postgresql,omitempty"`
 
 	// Configuration from the application point of view
 	ApplicationConfiguration ApplicationConfiguration `json:"applicationConfiguration"`
@@ -164,7 +165,7 @@ const (
 // PostgresConfiguration defines the PostgreSQL configuration
 type PostgresConfiguration struct {
 	// PostgreSQL configuration options (postgresql.conf)
-	Parameters []string `json:"parameters"`
+	Parameters map[string]string `json:"parameters,omitempty"`
 
 	// PostgreSQL Host Based Authentication rules (lines to be appended
 	// to the pg_hba.conf file)
