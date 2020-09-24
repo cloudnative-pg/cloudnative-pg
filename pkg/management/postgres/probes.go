@@ -10,12 +10,12 @@ import "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
 
 // IsHealthy check if the instance can really accept connections
 func (instance *Instance) IsHealthy() error {
-	applicationDB, err := instance.GetApplicationDB()
+	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return err
 	}
 
-	err = applicationDB.Ping()
+	err = superUserDB.Ping()
 	if err != nil {
 		return err
 	}

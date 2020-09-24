@@ -36,6 +36,7 @@ func (info JoinInfo) Join() error {
 		"-D", info.PgData,
 		"-v",
 		"-R",
+		"-w",
 		"-d", fmt.Sprintf("host=%v user=postgres dbname=%v", info.ParentNode, "postgres"),
 	}
 	cmd := exec.Command("pg_basebackup", options...) // #nosec
