@@ -11,13 +11,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CreateServiceAccount create the serviceaccount that will be used in every Pod
-func CreateServiceAccount(cluster metav1.ObjectMeta) corev1.ServiceAccount {
+// CreateServiceAccount create the ServiceAccount that will be used in every Pod
+func CreateServiceAccount(cluster metav1.ObjectMeta, imagePullSecretsNames []string) corev1.ServiceAccount {
+	imagePullSecrets := make([]corev1.LocalObjectReference, len(imagePullSecretsNames))
+
+	for idx, name := range imagePullSecretsNames {
+		imagePullSecrets[idx] = corev1.LocalObjectReference{Name: name}
+	}
+
 	serviceAccount := corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
 		},
+		ImagePullSecrets: imagePullSecrets,
 	}
 
 	return serviceAccount
