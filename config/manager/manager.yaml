@@ -40,6 +40,10 @@ spec:
         env:
         - name: OPERATOR_IMAGE_NAME
           value: $(OPERATOR_IMAGE_NAME)
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         resources:
           limits:
             cpu: 100m

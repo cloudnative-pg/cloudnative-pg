@@ -9,12 +9,14 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -22,6 +24,12 @@ import (
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
+)
+
+const (
+	// This is the name of the secret that we may be using to
+	// download the operator image
+	operatorSecretName = "postgresql-operator-pull-secret" //nolint:gosec
 )
 
 // createPostgresClusterObjects ensure that we have the required global objects
@@ -203,19 +211,72 @@ func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, clust
 
 // createServiceAccount create the service account for this PostgreSQL cluster
 func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	var pullSecretNames []string
 
-	serviceAccount := specs.CreateServiceAccount(cluster.ObjectMeta)
+	// Try to copy the secret from the operator
+	operatorPullSecret, err := r.copyPullSecretFromOperator(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
+	if operatorPullSecret {
+		pullSecretNames = append(pullSecretNames, operatorSecretName)
+	}
+
+	serviceAccount := specs.CreateServiceAccount(cluster.ObjectMeta, pullSecretNames)
 	utils.SetAsOwnedBy(&serviceAccount.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&serviceAccount.ObjectMeta, versions.Version)
 
-	err := r.Create(ctx, &serviceAccount)
+	err = r.Create(ctx, &serviceAccount)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
-		log.Error(err, "Unable to create ServiceAccount", "object", serviceAccount)
 		return err
 	}
 
 	return nil
+}
+
+// copyPullSecretFromOperator will create a secret to download the operator, if the
+// operator was downloaded via a Secret.
+// It will return "true" if a secret need to be used to use the operator, false
+// if not
+func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, cluster *v1alpha1.Cluster) (bool, error) {
+	operatorDeployNamespace := os.Getenv("OPERATOR_NAMESPACE")
+	if operatorDeployNamespace == "" {
+		// We are not getting started via a k8s deployment. Perhaps we are running in our development environment
+		return false, nil
+	}
+
+	// Let's find the operator secret
+	var operatorSecret corev1.Secret
+	if err := r.Get(ctx, client.ObjectKey{
+		Name:      operatorSecretName,
+		Namespace: operatorDeployNamespace,
+	}, &operatorSecret); err != nil {
+		if apierrs.IsNotFound(err) {
+			// There is no secret like that, probably because we are running in our development environment
+			return false, nil
+		}
+		return false, err
+	}
+
+	// Let's create the secret with the required info
+	secret := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cluster.Namespace,
+			Name:      operatorSecretName,
+		},
+		Data: operatorSecret.Data,
+		Type: operatorSecret.Type,
+	}
+	utils.SetAsOwnedBy(&secret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&secret.ObjectMeta, versions.Version)
+
+	// Another sync loop may have already created the service. Let's check that
+	if err := r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // createRole create the role

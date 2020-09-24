@@ -24,7 +24,7 @@ var _ = Describe("Service accounts", func() {
 	}
 
 	It("create a service account with the cluster name", func() {
-		serviceAccount := CreateServiceAccount(cluster.ObjectMeta)
+		serviceAccount := CreateServiceAccount(cluster.ObjectMeta, nil)
 		Expect(serviceAccount.Name).To(Equal(cluster.Name))
 		Expect(serviceAccount.Namespace).To(Equal(cluster.Namespace))
 	})
