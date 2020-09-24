@@ -95,10 +95,12 @@ docker-push:
 # Generate the licenses folder
 .PHONY: licenses
 licenses: go-licenses
+	# The following statement is expected to fail because our license is unrecognised
 	GOPRIVATE="gitlab.2ndquadrant.com/*" $(GO_LICENSES) \
 		save gitlab.2ndquadrant.com/k8s/cloud-native-postgresql \
-		--save_path licenses/go-licenses --force
+		--save_path licenses/go-licenses --force || true
 	chmod a+rw -R licenses/go-licenses
+	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete
 
 # find or download controller-gen
 .PHONY: controller-gen
