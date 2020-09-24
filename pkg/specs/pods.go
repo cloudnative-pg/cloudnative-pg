@@ -295,6 +295,7 @@ func createPostgresContainers(
 				"instance",
 				"run",
 				"-app-db-name", cluster.Spec.ApplicationConfiguration.Database,
+				"-pw-file", "/etc/superuser-secret/password",
 			},
 			Resources: cluster.Spec.Resources,
 		},
@@ -431,16 +432,13 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 							Name:  "POD_NAME",
 							Value: podName,
 						},
-						{
-							Name:  "PGPASS",
-							Value: "/etc/superuser-secret/pgpass",
-						},
 					},
 					Command: []string{
 						"/controller/manager",
 						"instance",
 						"join",
 						"-parent-node", cluster.GetServiceReadWriteName(),
+						"-pw-file", "/etc/superuser-secret/password",
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{

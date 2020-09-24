@@ -20,14 +20,16 @@ import (
 )
 
 const (
-	// defaultHbaContent is the default pg_hba.conf that is usei if the user
-	// don't specify something different
-	defaultHbaContent = `
+	// hbaHeader is the header of generated pg_hba.conf.
+	// The content provided by the user is inserted after this text
+	hbaHeader = `
 # Grant local access
 local all all peer
-host all all 127.0.0.1/32 trust
-host all all ::1/128 trust
+`
 
+	// hbaFooter is the footer of generated pg_hba.conf.
+	// The content provided by the user is inserted before this text
+	hbaFooter = `
 # Require md5 authentication elsewhere
 host all all all md5
 host replication all all md5
@@ -79,10 +81,15 @@ var (
 
 // CreatePostgresConfigMap create a configMap for this cluster
 func CreatePostgresConfigMap(cluster *v1alpha1.Cluster) (*corev1.ConfigMap, error) {
-	hbaContent := strings.Join(cluster.Spec.PostgresConfiguration.PgHBA, "\n")
-	if hbaContent == "" {
-		hbaContent = defaultHbaContent
+	// put the user provided content between header and footer
+	var hbaContent []string
+	hbaContent = append(hbaContent, strings.TrimSpace(hbaHeader), "")
+	if len(cluster.Spec.PostgresConfiguration.PgHBA) > 0 {
+		hbaContent = append(hbaContent, cluster.Spec.PostgresConfiguration.PgHBA...)
+		hbaContent = append(hbaContent, "")
 	}
+	hbaContent = append(hbaContent, strings.TrimSpace(hbaFooter))
+	hbaContent = append(hbaContent, "")
 
 	// Extract the PostgreSQL major version
 	imageName := cluster.GetImageName()
@@ -104,7 +111,7 @@ func CreatePostgresConfigMap(cluster *v1alpha1.Cluster) (*corev1.ConfigMap, erro
 		},
 		Data: map[string]string{
 			"postgresConfiguration": configFile,
-			"postgresHBA":           hbaContent,
+			"postgresHBA":           strings.Join(hbaContent, "\n"),
 		},
 	}, nil
 }
