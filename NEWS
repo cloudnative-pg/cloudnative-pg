@@ -1,15 +1,23 @@
 Cloud Native PostgreSQL  - History of user-visible changes
 Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 
-Version 0.3.0 - TODO
+Version 0.3.0 - 25 Sep 2020
 
-- Remove EmptyDir storage support
-- Remove "unusable" annotation support, now PVC can just be removed followed
-  by a deletion of the corresponding Pod
-- Use MD5 as authentication method for inter-cluster communication, "trust"
-  authentication method isn't needed anymore
+- Support for PostgreSQL 13
+- Remove `emptyDir` volume storage support
+- Node maintenance support for PostgreSQL clusters with local storage through
+  the `nodeMaintenanceWindow` parameter
+- Improve PostgreSQL configuration management through the usage of a dictionary
+  supporting default, required and fixed values
+- Use MD5 as authentication method for inter-cluster communication, with
+  automated password creation in a secret
+- Remove need for "trust" authentication method
 - `spec.postgresql.pg_hba` is now optional, defaulting to MD5 authentication
   required for communication between Pods and `peer` for in-Pod communication
+- Remove "unusable" annotation support, now PVC can just be removed followed by
+  a deletion of the corresponding Pod
+- Bug fixes and minor improvements
+- Update from an earlier version not supported
 
 Version 0.2.0 - 11 Aug 2020
 
@@ -44,14 +52,14 @@ Version 0.0.1 -  5 Mar 2020
 
 Prototype of PostgreSQL Operator with:
 
-* PostgreSQL 12.2 container image
-* Self-Healing capability, through:
-    * failover of the primary instance, by promoting the most aligned replica
-    * automated recreation of a replica
-* Planned switchover of the primary instance, by promoting a selected replica
-* Scale up/down capabilities
-* Definition of an arbitrary number of instances (minimum 1 - one primary server)
-* Definition of the *read-write* service, to connect your applications to the only primary server of the cluster
-* Definition of the *read-only* service, to connect your applications to any of the instances for read workloads
-* Support for Local Persistent Volumes with PVC templates
-* Standard output logging of PostgreSQL error messages
+- PostgreSQL 12.2 container image
+- Self-Healing capability, through:
+    - failover of the primary instance, by promoting the most aligned replica
+    - automated recreation of a replica
+- Planned switchover of the primary instance, by promoting a selected replica
+- Scale up/down capabilities
+- Definition of an arbitrary number of instances (minimum 1 - one primary server)
+- Definition of the *read-write* service, to connect your applications to the only primary server of the cluster
+- Definition of the *read-only* service, to connect your applications to any of the instances for read workloads
+- Support for Local Persistent Volumes with PVC templates
+- Standard output logging of PostgreSQL error messages
