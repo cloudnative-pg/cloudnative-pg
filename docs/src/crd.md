@@ -22,6 +22,7 @@ A PostgreSQL cluster object can be defined through the following parameters avai
 - `imageName`: name of the container image for PostgreSQL
 - `imagePullSecretName`: secret for pulling the PostgreSQL image
 - `instances`: number of instances required in the cluster, with `instances - 1` replicas (**required**)
+- `nodeMaintenanceWindow`: Define a maintenance window for the Kubernetes nodes
 - `postgresql`: configuration of the PostgreSQL server
 - `primaryUpdateStrategy`: strategy to update the primary as part of a rolling update: automated (`unsupervised`)
    or manually triggered (`supervised`)

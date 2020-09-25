@@ -6,7 +6,7 @@ Cloud Native PostgreSQL defines a new Kubernetes resource called *Cluster* that
 represents a PostgreSQL cluster made up of a single primary and an optional number
 of replicas that co-exist in a chosen Kubernetes namespace.
 
-PostgreSQL 12, 11 and 10 are currently supported.
+PostgreSQL 13, 12, 11 and 10 are currently supported.
 
 ## Requirements
 
