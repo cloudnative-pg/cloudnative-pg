@@ -74,36 +74,41 @@ lint:
     - echo $CI_JOB_TOKEN | docker login -u gitlab-ci-token --password-stdin $CI_REGISTRY
     - make e2e-test CONTROLLER_IMG="${TARGET_IMAGE}" BUILD_IMAGE=false POSTGRES_IMAGE_NAME="quay.io/2ndquadrant/postgres:${POSTGRESQL_VERSION}"
 
-e2e-1.15-pg12:
+e2e-1.15-pg13:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.15.12
-    POSTGRESQL_VERSION: 12
+    POSTGRESQL_VERSION: 13
 
-e2e-1.16-pg12:
+e2e-1.16-pg13:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.16.15
-    POSTGRESQL_VERSION: 12
+    POSTGRESQL_VERSION: 13
 
-e2e-1.17-pg12:
+e2e-1.17-pg13:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.17.11
-    POSTGRESQL_VERSION: 12
+    POSTGRESQL_VERSION: 13
 
-e2e-1.18-pg12:
+e2e-1.18-pg13:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.18.8
-    POSTGRESQL_VERSION: 12
+    POSTGRESQL_VERSION: 13
+
+e2e-1.19-pg13:
+  extends: .e2e_template
+  variables:
+    K8S_VERSION: 1.19.1
+    POSTGRESQL_VERSION: 13
 
 e2e-1.19-pg12:
   extends: .e2e_template
   variables:
     K8S_VERSION: 1.19.1
     POSTGRESQL_VERSION: 12
-
 
 e2e-1.19-pg11:
   extends: .e2e_template
