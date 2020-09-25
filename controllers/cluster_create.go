@@ -71,7 +71,11 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 }
 
 func (r *ClusterReconciler) createPostgresConfigMap(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	configMap := specs.CreatePostgresConfigMap(cluster)
+	configMap, err := specs.CreatePostgresConfigMap(cluster)
+	if err != nil {
+		return err
+	}
+
 	utils.SetAsOwnedBy(&configMap.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&configMap.ObjectMeta, versions.Version)
 	if err := r.Create(ctx, configMap); err != nil {
