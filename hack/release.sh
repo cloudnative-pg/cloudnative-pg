@@ -83,23 +83,11 @@ cp -r config/* "${CONFIG_TMP_DIR}"
     cd "${CONFIG_TMP_DIR}/default"
     "${KUSTOMIZE}" edit add patch manager_image_pull_secret.yaml
     cd "${CONFIG_TMP_DIR}/manager"
-    "${KUSTOMIZE}" edit set image controller="2ndq.io/release/k8s/cloud-native-postgresql-operator:v${release_version}"
+    "${KUSTOMIZE}" edit set image controller="quay.io/2ndquadrant/cloud-native-postgresql:v${release_version}"
 )
 
 "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${release_manifest}"
 rm -fr "${CONFIG_TMP_DIR}"
-
-cat >> "${release_manifest}" << EOF
----
-apiVersion: v1
-data:
-  .dockerconfigjson: %%SECRET%%
-kind: Secret
-metadata:
-  name: postgresql-operator-pull-secret
-  namespace: postgresql-operator-system
-type: kubernetes.io/dockerconfigjson
-EOF
 
 git add \
     pkg/versions/versions.go \

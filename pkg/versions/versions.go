@@ -20,7 +20,7 @@ const (
 
 	// DefaultOperatorImageName used to bootstrap the controller in the Pods running
 	// PostgreSQL
-	DefaultOperatorImageName = "2ndq.io/release/cloud-native-postgresql-operator:v0.2.0"
+	DefaultOperatorImageName = "quay.io/2ndquadrant/cloud-native-postgresql:v0.2.0"
 
 	// postgresImageNameEnvVar is the environment variable that allow overriding the default image used
 	// for PostgreSQL
