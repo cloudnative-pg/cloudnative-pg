@@ -25,7 +25,8 @@ var _ = Describe("Configmap creation", func() {
 		},
 	}
 	It("create a configmap with the same name and namespace of the cluster", func() {
-		configMap := CreatePostgresConfigMap(&cluster)
+		configMap, err := CreatePostgresConfigMap(&cluster)
+		Expect(err).To(BeNil())
 		Expect(configMap.Name).To(Equal(cluster.Name))
 		Expect(configMap.Namespace).To(Equal(cluster.Namespace))
 	})
@@ -37,7 +38,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	}
 
 	It("apply the default settings", func() {
-		config := CreatePostgresqlConfiguration(settings)
+		config := CreatePostgresqlConfiguration(100000, settings)
 		Expect(len(config)).To(BeNumerically(">", 1))
 		Expect(config["hot_standby"]).To(Equal("true"))
 	})
@@ -46,13 +47,27 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 		testing := map[string]string{
 			"hot_standby": "off",
 		}
-		config := CreatePostgresqlConfiguration(testing)
+		config := CreatePostgresqlConfiguration(100000, testing)
 		Expect(config["hot_standby"]).To(Equal("true"))
 	})
 
 	It("generate a config file", func() {
-		confFile := CreatePostgresqlConfFile(CreatePostgresqlConfiguration(settings))
+		confFile := CreatePostgresqlConfFile(CreatePostgresqlConfiguration(100000, settings))
 		Expect(confFile).To(Not(BeEmpty()))
 		Expect(len(strings.Split(confFile, "\n"))).To(BeNumerically(">", 2))
+	})
+
+	When("version is 10", func() {
+		It("will use appropriate settings", func() {
+			config := CreatePostgresqlConfiguration(100000, settings)
+			Expect(config["wal_keep_segments"]).To(Equal("32"))
+		})
+	})
+
+	When("version is 13", func() {
+		It("will use appropriate settings", func() {
+			config := CreatePostgresqlConfiguration(130000, settings)
+			Expect(config["wal_keep_size"]).To(Equal("512MB"))
+		})
 	})
 })
