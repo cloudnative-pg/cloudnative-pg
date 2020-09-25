@@ -38,7 +38,7 @@ LABEL summary="$SUMMARY" \
       name="Cloud Native PostgreSQL Operator" \
       vendor="2ndQuadrant" \
       url="https://www.2ndquadrant.com/" \
-      version="0.2.0" \
+      version="0.3.0" \
       release="1"
 
 COPY licenses /licenses
