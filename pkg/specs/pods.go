@@ -220,10 +220,6 @@ func createPostgresContainers(
 					Value: cluster.Name,
 				},
 				{
-					Name:  "PGPASS",
-					Value: "/etc/superuser-secret/pgpass",
-				},
-				{
 					Name:  "PGCONF",
 					Value: "/etc/configuration/postgresConfiguration",
 				},
