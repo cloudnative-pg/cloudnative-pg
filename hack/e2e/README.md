@@ -36,5 +36,7 @@ the following ones can be defined:
 * `KIND_VERSION`: the version of Kind. Defaults to the latest release.
 * `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
     false to get the image from a registry. Default: `false`.
+* `LOG_DIR`: the directory where the container logs are exported. Default:
+    `kind-logs` directory in the project root.
 
 `run-e2e-kind.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard`

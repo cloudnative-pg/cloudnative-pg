@@ -1,0 +1,20 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: "cnp-test-${CI_PIPELINE_ID}-${CI_NODE_INDEX}"
+  region: "${REGION}"
+  version: "${K8S_VERSION}"
+
+nodeGroups:
+  - name: "cnp-test-${CI_PIPELINE_ID}-${CI_NODE_INDEX}"
+    instanceType: m5.large
+    desiredCapacity: 3
+    iam:
+      withAddonPolicies:
+        ebs: true
+        cloudWatch: true
+
+cloudWatch:
+    clusterLogging:
+        enableTypes: ["all"]
