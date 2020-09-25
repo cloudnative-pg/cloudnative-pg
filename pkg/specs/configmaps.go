@@ -48,48 +48,50 @@ type MajorVersionRange = struct {
 // PostgresSettings is a collection of PostgreSQL settings
 type PostgresSettings = map[string]string
 
-var (
-	// globalDefaultPostgresSettings are the settings that are
-	// applied to the PostgreSQL default configuration when
+// PostgresConfigurationSettings is the set of settings that are applied,
+// together with the parameters supplied by the users, to generate a custom
+// PostgreSQL configuration
+type PostgresConfigurationSettings struct {
+	// These settings are applied to the PostgreSQL default configuration when
 	// the user don't specify something different
-	globalDefaultPostgresSettings = PostgresSettings{
-		"max_parallel_workers":  "32",
-		"max_worker_processes":  "32",
-		"max_replication_slots": "32",
-	}
+	GlobalDefaultSettings PostgresSettings
 
-	// defaultPostgresSettings are like globalDefeaultPostgresSettings
+	// The following settings are like GlobalPostgresSettings
 	// but are relative only to certain PostgreSQL versions
-	defaultPostgresSettings = map[MajorVersionRange]PostgresSettings{
-		{0, 130000}: {
-			"wal_keep_segments": "32",
-		},
-		{130000, math.MaxInt64}: {
-			"wal_keep_size": "512MB",
-		},
-	}
+	DefaultSettings map[MajorVersionRange]PostgresSettings
 
-	// mandatoryPostgresSettings are the settings that are
-	// applied to the final PostgreSQL configuration, even
-	// if the user specified something different
-	mandatoryPostgresSettings = PostgresSettings{
-		"hot_standby":     "true",
-		"archive_mode":    "on",
-		"archive_command": "/controller/manager wal-archive %p",
+	// The following settings are applied to the final PostgreSQL configuration,
+	// even if the user specified something different
+	MandatorySettings PostgresSettings
+}
+
+var (
+	cnpConfigurationSettings = PostgresConfigurationSettings{
+		GlobalDefaultSettings: PostgresSettings{
+			"max_parallel_workers":  "32",
+			"max_worker_processes":  "32",
+			"max_replication_slots": "32",
+		},
+		DefaultSettings: map[MajorVersionRange]PostgresSettings{
+			{0, 130000}: {
+				"wal_keep_segments": "32",
+			},
+			{130000, math.MaxInt64}: {
+				"wal_keep_size": "512MB",
+			},
+		},
+		MandatorySettings: PostgresSettings{
+			"hot_standby":     "true",
+			"archive_mode":    "on",
+			"archive_command": "/controller/manager wal-archive %p",
+		},
 	}
 )
 
 // CreatePostgresConfigMap create a configMap for this cluster
 func CreatePostgresConfigMap(cluster *v1alpha1.Cluster) (*corev1.ConfigMap, error) {
 	// put the user provided content between header and footer
-	var hbaContent []string
-	hbaContent = append(hbaContent, strings.TrimSpace(hbaHeader), "")
-	if len(cluster.Spec.PostgresConfiguration.PgHBA) > 0 {
-		hbaContent = append(hbaContent, cluster.Spec.PostgresConfiguration.PgHBA...)
-		hbaContent = append(hbaContent, "")
-	}
-	hbaContent = append(hbaContent, strings.TrimSpace(hbaFooter))
-	hbaContent = append(hbaContent, "")
+	hbaContent := CreateHBARules(cluster.Spec.PostgresConfiguration.PgHBA)
 
 	// Extract the PostgreSQL major version
 	imageName := cluster.GetImageName()
@@ -101,6 +103,7 @@ func CreatePostgresConfigMap(cluster *v1alpha1.Cluster) (*corev1.ConfigMap, erro
 
 	configFile := CreatePostgresqlConfFile(
 		CreatePostgresqlConfiguration(
+			cnpConfigurationSettings,
 			fromVersion,
 			cluster.Spec.PostgresConfiguration.Parameters))
 
@@ -111,23 +114,42 @@ func CreatePostgresConfigMap(cluster *v1alpha1.Cluster) (*corev1.ConfigMap, erro
 		},
 		Data: map[string]string{
 			"postgresConfiguration": configFile,
-			"postgresHBA":           strings.Join(hbaContent, "\n"),
+			"postgresHBA":           hbaContent,
 		},
 	}, nil
 }
 
+// CreateHBARules will create the content of pg_hba.conf file given
+// the rules set by the cluster spec
+func CreateHBARules(hba []string) string {
+	var hbaContent []string
+	hbaContent = append(hbaContent, strings.TrimSpace(hbaHeader), "")
+	if len(hba) > 0 {
+		hbaContent = append(hbaContent, hba...)
+		hbaContent = append(hbaContent, "")
+	}
+	hbaContent = append(hbaContent, strings.TrimSpace(hbaFooter), "")
+
+	return strings.Join(hbaContent, "\n")
+}
+
 // CreatePostgresqlConfiguration create the configuration from the settings
 // and the default values
-func CreatePostgresqlConfiguration(majorVersion int, parameters map[string]string) map[string]string {
+func CreatePostgresqlConfiguration(
+	settings PostgresConfigurationSettings,
+	majorVersion int,
+	userSettings map[string]string,
+) map[string]string {
+	// Start from scratch
 	configuration := make(map[string]string)
 
 	// start from the default settings
-	for key, value := range globalDefaultPostgresSettings {
+	for key, value := range settings.GlobalDefaultSettings {
 		configuration[key] = value
 	}
 
 	// apply settings relative to a certain PostgreSQL version
-	for constraints, settings := range defaultPostgresSettings {
+	for constraints, settings := range settings.DefaultSettings {
 		if constraints.Min <= majorVersion && majorVersion < constraints.Max {
 			for key, value := range settings {
 				configuration[key] = value
@@ -136,12 +158,12 @@ func CreatePostgresqlConfiguration(majorVersion int, parameters map[string]strin
 	}
 
 	// apply the values from the user
-	for key, value := range parameters {
+	for key, value := range userSettings {
 		configuration[key] = value
 	}
 
 	// apply the mandatory settings
-	for key, value := range mandatoryPostgresSettings {
+	for key, value := range settings.MandatorySettings {
 		configuration[key] = value
 	}
 
