@@ -17,6 +17,7 @@ fi
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 HACK_DIR="${ROOT_DIR}/hack/e2e"
 TEMP_DIR=$(mktemp -d)
+LOG_DIR=${LOG_DIR:-$ROOT_DIR/kind-logs/}
 
 export CONTROLLER_IMG=${CONTROLLER_IMG:-internal.2ndq.io/k8s/cloud-native-postgresql:latest}
 export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
@@ -65,21 +66,14 @@ install_kind() {
     chmod +x "${KIND}"
 }
 
-install_kubetest2() {
-    GO_KUBETEST2_TMP_DIR=$(mktemp -d)
-    cd "$GO_KUBETEST2_TMP_DIR"
+install_go_tools() {
+    local GO_TMP_DIR
+    GO_TMP_DIR=$(mktemp -d)
+    cd "$GO_TMP_DIR"
     go mod init tmp
-    GO111MODULE=on go get sigs.k8s.io/kubetest2/...@latest
-    rm -rf "$GO_KUBETEST2_TMP_DIR"
-    cd -
-}
-
-install_ginkgo() {
-    GO_GINKGO_TMP_DIR=$(mktemp -d)
-    cd "$GO_GINKGO_TMP_DIR"
-    go mod init tmp
-    GO111MODULE=on go get -u github.com/onsi/ginkgo/ginkgo
-    rm -rf "$GO_GINKGO_TMP_DIR"
+    go get sigs.k8s.io/kubetest2/...@latest
+    go get -u github.com/onsi/ginkgo/ginkgo
+    rm -rf "$GO_TMP_DIR"
     cd -
 }
 
@@ -94,8 +88,7 @@ main() {
     export PATH
     install_kubectl
     install_kind
-    install_kubetest2
-    install_ginkgo
+    install_go_tools
 
     # Create the cluster
     kubetest2 kind --up --image-name "kindest/node:${K8S_VERSION}" \
@@ -117,12 +110,17 @@ main() {
         build_and_load_operator
     fi
 
+    ${KUBECTL} apply -f "${HACK_DIR}/kind-fluentd.yaml"
     # Run the tests and destroy the cluster
+    # Do not fail out if the tests fail. We want the logs anyway.
+    RC=0
     kubetest2 kind --test exec --cluster-name "${KIND_CLUSTER_NAME}" \
-        -- "${HACK_DIR}/run-e2e.sh"
+        -- "${HACK_DIR}/run-e2e.sh" || RC=$?
+    kind export logs "${LOG_DIR}" --name "${KIND_CLUSTER_NAME}"
     if [ "${PRESERVE_CLUSTER}" = false ]; then
         kubetest2 kind --down --cluster-name "${KIND_CLUSTER_NAME}"
     fi
+    exit $RC
 }
 
 main

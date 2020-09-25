@@ -81,6 +81,7 @@ kind_e2e:
     DOCKER_PASSWORD: $CI_JOB_TOKEN
     KIND_VERSION: v0.9.0
     E2E_DEFAULT_STORAGE_CLASS: standard
+    LOG_DIR: ${CI_PROJECT_DIR}/kind-logs/
   parallel:
     matrix:
       - POSTGRES_IMG: quay.io/2ndquadrant/postgres:13
@@ -106,6 +107,11 @@ kind_e2e:
   script:
     - apk add make bash curl go gettext
     - CONTROLLER_IMG="${TARGET_IMAGE}" BUILD_IMAGE=false hack/e2e/run-e2e-kind.sh
+  artifacts:
+    paths:
+      - kind-logs/
+    name: kind-logs
+    when: always
 
 gke_e2e:
   stage: e2e
@@ -203,7 +209,9 @@ eks_e2e:
         go get -u github.com/onsi/ginkgo/ginkgo
         cd -; rm -rf "${GO_TMP_DIR}"
       )
-    - eksctl create cluster -n cnp-test-$CI_PIPELINE_ID-$CI_NODE_INDEX -r "${REGION}" --version "${K8S_VERSION}" --nodes 3
+    - cat hack/e2e/eks-cluster.yaml.template | envsubst > hack/e2e/eks-cluster.yaml
+    - eksctl create cluster -f hack/e2e/eks-cluster.yaml
+    - curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml | sed "s/{{cluster_name}}/cnp-test-$CI_PIPELINE_ID-$CI_NODE_INDEX/;s/{{region_name}}/${REGION}/" | kubectl apply -f -
     - hack/e2e/run-e2e.sh
   after_script:
     - eksctl delete cluster -n cnp-test-$CI_PIPELINE_ID-$CI_NODE_INDEX -r "${REGION}" -w
@@ -242,7 +250,7 @@ aks_e2e:
       )
     - az login --service-principal --username $AZURE_K8S_APP_ID --password $AZURE_K8S_PASSWORD --tenant $AZURE_K8S_TENANT_ID
     - az aks install-cli --client-version ${K8S_VERSION}
-    - az aks create --resource-group cnp-test --name cnp-test-${CI_PIPELINE_ID}-${CI_NODE_INDEX} --node-count 3 -k ${K8S_VERSION} --generate-ssh-keys --service-principal $AZURE_K8S_APP_ID --client-secret $AZURE_K8S_PASSWORD
+    - az aks create --resource-group cnp-test --name cnp-test-${CI_PIPELINE_ID}-${CI_NODE_INDEX} --node-count 3 -k ${K8S_VERSION} --generate-ssh-keys --service-principal $AZURE_K8S_APP_ID --client-secret $AZURE_K8S_PASSWORD --enable-addons monitoring --workspace-resource-id "/subscriptions/53b1fde4-768f-40ed-931a-1ba9745f577f/resourcegroups/cnp-test/providers/microsoft.operationalinsights/workspaces/cnp-test-logs"
     - az aks get-credentials --resource-group cnp-test --name cnp-test-${CI_PIPELINE_ID}-${CI_NODE_INDEX}
     - hack/e2e/run-e2e.sh
   after_script:
