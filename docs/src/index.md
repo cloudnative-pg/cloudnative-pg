@@ -8,12 +8,16 @@ of replicas that co-exist in a chosen Kubernetes namespace.
 
 PostgreSQL 13, 12, 11 and 10 are currently supported.
 
-## Requirements
-
-Kubernetes 1.15 or higher, tested on AWS, Google, Azure (with multiple availability zones).
+Cloud Native PostgreSQL has also been certified for
+[RedHat OpenShift Container Platform (OCP)](https://www.openshift.com/products/container-platform)
+4.5 and is available directly from the [RedHat Catalog](https://catalog.redhat.com/).
+OpenShift Container Platform is an open source distribution of Kubernetes which is
+maintained and commercially supported by Red Hat.
 
 ## Main features
 
+* Direct integration with Kubernetes API server for High Availability,
+  without requiring an external tool
 * Self-Healing capability, through:
     * failover of the primary instance, by promoting the most aligned replica
     * automated recreation of a replica
@@ -28,6 +32,13 @@ Kubernetes 1.15 or higher, tested on AWS, Google, Azure (with multiple availabil
 * Continuous backup to an S3 compatible object store
 * Standard output logging of PostgreSQL error messages
 
+## Requirements on Kubernetes
+
+Cloud Native PostgreSQL requires Kubernetes 1.15 or higher, tested on AWS, Google, Azure (with multiple availability zones).
+
+!!! Warning
+    These requirements do not apply to Cloud Native PostgreSQL on RedHat Open Container Platform.
+
 ## About this guide
 
 Follow the instructions in the ["Quickstart"](quickstart.md) to test Cloud Native PostgreSQL
@@ -35,3 +46,7 @@ on a local Kubernetes cluster using Minikube or Kind.
 
 In case you are not familiar with some basic terminology on Kubernetes and PostgreSQL,
 please consult the ["Before you start" section](before_you_start.md).
+
+!!! Note
+    Although the guide primarily addresses Kubernetes, all concepts can
+    be extended to OpenShift as well.

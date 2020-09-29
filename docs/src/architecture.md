@@ -6,12 +6,12 @@ Cloud Native PostgreSQL currently supports clusters based on asynchronous stream
 
 * One primary, with optional multiple hot standby replicas for High Availability
 * Available services for applications:
-  * `-rw`: applications connect to the only primary instance of the cluster
-  * `-r`: applications connect to any of the instances for read-only workloads
+    * `-rw`: applications connect to the only primary instance of the cluster
+    * `-r`: applications connect to any of the instances for read-only workloads
 * Shared-nothing architecture recommended for better resilience of the PostgreSQL cluster:
-  * PostgreSQL instances should reside on different Kubernetes worker nodes and share only the network
-  * PostgreSQL instances can reside in different availability zones in the same region
-  * All nodes of a PostgreSQL cluster should reside in the same region
+    * PostgreSQL instances should reside on different Kubernetes worker nodes and share only the network
+    * PostgreSQL instances can reside in different availability zones in the same region
+    * All nodes of a PostgreSQL cluster should reside in the same region
 
 ### Read-write workloads
 
@@ -96,19 +96,17 @@ you can use the following environment variables in your applications:
 
 ### Secrets
 
-The PostgreSQL operator will generate a secret for every PostgreSQL cluster it deploys.
-That secret contains the passwords for the `postgres` user and also for
-the *owner* of the database.
+The PostgreSQL operator will generate two secrets for every PostgreSQL cluster
+it deploys:
 
-The secret generated has the same name as the `Cluster` resource created
-in Kubernetes, and contains two entries:
+* `[cluster name]-superuser`
+* `[cluster name]-app`
 
-* `postgresPassword` - containing the password of the `postgres` user, which
-  is the superuser defined in the instance;
+The secrets contain the username, password and a working
+[`.pgpass file`](https://www.postgresql.org/docs/current/libpq-pgpass.html)
+respectively for the `postgres` user and for the *owner* of the database.
 
-* `ownerPassword` - containing the password of the user owning the database.
-
-The latter credentials are the ones which should be by used the applications
+The `-app` credentials are the ones which should be by used the applications
 connecting to the PostgreSQL cluster.
 
-The first one is supposed to be used only for administrative purposes.
+The `-superuser` ones are supposed to be used only for administrative purposes.

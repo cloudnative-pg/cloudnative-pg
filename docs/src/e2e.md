@@ -35,3 +35,9 @@ and the following suite of E2E tests are performed on that cluster:
 * Primary endpoint switch in case of failure in less than 5 seconds;
 * Recover from degraded state in less than 30 seconds.
 
+The E2E tests suite is also run for the latest Kubernetes and PostgreSQL
+releases on clusters created on the following services:
+
+* Google GKE
+* Amazon EKS
+* Microsoft Azure AKS

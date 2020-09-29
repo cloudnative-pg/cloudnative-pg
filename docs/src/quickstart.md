@@ -1,33 +1,37 @@
-This section describes how to test a PostgreSQL cluster on your laptop/computer,
-using a local Kubernetes cluster in
+This section describes how to test a PostgreSQL cluster on your laptop/computer
+using Cloud Native PostgreSQL on a local Kubernetes cluster in
 [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/) or
-[Kind](https://kind.sigs.k8s.io/) via Cloud Native PostgreSQL.
-Like any other Kubernetes application, Cloud Native PostgreSQL is deployed using
-regular manifests written in YAML.
+[Kind](https://kind.sigs.k8s.io/).
+
+RedHat OpenShift Container Platform users can test the certified operator for
+Cloud Native PostgreSQL on the [Red Hat CodeReady Containers (CRC)](https://developers.redhat.com/products/codeready-containers/overview)
+for OpenShift.
 
 !!! Warning
     The instructions contained in this section are for demonstration,
     testing and practice purposes only and must not be used in production.
 
-Cloud Native PostgreSQL has been tested on two widespread tools for running
-Kubernetes locally, available on major platforms such as Linux, Mac OS X
-and Windows:
-
-- [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/)
-- [Kind](https://kind.sigs.k8s.io/)
+Like any other Kubernetes application, Cloud Native PostgreSQL is deployed using
+regular manifests written in YAML.
 
 By following the instructions in this page you should be able to start a PostgreSQL
-cluster on your local Kubernetes installation and experiment with it.
+cluster on your local Kubernetes/Openshift installation and experiment with it.
 
 !!! Important
     Make sure that you have `kubectl` installed on your machine in order
-    to connect to the Kubernetes cluster.
+    to connect to the Kubernetes cluster, or `oc` if using CRC for OpenShift.
+    Please follow the Kubernetes documentation on [how to install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/) or the Openshift one on [how to install `oc`](https://docs.openshift.com/container-platform/4.5/cli_reference/openshift_cli/getting-started-cli.html).
 
-## Part 1 - Setup the local Kubernetes playground
 
-The first part is about installing Minikube and/or Kind. Please spend some time
-reading about which of the two systems proceed with. Once you have setup one or the
-other, please proceed with part 2.
+!!! Note
+    If you are running Openshift, use `oc` every time `kubectl` is mentioned
+    in this documentation. `kubectl` commands are compatible with `oc` ones.
+
+## Part 1 - Setup the local Kubernetes/Openshift playground
+
+The first part is about installing Minikube, Kind or CRC. Please spend some time
+reading about the systems and decide which one to proceed with.
+After setting up one of them, please proceed with part 2.
 
 ### Minikube
 
@@ -65,17 +69,41 @@ then create a Kubernetes cluster with:
 kind create cluster --name pg
 ```
 
+### CodeReady Containers (CRC)
+
+[Download RedHat CRC](https://developers.redhat.com/products/codeready-containers/overview)
+and move the binary inside a directory in your `PATH`.
+
+You can then run the following commands:
+```
+crc setup
+crc start
+```
+
+The `crc start` output will explain how to proceed. You'll then need to
+execute the output of the `crc oc-env` command.
+After that, you can login as `kubeadmin` with the printed `oc login`
+command. You can also open the web console running `crc console`.
+User and password are the same as for the `oc login` command.
+
+CRC doesn't come with a StorageClass, so one has to be configured.
+You can follow the [Dynamic volume provisioning wiki page](https://github.com/code-ready/crc/wiki/Dynamic-volume-provisioning)
+and install `rancher/local-path-provisioner`.
+
 ## Part 2 - Install Cloud Native PostgreSQL
 
-Now that you have a Kubernetes installation up and running on your laptop,
-you can proceed with Cloud Native PostgreSQL installation.
+Now that you have a Kubernetes or OpenShift installation up and running
+on your laptop, you can proceed with Cloud Native PostgreSQL installation.
 
-Locate the latest release of Cloud Native PostgreSQL from the
-["Cloud Native PostgreSQL" page available in the 2ndQuadrant Portal](https://access.2ndquadrant.com/customer_portal/sw/cloud-native-postgresql/).
-Follow the installation instructions and run the `kubectl` command that you are presented.
 
-!!! Important
-    Please contact your 2ndQuadrant account manager if you do not have access to the Kubernetes manifests of Cloud Native PostgreSQL.
+### Kubernetes
+
+Download the [latest operator manifest](samples/postgresql-operator-0.3.0.yaml)
+and run:
+
+```sh
+kubectl apply -f postgresql-operator-0.3.0.yaml
+```
 
 Once you have run the `kubectl` command, Cloud Native PostgreSQL will be installed in your Kubernetes cluster.
 You can verify that with:
@@ -83,6 +111,36 @@ You can verify that with:
 ```sh
 kubectl get deploy -n postgresql-operator-system postgresql-operator-controller-manager
 ```
+
+### Openshift
+
+#### Using the web interface
+
+Log in the console as `kubeadmin` and navigate to the  `Operator → OperatorHub` page.
+
+Find the `Cloud Native PostgreSQL` box scrolling or using the search filter.
+
+Select the operator and click `Install`. Click `Install` again in the following
+`Install Operator`, using the default settings. For an in-depth explanation of
+those settings, see the [Openshift documentation](https://docs.openshift.com/container-platform/4.5/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster).
+
+The operator will soon be available in all the namespaces.
+
+### Using the cli
+
+You can apply the subscription on [`subscription.yaml`](samples/subscription.yaml)
+to install the operator in all the namespaces.
+Download the yaml file and run:
+
+```sh
+oc apply -f subscription.yaml
+```
+
+The operator will soon be available in all the namespaces.
+
+More information on
+[how to install operators via CLI](https://docs.openshift.com/container-platform/4.5/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-operator-from-operatorhub-using-cli_olm-adding-operators-to-a-cluster)
+is available in the Openshift documentation.
 
 ## Part 3 - Deploy a PostgreSQL cluster
 

@@ -78,7 +78,7 @@ and recloning the new PostgreSQL instance takes shorter than
 waiting.
 
 !!! Note
-   When performing the `kubectl drain` command, you will need
-   to add the `--delete-local-data` option.
-   Do not be afraid: it refers to another volume internally used
-   by the operator - not the PostgreSQL data directory.
+    When performing the `kubectl drain` command, you will need
+    to add the `--delete-local-data` option.
+    Don't be afraid: it refers to another volume internally used
+    by the operator - not the PostgreSQL data directory.
