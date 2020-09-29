@@ -51,14 +51,27 @@ through the `resources` section of the manifest. For details, please refer to th
 
 ## PostgreSQL
 
-The current implementation of Cloud Native PostgreSQL does not automatically manage `~/.pgpass` files for passwords yet.
-Future implementations will automatically generate a password for each user and configure the password file accordingly.
+The current implementation of Cloud Native PostgreSQL automatically creates
+passwords and `.pgpass` files for the `postgres` superuser and for the owner of
+the database. See the
+["Secrets" section in the "Architecture" page](architecture.md#secrets).
 
-This is particularly important for streaming replication purposes.
+Those files can be used to configure application access to the database.
 
 Currently, the operator allows administrators to add `pg_hba.conf` lines directly in the manifest, as part of the
-`pg_hba` section of the `postgresql` configuration. Therefore, your applications should properly manage the password
-file to connect to the cluster.
+`pg_hba` section of the `postgresql` configuration. The lines defined in the
+manifest are added to a default `pg_hba.conf`
+
+```
+# Grant local access
+local all all peer
+
+# HBA lines in the pg_hba section are added here
+
+# Require md5 authentication elsewhere
+host all all all md5
+host replication all all md5
+```
 
 !!! Important
     Examples assume that the Kubernetes cluster runs in a private and secure network.

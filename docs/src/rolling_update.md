@@ -1,5 +1,8 @@
-The operator can deploy a new version of Cloud Native PostgreSQL
-while applications are running against the cluster.
+The operator allows changing the PostgreSQL version used in a cluster while
+applications are running against it.
+
+!!! Important
+    Only upgrades for PostgreSQL minor releases are supported.
 
 To initiate a rolling update, the user can change the `imageName`
 attribute of the cluster. The operator starts upgrading all the
@@ -15,9 +18,7 @@ accepting these two values:
 * `manual`: the rolling update process is suspended immediately
   after all replicas have been upgraded, and can only be completed
   with a manual switchover triggered by an administrator with:
-  ```sh
-  kubectl cnp promote [cluster] [pod]
-  ```
+  `kubectl cnp promote [cluster] [pod]`
 
 The default and recommended value is `switchover`.
 
