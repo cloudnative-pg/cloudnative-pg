@@ -38,6 +38,8 @@ type ClusterReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list
+// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;update;list
 // +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters/status,verbs=get;watch;update;patch
 // +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters/finalizers,verbs=update

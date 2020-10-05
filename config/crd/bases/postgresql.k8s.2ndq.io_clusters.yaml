@@ -22,7 +22,7 @@ spec:
     status: {}
   validation:
     openAPIV3Schema:
-      description: Cluster is the Schema for the postgresqls API
+      description: Cluster is the Schema for the postgresql API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -398,7 +398,7 @@ spec:
               description: Current primary instance
               type: string
             danglingPVC:
-              description: List of all the PVCs created by this bdrGroup and still
+              description: List of all the PVCs created by this cluster and still
                 available which are not attached to a Pod
               items:
                 type: string

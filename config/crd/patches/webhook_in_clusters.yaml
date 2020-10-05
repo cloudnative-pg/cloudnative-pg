@@ -5,6 +5,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clusters.postgresql.k8s.2ndq.io
 spec:
+  preserveUnknownFields: false
   conversion:
     strategy: Webhook
     webhookClientConfig:
