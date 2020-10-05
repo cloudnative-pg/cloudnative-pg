@@ -109,7 +109,7 @@ type ClusterStatus struct {
 	// during a switchover or a failover
 	TargetPrimary string `json:"targetPrimary,omitempty"`
 
-	// List of all the PVCs created by this bdrGroup and still available
+	// List of all the PVCs created by this cluster and still available
 	// which are not attached to a Pod
 	DanglingPVC []string `json:"danglingPVC,omitempty"`
 }
@@ -192,7 +192,7 @@ type StorageConfiguration struct {
 	// If not specified, generated PVCs will be satisfied by the
 	// default storage class
 	// +optional
-	StorageClass *string `json:"storageClass"`
+	StorageClass *string `json:"storageClass,omitempty"`
 
 	// Size of the storage. Required if not already specified in the PVC template.
 	Size resource.Quantity `json:"size"`
@@ -323,7 +323,7 @@ type S3Credentials struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.instances,statuspath=.status.instances
 
-// Cluster is the Schema for the postgresqls API
+// Cluster is the Schema for the postgresql API
 type Cluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

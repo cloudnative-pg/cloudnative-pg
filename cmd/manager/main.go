@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -19,6 +20,7 @@ import (
 	postgresqlv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/cmd/manager/app"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/controllers"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/certs"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
 	// +kubebuilder:scaffold:imports
 )
@@ -26,6 +28,26 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+)
+
+const (
+	// This is the name of the secret where CI crypto-material
+	// is stored
+	caSecretName = "postgresql-operator-ca-secret" // #nosec
+
+	// This is the name of the secret where the certificates
+	// for the webhook server are stored
+	webhookSecretName = "postgresql-operator-webhook-cert" // #nosec
+
+	// This is the name of the service where the webhook server
+	// is reachable
+	webhookServiceName = "postgresql-operator-webhook-service" // #nosec
+
+	// This is the name of the mutating webhook configuration
+	mutatingWebhookConfigurationName = "postgresql-operator-mutating-webhook-configuration"
+
+	// This is the name of the validating webhook configuration
+	validatingWebhookConfigurationName = "postgresql-operator-validating-webhook-configuration"
 )
 
 func init() {
@@ -89,6 +111,7 @@ func main() {
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "db9c8771.k8s.2ndq.io",
 		Namespace:          watchNamespace,
+		CertDir:            "/tmp",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -119,6 +142,49 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
 		os.Exit(1)
 	}
+
+	/*
+	   Ensure we have the required PKI infrastructure to make
+	   the operator and the clusters working
+	*/
+	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
+	if operatorNamespace == "" {
+		setupLog.Info("Missing OPERATOR_NAMESPACE environment variable")
+		os.Exit(1)
+	}
+
+	clientSet, err := kubernetes.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "Cannot create a K8s client")
+		os.Exit(1)
+	}
+
+	caSecret, err := certs.EnsureRootCACertificate(
+		clientSet,
+		operatorNamespace,
+		caSecretName)
+	if err != nil {
+		setupLog.Error(err, "Cannot setup PKI infrastructure")
+	}
+
+	webhookConfig := certs.WebhookEnvironment{
+		CertDir:                            mgr.GetWebhookServer().CertDir,
+		SecretName:                         webhookSecretName,
+		ServiceName:                        webhookServiceName,
+		OperatorNamespace:                  operatorNamespace,
+		MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
+		ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
+	}
+	err = webhookConfig.Setup(clientSet, caSecret)
+	if err != nil {
+		setupLog.Error(err, "Cannot setup webhook server environment")
+	}
+
+	if err = (&postgresqlv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
+		os.Exit(1)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
