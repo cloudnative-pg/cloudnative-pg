@@ -227,6 +227,10 @@ func createPostgresContainers(
 					Name:  "PGHBA",
 					Value: "/etc/configuration/postgresHBA",
 				},
+				{
+					Name:  "PGPORT",
+					Value: "5432",
+				},
 				CreateAccessKeyIDEnvVar(cluster.Spec.Backup),
 				CreateSecretAccessKeyEnvVar(cluster.Spec.Backup),
 			},

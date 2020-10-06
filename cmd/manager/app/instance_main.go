@@ -128,7 +128,6 @@ func InstanceManagerCommand(args []string) {
 		_ = runCommand.Parse(args[1:])
 		instance.PgData = pgData
 		instance.ApplicationDatabase = appDBName
-		instance.Port = 5432
 		instance.Namespace = namespace
 		instance.PodName = podName
 		instance.ClusterName = clusterName
