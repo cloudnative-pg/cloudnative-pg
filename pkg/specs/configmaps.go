@@ -84,6 +84,7 @@ var (
 			"hot_standby":     "true",
 			"archive_mode":    "on",
 			"archive_command": "/controller/manager wal-archive %p",
+			"port":            "5432",
 		},
 	}
 )

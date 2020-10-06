@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"syscall"
 
 	"github.com/lib/pq"
@@ -35,9 +34,6 @@ type Instance struct {
 	// Command line options to pass to the postmaster, see the
 	// '-c' option of pg_ctl for an useful example
 	StartupOptions []string
-
-	// Port where the instance will listen
-	Port int
 
 	// Connection pool pointing to the superuser database
 	superUserDB *sql.DB
@@ -62,7 +58,7 @@ func (instance Instance) Startup() error {
 		"start",
 		"-w",
 		"-D", instance.PgData,
-		"-o", "-c port=" + strconv.Itoa(instance.Port),
+		"-o", "-c port=5432",
 	}
 
 	// Add postmaster command line options
@@ -245,7 +241,7 @@ func (instance *Instance) Demote() error {
 // createRecoveryConf create a recovery.conf file for PostgreSQL 11 and earlier
 func (instance *Instance) createRecoveryConf() error {
 	primaryConnInfo := fmt.Sprintf(
-		"host=%v-rw user=postgres dbname=%v",
+		"host=%v-rw user=postgres port=5432 dbname=%v",
 		instance.ClusterName,
 		"postgres")
 
