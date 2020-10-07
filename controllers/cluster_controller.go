@@ -162,7 +162,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// 3 - We have already some Pods, all they all ready ==> we can create the other
 	// pods joining the node that we already have.
 	if cluster.Status.Instances == 0 {
-		return ctrl.Result{}, r.createPrimaryInstance(ctx, &cluster)
+		return r.createPrimaryInstance(ctx, &cluster)
 	}
 
 	if cluster.Status.ReadyInstances != cluster.Status.Instances ||

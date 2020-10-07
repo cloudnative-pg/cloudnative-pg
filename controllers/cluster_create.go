@@ -326,25 +326,45 @@ func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *v1a
 func (r *ClusterReconciler) createPrimaryInstance(
 	ctx context.Context,
 	cluster *v1alpha1.Cluster,
-) error {
+) (ctrl.Result, error) {
 	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
+	if cluster.Status.LatestGeneratedNode != 0 {
+		// We are we creating a new blank master when we had previously generated
+		// other nodes and we don't have any PVC to reuse?
+		// This can happen when:
+		//
+		// 1 - the user deletes all the PVCs and all the Pods in a cluster
+		//    (and why would an user do that?)
+		// 2 - the cache isn't ready for Pods and ready for the Cluster,
+		//     so we actually haven't the first pod in our managed list
+		//     but it's still in the API Server
+		//
+		// As far as the first option is concerned, we can just stop
+		// healing this cluster as we have nothing to do.
+		// For the second option we can just retry when the next
+		// reconciliation loop is started by the informers.
+		log.Info("refusing to create the master instance while the latest generated serial is not zero",
+			"latestGeneratedNode", cluster.Status.LatestGeneratedNode)
+		return ctrl.Result{}, nil
+	}
 
 	// Generate a new node serial
 	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
 	if err != nil {
-		return err
+		return ctrl.Result{}, err
 	}
 
 	// We are bootstrapping a cluster and in need to create the first node
 	pod := specs.CreatePrimaryPod(*cluster, nodeSerial)
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
 		log.Error(err, "Unable to set the owner reference for instance")
-		return err
+		return ctrl.Result{}, err
 	}
 
 	if err = r.setPrimaryInstance(ctx, cluster, pod.Name); err != nil {
 		log.Error(err, "Unable to set the primary instance name")
-		return err
+		return ctrl.Result{}, err
 	}
 
 	log.Info("Creating new Pod",
@@ -357,11 +377,11 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
-			return nil
+			return ctrl.Result{}, nil
 		}
 
 		log.Error(err, "Unable to create pod", "pod", pod)
-		return err
+		return ctrl.Result{}, err
 	}
 
 	pvcSpec := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
@@ -369,10 +389,10 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
 		log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
-		return err
+		return ctrl.Result{}, err
 	}
 
-	return nil
+	return ctrl.Result{}, nil
 }
 
 func (r *ClusterReconciler) joinReplicaInstance(
