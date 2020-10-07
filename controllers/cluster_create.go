@@ -174,7 +174,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 
 // createOrUpdatePodDisruptionBudget ensure that we have a PDB requiring to remove one node at a time
 func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	targetPdb := specs.CreatePodDisruptionBudget(*cluster)
 	utils.SetAsOwnedBy(&targetPdb.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
@@ -281,7 +281,7 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 
 // createRole create the role
 func (r *ClusterReconciler) createRole(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	roleBinding := specs.CreateRole(*cluster)
 	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
@@ -298,7 +298,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *v1alpha1.Cl
 
 // createRoleBinding create the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
 	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
@@ -327,7 +327,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	ctx context.Context,
 	cluster *v1alpha1.Cluster,
 ) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	// Generate a new node serial
 	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
@@ -380,7 +380,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	nodeSerial int32,
 	cluster *v1alpha1.Cluster,
 ) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	var pod *corev1.Pod
 	var err error
@@ -423,7 +423,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 // handleDanglingPVC reattach a dangling PVC
 func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	pvcToReattach := electPvcToReattach(cluster)
 	if pvcToReattach == "" {

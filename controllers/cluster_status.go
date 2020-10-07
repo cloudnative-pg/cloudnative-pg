@@ -21,7 +21,7 @@ func (r *ClusterReconciler) getManagedPods(
 	ctx context.Context,
 	cluster v1alpha1.Cluster,
 ) (corev1.PodList, error) {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	var childPods corev1.PodList
 	if err := r.List(ctx, &childPods,
@@ -39,7 +39,7 @@ func (r *ClusterReconciler) getManagedPVCs(
 	ctx context.Context,
 	cluster v1alpha1.Cluster,
 ) (corev1.PersistentVolumeClaimList, error) {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	var childPVCs corev1.PersistentVolumeClaimList
 	if err := r.List(ctx, &childPVCs,

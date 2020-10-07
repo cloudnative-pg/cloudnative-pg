@@ -59,7 +59,7 @@ type ClusterReconciler struct {
 // Reconcile is the operator reconciler loop
 func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", req.Namespace, "name", req.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", req.Namespace, "name", req.Name)
 
 	var cluster v1alpha1.Cluster
 	if err := r.Get(ctx, req.NamespacedName, &cluster); err != nil {
@@ -177,7 +177,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 // ReconcilePods decides when to create, scale up/down or wait for pods
 func (r *ClusterReconciler) ReconcilePods(ctx context.Context,
 	req ctrl.Request, cluster *v1alpha1.Cluster, childPods corev1.PodList) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", req.Namespace, "name", req.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", req.Namespace, "name", req.Name)
 
 	// Find if we have Pods that are not ready, this is OK
 	// only if we are in upgrade mode and we have choose to just

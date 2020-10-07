@@ -27,7 +27,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	cluster *v1alpha1.Cluster,
 	status postgres.PostgresqlStatusList,
 ) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	if len(status.Items) == 0 {
 		// Still no ready instances
