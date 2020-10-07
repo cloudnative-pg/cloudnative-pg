@@ -32,7 +32,7 @@ func (r *ClusterReconciler) upgradeCluster(
 	cluster *v1alpha1.Cluster,
 	podList v1.PodList, clusterStatus postgres.PostgresqlStatusList,
 ) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	targetImageName := cluster.GetImageName()
 
@@ -118,7 +118,7 @@ func (r *ClusterReconciler) upgradeCluster(
 
 // updatePod update an instance to a newer image version
 func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *v1alpha1.Cluster, pod *v1.Pod) error {
-	log := r.Log.WithName("cluster-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	log.Info("Deleting old Pod",
 		"pod", pod.Name,
