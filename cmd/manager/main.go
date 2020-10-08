@@ -8,12 +8,14 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -118,6 +120,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	err = setupPKIInfrastructure(mgr.GetConfig(), mgr.GetWebhookServer().CertDir)
+	if err != nil {
+		setupLog.Error(err, "unable to setup PKI infrastructure")
+		os.Exit(1)
+	}
+
 	if err = (&controllers.ClusterReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("Cluster"),
@@ -143,43 +151,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	/*
-	   Ensure we have the required PKI infrastructure to make
-	   the operator and the clusters working
-	*/
-	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
-	if operatorNamespace == "" {
-		setupLog.Info("Missing OPERATOR_NAMESPACE environment variable")
-		os.Exit(1)
-	}
-
-	clientSet, err := kubernetes.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		setupLog.Error(err, "Cannot create a K8s client")
-		os.Exit(1)
-	}
-
-	caSecret, err := certs.EnsureRootCACertificate(
-		clientSet,
-		operatorNamespace,
-		caSecretName)
-	if err != nil {
-		setupLog.Error(err, "Cannot setup PKI infrastructure")
-	}
-
-	webhookConfig := certs.WebhookEnvironment{
-		CertDir:                            mgr.GetWebhookServer().CertDir,
-		SecretName:                         webhookSecretName,
-		ServiceName:                        webhookServiceName,
-		OperatorNamespace:                  operatorNamespace,
-		MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
-		ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
-	}
-	err = webhookConfig.Setup(clientSet, caSecret)
-	if err != nil {
-		setupLog.Error(err, "Cannot setup webhook server environment")
-	}
-
 	if err = (&postgresqlv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
 		os.Exit(1)
@@ -192,4 +163,41 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func setupPKIInfrastructure(config *rest.Config, certDir string) error {
+	/*
+	   Ensure we have the required PKI infrastructure to make
+	   the operator and the clusters working
+	*/
+	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
+	if operatorNamespace == "" {
+		return fmt.Errorf("missing OPERATOR_NAMESPACE environment variable")
+	}
+
+	clientSet, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("cannot create a K8s client: %w", err)
+	}
+
+	webhookConfig := certs.WebhookEnvironment{
+		CaSecretName:                       caSecretName,
+		CertDir:                            certDir,
+		SecretName:                         webhookSecretName,
+		ServiceName:                        webhookServiceName,
+		OperatorNamespace:                  operatorNamespace,
+		MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
+		ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
+	}
+	err = webhookConfig.Setup(clientSet)
+	if err != nil {
+		return err
+	}
+
+	err = webhookConfig.SchedulePeriodicMaintenance(clientSet)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

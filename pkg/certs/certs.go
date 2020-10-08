@@ -18,6 +18,9 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -29,6 +32,9 @@ const (
 
 	// This is the PEM block type for certificates
 	certificatePEMBlockType = "CERTIFICATE"
+
+	// Threshold to consider a certificate as expiring
+	expiringCheckThreshold = 7 * 24 * time.Hour
 )
 
 // KeyPair represent a pair of keys to be used for asymmetric encryption and a
@@ -55,7 +61,7 @@ func (pair KeyPair) ParseECPrivateKey() (*ecdsa.PrivateKey, error) {
 func (pair KeyPair) ParseCertificate() (*x509.Certificate, error) {
 	block, _ := pem.Decode(pair.Certificate)
 	if block == nil || block.Type != certificatePEMBlockType {
-		return nil, fmt.Errorf("invalid private key PEM block type")
+		return nil, fmt.Errorf("invalid public key PEM block type")
 	}
 
 	return x509.ParseCertificate(block.Bytes)
@@ -63,6 +69,12 @@ func (pair KeyPair) ParseCertificate() (*x509.Certificate, error) {
 
 // CreateAndSignPair given a CA keypair, generate and sign a leaf keypair
 func (pair KeyPair) CreateAndSignPair(host string) (*KeyPair, error) {
+	notBefore := time.Now().Add(time.Minute * -5)
+	notAfter := notBefore.Add(certificateDuration)
+	return pair.createAndSignPairWithValidity(host, notBefore, notAfter)
+}
+
+func (pair KeyPair) createAndSignPairWithValidity(host string, notBefore, notAfter time.Time) (*KeyPair, error) {
 	caCertificate, err := pair.ParseCertificate()
 	if err != nil {
 		return nil, err
@@ -86,8 +98,6 @@ func (pair KeyPair) CreateAndSignPair(host string) (*KeyPair, error) {
 		return nil, fmt.Errorf("can't generate serial number: %w", err)
 	}
 
-	notBefore := time.Now().Add(time.Minute * -5)
-	notAfter := notBefore.Add(certificateDuration)
 	leafTemplate := x509.Certificate{
 		SerialNumber:          serialNumber,
 		NotBefore:             notBefore,
@@ -123,11 +133,143 @@ func (pair KeyPair) CreateAndSignPair(host string) (*KeyPair, error) {
 	}, nil
 }
 
+// GenerateCASecret create a k8s CA secret from a key pair
+func (pair KeyPair) GenerateCASecret(namespace, name string) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"ca.key": pair.Private,
+			"ca.crt": pair.Certificate,
+		},
+		Type: v1.SecretTypeOpaque,
+	}
+}
+
+// GenerateServerSecret create a k8s server secret from a key pair
+func (pair KeyPair) GenerateServerSecret(namespace, name string) *v1.Secret {
+	return &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"tls.key": pair.Private,
+			"tls.crt": pair.Certificate,
+		},
+		Type: v1.SecretTypeTLS,
+	}
+}
+
+// RenewCertificate create a new certificate for the embedded private
+// key, replacing the existing one. The certificate will be signed
+// with the passed private key
+func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey) error {
+	oldCertificate, err := pair.ParseCertificate()
+	if err != nil {
+		return err
+	}
+
+	notBefore := time.Now().Add(time.Minute * -5)
+	notAfter := notBefore.Add(certificateDuration)
+
+	newCertificate := *oldCertificate
+	newCertificate.NotBefore = notBefore
+	newCertificate.NotAfter = notAfter
+
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return err
+	}
+
+	rootTemplate := x509.Certificate{
+		SerialNumber:          serialNumber,
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
+		KeyUsage:              x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+
+	certificateBytes, err := x509.CreateCertificate(
+		rand.Reader,
+		&rootTemplate,
+		&rootTemplate,
+		&caPrivateKey.PublicKey,
+		caPrivateKey)
+	if err != nil {
+		return err
+	}
+
+	pair.Certificate = encodeCertificate(certificateBytes)
+	return nil
+}
+
+// IsExpiring check if the certificate will expire in the configured duration
+func (pair *KeyPair) IsExpiring() (bool, error) {
+	cert, err := pair.ParseCertificate()
+	if err != nil {
+		return true, err
+	}
+
+	if time.Now().Before(cert.NotBefore) {
+		return true, nil
+	}
+	if time.Now().Add(expiringCheckThreshold).After(cert.NotAfter) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
 // CreateCA generates a CA returning its keys
 func CreateCA() (*KeyPair, error) {
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
+	return createCAWithValidity(notBefore, notAfter)
+}
 
+// ParseCASecret parse a CA secret to a key pair
+func ParseCASecret(secret *v1.Secret) (*KeyPair, error) {
+	privateKey, ok := secret.Data["ca.key"]
+	if !ok {
+		return nil, fmt.Errorf("missing ca.key secret data")
+	}
+
+	publicKey, ok := secret.Data["ca.crt"]
+	if !ok {
+		return nil, fmt.Errorf("missing ca.crt secret data")
+	}
+
+	return &KeyPair{
+		Private:     privateKey,
+		Certificate: publicKey,
+	}, nil
+}
+
+// ParseServerSecret parse a secret for a server to a key pair
+func ParseServerSecret(secret *v1.Secret) (*KeyPair, error) {
+	privateKey, ok := secret.Data["tls.key"]
+	if !ok {
+		return nil, fmt.Errorf("missing tls.key secret data")
+	}
+
+	publicKey, ok := secret.Data["tls.crt"]
+	if !ok {
+		return nil, fmt.Errorf("missing tls.crt secret data")
+	}
+
+	return &KeyPair{
+		Private:     privateKey,
+		Certificate: publicKey,
+	}, nil
+}
+
+func createCAWithValidity(notBefore, notAfter time.Time) (*KeyPair, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
