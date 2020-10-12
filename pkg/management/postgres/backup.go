@@ -60,6 +60,13 @@ func (instance *Instance) Backup(
 		serverName)
 
 	// Mark the backup as running
+	backup.GetStatus().S3Credentials = configuration.S3Credentials
+	backup.GetStatus().EndpointURL = configuration.EndpointURL
+	backup.GetStatus().DestinationPath = configuration.DestinationPath
+	backup.GetStatus().ServerName = instance.ClusterName
+	if len(configuration.ServerName) != 0 {
+		backup.GetStatus().ServerName = configuration.ServerName
+	}
 	backup.GetStatus().Phase = apiv1alpha1.BackupPhaseRunning
 	backup.GetStatus().StartedAt = &metav1.Time{
 		Time: time.Now(),

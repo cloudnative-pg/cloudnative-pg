@@ -54,11 +54,65 @@ spec:
             commandOutput:
               description: The backup command output
               type: string
+            destinationPath:
+              description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
+                this path, with different destination folders, will be used for WALs
+                and for data
+              type: string
+            endpointURL:
+              description: Endpoint to be used to upload data to the cloud, overriding
+                the automatic endpoint discovery
+              type: string
             error:
               description: The detected error
               type: string
             phase:
               description: The last backup status
+              type: string
+            s3Credentials:
+              description: The credentials to use to upload data to S3
+              properties:
+                accessKeyId:
+                  description: The reference to the access key id
+                  properties:
+                    key:
+                      description: The key of the secret to select from.  Must be
+                        a valid secret key.
+                      type: string
+                    name:
+                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Add other useful fields. apiVersion, kind, uid?'
+                      type: string
+                    optional:
+                      description: Specify whether the Secret or its key must be defined
+                      type: boolean
+                  required:
+                  - key
+                  type: object
+                secretAccessKey:
+                  description: The reference to the secret access key
+                  properties:
+                    key:
+                      description: The key of the secret to select from.  Must be
+                        a valid secret key.
+                      type: string
+                    name:
+                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Add other useful fields. apiVersion, kind, uid?'
+                      type: string
+                    optional:
+                      description: Specify whether the Secret or its key must be defined
+                      type: boolean
+                  required:
+                  - key
+                  type: object
+              required:
+              - accessKeyId
+              - secretAccessKey
+              type: object
+            serverName:
+              description: The server name on S3, the cluster name is used if this
+                parameter is omitted
               type: string
             startedAt:
               description: When the backup was started
@@ -68,6 +122,9 @@ spec:
               description: When the backup was terminated
               format: date-time
               type: string
+          required:
+          - destinationPath
+          - s3Credentials
           type: object
       type: object
   version: v1alpha1
