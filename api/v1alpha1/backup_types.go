@@ -40,6 +40,22 @@ type BackupSpec struct {
 
 // BackupStatus defines the observed state of Backup
 type BackupStatus struct {
+	// The credentials to use to upload data to S3
+	S3Credentials S3Credentials `json:"s3Credentials"`
+
+	// Endpoint to be used to upload data to the cloud,
+	// overriding the automatic endpoint discovery
+	EndpointURL string `json:"endpointURL,omitempty"`
+
+	// The path where to store the backup (i.e. s3://bucket/path/to/folder)
+	// this path, with different destination folders, will be used for WALs
+	// and for data
+	DestinationPath string `json:"destinationPath"`
+
+	// The server name on S3, the cluster name is used if this
+	// parameter is omitted
+	ServerName string `json:"serverName,omitempty"`
+
 	// The last backup status
 	Phase BackupPhase `json:"phase,omitempty"`
 
