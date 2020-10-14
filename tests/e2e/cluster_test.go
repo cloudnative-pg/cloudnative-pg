@@ -55,8 +55,8 @@ var _ = Describe("Cluster", func() {
 			Expect(err).To(BeNil())
 		})
 		By("having a Cluster with 3 nodes ready", func() {
-			// Setting up a cluster with three pods is slow, usually 200-300s
-			timeout := 400
+			// Setting up a cluster with three pods is slow, usually 200-600s
+			timeout := 600
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      clusterName,
@@ -178,7 +178,7 @@ var _ = Describe("Cluster", func() {
 			By("adding an instance to the cluster", func() {
 				_, _, err := tests.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).To(BeNil())
-				timeout := 200
+				timeout := 300
 				namespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      clusterName,
@@ -462,7 +462,7 @@ var _ = Describe("Cluster", func() {
 
 	Context("Cluster rolling updates", func() {
 		AssertUpdateImage := func(namespace string, clusterName string) {
-			timeout := 400
+			timeout := 600
 
 			// Detect initial image name
 			var initialImageName string
@@ -776,7 +776,7 @@ var _ = Describe("Cluster", func() {
 				Expect(err).To(BeNil())
 
 				// The pod should be back
-				timeout := 120
+				timeout := 300
 				Eventually(func() (bool, error) {
 					pod := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, podNamespacedName, pod)
@@ -821,7 +821,7 @@ var _ = Describe("Cluster", func() {
 				_, _, err = tests.Run(fmt.Sprintf("kubectl delete -n %v pod/%v", namespace, podName))
 				Expect(err).To(BeNil())
 				// A new pod should be created
-				timeout := 180
+				timeout := 300
 				newPodName := clusterName + "-4"
 				newPodNamespacedName := types.NamespacedName{
 					Namespace: namespace,
