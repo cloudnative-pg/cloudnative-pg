@@ -5,12 +5,6 @@ metadata:
 spec:
   instances: 3
 
-  # Configuration of the application that will be used by
-  # this PostgreSQL cluster
-  applicationConfiguration:
-    database: app
-    owner: app
-
   # Example of rolling update strategy:
   # - unsupervised: automated update of the primary once all
   #                 replicas have been upgraded (default)
@@ -22,6 +16,11 @@ spec:
   storage:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
 
   backup:
     destinationPath: s3://cluster-backups/

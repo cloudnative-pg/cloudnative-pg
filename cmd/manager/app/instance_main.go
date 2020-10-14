@@ -46,7 +46,7 @@ func InstanceManagerCommand(args []string) {
 		"The name of the application containing the database")
 	initCommand.StringVar(&appUser, "app-user", "app",
 		"The name of the application user")
-	initCommand.StringVar(&appPwFile, "app-pw-file", "/etc/secret/ownerPassword",
+	initCommand.StringVar(&appPwFile, "app-pw-file", "",
 		"The file where the password for the application user is stored")
 	initCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
 	initCommand.StringVar(&parentNode, "parent-node", "", "The origin node")
@@ -63,8 +63,6 @@ func InstanceManagerCommand(args []string) {
 
 	runCommand := flag.NewFlagSet("run", flag.ExitOnError)
 	runCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be started up")
-	runCommand.StringVar(&appDBName, "app-db-name", "app",
-		"The name of the application containing the database")
 	runCommand.StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
 		"be checked against the cluster state")
 	runCommand.StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+

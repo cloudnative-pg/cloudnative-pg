@@ -50,6 +50,47 @@ const (
 func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 
+	initCommand := []string{
+		"/controller/manager",
+		"instance",
+		"init",
+		"-pw-file", "/etc/superuser-secret/password",
+		"-parent-node", cluster.GetServiceReadWriteName(),
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "pgdata",
+			MountPath: "/var/lib/postgresql/data",
+		},
+		{
+			Name:      "config",
+			MountPath: "/etc/configuration",
+		},
+		{
+			Name:      "superuser-secret",
+			MountPath: "/etc/superuser-secret",
+		},
+		{
+			Name:      "controller",
+			MountPath: "/controller",
+		},
+	}
+
+	if cluster.ShouldCreateApplicationDatabase() {
+		initCommand = append(initCommand,
+			"-app-db-name", cluster.Spec.Bootstrap.InitDB.Database,
+			"-app-user", cluster.Spec.Bootstrap.InitDB.Owner,
+			"-app-pw-file", "/etc/app-secret/password")
+
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      "app-secret",
+				MountPath: "/etc/app-secret",
+			},
+		)
+	}
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -102,38 +143,8 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 							Value: cluster.Namespace,
 						},
 					},
-					Command: []string{
-						"/controller/manager",
-						"instance",
-						"init",
-						"-pw-file", "/etc/superuser-secret/password",
-						"-app-db-name", cluster.Spec.ApplicationConfiguration.Database,
-						"-app-user", cluster.Spec.ApplicationConfiguration.Owner,
-						"-app-pw-file", "/etc/app-secret/password",
-						"-parent-node", cluster.GetServiceReadWriteName(),
-					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "pgdata",
-							MountPath: "/var/lib/postgresql/data",
-						},
-						{
-							Name:      "config",
-							MountPath: "/etc/configuration",
-						},
-						{
-							Name:      "superuser-secret",
-							MountPath: "/etc/superuser-secret",
-						},
-						{
-							Name:      "app-secret",
-							MountPath: "/etc/app-secret",
-						},
-						{
-							Name:      "controller",
-							MountPath: "/controller",
-						},
-					},
+					Command:      initCommand,
+					VolumeMounts: volumeMounts,
 				},
 			},
 			Containers:         createPostgresContainers(cluster, podName),
@@ -148,7 +159,7 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 }
 
 func createPostgresVolumes(cluster v1alpha1.Cluster, podName string) []corev1.Volume {
-	return []corev1.Volume{
+	result := []corev1.Volume{
 		{
 			Name: "pgdata",
 			VolumeSource: corev1.VolumeSource{
@@ -176,20 +187,27 @@ func createPostgresVolumes(cluster v1alpha1.Cluster, podName string) []corev1.Vo
 			},
 		},
 		{
-			Name: "app-secret",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: cluster.GetApplicationSecretName(),
-				},
-			},
-		},
-		{
 			Name: "controller",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
 	}
+
+	if cluster.ShouldCreateApplicationDatabase() {
+		result = append(result,
+			corev1.Volume{
+				Name: "app-secret",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: cluster.GetApplicationSecretName(),
+					},
+				},
+			},
+		)
+	}
+
+	return result
 }
 
 // createPostgresContainers create the PostgreSQL containers that are
@@ -294,7 +312,6 @@ func createPostgresContainers(
 				"/controller/manager",
 				"instance",
 				"run",
-				"-app-db-name", cluster.Spec.ApplicationConfiguration.Database,
 				"-pw-file", "/etc/superuser-secret/password",
 			},
 			Resources: cluster.Spec.Resources,
@@ -452,10 +469,6 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 						{
 							Name:      "superuser-secret",
 							MountPath: "/etc/superuser-secret",
-						},
-						{
-							Name:      "app-secret",
-							MountPath: "/etc/app-secret",
 						},
 						{
 							Name:      "controller",

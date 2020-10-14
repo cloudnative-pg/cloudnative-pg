@@ -64,12 +64,14 @@ func (info InitInfo) VerifyConfiguration() error {
 		return fmt.Errorf("superuser password file doesn't exist (%v)", info.PasswordFile)
 	}
 
-	applicationPasswordFileExists, err := fileutils.FileExists(info.ApplicationPasswordFile)
-	if err != nil {
-		return err
-	}
-	if !applicationPasswordFileExists {
-		return fmt.Errorf("application user's password file doesn't exist (%v)", info.PasswordFile)
+	if info.ApplicationPasswordFile != "" {
+		applicationPasswordFileExists, err := fileutils.FileExists(info.ApplicationPasswordFile)
+		if err != nil {
+			return err
+		}
+		if !applicationPasswordFileExists {
+			return fmt.Errorf("application user's password file doesn't exist (%v)", info.PasswordFile)
+		}
 	}
 
 	pgdataExists, err := fileutils.FileExists(info.PgData)
@@ -78,14 +80,6 @@ func (info InitInfo) VerifyConfiguration() error {
 	}
 	if pgdataExists {
 		return fmt.Errorf("PGData directories already exist")
-	}
-
-	if len(info.ApplicationUser) == 0 {
-		return fmt.Errorf("the name of the application user is empty")
-	}
-
-	if len(info.ApplicationDatabase) == 0 {
-		return fmt.Errorf("the name of the application database is empty")
 	}
 
 	return nil
@@ -237,9 +231,11 @@ func (info InitInfo) Bootstrap() error {
 			return nil
 		}
 
-		err = info.ConfigureApplicationEnvironment(db)
-		if err != nil {
-			return nil
+		if info.ApplicationDatabase != "" {
+			err = info.ConfigureApplicationEnvironment(db)
+			if err != nil {
+				return nil
+			}
 		}
 
 		if majorVersion >= 12 {

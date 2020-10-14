@@ -17,7 +17,7 @@ As any other object in Kubernetes, a PostgreSQL cluster has a `metadata` section
 A PostgreSQL cluster object can be defined through the following parameters available in the `spec` key of the manifest:
 
 - `affinity`: affinity/anti-affinity rules for Pods
-- `applicationConfiguration`: configuration of the PostgreSQL cluster (*required*)
+- `bootstrap`: how to create this new PostgreSQL cluster
 - `description`: description of the PostgreSQL cluster
 - `imageName`: name of the container image for PostgreSQL
 - `imagePullSecretName`: secret for pulling the PostgreSQL image
@@ -31,12 +31,27 @@ A PostgreSQL cluster object can be defined through the following parameters avai
 - `stopDelay`: allowed time in seconds for a PostgreSQL instance to gracefully shut down (default 30)
 - `storage`: configuration of the storage of PostgreSQL instances
 
-## Application configuration
+## Bootstrap
 
-Application oriented information, such as database name, is delegated to the `applicationConfiguration` section of the manifest, with the following mandatory parameters, in alphabetical order:
+The `bootstrap` section contain information about how to create this PostgreSQL cluster. For now, only the `initdb`
+method is available, specifying a database to be created and its owner like in the following example:
 
-- `database`: name of the PostgreSQL database in the cluster (e.g. `app`)
-- `owner`: name of the owner of the PostgreSQL database
+```yaml
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-example-initdb
+spec:
+  instances: 3
+
+  bootstrap:
+    initdb:
+      database: appdb
+      owner: appuser
+
+  storage:
+    size: 1Gi
+```
 
 ## PostgreSQL server configuration
 

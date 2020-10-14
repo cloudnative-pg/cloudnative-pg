@@ -160,12 +160,6 @@ metadata:
 spec:
   instances: 3
 
-  # Configuration of the application that will be used by
-  # this PostgreSQL cluster
-  applicationConfiguration:
-    database: app
-    owner: app
-
   # Example of rolling update strategy:
   # - unsupervised: automated update of the primary once all
   #                 replicas have been upgraded (default)
@@ -177,9 +171,6 @@ spec:
   storage:
     size: 1Gi
 ```
-
-This will create a `Cluster` called `cluster-example` with a PostgreSQL
-primary, two replicas, and a database called `app` owned by the `app` PostgreSQL user.
 
 !!! Note "There's more"
     For more detailed information about the available options, please refer

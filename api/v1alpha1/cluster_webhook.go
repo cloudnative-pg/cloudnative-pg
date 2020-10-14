@@ -47,8 +47,8 @@ func (r *Cluster) ValidateCreate() error {
 	var allErrs field.ErrorList
 	log.Info("validate create", "name", r.Name)
 
-	// TODO: add validations
-	// allErrs = append(allErrs, r.ValidateSomething()...)
+	allErrs = append(allErrs, r.ValidateInitDB()...)
+	allErrs = append(allErrs, r.ValidateSuperuserSecret()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -63,8 +63,8 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	var allErrs field.ErrorList
 	log.Info("validate update", "name", r.Name)
 
-	// TODO: add validations
-	// allErrs = append(allErrs, r.ValidateSomething()...)
+	allErrs = append(allErrs, r.ValidateInitDB()...)
+	allErrs = append(allErrs, r.ValidateSuperuserSecret()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -80,4 +80,64 @@ func (r *Cluster) ValidateDelete() error {
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil
+}
+
+// ValidateInitDB validate the bootstrapping options when initdb
+// method is used
+func (r *Cluster) ValidateInitDB() field.ErrorList {
+	var result field.ErrorList
+
+	// If it's not configured, everything is ok
+	if r.Spec.Bootstrap == nil {
+		return result
+	}
+
+	if r.Spec.Bootstrap.InitDB == nil {
+		return result
+	}
+
+	// If you specify the database name, then you need also to specify the
+	// owner user and vice-versa
+	initDBOptions := r.Spec.Bootstrap.InitDB
+
+	if initDBOptions.Database != "" && initDBOptions.Owner == "" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "owner"),
+				"",
+				"You need to specify the database owner user"))
+	}
+	if initDBOptions.Database == "" && initDBOptions.Owner != "" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "database"),
+				"",
+				"You need to specify the database name"))
+	}
+
+	return result
+}
+
+// ValidateSuperuserSecret validate super user secret value
+func (r *Cluster) ValidateSuperuserSecret() field.ErrorList {
+	var result field.ErrorList
+
+	// If empty, we're ok!
+	if r.Spec.SuperuserSecret == nil {
+		return result
+	}
+
+	// We check that we have a valid name and not empty
+	if r.Spec.SuperuserSecret.Name == "" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "superusersecret", "name"),
+				"",
+				"Super user secret name can't be empty"))
+	}
+
+	return result
 }
