@@ -64,7 +64,7 @@ var _ = Describe("Cluster", func() {
 				Expect(err).To(BeNil())
 			})
 			By("having a Cluster with three instances ready", func() {
-				timeout := 300
+				timeout := 600
 				namespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      clusterName,
