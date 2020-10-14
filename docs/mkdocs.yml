@@ -22,6 +22,7 @@ nav:
   - Architecture: 'architecture.md'
   - Quickstart: 'quickstart.md'
   - Security: 'security.md'
+  - Failure modes: 'failure_modes.md'
   - Rolling updates: 'rolling_update.md'
   - Backups: 'backups.md'
   - Custom Resource Definitions: 'crd.md'
