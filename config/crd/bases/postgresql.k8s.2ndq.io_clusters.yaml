@@ -52,22 +52,6 @@ spec:
               required:
               - enablePodAntiAffinity
               type: object
-            applicationConfiguration:
-              description: Configuration from the application point of view
-              properties:
-                database:
-                  description: Name of the database used by the application
-                  minLength: 1
-                  type: string
-                owner:
-                  description: Name of the owner of the database in the instance to
-                    be used by applications.
-                  minLength: 1
-                  type: string
-              required:
-              - database
-              - owner
-              type: object
             backup:
               description: The configuration to be used for backups
               properties:
@@ -162,6 +146,34 @@ spec:
               required:
               - destinationPath
               - s3Credentials
+              type: object
+            bootstrap:
+              description: Instructions to bootstrap this cluster
+              properties:
+                initdb:
+                  description: Bootstrap the cluster via initdb
+                  properties:
+                    database:
+                      description: Name of the database used by the application.
+                      type: string
+                    owner:
+                      description: Name of the owner of the database in the instance
+                        to be used by applications.
+                      type: string
+                    secret:
+                      description: Name of the secret containing the initial credentials
+                        for the owner of the user database. If empty a new secret
+                        will be created from scratch
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                  required:
+                  - database
+                  - owner
+                  type: object
               type: object
             description:
               description: Description of this PostgreSQL cluster
@@ -387,8 +399,16 @@ spec:
               required:
               - size
               type: object
+            superuserSecret:
+              description: The secret containing the superuser password, if empty
+                a new secret will be created with a randomly generated password
+              properties:
+                name:
+                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    TODO: Add other useful fields. apiVersion, kind, uid?'
+                  type: string
+              type: object
           required:
-          - applicationConfiguration
           - instances
           type: object
         status:

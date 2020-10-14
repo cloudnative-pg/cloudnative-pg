@@ -97,45 +97,53 @@ func (r *ClusterReconciler) createPostgresConfigMap(ctx context.Context, cluster
 }
 
 func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	postgresPassword, err := password.Generate(64, 10, 0, false, true)
-	if err != nil {
-		return err
-	}
-	appPassword, err := password.Generate(64, 10, 0, false, true)
-	if err != nil {
-		return err
+	if cluster.Spec.SuperuserSecret == nil ||
+		cluster.Spec.SuperuserSecret.Name == "" {
+		postgresPassword, err := password.Generate(64, 10, 0, false, true)
+		if err != nil {
+			return err
+		}
+
+		postgresSecret := specs.CreateSecret(
+			cluster.GetSuperuserSecretName(),
+			cluster.Namespace,
+			cluster.GetServiceReadWriteName(),
+			"*",
+			"postgres",
+			postgresPassword)
+		utils.SetAsOwnedBy(&postgresSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+		specs.SetOperatorVersion(&postgresSecret.ObjectMeta, versions.Version)
+		if err := r.Create(ctx, postgresSecret); err != nil {
+			if apierrs.IsAlreadyExists(err) {
+				return nil
+			}
+			return err
+		}
 	}
 
-	postgresSecret := specs.CreateSecret(
-		cluster.GetSuperuserSecretName(),
-		cluster.Namespace,
-		cluster.GetServiceReadWriteName(),
-		"*",
-		"postgres",
-		postgresPassword)
-	utils.SetAsOwnedBy(&postgresSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
-	specs.SetOperatorVersion(&postgresSecret.ObjectMeta, versions.Version)
-	if err := r.Create(ctx, postgresSecret); err != nil {
-		if apierrs.IsAlreadyExists(err) {
-			return nil
+	if cluster.ShouldCreateApplicationDatabase() &&
+		(cluster.Spec.Bootstrap.InitDB.Secret == nil ||
+			cluster.Spec.Bootstrap.InitDB.Secret.Name == "") {
+		appPassword, err := password.Generate(64, 10, 0, false, true)
+		if err != nil {
+			return err
 		}
-		return err
-	}
 
-	appSecret := specs.CreateSecret(
-		cluster.GetApplicationSecretName(),
-		cluster.Namespace,
-		cluster.GetServiceReadWriteName(),
-		cluster.Spec.ApplicationConfiguration.Database,
-		cluster.Spec.ApplicationConfiguration.Owner,
-		appPassword)
-	utils.SetAsOwnedBy(&appSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
-	specs.SetOperatorVersion(&appSecret.ObjectMeta, versions.Version)
-	if err := r.Create(ctx, appSecret); err != nil {
-		if apierrs.IsAlreadyExists(err) {
-			return nil
+		appSecret := specs.CreateSecret(
+			cluster.GetApplicationSecretName(),
+			cluster.Namespace,
+			cluster.GetServiceReadWriteName(),
+			cluster.Spec.Bootstrap.InitDB.Database,
+			cluster.Spec.Bootstrap.InitDB.Owner,
+			appPassword)
+		utils.SetAsOwnedBy(&appSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+		specs.SetOperatorVersion(&appSecret.ObjectMeta, versions.Version)
+		if err := r.Create(ctx, appSecret); err != nil {
+			if apierrs.IsAlreadyExists(err) {
+				return nil
+			}
+			return err
 		}
-		return err
 	}
 
 	return nil

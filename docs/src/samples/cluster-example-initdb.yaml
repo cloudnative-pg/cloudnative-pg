@@ -2,9 +2,14 @@
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
 kind: Cluster
 metadata:
-  name: cluster-example
+  name: cluster-example-initdb
 spec:
   instances: 3
+
+  bootstrap:
+    initdb:
+      database: appdb
+      owner: appuser
 
   storage:
     size: 1Gi

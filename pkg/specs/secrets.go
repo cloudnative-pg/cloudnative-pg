@@ -27,6 +27,7 @@ func CreateSecret(
 			Name:      name,
 			Namespace: namespace,
 		},
+		Type: corev1.SecretTypeBasicAuth,
 		StringData: map[string]string{
 			"username": username,
 			"password": password,

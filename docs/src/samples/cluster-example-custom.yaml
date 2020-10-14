@@ -6,12 +6,6 @@ metadata:
 spec:
   instances: 3
 
-  # Configuration of the application that will be used by
-  # this PostgreSQL cluster
-  applicationConfiguration:
-    database: app
-    owner: app
-
   # Parameters and pg_hba configuration will be append
   # to the default ones to make the cluster work
   postgresql:
@@ -27,6 +21,6 @@ spec:
   #               the switchover of the primary
   primaryUpdateStrategy: unsupervised
 
-  # Require 1Gi of space
+  # Require 1Gi of space per instance using default storage class
   storage:
     size: 1Gi

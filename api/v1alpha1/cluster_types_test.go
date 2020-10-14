@@ -100,3 +100,24 @@ var _ = Describe("Node maintenance window", func() {
 		Expect(cluster.IsNodeMaintenanceWindowReusePVC()).To(BeFalse())
 	})
 })
+
+var _ = Describe("Bootstrap via initdb", func() {
+	It("will create an application database if specified", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+					},
+				},
+			},
+		}
+
+		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeTrue())
+	})
+
+	It("will not create an application database if not requested", func() {
+		Expect(Cluster{}.ShouldCreateApplicationDatabase()).To(BeFalse())
+	})
+})

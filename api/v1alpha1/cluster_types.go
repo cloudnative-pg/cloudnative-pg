@@ -56,8 +56,14 @@ type ClusterSpec struct {
 	// +optional
 	PostgresConfiguration PostgresConfiguration `json:"postgresql,omitempty"`
 
-	// Configuration from the application point of view
-	ApplicationConfiguration ApplicationConfiguration `json:"applicationConfiguration"`
+	// Instructions to bootstrap this cluster
+	// +optional
+	Bootstrap *BootstrapConfiguration `json:"bootstrap,omitempty"`
+
+	// The secret containing the superuser password, if empty a new
+	// secret will be created with a randomly generated password
+	// +optional
+	SuperuserSecret *corev1.LocalObjectReference `json:"superuserSecret,omitempty"`
 
 	// Configuration of the storage of the instances
 	// +optional
@@ -173,16 +179,26 @@ type PostgresConfiguration struct {
 	PgHBA []string `json:"pg_hba,omitempty"`
 }
 
-// ApplicationConfiguration is the configuration required by the application
-type ApplicationConfiguration struct {
-	// Name of the database used by the application
-	// +kubebuilder:validation:MinLength=1
+// BootstrapConfiguration contains the instructions to bootstrap
+// the cluster from scratch
+type BootstrapConfiguration struct {
+	// Bootstrap the cluster via initdb
+	InitDB *BootstrapInitDB `json:"initdb,omitempty"`
+}
+
+// BootstrapInitDB is the configuration required by the application
+type BootstrapInitDB struct {
+	// Name of the database used by the application.
 	Database string `json:"database"`
 
 	// Name of the owner of the database in the instance to be used
 	// by applications.
-	// +kubebuilder:validation:MinLength=1
 	Owner string `json:"owner"`
+
+	// Name of the secret containing the initial credentials for the
+	// owner of the user database. If empty a new secret will be
+	// created from scratch
+	Secret *corev1.LocalObjectReference `json:"secret,omitempty"`
 }
 
 // StorageConfiguration is the configuration of the storage of the PostgreSQL instances
@@ -354,11 +370,23 @@ func (cluster *Cluster) GetImageName() string {
 
 // GetSuperuserSecretName get the secret name of the PostgreSQL superuser
 func (cluster *Cluster) GetSuperuserSecretName() string {
+	if cluster.Spec.SuperuserSecret != nil &&
+		cluster.Spec.SuperuserSecret.Name != "" {
+		return cluster.Spec.SuperuserSecret.Name
+	}
+
 	return fmt.Sprintf("%v%v", cluster.Name, SuperUserSecretSuffix)
 }
 
 // GetApplicationSecretName get the name of the secret of the application
 func (cluster *Cluster) GetApplicationSecretName() string {
+	if cluster.Spec.Bootstrap != nil &&
+		cluster.Spec.Bootstrap.InitDB != nil &&
+		cluster.Spec.Bootstrap.InitDB.Secret != nil &&
+		cluster.Spec.Bootstrap.InitDB.Secret.Name != "" {
+		return cluster.Spec.Bootstrap.InitDB.Secret.Name
+	}
+
 	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
 }
 
@@ -438,6 +466,21 @@ func (cluster *Cluster) IsNodeMaintenanceWindowNotReusePVC() bool {
 		reusePVC = *cluster.Spec.NodeMaintenanceWindow.ReusePVC
 	}
 	return !reusePVC
+}
+
+// ShouldCreateApplicationDatabase returns true if for this cluster,
+// during the bootstrap phase, we need to create an application database
+func (cluster Cluster) ShouldCreateApplicationDatabase() bool {
+	if cluster.Spec.Bootstrap == nil {
+		return false
+	}
+
+	if cluster.Spec.Bootstrap.InitDB == nil {
+		return false
+	}
+
+	initDBParameters := cluster.Spec.Bootstrap.InitDB
+	return initDBParameters.Owner != "" && initDBParameters.Database != ""
 }
 
 func init() {
