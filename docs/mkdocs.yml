@@ -25,6 +25,7 @@ nav:
   - Failure modes: 'failure_modes.md'
   - Rolling updates: 'rolling_update.md'
   - Backups: 'backups.md'
+  - PostgreSQL Configuration: 'postgresql_conf.md'
   - Custom Resource Definitions: 'crd.md'
   - Configuration samples: 'samples.md'
   - Exposing Postgres services: 'expose_pg_services.md'
