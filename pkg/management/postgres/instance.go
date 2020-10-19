@@ -255,7 +255,8 @@ func (instance *Instance) createRecoveryConf() error {
 	}()
 	_, err = f.WriteString("standby_mode = 'on'\n" +
 		"primary_conninfo = " + pq.QuoteLiteral(primaryConnInfo) + "\n" +
-		"recovery_target_timeline = 'latest'\n")
+		"recovery_target_timeline = 'latest'\n" +
+		"restore_command = '/controller/manager wal-restore %f %p'\n")
 	if err != nil {
 		return err
 	}

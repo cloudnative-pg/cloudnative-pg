@@ -84,6 +84,10 @@ func main() {
 			app.WalArchiveCommand(os.Args[2:])
 			return
 
+		case "wal-restore":
+			app.WalRestoreCommand(os.Args[2:])
+			return
+
 		case "backup":
 			app.BackupCommand(os.Args[2:])
 			return
