@@ -214,7 +214,12 @@ eks_e2e:
     - curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml | sed "s/{{cluster_name}}/cnp-test-$CI_PIPELINE_ID-$CI_NODE_INDEX/;s/{{region_name}}/${REGION}/" | kubectl apply -f -
     - hack/e2e/run-e2e.sh
   after_script:
-    - eksctl delete cluster -n cnp-test-$CI_PIPELINE_ID-$CI_NODE_INDEX -r "${REGION}" -w
+    - |
+      until eksctl delete cluster -n cnp-test-$CI_PIPELINE_ID-$CI_NODE_INDEX -r "${REGION}" --wait
+      do
+          echo "Failed deleting cluster cnp-test-$CI_PIPELINE_ID-$CI_NODE_INDEX"
+          sleep 5
+      done
 
 aks_e2e:
   stage: e2e
