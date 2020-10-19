@@ -143,6 +143,11 @@ var _ = Describe("Cluster", func() {
 						return utils.IsPodActive(*pod) && utils.IsPodReady(*pod)
 					}, timeout).Should(BeTrue())
 
+					// Ensure we have the latest metadata about the Pod
+					if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
+						Fail("Unable to get Pod " + podName)
+					}
+
 					// And it should still contain the table we created before,
 					// so an empty SELECT would work
 					query = "SELECT * FROM test"

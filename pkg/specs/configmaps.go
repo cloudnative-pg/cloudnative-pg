@@ -71,6 +71,7 @@ var (
 			"max_parallel_workers":  "32",
 			"max_worker_processes":  "32",
 			"max_replication_slots": "32",
+			"logging_collector":     "off",
 		},
 		DefaultSettings: map[MajorVersionRange]PostgresSettings{
 			{0, 130000}: {

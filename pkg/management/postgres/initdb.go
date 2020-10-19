@@ -198,9 +198,17 @@ func (info InitInfo) ConfigureReplica(db *sql.DB) error {
 		return err
 	}
 
-	// This parameter will be used when this master will be degraded.
+	// The following parameters will be used when this master is being demoted.
 	// PostgreSQL <= 11 will have this parameter written to the
 	// 'recovery.conf' when needed.
+
+	_, err = db.Exec(
+		fmt.Sprintf("ALTER SYSTEM SET restore_command TO %v",
+			pq.QuoteLiteral("/controller/manager wal-restore %f %p")))
+	if err != nil {
+		return err
+	}
+
 	_, err = db.Exec("ALTER SYSTEM SET recovery_target_timeline TO 'latest'")
 	if err != nil {
 		return err

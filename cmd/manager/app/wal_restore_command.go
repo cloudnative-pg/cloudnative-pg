@@ -20,9 +20,9 @@ import (
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
 )
 
-// WalArchiveCommand archives a certain WAL into the cloud
-// using barman-wal-archive
-func WalArchiveCommand(args []string) {
+// WalRestoreCommand restore a certain WAL file from the cloud
+// using barman-wal-restore
+func WalRestoreCommand(args []string) {
 	var clusterName string
 	var namespace string
 	var podName string
@@ -32,14 +32,15 @@ func WalArchiveCommand(args []string) {
 	flag.StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of the "+
 		"current pod in k8s")
 	flag.StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
-		"the cluster and of the Pod in k8s")
+		"the cluster and the Pods in k8s")
 
 	_ = flag.CommandLine.Parse(args)
-	if len(flag.Args()) != 1 {
-		fmt.Println("Usage: manager wal-archive <file>")
+	if len(flag.Args()) != 2 {
+		fmt.Println("Usage: manager wal-restore <wal_name> <destination_path>")
 		os.Exit(1)
 	}
 	walName := flag.Arg(0)
+	destinationPath := flag.Arg(1)
 
 	typedClient, err := management.NewClient()
 	if err != nil {
@@ -59,7 +60,7 @@ func WalArchiveCommand(args []string) {
 
 	if cluster.Spec.Backup == nil || len(cluster.Spec.Backup.DestinationPath) == 0 {
 		// Backup not configured, skipping WAL
-		log.Log.V(4).Info("Skipping WAL",
+		log.Log.V(4).Info("Skipping WAL restore, there is no backup configuration",
 			"walName", walName,
 			"pod", podName,
 			"cluster", clusterName,
@@ -67,21 +68,25 @@ func WalArchiveCommand(args []string) {
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
 		)
-		return
+		os.Exit(1)
 	}
 
-	if cluster.Status.CurrentPrimary != podName {
-		// Nothing to be done here, since I'm not the primary server
-		return
+	if cluster.Status.CurrentPrimary == podName {
+		// Why a request to restore a WAL file is arriving from the master server?
+		// Something strange is happening here
+		log.Log.Info("Received request to restore a WAL file on the current primary",
+			"walName", walName,
+			"pod", podName,
+			"cluster", clusterName,
+			"namespace", namespace,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary,
+		)
+		os.Exit(1)
 	}
 
 	var options []string
 	if cluster.Spec.Backup.Wal != nil {
-		if len(cluster.Spec.Backup.Wal.Compression) != 0 {
-			options = append(
-				options,
-				fmt.Sprintf("--%v", cluster.Spec.Backup.Wal.Compression))
-		}
 		if len(cluster.Spec.Backup.Wal.Encryption) != 0 {
 			options = append(
 				options,
@@ -89,28 +94,32 @@ func WalArchiveCommand(args []string) {
 				string(cluster.Spec.Backup.Wal.Encryption))
 		}
 	}
+
 	if len(cluster.Spec.Backup.EndpointURL) > 0 {
 		options = append(
 			options,
 			"--endpoint-url",
 			cluster.Spec.Backup.EndpointURL)
 	}
+
 	serverName := clusterName
 	if len(cluster.Spec.Backup.ServerName) != 0 {
 		serverName = cluster.Spec.Backup.ServerName
 	}
+
 	options = append(
 		options,
 		cluster.Spec.Backup.DestinationPath,
 		serverName,
-		flag.Arg(0))
+		walName,
+		destinationPath)
 
-	cmd := exec.Command("barman-cloud-wal-archive", options...) // #nosec G204
+	cmd := exec.Command("barman-cloud-wal-restore", options...) // #nosec G204
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		log.Log.Error(err, "Error while running barman-cloud-wal-archive",
+		log.Log.Info("barman-cloud-wal-restore",
 			"walName", walName,
 			"pod", podName,
 			"cluster", clusterName,
@@ -118,6 +127,7 @@ func WalArchiveCommand(args []string) {
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
 			"options", options,
+			"exitCode", cmd.ProcessState.ExitCode(),
 		)
 		os.Exit(1)
 	}
