@@ -104,7 +104,7 @@ var _ = Describe("Cluster", func() {
 					// Put something in the database. We'll check later if it
 					// still exists
 					query := "CREATE TABLE test (id bigserial PRIMARY KEY, t text)"
-					_, _, err := utils.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
+					_, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
 						"psql", "-U", "postgres", "app", "-tAc", query)
 					Expect(err).To(BeNil())
 
@@ -117,7 +117,7 @@ var _ = Describe("Cluster", func() {
 							restart = data.RestartCount
 						}
 					}
-					_, _, err = utils.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
+					_, _, err = env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
 						"sh", "-c", "kill 1")
 					Expect(err).To(BeNil())
 					Eventually(func() int32 {
@@ -147,7 +147,7 @@ var _ = Describe("Cluster", func() {
 					// And it should still contain the table we created before,
 					// so an empty SELECT would work
 					query = "SELECT * FROM test"
-					_, _, err = utils.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
+					_, _, err = env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
 						"psql", "-U", "postgres", "app", "-tAc", query)
 					Expect(err).To(BeNil())
 				})
@@ -292,7 +292,7 @@ var _ = Describe("Cluster", func() {
 					Fail("Unable to get Pod " + pausedReplica)
 				}
 				timeout := time.Second * 2
-				_, _, err := utils.ExecCommand(env.Ctx, pausedPod, "postgres", &timeout,
+				_, _, err := env.ExecCommand(env.Ctx, pausedPod, "postgres", &timeout,
 					"psql", "-U", "postgres", "-c", "SELECT pg_wal_replay_pause()")
 				Expect(err).To(BeNil())
 			})
@@ -308,7 +308,7 @@ var _ = Describe("Cluster", func() {
 					Fail("Unable to get Pod " + pausedReplica)
 				}
 				timeout := time.Second * 2
-				_, _, err := utils.ExecCommand(env.Ctx, primaryPod, "postgres", &timeout,
+				_, _, err := env.ExecCommand(env.Ctx, primaryPod, "postgres", &timeout,
 					"psql", "-U", "postgres", "-c", "CHECKPOINT; SELECT pg_switch_wal()")
 				Expect(err).To(BeNil())
 			})

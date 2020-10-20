@@ -13,6 +13,8 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
@@ -108,12 +110,17 @@ func (r *ClusterReconciler) getReplicaStatusFromPod(
 	var result postgres.PostgresqlStatus
 
 	timeout := time.Second * 2
+	config := controllerruntime.GetConfigOrDie()
+	clientInterface := kubernetes.NewForConfigOrDie(config)
 	stdout, _, err := utils.ExecCommand(
 		ctx,
+		clientInterface,
+		config,
 		pod,
 		specs.PostgresContainerName,
 		&timeout,
 		"/controller/manager", "instance", "status")
+
 	if err != nil {
 		return result, err
 	}

@@ -20,25 +20,19 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 // ExecCommand executes arbitrary command inside the pod, and returns his result
 func ExecCommand(
 	ctx context.Context,
+	client kubernetes.Interface,
+	config *rest.Config,
 	pod corev1.Pod,
 	containerName string,
 	timeout *time.Duration,
 	command ...string) (string, string, error) {
-	config := ctrl.GetConfigOrDie()
-
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return "", "", err
-	}
-
 	// iterate through all containers looking for the one running PostgreSQL.
 	targetContainer := -1
 	for i, cr := range pod.Spec.Containers {
@@ -52,7 +46,7 @@ func ExecCommand(
 		return "", "", fmt.Errorf("could not find %s container to exec to", containerName)
 	}
 
-	req := clientset.CoreV1().RESTClient().Post().
+	req := client.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(pod.Name).
 		Namespace(pod.Namespace).
