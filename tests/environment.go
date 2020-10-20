@@ -10,10 +10,14 @@ import (
 	"context"
 	"os"
 	"strings"
+	"time"
 
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,6 +30,7 @@ import (
 type TestingEnvironment struct {
 	RestClientConfig   *rest.Config
 	Client             client.Client
+	Interface          kubernetes.Interface
 	Ctx                context.Context
 	Scheme             *runtime.Scheme
 	PreserveNamespaces []string
@@ -35,6 +40,7 @@ type TestingEnvironment struct {
 func NewTestingEnvironment() (*TestingEnvironment, error) {
 	var env TestingEnvironment
 	env.RestClientConfig = controllerruntime.GetConfigOrDie()
+	env.Interface = kubernetes.NewForConfigOrDie(env.RestClientConfig)
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
 
@@ -96,4 +102,15 @@ func (env TestingEnvironment) DeletePod(namespace string, name string, opts ...c
 	})
 
 	return env.Client.Delete(env.Ctx, u, opts...)
+}
+
+// ExecCommand wraps the utils.ExecCommand pre-setting values constant during
+// tests
+func (env TestingEnvironment) ExecCommand(
+	ctx context.Context,
+	pod corev1.Pod,
+	containerName string,
+	timeout *time.Duration,
+	command ...string) (string, string, error) {
+	return utils.ExecCommand(ctx, env.Interface, env.RestClientConfig, pod, containerName, timeout, command...)
 }

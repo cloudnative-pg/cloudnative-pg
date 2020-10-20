@@ -8,6 +8,7 @@ package performance
 
 import (
 	"testing"
+	"time"
 
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
@@ -34,5 +35,6 @@ var _ = BeforeSuite(func() {
 
 func TestE2ESuite(t *testing.T) {
 	RegisterFailHandler(Fail)
+	SetDefaultEventuallyPollingInterval(200 * time.Millisecond)
 	RunSpecs(t, "Cloud Native PostgreSQL Operator E2E")
 }

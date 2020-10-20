@@ -16,7 +16,6 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -121,7 +120,7 @@ var _ = Describe("Cluster", func() {
 				}
 				err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
 				Expect(err).To(BeNil())
-				_, _, err = utils.ExecCommand(env.Ctx, *lmCr, "postgres",
+				_, _, err = env.ExecCommand(env.Ctx, *lmCr, "postgres",
 					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 				Expect(err).To(BeNil())
 			})
@@ -149,7 +148,7 @@ var _ = Describe("Cluster", func() {
 				Eventually(func() (string, error) {
 					lmCr := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
-					out, _, _ := utils.ExecCommand(env.Ctx, *lmCr, "postgres",
+					out, _, _ := env.ExecCommand(env.Ctx, *lmCr, "postgres",
 						&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
 						"SELECT count(*) > 0 FROM tps.tl")
 					return strings.TrimSpace(out), err
@@ -186,7 +185,7 @@ var _ = Describe("Cluster", func() {
 				Eventually(func() (string, error) {
 					lmCr := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
-					out, _, _ := utils.ExecCommand(env.Ctx, *lmCr, "postgres",
+					out, _, _ := env.ExecCommand(env.Ctx, *lmCr, "postgres",
 						&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
 						"SELECT count(*) > 0 FROM tps.tl "+
 							"WHERE timeline = '00000002'")
@@ -222,7 +221,7 @@ var _ = Describe("Cluster", func() {
 				lmCr := &corev1.Pod{}
 				err := env.Client.Get(env.Ctx, lmNamespacedName, lmCr)
 				Expect(err).To(BeNil())
-				out, _, _ := utils.ExecCommand(env.Ctx, *lmCr, "postgres",
+				out, _, _ := env.ExecCommand(env.Ctx, *lmCr, "postgres",
 					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 				switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
 				Expect(err).To(BeNil())
