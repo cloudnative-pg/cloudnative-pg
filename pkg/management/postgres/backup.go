@@ -9,6 +9,7 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"time"
@@ -20,6 +21,44 @@ import (
 	apiv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 )
+
+// BackupListResult represent the result of a
+// barman-cloud-backup-list invocation
+type BackupListResult struct {
+	// The list of backups
+	List []BarmanBackup `json:"backups_list"`
+}
+
+// GetLatestBackupID gets the latest backup ID
+// between the ones available in the list
+func (backupList *BackupListResult) GetLatestBackupID() string {
+	id := ""
+	for _, backup := range backupList.List {
+		if backup.ID > id {
+			id = backup.ID
+		}
+	}
+	return id
+}
+
+// BarmanBackup represent a backup as created
+// by Barman
+type BarmanBackup struct {
+	// The backup label
+	Label string `json:"backup_label"`
+
+	// The moment where the backup started
+	BeginTime string `json:"begin_time"`
+
+	// The moment where the backup ended
+	EndTime string `json:"end_time"`
+
+	// The systemID of the cluster
+	SystemID string `json:"systemid"`
+
+	// The ID of the backup
+	ID string `json:"backup_id"`
+}
 
 // Backup start a backup for this instance using
 // barman-cloud-backup
@@ -64,6 +103,9 @@ func (instance *Instance) Backup(
 	backup.GetStatus().EndpointURL = configuration.EndpointURL
 	backup.GetStatus().DestinationPath = configuration.DestinationPath
 	backup.GetStatus().ServerName = instance.ClusterName
+	if configuration.Data != nil {
+		backup.GetStatus().Encryption = string(configuration.Data.Encryption)
+	}
 	if len(configuration.ServerName) != 0 {
 		backup.GetStatus().ServerName = configuration.ServerName
 	}
@@ -106,7 +148,59 @@ func (instance *Instance) Backup(
 				"stdout", stdoutBuffer.String(),
 				"stderr", stderrBuffer.String())
 		}
+
+		// Extracting backup ID using barman-cloud-backup-list
+		options := []string{"--format", "json"}
+		if configuration.EndpointURL != "" {
+			options = append(options, "--endpoint-url", configuration.EndpointURL)
+		}
+		if configuration.Data != nil && configuration.Data.Encryption != "" {
+			options = append(options, "-e", string(configuration.Data.Encryption))
+		}
+		options = append(options, configuration.DestinationPath, serverName)
+
+		cmd = exec.Command("barman-cloud-backup-list", options...) // #nosec G204
+		stderrBuffer.Reset()
+		stdoutBuffer.Reset()
+		cmd.Stdout = &stdoutBuffer
+		cmd.Stderr = &stderrBuffer
+		err = cmd.Run()
+
+		if err != nil {
+			log.Error(err,
+				"Can't extract backup id using barman-cloud-backup-list",
+				"options", options,
+				"stdout", stdoutBuffer.String(),
+				"stderr", stderrBuffer.String())
+			return
+		}
+
+		backupList, err := parseBarmanCloudBackupList(stdoutBuffer.String())
+		if err != nil {
+			log.Error(err,
+				"Error parsing barman-cloud-backup-list output",
+				"stdout", stdoutBuffer.String(),
+				"stderr", stderrBuffer.String())
+			return
+		}
+
+		backup.GetStatus().BackupID = backupList.GetLatestBackupID()
+		if err := utils.UpdateStatusAndRetry(ctx, client, backup.GetKubernetesObject()); err != nil {
+			log.Error(err,
+				"Can't mark backup with Barman ID",
+				"backupID", backup.GetStatus().BackupID)
+		}
 	}()
 
 	return nil
+}
+
+// parse the output of barman-cloud-backup-list
+func parseBarmanCloudBackupList(output string) (*BackupListResult, error) {
+	var result BackupListResult
+	err := json.Unmarshal([]byte(output), &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }

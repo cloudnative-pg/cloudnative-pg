@@ -56,6 +56,12 @@ type BackupStatus struct {
 	// parameter is omitted
 	ServerName string `json:"serverName,omitempty"`
 
+	// Encryption method required to S3 API
+	Encryption string `json:"encryption,omitempty"`
+
+	// The ID of the Barman backup
+	BackupID string `json:"backupId,omitempty"`
+
 	// The last backup status
 	Phase BackupPhase `json:"phase,omitempty"`
 

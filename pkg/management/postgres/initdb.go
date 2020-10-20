@@ -45,6 +45,12 @@ type InitInfo struct {
 
 	// The cluster name to assign to
 	ClusterName string
+
+	// The namespace where the cluster will be installed
+	Namespace string
+
+	// The name of the backup to recover
+	BackupName string
 }
 
 const (

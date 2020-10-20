@@ -31,7 +31,7 @@ var _ = Describe("Serial ID of a PostgreSQL node", func() {
 			Namespace: "default",
 		},
 	}
-	firstPod := CreatePrimaryPod(cluster, 1)
+	firstPod := CreatePrimaryPodViaInitdb(cluster, 1)
 
 	It("can be extracted from a Pod", func() {
 		result, err := GetNodeSerial(firstPod.ObjectMeta)
@@ -61,7 +61,7 @@ var _ = Describe("Check if it a primary or a replica", func() {
 			Namespace: "default",
 		},
 	}
-	primaryPod := CreatePrimaryPod(cluster, 1)
+	primaryPod := CreatePrimaryPodViaInitdb(cluster, 1)
 	replicaPod := JoinReplicaInstance(cluster, 2)
 
 	It("a primary is detected as a primary", func() {
@@ -82,7 +82,7 @@ var _ = Describe("Extract the used image name", func() {
 			Namespace: "default",
 		},
 	}
-	pod := CreatePrimaryPod(cluster, 1)
+	pod := CreatePrimaryPodViaInitdb(cluster, 1)
 
 	It("extract the default image name", func() {
 		Expect(GetPostgreSQLImageName(*pod)).To(Equal(versions.GetDefaultImageName()))

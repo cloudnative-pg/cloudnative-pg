@@ -48,6 +48,9 @@ spec:
         status:
           description: BackupStatus defines the observed state of Backup
           properties:
+            backupId:
+              description: The ID of the Barman backup
+              type: string
             commandError:
               description: The backup command output
               type: string
@@ -58,6 +61,9 @@ spec:
               description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
                 this path, with different destination folders, will be used for WALs
                 and for data
+              type: string
+            encryption:
+              description: Encryption method required to S3 API
               type: string
             endpointURL:
               description: Endpoint to be used to upload data to the cloud, overriding

@@ -179,27 +179,6 @@ func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 	return instance.superUserDB, nil
 }
 
-// GetApplicationDB gets the connection pool pointing to this instance, possibly creating
-// it if needed
-func (instance *Instance) GetApplicationDB() (*sql.DB, error) {
-	if instance.applicationDB != nil {
-		return instance.applicationDB, nil
-	}
-
-	db, err := sql.Open(
-		"postgres",
-		"postgres://postgres@localhost/"+instance.ApplicationDatabase+"?sslmode=disable")
-	if err != nil {
-		return nil, errors.Wrap(err, "Can't create connection pool")
-	}
-
-	db.SetMaxOpenConns(2)
-	db.SetMaxIdleConns(0)
-
-	instance.applicationDB = db
-	return instance.applicationDB, nil
-}
-
 // IsPrimary check if the data directory belongs to a primary server or to a
 // secondary one by looking for a "standby.signal" file inside the data
 // directory. IMPORTANT: this method also works when the instance is not
