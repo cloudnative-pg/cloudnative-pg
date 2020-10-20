@@ -46,8 +46,8 @@ const (
 	postgresGroup = 26
 )
 
-// CreatePrimaryPod create a new primary instance in a Pod
-func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
+// CreatePrimaryPodViaInitdb create a new primary instance in a Pod
+func CreatePrimaryPodViaInitdb(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 
 	initCommand := []string{
@@ -145,6 +145,115 @@ func CreatePrimaryPod(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 					},
 					Command:      initCommand,
 					VolumeMounts: volumeMounts,
+				},
+			},
+			Containers:         createPostgresContainers(cluster, podName),
+			Volumes:            createPostgresVolumes(cluster, podName),
+			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
+			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
+			ServiceAccountName: cluster.Name,
+		},
+	}
+
+	return pod
+}
+
+// CreatePrimaryPodViaFullRecovery create a new primary instance in a Pod
+func CreatePrimaryPodViaFullRecovery(cluster v1alpha1.Cluster, nodeSerial int32, backup *v1alpha1.Backup) *corev1.Pod {
+	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+
+	initCommand := []string{
+		"/controller/manager",
+		"instance",
+		"restore",
+		"-pw-file", "/etc/superuser-secret/password",
+		"-parent-node", cluster.GetServiceReadWriteName(),
+		"-backup-name", cluster.Spec.Bootstrap.FullRecovery.Backup.Name,
+	}
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				ClusterLabelName:     cluster.Name,
+				ClusterRoleLabelName: ClusterRoleLabelPrimary,
+			},
+			Annotations: map[string]string{
+				ClusterSerialAnnotationName: strconv.Itoa(int(nodeSerial)),
+			},
+			Name:      podName,
+			Namespace: cluster.Namespace,
+		},
+		Spec: corev1.PodSpec{
+			Hostname:  podName,
+			Subdomain: cluster.GetServiceAnyName(),
+			InitContainers: []corev1.Container{
+				{
+					Name:  "bootstrap-controller",
+					Image: versions.GetDefaultOperatorImageName(),
+					Command: []string{
+						"/manager",
+						"bootstrap",
+						"/controller/manager",
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "controller",
+							MountPath: "/controller",
+						},
+					},
+				},
+				{
+					Name:  "bootstrap-full-recovery",
+					Image: cluster.GetImageName(),
+					Env: []corev1.EnvVar{
+						{
+							Name:  "PGDATA",
+							Value: "/var/lib/postgresql/data/pgdata",
+						},
+						{
+							Name:  "POD_NAME",
+							Value: podName,
+						},
+						{
+							Name:  "CLUSTER_NAME",
+							Value: cluster.Name,
+						},
+						{
+							Name:  "NAMESPACE",
+							Value: cluster.Namespace,
+						},
+						{
+							Name: "AWS_ACCESS_KEY_ID",
+							ValueFrom: &corev1.EnvVarSource{
+								SecretKeyRef: &backup.Status.S3Credentials.AccessKeyIDReference,
+							},
+						},
+						{
+							Name: "AWS_SECRET_ACCESS_KEY",
+							ValueFrom: &corev1.EnvVarSource{
+								SecretKeyRef: &backup.Status.S3Credentials.SecretAccessKeyReference,
+							},
+						},
+					},
+					Command: initCommand,
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "pgdata",
+							MountPath: "/var/lib/postgresql/data",
+						},
+						{
+							Name:      "config",
+							MountPath: "/etc/configuration",
+						},
+						{
+							Name:      "superuser-secret",
+							MountPath: "/etc/superuser-secret",
+						},
+						{
+							Name:      "controller",
+							MountPath: "/controller",
+						},
+					},
 				},
 			},
 			Containers:         createPostgresContainers(cluster, podName),

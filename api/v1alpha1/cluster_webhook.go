@@ -47,8 +47,9 @@ func (r *Cluster) ValidateCreate() error {
 	var allErrs field.ErrorList
 	log.Info("validate create", "name", r.Name)
 
-	allErrs = append(allErrs, r.ValidateInitDB()...)
-	allErrs = append(allErrs, r.ValidateSuperuserSecret()...)
+	allErrs = append(allErrs, r.validateInitDB()...)
+	allErrs = append(allErrs, r.validateSuperuserSecret()...)
+	allErrs = append(allErrs, r.validateBootstrapMethod()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -63,8 +64,9 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	var allErrs field.ErrorList
 	log.Info("validate update", "name", r.Name)
 
-	allErrs = append(allErrs, r.ValidateInitDB()...)
-	allErrs = append(allErrs, r.ValidateSuperuserSecret()...)
+	allErrs = append(allErrs, r.validateInitDB()...)
+	allErrs = append(allErrs, r.validateSuperuserSecret()...)
+	allErrs = append(allErrs, r.validateBootstrapMethod()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -84,7 +86,7 @@ func (r *Cluster) ValidateDelete() error {
 
 // ValidateInitDB validate the bootstrapping options when initdb
 // method is used
-func (r *Cluster) ValidateInitDB() field.ErrorList {
+func (r *Cluster) validateInitDB() field.ErrorList {
 	var result field.ErrorList
 
 	// If it's not configured, everything is ok
@@ -121,7 +123,7 @@ func (r *Cluster) ValidateInitDB() field.ErrorList {
 }
 
 // ValidateSuperuserSecret validate super user secret value
-func (r *Cluster) ValidateSuperuserSecret() field.ErrorList {
+func (r *Cluster) validateSuperuserSecret() field.ErrorList {
 	var result field.ErrorList
 
 	// If empty, we're ok!
@@ -137,6 +139,36 @@ func (r *Cluster) ValidateSuperuserSecret() field.ErrorList {
 				field.NewPath("spec", "superusersecret", "name"),
 				"",
 				"Super user secret name can't be empty"))
+	}
+
+	return result
+}
+
+// validateBootstrapMethod is used to ensure we have only one
+// bootstrap methods active
+func (r *Cluster) validateBootstrapMethod() field.ErrorList {
+	var result field.ErrorList
+
+	// If it's not configured, everything is ok
+	if r.Spec.Bootstrap == nil {
+		return result
+	}
+
+	bootstrapMethods := 0
+	if r.Spec.Bootstrap.InitDB != nil {
+		bootstrapMethods++
+	}
+	if r.Spec.Bootstrap.FullRecovery != nil {
+		bootstrapMethods++
+	}
+
+	if bootstrapMethods > 1 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap"),
+				"",
+				"Too many bootstrap types specified"))
 	}
 
 	return result

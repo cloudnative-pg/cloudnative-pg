@@ -150,6 +150,20 @@ spec:
             bootstrap:
               description: Instructions to bootstrap this cluster
               properties:
+                fullRecovery:
+                  description: Bootstrap the cluster from a backup
+                  properties:
+                    backup:
+                      description: The backup we need to restore
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                  required:
+                  - backup
+                  type: object
                 initdb:
                   description: Bootstrap the cluster via initdb
                   properties:

@@ -184,9 +184,13 @@ type PostgresConfiguration struct {
 type BootstrapConfiguration struct {
 	// Bootstrap the cluster via initdb
 	InitDB *BootstrapInitDB `json:"initdb,omitempty"`
+
+	// Bootstrap the cluster from a backup
+	FullRecovery *BootstrapFullRecovery `json:"fullRecovery,omitempty"`
 }
 
-// BootstrapInitDB is the configuration required by the application
+// BootstrapInitDB is the configuration of the bootstrap process when
+// initdb is used
 type BootstrapInitDB struct {
 	// Name of the database used by the application.
 	Database string `json:"database"`
@@ -198,7 +202,15 @@ type BootstrapInitDB struct {
 	// Name of the secret containing the initial credentials for the
 	// owner of the user database. If empty a new secret will be
 	// created from scratch
+	// +optional
 	Secret *corev1.LocalObjectReference `json:"secret,omitempty"`
+}
+
+// BootstrapFullRecovery is the configuration of the bootstrap process
+// when using an existing backup
+type BootstrapFullRecovery struct {
+	// The backup we need to restore
+	Backup corev1.LocalObjectReference `json:"backup"`
 }
 
 // StorageConfiguration is the configuration of the storage of the PostgreSQL instances

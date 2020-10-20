@@ -37,6 +37,7 @@ func InstanceManagerCommand(args []string) {
 	var parentNode string
 	var podName string
 	var clusterName string
+	var backupName string
 	var namespace string
 
 	initCommand := flag.NewFlagSet("init", flag.ExitOnError)
@@ -52,6 +53,8 @@ func InstanceManagerCommand(args []string) {
 	initCommand.StringVar(&parentNode, "parent-node", "", "The origin node")
 	initCommand.StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
 		"current cluster in k8s, used to coordinate switchover and failover")
+	initCommand.StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
+		"the cluster and of the Pod in k8s")
 
 	joinCommand := flag.NewFlagSet("join", flag.ExitOnError)
 	joinCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
@@ -76,15 +79,27 @@ func InstanceManagerCommand(args []string) {
 	runCommand.StringVar(&postgresHBARules, "hba-rules-file", os.Getenv("PGHBA"),
 		"The file containing the HBA rules to apply to PostgreSQL")
 
+	restoreCommand := flag.NewFlagSet("restore", flag.ExitOnError)
+	restoreCommand.StringVar(&pwFile, "pw-file", "",
+		"The file containing the PostgreSQL superuser password to use during the init phase")
+	restoreCommand.StringVar(&parentNode, "parent-node", "", "The origin node")
+	restoreCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
+	restoreCommand.StringVar(&backupName, "backup-name", "", "The name of the backup that should be restored")
+	restoreCommand.StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
+		"current cluster in k8s, used to coordinate switchover and failover")
+	restoreCommand.StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
+		"the cluster and the Pod in k8s")
+
 	statusCommand := flag.NewFlagSet("status", flag.ExitOnError)
 
 	if len(args) == 0 {
 		fmt.Println("usage: manager instance <command> <args>")
 		fmt.Println("Available commands:")
-		fmt.Println("  init    Bootstrap the first instance of a PostgreSQL cluster")
-		fmt.Println("  join    Bootstrap a new node by joining an existing node")
-		fmt.Println("  run     Run the PostgreSQL instance")
-		fmt.Println("  status  Print the instance status")
+		fmt.Println("  init      Bootstrap the first instance of a PostgreSQL cluster")
+		fmt.Println("  join      Bootstrap a new node by joining an existing node")
+		fmt.Println("  run       Run the PostgreSQL instance")
+		fmt.Println("  status    Print the instance status")
+		fmt.Println("  restore   Create a new PGData given a backup")
 		return
 	}
 
@@ -100,6 +115,7 @@ func InstanceManagerCommand(args []string) {
 			ApplicationPasswordFile: appPwFile,
 			ParentNode:              parentNode,
 			ClusterName:             clusterName,
+			Namespace:               namespace,
 		}
 
 		if err := postgres.CreatePgPass(pwFile); err != nil {
@@ -147,6 +163,23 @@ func InstanceManagerCommand(args []string) {
 		// Ignore errors; statusCommand is set for ExitOnError
 		_ = statusCommand.Parse(args[1:])
 		statusSubCommand()
+	case "restore":
+		// Ignore errors; restoreCommand is set for ExitOnError.
+		_ = restoreCommand.Parse(args[1:])
+		info := postgres.InitInfo{
+			PgData:       pgData,
+			PasswordFile: pwFile,
+			ClusterName:  clusterName,
+			Namespace:    namespace,
+			BackupName:   backupName,
+			ParentNode:   parentNode,
+		}
+
+		if err := postgres.CreatePgPass(pwFile); err != nil {
+			log.Log.Error(err, "Error creating pgpass file")
+			os.Exit(1)
+		}
+		restoreSubCommand(info)
 	default:
 		fmt.Printf("%v is not a valid command\n", args[0])
 		os.Exit(1)
@@ -174,6 +207,31 @@ func initSubCommand(info postgres.InitInfo) {
 	err = info.Bootstrap()
 	if err != nil {
 		log.Log.Error(err, "Error while bootstrapping data directory")
+		os.Exit(1)
+	}
+}
+
+func restoreSubCommand(info postgres.InitInfo) {
+	status, err := fileutils.FileExists(info.PgData)
+	if err != nil {
+		log.Log.Error(err, "Error while checking for an existent PGData")
+		os.Exit(1)
+	}
+	if status {
+		log.Log.Info("PGData already exists, can't restore over an existing folder")
+		return
+	}
+
+	err = info.VerifyConfiguration()
+	if err != nil {
+		log.Log.Error(err, "Configuration not valid",
+			"info", info)
+		os.Exit(1)
+	}
+
+	err = info.Restore()
+	if err != nil {
+		log.Log.Error(err, "Error while restoring a backup")
 		os.Exit(1)
 	}
 }
