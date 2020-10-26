@@ -193,10 +193,12 @@ type BootstrapConfiguration struct {
 // initdb is used
 type BootstrapInitDB struct {
 	// Name of the database used by the application.
+	// +optional
 	Database string `json:"database"`
 
 	// Name of the owner of the database in the instance to be used
 	// by applications.
+	// +optional
 	Owner string `json:"owner"`
 
 	// Name of the secret containing the initial credentials for the

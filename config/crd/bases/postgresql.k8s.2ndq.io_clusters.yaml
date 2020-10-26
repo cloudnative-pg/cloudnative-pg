@@ -184,9 +184,6 @@ spec:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
-                  required:
-                  - database
-                  - owner
                   type: object
               type: object
             description:
