@@ -417,7 +417,20 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, err
 	}
 
-	pvcSpec := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
+	pvcSpec, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
+	if err != nil {
+		if err == specs.ErrorInvalidSize {
+			// This error should have been caught by the validating
+			// webhook, but since we are here the user must have disabled server-side
+			// validation and we must react.
+			log.Info("The size specified for the cluster is not valid",
+				"size",
+				cluster.Spec.StorageConfiguration.Size)
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
+		return ctrl.Result{}, err
+	}
+
 	utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
@@ -432,7 +445,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	ctx context.Context,
 	nodeSerial int32,
 	cluster *v1alpha1.Cluster,
-) error {
+) (ctrl.Result, error) {
 	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	var pod *corev1.Pod
@@ -446,7 +459,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
 		log.Error(err, "Unable to set the owner reference for joined PostgreSQL node")
-		return err
+		return ctrl.Result{}, err
 	}
 
 	specs.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
@@ -456,22 +469,35 @@ func (r *ClusterReconciler) joinReplicaInstance(
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
 			log.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
-			return nil
+			return ctrl.Result{}, nil
 		}
 
 		log.Error(err, "Unable to create Pod", "pod", pod)
-		return err
+		return ctrl.Result{}, err
 	}
 
-	pvcSpec := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
+	pvcSpec, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
+	if err != nil {
+		if err == specs.ErrorInvalidSize {
+			// This error should have been caught by the validating
+			// webhook, but since we are here the user must have disabled server-side
+			// validation and we must react.
+			log.Info("The size specified for the cluster is not valid",
+				"size",
+				cluster.Spec.StorageConfiguration.Size)
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
+		return ctrl.Result{}, err
+	}
+
 	utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
 		log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
-		return err
+		return ctrl.Result{}, err
 	}
 
-	return nil
+	return ctrl.Result{}, nil
 }
 
 // handleDanglingPVC reattach a dangling PVC

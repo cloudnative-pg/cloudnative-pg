@@ -11,9 +11,16 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+)
+
+var (
+	// ErrorInvalidSize is raised when the size specified by the
+	// user is not valid and can't be specified in a PVC declaration
+	ErrorInvalidSize = fmt.Errorf("invalid storage size")
 )
 
 // CreatePVC create spec of a PVC, given its name and the storage configuration
@@ -22,7 +29,7 @@ func CreatePVC(
 	name string,
 	namespace string,
 	nodeSerial int32,
-) *corev1.PersistentVolumeClaim {
+) (*corev1.PersistentVolumeClaim, error) {
 	pvcName := fmt.Sprintf("%s-%v", name, nodeSerial)
 
 	result := &corev1.PersistentVolumeClaim{
@@ -46,9 +53,14 @@ func CreatePVC(
 	}
 
 	// Insert the storage requirement
+	parsedSize, err := resource.ParseQuantity(storageConfiguration.Size)
+	if err != nil {
+		return nil, ErrorInvalidSize
+	}
+
 	result.Spec.Resources = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			"storage": storageConfiguration.Size,
+			"storage": parsedSize,
 		},
 	}
 
@@ -58,5 +70,5 @@ func CreatePVC(
 		}
 	}
 
-	return result
+	return result, nil
 }

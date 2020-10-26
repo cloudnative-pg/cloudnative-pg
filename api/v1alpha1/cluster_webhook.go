@@ -8,6 +8,7 @@ package v1alpha1
 
 import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -68,6 +69,7 @@ func (r *Cluster) ValidateCreate() error {
 	allErrs = append(allErrs, r.validateInitDB()...)
 	allErrs = append(allErrs, r.validateSuperuserSecret()...)
 	allErrs = append(allErrs, r.validateBootstrapMethod()...)
+	allErrs = append(allErrs, r.validateStorageConfiguration()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -85,6 +87,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validateInitDB()...)
 	allErrs = append(allErrs, r.validateSuperuserSecret()...)
 	allErrs = append(allErrs, r.validateBootstrapMethod()...)
+	allErrs = append(allErrs, r.validateStorageConfiguration()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -187,6 +190,22 @@ func (r *Cluster) validateBootstrapMethod() field.ErrorList {
 				field.NewPath("spec", "bootstrap"),
 				"",
 				"Too many bootstrap types specified"))
+	}
+
+	return result
+}
+
+// validateStorageConfiguration validates the size format it's correct
+func (r *Cluster) validateStorageConfiguration() field.ErrorList {
+	var result field.ErrorList
+
+	if _, err := resource.ParseQuantity(r.Spec.StorageConfiguration.Size); err != nil {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "storage", "size"),
+				r.Spec.StorageConfiguration.Size,
+				"Size value isn't valid"))
 	}
 
 	return result
