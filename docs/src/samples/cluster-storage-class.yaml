@@ -1,4 +1,3 @@
-# Example of PostgreSQL cluster using a storage class
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
 kind: Cluster
 metadata:

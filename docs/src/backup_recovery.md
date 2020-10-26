@@ -3,6 +3,8 @@ that is based on the [Barman](https://pgbarman.org) tool. Instead
 of using the classical architecture with a Barman server which
 backup many PostgreSQL instances, the operator will use the
 `barman-cloud-wal-archive` and `barman-cloud-backup` tools.
+As a result, base backups will be *tarballs*. Both base backups and WAL files
+can be compressed and encrypted.
 
 For this it is required an image with `barman-cli-cloud` installed. The
 image `quay.io/2ndquadrant/postgres` can be used for this scope,
@@ -216,7 +218,7 @@ metadata:
   name: backup-example
 spec:
   cluster:
-    name: postgresql-bkp
+    name: pg-backup
 ```
 
 The operator will start to orchestrate the cluster to take the
@@ -231,17 +233,15 @@ Labels:       <none>
 Annotations:  API Version:  postgresql.k8s.2ndq.io/v1alpha1
 Kind:         Backup
 Metadata:
-  Creation Timestamp:  2020-04-08T13:45:04Z
-  Generation:          1
-  Resource Version:    148183
-  Self Link:           /apis/postgresql.k8s.2ndq.io/v1alpha1/namespaces/default/backups/backup-example
-  UID:                 e32f9190-e0c8-4424-9456-9e53d26a9c83
+  Creation Timestamp:  2020-10-26T13:57:40Z
+  Self Link:         /apis/postgresql.k8s.2ndq.io/v1alpha1/namespaces/default/backups/backup-example
+  UID:               ad5f855c-2ffd-454a-a157-900d5f1f6584
 Spec:
   Cluster:
-    Name:  postgresql-bkp
+    Name:  pg-backup
 Status:
   Phase:       running
-  Started At:  2020-04-08T13:45:04Z
+  Started At:  2020-10-26T13:57:40Z
 Events:        <none>
 ```
 
@@ -255,19 +255,28 @@ Labels:       <none>
 Annotations:  API Version:  postgresql.k8s.2ndq.io/v1alpha1
 Kind:         Backup
 Metadata:
-  Creation Timestamp:  2020-04-08T13:45:04Z
-  Generation:          1
-  Resource Version:    148260
-  Self Link:           /apis/postgresql.k8s.2ndq.io/v1alpha1/namespaces/default/backups/backup-example
-  UID:                 e32f9190-e0c8-4424-9456-9e53d26a9c83
+  Creation Timestamp:  2020-10-26T13:57:40Z
+  Self Link:         /apis/postgresql.k8s.2ndq.io/v1alpha1/namespaces/default/backups/backup-example
+  UID:               ad5f855c-2ffd-454a-a157-900d5f1f6584
 Spec:
   Cluster:
-    Name:  postgresql-bkp
+    Name:  pg-backup
 Status:
-  Phase:       completed
-  Started At:  2020-04-08T13:45:04Z
-  Stopped At:  2020-04-08T13:45:33Z
-Events:        <none>
+  Backup Id:         20201026T135740
+  Destination Path:  s3://backups/
+  Endpoint URL:      http://minio:9000
+  Phase:             completed
+  s3Credentials:
+    Access Key Id:
+      Key:   ACCESS_KEY_ID
+      Name:  minio
+    Secret Access Key:
+      Key:      ACCESS_SECRET_KEY
+      Name:     minio
+  Server Name:  pg-backup
+  Started At:   2020-10-26T13:57:40Z
+  Stopped At:   2020-10-26T13:57:44Z
+Events:         <none>
 ```
 
 ## Scheduled backups
@@ -290,7 +299,7 @@ metadata:
 spec:
   schedule: "0 0 0 * * *"
   cluster:
-    name: postgresql-bkp
+    name: pg-backup
 ```
 
 The proposed specification will schedule a backup every day at midnight.
@@ -318,3 +327,79 @@ spec:
 The encryption can be configured directly in your bucket, and if
 you don't specify otherwise in the cluster, the operator will use
 that one.
+
+
+## Recovery
+
+The data uploaded to the object storage can be used to bootstrap a
+new cluster from a backup. The operator will orchestrate the restore
+process using the `barman-cloud-restore` tool.
+
+When a backup is completed, the corresponding Kubernetes resource will
+contain every information needed to restore it, just like in the
+following example:
+
+```text
+Name:         backup-example
+Namespace:    default
+Labels:       <none>
+Annotations:  API Version:  postgresql.k8s.2ndq.io/v1alpha1
+Kind:         Backup
+Metadata:
+  Creation Timestamp:  2020-10-26T13:57:40Z
+  Self Link:         /apis/postgresql.k8s.2ndq.io/v1alpha1/namespaces/default/backups/backup-example
+  UID:               ad5f855c-2ffd-454a-a157-900d5f1f6584
+Spec:
+  Cluster:
+    Name:  pg-backup
+Status:
+  Backup Id:         20201026T135740
+  Destination Path:  s3://backups/
+  Endpoint URL:      http://minio:9000
+  Phase:             completed
+  s3Credentials:
+    Access Key Id:
+      Key:   ACCESS_KEY_ID
+      Name:  minio
+    Secret Access Key:
+      Key:      ACCESS_SECRET_KEY
+      Name:     minio
+  Server Name:  pg-backup
+  Started At:   2020-10-26T13:57:40Z
+  Stopped At:   2020-10-26T13:57:44Z
+Events:         <none>
+```
+
+Given the following cluster definition:
+
+```yaml
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  instances: 3
+
+  storage:
+    size: 5Gi
+
+  bootstrap:
+    fullRecovery:
+      backup:
+        name: backup-example
+```
+
+The operator will inject an init container in the first instance of the
+cluster and the init container will start recovering the backup from the
+object storage.
+
+When the recovery process is completed, the operator will start the instance
+to allow it to recover the transaction log files needed for the
+consistency of the restored data directory.
+
+Once the recovery is complete, the required superuser password will be set
+into the instance. Having done that, the new primary instance will start
+as usual and the remaining instances will join the cluster as replicas.
+
+The process is transparent for the user, and managed by the instance manager
+running in the Pods.
