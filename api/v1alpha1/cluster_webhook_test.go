@@ -128,3 +128,27 @@ var _ = Describe("initdb options validation", func() {
 		Expect(len(result)).To(Equal(1))
 	})
 })
+
+var _ = Describe("", func() {
+	It("defaults to creating an application database", func() {
+		cluster := Cluster{}
+		cluster.Default()
+		Expect(cluster.Spec.Bootstrap.InitDB.Database).To(Equal("app"))
+		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("app"))
+	})
+
+	It("default the owner user with the database name", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "appdb",
+					},
+				},
+			},
+		}
+
+		cluster.Default()
+		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("appdb"))
+	})
+})

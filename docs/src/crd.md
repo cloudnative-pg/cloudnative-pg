@@ -53,6 +53,9 @@ spec:
     size: 1Gi
 ```
 
+If you do not specify the application database name, a database named `app` will be created.
+If the owner of the database is not present, it will have the same name of the application database.
+
 ## PostgreSQL server configuration
 
 Each PostgreSQL instance can be configured in the `postgresql` section of the manifest, through the following options:

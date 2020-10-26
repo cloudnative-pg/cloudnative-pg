@@ -34,7 +34,25 @@ var _ webhook.Defaulter = &Cluster{}
 func (r *Cluster) Default() {
 	log.Info("default", "name", r.Name)
 
-	// TODO(user): fill in your defaulting logic.
+	if r.Spec.Bootstrap == nil {
+		r.Spec.Bootstrap = &BootstrapConfiguration{}
+	}
+
+	if r.Spec.Bootstrap.InitDB == nil && r.Spec.Bootstrap.FullRecovery == nil {
+		r.Spec.Bootstrap.InitDB = &BootstrapInitDB{
+			Database: "app",
+			Owner:    "app",
+		}
+	}
+
+	if r.Spec.Bootstrap.InitDB != nil {
+		if r.Spec.Bootstrap.InitDB.Database == "" {
+			r.Spec.Bootstrap.InitDB.Database = "app"
+		}
+		if r.Spec.Bootstrap.InitDB.Owner == "" {
+			r.Spec.Bootstrap.InitDB.Owner = r.Spec.Bootstrap.InitDB.Database
+		}
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
