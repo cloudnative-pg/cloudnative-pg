@@ -135,38 +135,21 @@ var _ = Describe("Cluster", func() {
 					}, timeout).Should(BeEquivalentTo(restart + 1))
 
 					// That pod should also be ready
-					Eventually(func() bool {
+					Eventually(func() (bool, error) {
 						pod := &corev1.Pod{}
 						if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
 							Fail("Unable to get Pod " + podName)
 						}
 
-						// Log line to try catching error the following error:
-						//     s: "unable to upgrade connection: container not found (\"postgres\") - "
-						// TODO: remove after the problem is fixed
-						if utils.IsPodActive(*pod) && utils.IsPodReady(*pod) {
-							env.Log.Info("got this pod (1)", "pod", pod, "name", namespacedName)
+						if !utils.IsPodActive(*pod) || !utils.IsPodReady(*pod) {
+							return false, nil
 						}
 
-						return utils.IsPodActive(*pod) && utils.IsPodReady(*pod)
+						query = "SELECT * FROM test"
+						_, _, err = env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
+							"psql", "-U", "postgres", "app", "-tAc", query)
+						return err == nil, err
 					}, timeout).Should(BeTrue())
-
-					// Ensure we have the latest metadata about the Pod
-					if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
-						Fail("Unable to get Pod " + podName)
-					}
-
-					// Log line to try catching error the following error:
-					//     s: "unable to upgrade connection: container not found (\"postgres\") - "
-					// TODO: remove after the problem is fixed
-					env.Log.Info("got this pod (2)", "pod", pod, "name", namespacedName)
-
-					// And it should still contain the table we created before,
-					// so an empty SELECT would work
-					query = "SELECT * FROM test"
-					_, _, err = env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
-						"psql", "-U", "postgres", "app", "-tAc", query)
-					Expect(err).To(BeNil())
 				})
 			})
 		}
