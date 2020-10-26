@@ -21,6 +21,7 @@ nav:
   - Before You Start: 'before_you_start.md'
   - Architecture: 'architecture.md'
   - Quickstart: 'quickstart.md'
+  - Bootstrap: 'bootstrap.md'
   - Custom Resource Definitions: 'crd.md'
   - Security: 'security.md'
   - Failure modes: 'failure_modes.md'
