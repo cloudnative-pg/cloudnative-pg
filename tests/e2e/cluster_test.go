@@ -140,6 +140,14 @@ var _ = Describe("Cluster", func() {
 						if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
 							Fail("Unable to get Pod " + podName)
 						}
+
+						// Log line to try catching error the following error:
+						//     s: "unable to upgrade connection: container not found (\"postgres\") - "
+						// TODO: remove after the problem is fixed
+						if utils.IsPodActive(*pod) && utils.IsPodReady(*pod) {
+							env.Log.Info("got this pod (1)", "pod", pod, "name", namespacedName)
+						}
+
 						return utils.IsPodActive(*pod) && utils.IsPodReady(*pod)
 					}, timeout).Should(BeTrue())
 
@@ -147,6 +155,11 @@ var _ = Describe("Cluster", func() {
 					if err := env.Client.Get(env.Ctx, namespacedName, pod); err != nil {
 						Fail("Unable to get Pod " + podName)
 					}
+
+					// Log line to try catching error the following error:
+					//     s: "unable to upgrade connection: container not found (\"postgres\") - "
+					// TODO: remove after the problem is fixed
+					env.Log.Info("got this pod (2)", "pod", pod, "name", namespacedName)
 
 					// And it should still contain the table we created before,
 					// so an empty SELECT would work
@@ -835,7 +848,7 @@ var _ = Describe("Cluster", func() {
 				Eventually(func() (bool, error) {
 					newPod := &corev1.Pod{}
 					err := env.Client.Get(env.Ctx, newPodNamespacedName, newPod)
-					return utils.IsPodActive(*pod) && utils.IsPodReady(*pod), err
+					return utils.IsPodActive(*newPod) && utils.IsPodReady(*newPod), err
 				}, timeout).Should(BeTrue())
 				// The pod should have a different PVC
 				newPod := &corev1.Pod{}

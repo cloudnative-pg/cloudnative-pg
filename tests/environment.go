@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,6 +21,9 @@ import (
 	"k8s.io/client-go/rest"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -34,6 +37,7 @@ type TestingEnvironment struct {
 	Ctx                context.Context
 	Scheme             *runtime.Scheme
 	PreserveNamespaces []string
+	Log                logr.Logger
 }
 
 // NewTestingEnvironment creates the environment for testing
@@ -43,6 +47,7 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.Interface = kubernetes.NewForConfigOrDie(env.RestClientConfig)
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
+	env.Log = log.Log.WithName("e2e")
 
 	var err error
 	env.Client, err = client.New(env.RestClientConfig, client.Options{Scheme: env.Scheme})
