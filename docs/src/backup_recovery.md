@@ -279,6 +279,11 @@ Status:
 Events:         <none>
 ```
 
+!!!Important
+    This feature will not backup the secrets for the superuser and for the
+    application user. The secrets are supposed to be backed up as part of
+    the standard backup procedures for the Kubernetes cluster.
+
 ## Scheduled backups
 
 You can also schedule your backups periodically by creating a
