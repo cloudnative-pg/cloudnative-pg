@@ -1,8 +1,7 @@
-# Example of PostgreSQL cluster using a storage class
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
 kind: Cluster
 metadata:
-  name: postgresql-bkp
+  name: pg-backup
 spec:
   instances: 3
 

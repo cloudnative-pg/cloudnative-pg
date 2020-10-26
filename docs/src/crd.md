@@ -34,8 +34,18 @@ A PostgreSQL cluster object can be defined through the following parameters avai
 
 ## Bootstrap
 
-The `bootstrap` section contain information about how to create this PostgreSQL cluster. For now, only the `initdb`
-method is available, specifying a database to be created and its owner like in the following example:
+The `bootstrap` section contain information about how to create this PostgreSQL cluster. The operator supports
+two bootstrap types:
+
+- `initdb`
+- `fullRecovery`
+
+The `initdb` bootstrap type is suitable to create a new cluster from scratch, while the `fullRecovery` allows the user
+to restore an existing backup. When creating a cluster, only a single bootstrap method can be specified.
+
+The operator will activate `initdb` as bootstrap method if no bootstrap type is specified.
+
+### `initdb`
 
 ```yaml
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
@@ -54,8 +64,33 @@ spec:
     size: 1Gi
 ```
 
-If you do not specify the application database name, a database named `app` will be created.
-If the owner of the database is not present, it will have the same name of the application database.
+If the application database name is not specified, a database named `app` will be created. If the owner of the database
+is not specified, the name of the database will be used for that.
+
+### `fullRecovery`
+
+```yaml
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  instances: 3
+
+  storage:
+    size: 5Gi
+
+  bootstrap:
+    fullRecovery:
+      backup:
+        name: backup-example
+```
+
+The `fullRecovery` bootstrap method restores the backup with the specified name and, after having changed the
+password with the one chosen for the superuser, will use it to bootstrap an existing cluster from the generated
+primary instance.
+
+More information about the restore feature can be found in the ["Backup and restore" page](backup_recovery.md).
 
 ## PostgreSQL server configuration
 

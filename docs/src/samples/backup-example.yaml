@@ -1,8 +1,7 @@
-# Example of PostgreSQL on-demand backup
 apiVersion: postgresql.k8s.2ndq.io/v1alpha1
 kind: Backup
 metadata:
   name: backup-example
 spec:
   cluster:
-    name: postgresql-bkp
+    name: pg-backup

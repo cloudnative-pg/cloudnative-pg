@@ -5,4 +5,4 @@ metadata:
 spec:
   schedule: "*/5 * * * * *"
   cluster:
-    name: postgresql-bkp
+    name: pg-backup

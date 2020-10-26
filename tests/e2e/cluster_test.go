@@ -853,7 +853,7 @@ var _ = Describe("Cluster", func() {
 	Context("Backup", func() {
 		const namespace = "cluster-backup"
 		const sampleFile = fixturesDir + "/backup/cluster-with-backup.yaml"
-		const clusterName = "postgresql-bkp"
+		const clusterName = "pg-backup"
 		BeforeEach(func() {
 			if err := env.CreateNamespace(namespace); err != nil {
 				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
