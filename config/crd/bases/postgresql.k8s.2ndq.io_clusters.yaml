@@ -395,13 +395,9 @@ spec:
                       type: string
                   type: object
                 size:
-                  anyOf:
-                  - type: integer
-                  - type: string
                   description: Size of the storage. Required if not already specified
                     in the PVC template.
-                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                  x-kubernetes-int-or-string: true
+                  type: string
                 storageClass:
                   description: StorageClass to use for database data (PGDATA). Applied
                     after evaluating the PVC template, if available. If not specified,

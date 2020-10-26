@@ -10,7 +10,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
@@ -225,7 +224,7 @@ type StorageConfiguration struct {
 	StorageClass *string `json:"storageClass,omitempty"`
 
 	// Size of the storage. Required if not already specified in the PVC template.
-	Size resource.Quantity `json:"size"`
+	Size string `json:"size"`
 
 	// Template to be used to generate the Persistent Volume Claim
 	// +optional

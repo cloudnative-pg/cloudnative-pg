@@ -169,7 +169,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	if cluster.Status.ReadyInstances != cluster.Status.Instances ||
 		cluster.Status.Instances != cluster.Spec.Instances {
-		return ctrl.Result{}, r.ReconcilePods(ctx, req, &cluster, childPods)
+		return r.ReconcilePods(ctx, req, &cluster, childPods)
 	}
 
 	// Check if we need to handle a rolling upgrade
@@ -178,7 +178,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
 func (r *ClusterReconciler) ReconcilePods(ctx context.Context,
-	req ctrl.Request, cluster *v1alpha1.Cluster, childPods corev1.PodList) error {
+	req ctrl.Request, cluster *v1alpha1.Cluster, childPods corev1.PodList) (ctrl.Result, error) {
 	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", req.Namespace, "name", req.Name)
 
 	// Find if we have Pods that are not ready, this is OK
@@ -187,24 +187,24 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context,
 	if !cluster.IsNodeMaintenanceWindowReusePVC() && cluster.Status.ReadyInstances < cluster.Status.Instances {
 		// A pod is not ready, let's retry
 		log.V(2).Info("Waiting for Pod to be ready")
-		return nil
+		return ctrl.Result{}, nil
 	}
 
 	// Are there missing nodes? Let's create one
 	if cluster.Status.Instances < cluster.Spec.Instances {
 		newNodeSerial, err := r.generateNodeSerial(ctx, cluster)
 		if err != nil {
-			return err
+			return ctrl.Result{}, err
 		}
 		return r.joinReplicaInstance(ctx, newNodeSerial, cluster)
 	}
 
 	// Are there nodes to be removed? Remove one of them
 	if cluster.Status.Instances > cluster.Spec.Instances {
-		return r.scaleDownCluster(ctx, cluster, childPods)
+		return ctrl.Result{}, r.scaleDownCluster(ctx, cluster, childPods)
 	}
 
-	return nil
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager creates a ClusterReconciler

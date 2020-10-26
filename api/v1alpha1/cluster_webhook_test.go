@@ -152,3 +152,32 @@ var _ = Describe("", func() {
 		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("appdb"))
 	})
 })
+
+var _ = Describe("Storage validation", func() {
+	It("complain if the value isn't correct", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					Size: "X",
+				},
+			},
+		}
+
+		result := cluster.validateStorageConfiguration()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("doesn't complain if value is correct", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					Size: "1Gi",
+				},
+			},
+		}
+
+		result := cluster.validateStorageConfiguration()
+		Expect(result).To(BeEmpty())
+	})
+
+})
