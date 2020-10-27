@@ -1,0 +1,14 @@
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  instances: 3
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    fullRecovery:
+      backup:
+        name: cluster-backup

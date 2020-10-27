@@ -229,11 +229,11 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 	}
 
 	retryDelay := wait.Backoff{
-		Duration: 1 * time.Second,
-		Factor:   5,
-		Jitter:   0.1,
+		Duration: 5 * time.Second,
+		Factor:   1,
+		Jitter:   0,
 		Steps:    math.MaxInt64,
-		Cap:      time.Minute,
+		Cap:      math.MaxInt64,
 	}
 
 	return retry.OnError(retryDelay, errorIsRetriable, func() error {
