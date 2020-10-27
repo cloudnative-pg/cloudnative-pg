@@ -850,7 +850,7 @@ var _ = Describe("Cluster", func() {
 		})
 	})
 
-	Context("Backup", func() {
+	Context("Backup and restore", func() {
 		const namespace = "cluster-backup"
 		const sampleFile = fixturesDir + "/backup/cluster-with-backup.yaml"
 		const clusterName = "pg-backup"
@@ -864,7 +864,7 @@ var _ = Describe("Cluster", func() {
 				Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
 			}
 		})
-		It("backs up the cluster", func() {
+		It("restores a backed up cluster", func() {
 
 			// First we create the secrets for minio
 			By("creating the cloud storage credentials", func() {
@@ -930,6 +930,17 @@ var _ = Describe("Cluster", func() {
 
 			// Create the Cluster
 			AssertCreateCluster(namespace, clusterName, sampleFile)
+
+			By("creating data on the database", func() {
+				primary := clusterName + "-1"
+				cmd := "psql -U postgres app -tAc 'CREATE TABLE to_restore AS VALUES (1), (2);'"
+				_, _, err := tests.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primary,
+					cmd))
+				Expect(err).To(BeNil())
+			})
 
 			// Create a WAL on the lead-master and check if it arrives on
 			// minio within a short time.
@@ -1067,6 +1078,61 @@ var _ = Describe("Cluster", func() {
 					}
 					return strconv.Atoi(strings.Trim(out, "\n"))
 				}, timeout).Should(BeEquivalentTo(3))
+			})
+
+			By("Restoring a backup in a new cluster", func() {
+				backupFile := fixturesDir + "/backup/cluster-from-restore.yaml"
+				restoredClusterName := "cluster-restore"
+				_, _, err := tests.Run(fmt.Sprintf(
+					"kubectl apply -n %v -f %v",
+					namespace, backupFile))
+				Expect(err).To(BeNil())
+
+				// The cluster should be back
+				timeout := 800
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      restoredClusterName,
+				}
+
+				Eventually(func() (int32, error) {
+					cr := &clusterv1alpha1.Cluster{}
+					err := env.Client.Get(env.Ctx, namespacedName, cr)
+					return cr.Status.ReadyInstances, err
+				}, timeout).Should(BeEquivalentTo(3))
+
+				// Test data should be present on restored primary
+				primary := restoredClusterName + "-1"
+				cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM to_restore'"
+				out, _, err := tests.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primary,
+					cmd))
+				Expect(err).To(BeNil())
+				Expect(strings.Trim(out, "\n")).To(
+					BeEquivalentTo("2"))
+
+				// Restored primary should be on timeline 2
+				cmd = "psql -U postgres app -tAc 'select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)'"
+				out, _, err = tests.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primary,
+					cmd))
+				Expect(err).To(BeNil())
+				Expect(strings.Trim(out, "\n")).To(Equal("00000002"))
+
+				// Restored standby should be attached to restored primary
+				cmd = "psql -U postgres app -tAc 'SELECT count(*) FROM pg_stat_replication'"
+				out, _, err = tests.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primary,
+					cmd))
+				Expect(err).To(BeNil())
+				Expect(strings.Trim(out, "\n")).To(
+					BeEquivalentTo("2"))
 			})
 		})
 	})

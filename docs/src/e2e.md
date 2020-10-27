@@ -32,6 +32,7 @@ and the following suite of E2E tests are performed on that cluster:
 * Switchover;
 * Rolling updates when changing PostgreSQL images;
 * Backup and ScheduledBackups execution;
+* Restore from backup;
 * Primary endpoint switch in case of failure in less than 5 seconds;
 * Recover from degraded state in less than 30 seconds.
 
