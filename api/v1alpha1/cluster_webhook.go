@@ -15,6 +15,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
 )
 
 // log is for logging in this package.
@@ -35,6 +37,12 @@ var _ webhook.Defaulter = &Cluster{}
 func (r *Cluster) Default() {
 	log.Info("default", "name", r.Name)
 
+	// Defaulting the image name if not specified
+	if r.Spec.ImageName == "" {
+		r.Spec.ImageName = versions.DefaultImageName
+	}
+
+	// Defaulting the bootstrap method if not specified
 	if r.Spec.Bootstrap == nil {
 		r.Spec.Bootstrap = &BootstrapConfiguration{}
 	}

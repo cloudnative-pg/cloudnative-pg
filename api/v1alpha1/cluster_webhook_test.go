@@ -3,6 +3,8 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -179,5 +181,60 @@ var _ = Describe("Storage validation", func() {
 		result := cluster.validateStorageConfiguration()
 		Expect(result).To(BeEmpty())
 	})
+})
 
+var _ = Describe("Defaulting webhook", func() {
+	It("should fill the image name if isn't already set", func() {
+		cluster := Cluster{}
+		cluster.Default()
+		Expect(cluster.Spec.ImageName).To(Equal(versions.DefaultImageName))
+	})
+
+	It("shouldn't set the image name if already present", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "test:13",
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.ImageName).To(Equal("test:13"))
+	})
+
+	It("should setup the application database name", func() {
+		cluster := Cluster{}
+		cluster.Default()
+		Expect(cluster.Spec.Bootstrap.InitDB.Database).To(Equal("app"))
+		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("app"))
+	})
+
+	It("should set the owner name as the database name", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "test",
+					},
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Bootstrap.InitDB.Database).To(Equal("test"))
+		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("test"))
+	})
+
+	It("should not overwrite application database and owner settings", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "testdb",
+						Owner:    "testuser",
+					},
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Bootstrap.InitDB.Database).To(Equal("testdb"))
+		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("testuser"))
+	})
 })
