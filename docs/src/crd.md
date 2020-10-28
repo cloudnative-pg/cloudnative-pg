@@ -17,19 +17,20 @@ As any other object in Kubernetes, a PostgreSQL cluster has a `metadata` section
 A PostgreSQL cluster object can be defined through the following parameters available in the `spec` key of the manifest:
 
 - `affinity`: affinity/anti-affinity rules for Pods
-- `bootstrap`: how to create this new PostgreSQL cluster
+- `backup`: configuration of the backup of the cluster. More details in the [Backup configuration](crd.md#backup-configuration) section.
+- `bootstrap`: how to create this new PostgreSQL cluster. More details in the [Bootstrap](crd.md#bootstrap) section.
 - `description`: description of the PostgreSQL cluster
 - `imageName`: name of the container image for PostgreSQL
 - `imagePullSecretName`: secret for pulling the PostgreSQL image
 - `instances`: number of instances required in the cluster, with `instances - 1` replicas (**required**)
 - `nodeMaintenanceWindow`: Define a maintenance window for the Kubernetes nodes
-- `postgresql`: configuration of the PostgreSQL server
+- `postgresql`: configuration of the PostgreSQL server.  More details in the [PostgreSQL server configuration](crd.md#postgresql-server-configuration) section.
 - `primaryUpdateStrategy`: strategy to update the primary as part of a rolling update: automated (`unsupervised`)
    or manually triggered (`supervised`)
-- `resources`: resources requirements of every generated Pod
+- `resources`: resources requirements of every generated Pod. More details in the [Resources](crd.md#resources) section.
 - `startDelay`: allowed time in seconds for a PostgreSQL instance to successfully start up (default 30)
 - `stopDelay`: allowed time in seconds for a PostgreSQL instance to gracefully shut down (default 30)
-- `storage`: configuration of the storage of PostgreSQL instances
+- `storage`: configuration of the storage of PostgreSQL instances. More details in the [Storage configuration](crd.md#storage-configuration) section.
 
 ## Bootstrap
 
@@ -98,5 +99,43 @@ For example, you can request an initial amount of RAM of 32MiB (scalable to 128M
    the storage class is applied after evaluating the PVC template, if available
 
 !!! Seealso "See also"
-   Please refer to the ["Configuration samples" page](samples.md) for examples on storage configuration.
+    Please refer to the ["Configuration samples" page](samples.md) for examples on storage configuration.
+
+## Backup configuration
+
+You can configure backup settings of an entire cluster through the following parameters
+available in the `backup` section of the `spec` key of the manifest:
+
+- `s3Credentials`: credentials used to upload backup data to the object store
+- `destinationPath`: the path where to store the backup (i.e. s3://bucket/path/to/folder),
+                     automatically managed by Barman Cloud for both WAL files and base backups
+- `endpointURL`: endpoint that identifies the object store (optional, overrides the automatic endpoint discovery)
+- `serverName`: optional server name to be used for the backup (by default, the cluster name is used)
+- `wal`: section for the configuration of WAL settings (optional)
+- `data`: section for the configuration of base backup settings (optional)
+
+For details and examples on backup configuration, please refer to the ["Backups"](backups.md) section.
+
+### Configuration of WAL files
+
+The `wal` section allows you to set the following options for WAL archive management:
+
+- `compression`: compress a WAL file before sending it to the object store. Available options are empty string (no compression, default), `gzip` or `bzip2`.
+- `encryption`:  enable server-side encryption (encryption at rest) for object store using the given method. Allowed options are empty string (use the bucket policy, default), `AES256` and `aws:kms`.
+
+!!! Warning
+    Without a `wal` section, WAL files will be stored uncompressed and may be unencrypted in the object store.
+
+### Configuration of base backups
+
+The `data` section allows you to set the following options for base backup management:
+
+- `compression`: compress a backup file (a tar file per tablespace) while streaming it to the object store. Available options are empty string (no compression, default), `gzip` or `bzip2`.
+- `encryption`:  enable server-side encryption (encryption at rest) for object store with the given method. Allowed options are empty string (use the bucket policy, default), `AES256` and `aws:kms`.
+- `immediateCheckpoint`:  control whether the I/O workload for the backup initial checkpoint will be limited, according to the `checkpoint_completion_target` setting on the PostgreSQL server.
+  If set to true, an immediate checkpoint will be used, meaning PostgreSQL will complete the checkpoint as soon as possible. (optional, `false` by default).
+- `jobs`: number of parallel jobs to upload the backup (default 2).
+
+!!! Warning
+    Without a `data` section, base backup file will be stored uncompressed and may be unencrypted in the object store.
 
