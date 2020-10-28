@@ -125,7 +125,7 @@ relies on the superuser to reconcile the cluster with the desired status.
 
 The `fullRecovery` bootstrap mode lets you create a new cluster from
 an existing backup. More information about the recovery feature
-can be found in the ["Backup and restore" page](backup_restore.md).
+can be found in the ["Backup and recovery" page](backup_recovery.md).
 
 The following example contains the full structure of the `fullRecovery`
 section:

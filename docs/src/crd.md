@@ -149,7 +149,7 @@ available in the `backup` section of the `spec` key of the manifest:
 - `wal`: section for the configuration of WAL settings (optional)
 - `data`: section for the configuration of base backup settings (optional)
 
-For details and examples on backup configuration, please refer to the ["Backups"](backups.md) section.
+For details and examples on backup configuration, please refer to the ["Backups"](backup_recovery.md) section.
 
 ### Configuration of WAL files
 
