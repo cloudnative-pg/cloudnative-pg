@@ -21,7 +21,7 @@ A PostgreSQL cluster object can be defined through the following parameters avai
 - `bootstrap`: how to create this new PostgreSQL cluster. More details in the [Bootstrap](crd.md#bootstrap) section.
 - `description`: description of the PostgreSQL cluster
 - `imageName`: name of the container image for PostgreSQL
-- `imagePullSecretName`: secret for pulling the PostgreSQL image
+- `imagePullSecrets`: list of maps with secrets for pulling the PostgreSQL image
 - `instances`: number of instances required in the cluster, with `instances - 1` replicas (**required**)
 - `nodeMaintenanceWindow`: Define a maintenance window for the Kubernetes nodes
 - `postgresql`: configuration of the PostgreSQL server.  More details in the [PostgreSQL server configuration](crd.md#postgresql-server-configuration) section.
