@@ -232,6 +232,11 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v
 		pullSecretNames = append(pullSecretNames, operatorSecretName)
 	}
 
+	// Append the secrets specified by the user
+	for _, secretReference := range cluster.Spec.ImagePullSecrets {
+		pullSecretNames = append(pullSecretNames, secretReference.Name)
+	}
+
 	serviceAccount := specs.CreateServiceAccount(cluster.ObjectMeta, pullSecretNames)
 	utils.SetAsOwnedBy(&serviceAccount.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&serviceAccount.ObjectMeta, versions.Version)

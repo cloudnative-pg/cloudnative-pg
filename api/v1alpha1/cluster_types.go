@@ -64,6 +64,9 @@ type ClusterSpec struct {
 	// +optional
 	SuperuserSecret *corev1.LocalObjectReference `json:"superuserSecret,omitempty"`
 
+	// The list of pull secrets to be used to pull the images
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
 	// Configuration of the storage of the instances
 	// +optional
 	StorageConfiguration StorageConfiguration `json:"storage,omitempty"`

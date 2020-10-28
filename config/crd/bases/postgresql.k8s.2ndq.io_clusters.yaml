@@ -193,6 +193,18 @@ spec:
               description: Name of the container image
               minLength: 0
               type: string
+            imagePullSecrets:
+              description: The list of pull secrets to be used to pull the images
+              items:
+                description: LocalObjectReference contains enough information to let
+                  you locate the referenced object inside the same namespace.
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    type: string
+                type: object
+              type: array
             instances:
               description: Number of instances required in the cluster
               format: int32

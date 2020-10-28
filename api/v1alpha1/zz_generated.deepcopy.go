@@ -289,6 +289,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}
+	if in.ImagePullSecrets != nil {
+		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
+		*out = make([]v1.LocalObjectReference, len(*in))
+		copy(*out, *in)
+	}
 	in.StorageConfiguration.DeepCopyInto(&out.StorageConfiguration)
 	out.Affinity = in.Affinity
 	in.Resources.DeepCopyInto(&out.Resources)
