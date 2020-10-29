@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	webhookEnvironmentTemplate = WebhookEnvironment{
+	pkiEnvironmentTemplate = PublicKeyInfrastructure{
 		CertDir:                            "/tmp",
 		CaSecretName:                       "ca-secret",
 		SecretName:                         "webhook-secret-name",
@@ -35,7 +35,7 @@ var (
 
 	mutatingWebhookTemplate = v1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: webhookEnvironmentTemplate.MutatingWebhookConfigurationName,
+			Name: pkiEnvironmentTemplate.MutatingWebhookConfigurationName,
 		},
 		Webhooks: []v1beta1.MutatingWebhook{
 			{
@@ -46,7 +46,7 @@ var (
 
 	validatingWebhookTemplate = v1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: webhookEnvironmentTemplate.ValidatingWebhookConfigurationName,
+			Name: pkiEnvironmentTemplate.ValidatingWebhookConfigurationName,
 		},
 		Webhooks: []v1beta1.ValidatingWebhook{
 			{
@@ -114,13 +114,13 @@ var _ = Describe("Webhook certificate validation", func() {
 		ca, _ := CreateCA()
 		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(caSecret)
-		webhook := webhookEnvironmentTemplate
+		pki := pkiEnvironmentTemplate
 
-		It("should correctly generate a webhook certificate", func() {
-			webhookSecret, err := webhook.EnsureCertificate(clientSet, caSecret)
+		It("should correctly generate a pki certificate", func() {
+			webhookSecret, err := pki.EnsureCertificate(clientSet, caSecret)
 			Expect(err).To(BeNil())
-			Expect(webhookSecret.Name).To(Equal(webhook.SecretName))
-			Expect(webhookSecret.Namespace).To(Equal(webhook.OperatorNamespace))
+			Expect(webhookSecret.Name).To(Equal(pki.SecretName))
+			Expect(webhookSecret.Namespace).To(Equal(pki.OperatorNamespace))
 
 			pair, err := ParseServerSecret(webhookSecret)
 			Expect(err).To(BeNil())
@@ -137,11 +137,11 @@ var _ = Describe("Webhook certificate validation", func() {
 		ca, _ := CreateCA()
 		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(caSecret)
-		webhook := webhookEnvironmentTemplate
-		webhookSecret, _ := webhook.EnsureCertificate(clientSet, caSecret)
+		pki := pkiEnvironmentTemplate
+		webhookSecret, _ := pki.EnsureCertificate(clientSet, caSecret)
 
 		It("must reuse them", func() {
-			currentWebhookSecret, err := webhook.EnsureCertificate(clientSet, caSecret)
+			currentWebhookSecret, err := pki.EnsureCertificate(clientSet, caSecret)
 			Expect(err).To(BeNil())
 			Expect(webhookSecret.Data).To(BeEquivalentTo(currentWebhookSecret.Data))
 		})
@@ -154,13 +154,13 @@ var _ = Describe("Webhook certificate validation", func() {
 		notAfter := time.Now().Add(-10 * time.Hour)
 		notBefore := notAfter.Add(-365 * 24 * time.Hour)
 		server, _ := ca.createAndSignPairWithValidity("this.server.com", notBefore, notAfter)
-		serverSecret := server.GenerateServerSecret("operator-namespace", "webhook-secret-name")
+		serverSecret := server.GenerateServerSecret("operator-namespace", "pki-secret-name")
 
 		clientSet := fake.NewSimpleClientset(caSecret, serverSecret)
-		webhook := webhookEnvironmentTemplate
+		pki := pkiEnvironmentTemplate
 
 		It("must renew the secret", func() {
-			currentServerSecret, err := webhook.EnsureCertificate(clientSet, caSecret)
+			currentServerSecret, err := pki.EnsureCertificate(clientSet, caSecret)
 			Expect(err).To(BeNil())
 			Expect(serverSecret.Data).To(Not(BeEquivalentTo(currentServerSecret.Data)))
 
@@ -180,8 +180,8 @@ var _ = Describe("Webhook certificate validation", func() {
 		Expect(err).To(BeNil())
 		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(caSecret)
-		webhook := webhookEnvironmentTemplate
-		webhookSecret, err := webhook.EnsureCertificate(clientSet, caSecret)
+		pki := pkiEnvironmentTemplate
+		webhookSecret, err := pki.EnsureCertificate(clientSet, caSecret)
 		Expect(err).To(BeNil())
 
 		tempDirName, err := ioutil.TempDir("/tmp", "cert_*")
@@ -200,39 +200,39 @@ var _ = Describe("Webhook certificate validation", func() {
 })
 
 var _ = Describe("TLS certificates injection", func() {
-	webhook := webhookEnvironmentTemplate
+	pki := pkiEnvironmentTemplate
 
-	// Create a CA and the webhook secret
+	// Create a CA and the pki secret
 	ca, _ := CreateCA()
 	caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
-	webhookPair, _ := ca.CreateAndSignPair("webhook-service.operator-namespace.svc")
-	webhookSecret := webhookPair.GenerateServerSecret(webhook.OperatorNamespace, webhook.SecretName)
+	webhookPair, _ := ca.CreateAndSignPair("pki-service.operator-namespace.svc")
+	webhookSecret := webhookPair.GenerateServerSecret(pki.OperatorNamespace, pki.SecretName)
 
-	It("inject the webhook certificate in the mutating webhook", func() {
-		// Create the mutating webhook
+	It("inject the pki certificate in the mutating pki", func() {
+		// Create the mutating pki
 		mutatingWebhook := mutatingWebhookTemplate
 		clientSet := fake.NewSimpleClientset(caSecret, webhookSecret, &mutatingWebhook)
 
-		err := webhook.InjectPublicKeyIntoMutatingWebhook(clientSet, webhookSecret)
+		err := pki.InjectPublicKeyIntoMutatingWebhook(clientSet, webhookSecret)
 		Expect(err).To(BeNil())
 
 		updatedWebhook, err := clientSet.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
-			webhook.MutatingWebhookConfigurationName, metav1.GetOptions{})
+			pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 
 		Expect(updatedWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 	})
 
-	It("inject the webhook certificate in the validating webhook", func() {
-		// Create the validating webhook
+	It("inject the pki certificate in the validating pki", func() {
+		// Create the validating pki
 		validatingWebhook := validatingWebhookTemplate
 		clientSet := fake.NewSimpleClientset(caSecret, webhookSecret, &validatingWebhook)
 
-		err := webhook.InjectPublicKeyIntoValidatingWebhook(clientSet, webhookSecret)
+		err := pki.InjectPublicKeyIntoValidatingWebhook(clientSet, webhookSecret)
 		Expect(err).To(BeNil())
 
 		updatedWebhook, err := clientSet.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
-			webhook.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+			pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 
 		Expect(updatedWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
@@ -248,27 +248,27 @@ var _ = Describe("Webhook environment creation", func() {
 			Expect(err).To(BeNil())
 		}()
 
-		webhook := webhookEnvironmentTemplate
+		pki := pkiEnvironmentTemplate
 		mutatingWebhook := mutatingWebhookTemplate
 		validatingWebhook := validatingWebhookTemplate
 		clientSet := fake.NewSimpleClientset(&mutatingWebhook, &validatingWebhook)
 
-		err = webhook.Setup(clientSet)
+		err = pki.Setup(clientSet)
 		Expect(err).To(BeNil())
 
 		webhookSecret, err := clientSet.CoreV1().Secrets(
-			webhook.OperatorNamespace).Get(webhook.SecretName, metav1.GetOptions{})
+			pki.OperatorNamespace).Get(pki.SecretName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
-		Expect(webhookSecret.Namespace).To(Equal(webhook.OperatorNamespace))
-		Expect(webhookSecret.Name).To(Equal(webhook.SecretName))
+		Expect(webhookSecret.Namespace).To(Equal(pki.OperatorNamespace))
+		Expect(webhookSecret.Name).To(Equal(pki.SecretName))
 
 		updatedMutatingWebhook, err := clientSet.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
-			webhook.MutatingWebhookConfigurationName, metav1.GetOptions{})
+			pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 		Expect(updatedMutatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 
 		updatedValidatingWebhook, err := clientSet.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
-			webhook.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+			pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 		Expect(updatedValidatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 	})

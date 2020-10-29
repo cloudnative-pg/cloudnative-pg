@@ -25,8 +25,9 @@ var (
 	log = ctrl.Log.WithName("pki")
 )
 
-// WebhookEnvironment represent the environment under which the WebHook server will work
-type WebhookEnvironment struct {
+// PublicKeyInfrastructure represent the PKI under which the operator and the WebHook server
+// will work
+type PublicKeyInfrastructure struct {
 	// Where to store the certificates
 	CertDir string
 
@@ -120,41 +121,41 @@ func renewCACertificate(client kubernetes.Interface, secret *v1.Secret) (*v1.Sec
 // Setup will setup the PKI infrastructure that is needed for the operator
 // to correctly work, and copy the certificates which are required for the webhook
 // server to run in the right folder
-func (webhook WebhookEnvironment) Setup(client kubernetes.Interface) error {
+func (pki PublicKeyInfrastructure) Setup(client kubernetes.Interface) error {
 	caSecret, err := EnsureRootCACertificate(
 		client,
-		webhook.OperatorNamespace,
-		webhook.CaSecretName)
+		pki.OperatorNamespace,
+		pki.CaSecretName)
 	if err != nil {
 		return err
 	}
 
-	webhookSecret, err := webhook.EnsureCertificate(client, caSecret)
+	webhookSecret, err := pki.EnsureCertificate(client, caSecret)
 	if err != nil {
 		return err
 	}
 
-	err = DumpSecretToDir(webhookSecret, webhook.CertDir)
+	err = DumpSecretToDir(webhookSecret, pki.CertDir)
 	if err != nil {
 		return err
 	}
 
-	err = webhook.InjectPublicKeyIntoMutatingWebhook(
+	err = pki.InjectPublicKeyIntoMutatingWebhook(
 		client,
 		webhookSecret)
 	if err != nil && apierrors.IsNotFound(err) {
-		log.Info("mutating webhook configuration not found, cannot inject public key",
-			"name", webhook.MutatingWebhookConfigurationName)
+		log.Info("mutating pki configuration not found, cannot inject public key",
+			"name", pki.MutatingWebhookConfigurationName)
 	} else if err != nil {
 		return err
 	}
 
-	err = webhook.InjectPublicKeyIntoValidatingWebhook(
+	err = pki.InjectPublicKeyIntoValidatingWebhook(
 		client,
 		webhookSecret)
 	if err != nil && apierrors.IsNotFound(err) {
-		log.Info("validating webhook configuration not found, cannot inject public key",
-			"name", webhook.ValidatingWebhookConfigurationName)
+		log.Info("validating pki configuration not found, cannot inject public key",
+			"name", pki.ValidatingWebhookConfigurationName)
 	} else if err != nil {
 		return err
 	}
@@ -164,10 +165,10 @@ func (webhook WebhookEnvironment) Setup(client kubernetes.Interface) error {
 
 // SchedulePeriodicMaintenance schedule a background periodic certificate maintenance,
 // to automatically renew TLS certificates
-func (webhook WebhookEnvironment) SchedulePeriodicMaintenance(client kubernetes.Interface) error {
+func (pki PublicKeyInfrastructure) SchedulePeriodicMaintenance(client kubernetes.Interface) error {
 	maintenance := func() {
 		log.Info("Periodic TLS certificates maintenance")
-		err := webhook.Setup(client)
+		err := pki.Setup(client)
 		if err != nil {
 			log.Error(err, "TLS maintenance failed")
 		}
@@ -185,11 +186,11 @@ func (webhook WebhookEnvironment) SchedulePeriodicMaintenance(client kubernetes.
 }
 
 // EnsureCertificate will ensure that a webhook certificate exists and is usable
-func (webhook WebhookEnvironment) EnsureCertificate(
+func (pki PublicKeyInfrastructure) EnsureCertificate(
 	client kubernetes.Interface, caSecret *v1.Secret) (*v1.Secret, error) {
 	// Checking if the secret already exist
 	secret, err := client.CoreV1().Secrets(
-		webhook.OperatorNamespace).Get(webhook.SecretName, metav1.GetOptions{})
+		pki.OperatorNamespace).Get(pki.SecretName, metav1.GetOptions{})
 	if err == nil {
 		// Verify the temporal validity of this certificate and
 		// renew it if needed
@@ -198,7 +199,7 @@ func (webhook WebhookEnvironment) EnsureCertificate(
 		return nil, err
 	}
 
-	// Let's generate the webhook certificate
+	// Let's generate the pki certificate
 	caPair, err := ParseCASecret(caSecret)
 	if err != nil {
 		return nil, err
@@ -206,16 +207,16 @@ func (webhook WebhookEnvironment) EnsureCertificate(
 
 	webhookHostname := fmt.Sprintf(
 		"%v.%v.svc",
-		webhook.ServiceName,
-		webhook.OperatorNamespace)
+		pki.ServiceName,
+		pki.OperatorNamespace)
 	webhookPair, err := caPair.CreateAndSignPair(webhookHostname)
 	if err != nil {
 		return nil, err
 	}
 
-	secret = webhookPair.GenerateServerSecret(webhook.OperatorNamespace, webhook.SecretName)
+	secret = webhookPair.GenerateServerSecret(pki.OperatorNamespace, pki.SecretName)
 	createdSecret, err := client.CoreV1().Secrets(
-		webhook.OperatorNamespace).Create(secret)
+		pki.OperatorNamespace).Create(secret)
 	if err != nil {
 		return nil, err
 	}
@@ -303,10 +304,10 @@ func DumpSecretToDir(secret *v1.Secret, certDir string) error {
 
 // InjectPublicKeyIntoMutatingWebhook inject the TLS public key into the admitted
 // ones for a certain mutating webhook configuration
-func (webhook WebhookEnvironment) InjectPublicKeyIntoMutatingWebhook(
+func (pki PublicKeyInfrastructure) InjectPublicKeyIntoMutatingWebhook(
 	client kubernetes.Interface, tlsSecret *v1.Secret) error {
 	config, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
-		webhook.MutatingWebhookConfigurationName, metav1.GetOptions{})
+		pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -321,10 +322,10 @@ func (webhook WebhookEnvironment) InjectPublicKeyIntoMutatingWebhook(
 
 // InjectPublicKeyIntoValidatingWebhook inject the TLS public key into the admitted
 // ones for a certain validating webhook configuration
-func (webhook WebhookEnvironment) InjectPublicKeyIntoValidatingWebhook(
+func (pki PublicKeyInfrastructure) InjectPublicKeyIntoValidatingWebhook(
 	client kubernetes.Interface, tlsSecret *v1.Secret) error {
 	config, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
-		webhook.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+		pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
