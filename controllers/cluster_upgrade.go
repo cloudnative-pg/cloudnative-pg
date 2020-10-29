@@ -17,7 +17,6 @@ import (
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 )
 
 var (
@@ -54,7 +53,7 @@ func (r *ClusterReconciler) upgradeCluster(
 			continue
 		}
 
-		status, err := canUpgrade(usedImageName, targetImageName)
+		status, err := postgres.CanUpgrade(usedImageName, targetImageName)
 		if err != nil {
 			log.Error(
 				err, "Error checking image versions", "from", usedImageName, "to", targetImageName)
@@ -127,28 +126,4 @@ func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *v1alpha1.Cl
 	// Let's wait for this Pod to be recloned or recreated using the
 	// same storage
 	return r.Delete(ctx, pod)
-}
-
-// canUpgrade check if we can upgrade from une image version to another
-func canUpgrade(fromImage, toImage string) (bool, error) {
-	fromTag := utils.GetImageTag(fromImage)
-	toTag := utils.GetImageTag(toImage)
-
-	if fromTag == "latest" || toTag == "latest" {
-		// We don't really know which major version "latest" is,
-		// so we can't safely upgrade
-		return false, nil
-	}
-
-	fromVersion, err := postgres.GetPostgresVersionFromTag(fromTag)
-	if err != nil {
-		return false, err
-	}
-
-	toVersion, err := postgres.GetPostgresVersionFromTag(toTag)
-	if err != nil {
-		return false, err
-	}
-
-	return postgres.IsUpgradePossible(fromVersion, toVersion), nil
 }

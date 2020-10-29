@@ -55,16 +55,44 @@ var _ = Describe("PostgreSQL version handling", func() {
 		})
 	})
 
-	Describe("detect whenever a version upgrade is possible", func() {
+	Describe("detect whenever a version upgrade is possible using the numeric version", func() {
 		It("succeed when the major version is the same", func() {
 			Expect(IsUpgradePossible(100000, 100003)).To(BeTrue())
 			Expect(IsUpgradePossible(90302, 90303)).To(BeTrue())
 		})
 
-		It("prevent from upgrading to a different major version", func() {
+		It("prevent upgrading to a different major version", func() {
 			Expect(IsUpgradePossible(100003, 110003)).To(BeFalse())
 			Expect(IsUpgradePossible(90604, 100000)).To(BeFalse())
 			Expect(IsUpgradePossible(90503, 900604)).To(BeFalse())
+		})
+	})
+
+	Describe("detect whenever a version upgrade is possible using the image tag", func() {
+		It("succeed when the major version is the same", func() {
+			Expect(CanUpgrade("postgres:10.0", "postgres:10.3")).To(BeTrue())
+			Expect(CanUpgrade("postgres:9.3.2", "postgres:9.3.3")).To(BeTrue())
+		})
+
+		It("prevent using 'latest'", func() {
+			Expect(CanUpgrade("postgres:latest", "postgres:10.3")).To(BeFalse())
+			Expect(CanUpgrade("postgres:10.0", "postgres:latest")).To(BeFalse())
+		})
+
+		It("prevent upgrading to a different major version", func() {
+			Expect(CanUpgrade("postgres:10.3", "postgres:11.3")).To(BeFalse())
+			Expect(CanUpgrade("postgres:9.6.4", "postgres:10")).To(BeFalse())
+			Expect(CanUpgrade("postgres:9.5.3", "postgres:9.6.4")).To(BeFalse())
+		})
+
+		It("raise errors when the image tag can't be parsed", func() {
+			status, err1 := CanUpgrade("postgres:ten_dot_three", "postgres:11.3")
+			Expect(err1).To(Not(BeNil()))
+			Expect(status).To(BeFalse())
+
+			status, err2 := CanUpgrade("postgres:10.3", "postgres:eleven_dot_tree")
+			Expect(err2).To(Not(BeNil()))
+			Expect(status).To(BeFalse())
 		})
 	})
 })
