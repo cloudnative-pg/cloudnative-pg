@@ -28,8 +28,9 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme         = runtime.NewScheme()
+	setupLog       = ctrl.Log.WithName("setup")
+	webhookCertDir = os.Getenv("WEBHOOK_CERT_DIR")
 )
 
 const (
@@ -110,7 +111,7 @@ func main() {
 	watchNamespace := os.Getenv("WATCH_NAMESPACE")
 	setupLog.Info("Listening for changes", "watchNamespace", watchNamespace)
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	managerOptions := ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		Port:               9443,
@@ -118,13 +119,31 @@ func main() {
 		LeaderElectionID:   "db9c8771.k8s.2ndq.io",
 		Namespace:          watchNamespace,
 		CertDir:            "/tmp",
-	})
+	}
+	if webhookCertDir != "" {
+		// If OLM will generate certificates for us, let's just
+		// use those
+		managerOptions.CertDir = webhookCertDir
+	}
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), managerOptions)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	err = setupPKI(mgr.GetConfig(), mgr.GetWebhookServer().CertDir)
+	// Use certificate names compatible with OLM
+	mgr.GetWebhookServer().CertName = "apiserver.crt"
+	mgr.GetWebhookServer().KeyName = "apiserver.key"
+
+	certificatesGenerationFolder := mgr.GetWebhookServer().CertDir
+	if webhookCertDir != "" {
+		// OLM is generating certificates for us so we can avoid
+		// injecting/creating certificates
+		certificatesGenerationFolder = ""
+	}
+	err = setupPKI(mgr.GetConfig(), certificatesGenerationFolder)
+
 	if err != nil {
 		setupLog.Error(err, "unable to setup PKI infrastructure")
 		os.Exit(1)

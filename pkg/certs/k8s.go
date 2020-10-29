@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"path/filepath"
 
 	"github.com/robfig/cron"
 	v1 "k8s.io/api/core/v1"
@@ -130,12 +131,22 @@ func (pki PublicKeyInfrastructure) Setup(client kubernetes.Interface) error {
 		return err
 	}
 
+	if pki.CertDir != "" {
+		if err = pki.setupWebhookCertificate(client, caSecret); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (pki PublicKeyInfrastructure) setupWebhookCertificate(client kubernetes.Interface, caSecret *v1.Secret) error {
 	webhookSecret, err := pki.EnsureCertificate(client, caSecret)
 	if err != nil {
 		return err
 	}
 
-	err = DumpSecretToDir(webhookSecret, pki.CertDir)
+	err = DumpSecretToDir(webhookSecret, pki.CertDir, "apiserver")
 	if err != nil {
 		return err
 	}
@@ -265,9 +276,21 @@ func renewServerCertificate(client kubernetes.Interface, caSecret v1.Secret, sec
 	return updatedSecret, nil
 }
 
-// DumpSecretToDir dumps the contents of a secret inside a directory, and this
-// is useful for the webhook server to correctly run
-func DumpSecretToDir(secret *v1.Secret, certDir string) error {
+// DumpSecretToDir dumps the contents of a secret inside a directory creating
+// a file to every key/value couple in the required Secret.
+//
+// The actual files written in the directory will be named accordingly to the
+// basename, i.e., given a secret with the following data:
+//
+//     data:
+//       test.crt: <test.crt.contents>
+//       test.key: <test.key.contents>
+//
+// The following files will be written:
+//
+//     <certdir>/<basename>.crt
+//     <certdir>/<basename>.key
+func DumpSecretToDir(secret *v1.Secret, certDir string, basename string) error {
 	resourceFileName := path.Join(certDir, "resource")
 
 	oldVersionExist, err := fileutils.FileExists(resourceFileName)
@@ -288,7 +311,8 @@ func DumpSecretToDir(secret *v1.Secret, certDir string) error {
 	}
 
 	for name, content := range secret.Data {
-		fileName := path.Join(certDir, name)
+		extension := filepath.Ext(name)
+		fileName := path.Join(certDir, basename+extension)
 		if err := ioutil.WriteFile(fileName, content, 0600); err != nil {
 			return err
 		}
