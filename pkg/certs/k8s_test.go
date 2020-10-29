@@ -191,11 +191,11 @@ var _ = Describe("Webhook certificate validation", func() {
 			Expect(err).To(BeNil())
 		}()
 
-		err = DumpSecretToDir(webhookSecret, tempDirName)
+		err = DumpSecretToDir(webhookSecret, tempDirName, "apiserver")
 		Expect(err).To(BeNil())
 
-		Expect(fileutils.FileExists(path.Join(tempDirName, "tls.key"))).To(BeTrue())
-		Expect(fileutils.FileExists(path.Join(tempDirName, "tls.crt"))).To(BeTrue())
+		Expect(fileutils.FileExists(path.Join(tempDirName, "apiserver.key"))).To(BeTrue())
+		Expect(fileutils.FileExists(path.Join(tempDirName, "apiserver.crt"))).To(BeTrue())
 	})
 })
 
