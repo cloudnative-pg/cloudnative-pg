@@ -7,6 +7,8 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package v1alpha1
 
 import (
+	"fmt"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,6 +18,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
 )
 
@@ -78,6 +82,7 @@ func (r *Cluster) ValidateCreate() error {
 	allErrs = append(allErrs, r.validateSuperuserSecret()...)
 	allErrs = append(allErrs, r.validateBootstrapMethod()...)
 	allErrs = append(allErrs, r.validateStorageConfiguration()...)
+	allErrs = append(allErrs, r.validateImageName()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -96,6 +101,16 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validateSuperuserSecret()...)
 	allErrs = append(allErrs, r.validateBootstrapMethod()...)
 	allErrs = append(allErrs, r.validateStorageConfiguration()...)
+	allErrs = append(allErrs, r.validateImageName()...)
+
+	oldObject := old.(*Cluster)
+	if oldObject == nil {
+		log.Info("Received invalid old object, skipping old object validation",
+			"old", old)
+	} else {
+		allErrs = append(allErrs, r.validateImageChange(oldObject.Spec.ImageName)...)
+	}
+
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -214,6 +229,75 @@ func (r *Cluster) validateStorageConfiguration() field.ErrorList {
 				field.NewPath("spec", "storage", "size"),
 				r.Spec.StorageConfiguration.Size,
 				"Size value isn't valid"))
+	}
+
+	return result
+}
+
+// validateImageName validate the image name ensuring we aren't
+// using the "latest" tag
+func (r *Cluster) validateImageName() field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.ImageName == "" {
+		// We'll use the default one
+		return result
+	}
+
+	tag := utils.GetImageTag(r.Spec.ImageName)
+	if tag == "latest" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "imageName"),
+				r.Spec.ImageName,
+				"Can't use 'latest' as image tag as we can't detect upgrades"))
+	} else {
+		_, err := postgres.GetPostgresVersionFromTag(tag)
+		if err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "imageName"),
+					r.Spec.ImageName,
+					"invalid version tag"))
+		}
+	}
+
+	return result
+}
+
+// validateImageChange validate the change from a certain image name
+// to a new one.
+func (r *Cluster) validateImageChange(old string) field.ErrorList {
+	var result field.ErrorList
+
+	newVersion := r.Spec.ImageName
+	if newVersion == "" {
+		// We'll use the default one
+		newVersion = versions.DefaultImageName
+	}
+
+	if old == "" {
+		old = versions.DefaultImageName
+	}
+
+	status, err := postgres.CanUpgrade(old, newVersion)
+	if err != nil {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "imageName"),
+				r.Spec.ImageName,
+				fmt.Sprintf("wrong version: %v", err.Error())))
+	} else if !status {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "imageName"),
+				r.Spec.ImageName,
+				fmt.Sprintf("can't upgrade between %v and %v",
+					old, newVersion)))
 	}
 
 	return result

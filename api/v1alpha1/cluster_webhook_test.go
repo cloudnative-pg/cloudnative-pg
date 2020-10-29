@@ -238,3 +238,41 @@ var _ = Describe("Defaulting webhook", func() {
 		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("testuser"))
 	})
 })
+
+var _ = Describe("Image name validation", func() {
+	It("doesn't complain if the user simply accept the default", func() {
+		var cluster Cluster
+		Expect(cluster.validateImageName()).To(BeEmpty())
+
+		// Let's apply the defaulting webhook, too
+		cluster.Default()
+		Expect(cluster.validateImageName()).To(BeEmpty())
+	})
+
+	It("complain when the 'latest' tag is detected", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:latest",
+			},
+		}
+		Expect(len(cluster.validateImageName())).To(Equal(1))
+	})
+
+	It("doesn't complain if the tag is valid", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:10.4",
+			},
+		}
+		Expect(cluster.validateImageName()).To(BeEmpty())
+	})
+
+	It("complain when the tag name is not a PostgreSQL version", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:test_12",
+			},
+		}
+		Expect(len(cluster.validateImageName())).To(Equal(1))
+	})
+})

@@ -12,6 +12,8 @@ import (
 	"path"
 	"strconv"
 	"strings"
+
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 )
 
 const firstMajorWithoutMinor = 10
@@ -83,4 +85,28 @@ func GetMajorVersion(pgData string) (int, error) {
 	}
 
 	return strconv.Atoi(strings.TrimSpace(string(content)))
+}
+
+// CanUpgrade check if we can upgrade from une image version to another
+func CanUpgrade(fromImage, toImage string) (bool, error) {
+	fromTag := utils.GetImageTag(fromImage)
+	toTag := utils.GetImageTag(toImage)
+
+	if fromTag == "latest" || toTag == "latest" {
+		// We don't really know which major version "latest" is,
+		// so we can't safely upgrade
+		return false, nil
+	}
+
+	fromVersion, err := GetPostgresVersionFromTag(fromTag)
+	if err != nil {
+		return false, err
+	}
+
+	toVersion, err := GetPostgresVersionFromTag(toTag)
+	if err != nil {
+		return false, err
+	}
+
+	return IsUpgradePossible(fromVersion, toVersion), nil
 }
