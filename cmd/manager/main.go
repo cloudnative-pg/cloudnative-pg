@@ -124,7 +124,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = setupPKIInfrastructure(mgr.GetConfig(), mgr.GetWebhookServer().CertDir)
+	err = setupPKI(mgr.GetConfig(), mgr.GetWebhookServer().CertDir)
 	if err != nil {
 		setupLog.Error(err, "unable to setup PKI infrastructure")
 		os.Exit(1)
@@ -169,7 +169,7 @@ func main() {
 	}
 }
 
-func setupPKIInfrastructure(config *rest.Config, certDir string) error {
+func setupPKI(config *rest.Config, certDir string) error {
 	/*
 	   Ensure we have the required PKI infrastructure to make
 	   the operator and the clusters working
@@ -184,7 +184,7 @@ func setupPKIInfrastructure(config *rest.Config, certDir string) error {
 		return fmt.Errorf("cannot create a K8s client: %w", err)
 	}
 
-	webhookConfig := certs.WebhookEnvironment{
+	pkiConfig := certs.PublicKeyInfrastructure{
 		CaSecretName:                       caSecretName,
 		CertDir:                            certDir,
 		SecretName:                         webhookSecretName,
@@ -193,12 +193,12 @@ func setupPKIInfrastructure(config *rest.Config, certDir string) error {
 		MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
 	}
-	err = webhookConfig.Setup(clientSet)
+	err = pkiConfig.Setup(clientSet)
 	if err != nil {
 		return err
 	}
 
-	err = webhookConfig.SchedulePeriodicMaintenance(clientSet)
+	err = pkiConfig.SchedulePeriodicMaintenance(clientSet)
 	if err != nil {
 		return err
 	}
