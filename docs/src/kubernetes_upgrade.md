@@ -1,3 +1,5 @@
+# Kubernetes Upgrade
+
 Kubernetes clusters must be kept updated. This becomes even more
 important if you are self-managing your Kubernetes clusters, especially
 on **bare metal**.

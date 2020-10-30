@@ -1,3 +1,5 @@
+# Quickstart
+
 This section describes how to test a PostgreSQL cluster on your laptop/computer
 using Cloud Native PostgreSQL on a local Kubernetes cluster in
 [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/) or

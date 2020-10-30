@@ -1,3 +1,5 @@
+# PostgreSQL Configuration
+
 Users that are familiar with PostgreSQL are aware of the existence of the following two files
 to configure an instance:
 

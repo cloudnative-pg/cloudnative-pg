@@ -1,3 +1,5 @@
+# Custom Resource Definitions
+
 This section describes the structure of a *Kubernetes manifest* to be used
 to instantiate a PostgreSQL cluster using the Cloud Native PostgreSQL Operator.
 
