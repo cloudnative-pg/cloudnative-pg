@@ -7,6 +7,9 @@ A PostgreSQL cluster can be defined using a Kubernetes manifest in *YAML* accord
 
 On the top level both individual parameters and parameter groups can be defined. Parameter names are written in camelCase.
 
+An example of cluster definition using most of the options described below is available in
+[`cluster-example-full.yaml`](samples/cluster-example-full.yaml).
+
 ## PostgreSQL Cluster metadata
 
 As any other object in Kubernetes, a PostgreSQL cluster has a `metadata` section which allows user to specify the following properties:
