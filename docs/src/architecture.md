@@ -1,3 +1,5 @@
+# Architecture
+
 For High Availability goals, the PostgreSQL database management system provides administrators with built-in **physical replication** capabilities based on **Write Ahead Log (WAL) shipping**.
 
 PostgreSQL supports both asynchronous and synchronous streaming replication, as well as asynchronous file-based log shipping (normally used as fallback option, for example to store WAL files in an object store). Replicas are normally called *standby servers* and can also be used for read-only workloads thanks to the *Hot Standby* feature.

@@ -1,3 +1,5 @@
+# Configuration Samples
+
 In this section you can find some examples of configuration files to setup your PostgreSQL `Cluster`.
 
 * [`cluster-example.yaml`](samples/cluster-example.yaml):

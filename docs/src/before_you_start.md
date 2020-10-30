@@ -1,3 +1,5 @@
+# Before You Start
+
 Before we get started, it is important to go over some terminology that is
 specific to Kubernetes and PostgreSQL.
 

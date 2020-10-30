@@ -17,20 +17,20 @@ markdown_extensions:
     - def_list
 
 nav:
-  - Cloud Native PostgreSQL: 'index.md'
-  - Before You Start: 'before_you_start.md'
-  - Architecture: 'architecture.md'
-  - Operator Capability Levels: 'operator_capability_levels.md'
-  - Quickstart: 'quickstart.md'
-  - Bootstrap: 'bootstrap.md'
-  - Custom Resource Definitions: 'crd.md'
-  - Security: 'security.md'
-  - Failure modes: 'failure_modes.md'
-  - Rolling updates: 'rolling_update.md'
-  - Backup and Recovery: 'backup_recovery.md'
-  - PostgreSQL Configuration: 'postgresql_conf.md'
-  - Configuration Samples: 'samples.md'
-  - Exposing Postgres Services: 'expose_pg_services.md'
-  - Kubernetes Upgrade: 'kubernetes_upgrade.md'
-  - End-to-end Tests: 'e2e.md'
-  - Credits: 'credits.md'
+  - index.md
+  - before_you_start.md
+  - architecture.md
+  - operator_capability_levels.md
+  - quickstart.md
+  - bootstrap.md
+  - crd.md
+  - security.md
+  - failure_modes.md
+  - rolling_update.md
+  - backup_recovery.md
+  - postgresql_conf.md
+  - samples.md
+  - expose_pg_services.md
+  - kubernetes_upgrade.md
+  - e2e.md
+  - credits.md

@@ -1,3 +1,5 @@
+# Exposing Postgres Services
+
 This section explains how to expose a PostgreSQL service externally, allowing access
 to your PostgreSQL database **from outside your Kubernetes cluster** using
 NGINX Ingress Controller.

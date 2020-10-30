@@ -1,3 +1,5 @@
+# Operator Capability Levels
+
 This section provides a summary of the capabilities implemented by Cloud Native PostgreSQL,
 classified using the
 ["Operator SDK definition of Capability Levels"](https://sdk.operatorframework.io/docs/advanced-topics/operator-capabilities/operator-capabilities/)

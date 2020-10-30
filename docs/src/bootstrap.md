@@ -1,3 +1,5 @@
+# Bootstrap
+
 This section describes the options you have to create a new
 PostgreSQL cluster and the design rationale behind them.
 

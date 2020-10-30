@@ -1,3 +1,5 @@
+# Backup and Recovery
+
 The operator can orchestrate a continuous backup infrastructure
 that is based on the [Barman](https://pgbarman.org) tool. Instead
 of using the classical architecture with a Barman server which

@@ -1,3 +1,5 @@
+# Security
+
 This section contains information about security for Cloud Native PostgreSQL,
 from a few standpoints: source code, Kubernetes and PostgreSQL.
 
