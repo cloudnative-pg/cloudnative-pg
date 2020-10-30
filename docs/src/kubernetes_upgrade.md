@@ -33,7 +33,7 @@ be situations where it is advised to temporarily operate with a
 degraded cluster and wait for the upgraded node to be up again.
 
 In particular, if your PostgreSQL cluster relies on **node-local storage**
-- that is *storage which is local to the Kubernetes worker node where
+\- that is *storage which is local to the Kubernetes worker node where
 the PostgreSQL database is running*.
 Node-local storage (or simply *local storage*) is used to enhance performance.
 

@@ -18,21 +18,21 @@ As any other object in Kubernetes, a PostgreSQL cluster has a `metadata` section
 
 A PostgreSQL cluster object can be defined through the following parameters available in the `spec` key of the manifest:
 
-- `affinity`: affinity/anti-affinity rules for Pods
-- `backup`: configuration of the backup of the cluster. More details in the [Backup configuration](crd.md#backup-configuration) section.
-- `bootstrap`: how to create this new PostgreSQL cluster. More details in the [Bootstrap](crd.md#bootstrap) section.
+- `affinity`: affinity/anti-affinity rules for Pods. More details in the ["Affinity"](crd.md#affinity) section.
+- `backup`: configuration of the backup of the cluster. More details in the ["Backup configuration"](crd.md#backup-configuration) section.
+- `bootstrap`: how to create this new PostgreSQL cluster. More details in the ["Bootstrap"](crd.md#bootstrap) section.
 - `description`: description of the PostgreSQL cluster
 - `imageName`: name of the container image for PostgreSQL
 - `imagePullSecrets`: list of maps with secrets for pulling the PostgreSQL image
 - `instances`: number of instances required in the cluster, with `instances - 1` replicas (**required**)
-- `nodeMaintenanceWindow`: Define a maintenance window for the Kubernetes nodes
-- `postgresql`: configuration of the PostgreSQL server.  More details in the [PostgreSQL server configuration](crd.md#postgresql-server-configuration) section.
+- `nodeMaintenanceWindow`: Define a maintenance window for the Kubernetes nodes. More details in the ["Node maintenance window"](crd.md#node-maintenance-window) section.
+- `postgresql`: configuration of the PostgreSQL server.  More details in the ["PostgreSQL server configuration"](crd.md#postgresql-server-configuration) section.
 - `primaryUpdateStrategy`: strategy to update the primary as part of a rolling update: automated (`unsupervised`)
    or manually triggered (`supervised`)
-- `resources`: resources requirements of every generated Pod. More details in the [Resources](crd.md#resources) section.
+- `resources`: resources requirements of every generated Pod. More details in the ["Resources"](crd.md#resources) section.
 - `startDelay`: allowed time in seconds for a PostgreSQL instance to successfully start up (default 30)
 - `stopDelay`: allowed time in seconds for a PostgreSQL instance to gracefully shut down (default 30)
-- `storage`: configuration of the storage of PostgreSQL instances. More details in the [Storage configuration](crd.md#storage-configuration) section.
+- `storage`: configuration of the storage of PostgreSQL instances. More details in the ["Storage configuration"](crd.md#storage-configuration) section.
 
 ## Bootstrap
 
@@ -176,3 +176,19 @@ The `data` section allows you to set the following options for base backup manag
 !!! Warning
     Without a `data` section, base backup file will be stored uncompressed and may be unencrypted in the object store.
 
+## Node maintenance window
+
+The optional `nodeMaintenanceWindow` section allows you to set the following options:
+
+- `inProgress`:  whether the maintenance window for the nodes is currently in progress or not (default: `off`)
+- `reusePVC`:  whether an existing PVC is reused or not during the maintenance operation (default: `on`).
+
+See the ["Kubernetes upgrade"](kubernetes_upgrade.md) chapter for a detailed description of the effects of such
+parameters.
+
+## Affinity
+
+The optional `affinity` section allows you to set the following options:
+
+`enablePodAntiAffinity`: if possible, avoid scheduling multiple instances on the same node (default: `off`)
+`topologyKey`: optional [Kubernetes topology key](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity).

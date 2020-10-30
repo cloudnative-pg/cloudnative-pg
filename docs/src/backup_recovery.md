@@ -328,13 +328,12 @@ spec:
     [...]
     wal:
       compression: gzip
-      encryption: SHA256
+      encryption: AES256
 ```
 
 The encryption can be configured directly in your bucket, and if
 you don't specify otherwise in the cluster, the operator will use
 that one.
-
 
 ## Recovery
 
