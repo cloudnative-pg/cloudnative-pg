@@ -1,4 +1,4 @@
-# Failure modes
+# Failure Modes
 
 This section provides an overview of the major failure scenarios that
 PostgreSQL can face on a Kubernetes cluster during its lifetime.
