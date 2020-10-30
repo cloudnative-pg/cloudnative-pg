@@ -12,5 +12,7 @@ In this section you can find some examples of configuration files to setup your 
    basic example of `Cluster` that uses a specified storage class.
 * [`cluster-pvc-template.yaml`](samples/cluster-pvc-template.yaml):
    basic example of `Cluster` that uses a persistent volume claim template.
+* [`cluster-example-full.yaml`](samples/cluster-example-full.yaml):
+   example of `Cluster` that sets most of the available options.
 
 For a list of available options, please refer to the ["Custom Resource Definitions" page](crd.md).

@@ -1,0 +1,104 @@
+# Example of definition of a test cluster using all the elements available
+# in the CRD. Please change values appropriately for your environment.
+# Remember that you can take advantage of convention over configuration
+# and normally you don't need to use all these definitions.
+
+apiVersion: v1
+data:
+  password: cGFzc3dvcmQ=
+  username: YXBwdXNlcg==
+kind: Secret
+metadata:
+  name: cluster-example-app-user
+type: kubernetes.io/basic-auth
+---
+apiVersion: v1
+data:
+  password: cGFzc3dvcmQ=
+  username: cG9zdGdyZXM=
+kind: Secret
+metadata:
+  name: cluster-example-superuser
+type: kubernetes.io/basic-auth
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backup-creds
+data:
+  ACCESS_KEY_ID: a2V5X2lk
+  ACCESS_SECRET_KEY: c2VjcmV0X2tleQ==
+---
+apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-example-full
+spec:
+  description: "Example of cluster"
+  imageName: quay.io/2ndquadrant/postgres:13.0
+  # imagePullSecret is only required if the images are located in a private registry
+  # imagePullSecrets:
+  #   - name: private_registry_access
+  instances: 3
+  startDelay: 300
+  stopDelay: 300
+  primaryUpdateStrategy: unsupervised
+
+  postgresql:
+    parameters:
+      shared_buffers: 256MB
+    pg_hba:
+      - host all all 10.244.0.0/16 md5
+
+  bootstrap:
+    initdb:
+      database: appdb
+      owner: appuser
+      secret:
+        name: cluster-example-app-user
+    # Alternative bootstrap method: start from a backup
+    #fullRecovery:
+    #  backup:
+    #    name: backup-example
+
+  superuserSecret:
+    name: cluster-example-superuser
+
+  storage:
+    storageClass: standard
+    size: 1Gi
+
+  backup:
+    destinationPath: s3://cluster-example-full-backup/
+    endpointURL: http://custom-endpoint:1234
+    s3Credentials:
+      accessKeyId:
+        name: backup-creds
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: backup-creds
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: gzip
+      encryption: AES256
+    data:
+      compression: gzip
+      encryption: AES256
+      immediateCheckpoint: false
+      jobs: 2
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "1"
+    limits:
+      memory: "1Gi"
+      cpu: "2"
+
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: failure-domain.beta.kubernetes.io/zone
+
+  nodeMaintenanceWindow:
+    inProgress: false
+    reusePVC: false
