@@ -33,4 +33,5 @@ nav:
   - expose_pg_services.md
   - kubernetes_upgrade.md
   - e2e.md
+  - container_images.md
   - credits.md

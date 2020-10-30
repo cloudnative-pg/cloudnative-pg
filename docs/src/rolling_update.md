@@ -1,4 +1,4 @@
-# Rolling updates
+# Rolling Updates
 
 The operator allows changing the PostgreSQL version used in a cluster while
 applications are running against it.
