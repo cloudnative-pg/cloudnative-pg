@@ -8,6 +8,7 @@ package controllers
 
 import (
 	"context"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -59,6 +60,8 @@ func (r *ClusterReconciler) updateResourceStatus(
 	childPods corev1.PodList,
 	childPVCs corev1.PersistentVolumeClaimList,
 ) error {
+	existingClusterStatus := cluster.Status
+
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones
 	filteredPods := utils.FilterActivePods(childPods.Items)
@@ -70,7 +73,10 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.Instances = int32(len(filteredPods))
 	cluster.Status.ReadyInstances = int32(utils.CountReadyPods(filteredPods))
 
-	return r.Status().Update(ctx, cluster)
+	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
+		return r.Status().Update(ctx, cluster)
+	}
+	return nil
 }
 
 func (r *ClusterReconciler) setPrimaryInstance(

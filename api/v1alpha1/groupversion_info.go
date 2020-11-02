@@ -25,6 +25,9 @@ var (
 		Resource: "clusters",
 	}
 
+	// ClusterKind is the kind name of Clusters
+	ClusterKind = "Cluster"
+
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 
