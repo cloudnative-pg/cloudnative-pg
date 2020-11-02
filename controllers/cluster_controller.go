@@ -220,7 +220,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return nil
 			}
 
-			if owner.APIVersion != apiGVString || owner.Kind != "Cluster" {
+			if owner.APIVersion != apiGVString || owner.Kind != v1alpha1.ClusterKind {
 				return nil
 			}
 
@@ -239,7 +239,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return nil
 			}
 
-			if owner.APIVersion != apiGVString || owner.Kind != "Cluster" {
+			if owner.APIVersion != apiGVString || owner.Kind != v1alpha1.ClusterKind {
 				return nil
 			}
 
@@ -251,5 +251,6 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.Cluster{}).
 		Owns(&corev1.Pod{}).
+		WithEventFilter(&ClusterPredicate{}).
 		Complete(r)
 }
