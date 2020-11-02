@@ -71,7 +71,7 @@ The above example of bootstrap will:
 4. set the password of the latter using the one in the `appuser-secret` secret
 5. create a database called `appdb` owned by the `appuser` user.
 
-Thanks to the *convention over configuration paradigm*, you can let the 
+Thanks to the *convention over configuration paradigm*, you can let the
 operator choose a default database name (`app`) and a default application
 user name (same as the database name), as well as randomly generate a
 secure password for both the superuser and the application user in
@@ -81,19 +81,17 @@ Alternatively, you can generate your own passwords, store them as secrets,
 and use them in the PostgreSQL cluster - as described in the above example.
 
 The supplied secrets must comply with the specifications of the
-`kubernetes.io/basic-auth` type, meaning that each secret should have
-at least the following properties:
+[`kubernetes.io/basic-auth` type](https://kubernetes.io/docs/concepts/configuration/secret/#basic-authentication-secret).
+The operator will only use the `password` field of the secret,
+ignoring the `username`one. If you plan to reuse the secret for application
+connections, you can set the `username` field to the same value of the `owner`.
 
-- `username`
-- `password`
-
-The following is an example of such a secret:
+The following is an example of a `basic-auth` secret:
 
 ```yaml
 apiVersion: v1
 data:
   password: cGFzc3dvcmQ=
-  username: YXBwdXNlcg==
 kind: Secret
 metadata:
   name: cluster-example-app-user
@@ -163,4 +161,3 @@ activity of the Kubernetes cluster itself.
 In case you don't supply any `superuserSecret`, a new one is automatically
 generated with a secure and random password. The secret is then used to
 reset the password for the `postgres` user of the cluster.
-
