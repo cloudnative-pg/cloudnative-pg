@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"os"
 	"os/exec"
 	"path"
 	"strings"
@@ -32,6 +33,10 @@ func (info InitInfo) Restore() error {
 	}
 
 	if err := info.restoreDataDir(backup); err != nil {
+		return err
+	}
+
+	if err := info.writeInitialPostgresqlConf(); err != nil {
 		return err
 	}
 
@@ -130,6 +135,15 @@ func (info InitInfo) writeRestoreWalConfig(backup *v1alpha1.Backup) error {
 			"restore_command = '%s'\n",
 		strings.Join(cmd, " "))
 
+	// Create default configuration
+	configParameters := postgres.CreateCNPConfiguration(major*10000, nil, true)
+	err = fileutils.AppendStringToFile(
+		path.Join(info.PgData, "custom.conf"),
+		postgres.CreatePostgresqlConfFile(configParameters))
+	if err != nil {
+		return fmt.Errorf("cannot write custom.conf: %w", err)
+	}
+
 	// Disable SSL as we still don't have the required certificates
 	err = fileutils.AppendStringToFile(
 		path.Join(info.PgData, "custom.conf"),
@@ -168,6 +182,53 @@ func (info InitInfo) writeRestoreWalConfig(backup *v1alpha1.Backup) error {
 		path.Join(info.PgData, "recovery.conf"),
 		[]byte(recoveryFileContents),
 		0600)
+}
+
+// writeInitialPostgresqlConf reset the postgresql.conf that there is in the instance
+func (info InitInfo) writeInitialPostgresqlConf() error {
+	tempDataDir, err := ioutil.TempDir("/tmp", "datadir_")
+	if err != nil {
+		return fmt.Errorf("while creating a temporary data directory: %w", err)
+	}
+	defer func() {
+		err = os.RemoveAll(tempDataDir)
+		if err != nil {
+			log.Log.Error(
+				err,
+				"skipping error while deleting temporary data directory")
+		}
+	}()
+
+	temporaryInstance := InitInfo{
+		PgData: tempDataDir,
+	}
+
+	if err = temporaryInstance.CreateDataDirectory(); err != nil {
+		return fmt.Errorf("while creating a temporary data directory: %w", err)
+	}
+
+	err = fileutils.CopyFile(
+		path.Join(temporaryInstance.PgData, "postgresql.conf"),
+		path.Join(info.PgData, "postgresql.conf"))
+	if err != nil {
+		return fmt.Errorf("while creating postgresql.conf: %w", err)
+	}
+
+	err = fileutils.CopyFile(
+		path.Join(temporaryInstance.PgData, "custom.conf"),
+		path.Join(info.PgData, "custom.conf"))
+	if err != nil {
+		return fmt.Errorf("while creating custom.conf: %w", err)
+	}
+
+	err = fileutils.CopyFile(
+		path.Join(temporaryInstance.PgData, "postgresql.auto.conf"),
+		path.Join(info.PgData, "postgresql.auto.conf"))
+	if err != nil {
+		return fmt.Errorf("while creating postgresql.auto.conf: %w", err)
+	}
+
+	return err
 }
 
 // writeRestoreHbaConf write a pg_hba.conf allowing access without password from localhost.

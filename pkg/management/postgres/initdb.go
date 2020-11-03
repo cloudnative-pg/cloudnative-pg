@@ -101,10 +101,16 @@ func (info InitInfo) CreateDataDirectory() error {
 	options := []string{
 		"--username",
 		"postgres",
-		"--pwfile",
-		info.PasswordFile,
 		"-D",
 		info.PgData,
+		"--no-sync",
+	}
+
+	if info.PasswordFile != "" {
+		options = append(options,
+			"--pwfile",
+			info.PasswordFile,
+		)
 	}
 
 	log.Log.Info("Creating new data directory",
