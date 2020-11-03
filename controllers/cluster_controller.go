@@ -9,6 +9,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -75,12 +76,12 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}
 
 		// This is a real error, maybe the RBAC configuration is wrong?
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("cannot get the managed resource: %w", err)
 	}
 
 	var namespace corev1.Namespace
 	if err := r.Get(ctx, client.ObjectKey{Namespace: "", Name: req.Namespace}, &namespace); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("cannot get the containing namespace: %w", err)
 	}
 
 	if !namespace.DeletionTimestamp.IsZero() {
@@ -118,18 +119,18 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return ctrl.Result{}, nil
 		}
 
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
 	}
 
 	// Ensure we have the required global objects
 	if err := r.createPostgresClusterObjects(ctx, &cluster); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("cannot create Cluster auxiliary objects: %w", err)
 	}
 
 	// Get the replication status
 	var instancesStatus postgres.PostgresqlStatusList
 	if instancesStatus, err = r.getStatusFromInstances(ctx, childPods); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("cannot get status from instances: %w", err)
 	}
 
 	// Recreate missing Pods
@@ -145,12 +146,12 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	// Update the target primary name from the Pods status
 	if err = r.updateTargetPrimaryFromPods(ctx, &cluster, instancesStatus); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("cannot update target primary from pods: %w", err)
 	}
 
 	// Update the labels for the -rw service to work correctly
 	if err = r.updateLabelsOnPods(ctx, &cluster, childPods); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("cannot update labels on pods: %w", err)
 	}
 
 	// We have these cases now:
@@ -194,14 +195,18 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context,
 	if cluster.Status.Instances < cluster.Spec.Instances {
 		newNodeSerial, err := r.generateNodeSerial(ctx, cluster)
 		if err != nil {
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 		}
 		return r.joinReplicaInstance(ctx, newNodeSerial, cluster)
 	}
 
 	// Are there nodes to be removed? Remove one of them
 	if cluster.Status.Instances > cluster.Spec.Instances {
-		return ctrl.Result{}, r.scaleDownCluster(ctx, cluster, childPods)
+		if err := r.scaleDownCluster(ctx, cluster, childPods); err != nil {
+			return ctrl.Result{}, fmt.Errorf("cannot scale down cluster: %w", err)
+		}
+
+		return ctrl.Result{}, nil
 	}
 
 	return ctrl.Result{}, nil
