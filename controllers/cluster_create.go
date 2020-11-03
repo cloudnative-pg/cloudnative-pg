@@ -366,7 +366,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	// Generate a new node serial
 	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
 	// We are bootstrapping a cluster and in need to create the first node
@@ -389,7 +389,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 				}, nil
 			}
 
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("cannot get the backup object: %w", err)
 		}
 		pod = specs.CreatePrimaryPodViaFullRecovery(*cluster, nodeSerial, &backup)
 	} else {
@@ -492,7 +492,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 				cluster.Spec.StorageConfiguration.Size)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("unable to create a PVC spec for node with serial %v: %w", nodeSerial, err)
 	}
 
 	utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
