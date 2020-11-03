@@ -115,10 +115,9 @@ func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *
 		utils.SetAsOwnedBy(&postgresSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 		specs.SetOperatorVersion(&postgresSecret.ObjectMeta, versions.Version)
 		if err := r.Create(ctx, postgresSecret); err != nil {
-			if apierrs.IsAlreadyExists(err) {
-				return nil
+			if !apierrs.IsAlreadyExists(err) {
+				return err
 			}
-			return err
 		}
 	}
 
@@ -140,10 +139,9 @@ func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *
 		utils.SetAsOwnedBy(&appSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 		specs.SetOperatorVersion(&appSecret.ObjectMeta, versions.Version)
 		if err := r.Create(ctx, appSecret); err != nil {
-			if apierrs.IsAlreadyExists(err) {
-				return nil
+			if !apierrs.IsAlreadyExists(err) {
+				return err
 			}
-			return err
 		}
 	}
 
