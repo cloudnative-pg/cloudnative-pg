@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 )
 
 // AppendStringToFile append the content of the given string to the
@@ -127,4 +128,15 @@ func CreateEmptyFile(fileName string) error {
 	}
 	_ = file.Close()
 	return nil
+}
+
+// FindinFile search for a pattern in a file return true
+// if success
+func FindinFile(fileName string, pattern string) (bool, error) {
+	fileContent, err := ReadFile(fileName)
+	if err != nil {
+		return false, err
+	}
+
+	return strings.Contains(fileContent, pattern), nil
 }
