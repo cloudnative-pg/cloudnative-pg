@@ -158,6 +158,28 @@ func (instance Instance) WithActiveInstance(inner func() error) error {
 	return inner()
 }
 
+// GetApplicationDB gets the connection pool pointing to this instance, possibly creating
+// it if needed.
+// IMPORTANT: this function isn't strictly needed here in CNP, but it's needed in CNBDR
+func (instance *Instance) GetApplicationDB() (*sql.DB, error) {
+	if instance.applicationDB != nil {
+		return instance.applicationDB, nil
+	}
+
+	db, err := sql.Open(
+		"postgres",
+		"postgres://postgres@localhost/"+instance.ApplicationDatabase+"?sslmode=disable")
+	if err != nil {
+		return nil, errors.Wrap(err, "Can't create connection pool")
+	}
+
+	db.SetMaxOpenConns(2)
+	db.SetMaxIdleConns(0)
+
+	instance.applicationDB = db
+	return instance.applicationDB, nil
+}
+
 // GetSuperUserDB gets the connection pool pointing to this instance, possibly creating
 // it if needed
 func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
