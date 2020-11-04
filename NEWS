@@ -1,6 +1,18 @@
 Cloud Native PostgreSQL  - History of user-visible changes
 Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 
+Version 0.4.0 - 5 Nov 2020
+
+- Support for full recovery from a backup
+- Add `bootstrap` section to configure how to initiate a cluster: `initDB`
+  or `fullRecovery`
+- Introduce defaulting and validating webhooks
+- Simplify configuration (convention over configuration)
+- Constrain rolling upgrades to the same PostgreSQL major version
+- End-to-end tests run on GKE, AKS and GKS
+- Documentation improvements
+- Bug fixes and minor improvements
+
 Version 0.3.0 - 25 Sep 2020
 
 - Support for PostgreSQL 13
