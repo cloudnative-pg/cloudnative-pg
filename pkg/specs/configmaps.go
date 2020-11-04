@@ -9,6 +9,7 @@ package specs
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -173,11 +174,25 @@ func CreatePostgresqlConfiguration(
 }
 
 // CreatePostgresqlConfFile create the contents of the postgresql.conf file
-func CreatePostgresqlConfFile(parameters map[string]string) string {
-	// create final configuration
+func CreatePostgresqlConfFile(configuration map[string]string) string {
+	// We need to be able to compare two configurations generated
+	// by operator to know if they are different or not. To do
+	// that we sort the configuration by parameter name as order
+	// is really irrelevant for our purposes
+	parameters := make([]string, len(configuration))
+	i := 0
+	for key := range configuration {
+		parameters[i] = key
+		i++
+	}
+	sort.Strings(parameters)
+
 	postgresConf := ""
-	for key, value := range parameters {
-		postgresConf += fmt.Sprintf("%v = %v\n", key, escapePostgresConfValue(value))
+	for _, parameter := range parameters {
+		postgresConf += fmt.Sprintf(
+			"%v = %v\n",
+			parameter,
+			escapePostgresConfValue(configuration[parameter]))
 	}
 	return postgresConf
 }
