@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
@@ -35,7 +36,7 @@ const (
 
 // createPostgresClusterObjects ensure that we have the required global objects
 func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	err := r.createPostgresConfigMap(ctx, cluster)
+	err := r.createOrPatchPostgresConfigMap(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -79,21 +80,50 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 	return nil
 }
 
-func (r *ClusterReconciler) createPostgresConfigMap(ctx context.Context, cluster *v1alpha1.Cluster) error {
-	configMap, err := specs.CreatePostgresConfigMap(cluster)
+func (r *ClusterReconciler) createOrPatchPostgresConfigMap(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	var configMap corev1.ConfigMap
+	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &configMap); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while getting config map: %w", err)
+		}
+
+		return r.createPostgresConfigMap(ctx, cluster)
+	}
+
+	generatedConfigMap, err := specs.CreatePostgresConfigMap(cluster)
 	if err != nil {
 		return err
 	}
+	if reflect.DeepEqual(generatedConfigMap.Data, configMap.Data) {
+		// Everything fine, the two config maps are exactly the same
+		return nil
+	}
 
-	utils.SetAsOwnedBy(&configMap.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
-	specs.SetOperatorVersion(&configMap.ObjectMeta, versions.Version)
-	if err := r.Create(ctx, configMap); err != nil {
+	// The configuration changed, and we need the patch the
+	// configMap we have
+	patchedConfigMap := configMap
+	patchedConfigMap.Data = generatedConfigMap.Data
+	if err := r.Patch(ctx, &patchedConfigMap, client.MergeFrom(&configMap)); err != nil {
+		return fmt.Errorf("while patching config map: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) createPostgresConfigMap(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	generatedConfigMap, err := specs.CreatePostgresConfigMap(cluster)
+	if err != nil {
+		return err
+	}
+	utils.SetAsOwnedBy(&generatedConfigMap.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&generatedConfigMap.ObjectMeta, versions.Version)
+
+	if err := r.Create(ctx, generatedConfigMap); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			return nil
 		}
-		return err
+		return fmt.Errorf("while creating config map: %w", err)
 	}
-
 	return nil
 }
 

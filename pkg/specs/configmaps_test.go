@@ -57,6 +57,15 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 		Expect(len(strings.Split(confFile, "\n"))).To(BeNumerically(">", 2))
 	})
 
+	It("is sorted by parameter name", func() {
+		settings := map[string]string{
+			"shared_buffers":  "128KB",
+			"log_destination": "stderr",
+		}
+		confFile := CreatePostgresqlConfFile(settings)
+		Expect(confFile).To(Equal("log_destination = 'stderr'\nshared_buffers = '128KB'\n"))
+	})
+
 	When("version is 10", func() {
 		It("will use appropriate settings", func() {
 			config := CreatePostgresqlConfiguration(cnpConfigurationSettings, 100000, settings)
