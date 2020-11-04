@@ -39,38 +39,6 @@ func AppendStringToFile(targetFile string, content string) error {
 	return err
 }
 
-// AppendFile append the content of the source file to the end of the target file
-// prepending new data with a carriage return
-func AppendFile(targetFile string, sourceFile string) error {
-	// TODO: append the file using the Reader / Writer interface,
-	// or better avoid appending the file at all
-	data, err := ioutil.ReadFile(sourceFile) // #nosec
-	if err != nil {
-		return err
-	}
-
-	stream, err := os.OpenFile(
-		targetFile,
-		os.O_APPEND|os.O_WRONLY, 0600) // #nosec
-	if err != nil {
-		return err
-	}
-	defer func() {
-		closeError := stream.Close()
-		if closeError != nil {
-			err = closeError
-		}
-	}()
-
-	_, err = stream.WriteString("\n")
-	if err != nil {
-		return err
-	}
-
-	_, err = stream.Write(data)
-	return err
-}
-
 // FileExists check if a file exists, and return an error otherwise
 func FileExists(fileName string) (bool, error) {
 	if _, err := os.Stat(fileName); err != nil {
@@ -107,6 +75,23 @@ func CopyFile(source, destination string) error {
 
 	err = out.Close()
 	return err
+}
+
+// WriteStringToFile replace the contents of a certain file
+// with a string. If the file doesn't exit, it's created
+func WriteStringToFile(fileName string, contents string) error {
+	out, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.WriteString(out, contents)
+	if err != nil {
+		_ = out.Close()
+		return err
+	}
+
+	return out.Close()
 }
 
 // ReadFile Read source file and output the content as string

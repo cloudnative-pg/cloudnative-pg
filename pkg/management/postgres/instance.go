@@ -121,6 +121,28 @@ func (instance *Instance) Shutdown() error {
 	return nil
 }
 
+// Reload makes a certain active instance reload the configuration
+func (instance *Instance) Reload() error {
+	options := []string{
+		"-D",
+		instance.PgData,
+		"reload",
+	}
+
+	log.Log.Info("Requesting configuration reload",
+		"pgdata", instance.PgData)
+
+	cmd := exec.Command("pg_ctl", options...) // #nosec
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		return errors.Wrap(err, "Error requesting configuration reload")
+	}
+
+	return nil
+}
+
 // Run this instance returning an exec.Cmd structure
 // to control the instance execution
 func (instance Instance) Run() (*exec.Cmd, error) {

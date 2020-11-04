@@ -10,6 +10,7 @@ package specs
 
 import (
 	"fmt"
+	"path"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -348,11 +349,11 @@ func createPostgresContainers(
 				},
 				{
 					Name:  "PGCONF",
-					Value: "/etc/configuration/postgresConfiguration",
+					Value: path.Join("/etc/configuration", PostgreSQLConfigurationKeyName),
 				},
 				{
 					Name:  "PGHBA",
-					Value: "/etc/configuration/postgresHBA",
+					Value: path.Join("/etc/configuration", PostgreSQLHBAKeyName),
 				},
 				{
 					Name:  "PGPORT",

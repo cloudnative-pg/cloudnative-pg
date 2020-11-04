@@ -35,6 +35,16 @@ local all all peer
 host all all all md5
 host replication all all md5
 `
+
+	// PostgreSQLConfigurationKeyName is the name of the key
+	// inside the ConfigMap which is containing the PostgreSQL
+	// configuration
+	PostgreSQLConfigurationKeyName = "postgresConfiguration"
+
+	// PostgreSQLHBAKeyName is the name of the key
+	// inside the ConfigMap which is containing the PostgreSQL
+	// HBA rules
+	PostgreSQLHBAKeyName = "postgresHBA"
 )
 
 // MajorVersionRange is used to represent a range of PostgreSQL versions
@@ -116,8 +126,8 @@ func CreatePostgresConfigMap(cluster *v1alpha1.Cluster) (*corev1.ConfigMap, erro
 			Namespace: cluster.Namespace,
 		},
 		Data: map[string]string{
-			"postgresConfiguration": configFile,
-			"postgresHBA":           hbaContent,
+			PostgreSQLConfigurationKeyName: configFile,
+			PostgreSQLHBAKeyName:           hbaContent,
 		},
 	}, nil
 }

@@ -15,8 +15,8 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	apiv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/internal/management/utils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 )
 
 var (

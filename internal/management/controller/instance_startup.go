@@ -15,8 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 
 	apiv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/internal/management/utils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 )
 
 // VerifyPgDataCoherence check if this cluster exist in k8s and panic if this
@@ -54,13 +54,16 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 // one from the PGDATA viewpoint, but is not classified as the target nor the
 // current primary
 func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructured.Unstructured) error {
-	currentPrimary, err := utils.GetCurrentPrimary(cluster)
+	targetPrimary, err := utils.GetTargetPrimary(cluster)
 	if err != nil {
 		return err
 	}
 
-	targetPrimary, err := utils.GetTargetPrimary(cluster)
-	if err != nil {
+	// When a new cluster has just started, we have still
+	// no current primary. It's not a real issue, we just need
+	// to put our name there
+	currentPrimary, err := utils.GetCurrentPrimary(cluster)
+	if err != nil && err != utils.ErrCurrentPrimaryNotFound {
 		return err
 	}
 

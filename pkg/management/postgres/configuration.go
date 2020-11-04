@@ -7,6 +7,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package postgres
 
 import (
+	"fmt"
 	"path"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
@@ -20,12 +21,12 @@ func InstallCustomConfigurationFile(pgdata, filename string) error {
 		return nil
 	}
 
-	log.Log.Info(
-		"Installing PostgreSQL configuration",
-		"pgdata", pgdata,
-		"filename", filename)
+	contents, err := fileutils.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("while reading custom configuration file: %w", err)
+	}
 
-	return installPgDataFile(pgdata, filename, PostgresqlCustomConfigurationFile)
+	return InstallPgDataFileContent(pgdata, contents, PostgresqlCustomConfigurationFile)
 }
 
 // InstallPgHBAFile install in the PgData the file containing
@@ -35,16 +36,24 @@ func InstallPgHBAFile(pgdata, filename string) error {
 		return nil
 	}
 
-	log.Log.Info(
-		"Installing pg_hba.conf file",
-		"pgdata", pgdata,
-		"filename", filename)
+	contents, err := fileutils.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("while reading hba file: %w", err)
+	}
 
-	return installPgDataFile(pgdata, filename, "pg_hba.conf")
+	return InstallPgDataFileContent(
+		pgdata,
+		contents,
+		PostgresqlHBARulesFile)
 }
 
-// installPgDataFile install a file in PgData
-func installPgDataFile(pgdata, source, destination string) error {
-	targetFile := path.Join(pgdata, destination)
-	return fileutils.CopyFile(source, targetFile)
+// InstallPgDataFileContent install a file in PgData
+func InstallPgDataFileContent(pgdata, contents, destinationFile string) error {
+	log.Log.Info(
+		"Installing configuration file",
+		"pgdata", pgdata,
+		"filename", destinationFile)
+
+	targetFile := path.Join(pgdata, destinationFile)
+	return fileutils.WriteStringToFile(targetFile, contents)
 }
