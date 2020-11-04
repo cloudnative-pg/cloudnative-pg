@@ -100,11 +100,11 @@ on your laptop, you can proceed with Cloud Native PostgreSQL installation.
 
 ### Kubernetes
 
-Download the [latest operator manifest](samples/postgresql-operator-0.3.0.yaml)
+Download the [latest operator manifest](samples/postgresql-operator-0.4.0.yaml)
 and run:
 
 ```sh
-kubectl apply -f postgresql-operator-0.3.0.yaml
+kubectl apply -f postgresql-operator-0.4.0.yaml
 ```
 
 Once you have run the `kubectl` command, Cloud Native PostgreSQL will be installed in your Kubernetes cluster.
