@@ -77,6 +77,9 @@ sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
 sed -i -e "s/version=\".*\"/version=\"${release_version}\"/" \
     Dockerfile
 
+sed -i "s/postgresql-operator-[0-9.]*.yaml/postgresql-operator-${release_version}.yaml/g" \
+    docs/src/quickstart.md
+
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
 (
@@ -89,10 +92,14 @@ cp -r config/* "${CONFIG_TMP_DIR}"
 "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${release_manifest}"
 rm -fr "${CONFIG_TMP_DIR}"
 
+cp "${release_manifest}" "docs/src/samples/postgresql-operator-${release_version}.yaml"
+
 git add \
     pkg/versions/versions.go \
     Dockerfile \
-    "${release_manifest}"
+    docs/src/quickstart.md \
+    "${release_manifest}" \
+    "docs/src/samples/postgresql-operator-${release_version}.yaml"
 git commit -sm "Version tag to ${release_version}"
 git tag -sam "Release ${release_version}" "v${release_version}"
 
