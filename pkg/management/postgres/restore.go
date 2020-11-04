@@ -169,7 +169,7 @@ func (info InitInfo) writeRestoreHbaConf() error {
 	// the database
 	temporaryHbaRules := "host all all 127.0.0.1/32 trust"
 	return ioutil.WriteFile(
-		path.Join(info.PgData, "pg_hba.conf"),
+		path.Join(info.PgData, PostgresqlHBARulesFile),
 		[]byte(temporaryHbaRules),
 		0600)
 }

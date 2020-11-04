@@ -48,6 +48,15 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 		return nil, err
 	}
 
+	settingsPendingRestart := 0
+	row = superUserDB.QueryRow(
+		"SELECT COUNT(*) FROM pg_settings WHERE pending_restart")
+	err = row.Scan(&settingsPendingRestart)
+	if err != nil {
+		return nil, err
+	}
+	result.PendingRestart = settingsPendingRestart > 0
+
 	if !result.IsPrimary {
 		row = superUserDB.QueryRow(
 			"SELECT pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), pg_is_wal_replay_paused()")

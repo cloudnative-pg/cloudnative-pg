@@ -9,11 +9,13 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package controller
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
@@ -26,12 +28,14 @@ import (
 )
 
 // InstanceReconciler can reconcile the status of the PostgreSQL cluster with
-// the one of this PostgreSQL instance
+// the one of this PostgreSQL instance. Also the configuration in the
+// ConfigMap is applied when needed
 type InstanceReconciler struct {
-	client        dynamic.Interface
-	instance      *postgres.Instance
-	log           logr.Logger
-	instanceWatch watch.Interface
+	client         dynamic.Interface
+	instance       *postgres.Instance
+	log            logr.Logger
+	instanceWatch  watch.Interface
+	configMapWatch watch.Interface
 }
 
 // NewInstanceReconciler create a new instance reconciler
@@ -82,12 +86,35 @@ func (r *InstanceReconciler) Watch() error {
 			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName).String(),
 		})
 	if err != nil {
-		return err
+		return fmt.Errorf("error watching cluster: %w", err)
 	}
 
-	channel := r.instanceWatch.ResultChan()
+	r.configMapWatch, err = r.client.
+		Resource(schema.GroupVersionResource{
+			Group:    "",
+			Version:  "v1",
+			Resource: "configmaps",
+		}).
+		Namespace(r.instance.Namespace).
+		Watch(metav1.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName).String(),
+		})
+	if err != nil {
+		return fmt.Errorf("error watching configmap: %w", err)
+	}
+
+	instanceChannel := r.instanceWatch.ResultChan()
+	configMapChannel := r.configMapWatch.ResultChan()
+
 	for {
-		event, ok := <-channel
+		var event watch.Event
+		var ok bool
+
+		select {
+		case event, ok = <-instanceChannel:
+		case event, ok = <-configMapChannel:
+		}
+
 		if !ok {
 			break
 		}
