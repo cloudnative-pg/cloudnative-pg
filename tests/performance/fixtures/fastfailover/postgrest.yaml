@@ -15,14 +15,24 @@ spec:
         app: postgrest
     spec:
       securityContext:
-        runAsUser: 0
+        runAsNonRoot: true
       containers:
       - image: postgrest/postgrest:v6.0.2
         name: postgrest
         resources: {}
         env:
+          - name: PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: cluster-example-superuser
+                key: password
+          - name: USER
+            valueFrom:
+              secretKeyRef:
+                name: cluster-example-superuser
+                key: username
           - name: PGRST_DB_URI
-            value: "postgres://postgres@cluster-example-rw/app?sslmode=disable"
+            value: "postgres://$(USER):$(PASSWORD)@cluster-example-rw/app?sslmode=disable"
           - name: PGRST_DB_SCHEMA
             value: tps
           - name: PGRST_DB_ANON_ROLE
@@ -30,17 +40,6 @@ spec:
         ports:
           - name: http
             containerPort: 3000
-        volumeMounts:
-        - mountPath: /root/
-          name: pgpass
-      volumes:
-      - name: pgpass
-        secret:
-          secretName: cluster-example-superuser
-          items:
-          - key: pgpass
-            path: .pgpass
-            mode: 0600
 ---
 apiVersion: v1
 kind: Service
