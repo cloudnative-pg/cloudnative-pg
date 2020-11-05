@@ -31,8 +31,9 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 ) error {
 	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
-	if len(status.Items) == 0 {
-		// Still no ready instances
+	if len(status.Items) <= 1 {
+		// Can't make a switchover of failover if we have
+		// less than two instances
 		return nil
 	}
 
@@ -43,6 +44,26 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 			"clusterStatus", status)
 		// No primary, no party. Failover please!
 		return r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
+	}
+
+	// If our primary instance need a restart and all the replicas
+	// already are restarted and ready, let's just switchover
+	// to a replica to finish the configuration changes
+	instancesNeedingRestart := 0
+	for _, status := range status.Items {
+		if status.PendingRestart {
+			instancesNeedingRestart++
+		}
+	}
+
+	primaryPendingRestart := status.Items[0].PendingRestart
+	allInstancesReady := cluster.Status.ReadyInstances == cluster.Spec.Instances
+	if instancesNeedingRestart == 1 && primaryPendingRestart && allInstancesReady {
+		log.Info("current primary is needing a restart and the replicas "+
+			"are ready, switching over to complete configuration apply",
+			"newPrimary", status.Items[1].PodName,
+			"clusterStatus", status)
+		return r.setPrimaryInstance(ctx, cluster, status.Items[1].PodName)
 	}
 
 	return nil

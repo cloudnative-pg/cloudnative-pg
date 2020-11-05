@@ -114,7 +114,40 @@ func (r *InstanceReconciler) reconcileConfigMap(event *watch.Event) error {
 			err)
 	}
 
-	return r.instance.Reload()
+	err = r.instance.Reload()
+	if err != nil {
+		return fmt.Errorf("while applying new configuration: %w", err)
+	}
+
+	// TODO: we already sighup the postmaster and
+	// probably it has already reloaded the configuration
+	// anyway there's no guarantee here that the signal
+	// has been actually received and sent to the children.
+	// What shall we do? Wait for a bit of time? Or inject
+	// a configuration marker and wait for it to appear somewhere?
+
+	status, err := r.instance.GetStatus()
+	if err != nil {
+		return fmt.Errorf("while applying new configuration: %w", err)
+	}
+
+	isPrimary, err := r.instance.IsPrimary()
+	if err != nil {
+		return fmt.Errorf("while applying new configuration: %w", err)
+	}
+
+	if status.PendingRestart && !isPrimary {
+		// This instance need a restart and is a replica.
+		// Let's just restart it and wait for the new configuration
+		// to be applied
+
+		// TODO: probably we need a restartMode flag in the cluster
+		// configuration to disable or enable this auto-restart behavior
+		r.log.Info("restarting this secondary server to apply the new configuration")
+		return r.instance.Shutdown()
+	}
+
+	return nil
 }
 
 // Reconciler primary logic
