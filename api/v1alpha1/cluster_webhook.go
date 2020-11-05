@@ -8,6 +8,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"reflect"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -66,6 +67,16 @@ func (r *Cluster) Default() {
 			r.Spec.Bootstrap.InitDB.Owner = r.Spec.Bootstrap.InitDB.Database
 		}
 	}
+
+	imageName := r.GetImageName()
+	tag := utils.GetImageTag(imageName)
+	psqlVersion, err := postgres.GetPostgresVersionFromTag(tag)
+	if err == nil {
+		// The validation error will be already raised by the
+		// validateImageName function
+		r.Spec.PostgresConfiguration.Parameters = postgres.CreateCNPConfiguration(
+			psqlVersion, r.Spec.PostgresConfiguration.Parameters, false)
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
@@ -109,6 +120,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 			"old", old)
 	} else {
 		allErrs = append(allErrs, r.validateImageChange(oldObject.Spec.ImageName)...)
+		allErrs = append(allErrs, r.validateConfigurationChange(oldObject)...)
 	}
 
 	if len(allErrs) == 0 {
@@ -261,6 +273,55 @@ func (r *Cluster) validateImageName() field.ErrorList {
 					field.NewPath("spec", "imageName"),
 					r.Spec.ImageName,
 					"invalid version tag"))
+		}
+	}
+
+	return result
+}
+
+// validateConfigurationChange determine whether a PostgreSQL configuration
+// change can be applied
+func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	configChanged := !reflect.DeepEqual(
+		old.Spec.PostgresConfiguration.Parameters,
+		r.Spec.PostgresConfiguration.Parameters)
+
+	if old.Spec.ImageName != r.Spec.ImageName && configChanged {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "imageName"),
+				r.Spec.ImageName,
+				"Can't change image name and configuration at the same time"))
+		return result
+	}
+
+	imageName := r.GetImageName()
+	tag := utils.GetImageTag(imageName)
+	psqlVersion, err := postgres.GetPostgresVersionFromTag(tag)
+	if err != nil {
+		// The validation error will be already raised by the
+		// validateImageName function
+		return result
+	}
+
+	r.Spec.PostgresConfiguration.Parameters = postgres.CreateCNPConfiguration(
+		psqlVersion, r.Spec.PostgresConfiguration.Parameters, false)
+	oldParameters := postgres.CreateCNPConfiguration(
+		psqlVersion, old.Spec.PostgresConfiguration.Parameters, false)
+
+	for key, value := range r.Spec.PostgresConfiguration.Parameters {
+		_, isFixed := postgres.FixedConfigurationParameters[key]
+		oldValue, presentInOldConfiguration := oldParameters[key]
+		if isFixed && (!presentInOldConfiguration || value != oldValue) {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", key),
+					value,
+					"Can't change fixed configuration parameter"))
 		}
 	}
 

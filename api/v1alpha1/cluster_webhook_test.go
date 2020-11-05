@@ -131,7 +131,7 @@ var _ = Describe("initdb options validation", func() {
 	})
 })
 
-var _ = Describe("", func() {
+var _ = Describe("cluster configuration", func() {
 	It("defaults to creating an application database", func() {
 		cluster := Cluster{}
 		cluster.Default()
@@ -139,7 +139,7 @@ var _ = Describe("", func() {
 		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("app"))
 	})
 
-	It("default the owner user with the database name", func() {
+	It("defaults the owner user with the database name", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
@@ -153,10 +153,16 @@ var _ = Describe("", func() {
 		cluster.Default()
 		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("appdb"))
 	})
+
+	It("defaults the PostgreSQL configuration with parameters from the operator", func() {
+		cluster := Cluster{}
+		cluster.Default()
+		Expect(len(cluster.Spec.PostgresConfiguration.Parameters)).To(BeNumerically(">", 0))
+	})
 })
 
 var _ = Describe("Storage validation", func() {
-	It("complain if the value isn't correct", func() {
+	It("complains if the value isn't correct", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				StorageConfiguration: StorageConfiguration{
@@ -274,5 +280,110 @@ var _ = Describe("Image name validation", func() {
 			},
 		}
 		Expect(len(cluster.validateImageName())).To(Equal(1))
+	})
+})
+
+var _ = Describe("configuration change validation", func() {
+	It("doesn't complain when the configuration is exactly the same", func() {
+		clusterOld := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:10.4",
+			},
+		}
+		clusterNew := clusterOld
+		Expect(len(clusterNew.validateConfigurationChange(&clusterOld))).To(Equal(0))
+	})
+
+	It("complains when we changed a fixed setting", func() {
+		clusterOld := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:10.4",
+			},
+		}
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:10.4",
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"data_directory": "/var/pgdata/here",
+					},
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfigurationChange(&clusterOld))).To(Equal(1))
+	})
+
+	It("doesn't complain when we change a setting which is not fixed", func() {
+		clusterOld := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:10.4",
+			},
+		}
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:10.4",
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"shared_buffers": "4G",
+					},
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfigurationChange(&clusterOld))).To(Equal(0))
+	})
+
+	It("complains when changing postgres major version and settings", func() {
+		clusterOld := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:10.4",
+			},
+		}
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:11.0",
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"shared_buffers": "4G",
+					},
+				},
+			},
+		}
+		Expect(len(clusterNew.validateConfigurationChange(&clusterOld))).To(Equal(1))
+	})
+})
+
+var _ = Describe("validate image name change", func() {
+	It("doesn't complain with no changes", func() {
+		clusterNew := Cluster{
+			Spec: ClusterSpec{},
+		}
+		Expect(len(clusterNew.validateImageChange(""))).To(Equal(0))
+	})
+
+	It("complains if versions are wrong", func() {
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:12.0",
+			},
+		}
+		Expect(len(clusterNew.validateImageChange("12:1"))).To(Equal(1))
+	})
+
+	It("complains if can't upgrade between mayor versions", func() {
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:11.0",
+			},
+		}
+		Expect(len(clusterNew.validateImageChange("postgres:12.0"))).To(Equal(1))
+	})
+
+	It("doesn't complain if image change it's valid", func() {
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:12.0",
+			},
+		}
+		Expect(len(clusterNew.validateImageChange("postgres:12.1"))).To(Equal(0))
 	})
 })
