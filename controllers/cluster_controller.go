@@ -144,7 +144,8 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, r.handleDanglingPVC(ctx, &cluster)
 	}
 
-	// Update the target primary name from the Pods status
+	// Update the target primary name from the Pods status.
+	// This means issuing a failover or switchover when needed.
 	if err = r.updateTargetPrimaryFromPods(ctx, &cluster, instancesStatus); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update target primary from pods: %w", err)
 	}
