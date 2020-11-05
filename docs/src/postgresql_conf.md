@@ -39,9 +39,10 @@ operator by applying the following sections in this order:
 The **global default parameters** are:
 
 ```text
+logging_collector = 'off'
 max_parallel_workers = '32'
-max_worker_processes = '32'
 max_replication_slots = '32'
+max_worker_processes = '32'
 ```
 
 The **default parameters for PostgreSQL 13 or higher** are:
@@ -59,10 +60,15 @@ wal_keep_segments = '32'
 The following parameters are **fixed** and exclusively controlled by the operator:
 
 ```text
-hot_standby = 'true'
-archive_mode = 'on'
 archive_command = '/controller/manager wal-archive %p'
+archive_mode = 'on'
+archive_timeout = '5min'
+full_page_writes = 'on'
+hot_standby = 'true'
 port = '5432'
+ssl = 'off'
+wal_level = 'logical'
+wal_log_hints = 'on'
 ```
 
 Since the fixed parameters are added last, they can't be overridden by the
