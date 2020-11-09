@@ -211,7 +211,7 @@ func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 
 	db, err := sql.Open(
 		"postgres",
-		"postgres://postgres@localhost/postgres?sslmode=disable")
+		"host=/tmp port=5432 dbname=postgres user=postgres sslmode=disable")
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't create connection pool")
 	}

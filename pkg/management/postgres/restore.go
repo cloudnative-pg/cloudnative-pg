@@ -167,7 +167,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *v1alpha1.Backup) error {
 func (info InitInfo) writeRestoreHbaConf() error {
 	// We allow every access from localhost, and this is needed to correctly restore
 	// the database
-	temporaryHbaRules := "host all all 127.0.0.1/32 trust"
+	temporaryHbaRules := "local all all peer"
 	return ioutil.WriteFile(
 		path.Join(info.PgData, PostgresqlHBARulesFile),
 		[]byte(temporaryHbaRules),

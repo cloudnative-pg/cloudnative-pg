@@ -10,7 +10,6 @@ package specs
 
 import (
 	"fmt"
-	"path"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -348,14 +347,6 @@ func createPostgresContainers(
 					Value: cluster.Name,
 				},
 				{
-					Name:  "PGCONF",
-					Value: path.Join("/etc/configuration", PostgreSQLConfigurationKeyName),
-				},
-				{
-					Name:  "PGHBA",
-					Value: path.Join("/etc/configuration", PostgreSQLHBAKeyName),
-				},
-				{
 					Name:  "PGPORT",
 					Value: "5432",
 				},
@@ -374,10 +365,6 @@ func createPostgresContainers(
 				{
 					Name:      "superuser-secret",
 					MountPath: "/etc/superuser-secret",
-				},
-				{
-					Name:      "config",
-					MountPath: "/etc/configuration",
 				},
 			},
 			ReadinessProbe: &corev1.Probe{

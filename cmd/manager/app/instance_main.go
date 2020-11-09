@@ -31,8 +31,6 @@ func InstanceManagerCommand(args []string) {
 	var appDBName string
 	var appUser string
 	var appPwFile string
-	var postgresHBARules string
-	var postgresConfig string
 	var pgData string
 	var parentNode string
 	var podName string
@@ -74,10 +72,6 @@ func InstanceManagerCommand(args []string) {
 		"the cluster and of the Pod in k8s")
 	runCommand.StringVar(&pwFile, "pw-file", "",
 		"The file containing the PostgreSQL superuser password to use to connect to PostgreSQL")
-	runCommand.StringVar(&postgresConfig, "postgresql-config-file", os.Getenv("PGCONF"),
-		"The file containing the PostgreSQL configuration to add")
-	runCommand.StringVar(&postgresHBARules, "hba-rules-file", os.Getenv("PGHBA"),
-		"The file containing the HBA rules to apply to PostgreSQL")
 
 	restoreCommand := flag.NewFlagSet("restore", flag.ExitOnError)
 	restoreCommand.StringVar(&pwFile, "pw-file", "",
@@ -118,10 +112,6 @@ func InstanceManagerCommand(args []string) {
 			Namespace:               namespace,
 		}
 
-		if err := postgres.CreatePgPass(pwFile); err != nil {
-			log.Log.Error(err, "Error creating pgpass file")
-			os.Exit(1)
-		}
 		initSubCommand(info)
 	case "join":
 		// Ignore errors; joinCommand is set for ExitOnError.
@@ -132,6 +122,9 @@ func InstanceManagerCommand(args []string) {
 			PodName:    podName,
 		}
 
+		// Here we need to create a pgpass file
+		// given that we'll use it to clone a pgdata from an
+		// existing server
 		if err := postgres.CreatePgPass(pwFile); err != nil {
 			log.Log.Error(err, "Error creating pgpass file")
 			os.Exit(1)
@@ -146,16 +139,10 @@ func InstanceManagerCommand(args []string) {
 		instance.PodName = podName
 		instance.ClusterName = clusterName
 
+		// Here we need to create a pgpass file because
+		// we'll use it ot handle replication between different PG Pods
 		if err := postgres.CreatePgPass(pwFile); err != nil {
 			log.Log.Error(err, "Error creating pgpass file")
-			os.Exit(1)
-		}
-		if err := postgres.InstallCustomConfigurationFile(pgData, postgresConfig); err != nil {
-			log.Log.Error(err, "Error creating PostgreSQL configuration file")
-			os.Exit(1)
-		}
-		if err := postgres.InstallPgHBAFile(pgData, postgresHBARules); err != nil {
-			log.Log.Error(err, "Error creating PostgreSQL HBA file")
 			os.Exit(1)
 		}
 		runSubCommand()
@@ -175,10 +162,6 @@ func InstanceManagerCommand(args []string) {
 			ParentNode:   parentNode,
 		}
 
-		if err := postgres.CreatePgPass(pwFile); err != nil {
-			log.Log.Error(err, "Error creating pgpass file")
-			os.Exit(1)
-		}
 		restoreSubCommand(info)
 	default:
 		fmt.Printf("%v is not a valid command\n", args[0])
