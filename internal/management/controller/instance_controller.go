@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
 
@@ -84,34 +85,9 @@ func (r *InstanceReconciler) reconcileConfigMap(event *watch.Event) error {
 			err)
 	}
 
-	postgresConfiguration, err := utils.GetPostgreSQLConfiguration(object)
+	err = r.refreshConfigurationFilesFromObject(object)
 	if err != nil {
 		return err
-	}
-
-	postgresHBA, err := utils.GetPostgreSQLHBA(object)
-	if err != nil {
-		return err
-	}
-
-	err = postgres.InstallPgDataFileContent(
-		r.instance.PgData,
-		postgresConfiguration,
-		postgres.PostgresqlCustomConfigurationFile)
-	if err != nil {
-		return fmt.Errorf(
-			"installing postgresql configuration: %w",
-			err)
-	}
-
-	err = postgres.InstallPgDataFileContent(
-		r.instance.PgData,
-		postgresHBA,
-		postgres.PostgresqlHBARulesFile)
-	if err != nil {
-		return fmt.Errorf(
-			"installing postgresql HBA rules: %w",
-			err)
 	}
 
 	err = r.instance.Reload()
@@ -145,6 +121,60 @@ func (r *InstanceReconciler) reconcileConfigMap(event *watch.Event) error {
 		// configuration to disable or enable this auto-restart behavior
 		r.log.Info("restarting this secondary server to apply the new configuration")
 		return r.instance.Shutdown()
+	}
+
+	return nil
+}
+
+// RefreshConfigurationFiles get the latest version of the ConfigMap from the API
+// server and then write the configuration in PGDATA
+func (r *InstanceReconciler) RefreshConfigurationFiles() error {
+	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "configmaps",
+	}).
+		Namespace(r.instance.Namespace).
+		Get(r.instance.ClusterName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	return r.refreshConfigurationFilesFromObject(unstructuredObject)
+}
+
+// refreshConfigurationFilesFromObject receive an unstructured object representing
+// a configmap and rewrite the file in the PGDATA.
+// Important: this won't send a SIGHUP to the server
+func (r *InstanceReconciler) refreshConfigurationFilesFromObject(object *unstructured.Unstructured) error {
+	postgresConfiguration, err := utils.GetPostgreSQLConfiguration(object)
+	if err != nil {
+		return err
+	}
+
+	postgresHBA, err := utils.GetPostgreSQLHBA(object)
+	if err != nil {
+		return err
+	}
+
+	err = postgres.InstallPgDataFileContent(
+		r.instance.PgData,
+		postgresConfiguration,
+		postgres.PostgresqlCustomConfigurationFile)
+	if err != nil {
+		return fmt.Errorf(
+			"installing postgresql configuration: %w",
+			err)
+	}
+
+	err = postgres.InstallPgDataFileContent(
+		r.instance.PgData,
+		postgresHBA,
+		postgres.PostgresqlHBARulesFile)
+	if err != nil {
+		return fmt.Errorf(
+			"installing postgresql HBA rules: %w",
+			err)
 	}
 
 	return nil

@@ -38,6 +38,12 @@ func runSubCommand() {
 		os.Exit(1)
 	}
 
+	err = reconciler.RefreshConfigurationFiles()
+	if err != nil {
+		log.Log.Error(err, "Error while writing the bootstrap configuration")
+		os.Exit(1)
+	}
+
 	startWebServer()
 	startReconciler()
 	registerSignalHandler()
