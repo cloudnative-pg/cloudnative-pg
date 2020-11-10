@@ -165,8 +165,10 @@ func (pair KeyPair) GenerateServerSecret(namespace, name string) *v1.Secret {
 
 // RenewCertificate create a new certificate for the embedded private
 // key, replacing the existing one. The certificate will be signed
-// with the passed private key
-func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey) error {
+// with the passed private key and will have as parent the specified
+// parent certificate. If the parent certificate is nil the certificate
+// will be self-signed
+func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey, parentCertificate *x509.Certificate) error {
 	oldCertificate, err := pair.ParseCertificate()
 	if err != nil {
 		return err
@@ -195,10 +197,14 @@ func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey) error {
 		IsCA:                  true,
 	}
 
+	if parentCertificate == nil {
+		parentCertificate = &rootTemplate
+	}
+
 	certificateBytes, err := x509.CreateCertificate(
 		rand.Reader,
 		&rootTemplate,
-		&rootTemplate,
+		parentCertificate,
 		&caPrivateKey.PublicKey,
 		caPrivateKey)
 	if err != nil {

@@ -105,7 +105,7 @@ func renewCACertificate(client kubernetes.Interface, secret *v1.Secret) (*v1.Sec
 		return nil, err
 	}
 
-	err = pair.RenewCertificate(privateKey)
+	err = pair.RenewCertificate(privateKey, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +262,12 @@ func renewServerCertificate(client kubernetes.Interface, caSecret v1.Secret, sec
 		return nil, err
 	}
 
-	err = pair.RenewCertificate(caPrivateKey)
+	caCertificate, err := caPair.ParseCertificate()
+	if err != nil {
+		return nil, err
+	}
+
+	err = pair.RenewCertificate(caPrivateKey, caCertificate)
 	if err != nil {
 		return nil, err
 	}
