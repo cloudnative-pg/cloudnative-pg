@@ -69,7 +69,7 @@ var _ = Describe("Keypair generation", func() {
 		privateKey, err := ca.ParseECPrivateKey()
 		Expect(err).To(BeNil())
 
-		err = ca.RenewCertificate(privateKey)
+		err = ca.RenewCertificate(privateKey, nil)
 		Expect(err).To(BeNil())
 
 		newCert, err := ca.ParseCertificate()
