@@ -69,6 +69,9 @@ var _ = Describe("Keypair generation", func() {
 		privateKey, err := ca.ParseECPrivateKey()
 		Expect(err).To(BeNil())
 
+		oldCert, err := ca.ParseCertificate()
+		Expect(err).To(BeNil())
+
 		err = ca.RenewCertificate(privateKey, nil)
 		Expect(err).To(BeNil())
 
@@ -77,6 +80,14 @@ var _ = Describe("Keypair generation", func() {
 
 		Expect(newCert.NotBefore).To(BeTemporally("<", time.Now()))
 		Expect(newCert.NotAfter).To(BeTemporally(">", time.Now()))
+
+		Expect(newCert.SerialNumber).ToNot(Equal(oldCert.SerialNumber))
+
+		Expect(newCert.Subject).To(Equal(oldCert.Subject))
+		Expect(newCert.Issuer).To(Equal(oldCert.Subject))
+		Expect(newCert.IsCA).To(Equal(oldCert.IsCA))
+		Expect(newCert.KeyUsage).To(Equal(oldCert.KeyUsage))
+		Expect(newCert.ExtKeyUsage).To(Equal(oldCert.ExtKeyUsage))
 	})
 
 	It("should be able to verify if a certificate will expire", func() {
@@ -137,6 +148,44 @@ var _ = Describe("Keypair generation", func() {
 			Expect(secret.Name).To(Equal("name"))
 			Expect(secret.Data["tls.crt"]).To(Equal(pair.Certificate))
 			Expect(secret.Data["tls.key"]).To(Equal(pair.Private))
+		})
+
+		It("should be able to renew an existing certificate", func() {
+			ca, err := CreateCA()
+			Expect(err).To(BeNil())
+
+			notAfter := time.Now().Add(-10 * time.Hour)
+			notBefore := notAfter.Add(-365 * 24 * time.Hour)
+
+			privateKey, err := ca.ParseECPrivateKey()
+			Expect(err).To(BeNil())
+
+			caCert, err := ca.ParseCertificate()
+			Expect(err).To(BeNil())
+
+			pair, err := ca.createAndSignPairWithValidity("this.host.name.com", notBefore, notAfter)
+			Expect(err).To(BeNil())
+
+			oldCert, err := pair.ParseCertificate()
+			Expect(err).To(BeNil())
+
+			err = pair.RenewCertificate(privateKey, caCert)
+			Expect(err).To(BeNil())
+
+			newCert, err := pair.ParseCertificate()
+			Expect(err).To(BeNil())
+
+			Expect(newCert.NotBefore).To(BeTemporally("<", time.Now()))
+			Expect(newCert.NotAfter).To(BeTemporally(">", time.Now()))
+			Expect(newCert.SerialNumber).ToNot(Equal(oldCert.SerialNumber))
+
+			Expect(newCert.Subject).To(Equal(oldCert.Subject))
+			Expect(newCert.Issuer).To(Equal(caCert.Subject))
+			Expect(newCert.IPAddresses).To(Equal(oldCert.IPAddresses))
+			Expect(newCert.DNSNames).To(Equal(oldCert.DNSNames))
+			Expect(newCert.IsCA).To(Equal(oldCert.IsCA))
+			Expect(newCert.KeyUsage).To(Equal(oldCert.KeyUsage))
+			Expect(newCert.ExtKeyUsage).To(Equal(oldCert.ExtKeyUsage))
 		})
 	})
 })
