@@ -177,33 +177,24 @@ func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey, parentCert
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 
-	newCertificate := *oldCertificate
-	newCertificate.NotBefore = notBefore
-	newCertificate.NotAfter = notAfter
-
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
 		return err
 	}
 
-	rootTemplate := x509.Certificate{
-		SerialNumber:          serialNumber,
-		NotBefore:             notBefore,
-		NotAfter:              notAfter,
-		KeyUsage:              x509.KeyUsageCertSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
+	newCertificate := *oldCertificate
+	newCertificate.NotBefore = notBefore
+	newCertificate.NotAfter = notAfter
+	newCertificate.SerialNumber = serialNumber
 
 	if parentCertificate == nil {
-		parentCertificate = &rootTemplate
+		parentCertificate = &newCertificate
 	}
 
 	certificateBytes, err := x509.CreateCertificate(
 		rand.Reader,
-		&rootTemplate,
+		&newCertificate,
 		parentCertificate,
 		&caPrivateKey.PublicKey,
 		caPrivateKey)
