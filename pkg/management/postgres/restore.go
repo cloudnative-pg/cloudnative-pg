@@ -130,6 +130,14 @@ func (info InitInfo) writeRestoreWalConfig(backup *v1alpha1.Backup) error {
 			"restore_command = '%s'\n",
 		strings.Join(cmd, " "))
 
+	// Disable SSL as we still don't have the required certificates
+	err = fileutils.AppendStringToFile(
+		path.Join(info.PgData, "custom.conf"),
+		"ssl = 'off'\n")
+	if err != nil {
+		return fmt.Errorf("cannot write recovery config: %w", err)
+	}
+
 	if major >= 12 {
 		// Append restore_command to the end of the
 		// custom configs file

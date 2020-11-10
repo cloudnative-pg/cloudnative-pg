@@ -41,6 +41,11 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
+	err = r.createPostgresPKI(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
 	err = r.createPostgresSecrets(ctx, cluster)
 	if err != nil {
 		return err

@@ -24,6 +24,14 @@ const (
 	// get the name of the application user secret
 	ApplicationUserSecretSuffix = "-app"
 
+	// CaSecretSuffix is the suffix appended to the secret containing
+	// the generated CA for the cluster
+	CaSecretSuffix = "-ca"
+
+	// ServerSecretSuffix is the seffix appended to the secret containing
+	// the generated server secret for PostgreSQL
+	ServerSecretSuffix = "-tls"
+
 	// ServiceAnySuffix is the suffix appended to the cluster name to get the
 	// service name for every node (including non-ready ones)
 	ServiceAnySuffix = "-any"
@@ -404,6 +412,18 @@ func (cluster *Cluster) GetApplicationSecretName() string {
 	}
 
 	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
+}
+
+// GetCASecretName get the name of the secret containing the CA
+// of the cluster
+func (cluster *Cluster) GetCASecretName() string {
+	return fmt.Sprintf("%v%v", cluster.Name, CaSecretSuffix)
+}
+
+// GetServerSecretName get the name of the secret containing the
+// certificate that is used for the PostgreSQL servers
+func (cluster *Cluster) GetServerSecretName() string {
+	return fmt.Sprintf("%v%v", cluster.Name, ServerSecretSuffix)
 }
 
 // GetServiceAnyName return the name of the service that is used as DNS

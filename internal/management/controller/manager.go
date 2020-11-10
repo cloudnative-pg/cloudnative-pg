@@ -36,6 +36,7 @@ type InstanceReconciler struct {
 	log            logr.Logger
 	instanceWatch  watch.Interface
 	configMapWatch watch.Interface
+	secretWatch    watch.Interface
 }
 
 // NewInstanceReconciler create a new instance reconciler
@@ -103,8 +104,24 @@ func (r *InstanceReconciler) Watch() error {
 		return fmt.Errorf("error watching configmap: %w", err)
 	}
 
+	r.secretWatch, err = r.client.
+		Resource(schema.GroupVersionResource{
+			Group:    "",
+			Version:  "v1",
+			Resource: "secrets",
+		}).
+		Namespace(r.instance.Namespace).
+		Watch(metav1.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(
+				"metadata.name", r.instance.ClusterName+apiv1alpha1.ServerSecretSuffix).String(),
+		})
+	if err != nil {
+		return fmt.Errorf("error watching secret: %w", err)
+	}
+
 	instanceChannel := r.instanceWatch.ResultChan()
 	configMapChannel := r.configMapWatch.ResultChan()
+	secretChannel := r.secretWatch.ResultChan()
 
 	for {
 		var event watch.Event
@@ -113,6 +130,7 @@ func (r *InstanceReconciler) Watch() error {
 		select {
 		case event, ok = <-instanceChannel:
 		case event, ok = <-configMapChannel:
+		case event, ok = <-secretChannel:
 		}
 
 		if !ok {

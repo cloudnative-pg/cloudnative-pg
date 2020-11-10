@@ -32,9 +32,17 @@ var (
 	// the PostgreSQL configuration of this cluster
 	ErrPostgreSQLConfigurationMissing = errors.New("missing postgresConfiguration in ConfigMap")
 
-	// ErrPostgreSQLHBAMissing missing that the ConfigMap does not contain
+	// ErrPostgreSQLHBAMissing means that the ConfigMap does not contain
 	// the PostgreSQL HBA rules of this cluster
 	ErrPostgreSQLHBAMissing = errors.New("missing postgresHBA in ConfigMap")
+
+	// ErrCertificateMissing means that the tls.crt file is missing in
+	// a TLS secret
+	ErrCertificateMissing = errors.New("missing tls.crt data in secret")
+
+	// ErrPrivateKeyMissing means that the tls.key file is missing in
+	// a TLS secret
+	ErrPrivateKeyMissing = errors.New("missing tls.key data in secret")
 )
 
 // GetCurrentPrimary get the current primary name from a cluster object
@@ -104,6 +112,34 @@ func GetPostgreSQLHBA(data *unstructured.Unstructured) (string, error) {
 
 	if !found {
 		return "", ErrPostgreSQLHBAMissing
+	}
+
+	return result, nil
+}
+
+// GetCertificate get the tls certificate from a secret of TLS type
+func GetCertificate(data *unstructured.Unstructured) (string, error) {
+	result, found, err := unstructured.NestedString(data.Object, "data", "tls.crt")
+	if err != nil {
+		return "", err
+	}
+
+	if !found {
+		return "", ErrCertificateMissing
+	}
+
+	return result, nil
+}
+
+// GetPrivateKey get the tls private key from a secret of TLS type
+func GetPrivateKey(data *unstructured.Unstructured) (string, error) {
+	result, found, err := unstructured.NestedString(data.Object, "data", "tls.key")
+	if err != nil {
+		return "", err
+	}
+
+	if !found {
+		return "", ErrPrivateKeyMissing
 	}
 
 	return result, nil

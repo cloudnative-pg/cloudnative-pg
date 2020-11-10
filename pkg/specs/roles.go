@@ -38,6 +38,22 @@ func CreateRole(cluster v1alpha1.Cluster) rbacv1.Role {
 			},
 			{
 				APIGroups: []string{
+					"",
+				},
+				Resources: []string{
+					"secrets",
+				},
+				Verbs: []string{
+					"get",
+					"watch",
+				},
+				ResourceNames: []string{
+					cluster.GetCASecretName(),
+					cluster.GetServerSecretName(),
+				},
+			},
+			{
+				APIGroups: []string{
 					"postgresql.k8s.2ndq.io",
 				},
 				Resources: []string{

@@ -27,6 +27,14 @@ var _ = Describe("PostgreSQL cluster type", func() {
 	It("correctly set the name of the secret of the application user", func() {
 		Expect(postgresql.GetApplicationSecretName()).To(Equal("clustername-app"))
 	})
+
+	It("correctly set the name of the secret containing the CA of the cluster", func() {
+		Expect(postgresql.GetCASecretName()).To(Equal("clustername-ca"))
+	})
+
+	It("correctly set the name of the secret containing the certificate for PostgreSQL", func() {
+		Expect(postgresql.GetServerSecretName()).To(Equal("clustername-tls"))
+	})
 })
 
 var _ = Describe("PostgreSQL services name", func() {

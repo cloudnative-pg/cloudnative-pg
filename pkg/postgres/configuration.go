@@ -37,6 +37,13 @@ host replication all all md5
 	// whose value must not be changed from the default one for the
 	// operator to work correctly
 	blockedConfigurationParameter = "blocked"
+
+	// ServerCertificateLocation is the location where the server certificate
+	// is stored
+	ServerCertificateLocation = "/tmp/server.crt"
+
+	// PrivateKeyLocation is the location where the private key is stored
+	PrivateKeyLocation = "/tmp/server.key"
 )
 
 // MajorVersionRange is used to represent a range of PostgreSQL versions
@@ -173,7 +180,9 @@ var (
 			"wal_log_hints":    "on",
 			"archive_timeout":  "5min", // TODO support configurable archive timeout
 			"full_page_writes": "on",
-			"ssl":              "off", // TODO support SSL communication
+			"ssl":              "on",
+			"ssl_cert_file":    ServerCertificateLocation,
+			"ssl_key_file":     PrivateKeyLocation,
 		},
 	}
 )

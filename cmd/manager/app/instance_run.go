@@ -44,6 +44,12 @@ func runSubCommand() {
 		os.Exit(1)
 	}
 
+	err = reconciler.RefreshCertificateFiles()
+	if err != nil {
+		log.Log.Error(err, "Error while writing the TLS server certificates")
+		os.Exit(1)
+	}
+
 	startWebServer()
 	startReconciler()
 	registerSignalHandler()
