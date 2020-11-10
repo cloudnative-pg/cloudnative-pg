@@ -31,6 +31,7 @@ nav:
   - postgresql_conf.md
   - samples.md
   - expose_pg_services.md
+  - ssl_connections.md
   - kubernetes_upgrade.md
   - e2e.md
   - container_images.md

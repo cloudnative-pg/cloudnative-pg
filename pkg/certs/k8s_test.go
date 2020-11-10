@@ -71,7 +71,7 @@ var _ = Describe("Root CA secret generation", func() {
 	})
 
 	It("must adopt the current certificate if it is valid", func() {
-		ca, err := CreateCA()
+		ca, err := CreateRootCA()
 		Expect(err).To(BeNil())
 
 		secret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
@@ -86,7 +86,7 @@ var _ = Describe("Root CA secret generation", func() {
 	It("must renew the CA certificate if it is not valid", func() {
 		notAfter := time.Now().Add(-10 * time.Hour)
 		notBefore := notAfter.Add(-365 * 24 * time.Hour)
-		ca, err := createCAWithValidity(notBefore, notAfter)
+		ca, err := createCAWithValidity(notBefore, notAfter, nil, nil)
 		Expect(err).To(BeNil())
 
 		secret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
@@ -111,7 +111,7 @@ var _ = Describe("Root CA secret generation", func() {
 
 var _ = Describe("Webhook certificate validation", func() {
 	When("we have a valid CA secret", func() {
-		ca, _ := CreateCA()
+		ca, _ := CreateRootCA()
 		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(caSecret)
 		pki := pkiEnvironmentTemplate
@@ -134,7 +134,7 @@ var _ = Describe("Webhook certificate validation", func() {
 	})
 
 	When("we have a valid CA and webhook secret", func() {
-		ca, _ := CreateCA()
+		ca, _ := CreateRootCA()
 		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(caSecret)
 		pki := pkiEnvironmentTemplate
@@ -148,7 +148,7 @@ var _ = Describe("Webhook certificate validation", func() {
 	})
 
 	When("we have a valid CA secret and expired webhook secret", func() {
-		ca, _ := CreateCA()
+		ca, _ := CreateRootCA()
 		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 
 		notAfter := time.Now().Add(-10 * time.Hour)
@@ -176,7 +176,7 @@ var _ = Describe("Webhook certificate validation", func() {
 	})
 
 	It("can dump the secrets to a directory", func() {
-		ca, err := CreateCA()
+		ca, err := CreateRootCA()
 		Expect(err).To(BeNil())
 		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(caSecret)
@@ -203,7 +203,7 @@ var _ = Describe("TLS certificates injection", func() {
 	pki := pkiEnvironmentTemplate
 
 	// Create a CA and the pki secret
-	ca, _ := CreateCA()
+	ca, _ := CreateRootCA()
 	caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 	webhookPair, _ := ca.CreateAndSignPair("pki-service.operator-namespace.svc")
 	webhookSecret := webhookPair.GenerateServerSecret(pki.OperatorNamespace, pki.SecretName)

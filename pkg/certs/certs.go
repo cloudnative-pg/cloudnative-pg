@@ -223,11 +223,30 @@ func (pair *KeyPair) IsExpiring() (bool, error) {
 	return false, nil
 }
 
-// CreateCA generates a CA returning its keys
-func CreateCA() (*KeyPair, error) {
+// CreateDerivedCA create a new CA derived from the certificate in the
+// keypair
+func (pair *KeyPair) CreateDerivedCA() (*KeyPair, error) {
+	certificate, err := pair.ParseCertificate()
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := pair.ParseECPrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
-	return createCAWithValidity(notBefore, notAfter)
+
+	return createCAWithValidity(notBefore, notAfter, certificate, key)
+}
+
+// CreateRootCA generates a CA returning its keys
+func CreateRootCA() (*KeyPair, error) {
+	notBefore := time.Now().Add(time.Minute * -5)
+	notAfter := notBefore.Add(certificateDuration)
+	return createCAWithValidity(notBefore, notAfter, nil, nil)
 }
 
 // ParseCASecret parse a CA secret to a key pair
@@ -266,7 +285,13 @@ func ParseServerSecret(secret *v1.Secret) (*KeyPair, error) {
 	}, nil
 }
 
-func createCAWithValidity(notBefore, notAfter time.Time) (*KeyPair, error) {
+// createCAWithValidity create a CA with a certain validity, with a parent certificate and signed by a certain
+// private key. If the latest two parameters are nil, the CA will be a root one (self-signed)
+func createCAWithValidity(
+	notBefore,
+	notAfter time.Time,
+	parentCertificate *x509.Certificate,
+	parentPrivateKey interface{}) (*KeyPair, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
@@ -287,7 +312,20 @@ func createCAWithValidity(notBefore, notAfter time.Time) (*KeyPair, error) {
 		IsCA:                  true,
 	}
 
-	certificateBytes, err := x509.CreateCertificate(rand.Reader, &rootTemplate, &rootTemplate, &rootKey.PublicKey, rootKey)
+	if parentCertificate == nil {
+		parentCertificate = &rootTemplate
+	}
+
+	if parentPrivateKey == nil {
+		parentPrivateKey = rootKey
+	}
+
+	certificateBytes, err := x509.CreateCertificate(
+		rand.Reader,
+		&rootTemplate,
+		parentCertificate,
+		&rootKey.PublicKey,
+		parentPrivateKey)
 	if err != nil {
 		return nil, err
 	}

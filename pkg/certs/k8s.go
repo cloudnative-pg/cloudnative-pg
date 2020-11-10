@@ -70,7 +70,7 @@ func EnsureRootCACertificate(client kubernetes.Interface, namespace string, name
 	}
 
 	// Let's create the CA
-	pair, err := CreateCA()
+	pair, err := CreateRootCA()
 	if err != nil {
 		return nil, err
 	}
@@ -234,51 +234,67 @@ func (pki PublicKeyInfrastructure) EnsureCertificate(
 	return createdSecret, nil
 }
 
-// renewServerCertificate renews a CA certificate if needed, the
-// renewed secret or the original one
-func renewServerCertificate(client kubernetes.Interface, caSecret v1.Secret, secret *v1.Secret) (*v1.Secret, error) {
+// RenewLeafCertificate renew a secret containing a server
+// certificate given the secret containing the CA that will sign it.
+// Returns true if the certificate has been renewed
+func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) {
 	// Verify the temporal validity of this CA
 	pair, err := ParseServerSecret(secret)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
 	expiring, err := pair.IsExpiring()
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 	if !expiring {
-		return secret, nil
+		return false, nil
 	}
 
 	// Parse the CA secret to get the private key
-	caPair, err := ParseCASecret(&caSecret)
+	caPair, err := ParseCASecret(caSecret)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
 	caPrivateKey, err := caPair.ParseECPrivateKey()
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
 	caCertificate, err := caPair.ParseCertificate()
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
 	err = pair.RenewCertificate(caPrivateKey, caCertificate)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
 	secret.Data["tls.crt"] = pair.Certificate
-	updatedSecret, err := client.CoreV1().Secrets(secret.Namespace).Update(secret)
+
+	return true, nil
+}
+
+// renewServerCertificate renews a server certificate if needed
+// Returns the renewed secret or the original one if unchanged
+func renewServerCertificate(client kubernetes.Interface, caSecret v1.Secret, secret *v1.Secret) (*v1.Secret, error) {
+	hasBeenRenewed, err := RenewLeafCertificate(&caSecret, secret)
 	if err != nil {
 		return nil, err
 	}
 
-	return updatedSecret, nil
+	if hasBeenRenewed {
+		updatedSecret, err := client.CoreV1().Secrets(secret.Namespace).Update(secret)
+		if err != nil {
+			return nil, err
+		}
+		return updatedSecret, nil
+	}
+
+	return secret, nil
 }
 
 // DumpSecretToDir dumps the contents of a secret inside a directory creating

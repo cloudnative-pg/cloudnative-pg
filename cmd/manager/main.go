@@ -34,10 +34,6 @@ var (
 )
 
 const (
-	// This is the name of the secret where CI crypto-material
-	// is stored
-	caSecretName = "postgresql-operator-ca-secret" // #nosec
-
 	// This is the name of the secret where the certificates
 	// for the webhook server are stored
 	webhookSecretName = "postgresql-operator-webhook-cert" // #nosec
@@ -193,22 +189,17 @@ func setupPKI(config *rest.Config, certDir string) error {
 	   Ensure we have the required PKI infrastructure to make
 	   the operator and the clusters working
 	*/
-	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
-	if operatorNamespace == "" {
-		return fmt.Errorf("missing OPERATOR_NAMESPACE environment variable")
-	}
-
 	clientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return fmt.Errorf("cannot create a K8s client: %w", err)
 	}
 
 	pkiConfig := certs.PublicKeyInfrastructure{
-		CaSecretName:                       caSecretName,
+		CaSecretName:                       controllers.CaSecretName,
 		CertDir:                            certDir,
 		SecretName:                         webhookSecretName,
 		ServiceName:                        webhookServiceName,
-		OperatorNamespace:                  operatorNamespace,
+		OperatorNamespace:                  controllers.GetOperatorNamespaceOrDie(),
 		MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
 	}
