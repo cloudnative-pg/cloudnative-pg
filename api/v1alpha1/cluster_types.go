@@ -16,6 +16,10 @@ import (
 )
 
 const (
+	// PostgresCertSecretSuffix is the suffix appended to the cluster name to
+	// get the name of the PostgreSQL superuser secret
+	PostgresCertSecretSuffix = "-superuser-tls" // #nosec
+
 	// SuperUserSecretSuffix is the suffix appended to the cluster name to
 	// get the name of the PostgreSQL superuser secret
 	SuperUserSecretSuffix = "-superuser"
@@ -400,6 +404,11 @@ func (cluster *Cluster) GetSuperuserSecretName() string {
 	}
 
 	return fmt.Sprintf("%v%v", cluster.Name, SuperUserSecretSuffix)
+}
+
+// GetPostgresTLSSecretName get the secret name of the PostgreSQL superuser
+func (cluster *Cluster) GetPostgresTLSSecretName() string {
+	return fmt.Sprintf("%v%v", cluster.Name, PostgresCertSecretSuffix)
 }
 
 // GetApplicationSecretName get the name of the secret of the application

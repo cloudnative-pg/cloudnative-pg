@@ -40,10 +40,46 @@ var (
 	// a TLS secret
 	ErrCertificateMissing = errors.New("missing tls.crt data in secret")
 
+	// ErrCACertificateMissing means that the tls.crt file is missing in
+	// a TLS secret
+	ErrCACertificateMissing = errors.New("missing ca.crt data in secret")
+
 	// ErrPrivateKeyMissing means that the tls.key file is missing in
 	// a TLS secret
 	ErrPrivateKeyMissing = errors.New("missing tls.key data in secret")
+
+	// ErrInvalidObject means that the metadata of the passed object are
+	// missing or invalid
+	ErrInvalidObject = errors.New("missing object metadata")
 )
+
+// GetNamespace get the namespace of an object
+func GetNamespace(data *unstructured.Unstructured) (string, error) {
+	result, found, err := unstructured.NestedString(data.Object, "metadata", "namespace")
+	if err != nil {
+		return "", err
+	}
+
+	if !found {
+		return "", ErrInvalidObject
+	}
+
+	return result, nil
+}
+
+// GetName get the name of an object
+func GetName(data *unstructured.Unstructured) (string, error) {
+	result, found, err := unstructured.NestedString(data.Object, "metadata", "name")
+	if err != nil {
+		return "", err
+	}
+
+	if !found {
+		return "", ErrInvalidObject
+	}
+
+	return result, nil
+}
 
 // GetCurrentPrimary get the current primary name from a cluster object
 func GetCurrentPrimary(data *unstructured.Unstructured) (string, error) {
@@ -140,6 +176,20 @@ func GetPrivateKey(data *unstructured.Unstructured) (string, error) {
 
 	if !found {
 		return "", ErrPrivateKeyMissing
+	}
+
+	return result, nil
+}
+
+// GetCACertificate get the tls certificate from a secret of TLS type
+func GetCACertificate(data *unstructured.Unstructured) (string, error) {
+	result, found, err := unstructured.NestedString(data.Object, "data", "ca.crt")
+	if err != nil {
+		return "", err
+	}
+
+	if !found {
+		return "", ErrCACertificateMissing
 	}
 
 	return result, nil

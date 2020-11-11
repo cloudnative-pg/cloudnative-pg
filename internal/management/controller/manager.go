@@ -31,12 +31,14 @@ import (
 // the one of this PostgreSQL instance. Also the configuration in the
 // ConfigMap is applied when needed
 type InstanceReconciler struct {
-	client         dynamic.Interface
-	instance       *postgres.Instance
-	log            logr.Logger
-	instanceWatch  watch.Interface
-	configMapWatch watch.Interface
-	secretWatch    watch.Interface
+	client              dynamic.Interface
+	instance            *postgres.Instance
+	log                 logr.Logger
+	instanceWatch       watch.Interface
+	configMapWatch      watch.Interface
+	serverSecretWatch   watch.Interface
+	caSecretWatch       watch.Interface
+	postgresSecretWatch watch.Interface
 }
 
 // NewInstanceReconciler create a new instance reconciler
@@ -104,7 +106,7 @@ func (r *InstanceReconciler) Watch() error {
 		return fmt.Errorf("error watching configmap: %w", err)
 	}
 
-	r.secretWatch, err = r.client.
+	r.serverSecretWatch, err = r.client.
 		Resource(schema.GroupVersionResource{
 			Group:    "",
 			Version:  "v1",
@@ -116,12 +118,44 @@ func (r *InstanceReconciler) Watch() error {
 				"metadata.name", r.instance.ClusterName+apiv1alpha1.ServerSecretSuffix).String(),
 		})
 	if err != nil {
-		return fmt.Errorf("error watching secret: %w", err)
+		return fmt.Errorf("error watching certificate secret: %w", err)
+	}
+
+	r.caSecretWatch, err = r.client.
+		Resource(schema.GroupVersionResource{
+			Group:    "",
+			Version:  "v1",
+			Resource: "secrets",
+		}).
+		Namespace(r.instance.Namespace).
+		Watch(metav1.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(
+				"metadata.name", r.instance.ClusterName+apiv1alpha1.CaSecretSuffix).String(),
+		})
+	if err != nil {
+		return fmt.Errorf("error watching CA secret: %w", err)
+	}
+
+	r.postgresSecretWatch, err = r.client.
+		Resource(schema.GroupVersionResource{
+			Group:    "",
+			Version:  "v1",
+			Resource: "secrets",
+		}).
+		Namespace(r.instance.Namespace).
+		Watch(metav1.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(
+				"metadata.name", r.instance.ClusterName+apiv1alpha1.PostgresCertSecretSuffix).String(),
+		})
+	if err != nil {
+		return fmt.Errorf("error watching 'postgres' user secret: %w", err)
 	}
 
 	instanceChannel := r.instanceWatch.ResultChan()
 	configMapChannel := r.configMapWatch.ResultChan()
-	secretChannel := r.secretWatch.ResultChan()
+	secretChannel := r.serverSecretWatch.ResultChan()
+	caSecretChannel := r.caSecretWatch.ResultChan()
+	postgresSecretChannel := r.postgresSecretWatch.ResultChan()
 
 	for {
 		var event watch.Event
@@ -131,6 +165,8 @@ func (r *InstanceReconciler) Watch() error {
 		case event, ok = <-instanceChannel:
 		case event, ok = <-configMapChannel:
 		case event, ok = <-secretChannel:
+		case event, ok = <-caSecretChannel:
+		case event, ok = <-postgresSecretChannel:
 		}
 
 		if !ok {
@@ -146,6 +182,10 @@ func (r *InstanceReconciler) Watch() error {
 	}
 
 	r.instanceWatch.Stop()
+	r.configMapWatch.Stop()
+	r.serverSecretWatch.Stop()
+	r.caSecretWatch.Stop()
+	r.postgresSecretWatch.Stop()
 	return nil
 }
 

@@ -38,12 +38,46 @@ func GetOperatorNamespaceOrDie() string {
 // createPostgresPKI create all the PKI infrastructure that PostgreSQL need to work
 // if using ssl=on
 func (r *ClusterReconciler) createPostgresPKI(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	// This is the CA of cluster
 	caSecret, err := r.ensureCASecret(ctx, cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("generating CA certificate: %w", err)
 	}
 
-	return r.ensureServerCertificate(ctx, cluster, caSecret)
+	// This is the certificate for the server
+	serverCommonName := fmt.Sprintf(
+		"%v.%v.svc",
+		cluster.GetServiceReadWriteName(),
+		cluster.Namespace)
+	serverCertificateName := client.ObjectKey{Namespace: cluster.GetNamespace(), Name: cluster.GetServerSecretName()}
+	err = r.ensureLeafCertificate(
+		ctx,
+		cluster,
+		serverCertificateName,
+		serverCommonName,
+		caSecret,
+		certs.CertTypeServer)
+	if err != nil {
+		return fmt.Errorf("generating server certificate: %w", err)
+	}
+
+	// Generating postgres client certificate
+	postgresCertificateName := client.ObjectKey{
+		Namespace: cluster.GetNamespace(),
+		Name:      cluster.GetPostgresTLSSecretName(),
+	}
+	err = r.ensureLeafCertificate(
+		ctx,
+		cluster,
+		postgresCertificateName,
+		"postgres",
+		caSecret,
+		certs.CertTypeClient)
+	if err != nil {
+		return fmt.Errorf("generating server certificate: %w", err)
+	}
+
+	return nil
 }
 
 // ensureCASecret ensure that the cluster CA really exist and is
@@ -63,12 +97,7 @@ func (r *ClusterReconciler) ensureCASecret(ctx context.Context, cluster *v1alpha
 		return nil, err
 	}
 
-	caPair, err := r.getOperatorCAPair(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	derivedCaPair, err := caPair.CreateDerivedCA()
+	derivedCaPair, err := certs.CreateRootCA(cluster.Name, cluster.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("while creating the CA of the cluster: %w", err)
 	}
@@ -77,23 +106,6 @@ func (r *ClusterReconciler) ensureCASecret(ctx context.Context, cluster *v1alpha
 	utils.SetAsOwnedBy(&derivedCaSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	err = r.Create(ctx, derivedCaSecret)
 	return derivedCaSecret, err
-}
-
-// getOperatorCAPair Get the CA Pair of the operator
-func (r *ClusterReconciler) getOperatorCAPair(ctx context.Context) (*certs.KeyPair, error) {
-	var secret v1.Secret
-
-	err := r.Get(ctx, client.ObjectKey{Namespace: GetOperatorNamespaceOrDie(), Name: CaSecretName}, &secret)
-	if err != nil {
-		return nil, fmt.Errorf("while getting operator CA: %w", err)
-	}
-
-	caPair, err := certs.ParseCASecret(&secret)
-	if err != nil {
-		return nil, fmt.Errorf("while parsing operator CA: %w", err)
-	}
-
-	return caPair, nil
 }
 
 // renewCASecret check if this CA secret is valid and renew it if needed
@@ -111,22 +123,12 @@ func (r *ClusterReconciler) renewCASecret(ctx context.Context, secret *v1.Secret
 		return secret, nil
 	}
 
-	operatorCaPair, err := r.getOperatorCAPair(ctx)
+	privateKey, err := pair.ParseECPrivateKey()
 	if err != nil {
 		return nil, err
 	}
 
-	operatorCaCert, err := operatorCaPair.ParseCertificate()
-	if err != nil {
-		return nil, err
-	}
-
-	operatorCaPrivateKey, err := operatorCaPair.ParseECPrivateKey()
-	if err != nil {
-		return nil, err
-	}
-
-	err = pair.RenewCertificate(operatorCaPrivateKey, operatorCaCert)
+	err = pair.RenewCertificate(privateKey, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -140,12 +142,17 @@ func (r *ClusterReconciler) renewCASecret(ctx context.Context, secret *v1.Secret
 	return secret, err
 }
 
-// ensureServerCertificate check if we have a certificate for PostgreSQL and generate/renew it
-func (r *ClusterReconciler) ensureServerCertificate(
+// ensureLeafCertificate check if we have a certificate for PostgreSQL and generate/renew it
+func (r *ClusterReconciler) ensureLeafCertificate(
 	ctx context.Context,
-	cluster *v1alpha1.Cluster, caSecret *v1.Secret) error {
+	cluster *v1alpha1.Cluster,
+	secretName client.ObjectKey,
+	commonName string,
+	caSecret *v1.Secret,
+	usage certs.CertType,
+) error {
 	var secret v1.Secret
-	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.GetServerSecretName()}, &secret)
+	err := r.Get(ctx, secretName, &secret)
 	if err == nil {
 		return r.renewServerCertificate(ctx, caSecret, &secret)
 	}
@@ -155,16 +162,12 @@ func (r *ClusterReconciler) ensureServerCertificate(
 		return err
 	}
 
-	clusterHostname := fmt.Sprintf(
-		"%v.%v.svc",
-		cluster.Name,
-		cluster.Namespace)
-	serverPair, err := caPair.CreateAndSignPair(clusterHostname)
+	serverPair, err := caPair.CreateAndSignPair(commonName, usage)
 	if err != nil {
 		return err
 	}
 
-	serverSecret := serverPair.GenerateServerSecret(cluster.Namespace, cluster.GetServerSecretName())
+	serverSecret := serverPair.GenerateServerSecret(secretName.Namespace, secretName.Name)
 	utils.SetAsOwnedBy(&serverSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	return r.Create(ctx, serverSecret)
 }

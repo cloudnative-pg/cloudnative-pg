@@ -70,7 +70,7 @@ func EnsureRootCACertificate(client kubernetes.Interface, namespace string, name
 	}
 
 	// Let's create the CA
-	pair, err := CreateRootCA()
+	pair, err := CreateRootCA(name, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func (pki PublicKeyInfrastructure) EnsureCertificate(
 		"%v.%v.svc",
 		pki.ServiceName,
 		pki.OperatorNamespace)
-	webhookPair, err := caPair.CreateAndSignPair(webhookHostname)
+	webhookPair, err := caPair.CreateAndSignPair(webhookHostname, CertTypeServer)
 	if err != nil {
 		return nil, err
 	}

@@ -25,7 +25,9 @@ local all all peer
 	// The content provided by the user is inserted before this text
 	hbaFooter = `
 # Require md5 authentication elsewhere
+hostssl all all all cert clientcert=1
 host all all all md5
+hostssl replication all all cert clientcert=1
 host replication all all md5
 `
 	// fixedConfigurationParameter are the configuration parameters
@@ -42,8 +44,21 @@ host replication all all md5
 	// is stored
 	ServerCertificateLocation = "/tmp/server.crt"
 
-	// PrivateKeyLocation is the location where the private key is stored
-	PrivateKeyLocation = "/tmp/server.key"
+	// ServerKeyLocation is the location where the private key is stored
+	ServerKeyLocation = "/tmp/server.key"
+
+	// PostgresCertificateLocation is the location where the certificate
+	// of the "postgres" user is stored
+	PostgresCertificateLocation = "/tmp/postgres.crt"
+
+	// PostgresKeyLocation is the location where the private key of
+	// the "postgres" user is stored
+	PostgresKeyLocation = "/tmp/postgres.key"
+
+	// CACertificateLocation is the location where the CA certificate
+	// is stored, and this certificate will be use to authenticate
+	// client certificates
+	CACertificateLocation = "/tmp/ca.crt"
 )
 
 // MajorVersionRange is used to represent a range of PostgreSQL versions
@@ -182,7 +197,17 @@ var (
 			"full_page_writes": "on",
 			"ssl":              "on",
 			"ssl_cert_file":    ServerCertificateLocation,
-			"ssl_key_file":     PrivateKeyLocation,
+			"ssl_key_file":     ServerKeyLocation,
+			"ssl_ca_file":      CACertificateLocation,
+			"ssl_ciphers": "ECDHE-ECDSA-AES128-GCM-SHA256:" +
+				"ECDHE-RSA-AES128-GCM-SHA256:" +
+				"ECDHE-ECDSA-AES256-GCM-SHA384:" +
+				"ECDHE-RSA-AES256-GCM-SHA384:" +
+				"ECDHE-ECDSA-CHACHA20-POLY1305:" +
+				"ECDHE-RSA-CHACHA20-POLY1305:" +
+				"DHE-RSA-AES128-GCM-SHA256:" +
+				"DHE-RSA-AES256-GCM-SHA384",
+			"ssl_min_protocol_version": "TLSv1.2",
 		},
 	}
 )

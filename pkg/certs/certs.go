@@ -12,6 +12,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -35,6 +36,17 @@ const (
 
 	// Threshold to consider a certificate as expiring
 	expiringCheckThreshold = 7 * 24 * time.Hour
+)
+
+// CertType represent a certificate type
+type CertType string
+
+const (
+	// CertTypeClient means a certificate for a client
+	CertTypeClient = "client"
+
+	// CertTypeServer means a certificate for a server
+	CertTypeServer = "server"
 )
 
 // KeyPair represent a pair of keys to be used for asymmetric encryption and a
@@ -68,13 +80,18 @@ func (pair KeyPair) ParseCertificate() (*x509.Certificate, error) {
 }
 
 // CreateAndSignPair given a CA keypair, generate and sign a leaf keypair
-func (pair KeyPair) CreateAndSignPair(host string) (*KeyPair, error) {
+func (pair KeyPair) CreateAndSignPair(host string, usage CertType) (*KeyPair, error) {
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
-	return pair.createAndSignPairWithValidity(host, notBefore, notAfter)
+	return pair.createAndSignPairWithValidity(host, notBefore, notAfter, usage)
 }
 
-func (pair KeyPair) createAndSignPairWithValidity(host string, notBefore, notAfter time.Time) (*KeyPair, error) {
+func (pair KeyPair) createAndSignPairWithValidity(
+	host string,
+	notBefore,
+	notAfter time.Time,
+	usage CertType,
+) (*KeyPair, error) {
 	caCertificate, err := pair.ParseCertificate()
 	if err != nil {
 		return nil, err
@@ -102,17 +119,29 @@ func (pair KeyPair) createAndSignPairWithValidity(host string, notBefore, notAft
 		SerialNumber:          serialNumber,
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		IsCA:                  false,
+		Subject: pkix.Name{
+			CommonName: host,
+		},
 	}
-	hosts := strings.Split(host, ",")
-	for _, h := range hosts {
-		if ip := net.ParseIP(h); ip != nil {
-			leafTemplate.IPAddresses = append(leafTemplate.IPAddresses, ip)
-		} else {
-			leafTemplate.DNSNames = append(leafTemplate.DNSNames, h)
+
+	leafTemplate.KeyUsage = x509.KeyUsageDigitalSignature | x509.KeyUsageKeyAgreement
+	switch {
+	case usage == CertTypeClient:
+		leafTemplate.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
+
+	case usage == CertTypeServer:
+		leafTemplate.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
+		leafTemplate.KeyUsage |= x509.KeyUsageKeyEncipherment
+
+		hosts := strings.Split(host, ",")
+		for _, h := range hosts {
+			if ip := net.ParseIP(h); ip != nil {
+				leafTemplate.IPAddresses = append(leafTemplate.IPAddresses, ip)
+			} else {
+				leafTemplate.DNSNames = append(leafTemplate.DNSNames, h)
+			}
 		}
 	}
 
@@ -225,7 +254,7 @@ func (pair *KeyPair) IsExpiring() (bool, error) {
 
 // CreateDerivedCA create a new CA derived from the certificate in the
 // keypair
-func (pair *KeyPair) CreateDerivedCA() (*KeyPair, error) {
+func (pair *KeyPair) CreateDerivedCA(commonName string, organizationalUnit string) (*KeyPair, error) {
 	certificate, err := pair.ParseCertificate()
 	if err != nil {
 		return nil, err
@@ -239,14 +268,14 @@ func (pair *KeyPair) CreateDerivedCA() (*KeyPair, error) {
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 
-	return createCAWithValidity(notBefore, notAfter, certificate, key)
+	return createCAWithValidity(notBefore, notAfter, certificate, key, commonName, organizationalUnit)
 }
 
 // CreateRootCA generates a CA returning its keys
-func CreateRootCA() (*KeyPair, error) {
+func CreateRootCA(commonName string, organizationalUnit string) (*KeyPair, error) {
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
-	return createCAWithValidity(notBefore, notAfter, nil, nil)
+	return createCAWithValidity(notBefore, notAfter, nil, nil, commonName, organizationalUnit)
 }
 
 // ParseCASecret parse a CA secret to a key pair
@@ -291,7 +320,9 @@ func createCAWithValidity(
 	notBefore,
 	notAfter time.Time,
 	parentCertificate *x509.Certificate,
-	parentPrivateKey interface{}) (*KeyPair, error) {
+	parentPrivateKey interface{},
+	commonName string,
+	organizationalUnit string) (*KeyPair, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
@@ -307,9 +338,14 @@ func createCAWithValidity(
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
 		KeyUsage:              x509.KeyUsageCertSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		IsCA:                  true,
+		Subject: pkix.Name{
+			CommonName: commonName,
+			OrganizationalUnit: []string{
+				organizationalUnit,
+			},
+		},
 	}
 
 	if parentCertificate == nil {
