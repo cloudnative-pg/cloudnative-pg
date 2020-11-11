@@ -27,7 +27,7 @@ func TestCerts(t *testing.T) {
 
 var _ = Describe("Keypair generation", func() {
 	It("should generate a correct root CA", func() {
-		pair, err := CreateRootCA()
+		pair, err := CreateRootCA("test", "namespace")
 		Expect(err).To(BeNil())
 
 		cert, err := pair.ParseCertificate()
@@ -41,7 +41,6 @@ var _ = Describe("Keypair generation", func() {
 		Expect(cert.BasicConstraintsValid).To(BeTrue())
 		Expect(cert.KeyUsage & x509.KeyUsageDigitalSignature).To(Not(Equal(0)))
 		Expect(cert.KeyUsage & x509.KeyUsageKeyEncipherment).To(Not(Equal(0)))
-		Expect(cert.ExtKeyUsage).To(Equal([]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}))
 		Expect(cert.NotBefore).To(BeTemporally("<", time.Now()))
 		Expect(cert.NotAfter).To(BeTemporally(">", time.Now()))
 
@@ -50,7 +49,7 @@ var _ = Describe("Keypair generation", func() {
 	})
 
 	It("should create a CA K8s corev1/secret resource structure", func() {
-		pair, err := CreateRootCA()
+		pair, err := CreateRootCA("test", "namespace")
 		Expect(err).To(BeNil())
 
 		secret := pair.GenerateCASecret("namespace", "name")
@@ -63,7 +62,7 @@ var _ = Describe("Keypair generation", func() {
 	It("should be able to renew an existing CA certificate", func() {
 		notAfter := time.Now().Add(-10 * time.Hour)
 		notBefore := notAfter.Add(-365 * 24 * time.Hour)
-		ca, err := createCAWithValidity(notBefore, notAfter, nil, nil)
+		ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", "namespace")
 		Expect(err).To(BeNil())
 
 		privateKey, err := ca.ParseECPrivateKey()
@@ -94,13 +93,13 @@ var _ = Describe("Keypair generation", func() {
 		When("it is expiring", func() {
 			notAfter := time.Now().Add(-10 * time.Hour)
 			notBefore := notAfter.Add(-365 * 24 * time.Hour)
-			ca, err := createCAWithValidity(notBefore, notAfter, nil, nil)
+			ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", "namespace")
 			Expect(err).To(BeNil())
 			Expect(ca.IsExpiring()).To(BeTrue())
 		})
 
 		When("it's not expiring", func() {
-			ca, err := CreateRootCA()
+			ca, err := CreateRootCA("test", "namespace")
 			Expect(err).To(BeNil())
 			Expect(ca.IsExpiring()).To(BeFalse())
 		})
@@ -108,10 +107,10 @@ var _ = Describe("Keypair generation", func() {
 
 	When("we have a CA generated", func() {
 		It("should successfully generate a leaf certificate", func() {
-			rootCA, err := CreateRootCA()
+			rootCA, err := CreateRootCA("test", "namespace")
 			Expect(err).To(BeNil())
 
-			pair, err := rootCA.CreateAndSignPair("this.host.name.com")
+			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer)
 			Expect(err).To(BeNil())
 
 			cert, err := pair.ParseCertificate()
@@ -137,10 +136,10 @@ var _ = Describe("Keypair generation", func() {
 		})
 
 		It("should create a CA K8s corev1/secret resource structure", func() {
-			rootCA, err := CreateRootCA()
+			rootCA, err := CreateRootCA("test", "namespace")
 			Expect(err).To(BeNil())
 
-			pair, err := rootCA.CreateAndSignPair("this.host.name.com")
+			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer)
 			Expect(err).To(BeNil())
 
 			secret := pair.GenerateServerSecret("namespace", "name")
@@ -151,7 +150,7 @@ var _ = Describe("Keypair generation", func() {
 		})
 
 		It("should be able to renew an existing certificate", func() {
-			ca, err := CreateRootCA()
+			ca, err := CreateRootCA("test", "namespace")
 			Expect(err).To(BeNil())
 
 			notAfter := time.Now().Add(-10 * time.Hour)
@@ -163,7 +162,7 @@ var _ = Describe("Keypair generation", func() {
 			caCert, err := ca.ParseCertificate()
 			Expect(err).To(BeNil())
 
-			pair, err := ca.createAndSignPairWithValidity("this.host.name.com", notBefore, notAfter)
+			pair, err := ca.createAndSignPairWithValidity("this.host.name.com", notBefore, notAfter, CertTypeClient)
 			Expect(err).To(BeNil())
 
 			oldCert, err := pair.ParseCertificate()

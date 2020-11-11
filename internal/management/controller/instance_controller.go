@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -18,7 +19,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
 
@@ -89,13 +89,38 @@ func (r *InstanceReconciler) reconcileSecret(event *watch.Event) error {
 			err)
 	}
 
-	err = r.refreshCertificateFilesFromObject(object)
+	name, err := utils.GetName(object)
 	if err != nil {
-		return err
+		return fmt.Errorf("while reading secret name: %w", err)
 	}
 
-	r.log.Info("reloading the SSL certificates")
+	switch {
+	case strings.HasSuffix(name, apiv1alpha1.ServerSecretSuffix):
+		err = r.refreshCertificateFilesFromObject(
+			object,
+			postgresSpec.ServerCertificateLocation,
+			postgresSpec.ServerKeyLocation)
+		if err != nil {
+			return err
+		}
 
+	case strings.HasSuffix(name, apiv1alpha1.PostgresCertSecretSuffix):
+		err = r.refreshCertificateFilesFromObject(
+			object,
+			postgresSpec.PostgresCertificateLocation,
+			postgresSpec.PostgresKeyLocation)
+		if err != nil {
+			return err
+		}
+
+	case strings.HasSuffix(name, apiv1alpha1.CaSecretSuffix):
+		err = r.refreshCAFromObject(object)
+		if err != nil {
+			return err
+		}
+	}
+
+	r.log.Info("reloading the TLS crypto material")
 	err = r.instance.Reload()
 	if err != nil {
 		return fmt.Errorf("while applying new certificates: %w", err)
@@ -178,39 +203,6 @@ func (r *InstanceReconciler) reconcileConfigMap(event *watch.Event) error {
 	return nil
 }
 
-// RefreshConfigurationFiles get the latest version of the ConfigMap from the API
-// server and then write the configuration in PGDATA
-func (r *InstanceReconciler) RefreshConfigurationFiles() error {
-	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "configmaps",
-	}).
-		Namespace(r.instance.Namespace).
-		Get(r.instance.ClusterName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	return r.refreshConfigurationFilesFromObject(unstructuredObject)
-}
-
-// RefreshCertificateFiles get the latest certificates from the secrets
-func (r *InstanceReconciler) RefreshCertificateFiles() error {
-	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "secrets",
-	}).
-		Namespace(r.instance.Namespace).
-		Get(r.instance.ClusterName+apiv1alpha1.ServerSecretSuffix, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	return r.refreshCertificateFilesFromObject(unstructuredObject)
-}
-
 // refreshConfigurationFilesFromObject receive an unstructured object representing
 // a configmap and rewrite the file in the PGDATA.
 // Important: this won't send a SIGHUP to the server
@@ -250,7 +242,11 @@ func (r *InstanceReconciler) refreshConfigurationFilesFromObject(object *unstruc
 
 // refreshConfigurationFilesFromObject receive an unstructured object representing
 // a secret and rewrite the file corresponding to the server certificate
-func (r *InstanceReconciler) refreshCertificateFilesFromObject(object *unstructured.Unstructured) error {
+func (r *InstanceReconciler) refreshCertificateFilesFromObject(
+	object *unstructured.Unstructured,
+	certificateLocation string,
+	privateKeyLocation string,
+) error {
 	certificate, err := utils.GetCertificate(object)
 	if err != nil {
 		return err
@@ -271,14 +267,35 @@ func (r *InstanceReconciler) refreshCertificateFilesFromObject(object *unstructu
 		return fmt.Errorf("while reading server private key: %w", err)
 	}
 
-	err = ioutil.WriteFile(postgresSpec.ServerCertificateLocation, certificateBytes, 0600)
+	err = ioutil.WriteFile(certificateLocation, certificateBytes, 0600)
 	if err != nil {
 		return fmt.Errorf("while writing server certificate: %w", err)
 	}
 
-	err = ioutil.WriteFile(postgresSpec.PrivateKeyLocation, privateKeyBytes, 0600)
+	err = ioutil.WriteFile(privateKeyLocation, privateKeyBytes, 0600)
 	if err != nil {
 		return fmt.Errorf("while writing server private key: %w", err)
+	}
+
+	return nil
+}
+
+// refreshConfigurationFilesFromObject receive an unstructured object representing
+// a secret and rewrite the file corresponding to the server certificate
+func (r *InstanceReconciler) refreshCAFromObject(object *unstructured.Unstructured) error {
+	caCertificate, err := utils.GetCACertificate(object)
+	if err != nil {
+		return err
+	}
+
+	caCertificateBytes, err := base64.StdEncoding.DecodeString(caCertificate)
+	if err != nil {
+		return fmt.Errorf("while reading CA certificate: %w", err)
+	}
+
+	err = ioutil.WriteFile(postgresSpec.CACertificateLocation, caCertificateBytes, 0600)
+	if err != nil {
+		return fmt.Errorf("while writing server certificate: %w", err)
 	}
 
 	return nil

@@ -13,11 +13,87 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	apiv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/internal/management/utils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
+	postgresSpec "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
 )
+
+// RefreshServerCertificateFiles get the latest certificates from the
+// secrets
+func (r *InstanceReconciler) RefreshServerCertificateFiles() error {
+	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "secrets",
+	}).
+		Namespace(r.instance.Namespace).
+		Get(r.instance.ClusterName+apiv1alpha1.ServerSecretSuffix, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	return r.refreshCertificateFilesFromObject(
+		unstructuredObject,
+		postgresSpec.ServerCertificateLocation,
+		postgresSpec.ServerKeyLocation)
+}
+
+// RefreshPostgresUserCertificate get the latest certificates from the
+// secrets
+func (r *InstanceReconciler) RefreshPostgresUserCertificate() error {
+	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "secrets",
+	}).
+		Namespace(r.instance.Namespace).
+		Get(r.instance.ClusterName+apiv1alpha1.PostgresCertSecretSuffix, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	return r.refreshCertificateFilesFromObject(
+		unstructuredObject,
+		postgresSpec.PostgresCertificateLocation,
+		postgresSpec.PostgresKeyLocation)
+}
+
+// RefreshCA get the latest certificates from the
+// secrets
+func (r *InstanceReconciler) RefreshCA() error {
+	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "secrets",
+	}).
+		Namespace(r.instance.Namespace).
+		Get(r.instance.ClusterName+apiv1alpha1.CaSecretSuffix, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	return r.refreshCAFromObject(unstructuredObject)
+}
+
+// RefreshConfigurationFiles get the latest version of the ConfigMap from the API
+// server and then write the configuration in PGDATA
+func (r *InstanceReconciler) RefreshConfigurationFiles() error {
+	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "configmaps",
+	}).
+		Namespace(r.instance.Namespace).
+		Get(r.instance.ClusterName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	return r.refreshConfigurationFilesFromObject(unstructuredObject)
+}
 
 // VerifyPgDataCoherence check if this cluster exist in k8s and panic if this
 // pod belongs to a primary but the cluster status is not coherent with that
