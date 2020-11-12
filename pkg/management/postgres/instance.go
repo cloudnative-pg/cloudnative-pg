@@ -8,7 +8,6 @@ package postgres
 
 import (
 	"database/sql"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -263,10 +262,7 @@ func (instance *Instance) Demote() error {
 
 // createRecoveryConf create a recovery.conf file for PostgreSQL 11 and earlier
 func (instance *Instance) createRecoveryConf() error {
-	primaryConnInfo := fmt.Sprintf(
-		"host=%v-rw user=postgres port=5432 dbname=%v",
-		instance.ClusterName,
-		"postgres")
+	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName + "-rw")
 
 	f, err := os.Create(filepath.Join(instance.PgData, "recovery.conf"))
 	if err != nil {
