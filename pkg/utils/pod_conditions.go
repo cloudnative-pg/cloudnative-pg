@@ -58,3 +58,21 @@ func CountReadyPods(podList []corev1.Pod) int {
 	}
 	return readyPods
 }
+
+// ListStatusPods return a list of active Pods
+func ListStatusPods(podList []corev1.Pod) map[string][]string {
+	var podsNames = make(map[string][]string)
+
+	for _, pod := range podList {
+		switch {
+		case IsPodReady(pod):
+			podsNames["healthy"] = append(podsNames["healthy"], pod.Name)
+		case IsPodActive(pod):
+			podsNames["replicating"] = append(podsNames["replicating"], pod.Name)
+		default:
+			podsNames["failed"] = append(podsNames["failed"], pod.Name)
+		}
+	}
+
+	return podsNames
+}

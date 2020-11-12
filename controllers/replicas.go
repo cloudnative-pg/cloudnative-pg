@@ -9,6 +9,7 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"time"
 
@@ -42,6 +43,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 		log.Info("Current primary isn't valid, failing over",
 			"newPrimary", status.Items[0].PodName,
 			"clusterStatus", status)
+		if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseFailOver,
+			fmt.Sprintf("Failing over to %v", status.Items[0].PodName)); err != nil {
+			return err
+		}
 		// No primary, no party. Failover please!
 		return r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
 	}

@@ -428,6 +428,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	} else {
 		pod = specs.CreatePrimaryPodViaInitdb(*cluster, nodeSerial)
 	}
+
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
 		log.Error(err, "Unable to set the owner reference for instance")
 		return ctrl.Result{}, err
@@ -435,6 +436,12 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	if err = r.setPrimaryInstance(ctx, cluster, pod.Name); err != nil {
 		log.Error(err, "Unable to set the primary instance name")
+		return ctrl.Result{}, err
+	}
+
+	err = r.RegisterPhase(ctx, cluster, v1alpha1.PhaseFirstPrimary,
+		fmt.Sprintf("Creating primary instance %v", pod.Name))
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -494,6 +501,12 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	log.Info("Creating new Pod",
 		"pod", pod.Name,
 		"primary", false)
+
+	if err := r.RegisterPhase(ctx, cluster,
+		v1alpha1.PhaseCreatingReplica,
+		fmt.Sprintf("Creating replica %v", pod.Name)); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
 		log.Error(err, "Unable to set the owner reference for joined PostgreSQL node")

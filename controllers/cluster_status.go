@@ -8,6 +8,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -73,6 +74,13 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.Instances = int32(len(filteredPods))
 	cluster.Status.ReadyInstances = int32(utils.CountReadyPods(filteredPods))
 
+	// Instances status
+	cluster.Status.InstancesStatus = utils.ListStatusPods(childPods.Items)
+
+	// Services
+	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
+	cluster.Status.ReadService = cluster.GetServiceReadName()
+
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
 	}
@@ -87,6 +95,32 @@ func (r *ClusterReconciler) setPrimaryInstance(
 	cluster.Status.TargetPrimary = podName
 	if err := r.Status().Update(ctx, cluster); err != nil {
 		return err
+	}
+
+	if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseSwitchover,
+		fmt.Sprintf("Switching over to %v", podName)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RegisterPhase update phase in the status cluster with the
+// proper reason
+func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
+	cluster *v1alpha1.Cluster,
+	phase string,
+	reason string,
+) error {
+	existingClusterStatus := cluster.Status
+
+	cluster.Status.Phase = phase
+	cluster.Status.PhaseReason = reason
+
+	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
+		if err := r.Status().Update(ctx, cluster); err != nil {
+			return err
+		}
 	}
 
 	return nil
