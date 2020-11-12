@@ -32,12 +32,14 @@ type JoinInfo struct {
 
 // Join create a new instance joined to an existing PostgreSQL cluster
 func (info JoinInfo) Join() error {
+	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode)
+
 	options := []string{
 		"-D", info.PgData,
 		"-v",
 		"-R",
 		"-w",
-		"-d", fmt.Sprintf("host=%v user=postgres port=5432 dbname=%v", info.ParentNode, "postgres"),
+		"-d", primaryConnInfo,
 	}
 	cmd := exec.Command("pg_basebackup", options...) // #nosec
 	cmd.Stdout = os.Stdout

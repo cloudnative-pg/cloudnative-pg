@@ -199,7 +199,7 @@ func (info InitInfo) ConfigureApplicationEnvironment(db *sql.DB) error {
 // ConfigureReplica set the `primary_conninfo` field in the PostgreSQL system
 // This must be invoked only on PostgreSQL version >= 12
 func (info InitInfo) ConfigureReplica(db *sql.DB) error {
-	primaryConnInfo := fmt.Sprintf("host=%v user=postgres port=5432 dbname=%v", info.ParentNode, "postgres")
+	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode)
 
 	_, err := db.Exec(
 		fmt.Sprintf("ALTER SYSTEM SET primary_conninfo TO %v",

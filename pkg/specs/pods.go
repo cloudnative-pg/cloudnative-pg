@@ -546,26 +546,25 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 							Name:  "POD_NAME",
 							Value: podName,
 						},
+						{
+							Name:  "CLUSTER_NAME",
+							Value: cluster.Name,
+						},
+						{
+							Name:  "NAMESPACE",
+							Value: cluster.Namespace,
+						},
 					},
 					Command: []string{
 						"/controller/manager",
 						"instance",
 						"join",
 						"-parent-node", cluster.GetServiceReadWriteName(),
-						"-pw-file", "/etc/superuser-secret/password",
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "pgdata",
 							MountPath: "/var/lib/postgresql/data",
-						},
-						{
-							Name:      "config",
-							MountPath: "/etc/configuration",
-						},
-						{
-							Name:      "superuser-secret",
-							MountPath: "/etc/superuser-secret",
 						},
 						{
 							Name:      "controller",
