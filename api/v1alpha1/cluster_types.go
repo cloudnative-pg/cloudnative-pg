@@ -111,6 +111,24 @@ type ClusterSpec struct {
 	NodeMaintenanceWindow *NodeMaintenanceWindow `json:"nodeMaintenanceWindow,omitempty"`
 }
 
+const (
+
+	// PhaseSwitchover when a cluster it's changing the primary node
+	PhaseSwitchover = "Switchover in progress"
+
+	// PhaseFailOver in case a pod it's missing and need to change primary
+	PhaseFailOver = "Failing over"
+
+	// PhaseFirstPrimary for an starting cluster
+	PhaseFirstPrimary = "Setting up primary"
+
+	// PhaseCreatingReplica it's everytime we add a new replica
+	PhaseCreatingReplica = "Creating a new replica"
+
+	// PhaseHealthy for a cluster doing nothing
+	PhaseHealthy = "Cluster in healthy state"
+)
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// Total number of instances in the cluster
@@ -118,6 +136,9 @@ type ClusterStatus struct {
 
 	// Total number of ready instances in the cluster
 	ReadyInstances int32 `json:"readyInstances,omitempty"`
+
+	// Instances status
+	InstancesStatus map[string][]string `json:"instancesStatus,omitempty"`
 
 	// ID of the latest generated node (used to avoid node name clashing)
 	LatestGeneratedNode int32 `json:"latestGeneratedNode,omitempty"`
@@ -132,6 +153,16 @@ type ClusterStatus struct {
 	// List of all the PVCs created by this cluster and still available
 	// which are not attached to a Pod
 	DanglingPVC []string `json:"danglingPVC,omitempty"`
+
+	// Current write pod
+	WriteService string `json:"writeService,omitempty"`
+
+	// Current list of read pods
+	ReadService string `json:"readService,omitempty"`
+
+	Phase string `json:"phase,omitempty"`
+
+	PhaseReason string `json:"phaseReason,omitempty"`
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to

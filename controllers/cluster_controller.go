@@ -174,6 +174,11 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return r.ReconcilePods(ctx, req, &cluster, childPods)
 	}
 
+	err = r.RegisterPhase(ctx, &cluster, v1alpha1.PhaseHealthy, "")
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Check if we need to handle a rolling upgrade
 	return ctrl.Result{}, r.upgradeCluster(ctx, &cluster, childPods, instancesStatus)
 }

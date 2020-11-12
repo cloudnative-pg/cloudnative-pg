@@ -446,11 +446,25 @@ spec:
               description: Total number of instances in the cluster
               format: int32
               type: integer
+            instancesStatus:
+              additionalProperties:
+                items:
+                  type: string
+                type: array
+              description: Instances status
+              type: object
             latestGeneratedNode:
               description: ID of the latest generated node (used to avoid node name
                 clashing)
               format: int32
               type: integer
+            phase:
+              type: string
+            phaseReason:
+              type: string
+            readService:
+              description: Current list of read pods
+              type: string
             readyInstances:
               description: Total number of ready instances in the cluster
               format: int32
@@ -458,6 +472,9 @@ spec:
             targetPrimary:
               description: Target primary instance, this is different from the previous
                 one during a switchover or a failover
+              type: string
+            writeService:
+              description: Current write pod
               type: string
           type: object
       type: object
