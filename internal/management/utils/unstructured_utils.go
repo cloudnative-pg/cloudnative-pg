@@ -25,6 +25,9 @@ var (
 	// one in the cluster status
 	ErrTargetPrimaryNotFound = errors.New("target primary not found")
 
+	// ErrInstancesNotFound means that we can't find the required instance number
+	ErrInstancesNotFound = errors.New("instances not found")
+
 	// ErrPostgreSQLConfigurationMissing means that the ConfigMap does not contain
 	// the PostgreSQL configuration of this cluster
 	ErrPostgreSQLConfigurationMissing = errors.New("missing postgresConfiguration in ConfigMap")
@@ -57,6 +60,20 @@ func GetTargetPrimary(data *unstructured.Unstructured) (string, error) {
 
 	if !found {
 		return "", ErrTargetPrimaryNotFound
+	}
+
+	return result, nil
+}
+
+// GetInstances get the current number of instances
+func GetInstances(data *unstructured.Unstructured) (int64, error) {
+	result, found, err := unstructured.NestedInt64(data.Object, "spec", "instances")
+	if err != nil {
+		return 0, err
+	}
+
+	if !found {
+		return 0, ErrInstancesNotFound
 	}
 
 	return result, nil

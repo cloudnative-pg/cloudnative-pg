@@ -112,14 +112,37 @@ func (r *InstanceReconciler) reconcileConfigMap(event *watch.Event) error {
 		return fmt.Errorf("while applying new configuration: %w", err)
 	}
 
-	if status.PendingRestart && !isPrimary {
-		// This instance need a restart and is a replica.
-		// Let's just restart it and wait for the new configuration
-		// to be applied
+	cluster, err := r.client.
+		Resource(apiv1alpha1.ClusterGVK).
+		Namespace(r.instance.Namespace).
+		Get(r.instance.ClusterName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("while applying new configuration: %w", err)
+	}
+
+	instances, err := utils.GetInstances(cluster)
+	if err != nil {
+		return fmt.Errorf("while applying new configuration: %w", err)
+	}
+
+	if status.PendingRestart && (!isPrimary || instances == 1) {
+		// We'll restart this instance because the configuration
+		// change requires it (PendingRestart) and one of the
+		// following condition applies:
+		//
+		// 1. this is the only instance composing the cluster,
+		//    and this is the only way to apply a configuration
+		//    change in this condition;
+		//
+		// 2. this is a replica server and we can restart it
+		//    painlessly (the operator will require
+		//    a switchover when all replicas are updated
+		//    to refresh the configuration server to the primary
+		//    server).
 
 		// TODO: probably we need a restartMode flag in the cluster
 		// configuration to disable or enable this auto-restart behavior
-		r.log.Info("restarting this secondary server to apply the new configuration")
+		r.log.Info("restarting this server to apply the new configuration")
 		return r.instance.Shutdown()
 	}
 
