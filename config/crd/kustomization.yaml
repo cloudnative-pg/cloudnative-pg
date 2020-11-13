@@ -2,9 +2,9 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/postgresql.k8s.2ndq.io_clusters.yaml
-- bases/postgresql.k8s.2ndq.io_backups.yaml
-- bases/postgresql.k8s.2ndq.io_scheduledbackups.yaml
+- bases/postgresql.k8s.enterprisedb.io_clusters.yaml
+- bases/postgresql.k8s.enterprisedb.io_backups.yaml
+- bases/postgresql.k8s.enterprisedb.io_scheduledbackups.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

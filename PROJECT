@@ -1,4 +1,4 @@
-domain: k8s.2ndq.io
+domain: k8s.enterprisedb.io
 repo: gitlab.2ndquadrant.com/k8s/cloud-native-postgresql
 resources:
 - group: postgresql

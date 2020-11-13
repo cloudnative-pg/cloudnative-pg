@@ -34,7 +34,7 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:path=/mutate-postgresql-k8s-2ndq-io-v1alpha1-cluster,mutating=true,failurePolicy=fail,groups=postgresql.k8s.2ndq.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io
+// +kubebuilder:webhook:path=/mutate-postgresql-k8s-enterprisedb-io-v1alpha1-cluster,mutating=true,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io
 
 var _ webhook.Defaulter = &Cluster{}
 
@@ -80,7 +80,7 @@ func (r *Cluster) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-// +kubebuilder:webhook:verbs=create;update,path=/validate-postgresql-k8s-2ndq-io-v1alpha1-cluster,mutating=false,failurePolicy=fail,groups=postgresql.k8s.2ndq.io,resources=clusters,versions=v1alpha1,name=vcluster.kb.io
+// +kubebuilder:webhook:verbs=create;update,path=/validate-postgresql-k8s-enterprisedb-io-v1alpha1-cluster,mutating=false,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=clusters,versions=v1alpha1,name=vcluster.kb.io
 
 var _ webhook.Validator = &Cluster{}
 
@@ -99,7 +99,7 @@ func (r *Cluster) ValidateCreate() error {
 	}
 
 	return apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.k8s.2ndq.io", Kind: "Cluster"},
+		schema.GroupKind{Group: "postgresql.k8s.enterprisedb.io", Kind: "Cluster"},
 		r.Name, allErrs)
 }
 
@@ -128,7 +128,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	}
 
 	return apierrors.NewInvalid(
-		schema.GroupKind{Group: "cluster.k8s.2ndq.io", Kind: "Cluster"},
+		schema.GroupKind{Group: "cluster.k8s.enterprisedb.io", Kind: "Cluster"},
 		r.Name, allErrs)
 }
 

@@ -112,7 +112,7 @@ func main() {
 		MetricsBindAddress: metricsAddr,
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "db9c8771.k8s.2ndq.io",
+		LeaderElectionID:   "db9c8771.k8s.enterprisedb.io",
 		Namespace:          watchNamespace,
 		CertDir:            "/tmp",
 	}

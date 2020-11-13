@@ -33,9 +33,9 @@ type ScheduledBackupReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=scheduledbackups,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=scheduledbackups/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=backups,verbs=get;list;create
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=scheduledbackups,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=scheduledbackups/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=backups,verbs=get;list;create
 
 // Reconcile is the main reconciler logic
 func (r *ScheduledBackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {

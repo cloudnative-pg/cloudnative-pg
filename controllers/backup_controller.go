@@ -29,9 +29,9 @@ type BackupReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=backups/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=postgresql.k8s.2ndq.io,resources=clusters,verbs=get
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=backups/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters,verbs=get
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
 
