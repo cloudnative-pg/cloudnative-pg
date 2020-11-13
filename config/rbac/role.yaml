@@ -136,7 +136,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.2ndq.io
+  - postgresql.k8s.enterprisedb.io
   resources:
   - backups
   verbs:
@@ -148,7 +148,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.2ndq.io
+  - postgresql.k8s.enterprisedb.io
   resources:
   - backups/status
   verbs:
@@ -156,7 +156,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - postgresql.k8s.2ndq.io
+  - postgresql.k8s.enterprisedb.io
   resources:
   - clusters
   verbs:
@@ -168,13 +168,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.2ndq.io
+  - postgresql.k8s.enterprisedb.io
   resources:
   - clusters/finalizers
   verbs:
   - update
 - apiGroups:
-  - postgresql.k8s.2ndq.io
+  - postgresql.k8s.enterprisedb.io
   resources:
   - clusters/status
   verbs:
@@ -183,7 +183,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.2ndq.io
+  - postgresql.k8s.enterprisedb.io
   resources:
   - scheduledbackups
   verbs:
@@ -195,7 +195,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.2ndq.io
+  - postgresql.k8s.enterprisedb.io
   resources:
   - scheduledbackups/status
   verbs:

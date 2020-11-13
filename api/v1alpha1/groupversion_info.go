@@ -6,7 +6,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 
 // Package v1alpha1 contains API Schema definitions for the postgresql v1alpha1 API group
 // +kubebuilder:object:generate=true
-// +groupName=postgresql.k8s.2ndq.io
+// +groupName=postgresql.k8s.enterprisedb.io
 package v1alpha1
 
 import (
@@ -16,7 +16,7 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "postgresql.k8s.2ndq.io", Version: "v1alpha1"}
+	GroupVersion = schema.GroupVersion{Group: "postgresql.k8s.enterprisedb.io", Version: "v1alpha1"}
 
 	// ClusterGVK is the triple to reach Cluster resources in k8s
 	ClusterGVK = schema.GroupVersionResource{

@@ -54,7 +54,7 @@ func CreateRole(cluster v1alpha1.Cluster) rbacv1.Role {
 			},
 			{
 				APIGroups: []string{
-					"postgresql.k8s.2ndq.io",
+					"postgresql.k8s.enterprisedb.io",
 				},
 				Resources: []string{
 					"clusters",
@@ -69,7 +69,7 @@ func CreateRole(cluster v1alpha1.Cluster) rbacv1.Role {
 			},
 			{
 				APIGroups: []string{
-					"postgresql.k8s.2ndq.io",
+					"postgresql.k8s.enterprisedb.io",
 				},
 				Resources: []string{
 					"clusters/status",
@@ -86,7 +86,7 @@ func CreateRole(cluster v1alpha1.Cluster) rbacv1.Role {
 			},
 			{
 				APIGroups: []string{
-					"postgresql.k8s.2ndq.io",
+					"postgresql.k8s.enterprisedb.io",
 				},
 				Resources: []string{
 					"backups",
@@ -97,7 +97,7 @@ func CreateRole(cluster v1alpha1.Cluster) rbacv1.Role {
 			},
 			{
 				APIGroups: []string{
-					"postgresql.k8s.2ndq.io",
+					"postgresql.k8s.enterprisedb.io",
 				},
 				Resources: []string{
 					"backups/status",

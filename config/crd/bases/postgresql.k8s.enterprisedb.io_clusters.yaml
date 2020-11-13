@@ -6,9 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.3.0
   creationTimestamp: null
-  name: clusters.postgresql.k8s.2ndq.io
+  name: clusters.postgresql.k8s.enterprisedb.io
 spec:
-  group: postgresql.k8s.2ndq.io
+  group: postgresql.k8s.enterprisedb.io
   names:
     kind: Cluster
     listKind: ClusterList

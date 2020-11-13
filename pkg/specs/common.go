@@ -11,7 +11,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 const (
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
-	OperatorVersionAnnotationName = "k8s.2ndq.io/operatorVersion"
+	OperatorVersionAnnotationName = "k8s.enterprisedb.io/operatorVersion"
 )
 
 // SetOperatorVersion set inside a a certain object metadata the annotation

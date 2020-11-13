@@ -53,7 +53,7 @@ The operator will activate `initdb` as bootstrap method if no bootstrap type is 
 ### `initdb`
 
 ```yaml
-apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
 kind: Cluster
 metadata:
   name: cluster-example-initdb
@@ -75,7 +75,7 @@ is not specified, the name of the database will be used for that.
 ### `fullRecovery`
 
 ```yaml
-apiVersion: postgresql.k8s.2ndq.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
 kind: Cluster
 metadata:
   name: cluster-restore
