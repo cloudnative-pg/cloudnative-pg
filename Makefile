@@ -5,7 +5,7 @@
 # Image URL to use all building/pushing image targets
 CONTROLLER_IMG ?= internal.2ndq.io/k8s/cloud-native-postgresql:latest
 BUILD_IMAGE ?= true
-POSTGRES_IMAGE_NAME ?= quay.io/2ndquadrant/postgres:12
+POSTGRES_IMAGE_NAME ?= quay.io/edb/postgresql:13
 KUSTOMIZE_VERSION=v3.5.4
 
 export CONTROLLER_IMG BUILD_IMAGE POSTGRES_IMAGE_NAME

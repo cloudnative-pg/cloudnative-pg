@@ -84,24 +84,24 @@ kind_e2e:
     LOG_DIR: ${CI_PROJECT_DIR}/kind-logs/
   parallel:
     matrix:
-      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:13
-        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:13.0
+      - POSTGRES_IMG: quay.io/edb/postgresql:13
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/edb/postgresql:13.0
         K8S_VERSION:
           - v1.19.1
           - v1.18.8
           - v1.17.11
           - v1.16.9
           - v1.15.12
-      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:12
-        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:12.4
+      - POSTGRES_IMG: quay.io/edb/postgresql:12
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/edb/postgresql:12.4
         K8S_VERSION:
           - v1.19.1
-      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:11
-        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:11.9
+      - POSTGRES_IMG: quay.io/edb/postgresql:11
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/edb/postgresql:11.9
         K8S_VERSION:
           - v1.19.1
-      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:10
-        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:10.14
+      - POSTGRES_IMG: quay.io/edb/postgresql:10
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/edb/postgresql:10.14
         K8S_VERSION:
           - v1.19.1
   script:
@@ -129,8 +129,8 @@ gke_e2e:
     ZONE: europe-west3-a
   parallel:
     matrix:
-      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:13
-        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:13.0
+      - POSTGRES_IMG: quay.io/edb/postgresql:13
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/edb/postgresql:13.0
         K8S_VERSION:
           - 1.17.9-gke.1504
           - 1.16.13-gke.401
@@ -183,8 +183,8 @@ eks_e2e:
     REGION: eu-central-1
   parallel:
     matrix:
-      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:13
-        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:13.0
+      - POSTGRES_IMG: quay.io/edb/postgresql:13
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/edb/postgresql:13.0
         K8S_VERSION:
           - "1.17"
           - "1.16"
@@ -235,8 +235,8 @@ aks_e2e:
     E2E_DEFAULT_STORAGE_CLASS: default
   parallel:
     matrix:
-      - POSTGRES_IMG: quay.io/2ndquadrant/postgres:13
-        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/2ndquadrant/postgres:13.0
+      - POSTGRES_IMG: quay.io/edb/postgresql:13
+        E2E_PRE_ROLLING_UPDATE_IMG: quay.io/edb/postgresql:13.0
         K8S_VERSION:
           - "1.18.8"
           - "1.17.11"
