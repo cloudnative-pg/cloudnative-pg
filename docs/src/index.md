@@ -1,6 +1,6 @@
 # Cloud Native PostgreSQL
 
-**Cloud Native PostgreSQL** is a stack designed by [2ndQuadrant](https://www.2ndquadrant.com)
+**Cloud Native PostgreSQL** is a stack designed by [EnterpriseDB](https://www.enterprisedb.com)
 to manage [PostgreSQL](https://www.postgresql.org/) workloads on [Kubernetes](https://kubernetes.io),
 particularly optimised for Private Cloud environments with Local Persistent Volumes (PV).
 

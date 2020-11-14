@@ -1,15 +1,16 @@
 # Credits
 
 Cloud Native PostgreSQL (Operator for Kubernetes/OpenShift) has been designed,
-developed and tested by the 2ndQuadrant team:
+developed and tested by the EnterpriseDB Cloud Native team:
 
 - Leonardo Cecchi
 - Marco Nenciarini
 - Jonathan Gonzalez
 - Francesco Canovai
-- Florin Irion
 - Jonathan Battiato
 - Niccolò Fei
+- Devin Nemec
+- Adam Wright
 - Gabriele Bartolini
 
 Cloud Native PostgreSQL is distributed under the 2ndQuadrant End User License

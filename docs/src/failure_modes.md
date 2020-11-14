@@ -5,7 +5,7 @@ PostgreSQL can face on a Kubernetes cluster during its lifetime.
 
 !!! Important
     In case the failure scenario you are experiencing is not covered by this
-    section, please immediately contact 2ndQuadrant for support and assistance.
+    section, please immediately contact EnterpriseDB for support and assistance.
 
 ## Liveness and readiness probes
 
@@ -162,4 +162,4 @@ solve the problem.
 
 !!! Important
     In such cases, please do not perform any manual operation without the
-    support and assistance of 2ndQuadrant engineering team.
+    support and assistance of EnterpriseDB engineering team.

@@ -7,7 +7,7 @@
 # browser to http://127.0.0.1:8000/.
 
 site_name: Cloud Native PostgreSQL
-site_author: 2ndQuadrant Ltd
+site_author: EnterpriseDB Corporation
 docs_dir: src
 
 theme: readthedocs
