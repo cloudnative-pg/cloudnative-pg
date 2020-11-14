@@ -36,8 +36,8 @@ LABEL summary="$SUMMARY" \
       io.k8s.display-name="$SUMMARY" \
       io.k8s.description="$DESCRIPTION" \
       name="Cloud Native PostgreSQL Operator" \
-      vendor="2ndQuadrant" \
-      url="https://www.2ndquadrant.com/" \
+      vendor="EnterpriseDB Corporation" \
+      url="https://www.enterprisedb.com/" \
       version="0.4.0" \
       release="1"
 

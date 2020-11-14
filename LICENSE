@@ -1,7 +1,6 @@
 Cloud Native PostgreSQL (Operator for Kubernetes/OpenShift)
 
-Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
+Copyright (C) 2019-2020 EnterpriseDB.
 
-The 2ndQuadrant End User License Agreement (2Q-EULA) is contained within the
-/licenses/2ndquadrant folder of the container image. If it is not visible
-please see https://licenses.2ndq.io/2Q-EULA.
+The EnterpriseDB Limited Use License is available at
+https://www.enterprisedb.com/limited-use-license.

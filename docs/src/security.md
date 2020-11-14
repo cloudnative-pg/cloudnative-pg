@@ -25,7 +25,7 @@ the code such as hard-coded credentials, integer overflows and SQL injections - 
     against all the linters defined by GolangCI-Lint.
 
 Source code is also regularly inspected through [Coverity Scan by Synopsys](https://scan.coverity.com/)
-via 2ndQuadrant's internal CI/CD pipeline.
+via EnterpriseDB's internal CI/CD pipeline.
 
 ## Kubernetes
 

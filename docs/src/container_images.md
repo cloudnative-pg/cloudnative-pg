@@ -27,8 +27,8 @@ Native PostgreSQL overrides it with its own instance manager.
     in a **Primary with multiple/optional Hot Standby Servers Architecture**
     only.
 
-2ndQuadrant provides and supports public container images for Cloud Native
-PostgreSQL and publishes them on [Quay.io](https://quay.io/repository/2ndquadrant/postgres).
+EnterpriseDB provides and supports public container images for Cloud Native
+PostgreSQL and publishes them on [Quay.io](https://quay.io/repository/edb/postgresql).
 
 ## Image tag requirements
 
