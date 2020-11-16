@@ -8,6 +8,22 @@ metadata:
   creationTimestamp: null
   name: clusters.postgresql.k8s.enterprisedb.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
+  - JSONPath: .status.instances
+    description: Number of instances
+    name: Instances
+    type: integer
+  - JSONPath: .status.readyInstances
+    description: Number of ready instances
+    name: Ready
+    type: integer
+  - JSONPath: .status.phase
+    description: Cluster current status
+    name: Status
+    type: string
   group: postgresql.k8s.enterprisedb.io
   names:
     kind: Cluster
