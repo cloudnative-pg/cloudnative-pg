@@ -193,3 +193,8 @@ func (r *InstanceReconciler) Watch() error {
 func (r *InstanceReconciler) Stop() {
 	r.instanceWatch.Stop()
 }
+
+// GetClient returns the client that is being used for a certain reconciler
+func (r *InstanceReconciler) GetClient() dynamic.Interface {
+	return r.client
+}

@@ -10,6 +10,12 @@ import (
 	"fmt"
 	"path"
 
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/internal/management/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
 )
@@ -56,4 +62,58 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) error {
 
 	targetFile := path.Join(pgdata, destinationFile)
 	return fileutils.WriteStringToFile(targetFile, contents)
+}
+
+// RefreshConfigurationFilesFromObject receive an unstructured object representing
+// a configmap and rewrite the file in the PGDATA.
+// Important: this won't send a SIGHUP to the server
+func (instance *Instance) RefreshConfigurationFilesFromObject(object *unstructured.Unstructured) error {
+	postgresConfiguration, err := utils.GetPostgreSQLConfiguration(object)
+	if err != nil {
+		return err
+	}
+
+	postgresHBA, err := utils.GetPostgreSQLHBA(object)
+	if err != nil {
+		return err
+	}
+
+	err = InstallPgDataFileContent(
+		instance.PgData,
+		postgresConfiguration,
+		PostgresqlCustomConfigurationFile)
+	if err != nil {
+		return fmt.Errorf(
+			"installing postgresql configuration: %w",
+			err)
+	}
+
+	err = InstallPgDataFileContent(
+		instance.PgData,
+		postgresHBA,
+		PostgresqlHBARulesFile)
+	if err != nil {
+		return fmt.Errorf(
+			"installing postgresql HBA rules: %w",
+			err)
+	}
+
+	return nil
+}
+
+// RefreshConfigurationFiles get the latest version of the ConfigMap from the API
+// server and then write the configuration in PGDATA
+func (instance *Instance) RefreshConfigurationFiles(client dynamic.Interface) error {
+	unstructuredObject, err := client.Resource(schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "configmaps",
+	}).
+		Namespace(instance.Namespace).
+		Get(instance.ClusterName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	return instance.RefreshConfigurationFilesFromObject(unstructuredObject)
 }
