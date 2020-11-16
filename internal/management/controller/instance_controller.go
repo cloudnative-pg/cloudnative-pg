@@ -24,7 +24,6 @@ import (
 
 	apiv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/internal/management/utils"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/postgres"
 	postgresSpec "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
 )
 
@@ -139,7 +138,7 @@ func (r *InstanceReconciler) reconcileConfigMap(event *watch.Event) error {
 			err)
 	}
 
-	err = r.refreshConfigurationFilesFromObject(object)
+	err = r.instance.RefreshConfigurationFilesFromObject(object)
 	if err != nil {
 		return err
 	}
@@ -198,43 +197,6 @@ func (r *InstanceReconciler) reconcileConfigMap(event *watch.Event) error {
 		// configuration to disable or enable this auto-restart behavior
 		r.log.Info("restarting this server to apply the new configuration")
 		return r.instance.Shutdown()
-	}
-
-	return nil
-}
-
-// refreshConfigurationFilesFromObject receive an unstructured object representing
-// a configmap and rewrite the file in the PGDATA.
-// Important: this won't send a SIGHUP to the server
-func (r *InstanceReconciler) refreshConfigurationFilesFromObject(object *unstructured.Unstructured) error {
-	postgresConfiguration, err := utils.GetPostgreSQLConfiguration(object)
-	if err != nil {
-		return err
-	}
-
-	postgresHBA, err := utils.GetPostgreSQLHBA(object)
-	if err != nil {
-		return err
-	}
-
-	err = postgres.InstallPgDataFileContent(
-		r.instance.PgData,
-		postgresConfiguration,
-		postgres.PostgresqlCustomConfigurationFile)
-	if err != nil {
-		return fmt.Errorf(
-			"installing postgresql configuration: %w",
-			err)
-	}
-
-	err = postgres.InstallPgDataFileContent(
-		r.instance.PgData,
-		postgresHBA,
-		postgres.PostgresqlHBARulesFile)
-	if err != nil {
-		return fmt.Errorf(
-			"installing postgresql HBA rules: %w",
-			err)
 	}
 
 	return nil

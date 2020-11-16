@@ -15,6 +15,8 @@ import (
 
 	"github.com/lib/pq"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -27,6 +29,16 @@ import (
 
 // Restore restore a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore() error {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return err
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
 	backup, err := info.loadBackup()
 	if err != nil {
 		return err
@@ -36,7 +48,7 @@ func (info InitInfo) Restore() error {
 		return err
 	}
 
-	if err := info.writeInitialPostgresqlConf(); err != nil {
+	if err := info.writeInitialPostgresqlConf(dynamicClient); err != nil {
 		return err
 	}
 
@@ -135,19 +147,11 @@ func (info InitInfo) writeRestoreWalConfig(backup *v1alpha1.Backup) error {
 			"restore_command = '%s'\n",
 		strings.Join(cmd, " "))
 
-	// Create default configuration
-	configParameters := postgres.CreateCNPConfiguration(major*10000, nil, true)
-	err = fileutils.AppendStringToFile(
-		path.Join(info.PgData, "custom.conf"),
-		postgres.CreatePostgresqlConfFile(configParameters))
-	if err != nil {
-		return fmt.Errorf("cannot write custom.conf: %w", err)
-	}
-
 	// Disable SSL as we still don't have the required certificates
 	err = fileutils.AppendStringToFile(
 		path.Join(info.PgData, "custom.conf"),
-		"ssl = 'off'\n")
+		"ssl = 'off'\n"+
+			"archive_command = 'cd .'\n")
 	if err != nil {
 		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
@@ -185,7 +189,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *v1alpha1.Backup) error {
 }
 
 // writeInitialPostgresqlConf reset the postgresql.conf that there is in the instance
-func (info InitInfo) writeInitialPostgresqlConf() error {
+func (info InitInfo) writeInitialPostgresqlConf(client dynamic.Interface) error {
 	tempDataDir, err := ioutil.TempDir("/tmp", "datadir_")
 	if err != nil {
 		return fmt.Errorf("while creating a temporary data directory: %w", err)
@@ -199,30 +203,39 @@ func (info InitInfo) writeInitialPostgresqlConf() error {
 		}
 	}()
 
-	temporaryInstance := InitInfo{
+	temporaryInitInfo := InitInfo{
 		PgData: tempDataDir,
 	}
 
-	if err = temporaryInstance.CreateDataDirectory(); err != nil {
+	if err = temporaryInitInfo.CreateDataDirectory(); err != nil {
 		return fmt.Errorf("while creating a temporary data directory: %w", err)
 	}
 
+	temporaryInstance := temporaryInitInfo.GetInstance()
+	temporaryInstance.Namespace = info.Namespace
+	temporaryInstance.ClusterName = info.ClusterName
+
+	err = temporaryInstance.RefreshConfigurationFiles(client)
+	if err != nil {
+		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
+	}
+
 	err = fileutils.CopyFile(
-		path.Join(temporaryInstance.PgData, "postgresql.conf"),
+		path.Join(temporaryInitInfo.PgData, "postgresql.conf"),
 		path.Join(info.PgData, "postgresql.conf"))
 	if err != nil {
 		return fmt.Errorf("while creating postgresql.conf: %w", err)
 	}
 
 	err = fileutils.CopyFile(
-		path.Join(temporaryInstance.PgData, "custom.conf"),
+		path.Join(temporaryInitInfo.PgData, "custom.conf"),
 		path.Join(info.PgData, "custom.conf"))
 	if err != nil {
 		return fmt.Errorf("while creating custom.conf: %w", err)
 	}
 
 	err = fileutils.CopyFile(
-		path.Join(temporaryInstance.PgData, "postgresql.auto.conf"),
+		path.Join(temporaryInitInfo.PgData, "postgresql.auto.conf"),
 		path.Join(info.PgData, "postgresql.auto.conf"))
 	if err != nil {
 		return fmt.Errorf("while creating postgresql.auto.conf: %w", err)

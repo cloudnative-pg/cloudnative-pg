@@ -78,23 +78,6 @@ func (r *InstanceReconciler) RefreshCA() error {
 	return r.refreshCAFromObject(unstructuredObject)
 }
 
-// RefreshConfigurationFiles get the latest version of the ConfigMap from the API
-// server and then write the configuration in PGDATA
-func (r *InstanceReconciler) RefreshConfigurationFiles() error {
-	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "configmaps",
-	}).
-		Namespace(r.instance.Namespace).
-		Get(r.instance.ClusterName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	return r.refreshConfigurationFilesFromObject(unstructuredObject)
-}
-
 // VerifyPgDataCoherence check if this cluster exist in k8s and panic if this
 // pod belongs to a primary but the cluster status is not coherent with that
 func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
