@@ -22,7 +22,7 @@ cluster on your local Kubernetes/Openshift installation and experiment with it.
 !!! Important
     Make sure that you have `kubectl` installed on your machine in order
     to connect to the Kubernetes cluster, or `oc` if using CRC for OpenShift.
-    Please follow the Kubernetes documentation on [how to install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/) or the Openshift one on [how to install `oc`](https://docs.openshift.com/container-platform/4.5/cli_reference/openshift_cli/getting-started-cli.html).
+    Please follow the Kubernetes documentation on [how to install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/) or the Openshift one on [how to install `oc`](https://docs.openshift.com/container-platform/4.6/cli_reference/openshift_cli/getting-started-cli.html).
 
 
 !!! Note
@@ -124,7 +124,7 @@ Find the `Cloud Native PostgreSQL` box scrolling or using the search filter.
 
 Select the operator and click `Install`. Click `Install` again in the following
 `Install Operator`, using the default settings. For an in-depth explanation of
-those settings, see the [Openshift documentation](https://docs.openshift.com/container-platform/4.5/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster).
+those settings, see the [Openshift documentation](https://docs.openshift.com/container-platform/4.6/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster).
 
 The operator will soon be available in all the namespaces.
 
@@ -141,7 +141,7 @@ oc apply -f subscription.yaml
 The operator will soon be available in all the namespaces.
 
 More information on
-[how to install operators via CLI](https://docs.openshift.com/container-platform/4.5/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-operator-from-operatorhub-using-cli_olm-adding-operators-to-a-cluster)
+[how to install operators via CLI](https://docs.openshift.com/container-platform/4.6/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-operator-from-operatorhub-using-cli_olm-adding-operators-to-a-cluster)
 is available in the Openshift documentation.
 
 ## Part 3 - Deploy a PostgreSQL cluster

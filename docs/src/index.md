@@ -12,7 +12,7 @@ PostgreSQL 13, 12, 11 and 10 are currently supported.
 
 Cloud Native PostgreSQL has also been certified for
 [RedHat OpenShift Container Platform (OCP)](https://www.openshift.com/products/container-platform)
-4.5 and is available directly from the [RedHat Catalog](https://catalog.redhat.com/).
+4.5+ and is available directly from the [RedHat Catalog](https://catalog.redhat.com/).
 OpenShift Container Platform is an open source distribution of Kubernetes which is
 maintained and commercially supported by Red Hat.
 
