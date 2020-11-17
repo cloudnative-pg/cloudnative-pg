@@ -18,6 +18,11 @@ the following variables to create a pull secret:
 * `DOCKER_USERNAME`: the registry username
 * `DOCKER_PASSWORD`: the registry password
 
+Additionally you can specify a DockerHub mirror to be used by
+specifying the following variable
+
+* `DOCKER_REGISTRY_MIRROR`: DockerHub mirror URL (i.e. https://mirror.gcr.io)
+
 ## Local test on Kind
 
 You can test the operator locally on kind running

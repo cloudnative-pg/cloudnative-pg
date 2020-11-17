@@ -62,7 +62,7 @@ install_kubectl() {
 }
 
 install_kind() {
-    curl -s -L "https://kind.sigs.k8s.io/dl/${KIND_VERSION}//kind-$(uname)-amd64" -o "${KIND}"
+    curl -s -L "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-$(uname)-amd64" -o "${KIND}"
     chmod +x "${KIND}"
 }
 
@@ -90,10 +90,24 @@ main() {
     install_kind
     install_go_tools
 
+    # Create kind config
+    config_file=$(mktemp)
+    cp "${HACK_DIR}/kind-config.yaml" "${config_file}"
+    if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
+	cat >> "${config_file}" <<-EOF
+
+	containerdConfigPatches:
+	- |-
+	  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${DOCKER_REGISTRY_MIRROR##*//}"]
+	    endpoint = ["${DOCKER_REGISTRY_MIRROR}"]
+
+	EOF
+    fi
+
     # Create the cluster
     kubetest2 kind --up --image-name "kindest/node:${K8S_VERSION}" \
         --cluster-name "${KIND_CLUSTER_NAME}" \
-        --config "${HACK_DIR}/kind-config.yaml"
+        --config "${config_file}"
 
     # Support for docker:dind service
     if [ "${DOCKER_HOST:-}" == "tcp://docker:2376" ]; then
