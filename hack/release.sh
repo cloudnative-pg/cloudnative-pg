@@ -86,7 +86,7 @@ cp -r config/* "${CONFIG_TMP_DIR}"
     cd "${CONFIG_TMP_DIR}/default"
     "${KUSTOMIZE}" edit add patch manager_image_pull_secret.yaml
     cd "${CONFIG_TMP_DIR}/manager"
-    "${KUSTOMIZE}" edit set image controller="quay.io/edb/cloud-native-postgresql:v${release_version}"
+    "${KUSTOMIZE}" edit set image controller="quay.io/enterprisedb/cloud-native-postgresql:v${release_version}"
 )
 
 "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${release_manifest}"

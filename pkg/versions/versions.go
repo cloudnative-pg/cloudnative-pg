@@ -16,11 +16,11 @@ const (
 
 	// DefaultImageName is the image used by default by the operator to create
 	// pods.
-	DefaultImageName = "quay.io/edb/postgresql:13"
+	DefaultImageName = "quay.io/enterprisedb/postgresql:13"
 
 	// DefaultOperatorImageName used to bootstrap the controller in the Pods running
 	// PostgreSQL
-	DefaultOperatorImageName = "quay.io/edb/cloud-native-postgresql:v0.4.0"
+	DefaultOperatorImageName = "quay.io/enterprisedb/cloud-native-postgresql:v0.4.0"
 
 	// postgresImageNameEnvVar is the environment variable that allow overriding the default image used
 	// for PostgreSQL
