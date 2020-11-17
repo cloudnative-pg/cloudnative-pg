@@ -187,18 +187,20 @@ var (
 			},
 		},
 		MandatorySettings: SettingsCollection{
-			"hot_standby":      "true",
-			"archive_mode":     "on",
-			"archive_command":  "/controller/manager wal-archive %p",
-			"port":             "5432",
-			"wal_level":        "logical",
-			"wal_log_hints":    "on",
-			"archive_timeout":  "5min", // TODO support configurable archive timeout
-			"full_page_writes": "on",
-			"ssl":              "on",
-			"ssl_cert_file":    ServerCertificateLocation,
-			"ssl_key_file":     ServerKeyLocation,
-			"ssl_ca_file":      CACertificateLocation,
+			"listen_addresses":        "*",
+			"unix_socket_directories": "/var/run/postgresql",
+			"hot_standby":             "true",
+			"archive_mode":            "on",
+			"archive_command":         "/controller/manager wal-archive %p",
+			"port":                    "5432",
+			"wal_level":               "logical",
+			"wal_log_hints":           "on",
+			"archive_timeout":         "5min", // TODO support configurable archive timeout
+			"full_page_writes":        "on",
+			"ssl":                     "on",
+			"ssl_cert_file":           ServerCertificateLocation,
+			"ssl_key_file":            ServerKeyLocation,
+			"ssl_ca_file":             CACertificateLocation,
 		},
 	}
 )

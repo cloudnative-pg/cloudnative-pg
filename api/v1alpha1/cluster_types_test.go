@@ -129,3 +129,22 @@ var _ = Describe("Bootstrap via initdb", func() {
 		Expect(Cluster{}.ShouldCreateApplicationDatabase()).To(BeFalse())
 	})
 })
+
+var _ = Describe("default UID/GID", func() {
+	It("will use 26/26 if not specified", func() {
+		cluster := Cluster{}
+		Expect(cluster.GetPostgresUID()).To(Equal(int64(26)))
+		Expect(cluster.GetPostgresGID()).To(Equal(int64(26)))
+	})
+
+	It("will respect user specification", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				PostgresUID: 10,
+				PostgresGID: 11,
+			},
+		}
+		Expect(cluster.GetPostgresUID()).To(Equal(int64(10)))
+		Expect(cluster.GetPostgresGID()).To(Equal(int64(11)))
+	})
+})

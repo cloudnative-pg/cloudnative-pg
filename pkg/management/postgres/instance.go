@@ -8,6 +8,7 @@ package postgres
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -208,9 +209,15 @@ func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 		return instance.superUserDB, nil
 	}
 
+	socketDir := os.Getenv("PGHOST")
+	if socketDir == "" {
+		socketDir = "/var/run/postgresql"
+	}
+
+	dsn := fmt.Sprintf("host=%s port=5432 dbname=postgres user=postgres sslmode=disable", socketDir)
 	db, err := sql.Open(
 		"postgres",
-		"host=/tmp port=5432 dbname=postgres user=postgres sslmode=disable")
+		dsn)
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't create connection pool")
 	}
