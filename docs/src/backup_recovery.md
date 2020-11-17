@@ -9,7 +9,7 @@ As a result, base backups will be *tarballs*. Both base backups and WAL files
 can be compressed and encrypted.
 
 For this it is required an image with `barman-cli-cloud` installed. The
-image `quay.io/edb/postgresql` can be used for this scope,
+image `quay.io/enterprisedb/postgresql` can be used for this scope,
 as it is composed by a community PostgreSQL image and the latest
 `barman-cli-cloud` package.
 
