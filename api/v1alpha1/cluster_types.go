@@ -48,6 +48,12 @@ const (
 	// the se service name for every node that you can use to read and write
 	// data
 	ServiceReadWriteSuffix = "-rw"
+
+	// defaultPostgresUID is the default UID which is used by PostgreSQL
+	defaultPostgresUID = 26
+
+	// defaultPostgresGID is the default GID which is used by PostgreSQL
+	defaultPostgresGID = 26
 )
 
 // ClusterSpec defines the desired state of Cluster
@@ -58,6 +64,12 @@ type ClusterSpec struct {
 	// Name of the container image
 	// +kubebuilder:validation:MinLength=0
 	ImageName string `json:"imageName,omitempty"`
+
+	// The UID of the "postgres" user inside the image, defaults to "26"
+	PostgresUID int64 `json:"postgresUID,omitempty"`
+
+	// The GID of the "postgres" user inside the image, defaults to "26"
+	PostgresGID int64 `json:"postgresGID,omitempty"`
 
 	// Number of instances required in the cluster
 	// +kubebuilder:validation:Minimum=1
@@ -561,6 +573,24 @@ func (cluster Cluster) ShouldCreateApplicationDatabase() bool {
 
 	initDBParameters := cluster.Spec.Bootstrap.InitDB
 	return initDBParameters.Owner != "" && initDBParameters.Database != ""
+}
+
+// GetPostgresUID returns the UID that is being used for the "postgres"
+// user
+func (cluster Cluster) GetPostgresUID() int64 {
+	if cluster.Spec.PostgresUID == 0 {
+		return defaultPostgresUID
+	}
+	return cluster.Spec.PostgresUID
+}
+
+// GetPostgresGID returns the GID that is being used for the "postgres"
+// user
+func (cluster Cluster) GetPostgresGID() int64 {
+	if cluster.Spec.PostgresGID == 0 {
+		return defaultPostgresGID
+	}
+	return cluster.Spec.PostgresGID
 }
 
 func init() {

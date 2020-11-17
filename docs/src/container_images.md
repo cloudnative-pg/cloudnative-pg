@@ -17,7 +17,6 @@ with the following requirements:
     - `barman-cloud-restore`
     - `barman-cloud-backup-list`
 - Sensible locale settings
-- User and group `postgres` with `UID` and `GID` set to 26
 
 No entry point and/or command is required in the image definition, as Cloud
 Native PostgreSQL overrides it with its own instance manager.

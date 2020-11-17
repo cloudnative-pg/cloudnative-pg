@@ -239,6 +239,16 @@ spec:
               required:
               - inProgress
               type: object
+            postgresGID:
+              description: The GID of the "postgres" user inside the image, defaults
+                to "26"
+              format: int64
+              type: integer
+            postgresUID:
+              description: The UID of the "postgres" user inside the image, defaults
+                to "26"
+              format: int64
+              type: integer
             postgresql:
               description: Configuration of the PostgreSQL server
               properties:

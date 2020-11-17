@@ -38,12 +38,6 @@ const (
 	// PostgresContainerName is the name of the container executing PostgreSQL
 	// inside one Pod
 	PostgresContainerName = "postgres"
-
-	// postgresUser is the default UID which is used by PostgreSQL
-	postgresUser = 26
-
-	// postgresGroup is the default GID which is used by PostgreSQL
-	postgresGroup = 26
 )
 
 // CreatePrimaryPodViaInitdb create a new primary instance in a Pod
@@ -74,6 +68,10 @@ func CreatePrimaryPodViaInitdb(cluster v1alpha1.Cluster, nodeSerial int32) *core
 		{
 			Name:      "controller",
 			MountPath: "/controller",
+		},
+		{
+			Name:      "socket",
+			MountPath: "/var/run/postgresql",
 		},
 	}
 
@@ -120,6 +118,16 @@ func CreatePrimaryPodViaInitdb(cluster v1alpha1.Cluster, nodeSerial int32) *core
 							Name:      "controller",
 							MountPath: "/controller",
 						},
+						{
+							Name:      "socket",
+							MountPath: "/var/run/postgresql",
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "PGHOST",
+							Value: "/var/run/postgresql",
+						},
 					},
 				},
 				{
@@ -142,6 +150,10 @@ func CreatePrimaryPodViaInitdb(cluster v1alpha1.Cluster, nodeSerial int32) *core
 							Name:  "NAMESPACE",
 							Value: cluster.Namespace,
 						},
+						{
+							Name:  "PGHOST",
+							Value: "/var/run/postgresql",
+						},
 					},
 					Command:      initCommand,
 					VolumeMounts: volumeMounts,
@@ -149,7 +161,7 @@ func CreatePrimaryPodViaInitdb(cluster v1alpha1.Cluster, nodeSerial int32) *core
 			},
 			Containers:         createPostgresContainers(cluster, podName),
 			Volumes:            createPostgresVolumes(cluster, podName),
-			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
+			SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 			ServiceAccountName: cluster.Name,
 		},
@@ -200,6 +212,16 @@ func CreatePrimaryPodViaFullRecovery(cluster v1alpha1.Cluster, nodeSerial int32,
 							Name:      "controller",
 							MountPath: "/controller",
 						},
+						{
+							Name:      "socket",
+							MountPath: "/var/run/postgresql",
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "PGHOST",
+							Value: "/var/run/postgresql",
+						},
 					},
 				},
 				{
@@ -234,6 +256,10 @@ func CreatePrimaryPodViaFullRecovery(cluster v1alpha1.Cluster, nodeSerial int32,
 								SecretKeyRef: &backup.Status.S3Credentials.SecretAccessKeyReference,
 							},
 						},
+						{
+							Name:  "PGHOST",
+							Value: "/var/run/postgresql",
+						},
 					},
 					Command: initCommand,
 					VolumeMounts: []corev1.VolumeMount{
@@ -253,12 +279,16 @@ func CreatePrimaryPodViaFullRecovery(cluster v1alpha1.Cluster, nodeSerial int32,
 							Name:      "controller",
 							MountPath: "/controller",
 						},
+						{
+							Name:      "socket",
+							MountPath: "/var/run/postgresql",
+						},
 					},
 				},
 			},
 			Containers:         createPostgresContainers(cluster, podName),
 			Volumes:            createPostgresVolumes(cluster, podName),
-			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
+			SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 			ServiceAccountName: cluster.Name,
 		},
@@ -297,6 +327,12 @@ func createPostgresVolumes(cluster v1alpha1.Cluster, podName string) []corev1.Vo
 		},
 		{
 			Name: "controller",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "socket",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
@@ -350,6 +386,10 @@ func createPostgresContainers(
 					Name:  "PGPORT",
 					Value: "5432",
 				},
+				{
+					Name:  "PGHOST",
+					Value: "/var/run/postgresql",
+				},
 				CreateAccessKeyIDEnvVar(cluster.Spec.Backup),
 				CreateSecretAccessKeyEnvVar(cluster.Spec.Backup),
 			},
@@ -365,6 +405,10 @@ func createPostgresContainers(
 				{
 					Name:      "superuser-secret",
 					MountPath: "/etc/superuser-secret",
+				},
+				{
+					Name:      "socket",
+					MountPath: "/var/run/postgresql",
 				},
 			},
 			ReadinessProbe: &corev1.Probe{
@@ -412,6 +456,12 @@ func createPostgresContainers(
 				"-pw-file", "/etc/superuser-secret/password",
 			},
 			Resources: cluster.Spec.Resources,
+			Ports: []corev1.ContainerPort{
+				{
+					ContainerPort: 5432,
+					Protocol:      "TCP",
+				},
+			},
 		},
 	}
 }
@@ -532,6 +582,16 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 							Name:      "controller",
 							MountPath: "/controller",
 						},
+						{
+							Name:      "socket",
+							MountPath: "/var/run/postgresql",
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "PGHOST",
+							Value: "/var/run/postgresql",
+						},
 					},
 				},
 				{
@@ -554,6 +614,10 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 							Name:  "NAMESPACE",
 							Value: cluster.Namespace,
 						},
+						{
+							Name:  "PGHOST",
+							Value: "/var/run/postgresql",
+						},
 					},
 					Command: []string{
 						"/controller/manager",
@@ -570,12 +634,16 @@ func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod
 							Name:      "controller",
 							MountPath: "/controller",
 						},
+						{
+							Name:      "socket",
+							MountPath: "/var/run/postgresql",
+						},
 					},
 				},
 			},
 			Containers:         createPostgresContainers(cluster, podName),
 			Volumes:            createPostgresVolumes(cluster, podName),
-			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
+			SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 			ServiceAccountName: cluster.Name,
 		},
@@ -617,12 +685,22 @@ func PodWithExistingStorage(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.
 							Name:      "controller",
 							MountPath: "/controller",
 						},
+						{
+							Name:      "socket",
+							MountPath: "/var/run/postgresql",
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "PGHOST",
+							Value: "/var/run/postgresql",
+						},
 					},
 				},
 			},
 			Containers:         createPostgresContainers(cluster, podName),
 			Volumes:            createPostgresVolumes(cluster, podName),
-			SecurityContext:    CreatePostgresSecurityContext(postgresUser, postgresGroup),
+			SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 			ServiceAccountName: cluster.Name,
 		},
