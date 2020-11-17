@@ -121,6 +121,44 @@ primary, pod `-1` needs to promote itself while the other pods need to follow
 pod `-1`). The same status is used by Kubernetes client applications to
 provide details, including the OpenShift dashboard.
 
+### Operator's certification authority
+
+The operator automatically creates a certification authority for itself.
+It creates and signs with the operator certification authority a leaf certificate
+to be used by the webhook server, to ensure safe communication between the
+Kubernetes API Server and the operator itself.
+
+### Cluster's certification authority
+
+The operator automatically creates a certification authority for every PostgreSQL
+cluster, which is used to create TLS certificates for the authentication
+of streaming replication standby servers (instead of using passwords) and
+applications.
+The Certification Authority of the Operator will be used to sign every cluster
+certification authority.
+
+### TLS connections
+
+The operator transparently and natively supports using TLS/SSL connections
+to encrypt client/server communications for increased security using the
+cluster's certification authority.
+
+### Certificate authentication for streaming replication
+
+The operator relies on TLS client certificate authentication to authorise streaming
+replication connections from the standby servers, instead of relying on a password
+(and therefore a secret).
+
+### Continuous configuration management
+
+The operator enables users to apply changes to the `Cluster` resource YAML
+section of the PostgreSQL configuration and makes sure that all instances
+are properly reloaded or restarted, depending on the configuration option.
+*Current limitations:* changes with `ALTER SYSTEM` are not detected, meaning
+that the cluster state is not enforced; proper restart order is not implemented
+with [hot standby sensitive parameters](https://www.postgresql.org/docs/current/hot-standby.html#HOT-STANDBY-ADMIN)
+such as `max_connections` and `max_wal_senders`.
+
 ### Multiple installation methods
 
 The operator can be installed through a Kubernetes manifest via `kubectl
@@ -166,6 +204,12 @@ waits for the user to issue the switchover procedure manually (`supervised`).
 Which setting to use depends on the business requirements as the operation
 might generate some downtime for the applications, from a few seconds to
 minutes based on the actual database workload.
+
+### Display cluster availability status during upgrade
+
+At any time convey the high availability status of the cluster, for example `OK`,
+`Failover in progress`, `Switchover in progress`, `Upgrade in progress` or
+`Upgrade failed`.
 
 ## Level 3 - Full Lifecycle
 
