@@ -53,18 +53,28 @@ func (r *ClusterReconciler) upgradeCluster(
 			continue
 		}
 
+		if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseUpgrade,
+			fmt.Sprintf("Upgrading cluster to image: %v", targetImageName)); err != nil {
+			return err
+		}
+
 		status, err := postgres.CanUpgrade(usedImageName, targetImageName)
 		if err != nil {
 			log.Error(
 				err, "Error checking image versions", "from", usedImageName, "to", targetImageName)
-			return fmt.Errorf("wrong image version: %w", err)
+			return r.RegisterPhase(ctx, cluster, v1alpha1.PhaseUpgradeFailed,
+				fmt.Sprintf("Upgrade Failed, wrong image version: %v", err))
 		}
+
 		if !status {
 			log.Info("Can't upgrade between these PostgreSQL versions",
 				"from", usedImageName,
 				"to", targetImageName,
 				"pod", pod.Name)
-			return nil
+			return r.RegisterPhase(ctx, cluster,
+				v1alpha1.PhaseUpgradeFailed,
+				fmt.Sprintf("Upgrade Failed, can't upgrade from %v to %v",
+					usedImageName, targetImageName))
 		}
 	}
 
@@ -96,9 +106,10 @@ func (r *ClusterReconciler) upgradeCluster(
 	// if the user prefer to do it manually
 	if cluster.GetPrimaryUpdateStrategy() == v1alpha1.PrimaryUpdateStrategySupervised {
 		log.Info(
-			"Waiting for the user to issue a supervised switchover to complete the rolling update",
+			"Waiting for the user to request a switchover to complete the rolling update",
 			"primaryPod", sortedPodList[primaryIdx].Name)
-		return nil
+		return r.RegisterPhase(ctx, cluster, v1alpha1.PhaseWaitingForUser,
+			"User must issue a supervised switchover")
 	}
 
 	// Ok, the user wants us to automatically update all
