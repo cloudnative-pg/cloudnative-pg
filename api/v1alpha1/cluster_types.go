@@ -137,6 +137,15 @@ const (
 	// PhaseCreatingReplica it's everytime we add a new replica
 	PhaseCreatingReplica = "Creating a new replica"
 
+	// PhaseUpgrade upgrade in process
+	PhaseUpgrade = "Upgrading cluster"
+
+	// PhaseUpgradeFailed used for failures in upgrade
+	PhaseUpgradeFailed = "Cluster upgrade failed"
+
+	// PhaseWaitingForUser set the status to wait for an action from the user
+	PhaseWaitingForUser = "Waiting for user action"
+
 	// PhaseHealthy for a cluster doing nothing
 	PhaseHealthy = "Cluster in healthy state"
 )
