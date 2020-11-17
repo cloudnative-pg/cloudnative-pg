@@ -62,7 +62,8 @@ kind_e2e:
   tags:
     - privileged
   services:
-    - docker:stable-dind
+    - name: docker:stable-dind
+      command: ["--registry-mirror", "https://ci-dockerhub-proxy.2ndquadrant.com"]
   variables:
     # DinD configuration, see https://gitlab.com/gitlab-org/gitlab-runner/issues/4501
     #
@@ -82,6 +83,7 @@ kind_e2e:
     KIND_VERSION: v0.9.0
     E2E_DEFAULT_STORAGE_CLASS: standard
     LOG_DIR: ${CI_PROJECT_DIR}/kind-logs/
+    DOCKER_REGISTRY_MIRROR: https://ci-dockerhub-proxy.2ndquadrant.com
   parallel:
     matrix:
       - POSTGRES_IMG: quay.io/edb/postgresql:13
