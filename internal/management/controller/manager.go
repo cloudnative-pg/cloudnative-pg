@@ -145,7 +145,7 @@ func (r *InstanceReconciler) Watch() error {
 		Namespace(r.instance.Namespace).
 		Watch(metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(
-				"metadata.name", r.instance.ClusterName+apiv1alpha1.PostgresCertSecretSuffix).String(),
+				"metadata.name", r.instance.ClusterName+apiv1alpha1.ReplicationSecretSuffix).String(),
 		})
 	if err != nil {
 		return fmt.Errorf("error watching 'postgres' user secret: %w", err)

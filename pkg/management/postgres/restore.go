@@ -60,7 +60,7 @@ func (info InitInfo) Restore() error {
 		return err
 	}
 
-	return info.forceSuperuserPassword()
+	return info.configureInstanceAfterRestore()
 }
 
 // restoreDataDir restore PGDATA from an existing backup
@@ -256,9 +256,11 @@ func (info InitInfo) writeRestoreHbaConf() error {
 		0600)
 }
 
-// forceSuperuserPassword change the superuser password
-// of the instance. Can only be used if the instance is down
-func (info InitInfo) forceSuperuserPassword() error {
+// configureInstanceAfterRestore change the superuser password
+// of the instance to be coherent with the one specified in the
+// cluster. This function also ensure that the user for streaming
+// replication actually exist in the target cluster
+func (info InitInfo) configureInstanceAfterRestore() error {
 	superUserPassword, err := fileutils.ReadFile(info.PasswordFile)
 	if err != nil {
 		return fmt.Errorf("cannot read superUserPassword file: %w", err)
@@ -289,7 +291,33 @@ func (info InitInfo) forceSuperuserPassword() error {
 			"ALTER USER postgres PASSWORD %v",
 			pq.QuoteLiteral(superUserPassword)))
 		if err != nil {
-			return fmt.Errorf("ALTER ROLE postgres error: %w", err)
+			return fmt.Errorf("ALTER USER postgres error: %w", err)
+		}
+
+		var hasLoginRight, hasReplicationRight bool
+		row := db.QueryRow("SELECT rolcanlogin, rolreplication FROM pg_roles WHERE rolname = $1",
+			v1alpha1.StreamingReplicationUser)
+		err = row.Scan(&hasLoginRight, &hasReplicationRight)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				_, err = db.Exec(fmt.Sprintf(
+					"CREATE USER %v REPLICATION",
+					pq.QuoteIdentifier(v1alpha1.StreamingReplicationUser)))
+				if err != nil {
+					return fmt.Errorf("CREATE USER %v error: %w", v1alpha1.StreamingReplicationUser, err)
+				}
+			} else {
+				return fmt.Errorf("while creating streaming replication user: %w", err)
+			}
+		}
+
+		if !hasLoginRight || !hasReplicationRight {
+			_, err = db.Exec(fmt.Sprintf(
+				"ALTER USER %v LOGIN REPLICATION",
+				pq.QuoteIdentifier(v1alpha1.StreamingReplicationUser)))
+			if err != nil {
+				return fmt.Errorf("ALTER USER %v error: %w", v1alpha1.StreamingReplicationUser, err)
+			}
 		}
 
 		if majorVersion >= 12 {

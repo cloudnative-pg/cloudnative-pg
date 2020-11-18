@@ -103,11 +103,11 @@ func (r *InstanceReconciler) reconcileSecret(event *watch.Event) error {
 			return err
 		}
 
-	case strings.HasSuffix(name, apiv1alpha1.PostgresCertSecretSuffix):
+	case strings.HasSuffix(name, apiv1alpha1.ReplicationSecretSuffix):
 		err = r.refreshCertificateFilesFromObject(
 			object,
-			postgresSpec.PostgresCertificateLocation,
-			postgresSpec.PostgresKeyLocation)
+			postgresSpec.StreamingReplicaCertificateLocation,
+			postgresSpec.StreamingReplicaKeyLocation)
 		if err != nil {
 			return err
 		}
