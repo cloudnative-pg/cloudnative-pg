@@ -44,7 +44,7 @@ func (r *Cluster) Default() {
 
 	// Defaulting the image name if not specified
 	if r.Spec.ImageName == "" {
-		r.Spec.ImageName = versions.DefaultImageName
+		r.Spec.ImageName = versions.GetDefaultImageName()
 	}
 
 	// Defaulting the bootstrap method if not specified
@@ -336,11 +336,11 @@ func (r *Cluster) validateImageChange(old string) field.ErrorList {
 	newVersion := r.Spec.ImageName
 	if newVersion == "" {
 		// We'll use the default one
-		newVersion = versions.DefaultImageName
+		newVersion = versions.GetDefaultImageName()
 	}
 
 	if old == "" {
-		old = versions.DefaultImageName
+		old = versions.GetDefaultImageName()
 	}
 
 	status, err := postgres.CanUpgrade(old, newVersion)

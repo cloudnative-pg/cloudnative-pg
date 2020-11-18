@@ -193,7 +193,7 @@ var _ = Describe("Defaulting webhook", func() {
 	It("should fill the image name if isn't already set", func() {
 		cluster := Cluster{}
 		cluster.Default()
-		Expect(cluster.Spec.ImageName).To(Equal(versions.DefaultImageName))
+		Expect(cluster.Spec.ImageName).To(Equal(versions.GetDefaultImageName()))
 	})
 
 	It("shouldn't set the image name if already present", func() {
