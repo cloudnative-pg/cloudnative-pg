@@ -16,6 +16,10 @@ A reference for custom settings usage is included in the samples, see
 
 These settings are the same across all instances.
 
+!!! Warning
+    **OpenShift users:** due to a current limitation of the OpenShift user interface,
+    it is possible to change PostgreSQL settings from the YAML pane only.
+
 ## The `postgresql` section
 
 The PostgreSQL instance in the pod starts with a default `postgresql.conf` file,
