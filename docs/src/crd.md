@@ -136,7 +136,9 @@ For example, you can request an initial amount of RAM of 32MiB (scalable to 128M
 - `pvcTemplate`: template to be used to generate the Persistent Volume Claim
 - `size`: size of the storage (*required* if not already specified in the PVC template)
 - `storageClass`: `StorageClass` to use to contain PostgreSQL database (aka `PGDATA`);
-   the storage class is applied after evaluating the PVC template, if available
+   the storage class is applied after evaluating the PVC template, if available.
+   If both `pvcTemplate` and `storageClass` are undefined, the `Cluster` will
+   use the default storage class.
 
 !!! Seealso "See also"
     Please refer to the ["Configuration samples" page](samples.md) for examples on storage configuration.

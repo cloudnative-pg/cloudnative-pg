@@ -20,8 +20,8 @@ nav:
   - index.md
   - before_you_start.md
   - architecture.md
-  - operator_capability_levels.md
   - quickstart.md
+  - cloud_setup.md
   - bootstrap.md
   - crd.md
   - security.md
@@ -35,4 +35,5 @@ nav:
   - kubernetes_upgrade.md
   - e2e.md
   - container_images.md
+  - operator_capability_levels.md
   - credits.md
