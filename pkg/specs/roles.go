@@ -50,7 +50,7 @@ func CreateRole(cluster v1alpha1.Cluster) rbacv1.Role {
 				ResourceNames: []string{
 					cluster.GetCASecretName(),
 					cluster.GetServerSecretName(),
-					cluster.GetPostgresTLSSecretName(),
+					cluster.GetReplicationSecretName(),
 				},
 			},
 			{

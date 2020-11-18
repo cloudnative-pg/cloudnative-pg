@@ -50,15 +50,15 @@ func (r *InstanceReconciler) RefreshPostgresUserCertificate() error {
 		Resource: "secrets",
 	}).
 		Namespace(r.instance.Namespace).
-		Get(r.instance.ClusterName+apiv1alpha1.PostgresCertSecretSuffix, metav1.GetOptions{})
+		Get(r.instance.ClusterName+apiv1alpha1.ReplicationSecretSuffix, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
 	return r.refreshCertificateFilesFromObject(
 		unstructuredObject,
-		postgresSpec.PostgresCertificateLocation,
-		postgresSpec.PostgresKeyLocation)
+		postgresSpec.StreamingReplicaCertificateLocation,
+		postgresSpec.StreamingReplicaKeyLocation)
 }
 
 // RefreshCA get the latest certificates from the

@@ -25,10 +25,8 @@ local all all peer
 	// The content provided by the user is inserted before this text
 	hbaFooter = `
 # Require md5 authentication elsewhere
-hostssl all all all cert clientcert=1
 host all all all md5
 hostssl replication all all cert clientcert=1
-host replication all all md5
 `
 	// fixedConfigurationParameter are the configuration parameters
 	// whose value is managed by the operator and should not be changed
@@ -47,13 +45,13 @@ host replication all all md5
 	// ServerKeyLocation is the location where the private key is stored
 	ServerKeyLocation = "/tmp/server.key"
 
-	// PostgresCertificateLocation is the location where the certificate
+	// StreamingReplicaCertificateLocation is the location where the certificate
 	// of the "postgres" user is stored
-	PostgresCertificateLocation = "/tmp/postgres.crt"
+	StreamingReplicaCertificateLocation = "/tmp/streaming_replica.crt"
 
-	// PostgresKeyLocation is the location where the private key of
+	// StreamingReplicaKeyLocation is the location where the private key of
 	// the "postgres" user is stored
-	PostgresKeyLocation = "/tmp/postgres.key"
+	StreamingReplicaKeyLocation = "/tmp/streaming_replica.key"
 
 	// CACertificateLocation is the location where the CA certificate
 	// is stored, and this certificate will be use to authenticate

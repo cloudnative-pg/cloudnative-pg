@@ -62,15 +62,15 @@ func (r *ClusterReconciler) createPostgresPKI(ctx context.Context, cluster *v1al
 	}
 
 	// Generating postgres client certificate
-	postgresCertificateName := client.ObjectKey{
+	replicationSecretName := client.ObjectKey{
 		Namespace: cluster.GetNamespace(),
-		Name:      cluster.GetPostgresTLSSecretName(),
+		Name:      cluster.GetReplicationSecretName(),
 	}
 	err = r.ensureLeafCertificate(
 		ctx,
 		cluster,
-		postgresCertificateName,
-		"postgres",
+		replicationSecretName,
+		v1alpha1.StreamingReplicationUser,
 		caSecret,
 		certs.CertTypeClient)
 	if err != nil {

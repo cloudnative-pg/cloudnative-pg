@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	// PostgresCertSecretSuffix is the suffix appended to the cluster name to
-	// get the name of the PostgreSQL superuser secret
-	PostgresCertSecretSuffix = "-superuser-tls" // #nosec
+	// ReplicationSecretSuffix is the suffix appended to the cluster name to
+	// get the name of the generated replication secret for PostgreSQL
+	ReplicationSecretSuffix = "-replication" // #nosec
 
 	// SuperUserSecretSuffix is the suffix appended to the cluster name to
 	// get the name of the PostgreSQL superuser secret
@@ -32,9 +32,9 @@ const (
 	// the generated CA for the cluster
 	CaSecretSuffix = "-ca"
 
-	// ServerSecretSuffix is the seffix appended to the secret containing
+	// ServerSecretSuffix is the suffix appended to the secret containing
 	// the generated server secret for PostgreSQL
-	ServerSecretSuffix = "-tls"
+	ServerSecretSuffix = "-server"
 
 	// ServiceAnySuffix is the suffix appended to the cluster name to get the
 	// service name for every node (including non-ready ones)
@@ -48,6 +48,10 @@ const (
 	// the se service name for every node that you can use to read and write
 	// data
 	ServiceReadWriteSuffix = "-rw"
+
+	// StreamingReplicationUser is the name of the user we'll use for
+	// streaming replication purposes
+	StreamingReplicationUser = "streaming_replica"
 
 	// defaultPostgresUID is the default UID which is used by PostgreSQL
 	defaultPostgresUID = 26
@@ -462,9 +466,9 @@ func (cluster *Cluster) GetSuperuserSecretName() string {
 	return fmt.Sprintf("%v%v", cluster.Name, SuperUserSecretSuffix)
 }
 
-// GetPostgresTLSSecretName get the secret name of the PostgreSQL superuser
-func (cluster *Cluster) GetPostgresTLSSecretName() string {
-	return fmt.Sprintf("%v%v", cluster.Name, PostgresCertSecretSuffix)
+// GetReplicationSecretName get the name of the secret for the replication user
+func (cluster *Cluster) GetReplicationSecretName() string {
+	return fmt.Sprintf("%v%v", cluster.Name, ReplicationSecretSuffix)
 }
 
 // GetApplicationSecretName get the name of the secret of the application

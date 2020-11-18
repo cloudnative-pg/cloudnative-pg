@@ -33,7 +33,7 @@ var _ = Describe("PostgreSQL cluster type", func() {
 	})
 
 	It("correctly set the name of the secret containing the certificate for PostgreSQL", func() {
-		Expect(postgresql.GetServerSecretName()).To(Equal("clustername-tls"))
+		Expect(postgresql.GetServerSecretName()).To(Equal("clustername-server"))
 	})
 })
 

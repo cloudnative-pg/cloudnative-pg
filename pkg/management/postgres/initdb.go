@@ -17,6 +17,7 @@ import (
 
 	"github.com/lib/pq"
 
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
@@ -157,12 +158,19 @@ func (info InitInfo) GetInstance() Instance {
 	return postgresInstance
 }
 
-// ConfigureApplicationEnvironment creates the environment for an
-// application to run against this PostgreSQL instance given a connection pool
-func (info InitInfo) ConfigureApplicationEnvironment(db *sql.DB) error {
+// configureNewInstance creates the expected users and databases in a new
+// PostgreSQL instance
+func (info InitInfo) configureNewInstance(db *sql.DB) error {
 	_, err := db.Exec(fmt.Sprintf(
 		"CREATE USER %v",
 		pq.QuoteIdentifier(info.ApplicationUser)))
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(fmt.Sprintf(
+		"CREATE USER %v REPLICATION",
+		pq.QuoteIdentifier(v1alpha1.StreamingReplicationUser)))
 	if err != nil {
 		return err
 	}
@@ -172,19 +180,21 @@ func (info InitInfo) ConfigureApplicationEnvironment(db *sql.DB) error {
 		return err
 	}
 
-	_, err = db.Exec(fmt.Sprintf(
-		"ALTER USER %v PASSWORD %v",
-		pq.QuoteIdentifier(info.ApplicationUser),
-		pq.QuoteLiteral(ApplicationPassword)))
-	if err != nil {
-		return err
-	}
+	if info.ApplicationDatabase != "" {
+		_, err = db.Exec(fmt.Sprintf(
+			"ALTER USER %v PASSWORD %v",
+			pq.QuoteIdentifier(info.ApplicationUser),
+			pq.QuoteLiteral(ApplicationPassword)))
+		if err != nil {
+			return err
+		}
 
-	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
-		pq.QuoteIdentifier(info.ApplicationDatabase),
-		pq.QuoteIdentifier(info.ApplicationUser)))
-	if err != nil {
-		return err
+		_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
+			pq.QuoteIdentifier(info.ApplicationDatabase),
+			pq.QuoteIdentifier(info.ApplicationUser)))
+		if err != nil {
+			return err
+		}
 	}
 
 	_, err = db.Exec(fmt.Sprintf("ALTER SYSTEM SET cluster_name TO %v",
@@ -247,11 +257,9 @@ func (info InitInfo) Bootstrap() error {
 			return nil
 		}
 
-		if info.ApplicationDatabase != "" {
-			err = info.ConfigureApplicationEnvironment(db)
-			if err != nil {
-				return nil
-			}
+		err = info.configureNewInstance(db)
+		if err != nil {
+			return nil
 		}
 
 		if majorVersion >= 12 {
