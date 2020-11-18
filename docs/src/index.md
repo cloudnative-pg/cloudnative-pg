@@ -2,11 +2,11 @@
 
 **Cloud Native PostgreSQL** is a stack designed by [EnterpriseDB](https://www.enterprisedb.com)
 to manage [PostgreSQL](https://www.postgresql.org/) workloads on [Kubernetes](https://kubernetes.io),
-particularly optimised for Private Cloud environments with Local Persistent Volumes (PV).
+particularly optimised for private cloud environments with Local Persistent Volumes (PV).
 
 Cloud Native PostgreSQL defines a new Kubernetes resource called *Cluster* that
 represents a PostgreSQL cluster made up of a single primary and an optional number
-of replicas that co-exist in a chosen Kubernetes namespace.
+of High Availability replicas that co-exist in a chosen Kubernetes namespace.
 
 PostgreSQL 13, 12, 11 and 10 are currently supported.
 
@@ -14,7 +14,13 @@ Cloud Native PostgreSQL has also been certified for
 [RedHat OpenShift Container Platform (OCP)](https://www.openshift.com/products/container-platform)
 4.5+ and is available directly from the [RedHat Catalog](https://catalog.redhat.com/).
 OpenShift Container Platform is an open source distribution of Kubernetes which is
-maintained and commercially supported by Red Hat.
+[maintained and commercially supported](https://access.redhat.com/support/policy/updates/openshift#ocp4)
+by Red Hat.
+
+!!! IMPORTANT
+    Currently, based on the [Operator Capability Levels model](operator_capability_levels.md),
+    users can expect a **"Level III - Full Lifecycle"** set of capabilities from the
+    Cloud Native PostgreSQL Operator.
 
 ## Main features
 
@@ -31,7 +37,9 @@ maintained and commercially supported by Red Hat.
 * Support for Local Persistent Volumes with PVC templates
 * Reuse of Persistent Volumes storage in Pods
 * Rolling updates for PostgreSQL minor versions and operator upgrades
+* TLS connections and client certificate authentication
 * Continuous backup to an S3 compatible object store
+* Full recovery from an S3 compatible object store backup
 * Standard output logging of PostgreSQL error messages
 
 ## Requirements on Kubernetes

@@ -139,7 +139,7 @@ certification authority.
 
 ### TLS connections
 
-The operator transparently and natively supports using TLS/SSL connections
+The operator transparently and natively supports TLS/SSL connections
 to encrypt client/server communications for increased security using the
 cluster's certification authority.
 
@@ -299,8 +299,8 @@ preventing any disruption of the cluster service.
 
 While this strategy is correct for most Kubernetes Clusters, where
 storage is shared in all the worker nodes, it may not be the best solution
-for clusters using Local Storage or for clusters installed in a Private
-Cloud. The operator allows users to specify a Maintenance Window and to
+for clusters using Local Storage or for clusters installed in a private
+cloud. The operator allows users to specify a Maintenance Window and to
 configure the reaction to any underlying node eviction. The `ReusePVC` option
 in the maintenance window section enables to specify the strategy to be used:
 allocate new storage in a different PVC for the evicted instance or just wait
