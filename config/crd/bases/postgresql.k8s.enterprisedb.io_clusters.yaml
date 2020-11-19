@@ -24,6 +24,10 @@ spec:
     description: Cluster current status
     name: Status
     type: string
+  - JSONPath: .status.currentPrimary
+    description: Primary pod
+    name: Primary
+    type: string
   group: postgresql.k8s.enterprisedb.io
   names:
     kind: Cluster
