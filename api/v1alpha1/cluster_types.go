@@ -352,9 +352,9 @@ const (
 	EncryptionTypeNoneAWSKMS = "aws:kms"
 )
 
-// BackupConfiguration contains the backup configuration when the backup
-// is available
-type BackupConfiguration struct {
+// BarmanObjectStoreConfiguration contains the backup configuration
+// using Barman against an S3-compatible object storage
+type BarmanObjectStoreConfiguration struct {
 	// The credentials to use to upload data to S3
 	S3Credentials S3Credentials `json:"s3Credentials"`
 
@@ -377,6 +377,13 @@ type BackupConfiguration struct {
 
 	// The configuration to be used to backup the data files
 	Data *DataBackupConfiguration `json:"data,omitempty"`
+}
+
+// BackupConfiguration contains the backup configuration when the backup
+// is available
+type BackupConfiguration struct {
+	// The configuration for the barman-cloud tool suite
+	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
 }
 
 // WalBackupConfiguration is the configuration of the backup of the

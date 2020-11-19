@@ -65,7 +65,7 @@ type BarmanBackup struct {
 func (instance *Instance) Backup(
 	ctx context.Context,
 	client client.StatusClient,
-	configuration apiv1alpha1.BackupConfiguration,
+	configuration apiv1alpha1.BarmanObjectStoreConfiguration,
 	backup apiv1alpha1.BackupCommon,
 	log logr.Logger,
 ) error {

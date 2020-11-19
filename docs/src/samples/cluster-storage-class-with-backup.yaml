@@ -19,13 +19,14 @@ spec:
 
   # Backup properties
   backup:
-    destinationPath: s3://BUCKET_NAME/path/to/folder
-    s3Credentials:
-      accessKeyId:
-        name: aws-creds
-        key: ACCESS_KEY_ID
-      secretAccessKey:
-        name: aws-creds
-        key: ACCESS_SECRET_KEY
-    wal:
-      compression: gzip
+    barmanObjectStore:
+      destinationPath: s3://BUCKET_NAME/path/to/folder
+      s3Credentials:
+        accessKeyId:
+          name: aws-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: aws-creds
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip

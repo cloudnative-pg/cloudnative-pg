@@ -58,7 +58,7 @@ func WalRestoreCommand(args []string) {
 		os.Exit(1)
 	}
 
-	if cluster.Spec.Backup == nil || len(cluster.Spec.Backup.DestinationPath) == 0 {
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		// Backup not configured, skipping WAL
 		log.Log.V(4).Info("Skipping WAL restore, there is no backup configuration",
 			"walName", walName,
@@ -85,31 +85,33 @@ func WalRestoreCommand(args []string) {
 		os.Exit(1)
 	}
 
+	configuration := cluster.Spec.Backup.BarmanObjectStore
+
 	var options []string
-	if cluster.Spec.Backup.Wal != nil {
-		if len(cluster.Spec.Backup.Wal.Encryption) != 0 {
+	if configuration.Wal != nil {
+		if len(configuration.Wal.Encryption) != 0 {
 			options = append(
 				options,
 				"-e",
-				string(cluster.Spec.Backup.Wal.Encryption))
+				string(configuration.Wal.Encryption))
 		}
 	}
 
-	if len(cluster.Spec.Backup.EndpointURL) > 0 {
+	if len(configuration.EndpointURL) > 0 {
 		options = append(
 			options,
 			"--endpoint-url",
-			cluster.Spec.Backup.EndpointURL)
+			configuration.EndpointURL)
 	}
 
 	serverName := clusterName
-	if len(cluster.Spec.Backup.ServerName) != 0 {
-		serverName = cluster.Spec.Backup.ServerName
+	if len(configuration.ServerName) != 0 {
+		serverName = configuration.ServerName
 	}
 
 	options = append(
 		options,
-		cluster.Spec.Backup.DestinationPath,
+		configuration.DestinationPath,
 		serverName,
 		walName,
 		destinationPath)
