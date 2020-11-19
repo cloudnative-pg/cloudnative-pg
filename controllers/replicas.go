@@ -31,8 +31,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	status postgres.PostgresqlStatusList,
 ) error {
 	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
-
-	if len(status.Items) <= 1 {
+	if len(status.Items) <= 1 && cluster.Status.Instances <= 1 {
 		// Can't make a switchover of failover if we have
 		// less than two instances
 		return nil

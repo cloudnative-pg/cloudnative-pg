@@ -19,6 +19,10 @@ func DetectDanglingPVCs(
 	var result []string
 
 	for _, pvc := range pvcList {
+		if pvc.Status.Phase != corev1.ClaimPending &&
+			pvc.Status.Phase != corev1.ClaimBound {
+			continue
+		}
 		found := false
 
 		for idx := range podList {
