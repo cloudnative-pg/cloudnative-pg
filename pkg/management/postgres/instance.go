@@ -58,7 +58,7 @@ func (instance Instance) Startup() error {
 		"start",
 		"-w",
 		"-D", instance.PgData,
-		"-o", "-c port=5432",
+		"-o", "-c port=5432 -c unix_socket_directories=/var/run/postgresql",
 	}
 
 	// Add postmaster command line options
