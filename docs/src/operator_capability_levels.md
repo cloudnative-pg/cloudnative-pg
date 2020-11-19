@@ -131,9 +131,8 @@ Kubernetes API Server and the operator itself.
 ### Cluster's certification authority
 
 The operator automatically creates a certification authority for every PostgreSQL
-cluster, which is used to create TLS certificates for the authentication
-of streaming replication standby servers (instead of using passwords) and
-applications.
+cluster, which is used to issue and renew TLS certificates for the authentication
+of streaming replication standby servers and applications (instead of passwords).
 The Certification Authority of the Operator will be used to sign every cluster
 certification authority.
 
