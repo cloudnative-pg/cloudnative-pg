@@ -248,23 +248,22 @@ func (info InitInfo) Bootstrap() error {
 
 	majorVersion, err := postgres.GetMajorVersion(instance.PgData)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return instance.WithActiveInstance(func() error {
 		db, err := instance.GetSuperUserDB()
 		if err != nil {
-			return nil
+			return err
 		}
 
 		err = info.configureNewInstance(db)
 		if err != nil {
-			return nil
+			return err
 		}
 
 		if majorVersion >= 12 {
-			err = info.ConfigureReplica(db)
-			return err
+			return info.ConfigureReplica(db)
 		}
 
 		return nil
