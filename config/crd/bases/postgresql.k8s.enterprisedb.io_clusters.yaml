@@ -71,97 +71,102 @@ spec:
             backup:
               description: The configuration to be used for backups
               properties:
-                data:
-                  description: The configuration to be used to backup the data files
+                barmanObjectStore:
+                  description: The configuration for the barman-cloud tool suite
                   properties:
-                    compression:
-                      description: Whenever to compress files or not
-                      type: string
-                    encryption:
-                      description: Whenever to force the encryption of files (if the
-                        bucket is not already configured for that)
-                      type: string
-                    immediateCheckpoint:
-                      description: Whenever to force the initial checkpoint to be
-                        done as quickly as possible
-                      type: boolean
-                    jobs:
-                      description: The number of jobs to be used to upload the backup,
-                        defaults to 2
-                      format: int32
-                      type: integer
-                  type: object
-                destinationPath:
-                  description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
-                    this path, with different destination folders, will be used for
-                    WALs and for data
-                  minLength: 1
-                  type: string
-                endpointURL:
-                  description: Endpoint to be used to upload data to the cloud, overriding
-                    the automatic endpoint discovery
-                  type: string
-                s3Credentials:
-                  description: The credentials to use to upload data to S3
-                  properties:
-                    accessKeyId:
-                      description: The reference to the access key id
+                    data:
+                      description: The configuration to be used to backup the data
+                        files
                       properties:
-                        key:
-                          description: The key of the secret to select from.  Must
-                            be a valid secret key.
+                        compression:
+                          description: Whenever to compress files or not
                           type: string
-                        name:
-                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                        encryption:
+                          description: Whenever to force the encryption of files (if
+                            the bucket is not already configured for that)
                           type: string
-                        optional:
-                          description: Specify whether the Secret or its key must
-                            be defined
+                        immediateCheckpoint:
+                          description: Whenever to force the initial checkpoint to
+                            be done as quickly as possible
                           type: boolean
-                      required:
-                      - key
+                        jobs:
+                          description: The number of jobs to be used to upload the
+                            backup, defaults to 2
+                          format: int32
+                          type: integer
                       type: object
-                    secretAccessKey:
-                      description: The reference to the secret access key
+                    destinationPath:
+                      description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
+                        this path, with different destination folders, will be used
+                        for WALs and for data
+                      minLength: 1
+                      type: string
+                    endpointURL:
+                      description: Endpoint to be used to upload data to the cloud,
+                        overriding the automatic endpoint discovery
+                      type: string
+                    s3Credentials:
+                      description: The credentials to use to upload data to S3
                       properties:
-                        key:
-                          description: The key of the secret to select from.  Must
-                            be a valid secret key.
-                          type: string
-                        name:
-                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Add other useful fields. apiVersion, kind, uid?'
-                          type: string
-                        optional:
-                          description: Specify whether the Secret or its key must
-                            be defined
-                          type: boolean
+                        accessKeyId:
+                          description: The reference to the access key id
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                        secretAccessKey:
+                          description: The reference to the secret access key
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
                       required:
-                      - key
+                      - accessKeyId
+                      - secretAccessKey
+                      type: object
+                    serverName:
+                      description: The server name on S3, the cluster name is used
+                        if this parameter is omitted
+                      type: string
+                    wal:
+                      description: The configuration for the backup of the WAL stream
+                      properties:
+                        compression:
+                          description: Whenever to compress files or not
+                          type: string
+                        encryption:
+                          description: Whenever to force the encryption of files (if
+                            the bucket is not already configured for that)
+                          type: string
                       type: object
                   required:
-                  - accessKeyId
-                  - secretAccessKey
+                  - destinationPath
+                  - s3Credentials
                   type: object
-                serverName:
-                  description: The server name on S3, the cluster name is used if
-                    this parameter is omitted
-                  type: string
-                wal:
-                  description: The configuration for the backup of the WAL stream
-                  properties:
-                    compression:
-                      description: Whenever to compress files or not
-                      type: string
-                    encryption:
-                      description: Whenever to force the encryption of files (if the
-                        bucket is not already configured for that)
-                      type: string
-                  type: object
-              required:
-              - destinationPath
-              - s3Credentials
               type: object
             bootstrap:
               description: Instructions to bootstrap this cluster

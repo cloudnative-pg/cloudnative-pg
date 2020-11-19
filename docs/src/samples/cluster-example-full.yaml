@@ -67,23 +67,24 @@ spec:
     size: 1Gi
 
   backup:
-    destinationPath: s3://cluster-example-full-backup/
-    endpointURL: http://custom-endpoint:1234
-    s3Credentials:
-      accessKeyId:
-        name: backup-creds
-        key: ACCESS_KEY_ID
-      secretAccessKey:
-        name: backup-creds
-        key: ACCESS_SECRET_KEY
-    wal:
-      compression: gzip
-      encryption: AES256
-    data:
-      compression: gzip
-      encryption: AES256
-      immediateCheckpoint: false
-      jobs: 2
+    barmanObjectStore:
+      destinationPath: s3://cluster-example-full-backup/
+      endpointURL: http://custom-endpoint:1234
+      s3Credentials:
+        accessKeyId:
+          name: backup-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: backup-creds
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+        encryption: AES256
+      data:
+        compression: gzip
+        encryption: AES256
+        immediateCheckpoint: false
+        jobs: 2
 
   resources:
     requests:

@@ -57,7 +57,7 @@ func WalArchiveCommand(args []string) {
 		os.Exit(1)
 	}
 
-	if cluster.Spec.Backup == nil || len(cluster.Spec.Backup.DestinationPath) == 0 {
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		// Backup not configured, skipping WAL
 		log.Log.V(4).Info("Skipping WAL",
 			"walName", walName,
@@ -75,33 +75,35 @@ func WalArchiveCommand(args []string) {
 		return
 	}
 
+	configuration := cluster.Spec.Backup.BarmanObjectStore
+
 	var options []string
-	if cluster.Spec.Backup.Wal != nil {
-		if len(cluster.Spec.Backup.Wal.Compression) != 0 {
+	if configuration.Wal != nil {
+		if len(configuration.Wal.Compression) != 0 {
 			options = append(
 				options,
-				fmt.Sprintf("--%v", cluster.Spec.Backup.Wal.Compression))
+				fmt.Sprintf("--%v", configuration.Wal.Compression))
 		}
-		if len(cluster.Spec.Backup.Wal.Encryption) != 0 {
+		if len(configuration.Wal.Encryption) != 0 {
 			options = append(
 				options,
 				"-e",
-				string(cluster.Spec.Backup.Wal.Encryption))
+				string(configuration.Wal.Encryption))
 		}
 	}
-	if len(cluster.Spec.Backup.EndpointURL) > 0 {
+	if len(configuration.EndpointURL) > 0 {
 		options = append(
 			options,
 			"--endpoint-url",
-			cluster.Spec.Backup.EndpointURL)
+			configuration.EndpointURL)
 	}
 	serverName := clusterName
-	if len(cluster.Spec.Backup.ServerName) != 0 {
-		serverName = cluster.Spec.Backup.ServerName
+	if len(configuration.ServerName) != 0 {
+		serverName = configuration.ServerName
 	}
 	options = append(
 		options,
-		cluster.Spec.Backup.DestinationPath,
+		configuration.DestinationPath,
 		serverName,
 		flag.Arg(0))
 

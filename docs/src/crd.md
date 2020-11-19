@@ -144,7 +144,8 @@ For example, you can request an initial amount of RAM of 32MiB (scalable to 128M
 ## Backup configuration
 
 You can configure backup settings of an entire cluster through the following parameters
-available in the `backup` section of the `spec` key of the manifest:
+available in the `backup` section of the `spec` key of the manifest. This section allows many backup methods
+to be configured but for now we are only supporting the `barmanObjectStore` method, having the following parameters:
 
 - `s3Credentials`: credentials used to upload backup data to the object store
 - `destinationPath`: the path where to store the backup (i.e. s3://bucket/path/to/folder),

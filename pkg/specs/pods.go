@@ -469,7 +469,7 @@ func createPostgresContainers(
 // CreateAccessKeyIDEnvVar create the environment variable giving
 // the AWS access key ID
 func CreateAccessKeyIDEnvVar(backupConfiguration *v1alpha1.BackupConfiguration) corev1.EnvVar {
-	if backupConfiguration == nil {
+	if backupConfiguration == nil || backupConfiguration.BarmanObjectStore == nil {
 		return corev1.EnvVar{
 			Name:  "AWS_ACCESS_KEY_ID",
 			Value: "",
@@ -479,7 +479,7 @@ func CreateAccessKeyIDEnvVar(backupConfiguration *v1alpha1.BackupConfiguration) 
 	return corev1.EnvVar{
 		Name: "AWS_ACCESS_KEY_ID",
 		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &backupConfiguration.S3Credentials.AccessKeyIDReference,
+			SecretKeyRef: &backupConfiguration.BarmanObjectStore.S3Credentials.AccessKeyIDReference,
 		},
 	}
 }
@@ -487,7 +487,7 @@ func CreateAccessKeyIDEnvVar(backupConfiguration *v1alpha1.BackupConfiguration) 
 // CreateSecretAccessKeyEnvVar create the environment variable giving
 // the AWS access key ID
 func CreateSecretAccessKeyEnvVar(backupConfiguration *v1alpha1.BackupConfiguration) corev1.EnvVar {
-	if backupConfiguration == nil {
+	if backupConfiguration == nil || backupConfiguration.BarmanObjectStore == nil {
 		return corev1.EnvVar{
 			Name:  "AWS_SECRET_ACCESS_KEY",
 			Value: "",
@@ -497,7 +497,7 @@ func CreateSecretAccessKeyEnvVar(backupConfiguration *v1alpha1.BackupConfigurati
 	return corev1.EnvVar{
 		Name: "AWS_SECRET_ACCESS_KEY",
 		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &backupConfiguration.S3Credentials.SecretAccessKeyReference,
+			SecretKeyRef: &backupConfiguration.BarmanObjectStore.S3Credentials.SecretAccessKeyReference,
 		},
 	}
 }

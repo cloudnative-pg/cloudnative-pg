@@ -23,14 +23,15 @@ spec:
       owner: app
 
   backup:
-    destinationPath: s3://cluster-backups/
-    endpointURL: http://minio-service:9000
-    s3Credentials:
-      accessKeyId:
-        name: aws-creds
-        key: ACCESS_KEY_ID
-      secretAccessKey:
-        name: aws-creds
-        key: ACCESS_SECRET_KEY
-    wal:
-      compression: gzip
+    barmanObjectStore:
+        destinationPath: s3://cluster-backups/
+        endpointURL: http://minio-service:9000
+        s3Credentials:
+          accessKeyId:
+            name: aws-creds
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: aws-creds
+            key: ACCESS_SECRET_KEY
+        wal:
+          compression: gzip

@@ -53,14 +53,15 @@ kind: Cluster
 [...]
 spec:
   backup:
-    destinationPath: "<destination path here>"
-    s3Credentials:
-      accessKeyId:
-        name: aws-creds
-        key: ACCESS_KEY_ID
-      secretAccessKey:
-        name: aws-creds
-        key: ACCESS_SECRET_KEY
+    barmanObjectStore:
+      destinationPath: "<destination path here>"
+      s3Credentials:
+        accessKeyId:
+          name: aws-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: aws-creds
+          key: ACCESS_SECRET_KEY
 ```
 
 The destination path can be every URL pointing to a folder where
@@ -82,10 +83,11 @@ kind: Cluster
 [...]
 spec:
   backup:
-    destinationPath: "<destination path here>"
-    endpointURL: bucket.us-east1.linodeobjects.com
-    s3Credentials:
-      [...]
+    barmanObjectStore:
+      destinationPath: "<destination path here>"
+      endpointURL: bucket.us-east1.linodeobjects.com
+      s3Credentials:
+        [...]
 ```
 
 ### MinIO Gateway
@@ -193,16 +195,17 @@ kind: Cluster
 [...]
 spec:
   backup:
-    destinationPath: s3://BUCKET_NAME/
-    endpointURL: http://minio-gateway-service:9000
-    s3Credentials:
-      accessKeyId:
-        name: minio-creds
-        key: MINIO_ACCESS_KEY
-      secretAccessKey:
-        name: minio-creds
-        key: MINIO_SECRET_KEY
-  [...]
+    barmanObjectStore:
+      destinationPath: s3://BUCKET_NAME/
+      endpointURL: http://minio-gateway-service:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio-creds
+          key: MINIO_ACCESS_KEY
+        secretAccessKey:
+          name: minio-creds
+          key: MINIO_SECRET_KEY
+    [...]
 ```
 
 Verify on `s3://BUCKET_NAME/` the presence of archived WAL files before
@@ -325,10 +328,11 @@ kind: Cluster
 [...]
 spec:
   backup:
-    [...]
-    wal:
-      compression: gzip
-      encryption: AES256
+    barmanObjectStore:
+      [...]
+      wal:
+        compression: gzip
+        encryption: AES256
 ```
 
 The encryption can be configured directly in your bucket, and if

@@ -92,7 +92,7 @@ func requestBackup(typedClient client.Client, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if cluster.Spec.Backup == nil || len(cluster.Spec.Backup.DestinationPath) == 0 {
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		http.Error(w, "Backup not configured in the cluster", http.StatusConflict)
 		return
 	}
@@ -104,7 +104,7 @@ func requestBackup(typedClient client.Client, w http.ResponseWriter, r *http.Req
 	err = instance.Backup(
 		ctx,
 		typedClient,
-		*cluster.Spec.Backup,
+		*cluster.Spec.Backup.BarmanObjectStore,
 		&backup,
 		backupLog)
 	if err != nil {
