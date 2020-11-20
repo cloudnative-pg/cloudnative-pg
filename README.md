@@ -77,17 +77,9 @@ make licenses
   [Jenkins](https://ci.2ndquadrant.com/jenkins/job/cloud-native-postgresql-docs/job/cloud-native-postgresql-docs/)
   (you can reuse an existing release build task and change the tag name).
 
-* Add the new release to `releases.map` in the [k8s-release
-  repo](https://gitlab.2ndquadrant.com/release/k8s) and update the
-  metadata about the latest image:
+* Upload the images on the Quay.io repository
 
 ```
-# CNP <VERSION>
-k8s/cloud-native-postgresql:<VERSION>=cloud-native-postgresql-operator:<VERSION>
-
-# Meta
-k8s/cloud-native-postgresql:<VERSION>=cloud-native-postgresql-operator:latest
+skopeo copy docker://internal.2ndq.io/k8s/cloud-native-postgresql:v0.2.0 docker://quay.io/enterprisedb/cloud-native-postgresql:v0.2.0
+skopeo copy docker://internal.2ndq.io/k8s/cloud-native-postgresql:v0.2.0 docker://quay.io/enterprisedb/cloud-native-postgresql:latest
 ```
-
-  When you commit the new file GitLab will copy the images to the production
-  repository.
