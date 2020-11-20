@@ -69,8 +69,13 @@ archive_mode = 'on'
 archive_timeout = '5min'
 full_page_writes = 'on'
 hot_standby = 'true'
+listen_addresses = '*'
 port = '5432'
-ssl = 'off'
+ssl = 'on'
+ssl_ca_file = '/tmp/ca.crt'
+ssl_cert_file = '/tmp/server.crt'
+ssl_key_file = '/tmp/server.key'
+unix_socket_directories = '/var/run/postgresql'
 wal_level = 'logical'
 wal_log_hints = 'on'
 ```
@@ -78,11 +83,6 @@ wal_log_hints = 'on'
 Since the fixed parameters are added last, they can't be overridden by the
 user via the YAML configuration. Those parameters are required for correct WAL
 archiving and replication.
-
-!!! Important
-    The `parameters` value in the `Cluster` definition is used only during cluster
-    creation. Changing it after cluster creation currently has no
-    effect on the cluster.
 
 ### Replication settings
 
@@ -117,7 +117,7 @@ Default rules:
 
 ```text
 host all all all md5
-host replication all all md5
+hostssl replication all all cert certclient=1
 ```
 
 The resulting `pg_hba.conf` will look like this:
@@ -126,12 +126,100 @@ The resulting `pg_hba.conf` will look like this:
 local all all peer
 <user defined rules>
 host all all all md5
-host replication all all md5
+hostssl replication all all cert clientcert=1
 ```
 
-!!! Important
-    The `pg_hba` value in the `Cluster` definition is used only during cluster
-    creation. Changing it after cluster creation currently has no
-    effect on the cluster.
-
 Refer to the PostgreSQL documentation for [more information on `pg_hba.conf`](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html).
+
+## Changing configuration
+
+Configuration changes can be applied editing the `postgresql` section of
+the `Cluster` resource.
+
+After the change, the cluster instances will immediately reload the
+configuration to apply the changes.
+If the change involves a parameter requiring a restart, the
+following behaviour will depend on the amount of istances in the cluster:
+
+- If there is a single instance, that instance is restarted.
+- If there more than one instance, the standbys are restarted and a switchover
+  on a restarted standby is performed. Finally, the former primary is restarted.
+
+## Fixed parameters
+
+Some PostgreSQL configuration parameters should be managed exclusively by the
+operator. The operator prevents the user from setting them using a webhook.
+
+Users are not allowed to set the following configuration parameters in the
+`postgresql` section:
+
+- `allow_system_table_mods`
+- `archive_cleanup_command`
+- `archive_command`
+- `archive_mode`
+- `archive_timeout`
+- `bonjour_name`
+- `bonjour`
+- `cluster_name`
+- `config_file`
+- `data_directory`
+- `data_sync_retry`
+- `dynamic_shared_memory_type`
+- `event_source`
+- `external_pid_file`
+- `full_page_writes`
+- `hba_file`
+- `hot_standby`
+- `huge_pages`
+- `ident_file`
+- `jit_provider`
+- `listen_addresses`
+- `log_destination`
+- `log_directory`
+- `log_file_mode`
+- `log_filename`
+- `log_rotation_age`
+- `log_rotation_size`
+- `log_truncate_on_rotation`
+- `logging_collector`
+- `port`
+- `primary_conninfo`
+- `primary_slot_name`
+- `promote_trigger_file`
+- `recovery_end_command`
+- `recovery_min_apply_delay`
+- `recovery_target_action`
+- `recovery_target_inclusive`
+- `recovery_target_lsn`
+- `recovery_target_name`
+- `recovery_target_time`
+- `recovery_target_timeline`
+- `recovery_target_xid`
+- `recovery_target`
+- `restart_after_crash`
+- `restore_command`
+- `shared_memory_type`
+- `ssl_ca_file`
+- `ssl_cert_file`
+- `ssl_ciphers`
+- `ssl_crl_file`
+- `ssl_dh_params_file`
+- `ssl_ecdh_curve`
+- `ssl_key_file`
+- `ssl_max_protocol_version`
+- `ssl_min_protocol_version`
+- `ssl_passphrase_command_supports_reload`
+- `ssl_passphrase_command`
+- `ssl_prefer_server_ciphers`
+- `ssl`
+- `stats_temp_directory`
+- `synchronous_standby_names`
+- `syslog_facility`
+- `syslog_ident`
+- `syslog_sequence_numbers`
+- `syslog_split_messages`
+- `unix_socket_directories`
+- `unix_socket_group`
+- `unix_socket_permissions`
+- `wal_level`
+- `wal_log_hints`
