@@ -86,7 +86,7 @@ kind_e2e:
     DOCKER_REGISTRY_MIRROR: https://ci-dockerhub-proxy.2ndquadrant.com
   parallel:
     matrix:
-      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:13
+      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:13.1
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:13.0
         K8S_VERSION:
           - v1.19.1
@@ -94,15 +94,15 @@ kind_e2e:
           - v1.17.11
           - v1.16.9
           - v1.15.12
-      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:12
+      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:12.5
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:12.4
         K8S_VERSION:
           - v1.19.1
-      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:11
+      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:11.10
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:11.9
         K8S_VERSION:
           - v1.19.1
-      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:10
+      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:10.15
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:10.14
         K8S_VERSION:
           - v1.19.1
@@ -131,12 +131,12 @@ gke_e2e:
     ZONE: europe-west3-a
   parallel:
     matrix:
-      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:13
+      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:13.1
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:13.0
         K8S_VERSION:
-          - 1.17.9-gke.1504
-          - 1.16.13-gke.401
-          - 1.15.12-gke.20
+          - 1.18.10-gke.2101
+          - 1.17.13-gke.1400
+          - 1.16.15-gke.4300
   script:
     - export CONTROLLER_IMG="${TARGET_IMAGE}"
     - apk add go make gettext
@@ -185,7 +185,7 @@ eks_e2e:
     REGION: eu-central-1
   parallel:
     matrix:
-      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:13
+      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:13.1
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:13.0
         K8S_VERSION:
           - "1.17"
@@ -237,7 +237,7 @@ aks_e2e:
     E2E_DEFAULT_STORAGE_CLASS: default
   parallel:
     matrix:
-      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:13
+      - POSTGRES_IMG: quay.io/enterprisedb/postgresql:13.1
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:13.0
         K8S_VERSION:
           - "1.18.8"
