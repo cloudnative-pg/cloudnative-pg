@@ -72,6 +72,8 @@ spec:
 If the application database name is not specified, a database named `app` will be created. If the owner of the database
 is not specified, the name of the database will be used for that.
 
+More information about this section can be found in the ["Bootstrap" page](bootstrap.md).
+
 ### `fullRecovery`
 
 ```yaml

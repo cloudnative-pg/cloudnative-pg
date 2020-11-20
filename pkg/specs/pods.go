@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/kballard/go-shellquote"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -50,6 +51,13 @@ func CreatePrimaryPodViaInitdb(cluster v1alpha1.Cluster, nodeSerial int32) *core
 		"init",
 		"-pw-file", "/etc/superuser-secret/password",
 		"-parent-node", cluster.GetServiceReadWriteName(),
+	}
+
+	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.InitDB != nil {
+		initCommand = append(
+			initCommand,
+			"--initdb-flags",
+			shellquote.Join(cluster.Spec.Bootstrap.InitDB.Options...))
 	}
 
 	volumeMounts := []corev1.VolumeMount{

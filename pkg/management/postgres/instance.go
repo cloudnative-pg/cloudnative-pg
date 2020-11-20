@@ -169,7 +169,7 @@ func (instance Instance) Run() (*exec.Cmd, error) {
 func (instance Instance) WithActiveInstance(inner func() error) error {
 	err := instance.Startup()
 	if err != nil {
-		return errors.Wrap(err, "Error while activating instance")
+		return fmt.Errorf("while activating instance: %w", err)
 	}
 	defer func() {
 		if err := instance.Shutdown(); err != nil {

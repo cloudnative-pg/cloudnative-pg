@@ -121,6 +121,31 @@ relies on the superuser to reconcile the cluster with the desired status.
     For now changes to the name of the superuser secret are not applied
     to the cluster.
 
+The actual PostgreSQL data directory is created via an invocation of the
+`initdb` PostgreSQL command. If you need to add custom options to that
+command (i.e. to change the locale used for the template databases or to
+add data checksums), you can add them to the `options` section like in
+the following example:
+
+```
+apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-example-initdb
+spec:
+  instances: 3
+
+  bootstrap:
+    initdb:
+      database: appdb
+      owner: appuser
+      options:
+      - "-k"
+      - "--locale=en_US"
+  storage:
+    size: 1Gi
+```
+
 ## fullRecovery
 
 The `fullRecovery` bootstrap mode lets you create a new cluster from
