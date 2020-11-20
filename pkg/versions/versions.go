@@ -12,7 +12,7 @@ import "os"
 
 const (
 	// Version is the version of the operator
-	Version = "0.4.0"
+	Version = "0.5.0"
 
 	// DefaultImageName is the image used by default by the operator to create
 	// pods.
@@ -20,7 +20,7 @@ const (
 
 	// DefaultOperatorImageName used to bootstrap the controller in the Pods running
 	// PostgreSQL
-	DefaultOperatorImageName = "quay.io/enterprisedb/cloud-native-postgresql:v0.4.0"
+	DefaultOperatorImageName = "quay.io/enterprisedb/cloud-native-postgresql:v0.5.0"
 
 	// postgresImageNameEnvVar is the environment variable that allow overriding the default image used
 	// for PostgreSQL
