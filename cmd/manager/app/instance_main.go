@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/kballard/go-shellquote"
+
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/internal/management/controller"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
@@ -38,6 +40,7 @@ func InstanceManagerCommand(args []string) {
 	var clusterName string
 	var backupName string
 	var namespace string
+	var initDBFlagsString string
 
 	initCommand := flag.NewFlagSet("init", flag.ExitOnError)
 	initCommand.StringVar(&pwFile, "pw-file", "",
@@ -54,6 +57,8 @@ func InstanceManagerCommand(args []string) {
 		"current cluster in k8s, used to coordinate switchover and failover")
 	initCommand.StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and of the Pod in k8s")
+	initCommand.StringVar(&initDBFlagsString, "initdb-flags", "", "The list of flags to be passed "+
+		"to initdb while creating the initial database")
 
 	joinCommand := flag.NewFlagSet("join", flag.ExitOnError)
 	joinCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
@@ -104,6 +109,12 @@ func InstanceManagerCommand(args []string) {
 	case "init":
 		// Ignore errors; initCommand is set for ExitOnError.
 		_ = initCommand.Parse(args[1:])
+		initDBFlags, err := shellquote.Split(initDBFlagsString)
+		if err != nil {
+			log.Log.Error(err, "Error while parsing initdb flags")
+			os.Exit(1)
+		}
+
 		info := postgres.InitInfo{
 			PgData:                  pgData,
 			PasswordFile:            pwFile,
@@ -113,6 +124,7 @@ func InstanceManagerCommand(args []string) {
 			ParentNode:              parentNode,
 			ClusterName:             clusterName,
 			Namespace:               namespace,
+			InitDBOptions:           initDBFlags,
 		}
 
 		initSubCommand(info)

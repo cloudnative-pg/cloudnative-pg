@@ -195,6 +195,12 @@ spec:
                     database:
                       description: Name of the database used by the application.
                       type: string
+                    options:
+                      description: The list of options that must be passed to initdb
+                        when creating the cluster
+                      items:
+                        type: string
+                      type: array
                     owner:
                       description: Name of the owner of the database in the instance
                         to be used by applications.

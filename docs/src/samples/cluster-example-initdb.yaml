@@ -9,6 +9,8 @@ spec:
     initdb:
       database: appdb
       owner: appuser
-
+      options:
+      - "-k"
+      - "--locale=en_US"
   storage:
     size: 1Gi

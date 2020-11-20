@@ -276,6 +276,10 @@ type BootstrapInitDB struct {
 	// created from scratch
 	// +optional
 	Secret *corev1.LocalObjectReference `json:"secret,omitempty"`
+
+	// The list of options that must be passed to initdb
+	// when creating the cluster
+	Options []string `json:"options,omitempty"`
 }
 
 // BootstrapFullRecovery is the configuration of the bootstrap process

@@ -12,6 +12,7 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"os/exec"
 	"path"
 
@@ -52,6 +53,10 @@ type InitInfo struct {
 
 	// The name of the backup to recover
 	BackupName string
+
+	// The list options that should be passed to initdb to
+	// create the cluster
+	InitDBOptions []string
 }
 
 const (
@@ -107,6 +112,9 @@ func (info InitInfo) CreateDataDirectory() error {
 		"--no-sync",
 	}
 
+	// Add custom initdb options from the user
+	options = append(options, info.InitDBOptions...)
+
 	if info.PasswordFile != "" {
 		options = append(options,
 			"--pwfile",
@@ -119,9 +127,10 @@ func (info InitInfo) CreateDataDirectory() error {
 		"initDbOptions", options)
 
 	cmd := exec.Command("initdb", options...) // #nosec
-	stdOutErr, err := cmd.CombinedOutput()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
 	if err != nil {
-		log.Log.Info("initdb output", "output", stdOutErr)
 		return fmt.Errorf("error while creating the PostgreSQL instance: %w", err)
 	}
 
@@ -175,20 +184,25 @@ func (info InitInfo) configureNewInstance(db *sql.DB) error {
 		return err
 	}
 
-	ApplicationPassword, err := fileutils.ReadFile(info.ApplicationPasswordFile)
+	status, err := fileutils.FileExists(info.ApplicationPasswordFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("while reading application password file: %w", err)
 	}
-
-	if info.ApplicationDatabase != "" {
+	if status {
+		applicationPassword, err := fileutils.ReadFile(info.ApplicationPasswordFile)
+		if err != nil {
+			return fmt.Errorf("while reading application password file: %w", err)
+		}
 		_, err = db.Exec(fmt.Sprintf(
 			"ALTER USER %v PASSWORD %v",
 			pq.QuoteIdentifier(info.ApplicationUser),
-			pq.QuoteLiteral(ApplicationPassword)))
+			pq.QuoteLiteral(applicationPassword)))
 		if err != nil {
 			return err
 		}
+	}
 
+	if info.ApplicationDatabase != "" {
 		_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
 			pq.QuoteIdentifier(info.ApplicationDatabase),
 			pq.QuoteIdentifier(info.ApplicationUser)))
@@ -248,22 +262,25 @@ func (info InitInfo) Bootstrap() error {
 
 	majorVersion, err := postgres.GetMajorVersion(instance.PgData)
 	if err != nil {
-		return err
+		return fmt.Errorf("while reading major version: %w", err)
 	}
 
 	return instance.WithActiveInstance(func() error {
 		db, err := instance.GetSuperUserDB()
 		if err != nil {
-			return err
+			return fmt.Errorf("while creating superuser: %w", err)
 		}
 
 		err = info.configureNewInstance(db)
 		if err != nil {
-			return err
+			return fmt.Errorf("while configuring new instance: %w", err)
 		}
 
 		if majorVersion >= 12 {
-			return info.ConfigureReplica(db)
+			err = info.ConfigureReplica(db)
+			if err != nil {
+				return fmt.Errorf("while configuring replica: %w", err)
+			}
 		}
 
 		return nil
