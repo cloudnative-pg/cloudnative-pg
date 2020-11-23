@@ -29,9 +29,7 @@ func Run(command string) (stdout string, stderr string, err error) {
 	cmd := exec.Command(tokens[0], tokens[1:]...)
 	cmd.Stdout, cmd.Stderr = &outBuffer, &errBuffer
 	if err = cmd.Run(); err != nil {
-		log.Printf("Error executing command `%v`\nerr: %v\nstdout: %v\nstderr: %v\n",
-			command, err, outBuffer.String(), errBuffer.String())
-		return "", "", err
+		return "", errBuffer.String(), err
 	}
 
 	return outBuffer.String(), errBuffer.String(), nil

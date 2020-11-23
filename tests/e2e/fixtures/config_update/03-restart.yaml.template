@@ -1,0 +1,30 @@
+# Example of PostgreSQL cluster using a storage class
+apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+kind: Cluster
+metadata:
+  name: postgresql-storage-class
+spec:
+  instances: 3
+
+  postgresql:
+    parameters:
+      work_mem: "8MB"
+      shared_buffers: "256MB"
+    pg_hba:
+      - host all all all trust
+  # Example of rolling update strategy:
+  # - unsupervised: automated update of the primary once all
+  #                 replicas have been upgraded (default)
+  # - supervised: requires manual supervision to perform
+  #               the switchover of the primary
+  primaryUpdateStrategy: unsupervised
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
