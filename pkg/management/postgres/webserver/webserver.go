@@ -15,12 +15,15 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/postgres"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/postgres/metrics"
 )
 
 var instance *postgres.Instance
@@ -118,7 +121,7 @@ func requestBackup(typedClient client.Client, w http.ResponseWriter, r *http.Req
 	_, _ = fmt.Fprint(w, "OK")
 }
 
-// ListenAndServe starts a the web server handling probes
+// ListenAndServe starts a the web server handling probes and metrics
 func ListenAndServe(serverInstance *postgres.Instance) error {
 	instance = serverInstance
 
@@ -136,6 +139,16 @@ func ListenAndServe(serverInstance *postgres.Instance) error {
 			requestBackup(typedClient, w, r)
 		},
 	)
+
+	// create the exporter and serve it on the /metrics endpoint
+	registry := prometheus.NewRegistry()
+	if err = registry.Register(metrics.NewExporter(instance)); err != nil {
+		return fmt.Errorf("while registering PostgreSQL exporters: %w", err)
+	}
+	if err = registry.Register(prometheus.NewGoCollector()); err != nil {
+		return fmt.Errorf("while registering Go exporters: %w", err)
+	}
+	serveMux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 
 	server = &http.Server{Addr: ":8000", Handler: serveMux}
 	err = server.ListenAndServe()
