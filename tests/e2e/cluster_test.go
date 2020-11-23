@@ -865,6 +865,7 @@ var _ = Describe("Cluster", func() {
 			})
 		})
 	})
+
 	Context("PVC Deletion", func() {
 		const namespace = "cluster-pvc-deletion"
 		const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
@@ -1089,7 +1090,7 @@ var _ = Describe("Cluster", func() {
 
 				mcName := "mc"
 				timeout := 30
-				Eventually(func() (int, error) {
+				Eventually(func() (int, error, error) {
 					// In the fixture WALs are compressed with gzip
 					findCmd := fmt.Sprintf(
 						"sh -c 'mc find  minio --name %v.gz | wc -l'",
@@ -1099,10 +1100,9 @@ var _ = Describe("Cluster", func() {
 						namespace,
 						mcName,
 						findCmd))
-					if err != nil {
-						return 0, err
-					}
-					return strconv.Atoi(strings.Trim(out, "\n"))
+
+					value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
+					return value, atoiErr, err
 				}, timeout).Should(BeEquivalentTo(1))
 			})
 
@@ -1130,17 +1130,15 @@ var _ = Describe("Cluster", func() {
 				// A file called data.tar should be available on minio
 				mcName := "mc"
 				timeout = 30
-				Eventually(func() (int, error) {
+				Eventually(func() (int, error, error) {
 					findCmd := "sh -c 'mc find  minio --name data.tar | wc -l'"
 					out, _, err := tests.Run(fmt.Sprintf(
 						"kubectl exec -n %v %v -- %v",
 						namespace,
 						mcName,
 						findCmd))
-					if err != nil {
-						return 0, err
-					}
-					return strconv.Atoi(strings.Trim(out, "\n"))
+					value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
+					return value, atoiErr, err
 				}, timeout).Should(BeEquivalentTo(1))
 			})
 
@@ -1268,4 +1266,208 @@ var _ = Describe("Cluster", func() {
 			})
 		})
 	})
+
+	Context("Configuration update", func() {
+		// Gather the current list of pods in a given cluster
+		AssertGetPodList := func(namespace string, clusterName string) (*corev1.PodList, error) {
+			podList := &corev1.PodList{}
+			err := env.Client.List(
+				env.Ctx, podList, ctrlclient.InNamespace(namespace),
+				ctrlclient.MatchingLabels{"postgresql": clusterName},
+			)
+			Expect(err).ToNot(HaveOccurred())
+			return podList, err
+		}
+
+		It("can manage cluster configuration changes", func() {
+			// Cluster identifiers
+			const namespace = "cluster-update-config-e2e"
+			const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
+			const clusterName = "postgresql-storage-class"
+			// Create a cluster in a namespace we'll delete after the test
+			if err := env.CreateNamespace(namespace); err != nil {
+				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
+			}
+			defer func() {
+				if err := env.DeleteNamespace(namespace); err != nil {
+					Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
+				}
+			}()
+			AssertCreateCluster(namespace, clusterName, sampleFile)
+
+			By("reloading Pg when a parameter requring reload is modified", func() {
+				sample := fixturesDir + "/config_update/01-reload.yaml"
+				podList, _ := AssertGetPodList(namespace, clusterName)
+				// Update the configuration
+				_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+				Expect(err).ToNot(HaveOccurred())
+				timeout := 60
+				commandtimeout := time.Second * 2
+				// Check that the parameter has been modified in every pod
+				for _, pod := range podList.Items {
+					pod := pod // pin the variable
+					Eventually(func() (int, error, error) {
+						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+							"psql", "-U", "postgres", "-tAc", "show work_mem")
+						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
+						return value, atoiErr, err
+					}, timeout).Should(BeEquivalentTo(8))
+				}
+			})
+			By("reloading Pg when pg_hba rules are modified", func() {
+				sample := fixturesDir + "/config_update/02-pg_hba_reload.yaml"
+				endpointName := clusterName + "-rw"
+				timeout := 60
+				commandtimeout := time.Second * 2
+				// Connection should fail now because we are not supplying a password
+				podList, _ := AssertGetPodList(namespace, clusterName)
+				stdout, _, err := env.ExecCommand(env.Ctx, podList.Items[0], "postgres", &commandtimeout,
+					"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1")
+				Expect(err).To(HaveOccurred())
+				// Update the configuration
+				_, _, err = tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+				Expect(err).ToNot(HaveOccurred())
+				// The new pg_hba rule should be present in every pod
+				for _, pod := range podList.Items {
+					pod := pod // pin the variable
+					Eventually(func() (string, error) {
+						stdout, _, err = env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+							"psql", "-U", "postgres", "-tAc",
+							"select auth_method from pg_hba_file_rules where auth_method = 'trust';")
+						return strings.Trim(stdout, "\n"), err
+					}, timeout).Should(BeEquivalentTo("trust"))
+				}
+				// The connection should work now
+				Eventually(func() (int, error, error) {
+					stdout, _, err = env.ExecCommand(env.Ctx, podList.Items[0], "postgres", &commandtimeout,
+						"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1")
+					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
+					return value, atoiErr, err
+				}, timeout).Should(BeEquivalentTo(1))
+			})
+			By("restarting and switching Pg when a parameter requring restart is modified", func() {
+				sample := fixturesDir + "/config_update/03-restart.yaml"
+				podList, _ := AssertGetPodList(namespace, clusterName)
+				// Gather current primary
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				cr := &clusterv1alpha1.Cluster{}
+				if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
+					Fail("Unable to get Cluster " + clusterName)
+				}
+				Expect(cr.Status.CurrentPrimary).To(BeEquivalentTo(cr.Status.TargetPrimary))
+				oldPrimary := cr.Status.CurrentPrimary
+				// Update the configuration
+				_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+				Expect(err).ToNot(HaveOccurred())
+				timeout := 300
+				commandtimeout := time.Second * 2
+				// Check that the new parameter has been modified in every pod
+				for _, pod := range podList.Items {
+					pod := pod
+					Eventually(func() (int, error, error) {
+						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+							"psql", "-U", "postgres", "-tAc", "show shared_buffers")
+						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
+						return value, atoiErr, err
+					}, timeout).Should(BeEquivalentTo(256))
+				}
+				// Check that a switchover happened
+				Eventually(func() string {
+					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
+						Fail("Unable to get Cluster " + clusterName)
+					}
+					return cr.Status.CurrentPrimary
+				}, timeout).ShouldNot(BeEquivalentTo(oldPrimary))
+			})
+			By("restarting and switching Pg when mixed parameters are modified", func() {
+				sample := fixturesDir + "/config_update/04-mixed-params.yaml"
+				podList, _ := AssertGetPodList(namespace, clusterName)
+				// Gather current primary
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				cr := &clusterv1alpha1.Cluster{}
+				if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
+					Fail("Unable to get Cluster " + clusterName)
+				}
+				Expect(cr.Status.CurrentPrimary).To(BeEquivalentTo(cr.Status.TargetPrimary))
+				oldPrimary := cr.Status.CurrentPrimary
+				// Update the configuration
+				_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+				Expect(err).ToNot(HaveOccurred())
+				timeout := 300
+				commandtimeout := time.Second * 2
+				// Check that both parameters have been modified in each pod
+				for _, pod := range podList.Items {
+					pod := pod // pin the variable
+					Eventually(func() (int, error, error) {
+						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+							"psql", "-U", "postgres", "-tAc", "show max_replication_slots")
+						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
+						return value, atoiErr, err
+					}, timeout).Should(BeEquivalentTo(16))
+
+					Eventually(func() (int, error, error) {
+						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+							"psql", "-U", "postgres", "-tAc", "show maintenance_work_mem")
+						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
+						return value, atoiErr, err
+					}, timeout).Should(BeEquivalentTo(128))
+				}
+				// Check that a switchover happened
+				Eventually(func() string {
+					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
+						Fail("Unable to get Cluster " + clusterName)
+					}
+					return cr.Status.CurrentPrimary
+				}, timeout).ShouldNot(BeEquivalentTo(oldPrimary))
+			})
+			By("Erroring out when a fixedConfigurationParameter is modified", func() {
+				sample := fixturesDir + "/config_update/05-fixed-params.yaml"
+				// Update the configuration
+				_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+				// Expecting an error when a fixedConfigurationParameter is modified
+				Expect(err).To(HaveOccurred())
+				podList, _ := AssertGetPodList(namespace, clusterName)
+				timeout := 60
+				commandtimeout := time.Second * 2
+				// Expect other config parameters applied together with a fixedParameter to not have changed
+				for _, pod := range podList.Items {
+					pod := pod // pin the variable
+					Eventually(func() (int, error, error) {
+						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+							"psql", "-U", "postgres", "-tAc", "show autovacuum_max_workers")
+						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
+						return value, atoiErr, err
+					}, timeout).ShouldNot(BeEquivalentTo(4))
+				}
+			})
+			By("Erroring out when a blockedConfigurationParameter is modified", func() {
+				sample := fixturesDir + "/config_update/06-blocked-params.yaml"
+				// Update the configuration
+				_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+				// Expecting an error when a blockedConfigurationParameter is modified
+				Expect(err).To(HaveOccurred())
+				podList, _ := AssertGetPodList(namespace, clusterName)
+				timeout := 60
+				commandtimeout := time.Second * 2
+				// Expect other config parameters applied together with a blockedParameter to not have changed
+				for _, pod := range podList.Items {
+					pod := pod
+					Eventually(func() (int, error, error) {
+						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+							"psql", "-U", "postgres", "-tAc", "show autovacuum_max_workers")
+						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
+						return value, atoiErr, err
+					}, timeout).ShouldNot(BeEquivalentTo(4))
+				}
+			})
+		})
+
+	})
+
 })
