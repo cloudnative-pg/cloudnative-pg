@@ -83,8 +83,6 @@ sed -i "s/postgresql-operator-[0-9.]*.yaml/postgresql-operator-${release_version
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
 (
-    cd "${CONFIG_TMP_DIR}/default"
-    "${KUSTOMIZE}" edit add patch manager_image_pull_secret.yaml
     cd "${CONFIG_TMP_DIR}/manager"
     "${KUSTOMIZE}" edit set image controller="quay.io/enterprisedb/cloud-native-postgresql:v${release_version}"
 )
