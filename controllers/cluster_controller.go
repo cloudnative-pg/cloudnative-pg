@@ -12,6 +12,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +27,7 @@ import (
 const (
 	podOwnerKey = ".metadata.controller"
 	pvcOwnerKey = ".metadata.controller"
+	jobOwnerKey = ".metadata.controller"
 )
 
 var (
@@ -48,6 +50,7 @@ type ClusterReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
+// +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;create;delete;update;patch;list;watch
@@ -91,15 +94,9 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Update the status of this resource
-	childPods, err := r.getManagedPods(ctx, cluster)
+	resources, err := r.getManagedResources(ctx, cluster)
 	if err != nil {
-		log.Error(err, "Cannot extract the list of managed Pods")
-		return ctrl.Result{}, err
-	}
-
-	childPVCs, err := r.getManagedPVCs(ctx, cluster)
-	if err != nil {
-		log.Error(err, "Cannot extract the list of managed PVCs")
+		log.Error(err, "Cannot extract the list of managed resources")
 		return ctrl.Result{}, err
 	}
 
@@ -112,7 +109,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Update the status section of this Cluster resource
-	if err = r.updateResourceStatus(ctx, &cluster, childPods, childPVCs); err != nil {
+	if err = r.updateResourceStatus(ctx, &cluster, resources.pods, resources.pvcs); err != nil {
 		if apierrs.IsConflict(err) {
 			// Let's wait for another reconciler loop, since the
 			// status already changed
@@ -122,6 +119,15 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
 	}
 
+	// If we are joining a node, we should wait for the process to finish
+	if resources.countRunningJobs() > 0 {
+		log.V(2).Info("Waiting for jobs to finish",
+			"clusterName", cluster.Name,
+			"namespace", cluster.Namespace,
+			"jobs", resources.jobs.Items)
+		return ctrl.Result{}, nil
+	}
+
 	// Ensure we have the required global objects
 	if err := r.createPostgresClusterObjects(ctx, &cluster); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot create Cluster auxiliary objects: %w", err)
@@ -129,7 +135,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	// Get the replication status
 	var instancesStatus postgres.PostgresqlStatusList
-	if instancesStatus, err = r.getStatusFromInstances(ctx, childPods); err != nil {
+	if instancesStatus, err = r.getStatusFromInstances(ctx, resources.pods); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot get status from instances: %w", err)
 	}
 
@@ -151,7 +157,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Update the labels for the -rw service to work correctly
-	if err = r.updateLabelsOnPods(ctx, &cluster, childPods); err != nil {
+	if err = r.updateLabelsOnPods(ctx, &cluster, resources.pods); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update labels on pods: %w", err)
 	}
 
@@ -171,7 +177,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	if cluster.Status.ReadyInstances != cluster.Status.Instances ||
 		cluster.Status.Instances != cluster.Spec.Instances {
-		return r.ReconcilePods(ctx, req, &cluster, childPods)
+		return r.ReconcilePods(ctx, req, &cluster, resources.pods)
 	}
 
 	err = r.RegisterPhase(ctx, &cluster, v1alpha1.PhaseHealthy, "")
@@ -180,7 +186,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Check if we need to handle a rolling upgrade
-	return ctrl.Result{}, r.upgradeCluster(ctx, &cluster, childPods, instancesStatus)
+	return ctrl.Result{}, r.upgradeCluster(ctx, &cluster, resources.pods, instancesStatus)
 }
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
@@ -260,9 +266,29 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
+	// Create a new indexed field on Jobs.
+	if err := mgr.GetFieldIndexer().IndexField(
+		&batchv1.Job{},
+		jobOwnerKey, func(rawObj runtime.Object) []string {
+			job := rawObj.(*batchv1.Job)
+			owner := metav1.GetControllerOf(job)
+			if owner == nil {
+				return nil
+			}
+
+			if owner.APIVersion != apiGVString || owner.Kind != v1alpha1.ClusterKind {
+				return nil
+			}
+
+			return []string{owner.Name}
+		}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.Cluster{}).
 		Owns(&corev1.Pod{}).
+		Owns(&batchv1.Job{}).
 		WithEventFilter(&ClusterPredicate{}).
 		Complete(r)
 }

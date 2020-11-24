@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"reflect"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -18,6 +19,47 @@ import (
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 )
+
+// managedResources contains the resources that are created a cluster
+// and need to be managed by the controller
+type managedResources struct {
+	pods corev1.PodList
+	pvcs corev1.PersistentVolumeClaimList
+	jobs batchv1.JobList
+}
+
+// Count the number of jobs that are still running
+func (resources managedResources) countRunningJobs() int {
+	jobCount := len(resources.jobs.Items)
+	completeJobs := utils.CountCompleteJobs(resources.jobs.Items)
+	return jobCount - completeJobs
+}
+
+// getManagedResources get the managed resources of various types
+func (r *ClusterReconciler) getManagedResources(ctx context.Context,
+	cluster v1alpha1.Cluster) (*managedResources, error) {
+	// Update the status of this resource
+	childPods, err := r.getManagedPods(ctx, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	childPVCs, err := r.getManagedPVCs(ctx, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	childJobs, err := r.getManagedJobs(ctx, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return &managedResources{
+		pods: childPods,
+		pvcs: childPVCs,
+		jobs: childJobs,
+	}, nil
+}
 
 func (r *ClusterReconciler) getManagedPods(
 	ctx context.Context,
@@ -53,6 +95,23 @@ func (r *ClusterReconciler) getManagedPVCs(
 	}
 
 	return childPVCs, nil
+}
+
+// getManagedJobs extract the list of jobs which are being created
+// by this cluster
+func (r *ClusterReconciler) getManagedJobs(
+	ctx context.Context,
+	cluster v1alpha1.Cluster,
+) (batchv1.JobList, error) {
+	var childJobs batchv1.JobList
+	if err := r.List(ctx, &childJobs,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingFields{jobOwnerKey: cluster.Name},
+	); err != nil {
+		return batchv1.JobList{}, err
+	}
+
+	return childJobs, nil
 }
 
 func (r *ClusterReconciler) updateResourceStatus(

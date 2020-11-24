@@ -23,6 +23,11 @@ func DetectDanglingPVCs(
 			pvc.Status.Phase != corev1.ClaimBound {
 			continue
 		}
+
+		// There's no point in reattaching deleted PVCs
+		if pvc.ObjectMeta.DeletionTimestamp != nil {
+			continue
+		}
 		found := false
 
 		for idx := range podList {
