@@ -8,7 +8,6 @@ package postgres
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 )
@@ -59,12 +58,15 @@ hostssl replication all all cert clientcert=1
 	CACertificateLocation = "/tmp/ca.crt"
 )
 
+// MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
+const MajorVersionRangeUnlimited = 0
+
 // MajorVersionRange is used to represent a range of PostgreSQL versions
 type MajorVersionRange = struct {
 	// The minimum limit of PostgreSQL major version, extreme included
 	Min int
 
-	// The maximum limit of PostgreSQL version, extreme excluded
+	// The maximum limit of PostgreSQL version, extreme excluded, or MajorVersionRangeUnlimited
 	Max int
 }
 
@@ -177,10 +179,10 @@ var (
 			"logging_collector":     "off",
 		},
 		DefaultSettings: map[MajorVersionRange]SettingsCollection{
-			{0, 130000}: {
+			{MajorVersionRangeUnlimited, 130000}: {
 				"wal_keep_segments": "32",
 			},
-			{130000, math.MaxInt64}: {
+			{130000, MajorVersionRangeUnlimited}: {
 				"wal_keep_size": "512MB",
 			},
 		},
@@ -235,9 +237,11 @@ func CreatePostgresqlConfiguration(
 
 	// apply settings relative to a certain PostgreSQL version
 	for constraints, settings := range settings.DefaultSettings {
-		if constraints.Min <= majorVersion && majorVersion < constraints.Max {
-			for key, value := range settings {
-				configuration[key] = value
+		if constraints.Min == MajorVersionRangeUnlimited || (constraints.Min <= majorVersion) {
+			if constraints.Max == MajorVersionRangeUnlimited || (majorVersion < constraints.Max) {
+				for key, value := range settings {
+					configuration[key] = value
+				}
 			}
 		}
 	}
