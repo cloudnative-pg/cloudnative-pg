@@ -187,7 +187,7 @@ func initSubCommand(info postgres.InitInfo) {
 	}
 	if status {
 		log.Log.Info("PGData already exists, no need to init")
-		return
+		os.Exit(1)
 	}
 
 	err = info.VerifyConfiguration()
@@ -212,7 +212,7 @@ func restoreSubCommand(info postgres.InitInfo) {
 	}
 	if status {
 		log.Log.Info("PGData already exists, can't restore over an existing folder")
-		return
+		os.Exit(1)
 	}
 
 	err = info.VerifyConfiguration()
@@ -237,7 +237,7 @@ func joinSubCommand(info postgres.JoinInfo) {
 	}
 	if status {
 		log.Log.Info("PGData already exists, no need to init")
-		return
+		os.Exit(1)
 	}
 
 	// Let's download the crypto material from the cluster

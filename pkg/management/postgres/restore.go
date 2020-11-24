@@ -27,6 +27,11 @@ import (
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
 )
 
+var (
+	// ErrInstanceInRecovery is raised while PostgreSQL is still in recovery mode
+	ErrInstanceInRecovery = fmt.Errorf("instance in recovery")
+)
+
 // Restore restore a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore() error {
 	config, err := rest.InClusterConfig()
@@ -284,7 +289,7 @@ func (info InitInfo) configureInstanceAfterRestore() error {
 		// Wait until we exit from recovery mode
 		err = waitUntilRecoveryFinishes(db)
 		if err != nil {
-			return err
+			return fmt.Errorf("while waiting for PostgreSQL to stop recovery mode: %w", err)
 		}
 
 		_, err = db.Exec(fmt.Sprintf(
@@ -332,18 +337,20 @@ func (info InitInfo) configureInstanceAfterRestore() error {
 // PostgreSQL connection and returns only when the recovery
 // mode is finished
 func waitUntilRecoveryFinishes(db *sql.DB) error {
-	instanceInRecovery := fmt.Errorf("instance in recovery")
-
 	errorIsRetriable := func(err error) bool {
-		return err == instanceInRecovery
+		return err == ErrInstanceInRecovery
 	}
 
 	retryDelay := wait.Backoff{
 		Duration: 5 * time.Second,
 		Factor:   1,
 		Jitter:   0,
-		Steps:    math.MaxInt64,
-		Cap:      math.MaxInt64,
+		// Steps is declared as an "int", so we are capping
+		// to int32 to support ARM-based 32 bit architectures
+		Steps: math.MaxInt32,
+		// Cap is declared as "Duration", and durations are
+		// declared int64. No need to cap to 32 bit here
+		Cap: math.MaxInt64,
 	}
 
 	return retry.OnError(retryDelay, errorIsRetriable, func() error {
@@ -358,7 +365,7 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 			"recovery", status)
 
 		if status {
-			return instanceInRecovery
+			return ErrInstanceInRecovery
 		}
 
 		return nil
