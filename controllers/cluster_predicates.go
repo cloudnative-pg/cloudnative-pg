@@ -20,7 +20,7 @@ var (
 type ClusterPredicate struct {
 }
 
-// isControlledObject checks if a certain object is controller
+// isControlledObject checks if a certain object is controlled
 // by a PostgreSQL cluster
 func isControlledObject(objectMeta metav1.Object) bool {
 	owner := metav1.GetControllerOf(objectMeta)

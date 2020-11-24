@@ -15,6 +15,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -402,66 +403,6 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
-	// We are bootstrapping a cluster and in need to create the first node
-	var pod *corev1.Pod
-
-	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.FullRecovery != nil {
-		var backup v1alpha1.Backup
-		err = r.Get(ctx, client.ObjectKey{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Spec.Bootstrap.FullRecovery.Backup.Name,
-		}, &backup)
-		if err != nil {
-			if apierrs.IsNotFound(err) {
-				// Missing backup
-				log.Info("Missing backup object, can't continue full recovery",
-					"backup", cluster.Spec.Bootstrap.FullRecovery.Backup)
-				return ctrl.Result{
-					Requeue:      true,
-					RequeueAfter: time.Minute,
-				}, nil
-			}
-
-			return ctrl.Result{}, fmt.Errorf("cannot get the backup object: %w", err)
-		}
-		pod = specs.CreatePrimaryPodViaFullRecovery(*cluster, nodeSerial, &backup)
-	} else {
-		pod = specs.CreatePrimaryPodViaInitdb(*cluster, nodeSerial)
-	}
-
-	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
-		log.Error(err, "Unable to set the owner reference for instance")
-		return ctrl.Result{}, err
-	}
-
-	if err = r.setPrimaryInstance(ctx, cluster, pod.Name); err != nil {
-		log.Error(err, "Unable to set the primary instance name")
-		return ctrl.Result{}, err
-	}
-
-	err = r.RegisterPhase(ctx, cluster, v1alpha1.PhaseFirstPrimary,
-		fmt.Sprintf("Creating primary instance %v", pod.Name))
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	log.Info("Creating new Pod",
-		"name", pod.Name,
-		"primary", true)
-
-	specs.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
-
-	if err = r.Create(ctx, pod); err != nil {
-		if apierrs.IsAlreadyExists(err) {
-			// This Pod was already created, maybe the cache is stale.
-			// Let's reconcile another time
-			return ctrl.Result{}, nil
-		}
-
-		log.Error(err, "Unable to create pod", "pod", pod)
-		return ctrl.Result{}, err
-	}
-
 	pvcSpec, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
 	if err != nil {
 		if err == specs.ErrorInvalidSize {
@@ -483,6 +424,66 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, err
 	}
 
+	// We are bootstrapping a cluster and in need to create the first node
+	var job *batchv1.Job
+
+	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.FullRecovery != nil {
+		var backup v1alpha1.Backup
+		err = r.Get(ctx, client.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Spec.Bootstrap.FullRecovery.Backup.Name,
+		}, &backup)
+		if err != nil {
+			if apierrs.IsNotFound(err) {
+				// Missing backup
+				log.Info("Missing backup object, can't continue full recovery",
+					"backup", cluster.Spec.Bootstrap.FullRecovery.Backup)
+				return ctrl.Result{
+					Requeue:      true,
+					RequeueAfter: time.Minute,
+				}, nil
+			}
+
+			return ctrl.Result{}, fmt.Errorf("cannot get the backup object: %w", err)
+		}
+		job = specs.CreatePrimaryJobViaFullRecovery(*cluster, nodeSerial, &backup)
+	} else {
+		job = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial)
+	}
+
+	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
+		log.Error(err, "Unable to set the owner reference for instance")
+		return ctrl.Result{}, err
+	}
+
+	if err = r.setPrimaryInstance(ctx, cluster, fmt.Sprintf("%v-%v", cluster.Name, nodeSerial)); err != nil {
+		log.Error(err, "Unable to set the primary instance name")
+		return ctrl.Result{}, err
+	}
+
+	err = r.RegisterPhase(ctx, cluster, v1alpha1.PhaseFirstPrimary,
+		fmt.Sprintf("Creating primary instance %v", job.Name))
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	log.Info("Creating new Job",
+		"name", job.Name,
+		"primary", true)
+
+	specs.SetOperatorVersion(&job.ObjectMeta, versions.Version)
+
+	if err = r.Create(ctx, job); err != nil {
+		if apierrs.IsAlreadyExists(err) {
+			// This Job was already created, maybe the cache is stale.
+			// Let's reconcile another time
+			return ctrl.Result{}, nil
+		}
+
+		log.Error(err, "Unable to create job", "job", job)
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -493,37 +494,37 @@ func (r *ClusterReconciler) joinReplicaInstance(
 ) (ctrl.Result, error) {
 	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
-	var pod *corev1.Pod
+	var job *batchv1.Job
 	var err error
 
-	pod = specs.JoinReplicaInstance(*cluster, nodeSerial)
+	job = specs.JoinReplicaInstance(*cluster, nodeSerial)
 
-	log.Info("Creating new Pod",
-		"pod", pod.Name,
+	log.Info("Creating new Job",
+		"job", job.Name,
 		"primary", false)
 
 	if err := r.RegisterPhase(ctx, cluster,
 		v1alpha1.PhaseCreatingReplica,
-		fmt.Sprintf("Creating replica %v", pod.Name)); err != nil {
+		fmt.Sprintf("Creating replica %v", job.Name)); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
 		log.Error(err, "Unable to set the owner reference for joined PostgreSQL node")
 		return ctrl.Result{}, err
 	}
 
-	specs.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
+	specs.SetOperatorVersion(&job.ObjectMeta, versions.Version)
 
-	if err = r.Create(ctx, pod); err != nil {
+	if err = r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
-			// This Pod was already created, maybe the cache is stale.
+			// This Job was already created, maybe the cache is stale.
 			// Let's reconcile another time
-			log.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
+			log.Info("Job already exist, maybe the cache is stale", "pod", job.Name)
 			return ctrl.Result{}, nil
 		}
 
-		log.Error(err, "Unable to create Pod", "pod", pod)
+		log.Error(err, "Unable to create Job", "job", job)
 		return ctrl.Result{}, err
 	}
 

@@ -124,6 +124,17 @@ rules:
   - list
   - update
 - apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets
