@@ -22,3 +22,6 @@
 # Testing artifacts
 _artifacts/
 kind-logs/
+
+# goreleaser
+/dist/

@@ -1,0 +1,53 @@
+project_name: kubectl-cnp
+
+release:
+  github:
+    owner: EnterpriseDB
+    name: kubectl-cnp
+
+env:
+  - GO111MODULE=on
+  - CGO_ENABLED=0
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+- id: kubectl-cnp
+  binary: kubectl-cnp
+  main: cmd/kubectl-cnp/main.go
+  goos:
+  - darwin
+  - linux
+  goarch:
+  - amd64
+  - 386
+  - arm64
+  - arm
+  - ppc64le
+  - s390x
+  goarm:
+  - 5
+  - 6
+  - 7
+  ignore:
+  - goos: darwin
+    goarch: 386
+
+archives:
+- replacements:
+    386: i386
+    amd64: x86_64
+
+checksum:
+  name_template: '{{ .ProjectName }}-{{ .Version }}-checksums.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  skip: true
+
+signs:
+  - artifacts: checksum
