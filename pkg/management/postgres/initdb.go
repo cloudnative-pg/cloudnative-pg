@@ -178,9 +178,9 @@ func (info InitInfo) GetInstance() Instance {
 	return postgresInstance
 }
 
-// configureNewInstance creates the expected users and databases in a new
+// ConfigureNewInstance creates the expected users and databases in a new
 // PostgreSQL instance
-func (info InitInfo) configureNewInstance(db *sql.DB) error {
+func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
 	_, err := db.Exec(fmt.Sprintf(
 		"CREATE USER %v",
 		pq.QuoteIdentifier(info.ApplicationUser)))
@@ -282,7 +282,7 @@ func (info InitInfo) Bootstrap() error {
 			return fmt.Errorf("while creating superuser: %w", err)
 		}
 
-		err = info.configureNewInstance(db)
+		err = info.ConfigureNewInstance(db)
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
 		}
