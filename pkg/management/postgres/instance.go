@@ -188,9 +188,14 @@ func (instance *Instance) GetApplicationDB() (*sql.DB, error) {
 		return instance.applicationDB, nil
 	}
 
+	socketDir := os.Getenv("PGHOST")
+	if socketDir == "" {
+		socketDir = "/var/run/postgresql"
+	}
+
 	db, err := sql.Open(
 		"postgres",
-		"postgres://postgres@localhost/"+instance.ApplicationDatabase+"?sslmode=disable")
+		fmt.Sprintf("host=%s port=5432 dbname=postgres user=postgres sslmode=disable", socketDir))
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't create connection pool")
 	}
