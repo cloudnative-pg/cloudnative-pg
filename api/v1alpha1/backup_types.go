@@ -89,7 +89,12 @@ type Backup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   BackupSpec   `json:"spec,omitempty"`
+	// Specification of the desired behavior of the backup.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec BackupSpec `json:"spec,omitempty"`
+	// Most recently observed status of the backup. This data may not be up to
+	// date. Populated by the system. Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status BackupStatus `json:"status,omitempty"`
 }
 
@@ -98,8 +103,11 @@ type Backup struct {
 // BackupList contains a list of Backup
 type BackupList struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Backup `json:"items"`
+	// List of backups
+	Items []Backup `json:"items"`
 }
 
 // SetAsFailed marks a certain backup as invalid

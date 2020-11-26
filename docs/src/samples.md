@@ -15,4 +15,4 @@ In this section you can find some examples of configuration files to setup your 
 * [`cluster-example-full.yaml`](samples/cluster-example-full.yaml):
    example of `Cluster` that sets most of the available options.
 
-For a list of available options, please refer to the ["Custom Resource Definitions" page](crd.md).
+For a list of available options, please refer to the ["API Reference" page](api_reference.md).

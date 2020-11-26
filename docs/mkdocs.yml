@@ -23,7 +23,6 @@ nav:
   - quickstart.md
   - cloud_setup.md
   - bootstrap.md
-  - crd.md
   - security.md
   - failure_modes.md
   - rolling_update.md
@@ -36,4 +35,5 @@ nav:
   - e2e.md
   - container_images.md
   - operator_capability_levels.md
+  - api_reference.md
   - credits.md

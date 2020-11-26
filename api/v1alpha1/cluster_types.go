@@ -69,10 +69,10 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinLength=0
 	ImageName string `json:"imageName,omitempty"`
 
-	// The UID of the "postgres" user inside the image, defaults to "26"
+	// The UID of the `postgres` user inside the image, defaults to `26`
 	PostgresUID int64 `json:"postgresUID,omitempty"`
 
-	// The GID of the "postgres" user inside the image, defaults to "26"
+	// The GID of the `postgres` user inside the image, defaults to `26`
 	PostgresGID int64 `json:"postgresGID,omitempty"`
 
 	// Number of instances required in the cluster
@@ -87,7 +87,7 @@ type ClusterSpec struct {
 	// +optional
 	Bootstrap *BootstrapConfiguration `json:"bootstrap,omitempty"`
 
-	// The secret containing the superuser password, if empty a new
+	// The secret containing the superuser password. If not defined a new
 	// secret will be created with a randomly generated password
 	// +optional
 	SuperuserSecret *corev1.LocalObjectReference `json:"superuserSecret,omitempty"`
@@ -111,7 +111,9 @@ type ClusterSpec struct {
 	// +optional
 	Affinity AffinityConfiguration `json:"affinity,omitempty"`
 
-	// Resources requirements of every generated Pod
+	// Resources requirements of every generated Pod. Please refer to
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// for more information.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
@@ -129,16 +131,16 @@ type ClusterSpec struct {
 
 const (
 
-	// PhaseSwitchover when a cluster it's changing the primary node
+	// PhaseSwitchover when a cluster is changing the primary node
 	PhaseSwitchover = "Switchover in progress"
 
-	// PhaseFailOver in case a pod it's missing and need to change primary
+	// PhaseFailOver in case a pod is missing and need to change primary
 	PhaseFailOver = "Failing over"
 
 	// PhaseFirstPrimary for an starting cluster
 	PhaseFirstPrimary = "Setting up primary"
 
-	// PhaseCreatingReplica it's everytime we add a new replica
+	// PhaseCreatingReplica everytime we add a new replica
 	PhaseCreatingReplica = "Creating a new replica"
 
 	// PhaseUpgrade upgrade in process
@@ -185,8 +187,10 @@ type ClusterStatus struct {
 	// Current list of read pods
 	ReadService string `json:"readService,omitempty"`
 
+	// Current phase of the cluster
 	Phase string `json:"phase,omitempty"`
 
+	// Reason for the current phase
 	PhaseReason string `json:"phaseReason,omitempty"`
 }
 
@@ -249,8 +253,11 @@ type PostgresConfiguration struct {
 	PgHBA []string `json:"pg_hba,omitempty"`
 }
 
-// BootstrapConfiguration contains the instructions to bootstrap
-// the cluster from scratch
+// BootstrapConfiguration contains information about how to create the PostgreSQL
+// cluster. Only a single bootstrap method can be defined among the supported
+// ones. `initdb` will be used as the bootstrap method if left
+// unspecified. Refer to the Bootstrap page of the documentation for more
+// information.
 type BootstrapConfiguration struct {
 	// Bootstrap the cluster via initdb
 	InitDB *BootstrapInitDB `json:"initdb,omitempty"`
@@ -261,13 +268,14 @@ type BootstrapConfiguration struct {
 
 // BootstrapInitDB is the configuration of the bootstrap process when
 // initdb is used
+// Refer to the Bootstrap page of the documentation for more information.
 type BootstrapInitDB struct {
-	// Name of the database used by the application.
+	// Name of the database used by the application. Default: `app`.
 	// +optional
 	Database string `json:"database"`
 
 	// Name of the owner of the database in the instance to be used
-	// by applications.
+	// by applications. Defaults to the value of the `database` key.
 	// +optional
 	Owner string `json:"owner"`
 
@@ -282,8 +290,11 @@ type BootstrapInitDB struct {
 	Options []string `json:"options,omitempty"`
 }
 
-// BootstrapFullRecovery is the configuration of the bootstrap process
-// when using an existing backup
+// BootstrapFullRecovery contains the configuration required to restore
+// the backup with the specified name and, after having changed the password
+// with the one chosen for the superuser, will use it to bootstrap a full
+// cluster cloning all the instances from the restored primary.
+// Refer to the Bootstrap page of the documentation for more information.
 type BootstrapFullRecovery struct {
 	// The backup we need to restore
 	Backup corev1.LocalObjectReference `json:"backup"`
@@ -291,7 +302,7 @@ type BootstrapFullRecovery struct {
 
 // StorageConfiguration is the configuration of the storage of the PostgreSQL instances
 type StorageConfiguration struct {
-	// StorageClass to use for database data (PGDATA). Applied after
+	// StorageClass to use for database data (`PGDATA`). Applied after
 	// evaluating the PVC template, if available.
 	// If not specified, generated PVCs will be satisfied by the
 	// default storage class
@@ -376,15 +387,22 @@ type BarmanObjectStoreConfiguration struct {
 	// parameter is omitted
 	ServerName string `json:"serverName,omitempty"`
 
-	// The configuration for the backup of the WAL stream
+	// The configuration for the backup of the WAL stream.
+	// When not defined, WAL files will be stored uncompressed and may be
+	// unencrypted in the object store, according to the bucket default policy.
 	Wal *WalBackupConfiguration `json:"wal,omitempty"`
 
 	// The configuration to be used to backup the data files
+	// When not defined, base backups files will be stored uncompressed and may
+	// be unencrypted in the object store, according to the bucket default
+	// policy.
 	Data *DataBackupConfiguration `json:"data,omitempty"`
 }
 
-// BackupConfiguration contains the backup configuration when the backup
-// is available
+// BackupConfiguration defines how the backup of the cluster are taken.
+// Currently the only supported backup method is barmanObjectStore.
+// For details and examples refer to the Backup and Recovery section of the
+// documentation
 type BackupConfiguration struct {
 	// The configuration for the barman-cloud tool suite
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
@@ -393,29 +411,39 @@ type BackupConfiguration struct {
 // WalBackupConfiguration is the configuration of the backup of the
 // WAL stream
 type WalBackupConfiguration struct {
-	// Whenever to compress files or not
+	// Compress a WAL file before sending it to the object store. Available
+	// options are empty string (no compression, default), `gzip` or `bzip2`.
 	Compression CompressionType `json:"compression,omitempty"`
 
 	// Whenever to force the encryption of files (if the bucket is
-	// not already configured for that)
+	// not already configured for that).
+	// Allowed options are empty string (use the bucket policy, default),
+	// `AES256` and `aws:kms`
 	Encryption EncryptionType `json:"encryption,omitempty"`
 }
 
 // DataBackupConfiguration is the configuration of the backup of
 // the data directory
 type DataBackupConfiguration struct {
-	// Whenever to compress files or not
+	// Compress a backup file (a tar file per tablespace) while streaming it
+	// to the object store. Available options are empty string (no
+	// compression, default), `gzip` or `bzip2`.
 	Compression CompressionType `json:"compression,omitempty"`
 
 	// Whenever to force the encryption of files (if the bucket is
-	// not already configured for that)
+	// not already configured for that).
+	// Allowed options are empty string (use the bucket policy, default),
+	// `AES256` and `aws:kms`
 	Encryption EncryptionType `json:"encryption,omitempty"`
 
-	// Whenever to force the initial checkpoint to be done as quickly
-	// as possible
+	// Control whether the I/O workload for the backup initial checkpoint will
+	// be limited, according to the `checkpoint_completion_target` setting on
+	// the PostgreSQL server. If set to true, an immediate checkpoint will be
+	// used, meaning PostgreSQL will complete the checkpoint as soon as
+	// possible. `false` by default.
 	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
 
-	// The number of jobs to be used to upload the backup, defaults
+	// The number of parallel jobs to be used to upload the backup, defaults
 	// to 2
 	Jobs *int32 `json:"jobs,omitempty"`
 }
@@ -444,7 +472,12 @@ type Cluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterSpec   `json:"spec,omitempty"`
+	// Specification of the desired behavior of the cluster.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec ClusterSpec `json:"spec,omitempty"`
+	// Most recently observed status of the cluster. This data may not be up
+	// to date. Populated by the system. Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status ClusterStatus `json:"status,omitempty"`
 }
 
@@ -454,8 +487,11 @@ type Cluster struct {
 // ClusterList contains a list of Cluster
 type ClusterList struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Cluster `json:"items"`
+	// List of clusters
+	Items []Cluster `json:"items"`
 }
 
 // GetImageName get the name of the image that should be used
