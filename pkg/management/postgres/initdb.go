@@ -57,6 +57,10 @@ type InitInfo struct {
 	// The list options that should be passed to initdb to
 	// create the cluster
 	InitDBOptions []string
+
+	// The recovery target options, only applicable for the
+	// fullRecovery bootstrap type
+	RecoveryTarget string
 }
 
 const (

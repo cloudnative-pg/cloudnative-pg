@@ -413,3 +413,8 @@ as usual and the remaining instances will join the cluster as replicas.
 
 The process is transparent for the user, and managed by the instance manager
 running in the Pods.
+
+You can optionally specify a `recoveryTarget` to perform a point in time
+recovery. If left unspecified, the recovery will continue up to the latest
+available WAL on the default target timeline (`current` for PostgreSQL up to
+11, `latest` for version 12 and above).

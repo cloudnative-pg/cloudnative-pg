@@ -298,6 +298,44 @@ type BootstrapInitDB struct {
 type BootstrapFullRecovery struct {
 	// The backup we need to restore
 	Backup corev1.LocalObjectReference `json:"backup"`
+
+	// By default the recovery will end as soon as a consistent state is
+	// reached: in this case that means at the end of a backup.
+	// This option allows to fine tune the recovery process
+	// +optional
+	RecoveryTarget *RecoveryTarget `json:"recoveryTarget,omitempty"`
+}
+
+// RecoveryTarget allows to configure the moment where the recovery process
+// will stop. All the target options except TargetTLI are mutually exclusive.
+type RecoveryTarget struct {
+	// The target timeline
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	TargetTLI *int32 `json:"targetTLI,omitempty"`
+
+	// The target transaction ID
+	// +optional
+	TargetXID string `json:"targetXID,omitempty"`
+
+	// The target name (to be previously created
+	// with `pg_create_restore_point`)
+	// +optional
+	TargetName string `json:"targetName,omitempty"`
+
+	// The target LSN (Log Sequence Number)
+	// +optional
+	TargetLSN string `json:"targetLSN,omitempty"`
+
+	// The target time, in any unambiguous representation
+	// allowed by PostgreSQL
+	TargetTime string `json:"targetTime,omitempty"`
+
+	// End recovery as soon as a consistent state is reached
+	TargetImmediate *bool `json:"targetImmediate,omitempty"`
+
+	// Set the target to be exclusive (defaults to true)
+	Exclusive *bool `json:"exclusive,omitempty"`
 }
 
 // StorageConfiguration is the configuration of the storage of the PostgreSQL instances
@@ -652,6 +690,51 @@ func (cluster Cluster) GetPostgresGID() int64 {
 		return defaultPostgresGID
 	}
 	return cluster.Spec.PostgresGID
+}
+
+// BuildPostgresOptions create the list of options that
+// should be added to the PostgreSQL configuration to
+// recover given a certain target
+func (target RecoveryTarget) BuildPostgresOptions() string {
+	result := ""
+	if target.TargetTLI != nil {
+		result += fmt.Sprintf(
+			"recovery_target_timeline = '%v'\n",
+			*target.TargetTLI)
+	}
+	if target.TargetXID != "" {
+		result += fmt.Sprintf(
+			"recovery_target_xid = '%v'\n",
+			target.TargetXID)
+	}
+	if target.TargetName != "" {
+		result += fmt.Sprintf(
+			"recovery_target_name = '%v'\n",
+			target.TargetName)
+	}
+	if target.TargetLSN != "" {
+		result += fmt.Sprintf(
+			"recovery_target_lsn = '%v'\n",
+			target.TargetName)
+	}
+	if target.TargetTime != "" {
+		result += fmt.Sprintf(
+			"recovery_target_time = '%v'\n",
+			target.TargetTime)
+	}
+	if target.TargetImmediate != nil && *target.TargetImmediate {
+		result += "recovery_target = immediate\n"
+	}
+	switch {
+	case target.Exclusive == nil:
+		result += "recovery_target_inclusive = true\n"
+	case *target.Exclusive:
+		result += "recovery_target_inclusive = true\n"
+	default:
+		result += "recovery_target_inclusive = false\n"
+	}
+
+	return result
 }
 
 func init() {

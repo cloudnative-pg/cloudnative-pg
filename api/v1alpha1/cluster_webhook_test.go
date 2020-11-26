@@ -387,3 +387,43 @@ var _ = Describe("validate image name change", func() {
 		Expect(len(clusterNew.validateImageChange("postgres:12.1"))).To(Equal(0))
 	})
 })
+
+var _ = Describe("recovery target", func() {
+	It("is mutually exclusive", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					FullRecovery: &BootstrapFullRecovery{
+						RecoveryTarget: &RecoveryTarget{
+							TargetTLI:       nil,
+							TargetXID:       "3",
+							TargetName:      "",
+							TargetLSN:       "",
+							TargetTime:      "2020-01-01 01:01",
+							TargetImmediate: nil,
+							Exclusive:       nil,
+						},
+					},
+				},
+			},
+		}
+
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
+	})
+
+	It("can be specified", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					FullRecovery: &BootstrapFullRecovery{
+						RecoveryTarget: &RecoveryTarget{
+							TargetTime: "2020-01-01 01:01",
+						},
+					},
+				},
+			},
+		}
+
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
+	})
+})

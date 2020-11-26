@@ -94,6 +94,7 @@ func (r *Cluster) ValidateCreate() error {
 	allErrs = append(allErrs, r.validateBootstrapMethod()...)
 	allErrs = append(allErrs, r.validateStorageConfiguration()...)
 	allErrs = append(allErrs, r.validateImageName()...)
+	allErrs = append(allErrs, r.validateRecoveryTarget()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -113,6 +114,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validateBootstrapMethod()...)
 	allErrs = append(allErrs, r.validateStorageConfiguration()...)
 	allErrs = append(allErrs, r.validateImageName()...)
+	allErrs = append(allErrs, r.validateRecoveryTarget()...)
 
 	oldObject := old.(*Cluster)
 	if oldObject == nil {
@@ -359,6 +361,46 @@ func (r *Cluster) validateImageChange(old string) field.ErrorList {
 				r.Spec.ImageName,
 				fmt.Sprintf("can't upgrade between %v and %v",
 					old, newVersion)))
+	}
+
+	return result
+}
+
+// Validate the recovery target to ensure that the mutual exclusivity
+// of options is respected
+func (r *Cluster) validateRecoveryTarget() field.ErrorList {
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.FullRecovery == nil {
+		return nil
+	}
+
+	recoveryTarget := r.Spec.Bootstrap.FullRecovery.RecoveryTarget
+	if recoveryTarget == nil {
+		return nil
+	}
+
+	targets := 0
+	if recoveryTarget.TargetImmediate != nil {
+		targets++
+	}
+	if recoveryTarget.TargetLSN != "" {
+		targets++
+	}
+	if recoveryTarget.TargetName != "" {
+		targets++
+	}
+	if recoveryTarget.TargetXID != "" {
+		targets++
+	}
+	if recoveryTarget.TargetTime != "" {
+		targets++
+	}
+
+	var result field.ErrorList
+	if targets > 1 {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "bootstrap", "fullRecovery", "recoveryTarget"),
+			recoveryTarget,
+			"Recovery target options are mutually exclusive"))
 	}
 
 	return result
