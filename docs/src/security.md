@@ -48,8 +48,29 @@ In a typical Kubernetes cluster, containers run with unlimited resources. By def
 they might be allowed to use as much CPU and RAM as needed.
 
 Cloud Native PostgreSQL allows administrators to control and manage resource usage by the pods of the cluster,
-through the `resources` section of the manifest. For details, please refer to the
-["Resources" section in the "Custom Resource Definitions" page](crd.md#resources).
+through the `resources` section of the manifest, with two knobs:
+
+- `requests`: initial requirement
+- `limits`: maximum usage, in case of dynamic increase of resource needs
+
+For example, you can request an initial amount of RAM of 32MiB (scalable to 128MiB) and 50m of CPU (scalable to 100m) as follows:
+
+```yaml
+  resources:
+    requests:
+      memory: "32Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+```
+
+[//]: # ( TODO: we may want to explain what happens to a pod that excedes the resource limits: CPU -> trottle; MEMORY -> kill )
+
+!!! Seealso "Managing Compute Resources for Containers"
+    For more details on resource management, please refer to the
+    ["Managing Compute Resources for Containers"](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
+    page from the Kubernetes documentation.
 
 ## PostgreSQL
 
@@ -62,18 +83,10 @@ Those files can be used to configure application access to the database.
 
 Currently, the operator allows administrators to add `pg_hba.conf` lines directly in the manifest, as part of the
 `pg_hba` section of the `postgresql` configuration. The lines defined in the
-manifest are added to a default `pg_hba.conf`
+manifest are added to a default `pg_hba.conf`.
 
-```
-# Grant local access
-local all all peer
-
-# HBA lines in the pg_hba section are added here
-
-# Require md5 authentication elsewhere
-host all all all md5
-host replication all all md5
-```
+For further detail on how `pg_hba.conf` is managed by the operator see the
+["PostgreSQL Configuration" page](postgresql_conf.md#the-pg_hba-section) of the documentation.
 
 !!! Important
     Examples assume that the Kubernetes cluster runs in a private and secure network.

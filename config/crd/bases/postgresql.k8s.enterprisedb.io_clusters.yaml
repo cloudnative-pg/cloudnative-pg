@@ -57,7 +57,8 @@ spec:
         metadata:
           type: object
         spec:
-          description: ClusterSpec defines the desired state of Cluster
+          description: 'Specification of the desired behavior of the cluster. More
+            info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
           properties:
             affinity:
               description: Affinity/Anti-affinity rules for Pods
@@ -80,22 +81,32 @@ spec:
                   properties:
                     data:
                       description: The configuration to be used to backup the data
-                        files
+                        files When not defined, base backups files will be stored
+                        uncompressed and may be unencrypted in the object store, according
+                        to the bucket default policy.
                       properties:
                         compression:
-                          description: Whenever to compress files or not
+                          description: Compress a backup file (a tar file per tablespace)
+                            while streaming it to the object store. Available options
+                            are empty string (no compression, default), `gzip` or
+                            `bzip2`.
                           type: string
                         encryption:
                           description: Whenever to force the encryption of files (if
-                            the bucket is not already configured for that)
+                            the bucket is not already configured for that). Allowed
+                            options are empty string (use the bucket policy, default),
+                            `AES256` and `aws:kms`
                           type: string
                         immediateCheckpoint:
-                          description: Whenever to force the initial checkpoint to
-                            be done as quickly as possible
+                          description: Control whether the I/O workload for the backup
+                            initial checkpoint will be limited, according to the `checkpoint_completion_target`
+                            setting on the PostgreSQL server. If set to true, an immediate
+                            checkpoint will be used, meaning PostgreSQL will complete
+                            the checkpoint as soon as possible. `false` by default.
                           type: boolean
                         jobs:
-                          description: The number of jobs to be used to upload the
-                            backup, defaults to 2
+                          description: The number of parallel jobs to be used to upload
+                            the backup, defaults to 2
                           format: int32
                           type: integer
                       type: object
@@ -157,14 +168,21 @@ spec:
                         if this parameter is omitted
                       type: string
                     wal:
-                      description: The configuration for the backup of the WAL stream
+                      description: The configuration for the backup of the WAL stream.
+                        When not defined, WAL files will be stored uncompressed and
+                        may be unencrypted in the object store, according to the bucket
+                        default policy.
                       properties:
                         compression:
-                          description: Whenever to compress files or not
+                          description: Compress a WAL file before sending it to the
+                            object store. Available options are empty string (no compression,
+                            default), `gzip` or `bzip2`.
                           type: string
                         encryption:
                           description: Whenever to force the encryption of files (if
-                            the bucket is not already configured for that)
+                            the bucket is not already configured for that). Allowed
+                            options are empty string (use the bucket policy, default),
+                            `AES256` and `aws:kms`
                           type: string
                       type: object
                   required:
@@ -193,7 +211,8 @@ spec:
                   description: Bootstrap the cluster via initdb
                   properties:
                     database:
-                      description: Name of the database used by the application.
+                      description: 'Name of the database used by the application.
+                        Default: `app`.'
                       type: string
                     options:
                       description: The list of options that must be passed to initdb
@@ -203,7 +222,8 @@ spec:
                       type: array
                     owner:
                       description: Name of the owner of the database in the instance
-                        to be used by applications.
+                        to be used by applications. Defaults to the value of the `database`
+                        key.
                       type: string
                     secret:
                       description: Name of the secret containing the initial credentials
@@ -255,13 +275,13 @@ spec:
               - inProgress
               type: object
             postgresGID:
-              description: The GID of the "postgres" user inside the image, defaults
-                to "26"
+              description: The GID of the `postgres` user inside the image, defaults
+                to `26`
               format: int64
               type: integer
             postgresUID:
-              description: The UID of the "postgres" user inside the image, defaults
-                to "26"
+              description: The UID of the `postgres` user inside the image, defaults
+                to `26`
               format: int64
               type: integer
             postgresql:
@@ -286,7 +306,9 @@ spec:
                 (`supervised`)'
               type: string
             resources:
-              description: Resources requirements of every generated Pod
+              description: Resources requirements of every generated Pod. Please refer
+                to https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                for more information.
               properties:
                 limits:
                   additionalProperties:
@@ -452,7 +474,7 @@ spec:
                     in the PVC template.
                   type: string
                 storageClass:
-                  description: StorageClass to use for database data (PGDATA). Applied
+                  description: StorageClass to use for database data (`PGDATA`). Applied
                     after evaluating the PVC template, if available. If not specified,
                     generated PVCs will be satisfied by the default storage class
                   type: string
@@ -460,7 +482,7 @@ spec:
               - size
               type: object
             superuserSecret:
-              description: The secret containing the superuser password, if empty
+              description: The secret containing the superuser password. If not defined
                 a new secret will be created with a randomly generated password
               properties:
                 name:
@@ -472,7 +494,8 @@ spec:
           - instances
           type: object
         status:
-          description: ClusterStatus defines the observed state of Cluster
+          description: 'Most recently observed status of the cluster. This data may
+            not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
           properties:
             currentPrimary:
               description: Current primary instance
@@ -500,8 +523,10 @@ spec:
               format: int32
               type: integer
             phase:
+              description: Current phase of the cluster
               type: string
             phaseReason:
+              description: Reason for the current phase
               type: string
             readService:
               description: Current list of read pods

@@ -44,7 +44,12 @@ type ScheduledBackup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ScheduledBackupSpec   `json:"spec,omitempty"`
+	// Specification of the desired behavior of the ScheduledBackup.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec ScheduledBackupSpec `json:"spec,omitempty"`
+	// Most recently observed status of the ScheduledBackup. This data may not be up
+	// to date. Populated by the system. Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status ScheduledBackupStatus `json:"status,omitempty"`
 }
 
@@ -53,8 +58,11 @@ type ScheduledBackup struct {
 // ScheduledBackupList contains a list of ScheduledBackup
 type ScheduledBackupList struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ScheduledBackup `json:"items"`
+	// List of clusters
+	Items []ScheduledBackup `json:"items"`
 }
 
 // IsSuspended check if a scheduled backup has been suspended or not

@@ -176,7 +176,7 @@ spec:
 
 !!! Note "There's more"
     For more detailed information about the available options, please refer
-    to the ["Custom Resource Definitions" section](crd.md).
+    to the ["API Reference" section](api_reference.md).
 
 In order to create the 3-node PostgreSQL cluster, you need to run the following command:
 

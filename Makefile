@@ -102,6 +102,21 @@ licenses: go-licenses
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete
 
+# Update the API Reference section of the documentation
+apidoc: po-docgen
+	set -e ;\
+	CONFIG_TMP_DIR=$$(mktemp -d) ;\
+	echo $$CONFIG_TMP_DIR ;\
+	po-docgen api api/v1alpha1/*_types.go | sed 's/\\n/\n/g' | \
+	  sed -n '/## Table of Contents/,$$p' | \
+	  sed 's/^## Table of Contents/<!-- TOC -->/' | \
+	  grep -v '#table-of-contents' > $${CONFIG_TMP_DIR}/api_reference.new.md ;\
+	sed '/<!-- TOC -->/,$${/<!-- TOC -->/!d;}' \
+	  docs/src/api_reference.md > $${CONFIG_TMP_DIR}/api_reference.md ;\
+	sed 1d \
+	  $${CONFIG_TMP_DIR}/api_reference.new.md >> $${CONFIG_TMP_DIR}/api_reference.md ;\
+	cp $${CONFIG_TMP_DIR}/api_reference.md docs/src/api_reference.md
+
 # find or download controller-gen
 .PHONY: controller-gen
 controller-gen:
@@ -136,6 +151,24 @@ ifeq (, $(shell which go-licenses))
 GO_LICENSES=$(GOBIN)/go-licenses
 else
 GO_LICENSES=$(shell which go-licenses)
+endif
+
+# find or download po-docgen
+.PHONY: po-docgen
+po-docgen:
+# download po-docgen if necessary
+ifeq (, $(shell which po-docgen))
+	@{ \
+	set -e ;\
+	PO_DOCGEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$PO_DOCGEN_TMP_DIR ;\
+	go mod init tmp ;\
+	go get github.com/prometheus-operator/prometheus-operator/cmd/po-docgen@v0.43.0 ;\
+	rm -rf $$PO_DOCGEN_TMP_DIR ;\
+	}
+PO_DOCGEN=$(GOBIN)/po-docgen
+else
+PO_DOCGEN=$(shell which po-docgen)
 endif
 
 # find or download kustomize

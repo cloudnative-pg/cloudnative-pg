@@ -34,7 +34,8 @@ spec:
         metadata:
           type: object
         spec:
-          description: BackupSpec defines the desired state of Backup
+          description: 'Specification of the desired behavior of the backup. More
+            info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
           properties:
             cluster:
               description: The cluster to backup
@@ -46,7 +47,8 @@ spec:
               type: object
           type: object
         status:
-          description: BackupStatus defines the observed state of Backup
+          description: 'Most recently observed status of the backup. This data may
+            not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
           properties:
             backupId:
               description: The ID of the Barman backup
