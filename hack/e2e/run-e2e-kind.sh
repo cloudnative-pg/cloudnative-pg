@@ -21,7 +21,7 @@ LOG_DIR=${LOG_DIR:-$ROOT_DIR/kind-logs/}
 
 export CONTROLLER_IMG=${CONTROLLER_IMG:-internal.2ndq.io/k8s/cloud-native-postgresql:latest}
 export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
-export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG}.0}
+export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 
 PRESERVE_CLUSTER=${PRESERVE_CLUSTER:-false}
 BUILD_IMAGE=${BUILD_IMAGE:-false}
