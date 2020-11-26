@@ -149,8 +149,12 @@ func (info InitInfo) writeRestoreWalConfig(backup *v1alpha1.Backup) error {
 
 	recoveryFileContents := fmt.Sprintf(
 		"recovery_target_action = promote\n"+
-			"restore_command = '%s'\n",
-		strings.Join(cmd, " "))
+			"restore_command = '%s'\n"+
+			"%s",
+		strings.Join(cmd, " "),
+		info.RecoveryTarget)
+
+	log.Log.Info("Generated recovery configuration", "configuration", recoveryFileContents)
 
 	// Disable SSL as we still don't have the required certificates
 	err = fileutils.AppendStringToFile(

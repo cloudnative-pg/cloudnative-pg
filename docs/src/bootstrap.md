@@ -127,7 +127,7 @@ command (i.e. to change the locale used for the template databases or to
 add data checksums), you can add them to the `options` section like in
 the following example:
 
-```
+```yaml
 apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
 kind: Cluster
 metadata:
@@ -186,3 +186,86 @@ activity of the Kubernetes cluster itself.
 In case you don't supply any `superuserSecret`, a new one is automatically
 generated with a secure and random password. The secret is then used to
 reset the password for the `postgres` user of the cluster.
+
+By default the recovery will continue up to the latest
+available WAL on the default target timeline (`current` for PostgreSQL up to
+11, `latest` for version 12 and above).
+You can optionally specify a `recoveryTarget` to perform a point in time
+recovery (see the ["Point in time recovery" chapter](#point-in-time-recovery)).
+
+### Point in time recovery
+
+Instead of replaying all the WALs up to the latest one,
+we can ask PostgreSQL to stop replaying WALs at any given point in time.
+This technique is used by PostgreSQL to implement *point-in-time* recovery.
+This allows you to restore the database to its state at any time after base
+backup was taken.
+
+The operator will generate the configuration parameters required for this
+feature to work if a recovery target is specified like in the following
+example:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-restore-pitr
+spec:
+  instances: 3
+
+  storage:
+    size: 5Gi
+
+  bootstrap:
+    fullRecovery:
+      backup:
+        name: backup-example
+
+      recoveryTarget:
+        targetTime: "2020-11-26 15:22:00.00000+00"
+```
+
+Beside `targetTime`, the following criteria can be used to stop the recovery:
+
+- `targetXID` specify a transaction ID up to which recovery will proceed
+
+- `targetName` specify a restore point (created with `pg_create_restore_point`
+  to which recovery will proceed)
+
+- `targetLSN` specify the LSN of the write-ahead log location up to whick
+  recovery will proceed
+
+- `targetImmediate` specify to stop as soon as a consistent state is
+  reached
+
+Only a single one among the targets above can be chosen in each
+`recoveryTarget` configuration.
+
+Additionally, you can specify `targetTLI` force recovery to a specific
+timeline.
+
+By default the previous parameters are considered to be exclusive, stopping
+just before the recovery target. You can request an inclusive behaviour,
+stopping right after the recovery target, setting the `exclusive` parameter to
+`false` like in the following example:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-restore-pitr
+spec:
+  instances: 3
+
+  storage:
+    size: 5Gi
+
+  bootstrap:
+    fullRecovery:
+      backup:
+        name: backup-example
+
+      recoveryTarget:
+        targetName: "maintenance-activity"
+        exclusive: false
+```

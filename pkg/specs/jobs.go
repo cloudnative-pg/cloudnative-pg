@@ -167,6 +167,12 @@ func CreatePrimaryJobViaFullRecovery(cluster v1alpha1.Cluster, nodeSerial int32,
 		"-backup-name", cluster.Spec.Bootstrap.FullRecovery.Backup.Name,
 	}
 
+	if cluster.Spec.Bootstrap.FullRecovery.RecoveryTarget != nil {
+		initCommand = append(initCommand,
+			"-target",
+			cluster.Spec.Bootstrap.FullRecovery.RecoveryTarget.BuildPostgresOptions())
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,

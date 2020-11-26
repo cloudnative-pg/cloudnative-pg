@@ -1,0 +1,17 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-restore-pitr
+spec:
+  instances: 3
+
+  storage:
+    size: 5Gi
+
+  bootstrap:
+    fullRecovery:
+      backup:
+        name: backup-example
+
+      recoveryTarget:
+        targetTime: "2020-11-26 15:22:00.00000+00"

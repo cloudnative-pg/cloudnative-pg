@@ -34,6 +34,7 @@ Below you will find a description of the defined resources:
 * [DataBackupConfiguration](#databackupconfiguration)
 * [NodeMaintenanceWindow](#nodemaintenancewindow)
 * [PostgresConfiguration](#postgresconfiguration)
+* [RecoveryTarget](#recoverytarget)
 * [RollingUpdateStatus](#rollingupdatestatus)
 * [S3Credentials](#s3credentials)
 * [StorageConfiguration](#storageconfiguration)
@@ -143,6 +144,7 @@ BootstrapFullRecovery contains the configuration required to restore the backup 
 | Field | Description | Scheme | Required |
 | ----- | ----------- | ------ | -------- |
 | backup | The backup we need to restore | corev1.LocalObjectReference | true |
+| recoveryTarget | By default the recovery will end as soon as a consistent state is reached: in this case that means at the end of a backup. This option allows to fine tune the recovery process | *[RecoveryTarget](#recoverytarget) | false |
 
 
 ## BootstrapInitDB
@@ -254,6 +256,21 @@ PostgresConfiguration defines the PostgreSQL configuration
 | ----- | ----------- | ------ | -------- |
 | parameters | PostgreSQL configuration options (postgresql.conf) | map[string]string | false |
 | pg_hba | PostgreSQL Host Based Authentication rules (lines to be appended to the pg_hba.conf file) | []string | false |
+
+
+## RecoveryTarget
+
+RecoveryTarget allows to configure the moment where the recovery process will stop. All the target options except TargetTLI are mutually exclusive.
+
+| Field | Description | Scheme | Required |
+| ----- | ----------- | ------ | -------- |
+| targetTLI | The target timeline | *int32 | false |
+| targetXID | The target transaction ID | string | false |
+| targetName | The target name (to be previously created with `pg_create_restore_point`) | string | false |
+| targetLSN | The target LSN (Log Sequence Number) | string | false |
+| targetTime | The target time, in any unambiguous representation allowed by PostgreSQL | string | false |
+| targetImmediate | End recovery as soon as a consistent state is reached | *bool | false |
+| exclusive | Set the target to be exclusive (defaults to true) | *bool | false |
 
 
 ## RollingUpdateStatus

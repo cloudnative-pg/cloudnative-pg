@@ -41,6 +41,7 @@ func InstanceManagerCommand(args []string) {
 	var backupName string
 	var namespace string
 	var initDBFlagsString string
+	var recoveryTarget string
 
 	initCommand := flag.NewFlagSet("init", flag.ExitOnError)
 	initCommand.StringVar(&pwFile, "pw-file", "",
@@ -91,6 +92,8 @@ func InstanceManagerCommand(args []string) {
 		"current cluster in k8s, used to coordinate switchover and failover")
 	restoreCommand.StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and the Pod in k8s")
+	restoreCommand.StringVar(&recoveryTarget, "target", "", "The recovery target in the form of "+
+		"PostgreSQL options")
 
 	statusCommand := flag.NewFlagSet("status", flag.ExitOnError)
 
@@ -164,12 +167,13 @@ func InstanceManagerCommand(args []string) {
 		// Ignore errors; restoreCommand is set for ExitOnError.
 		_ = restoreCommand.Parse(args[1:])
 		info := postgres.InitInfo{
-			PgData:       pgData,
-			PasswordFile: pwFile,
-			ClusterName:  clusterName,
-			Namespace:    namespace,
-			BackupName:   backupName,
-			ParentNode:   parentNode,
+			PgData:         pgData,
+			PasswordFile:   pwFile,
+			ClusterName:    clusterName,
+			Namespace:      namespace,
+			BackupName:     backupName,
+			ParentNode:     parentNode,
+			RecoveryTarget: recoveryTarget,
 		}
 
 		restoreSubCommand(info)

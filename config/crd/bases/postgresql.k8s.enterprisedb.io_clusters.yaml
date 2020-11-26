@@ -204,6 +204,40 @@ spec:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                    recoveryTarget:
+                      description: 'By default the recovery will end as soon as a
+                        consistent state is reached: in this case that means at the
+                        end of a backup. This option allows to fine tune the recovery
+                        process'
+                      properties:
+                        exclusive:
+                          description: Set the target to be exclusive (defaults to
+                            true)
+                          type: boolean
+                        targetImmediate:
+                          description: End recovery as soon as a consistent state
+                            is reached
+                          type: boolean
+                        targetLSN:
+                          description: The target LSN (Log Sequence Number)
+                          type: string
+                        targetName:
+                          description: The target name (to be previously created with
+                            `pg_create_restore_point`)
+                          type: string
+                        targetTLI:
+                          description: The target timeline
+                          format: int32
+                          minimum: 1
+                          type: integer
+                        targetTime:
+                          description: The target time, in any unambiguous representation
+                            allowed by PostgreSQL
+                          type: string
+                        targetXID:
+                          description: The target transaction ID
+                          type: string
+                      type: object
                   required:
                   - backup
                   type: object
