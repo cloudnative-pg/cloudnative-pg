@@ -17,6 +17,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -40,6 +41,7 @@ type ClusterReconciler struct {
 	client.Client
 	Log             logr.Logger
 	Scheme          *runtime.Scheme
+	Recorder        record.EventRecorder
 	podExpectations *expectations.ControllerExpectations
 	jobExpectations *expectations.ControllerExpectations
 	pvcExpectations *expectations.ControllerExpectations

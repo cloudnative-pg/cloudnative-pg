@@ -40,9 +40,12 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 
 	// Set targetPrimary to do a failover if needed
 	if !status.Items[0].IsPrimary {
-		log.Info("Current primary isn't valid, failing over",
+		log.Info("Current primary isn't healthy, failing over",
 			"newPrimary", status.Items[0].PodName,
 			"clusterStatus", status)
+		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
+			"Current primary isn't healthy, failing over from %v to %v",
+			cluster.Status.TargetPrimary, status.Items[0].PodName)
 		if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseFailOver,
 			fmt.Sprintf("Failing over to %v", status.Items[0].PodName)); err != nil {
 			return err
@@ -68,6 +71,15 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 			"are ready, switching over to complete configuration apply",
 			"newPrimary", status.Items[1].PodName,
 			"clusterStatus", status)
+		r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
+			"Current primary %v is needing a restart and the replicas "+
+				"are ready, switching over to %v to complete configuration apply",
+			cluster.Status.TargetPrimary, status.Items[1].PodName)
+		if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseFailOver,
+			fmt.Sprintf("Switching over to %v to complete configuration apply",
+				status.Items[1].PodName)); err != nil {
+			return err
+		}
 		return r.setPrimaryInstance(ctx, cluster, status.Items[1].PodName)
 	}
 

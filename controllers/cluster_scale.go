@@ -34,6 +34,9 @@ func (r *ClusterReconciler) scaleDownCluster(
 		return nil
 	}
 
+	r.Recorder.Eventf(cluster, "Normal", "DeletingInstance",
+		"Scaling down: removing instance %v", sacrificialPod.Name)
+
 	// Retrieve the cluster key
 	key := expectations.KeyFunc(cluster)
 

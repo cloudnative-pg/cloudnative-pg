@@ -120,9 +120,6 @@ func (r *ClusterReconciler) upgradeCluster(
 	// we "just" need to delete the Pod we have, waiting for it to be
 	// created again with the same storage.
 	if cluster.Spec.Instances == 1 {
-		// TODO: Add an event for this cluster, notifying the user
-		// that we are updating the primary Pod given this is
-		// a single-node cluster
 		return r.upgradePod(ctx, cluster, &sortedPodList[0])
 	}
 
@@ -137,6 +134,9 @@ func (r *ClusterReconciler) upgradeCluster(
 		"oldPrimary", cluster.Status.TargetPrimary,
 		"newPrimary", clusterStatus.Items[1].PodName,
 		"status", clusterStatus)
+	r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
+		"Switching over from %v to %v to complete upgrade",
+		cluster.Status.TargetPrimary, clusterStatus.Items[1].PodName)
 	return r.setPrimaryInstance(ctx, cluster, clusterStatus.Items[1].PodName)
 }
 
@@ -147,6 +147,9 @@ func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *v1alpha1.Cl
 	log.Info("Deleting old Pod",
 		"pod", pod.Name,
 		"to", cluster.Spec.ImageName)
+
+	r.Recorder.Eventf(cluster, "Normal", "UpgradingInstance",
+		"Upgrading instance %v", pod.Name)
 
 	// We expect the deletion of the selected Pod
 	if err := r.podExpectations.ExpectDeletions(expectations.KeyFunc(cluster), 1); err != nil {

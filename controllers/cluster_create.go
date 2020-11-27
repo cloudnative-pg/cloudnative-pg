@@ -13,7 +13,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -94,6 +93,7 @@ func (r *ClusterReconciler) createOrPatchPostgresConfigMap(ctx context.Context, 
 			return fmt.Errorf("while getting config map: %w", err)
 		}
 
+		r.Recorder.Event(cluster, "Normal", "CreatingConfigMap", "Creating Cluster ConfigMap")
 		return r.createPostgresConfigMap(ctx, cluster)
 	}
 
@@ -105,6 +105,8 @@ func (r *ClusterReconciler) createOrPatchPostgresConfigMap(ctx context.Context, 
 		// Everything fine, the two config maps are exactly the same
 		return nil
 	}
+
+	r.Recorder.Event(cluster, "Normal", "UpdatingConfigMap", "Updating Cluster ConfigMap")
 
 	// The configuration changed, and we need the patch the
 	// configMap we have
@@ -225,9 +227,13 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 	specs.SetOperatorVersion(&targetPdb.ObjectMeta, versions.Version)
 
 	err := r.Create(ctx, &targetPdb)
-	if err != nil && !apierrs.IsAlreadyExists(err) {
-		log.Error(err, "Unable to create PodDisruptionBugdet", "object", targetPdb)
-		return err
+	if err != nil {
+		if !apierrs.IsAlreadyExists(err) {
+			log.Error(err, "Unable to create PodDisruptionBugdet", "object", targetPdb)
+			return err
+		}
+	} else {
+		r.Recorder.Event(cluster, "Normal", "CreatingPodDisruptionBugdet", "Creating Pod Disruption Budget")
 	}
 
 	return nil
@@ -235,20 +241,28 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 
 // deletePodDisruptionBudget ensure that we delete the PDB requiring to remove one node at a time
 func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, cluster *v1alpha1.Cluster) error {
+	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	// If we have a PDB, we need to delete it
 	var targetPdb v1beta1.PodDisruptionBudget
 	err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &targetPdb)
-	if apierrs.IsNotFound(err) {
-		// Nothing to do here
+	if err != nil {
+		if !apierrs.IsNotFound(err) {
+			log.Error(err, "Unable to retrieve PodDisruptionBugdet")
+			return err
+		}
 		return nil
 	}
-	if err != nil {
-		return errors.Wrap(err, "Unable to Get PDB")
-	}
+
+	r.Recorder.Event(cluster, "Normal", "DeletingPodDisruptionBugdet", "Deleting Pod Disruption Budget")
 
 	err = r.Delete(ctx, &targetPdb)
 	if err != nil {
-		return errors.Wrap(err, "Can't delete PDB while cluster is in upgrade mode.")
+		if !apierrs.IsNotFound(err) {
+			log.Error(err, "Unable to delete PodDisruptionBugdet", "object", targetPdb)
+			return err
+		}
+		return nil
 	}
 	return nil
 }
@@ -463,8 +477,11 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 			return ctrl.Result{}, fmt.Errorf("cannot get the backup object: %w", err)
 		}
+
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
 		job = specs.CreatePrimaryJobViaFullRecovery(*cluster, nodeSerial, &backup)
 	} else {
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
 		job = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial)
 	}
 
@@ -527,6 +544,9 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	log.Info("Creating new Job",
 		"job", job.Name,
 		"primary", false)
+
+	r.Recorder.Eventf(cluster, "Normal", "CreatingInstance",
+		"Creating instance %v-%v", cluster.Name, nodeSerial)
 
 	if err := r.RegisterPhase(ctx, cluster,
 		v1alpha1.PhaseCreatingReplica,
