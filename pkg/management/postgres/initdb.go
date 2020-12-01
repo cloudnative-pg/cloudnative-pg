@@ -61,6 +61,9 @@ type InitInfo struct {
 	// The recovery target options, only applicable for the
 	// fullRecovery bootstrap type
 	RecoveryTarget string
+
+	// Whether it is a temporary instance that will never contain real data.
+	Temporary bool
 }
 
 const (
@@ -113,7 +116,11 @@ func (info InitInfo) CreateDataDirectory() error {
 		"postgres",
 		"-D",
 		info.PgData,
-		"--no-sync",
+	}
+
+	// If temporary instance disable fsync on creation
+	if info.Temporary {
+		options = append(options, "--no-sync")
 	}
 
 	// Add custom initdb options from the user
