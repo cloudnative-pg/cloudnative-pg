@@ -13,6 +13,7 @@ import (
 	"os"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
 )
 
 // BootstrapIntoCommand is called by the controller manager to copy the operator executable
@@ -26,13 +27,17 @@ func BootstrapIntoCommand(executablePath string, args []string) {
 
 	dest := args[0]
 
+	log.Log.Info("Installing the manager executable to " + dest)
 	err := fileutils.CopyFile(executablePath, dest)
 	if err != nil {
 		panic(err)
 	}
 
+	log.Log.Info("Setting 0755 permissions")
 	err = os.Chmod(dest, 0755) // #nosec
 	if err != nil {
 		panic(err)
 	}
+
+	log.Log.Info("Bootstrap completed")
 }
