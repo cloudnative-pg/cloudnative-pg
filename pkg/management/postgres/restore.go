@@ -213,7 +213,8 @@ func (info InitInfo) writeInitialPostgresqlConf(client dynamic.Interface) error 
 	}()
 
 	temporaryInitInfo := InitInfo{
-		PgData: tempDataDir,
+		PgData:    tempDataDir,
+		Temporary: true,
 	}
 
 	if err = temporaryInitInfo.CreateDataDirectory(); err != nil {
