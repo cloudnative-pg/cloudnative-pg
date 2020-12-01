@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/expectations"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
 )
 
@@ -37,8 +38,11 @@ var (
 // ClusterReconciler reconciles a Cluster objects
 type ClusterReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log             logr.Logger
+	Scheme          *runtime.Scheme
+	podExpectations *expectations.ControllerExpectations
+	jobExpectations *expectations.ControllerExpectations
+	pvcExpectations *expectations.ControllerExpectations
 }
 
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list
@@ -109,7 +113,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Update the status section of this Cluster resource
-	if err = r.updateResourceStatus(ctx, &cluster, resources.pods, resources.pvcs); err != nil {
+	if err = r.updateResourceStatus(ctx, &cluster, resources); err != nil {
 		if apierrs.IsConflict(err) {
 			// Let's wait for another reconciler loop, since the
 			// status already changed
@@ -139,17 +143,6 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, fmt.Errorf("cannot get status from instances: %w", err)
 	}
 
-	// Recreate missing Pods
-	if len(cluster.Status.DanglingPVC) > 0 {
-		if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
-			// A pod is not ready, let's retry
-			log.V(2).Info("Waiting for node to be ready before attaching PVCs")
-			return ctrl.Result{}, nil
-		}
-
-		return ctrl.Result{}, r.handleDanglingPVC(ctx, &cluster)
-	}
-
 	// Update the target primary name from the Pods status.
 	// This means issuing a failover or switchover when needed.
 	if err = r.updateTargetPrimaryFromPods(ctx, &cluster, instancesStatus); err != nil {
@@ -159,6 +152,47 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// Update the labels for the -rw service to work correctly
 	if err = r.updateLabelsOnPods(ctx, &cluster, resources.pods); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update labels on pods: %w", err)
+	}
+
+	// Act on Pods only if there is nothing that is currently being created or deleted
+	if r.SatisfiedExpectations(&cluster) {
+		return r.ReconcilePods(ctx, req, &cluster, resources.pods, instancesStatus)
+	}
+
+	log.V(2).Info("A managed resource is currently being created or deleted. Waiting")
+	return ctrl.Result{}, nil
+}
+
+// SatisfiedExpectations check if the expectations for a certain cluster are met
+func (r *ClusterReconciler) SatisfiedExpectations(cluster *v1alpha1.Cluster) bool {
+	key := expectations.KeyFunc(cluster)
+	if !r.podExpectations.SatisfiedExpectations(key) {
+		return false
+	}
+	if !r.jobExpectations.SatisfiedExpectations(key) {
+		return false
+	}
+	if !r.pvcExpectations.SatisfiedExpectations(key) {
+		return false
+	}
+
+	return true
+}
+
+// ReconcilePods decides when to create, scale up/down or wait for pods
+func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request, cluster *v1alpha1.Cluster,
+	childPods corev1.PodList, instancesStatus postgres.PostgresqlStatusList) (ctrl.Result, error) {
+	log := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
+
+	// Recreate missing Pods
+	if len(cluster.Status.DanglingPVC) > 0 {
+		if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
+			// A pod is not ready, let's retry
+			log.V(2).Info("Waiting for node to be ready before attaching PVCs")
+			return ctrl.Result{}, nil
+		}
+
+		return ctrl.Result{}, r.handleDanglingPVC(ctx, cluster)
 	}
 
 	// We have these cases now:
@@ -172,33 +206,25 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// 3 - We have already some Pods, all they all ready ==> we can create the other
 	// pods joining the node that we already have.
 	if cluster.Status.Instances == 0 {
-		return r.createPrimaryInstance(ctx, &cluster)
+		return r.createPrimaryInstance(ctx, cluster)
 	}
 
-	if cluster.Status.ReadyInstances != cluster.Status.Instances ||
-		cluster.Status.Instances != cluster.Spec.Instances {
-		return r.ReconcilePods(ctx, req, &cluster, resources.pods)
+	// When everything is reconciled, update the status
+	if cluster.Status.ReadyInstances == cluster.Status.Instances &&
+		cluster.Status.Instances == cluster.Spec.Instances {
+		if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseHealthy, ""); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Check if we need to handle a rolling upgrade
+		return ctrl.Result{}, r.upgradeCluster(ctx, cluster, childPods, instancesStatus)
 	}
-
-	err = r.RegisterPhase(ctx, &cluster, v1alpha1.PhaseHealthy, "")
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Check if we need to handle a rolling upgrade
-	return ctrl.Result{}, r.upgradeCluster(ctx, &cluster, resources.pods, instancesStatus)
-}
-
-// ReconcilePods decides when to create, scale up/down or wait for pods
-func (r *ClusterReconciler) ReconcilePods(ctx context.Context,
-	req ctrl.Request, cluster *v1alpha1.Cluster, childPods corev1.PodList) (ctrl.Result, error) {
-	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", req.Namespace, "name", req.Name)
 
 	// Find if we have Pods that are not ready, this is OK
 	// only if we are in upgrade mode and we have choose to just
 	// wait for the node to come up
 	if !cluster.IsNodeMaintenanceWindowReusePVC() && cluster.Status.ReadyInstances < cluster.Status.Instances {
-		// A pod is not ready, let's retry
+		// A Pod is not ready, let's retry
 		log.V(2).Info("Waiting for Pod to be ready")
 		return ctrl.Result{}, nil
 	}
@@ -218,8 +244,6 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context,
 		if err := r.scaleDownCluster(ctx, cluster, childPods); err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot scale down cluster: %w", err)
 		}
-
-		return ctrl.Result{}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -227,6 +251,11 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context,
 
 // SetupWithManager creates a ClusterReconciler
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Initialize expectations
+	r.podExpectations = expectations.NewControllerExpectations()
+	r.jobExpectations = expectations.NewControllerExpectations()
+	r.pvcExpectations = expectations.NewControllerExpectations()
+
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by this controller
 	if err := mgr.GetFieldIndexer().IndexField(

@@ -177,6 +177,12 @@ type ClusterStatus struct {
 	// during a switchover or a failover
 	TargetPrimary string `json:"targetPrimary,omitempty"`
 
+	// How many PVCs have been created by this cluster
+	PVCCount int32 `json:"pvcCount,omitempty"`
+
+	// How many Jobs have been created by this cluster
+	JobCount int32 `json:"jobCount,omitempty"`
+
 	// List of all the PVCs created by this cluster and still available
 	// which are not attached to a Pod
 	DanglingPVC []string `json:"danglingPVC,omitempty"`

@@ -13,8 +13,10 @@ import (
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/expectations"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
 )
@@ -134,7 +136,22 @@ func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *v1alpha1.Cl
 		"pod", pod.Name,
 		"to", cluster.Spec.ImageName)
 
-	// Let's wait for this Pod to be recloned or recreated using the
-	// same storage
-	return r.Delete(ctx, pod)
+	// We expect the deletion of the selected Pod
+	if err := r.podExpectations.ExpectDeletions(expectations.KeyFunc(cluster), 1); err != nil {
+		log.Error(err, "Unable to set podExpectations",
+			"key", expectations.KeyFunc(cluster), "dels", 1)
+	}
+
+	// Let's wait for this Pod to be recloned or recreated using the same storage
+	if err := r.Delete(ctx, pod); err != nil {
+		// We cannot observe a deletion if it was not accepted by the server
+		r.podExpectations.DeletionObserved(expectations.KeyFunc(cluster))
+
+		// Ignore if NotFound, otherwise report the error
+		if !apierrs.IsNotFound(err) {
+			return err
+		}
+	}
+
+	return nil
 }

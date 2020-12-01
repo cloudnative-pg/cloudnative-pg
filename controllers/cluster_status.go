@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/expectations"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 )
@@ -117,24 +118,45 @@ func (r *ClusterReconciler) getManagedJobs(
 func (r *ClusterReconciler) updateResourceStatus(
 	ctx context.Context,
 	cluster *v1alpha1.Cluster,
-	childPods corev1.PodList,
-	childPVCs corev1.PersistentVolumeClaimList,
+	resources *managedResources,
 ) error {
+	// Retrieve the cluster key
+	key := expectations.KeyFunc(cluster)
+
 	existingClusterStatus := cluster.Status
 
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones
-	filteredPods := utils.FilterActivePods(childPods.Items)
+	filteredPods := utils.FilterActivePods(resources.pods.Items)
 
 	// Fill the list of dangling PVCs
-	cluster.Status.DanglingPVC = specs.DetectDanglingPVCs(filteredPods, childPVCs.Items)
+	oldPVCCount := cluster.Status.PVCCount
+	newPVCCount := int32(len(resources.pvcs.Items))
+	cluster.Status.PVCCount = newPVCCount
+	cluster.Status.DanglingPVC = specs.DetectDanglingPVCs(filteredPods, resources.pvcs.Items)
+
+	// Update the pvcExpectations for the cluster
+	r.pvcExpectations.LowerExpectationsDelta(key, int(newPVCCount-oldPVCCount))
 
 	// Count pods
-	cluster.Status.Instances = int32(len(filteredPods))
+	oldInstances := cluster.Status.Instances
+	newInstances := int32(len(filteredPods))
+	cluster.Status.Instances = newInstances
 	cluster.Status.ReadyInstances = int32(utils.CountReadyPods(filteredPods))
 
+	// Update the podExpectations for the cluster
+	r.podExpectations.LowerExpectationsDelta(key, int(newInstances-oldInstances))
+
+	// Count jobs
+	oldJobs := cluster.Status.JobCount
+	newJobs := int32(len(resources.jobs.Items))
+	cluster.Status.JobCount = newJobs
+
+	// Update the jobExpectations for the cluster
+	r.jobExpectations.LowerExpectationsDelta(key, int(newJobs-oldJobs))
+
 	// Instances status
-	cluster.Status.InstancesStatus = utils.ListStatusPods(childPods.Items)
+	cluster.Status.InstancesStatus = utils.ListStatusPods(resources.pods.Items)
 
 	// Services
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
