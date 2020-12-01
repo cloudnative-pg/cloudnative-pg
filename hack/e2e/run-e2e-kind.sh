@@ -71,7 +71,7 @@ install_go_tools() {
     GO_TMP_DIR=$(mktemp -d)
     cd "$GO_TMP_DIR"
     go mod init tmp
-    go get sigs.k8s.io/kubetest2/...@latest
+    go get sigs.k8s.io/kubetest2/...@ec3b910313a8c9b22d61372930e32dc99f2a7482
     go get -u github.com/onsi/ginkgo/ginkgo
     rm -rf "$GO_TMP_DIR"
     cd -
