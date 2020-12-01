@@ -65,7 +65,7 @@ type ClusterReconciler struct {
 // Reconcile is the operator reconciler loop
 func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", req.Namespace, "name", req.Name)
+	log := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
 
 	var cluster v1alpha1.Cluster
 	if err := r.Get(ctx, req.NamespacedName, &cluster); err != nil {

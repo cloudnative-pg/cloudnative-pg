@@ -27,7 +27,7 @@ func BootstrapIntoCommand(executablePath string, args []string) {
 
 	dest := args[0]
 
-	log.Log.Info("Installing the manager executable to " + dest)
+	log.Log.Info("Installing the manager executable", "destination", dest)
 	err := fileutils.CopyFile(executablePath, dest)
 	if err != nil {
 		panic(err)

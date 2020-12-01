@@ -8,10 +8,12 @@ package utils
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-var log = zap.Logger(true).WithName("omnidb")
+var (
+	log = ctrl.Log.WithName("utils")
+)
 
 // IsPodReady check if a Pod is ready or not
 func IsPodReady(pod corev1.Pod) bool {
