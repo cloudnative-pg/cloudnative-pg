@@ -1,1 +1,2 @@
-cluster-storage-class.yaml
+cluster-three-instances.yaml
+cluster-single-instance.yaml
