@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/expectations"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
@@ -417,9 +418,20 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, err
 	}
 
+	// Retrieve the cluster key
+	key := expectations.KeyFunc(cluster)
+
+	// We expect the creation of a PVC
+	if err := r.pvcExpectations.ExpectCreations(key, 1); err != nil {
+		log.Error(err, "Unable to set pvcExpectations", "key", key, "adds", 1)
+	}
+
 	utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
+		// We cannot observe a creation if it was not accepted by the server
+		r.pvcExpectations.CreationObserved(key)
+
 		log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 		return ctrl.Result{}, err
 	}
@@ -473,7 +485,15 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	specs.SetOperatorVersion(&job.ObjectMeta, versions.Version)
 
+	// We expect the creation of a Job
+	if err := r.jobExpectations.ExpectCreations(key, 1); err != nil {
+		log.Error(err, "Unable to set jobExpectations", "key", key, "adds", 1)
+	}
+
 	if err = r.Create(ctx, job); err != nil {
+		// We cannot observe a creation if it was not accepted by the server
+		r.jobExpectations.CreationObserved(key)
+
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			// Let's reconcile another time
@@ -516,7 +536,18 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 	specs.SetOperatorVersion(&job.ObjectMeta, versions.Version)
 
+	// Retrieve the cluster key
+	key := expectations.KeyFunc(cluster)
+
+	// We expect the creation of a PVC
+	if err := r.pvcExpectations.ExpectCreations(key, 1); err != nil {
+		log.Error(err, "Unable to set pvcExpectations", "key", key, "adds", 1)
+	}
+
 	if err = r.Create(ctx, job); err != nil {
+		// We cannot observe a creation if it was not accepted by the server
+		r.pvcExpectations.CreationObserved(key)
+
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			// Let's reconcile another time
@@ -544,7 +575,16 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 	utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
+
+	// We expect the creation of a PVC
+	if err := r.pvcExpectations.ExpectCreations(key, 1); err != nil {
+		log.Error(err, "Unable to set pvcExpectations", "key", key, "adds", 1)
+	}
+
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
+		// We cannot observe a creation if it was not accepted by the server
+		r.pvcExpectations.CreationObserved(key)
+
 		log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 		return ctrl.Result{}, err
 	}
@@ -596,7 +636,15 @@ func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *v1al
 
 	specs.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
 
+	// We expect the creation of a Pod
+	if err := r.podExpectations.ExpectCreations(expectations.KeyFunc(cluster), 1); err != nil {
+		log.Error(err, "Unable to set podExpectations", "key", expectations.KeyFunc(cluster), "adds", 1)
+	}
+
 	if err := r.Create(ctx, pod); err != nil {
+		// We cannot observe a creation if it was not accepted by the server
+		r.podExpectations.CreationObserved(expectations.KeyFunc(cluster))
+
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
@@ -634,12 +682,28 @@ func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *v1a
 
 		err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: pvcName}, &pvc)
 		if err != nil {
-			return err
+			// Ignore if NotFound, otherwise report the error
+			if apierrs.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
+		}
+
+		// We expect the deletion of a PVC
+		if err := r.pvcExpectations.ExpectDeletions(expectations.KeyFunc(cluster), 1); err != nil {
+			log.Error(err, "Unable to set podExpectations", "key", expectations.KeyFunc(cluster), "dels", 1)
 		}
 
 		err = r.Delete(ctx, &pvc)
 		if err != nil {
-			return err
+			// We cannot observe a deletion if it was not accepted by the server
+			r.podExpectations.DeletionObserved(expectations.KeyFunc(cluster))
+
+			// Ignore if NotFound, otherwise report the error
+			if apierrs.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
 		}
 	}
 

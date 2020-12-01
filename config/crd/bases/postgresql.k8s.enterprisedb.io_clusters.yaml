@@ -551,6 +551,10 @@ spec:
                 type: array
               description: Instances status
               type: object
+            jobCount:
+              description: How many Jobs have been created by this cluster
+              format: int32
+              type: integer
             latestGeneratedNode:
               description: ID of the latest generated node (used to avoid node name
                 clashing)
@@ -562,6 +566,10 @@ spec:
             phaseReason:
               description: Reason for the current phase
               type: string
+            pvcCount:
+              description: How many PVCs have been created by this cluster
+              format: int32
+              type: integer
             readService:
               description: Current list of read pods
               type: string

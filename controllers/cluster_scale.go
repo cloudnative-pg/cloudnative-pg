@@ -11,9 +11,11 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/expectations"
 )
 
 // scaleDownCluster handles the scaling down operations of a PostgreSQL cluster.
@@ -32,13 +34,26 @@ func (r *ClusterReconciler) scaleDownCluster(
 		return nil
 	}
 
+	// Retrieve the cluster key
+	key := expectations.KeyFunc(cluster)
+
+	// We expect the deletion of the selected Pod
+	if err := r.podExpectations.ExpectDeletions(key, 1); err != nil {
+		log.Error(err, "Unable to set podExpectations", "key", key, "dels", 1)
+	}
+
 	log.Info("Too many nodes for cluster, deleting an instance",
 		"pod", sacrificialPod.Name)
-	err := r.Delete(ctx, sacrificialPod)
-	if err != nil {
-		log.Error(err, "Cannot kill the Pod to scale down",
-			"pod", sacrificialPod.Name)
-		return err
+	if err := r.Delete(ctx, sacrificialPod); err != nil {
+		// We cannot observe a deletion if it was not accepted by the server
+		r.podExpectations.DeletionObserved(key)
+
+		// Ignore if NotFound, otherwise report the error
+		if !apierrs.IsNotFound(err) {
+			log.Error(err, "Cannot kill the Pod to scale down",
+				"pod", sacrificialPod.Name)
+			return err
+		}
 	}
 
 	// Let's drop the PVC too
@@ -48,9 +63,21 @@ func (r *ClusterReconciler) scaleDownCluster(
 			Namespace: sacrificialPod.Namespace,
 		},
 	}
-	err = r.Delete(ctx, &pvc)
+
+	// We expect the deletion of the selected PVC
+	if err := r.pvcExpectations.ExpectDeletions(key, 1); err != nil {
+		log.Error(err, "Unable to set pvcExpectations", "key", key, "dels", 1)
+	}
+
+	err := r.Delete(ctx, &pvc)
 	if err != nil {
-		return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialPod.Name, err)
+		// We cannot observe a deletion if it was not accepted by the server
+		r.pvcExpectations.DeletionObserved(key)
+
+		// Ignore if NotFound, otherwise report the error
+		if !apierrs.IsNotFound(err) {
+			return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialPod.Name, err)
+		}
 	}
 
 	return nil

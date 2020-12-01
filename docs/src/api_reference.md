@@ -217,6 +217,8 @@ ClusterStatus defines the observed state of Cluster
 | latestGeneratedNode | ID of the latest generated node (used to avoid node name clashing) | int32 | false |
 | currentPrimary | Current primary instance | string | false |
 | targetPrimary | Target primary instance, this is different from the previous one during a switchover or a failover | string | false |
+| pvcCount | How many PVCs have been created by this cluster | int32 | false |
+| jobCount | How many Jobs have been created by this cluster | int32 | false |
 | danglingPVC | List of all the PVCs created by this cluster and still available which are not attached to a Pod | []string | false |
 | writeService | Current write pod | string | false |
 | readService | Current list of read pods | string | false |
