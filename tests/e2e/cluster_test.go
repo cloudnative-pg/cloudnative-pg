@@ -55,19 +55,23 @@ var _ = Describe("Cluster", func() {
 			_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + sample)
 			Expect(err).To(BeNil())
 		})
-		By("having a Cluster with 3 nodes ready", func() {
+		By("having a Cluster with each instance in status ready", func() {
 			// Setting up a cluster with three pods is slow, usually 200-600s
 			timeout := 600
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      clusterName,
 			}
-
+			// Eventually the number of ready instances should be equal to the
+			// amount of instances defined in the cluster
+			cr := &clusterv1alpha1.Cluster{}
+			err := env.Client.Get(env.Ctx, namespacedName, cr)
+			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int32, error) {
 				cr := &clusterv1alpha1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cr)
 				return cr.Status.ReadyInstances, err
-			}, timeout).Should(BeEquivalentTo(3))
+			}, timeout).Should(BeEquivalentTo(cr.Spec.Instances))
 		})
 	}
 
@@ -598,6 +602,37 @@ var _ = Describe("Cluster", func() {
 	})
 
 	Context("Cluster rolling updates", func() {
+		// GatherClusterInfo returns the current lists of pods, pod UIDs and pvc UIDs in a given cluster
+		GatherClusterInfo := func(namespace string, clusterName string) ([]string, []types.UID, []types.UID, error) {
+			var podNames []string
+			var podUIDs []types.UID
+			var pvcUIDs []types.UID
+			podList := &corev1.PodList{}
+			if err := env.Client.List(
+				env.Ctx, podList, ctrlclient.InNamespace(namespace),
+				ctrlclient.MatchingLabels{"postgresql": clusterName},
+			); err != nil {
+				return nil, nil, nil, err
+			}
+			for _, pod := range podList.Items {
+				podNames = append(podNames, pod.GetName())
+				podUIDs = append(podUIDs, pod.GetUID())
+				pvcName := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
+				pvc := &corev1.PersistentVolumeClaim{}
+				namespacedPVCName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      pvcName,
+				}
+				if err := env.Client.Get(env.Ctx, namespacedPVCName, pvc); err != nil {
+					return nil, nil, nil, err
+				}
+				pvcUIDs = append(pvcUIDs, pvc.GetUID())
+			}
+			return podNames, podUIDs, pvcUIDs, nil
+		}
+
+		// Verify that after an update all the pods are ready and running
+		// an updated image
 		AssertUpdateImage := func(namespace string, clusterName string) {
 			timeout := 600
 
@@ -638,13 +673,13 @@ var _ = Describe("Cluster", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// All the postgres containers should have the updated image
-			Eventually(func() (int, error) {
+			Eventually(func() (int32, error) {
 				podList := &corev1.PodList{}
 				err := env.Client.List(
 					env.Ctx, podList, ctrlclient.InNamespace(namespace),
 					ctrlclient.MatchingLabels{"postgresql": clusterName},
 				)
-				updatedPods := 0
+				updatedPods := int32(0)
 				for _, pod := range podList.Items {
 					// We need to check if a pod is ready, otherwise we
 					// may end up asking the status of a container that
@@ -662,7 +697,7 @@ var _ = Describe("Cluster", func() {
 					}
 				}
 				return updatedPods, err
-			}, timeout).Should(BeEquivalentTo(3))
+			}, timeout).Should(BeEquivalentTo(cr.Spec.Instances))
 
 			// All the pods should be ready
 			Eventually(func() (int32, error) {
@@ -673,9 +708,10 @@ var _ = Describe("Cluster", func() {
 				}
 				err := env.Client.Get(env.Ctx, namespacedName, cr)
 				return cr.Status.ReadyInstances, err
-			}, timeout).Should(BeEquivalentTo(3))
+			}, timeout).Should(BeEquivalentTo(cr.Spec.Instances))
 		}
 
+		// Verify that the pod name changes amount to an expected number
 		AssertChangedNames := func(namespace string, clusterName string,
 			originalPodNames []string, expectedUnchangedNames int) {
 			podList := &corev1.PodList{}
@@ -697,6 +733,7 @@ var _ = Describe("Cluster", func() {
 			Expect(matchingNames).To(BeEquivalentTo(expectedUnchangedNames))
 		}
 
+		// Verify that the pod UIDs changes are the expected number
 		AssertNewPodsUID := func(namespace string, clusterName string,
 			originalPodUID []types.UID, expectedUnchangedUIDs int) {
 			podList := &corev1.PodList{}
@@ -718,6 +755,36 @@ var _ = Describe("Cluster", func() {
 			Expect(matchingUID).To(BeEquivalentTo(expectedUnchangedUIDs))
 		}
 
+		// Verify that the PVC UIDs changes are the expected number
+		AssertChangedPvcUID := func(namespace string, clusterName string,
+			originalPVCUID []types.UID, expectedUnchangedPvcUIDs int) {
+			podList := &corev1.PodList{}
+			err := env.Client.List(
+				env.Ctx, podList, ctrlclient.InNamespace(namespace),
+				ctrlclient.MatchingLabels{"postgresql": clusterName},
+			)
+			Expect(err).ToNot(HaveOccurred())
+			matchingPVC := 0
+			for _, pod := range podList.Items {
+				pvcName := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
+
+				pvc := &corev1.PersistentVolumeClaim{}
+				namespacedPVCName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      pvcName,
+				}
+				err := env.Client.Get(env.Ctx, namespacedPVCName, pvc)
+				Expect(err).ToNot(HaveOccurred())
+				for _, oldUID := range originalPVCUID {
+					if pvc.GetUID() == oldUID {
+						matchingPVC++
+					}
+				}
+			}
+			Expect(matchingPVC).To(BeEquivalentTo(expectedUnchangedPvcUIDs))
+		}
+
+		// Verify that the -rw endpoint points to the expected primary
 		AssertPrimary := func(namespace string, clusterName string, expectedPrimaryIdx int) {
 			endpointName := clusterName + "-rw"
 			endpointCr := &corev1.Endpoints{}
@@ -725,20 +792,25 @@ var _ = Describe("Cluster", func() {
 				Namespace: namespace,
 				Name:      endpointName,
 			}
+			err := env.Client.Get(env.Ctx, endpointNamespacedName,
+				endpointCr)
+			Expect(err).ToNot(HaveOccurred())
+
 			podName := clusterName + "-" + strconv.Itoa(expectedPrimaryIdx)
 			podCr := &corev1.Pod{}
 			podNamespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      podName,
 			}
-			err := env.Client.Get(env.Ctx, endpointNamespacedName,
-				endpointCr)
-			Expect(err).To(BeNil())
 			err = env.Client.Get(env.Ctx, podNamespacedName, podCr)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+
 			Expect(endpointCr.Subsets[0].Addresses[0].IP).To(
 				BeEquivalentTo(podCr.Status.PodIP))
 		}
+
+		// Verify that the IPs of the pods match the ones in the -r endpoint and
+		// that the amount of pods is the expected one
 		AssertReadyEndpoint := func(namespace string, clusterName string, expectedEndpoints int) {
 			endpointName := clusterName + "-r"
 			endpointCr := &corev1.Endpoints{}
@@ -748,13 +820,14 @@ var _ = Describe("Cluster", func() {
 			}
 			err := env.Client.Get(env.Ctx, endpointNamespacedName,
 				endpointCr)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			podList := &corev1.PodList{}
 			err = env.Client.List(
 				env.Ctx, podList, ctrlclient.InNamespace(namespace),
 				ctrlclient.MatchingLabels{"postgresql": clusterName},
 			)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(expectedEndpoints).To(BeEquivalentTo(len(podList.Items)))
 			matchingIP := 0
 			for _, pod := range podList.Items {
 				ip := pod.Status.PodIP
@@ -767,108 +840,96 @@ var _ = Describe("Cluster", func() {
 			Expect(matchingIP).To(BeEquivalentTo(expectedEndpoints))
 		}
 
-		Context("Storage Class", func() {
-			const namespace = "cluster-rolling-e2e-storage-class"
+		AssertRollingUpdate := func(namespace string, clusterName string,
+			sampleFile string, expectedPrimaryIdx int) {
+			var originalPodNames []string
+			var originalPodUID []types.UID
+			var originalPVCUID []types.UID
+
+			AssertCreateCluster(namespace, clusterName, sampleFile)
+			// Gather the number of instances in this Cluster
+			cr := &clusterv1alpha1.Cluster{}
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      clusterName,
+			}
+			err := env.Client.Get(env.Ctx, namespacedName, cr)
+			Expect(err).ToNot(HaveOccurred())
+			crInstanceNum := int(cr.Spec.Instances)
+
+			By("Gathering info on the current state", func() {
+				originalPodNames, originalPodUID, originalPVCUID, err = GatherClusterInfo(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+			})
+			By("updating the cluster definition", func() {
+				AssertUpdateImage(namespace, clusterName)
+			})
+			// Since we're using a pvc, after the update the pods should
+			// have been created with the same name using the same pvc.
+			// Here we check that the names we've saved at the beginning
+			// of the It are the same names of the current pods.
+			By("checking that the names of the pods have not changed", func() {
+				AssertChangedNames(namespace, clusterName, originalPodNames, crInstanceNum)
+			})
+			// Even if they have the same names, they should have different
+			// UIDs, as the pods are new. Here we check that the UID
+			// we've saved at the beginning of the It don't match the
+			// current ones.
+			By("checking that the pods are new ones", func() {
+				AssertNewPodsUID(namespace, clusterName, originalPodUID, 0)
+			})
+			// The PVC get reused, so they should have the same UID
+			By("checking that the PVCs are the same", func() {
+				AssertChangedPvcUID(namespace, clusterName, originalPVCUID, crInstanceNum)
+			})
+			// The operator should upgrade the primary last and the primary role
+			// should go to our new TargetPrimary.
+			// In case of single-instance cluster, we expect the primary to just
+			// be deleted and recreated.
+			By("having the current primary on the new TargetPrimary", func() {
+				AssertPrimary(namespace, clusterName, expectedPrimaryIdx)
+			})
+			// Check that the new pods are included in the endpoint
+			By("having each pod included in the -r service", func() {
+				AssertReadyEndpoint(namespace, clusterName, crInstanceNum)
+			})
+		}
+
+		It("can do a rolling update on three instances", func() {
+			const namespace = "cluster-rolling-e2e-three-instances"
 			// We set up a cluster with a previous release of the same PG major
 			// The yaml has been previously generated from a template and
 			// the image name has to be tagged as foo:MAJ.MIN. We'll update
 			// it to foo:MAJ, representing the latest minor.
-			const sampleFile = fixturesDir + "/rolling_updates/cluster-storage-class.yaml"
-			const clusterName = "postgresql-storage-class"
-			BeforeEach(func() {
-				if err := env.CreateNamespace(namespace); err != nil {
-					Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
-				}
-			})
-			AfterEach(func() {
+			const sampleFile = fixturesDir + "/rolling_updates/cluster-three-instances.yaml"
+			const clusterName = "postgresql-three-instances"
+			if err := env.CreateNamespace(namespace); err != nil {
+				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
+			}
+			defer func() {
 				if err := env.DeleteNamespace(namespace); err != nil {
 					Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
 				}
-			})
-			It("can do a rolling update", func() {
-				var originalPodNames []string
-				var originalPodUID []types.UID
-				var originalPVCUID []types.UID
-
-				AssertCreateCluster(namespace, clusterName, sampleFile)
-				By("Gathering info on the current state", func() {
-					podList := &corev1.PodList{}
-					if err := env.Client.List(
-						env.Ctx, podList, ctrlclient.InNamespace(namespace),
-						ctrlclient.MatchingLabels{"postgresql": clusterName},
-					); err != nil {
-						Fail("Unable to get pods in Cluster " + clusterName)
-					}
-					for _, pod := range podList.Items {
-						originalPodNames = append(originalPodNames, pod.GetName())
-						originalPodUID = append(originalPodUID, pod.GetUID())
-						pvcName := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
-						pvc := &corev1.PersistentVolumeClaim{}
-						namespacedPVCName := types.NamespacedName{
-							Namespace: namespace,
-							Name:      pvcName,
-						}
-						if err := env.Client.Get(env.Ctx, namespacedPVCName, pvc); err != nil {
-							Fail("Unable to get pvc in Cluster " + clusterName)
-						}
-						originalPVCUID = append(originalPVCUID, pvc.GetUID())
-					}
-				})
-				By("updating the cluster definition", func() {
-					AssertUpdateImage(namespace, clusterName)
-				})
-				// Since we're using a pvc, after the update the pods should
-				// have been created with the same name using the same pvc.
-				// Here we check that the names we've saved at the beginning
-				// of the It are the same names of the current pods.
-				By("checking that the names of the pods have not changed", func() {
-					AssertChangedNames(namespace, clusterName, originalPodNames, 3)
-				})
-				// Even if they have the same names, they should have different
-				// UIDs, as the pods are new. Here we check that the UID
-				// we've saved at the beginning of the It don't match the
-				// current ones.
-				By("checking that the pods are new ones", func() {
-					AssertNewPodsUID(namespace, clusterName, originalPodUID, 0)
-				})
-				// The PVC get reused, so they should have the same UID
-				By("checking that the PVCs are the same", func() {
-					podList := &corev1.PodList{}
-					err := env.Client.List(
-						env.Ctx, podList, ctrlclient.InNamespace(namespace),
-						ctrlclient.MatchingLabels{"postgresql": clusterName},
-					)
-					Expect(err).To(BeNil())
-					matchingPVC := 0
-					for _, pod := range podList.Items {
-						pvcName := pod.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
-
-						pvc := &corev1.PersistentVolumeClaim{}
-						namespacedPVCName := types.NamespacedName{
-							Namespace: namespace,
-							Name:      pvcName,
-						}
-						err := env.Client.Get(env.Ctx, namespacedPVCName, pvc)
-						Expect(err).To(BeNil())
-						for _, oldUID := range originalPVCUID {
-							if pvc.GetUID() == oldUID {
-								matchingPVC++
-							}
-						}
-					}
-					Expect(matchingPVC).To(BeEquivalentTo(3))
-				})
-				// The operator should upgrade the primary last, so the last
-				// to be updated is node1, and the primary role should go
-				// to node2
-				By("having the current primary on node2", func() {
-					AssertPrimary(namespace, clusterName, 2)
-				})
-				// Check that the new pods are included in the endpoint
-				By("having each pod included in the -r service", func() {
-					AssertReadyEndpoint(namespace, clusterName, 3)
-				})
-			})
+			}()
+			AssertRollingUpdate(namespace, clusterName, sampleFile, 2)
+		})
+		It("can do a rolling updates on a single instance", func() {
+			const namespace = "cluster-rolling-e2e-single-instance"
+			// We set up a cluster with a previous release of the same PG major
+			// The yaml has been previously generated from a template and
+			// the image name has to be tagged as foo:MAJ.MIN. We'll update
+			// it to foo:MAJ, representing the latest minor.
+			const sampleFile = fixturesDir + "/rolling_updates/cluster-single-instance.yaml"
+			const clusterName = "postgresql-single-instance"
+			if err := env.CreateNamespace(namespace); err != nil {
+				Fail(fmt.Sprintf("Unable to create %v namespace", namespace))
+			}
+			defer func() {
+				if err := env.DeleteNamespace(namespace); err != nil {
+					Fail(fmt.Sprintf("Unable to delete %v namespace", namespace))
+				}
+			}()
+			AssertRollingUpdate(namespace, clusterName, sampleFile, 1)
 		})
 	})
 

@@ -2,7 +2,7 @@
 apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
 kind: Cluster
 metadata:
-  name: postgresql-storage-class
+  name: postgresql-three-instances
 spec:
   imageName: ${E2E_PRE_ROLLING_UPDATE_IMG}
   instances: 3
