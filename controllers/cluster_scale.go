@@ -23,7 +23,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 	cluster *v1alpha1.Cluster,
 	childPods v1.PodList,
 ) error {
-	log := r.Log.WithName("cloud-native-postgresql").WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	// Is there one pod to be deleted?
 	sacrificialPod := getSacrificialPod(childPods.Items)
