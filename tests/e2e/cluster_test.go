@@ -18,6 +18,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
@@ -546,7 +547,10 @@ var _ = Describe("Cluster", func() {
 					Fail("Unable to get Cluster " + clusterName)
 				}
 				cr.Status.TargetPrimary = targetPrimary
-				Expect(env.Client.Status().Update(env.Ctx, cr)).To(BeNil())
+				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					return env.Client.Status().Update(env.Ctx, cr)
+				})
+				Expect(err).ToNot(HaveOccurred())
 			})
 			By("waiting that the TargetPrimary become also CurrentPrimary", func() {
 				namespacedName := types.NamespacedName{
@@ -628,8 +632,10 @@ var _ = Describe("Cluster", func() {
 			err = env.Client.Get(env.Ctx, namespacedName, cr)
 			Expect(err).To(BeNil())
 			cr.Spec.ImageName = updatedImageName
-			err = env.Client.Update(env.Ctx, cr)
-			Expect(err).To(BeNil())
+			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				return env.Client.Update(env.Ctx, cr)
+			})
+			Expect(err).ToNot(HaveOccurred())
 
 			// All the postgres containers should have the updated image
 			Eventually(func() (int, error) {
