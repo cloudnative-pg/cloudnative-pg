@@ -9,6 +9,7 @@ package v1alpha1
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -396,11 +397,25 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 	}
 
 	var result field.ErrorList
+
 	if targets > 1 {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "bootstrap", "fullRecovery", "recoveryTarget"),
 			recoveryTarget,
 			"Recovery target options are mutually exclusive"))
+	}
+
+	switch recoveryTarget.TargetTLI {
+	case "", "latest", "current":
+		// Allowed non numeric values
+	default:
+		// Everything else must be a valid positive integer
+		if tli, err := strconv.Atoi(recoveryTarget.TargetTLI); err != nil || tli < 1 {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "fullRecovery", "recoveryTarget", "targetTLI"),
+				recoveryTarget,
+				"recovery target timeline can be set to 'latest', 'current' or a positive integer"))
+		}
 	}
 
 	return result
