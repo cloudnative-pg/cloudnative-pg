@@ -417,6 +417,32 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, nil
 	}
 
+	var backup v1alpha1.Backup
+	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.FullRecovery != nil {
+		backupObjectKey := client.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Spec.Bootstrap.FullRecovery.Backup.Name,
+		}
+		err := r.Get(ctx, backupObjectKey, &backup)
+		if err != nil {
+			if apierrs.IsNotFound(err) {
+				r.Recorder.Eventf(cluster, "Normal", "ErrorNoBackup",
+					"Backup object \"%v/%v\" is missing",
+					backupObjectKey.Namespace, backupObjectKey.Name)
+
+				// Missing backup
+				log.Info("Missing backup object, can't continue full recovery",
+					"backup", cluster.Spec.Bootstrap.FullRecovery.Backup)
+				return ctrl.Result{
+					Requeue:      true,
+					RequeueAfter: time.Minute,
+				}, nil
+			}
+
+			return ctrl.Result{}, fmt.Errorf("cannot get the backup object: %w", err)
+		}
+	}
+
 	// Generate a new node serial
 	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
 	if err != nil {
@@ -459,25 +485,6 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	var job *batchv1.Job
 
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.FullRecovery != nil {
-		var backup v1alpha1.Backup
-		err = r.Get(ctx, client.ObjectKey{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Spec.Bootstrap.FullRecovery.Backup.Name,
-		}, &backup)
-		if err != nil {
-			if apierrs.IsNotFound(err) {
-				// Missing backup
-				log.Info("Missing backup object, can't continue full recovery",
-					"backup", cluster.Spec.Bootstrap.FullRecovery.Backup)
-				return ctrl.Result{
-					Requeue:      true,
-					RequeueAfter: time.Minute,
-				}, nil
-			}
-
-			return ctrl.Result{}, fmt.Errorf("cannot get the backup object: %w", err)
-		}
-
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
 		job = specs.CreatePrimaryJobViaFullRecovery(*cluster, nodeSerial, &backup)
 	} else {
