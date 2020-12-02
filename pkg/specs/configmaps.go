@@ -7,6 +7,8 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package specs
 
 import (
+	"sort"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -40,12 +42,33 @@ func CreatePostgresConfigMap(cluster *v1alpha1.Cluster) (*corev1.ConfigMap, erro
 		return nil, err
 	}
 
-	configFile := postgres.CreatePostgresqlConfFile(
-		postgres.CreatePostgresqlConfiguration(
-			postgres.CnpConfigurationSettings,
-			fromVersion,
-			cluster.Spec.PostgresConfiguration.Parameters,
-			true))
+	info := postgres.ConfigurationInfo{
+		Settings:           postgres.CnpConfigurationSettings,
+		MajorVersion:       fromVersion,
+		UserSettings:       cluster.Spec.PostgresConfiguration.Parameters,
+		IncludingMandatory: true,
+	}
+
+	// We need to include every replica inside the list of possible synchronous standbys
+	info.Replicas = nil
+	for _, instances := range cluster.Status.InstancesStatus {
+		info.Replicas = append(info.Replicas, instances...)
+	}
+
+	// Ensure a consistent ordering to avoid spurious configuration changes
+	sort.Strings(info.Replicas)
+
+	// We start with the number of healthy replicas (healthy pods minus one)
+	// and verify it is between minSyncReplicas and maxSyncReplicas
+	info.SyncReplicas = len(cluster.Status.InstancesStatus[utils.PodHealthy]) - 1
+	if info.SyncReplicas > int(cluster.Spec.MaxSyncReplicas) {
+		info.SyncReplicas = int(cluster.Spec.MaxSyncReplicas)
+	}
+	if info.SyncReplicas < int(cluster.Spec.MinSyncReplicas) {
+		info.SyncReplicas = int(cluster.Spec.MinSyncReplicas)
+	}
+
+	configFile := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
 
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

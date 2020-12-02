@@ -90,6 +90,28 @@ type ConfigurationSettings struct {
 	MandatorySettings SettingsCollection
 }
 
+// ConfigurationInfo contains the required information to create a PostgreSQL
+// configuration
+type ConfigurationInfo struct {
+	// The database settings to be used
+	Settings ConfigurationSettings
+
+	// The major version
+	MajorVersion int
+
+	// The list of user-level settings
+	UserSettings map[string]string
+
+	// If we need to include mandatory settings or not
+	IncludingMandatory bool
+
+	// The list of replicas
+	Replicas []string
+
+	// The number of desired number of synchronous replicas
+	SyncReplicas int
+}
+
 var (
 	// FixedConfigurationParameters contains the parameters that can't be
 	// changed by the user
@@ -221,24 +243,19 @@ func CreateHBARules(hba []string) string {
 
 // CreatePostgresqlConfiguration create the configuration from the settings
 // and the default values
-func CreatePostgresqlConfiguration(
-	settings ConfigurationSettings,
-	majorVersion int,
-	userSettings map[string]string,
-	includingMandatory bool,
-) map[string]string {
+func CreatePostgresqlConfiguration(info ConfigurationInfo) map[string]string {
 	// Start from scratch
 	configuration := make(map[string]string)
 
 	// start from the default settings
-	for key, value := range settings.GlobalDefaultSettings {
+	for key, value := range info.Settings.GlobalDefaultSettings {
 		configuration[key] = value
 	}
 
 	// apply settings relative to a certain PostgreSQL version
-	for constraints, settings := range settings.DefaultSettings {
-		if constraints.Min == MajorVersionRangeUnlimited || (constraints.Min <= majorVersion) {
-			if constraints.Max == MajorVersionRangeUnlimited || (majorVersion < constraints.Max) {
+	for constraints, settings := range info.Settings.DefaultSettings {
+		if constraints.Min == MajorVersionRangeUnlimited || (constraints.Min <= info.MajorVersion) {
+			if constraints.Max == MajorVersionRangeUnlimited || (info.MajorVersion < constraints.Max) {
 				for key, value := range settings {
 					configuration[key] = value
 				}
@@ -247,28 +264,48 @@ func CreatePostgresqlConfiguration(
 	}
 
 	// apply the values from the user
-	for key, value := range userSettings {
+	for key, value := range info.UserSettings {
 		configuration[key] = value
 	}
 
 	// apply the mandatory settings
-	if includingMandatory {
-		for key, value := range settings.MandatorySettings {
+	if info.IncludingMandatory {
+		for key, value := range info.Settings.MandatorySettings {
 			configuration[key] = value
 		}
+	}
+
+	// apply the list of replicas
+	if info.Replicas != nil && info.SyncReplicas > 0 {
+		escapedReplicas := make([]string, len(info.Replicas))
+		for idx, name := range info.Replicas {
+			escapedReplicas[idx] = escapePostgresConfLiteral(name)
+		}
+		configuration["synchronous_standby_names"] = fmt.Sprintf(
+			"ANY %v (%v)",
+			info.SyncReplicas,
+			strings.Join(escapedReplicas, ","))
 	}
 
 	return configuration
 }
 
-// CreateCNPConfiguration create the actual PostgreSQL configuration
-// for CNP given the user settings and the major version
-func CreateCNPConfiguration(
+// FillCNPConfiguration create the actual PostgreSQL configuration
+// for CNP given the user settings and the major version. This is
+// useful during the configuration validation
+func FillCNPConfiguration(
 	majorVersion int,
 	userSettings map[string]string,
 	includingMandatory bool,
 ) map[string]string {
-	return CreatePostgresqlConfiguration(CnpConfigurationSettings, majorVersion, userSettings, includingMandatory)
+	info := ConfigurationInfo{
+		Settings:           CnpConfigurationSettings,
+		MajorVersion:       majorVersion,
+		UserSettings:       userSettings,
+		IncludingMandatory: includingMandatory,
+		Replicas:           nil,
+	}
+	return CreatePostgresqlConfiguration(info)
 }
 
 // CreatePostgresqlConfFile create the contents of the postgresql.conf file
@@ -299,4 +336,10 @@ func CreatePostgresqlConfFile(configuration map[string]string) string {
 // directly embeddable in the PostgreSQL configuration file
 func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
+}
+
+// escapePostgresLiteral escapes a value to make its representation
+// similar to the literals in PostgreSQL
+func escapePostgresConfLiteral(value string) string {
+	return fmt.Sprintf("\"%v\"", strings.ReplaceAll(value, "\"", "\"\""))
 }

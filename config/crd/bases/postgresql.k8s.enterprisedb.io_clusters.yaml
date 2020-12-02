@@ -294,6 +294,18 @@ spec:
               format: int32
               minimum: 1
               type: integer
+            maxSyncReplicas:
+              description: The target value for the synchronous replication quorum,
+                that can be decreased if the number of ready standbys is lower than
+                this. Undefined or 0 disable synchronous replication.
+              format: int32
+              type: integer
+            minSyncReplicas:
+              description: Minimum number of instances required in synchronous replication
+                with the primary. Undefined or 0 allow writes to complete when no
+                standby is available.
+              format: int32
+              type: integer
             nodeMaintenanceWindow:
               description: Define a maintenance window for the Kubernetes nodes
               properties:

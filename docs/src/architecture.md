@@ -4,7 +4,7 @@ For High Availability goals, the PostgreSQL database management system provides 
 
 PostgreSQL supports both asynchronous and synchronous streaming replication, as well as asynchronous file-based log shipping (normally used as a fallback option, for example, to store WAL files in an object store). Replicas are usually called *standby servers* and can also be used for read-only workloads, thanks to the *Hot Standby* feature.
 
-Cloud Native PostgreSQL currently supports clusters based on asynchronous streaming replication to manage multiple hot standby replicas, with the following specifications:
+Cloud Native PostgreSQL currently supports clusters based on asynchronous and synchronous streaming replication to manage multiple hot standby replicas, with the following specifications:
 
 * One primary, with optional multiple hot standby replicas for High Availability
 * Available services for applications:

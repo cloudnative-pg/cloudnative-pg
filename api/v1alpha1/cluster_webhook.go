@@ -75,7 +75,7 @@ func (r *Cluster) Default() {
 	if err == nil {
 		// The validation error will be already raised by the
 		// validateImageName function
-		r.Spec.PostgresConfiguration.Parameters = postgres.CreateCNPConfiguration(
+		r.Spec.PostgresConfiguration.Parameters = postgres.FillCNPConfiguration(
 			psqlVersion, r.Spec.PostgresConfiguration.Parameters, false)
 	}
 }
@@ -97,6 +97,8 @@ func (r *Cluster) ValidateCreate() error {
 	allErrs = append(allErrs, r.validateImageName()...)
 	allErrs = append(allErrs, r.validateRecoveryTarget()...)
 	allErrs = append(allErrs, r.validatePrimaryUpdateStrategy()...)
+	allErrs = append(allErrs, r.validateMinSyncReplicas()...)
+	allErrs = append(allErrs, r.validateMaxSyncReplicas()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -118,6 +120,8 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validateImageName()...)
 	allErrs = append(allErrs, r.validateRecoveryTarget()...)
 	allErrs = append(allErrs, r.validatePrimaryUpdateStrategy()...)
+	allErrs = append(allErrs, r.validateMinSyncReplicas()...)
+	allErrs = append(allErrs, r.validateMaxSyncReplicas()...)
 
 	oldObject := old.(*Cluster)
 	if oldObject == nil {
@@ -312,9 +316,9 @@ func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
 		return result
 	}
 
-	r.Spec.PostgresConfiguration.Parameters = postgres.CreateCNPConfiguration(
+	r.Spec.PostgresConfiguration.Parameters = postgres.FillCNPConfiguration(
 		psqlVersion, r.Spec.PostgresConfiguration.Parameters, false)
-	oldParameters := postgres.CreateCNPConfiguration(
+	oldParameters := postgres.FillCNPConfiguration(
 		psqlVersion, old.Spec.PostgresConfiguration.Parameters, false)
 
 	for key, value := range r.Spec.PostgresConfiguration.Parameters {
@@ -450,4 +454,47 @@ func (r *Cluster) validatePrimaryUpdateStrategy() field.ErrorList {
 	}
 
 	return nil
+}
+
+// Validate the maximum number of synchronous instances
+// that should be kept in sync with the primary server
+func (r *Cluster) validateMaxSyncReplicas() field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.MaxSyncReplicas < 0 {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "maxSyncReplicas"),
+			r.Spec.MaxSyncReplicas,
+			"maxSyncReplicas must be a non negative integer"))
+	}
+
+	if r.Spec.MaxSyncReplicas >= r.Spec.Instances {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "maxSyncReplicas"),
+			r.Spec.MaxSyncReplicas,
+			"maxSyncReplicas must be lower than the number of instances"))
+	}
+
+	return result
+}
+
+// Validate the minimum number of synchronous instances
+func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.MinSyncReplicas < 0 {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "minSyncReplicas"),
+			r.Spec.MinSyncReplicas,
+			"minSyncReplicas must be a non negative integer"))
+	}
+
+	if r.Spec.MinSyncReplicas > r.Spec.MaxSyncReplicas {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "minSyncReplicas"),
+			r.Spec.MinSyncReplicas,
+			"minSyncReplicas cannot be greater than maxSyncReplicas"))
+	}
+
+	return result
 }

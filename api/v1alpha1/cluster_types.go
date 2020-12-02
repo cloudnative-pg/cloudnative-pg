@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
 )
 
@@ -78,6 +79,16 @@ type ClusterSpec struct {
 	// Number of instances required in the cluster
 	// +kubebuilder:validation:Minimum=1
 	Instances int32 `json:"instances"`
+
+	// Minimum number of instances required in synchronous replication with the
+	// primary. Undefined or 0 allow writes to complete when no standby is
+	// available.
+	MinSyncReplicas int32 `json:"minSyncReplicas,omitempty"`
+
+	// The target value for the synchronous replication quorum, that can be
+	// decreased if the number of ready standbys is lower than this.
+	// Undefined or 0 disable synchronous replication.
+	MaxSyncReplicas int32 `json:"maxSyncReplicas,omitempty"`
 
 	// Configuration of the PostgreSQL server
 	// +optional
@@ -165,7 +176,7 @@ type ClusterStatus struct {
 	ReadyInstances int32 `json:"readyInstances,omitempty"`
 
 	// Instances status
-	InstancesStatus map[string][]string `json:"instancesStatus,omitempty"`
+	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
 
 	// ID of the latest generated node (used to avoid node name clashing)
 	LatestGeneratedNode int32 `json:"latestGeneratedNode,omitempty"`

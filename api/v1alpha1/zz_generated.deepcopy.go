@@ -11,6 +11,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package v1alpha1
 
 import (
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -354,7 +355,7 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	*out = *in
 	if in.InstancesStatus != nil {
 		in, out := &in.InstancesStatus, &out.InstancesStatus
-		*out = make(map[string][]string, len(*in))
+		*out = make(map[utils.PodStatus][]string, len(*in))
 		for key, val := range *in {
 			var outVal []string
 			if val == nil {
