@@ -19,7 +19,7 @@ with the following requirements:
 - Sensible locale settings
 
 No entry point and/or command is required in the image definition, as Cloud
-Native PostgreSQL overrides it with its own instance manager.
+Native PostgreSQL overrides it with its instance manager.
 
 !!! Warning
     Application Container Images will be used by Cloud Native PostgreSQL
@@ -39,7 +39,7 @@ The image tag must start with a valid PostgreSQL major version number (e.g. 9.6
 or 12) optionally followed by a dot and the patch level.
 
 The prefix can be followed by any valid character combination that is valid and
-accepted in a Docker tag, preceded by a dot, an underscore or a minus sign.
+accepted in a Docker tag, preceded by a dot, an underscore, or a minus sign.
 
 Examples of accepted image tags:
 

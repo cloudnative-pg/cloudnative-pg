@@ -2,7 +2,7 @@
 
 For High Availability goals, the PostgreSQL database management system provides administrators with built-in **physical replication** capabilities based on **Write Ahead Log (WAL) shipping**.
 
-PostgreSQL supports both asynchronous and synchronous streaming replication, as well as asynchronous file-based log shipping (normally used as fallback option, for example to store WAL files in an object store). Replicas are normally called *standby servers* and can also be used for read-only workloads thanks to the *Hot Standby* feature.
+PostgreSQL supports both asynchronous and synchronous streaming replication, as well as asynchronous file-based log shipping (normally used as a fallback option, for example, to store WAL files in an object store). Replicas are usually called *standby servers* and can also be used for read-only workloads, thanks to the *Hot Standby* feature.
 
 Cloud Native PostgreSQL currently supports clusters based on asynchronous streaming replication to manage multiple hot standby replicas, with the following specifications:
 
@@ -22,7 +22,7 @@ by the Kubernetes operator, as depicted in the following diagram:
 
 ![Applications writing to the single primary](./images/architecture-rw.png)
 
-Applications can simply use the `-rw` suffix service.
+Applications can use the `-rw` suffix service.
 
 In case of temporary or permanent unavailability of the primary, Kubernetes
 will move the `-rw` to another instance of the cluster for high availability
@@ -34,7 +34,7 @@ purposes.
     Applications must be aware of the limitations that [Hot Standby](https://www.postgresql.org/docs/current/hot-standby.html)
     presents and familiar with the way PostgreSQL operates when dealing with these workloads.
 
-Applications can access to any PostgreSQL instance at any time through the `-r`
+Applications can access any PostgreSQL instance at any time through the `-r`
 service made available by the operator at connection time.
 
 The following diagram shows the architecture:
@@ -104,11 +104,11 @@ it deploys:
 * `[cluster name]-superuser`
 * `[cluster name]-app`
 
-The secrets contain the username, password and a working
+The secrets contain the username, password, and a working
 [`.pgpass file`](https://www.postgresql.org/docs/current/libpq-pgpass.html)
-respectively for the `postgres` user and for the *owner* of the database.
+respectively for the `postgres` user and the *owner* of the database.
 
-The `-app` credentials are the ones which should be by used the applications
+The `-app` credentials are the ones that should be used by applications
 connecting to the PostgreSQL cluster.
 
 The `-superuser` ones are supposed to be used only for administrative purposes.

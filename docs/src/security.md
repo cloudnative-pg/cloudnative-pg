@@ -1,7 +1,7 @@
 # Security
 
 This section contains information about security for Cloud Native PostgreSQL,
-from a few standpoints: source code, Kubernetes and PostgreSQL.
+from a few standpoints: source code, Kubernetes, and PostgreSQL.
 
 !!! Warning
     The information contained in this page must not exonerate you from
@@ -10,13 +10,13 @@ from a few standpoints: source code, Kubernetes and PostgreSQL.
 ## Source code static analysis
 
 Source code of Cloud Native PostgreSQL is *systematically scanned* for static analysis purposes,
-including **security problems**, using a popular open source for Go called
+including **security problems**, using a popular open-source for Go called
 [GolangCI-Lint](https://github.com/golangci/golangci-lint) directly in the CI/CD pipeline.
-GolangCI-Lint has the ability to run several *linters* on the same source code.
+GolangCI-Lint can run several *linters* on the same source code.
 
 One of these is [Golang Security Checker](https://github.com/securego/gosec), or simply `gosec`,
 a linter that scans the abstract syntactic tree of the source against a set of rules aimed at
-the discovery of well known vulnerabilities, threats and weaknesses hidden in
+the discovery of well-known vulnerabilities, threats, and weaknesses hidden in
 the code such as hard-coded credentials, integer overflows and SQL injections - to name a few.
 
 !!! Important
@@ -33,7 +33,7 @@ via EnterpriseDB's internal CI/CD pipeline.
 
 A [Pod Security Policy](https://kubernetes.io/docs/concepts/policy/pod-security-policy/)
 is the Kubernetes way to define security rules and specifications that a pod needs to meet
-in order to run in a cluster.
+to run in a cluster.
 For InfoSec reasons, every Kubernetes platform should implement them.
 
 Cloud Native PostgreSQL does not require *privileged* mode for containers execution.
@@ -65,7 +65,7 @@ For example, you can request an initial amount of RAM of 32MiB (scalable to 128M
       cpu: "100m"
 ```
 
-[//]: # ( TODO: we may want to explain what happens to a pod that excedes the resource limits: CPU -> trottle; MEMORY -> kill )
+[//]: # ( TODO: we may want to explain what happens to a pod that exceedes the resource limits: CPU -> trottle; MEMORY -> kill )
 
 !!! Seealso "Managing Compute Resources for Containers"
     For more details on resource management, please refer to the
@@ -75,17 +75,16 @@ For example, you can request an initial amount of RAM of 32MiB (scalable to 128M
 ## PostgreSQL
 
 The current implementation of Cloud Native PostgreSQL automatically creates
-passwords and `.pgpass` files for the `postgres` superuser and for the owner of
-the database. See the
-["Secrets" section in the "Architecture" page](architecture.md#secrets).
+passwords and `.pgpass` files for the `postgres` superuser and the database owner.
+See the ["Secrets" section in the "Architecture" page](architecture.md#secrets).
 
-Those files can be used to configure application access to the database.
+You can use those files to configure application access to the database.
 
-Currently, the operator allows administrators to add `pg_hba.conf` lines directly in the manifest, as part of the
-`pg_hba` section of the `postgresql` configuration. The lines defined in the
+Currently, the operator allows administrators to add `pg_hba.conf` lines directly in the manifest
+as part of the `pg_hba` section of the `postgresql` configuration. The lines defined in the
 manifest are added to a default `pg_hba.conf`.
 
-For further detail on how `pg_hba.conf` is managed by the operator see the
+For further detail on how `pg_hba.conf` is managed by the operator, see the
 ["PostgreSQL Configuration" page](postgresql_conf.md#the-pg_hba-section) of the documentation.
 
 !!! Important

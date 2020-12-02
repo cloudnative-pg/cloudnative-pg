@@ -13,8 +13,9 @@ The Cloud Native PostgreSQL Operator is systematically tested on the following p
 - [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine/)
 
 Below you can find specific instructions for each of the above environments.
-Once the steps described in this page have been completed, and your `kubectl`
-is able to connect to the desired cluster, you can install the operator and start creating PostgreSQL `Clusters`.
+Once the steps described on this page have been completed, and your `kubectl`
+can connect to the desired cluster, you can install the operator and start
+creating PostgreSQL `Clusters`.
 
 !!! Important
     `kubectl` is required to proceed with setup.
@@ -23,10 +24,10 @@ is able to connect to the desired cluster, you can install the operator and star
 
 Follow the instructions contained in
 ["Quickstart: Deploy an Azure Kubernetes Service (AKS) cluster using the Azure portal"](https://docs.microsoft.com/bs-latn-ba/azure/aks/kubernetes-walkthrough-portal)
-available on the Microsoft documentation to setup your Kubernetes cluster in AKS.
+available on the Microsoft documentation to set up your Kubernetes cluster in AKS.
 
 In particular, you need to configure `kubectl` to connect to your Kubernetes cluster
-(called `myAKSCluster` using resources in `myResourceGroup` group), through the
+(called `myAKSCluster` using resources in `myResourceGroup` group) through the
 `az aks get-credentials` command.
 This command downloads the credentials and configures your `kubectl` to use them:
 
@@ -51,19 +52,19 @@ You can use any of the storage classes that work with Azure disks:
 
 Follow the instructions contained in
 ["Creating an Amazon EKS Cluster"](https://docs.aws.amazon.com/eks/latest/userguide/create-cluster.html)
-available on the AWS documentation to setup your Kubernetes cluster in EKS.
+available on the AWS documentation to set up your Kubernetes cluster in EKS.
 
 !!! Important
     Keep in mind that Amazon puts limitations on how many pods a node can create.
-    It depends on the type of the instance that you choose to use when you create
+    It depends on the type of instance that you choose to use when you create
     your cluster.
 
-After the setup `kubectl` should point to your newly created EKS cluster.
+After the setup, `kubectl` should point to your newly created EKS cluster.
 
-By default a `gp2` storage class is available after cluster creation, however Amazon EKS offers multiple
+By default, a `gp2` storage class is available after cluster creation. However, Amazon EKS offers multiple
 storage types that can be leveraged to create other storage classes for `Clusters`' volumes:
 
-- `gp2`: general purpose SSD volume
+- `gp2`: general-purpose SSD volume
 - `io1`: provisioned IOPS SSD
 - `st1`: throughput optimized HDD
 - `sc1`: cold HDD
@@ -79,13 +80,12 @@ storage types that can be leveraged to create other storage classes for `Cluster
 
 Follow the instructions contained in
 ["Creating a cluster"](https://cloud.google.com/kubernetes-engine/docs/how-to/creating-a-cluster)
-available on the Google Cloud documentation to setup your Kubernetes cluster in GKE.
+available on the Google Cloud documentation to set up your Kubernetes cluster in GKE.
 
 !!! Warning
     Google Kubernetes Engine uses the deprecated `kube-dns` server instead of the
-    recommended [CoreDNS](https://coredns.io/). In order to be able to work with
-    Cloud Native PostgreSQL Operator you need to disable `kube-dns` and replace it
-    with `coredns`.
+    recommended [CoreDNS](https://coredns.io/). To work with Cloud Native PostgreSQL Operator,
+    you need to disable `kube-dns` and replace it with `coredns`.
 
 To replace `kube-dns` with `coredns` in your GKE cluster, follow these instructions:
 
@@ -96,8 +96,8 @@ git clone https://github.com/coredns/deployment.git
 ./deployment/kubernetes/deploy.sh | kubectl apply -f -
 ```
 
-By default a `standard` storage class is available after cluster creation, using
-standard hard disks. For other storage types you'll need to create specific
+By default, a `standard` storage class is available after cluster creation, using
+standard hard disks. For other storage types, you'll need to create specific
 storage classes.
 
 !!! Seealso "About GKE storage classes"
