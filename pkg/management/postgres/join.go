@@ -32,7 +32,7 @@ type JoinInfo struct {
 
 // Join create a new instance joined to an existing PostgreSQL cluster
 func (info JoinInfo) Join() error {
-	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode)
+	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName)
 
 	options := []string{
 		"-D", info.PgData,

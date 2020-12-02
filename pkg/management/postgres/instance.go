@@ -274,7 +274,7 @@ func (instance *Instance) Demote() error {
 
 // createRecoveryConf create a recovery.conf file for PostgreSQL 11 and earlier
 func (instance *Instance) createRecoveryConf() error {
-	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName + "-rw")
+	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
 
 	f, err := os.Create(filepath.Join(instance.PgData, "recovery.conf"))
 	if err != nil {

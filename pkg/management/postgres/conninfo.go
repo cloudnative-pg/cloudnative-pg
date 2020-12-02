@@ -14,13 +14,14 @@ import (
 )
 
 // buildPrimaryConnInfo builds the connection string to connect to primaryHostname
-func buildPrimaryConnInfo(primaryHostname string) string {
+func buildPrimaryConnInfo(primaryHostname, applicationName string) string {
 	primaryConnInfo := fmt.Sprintf("host=%v ", primaryHostname) +
 		fmt.Sprintf("user=%v ", v1alpha1.StreamingReplicationUser) +
 		"port=5432 " +
 		fmt.Sprintf("sslkey=%v ", postgres.StreamingReplicaKeyLocation) +
 		fmt.Sprintf("sslcert=%v ", postgres.StreamingReplicaCertificateLocation) +
 		fmt.Sprintf("sslrootcert=%v ", postgres.CACertificateLocation) +
+		fmt.Sprintf("application_name=%v ", applicationName) +
 		"sslmode=require"
 	return primaryConnInfo
 }
