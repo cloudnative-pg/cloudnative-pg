@@ -45,6 +45,9 @@ type InitInfo struct {
 	// The parent node, used to fill primary_conninfo
 	ParentNode string
 
+	// The current node, used to fill application_name
+	CurrentNode string
+
 	// The cluster name to assign to
 	ClusterName string
 
@@ -234,7 +237,7 @@ func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
 // ConfigureReplica set the `primary_conninfo` field in the PostgreSQL system
 // This must be invoked only on PostgreSQL version >= 12
 func (info InitInfo) ConfigureReplica(db *sql.DB) error {
-	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode)
+	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.CurrentNode)
 
 	_, err := db.Exec(
 		fmt.Sprintf("ALTER SYSTEM SET primary_conninfo TO %v",

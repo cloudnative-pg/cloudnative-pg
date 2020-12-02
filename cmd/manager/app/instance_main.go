@@ -60,6 +60,8 @@ func InstanceManagerCommand(args []string) {
 		"the cluster and of the Pod in k8s")
 	initCommand.StringVar(&initDBFlagsString, "initdb-flags", "", "The list of flags to be passed "+
 		"to initdb while creating the initial database")
+	initCommand.StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
+		"be checked against the cluster state")
 
 	joinCommand := flag.NewFlagSet("join", flag.ExitOnError)
 	joinCommand.StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
@@ -128,6 +130,7 @@ func InstanceManagerCommand(args []string) {
 			ClusterName:             clusterName,
 			Namespace:               namespace,
 			InitDBOptions:           initDBFlags,
+			CurrentNode:             podName,
 		}
 
 		initSubCommand(info)
