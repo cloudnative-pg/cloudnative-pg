@@ -262,6 +262,27 @@ from the specified archive, exiting recovery and starting as a primary.
 Subsequently, the operator will clone the requested number of standby instances
 from the primary.
 
+### Point-In-Time Recovery (PITR) from a backup
+
+The operator enables users to create a new PostgreSQL cluster by recovering
+an existing backup to a specific point-in-time, defined with a timestamp, a
+label or a transaction ID. This capability is built on top of the full restore
+one and supports all the options available in
+[PostgreSQL for PITR](https://www.postgresql.org/docs/13/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET).
+
+### Zero Data Loss clusters through synchronous replication
+
+Achieve  *Zero Data Loss* (RPO=0) in your local High Availability Cloud Native PostgreSQL
+cluster through quorum based synchronous replication support.  The operator provides
+two configuration options that control the minimum and maximum number of
+expected synchronous standby replicas available at any time. The operator will
+react accordingly, based on the number of available and ready PostgreSQL
+instances in the cluster, through the following formula:
+
+```
+0 <= minSyncReplicas <= maxSyncReplicas < instances
+```
+
 ### Liveness and readiness probes
 
 The operator defines liveness and readiness probes for the Postgres
@@ -324,7 +345,19 @@ alerting, trending, log processing. This might involve the use of external tools
 such as Prometheus, Grafana, Fluent Bit, as well as extensions in the
 PostgreSQL engine for the output of error logs directly in JSON format.
 
-*No relevant capability implemented yet in the "Deep Insights" level*.
+### Prometheus exporter infrastructure
+
+The instance manager provides a pluggable framework and, via its own
+web server, exposes an endpoint to export metrics for the
+[Prometheus](https://prometheus.io/) monitoring and alerting tool.
+Currently, only basic metrics and the `pg_stat_archiver` system view
+for PostgreSQL have been implemented.
+
+### Kubernetes events
+
+Record major events as expected by the Kubernetes API, such as creating resources,
+removing nodes, upgrading, and so on. Events can be displayed throught
+the `kubectl describe` and `kubectl get events` command.
 
 ## Level 5 - Auto Pilot
 

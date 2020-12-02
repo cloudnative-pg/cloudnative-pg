@@ -1,6 +1,28 @@
 Cloud Native PostgreSQL  - History of user-visible changes
 Copyright (C) 2019-2020 EnterpriseDB.
 
+Version 0.6.0 - 4 Dec 2020
+
+- Add Point-In-Time Recovery based on timestamp, target name, or transaction
+  Id, as well as the specification of the timeline, through a new bootstrap
+  method option called `recoveryTarget`
+- Add Synchronous Streaming Replication support through the `minSyncReplicas`
+  and `maxSyncReplicas` cluster options, defining respectively the expected
+  minimum and maximum number of synchronous standby servers at any time (disabled
+  by default)
+- Configure `initdb` options for the bootstrap of an empty cluster (`initDb`)
+- Extend the instance manager with a new framework for the export of metrics
+  for Prometheus - currently supporting pg_stat_archiver only
+- Use Kubernetes jobs instead of init containers to perform cluster
+  initialization procedures (including standby creation and recovery) and
+  improve their observability
+- Record Kubernetes events to be used by `kubectl describe` and
+  `kubectl get events`
+- Introduce Kubernetes expectations for Pods, PVCs, and Jobs to prevent race
+  conditions
+- Set `application_name` in PostgreSQL to the name of the Pod/instance
+- Bug fixes and improvements
+
 Version 0.5.0 - 20 Nov 2020
 
 - Automated provisioning of an independent Certification Authority (CA) for
