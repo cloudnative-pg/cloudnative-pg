@@ -115,6 +115,7 @@ apidoc: po-docgen
 	  docs/src/api_reference.md > $${CONFIG_TMP_DIR}/api_reference.md ;\
 	sed 1d \
 	  $${CONFIG_TMP_DIR}/api_reference.new.md >> $${CONFIG_TMP_DIR}/api_reference.md ;\
+	sed -i 's/| ----- | ----------- | ------ | -------- |/| -------------------- | ------------------------------ | -------------------- | -------- |/' $${CONFIG_TMP_DIR}/api_reference.md ;\
 	cp $${CONFIG_TMP_DIR}/api_reference.md docs/src/api_reference.md
 
 # find or download controller-gen
