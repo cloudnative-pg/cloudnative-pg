@@ -114,8 +114,20 @@ func (r *ClusterReconciler) upgradeCluster(
 			"User must issue a supervised switchover")
 	}
 
-	// Ok, the user wants us to automatically update all
-	// the server, so let's switch over
+	// Ok, the user want us to automatically update all
+	// the servers.
+	// If we are working on a single-instance cluster
+	// we "just" need to delete the Pod we have, waiting for it to be
+	// created again with the same storage.
+	if cluster.Spec.Instances == 1 {
+		// TODO: Add an event for this cluster, notifying the user
+		// that we are updating the primary Pod given this is
+		// a single-node cluster
+		return r.upgradePod(ctx, cluster, &sortedPodList[0])
+	}
+
+	// If we have replicas, let's switch over to the most up-to-date and
+	// then the procedure will continue with the old master.
 	if len(clusterStatus.Items) < 2 || clusterStatus.Items[1].IsPrimary {
 		return ErrorInconsistentClusterStatus
 	}
