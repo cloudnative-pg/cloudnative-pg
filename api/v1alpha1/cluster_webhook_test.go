@@ -519,3 +519,55 @@ var _ = Describe("recovery target", func() {
 		})
 	})
 })
+
+var _ = Describe("primary update strategy", func() {
+	It("allows 'unsupervised'", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				PrimaryUpdateStrategy: PrimaryUpdateStrategyUnsupervised,
+				Instances:             3,
+			},
+		}
+		Expect(cluster.validatePrimaryUpdateStrategy()).To(BeEmpty())
+	})
+
+	It("allows 'supervised'", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				PrimaryUpdateStrategy: PrimaryUpdateStrategySupervised,
+				Instances:             3,
+			},
+		}
+		Expect(cluster.validatePrimaryUpdateStrategy()).To(BeEmpty())
+	})
+
+	It("prevents 'supervised' for single-instance clusters", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				PrimaryUpdateStrategy: PrimaryUpdateStrategySupervised,
+				Instances:             1,
+			},
+		}
+		Expect(cluster.validatePrimaryUpdateStrategy()).ToNot(BeEmpty())
+	})
+
+	It("allows 'unsupervised' for single-instance clusters", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				PrimaryUpdateStrategy: PrimaryUpdateStrategyUnsupervised,
+				Instances:             1,
+			},
+		}
+		Expect(cluster.validatePrimaryUpdateStrategy()).To(BeEmpty())
+	})
+
+	It("prevents everything else", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				PrimaryUpdateStrategy: "maybe",
+				Instances:             3,
+			},
+		}
+		Expect(cluster.validatePrimaryUpdateStrategy()).ToNot(BeEmpty())
+	})
+})

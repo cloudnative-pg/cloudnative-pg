@@ -96,6 +96,7 @@ func (r *Cluster) ValidateCreate() error {
 	allErrs = append(allErrs, r.validateStorageConfiguration()...)
 	allErrs = append(allErrs, r.validateImageName()...)
 	allErrs = append(allErrs, r.validateRecoveryTarget()...)
+	allErrs = append(allErrs, r.validatePrimaryUpdateStrategy()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -116,6 +117,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validateStorageConfiguration()...)
 	allErrs = append(allErrs, r.validateImageName()...)
 	allErrs = append(allErrs, r.validateRecoveryTarget()...)
+	allErrs = append(allErrs, r.validatePrimaryUpdateStrategy()...)
 
 	oldObject := old.(*Cluster)
 	if oldObject == nil {
@@ -419,4 +421,33 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 	}
 
 	return result
+}
+
+// Validate the update strategy related to the number of required
+// instances
+func (r *Cluster) validatePrimaryUpdateStrategy() field.ErrorList {
+	if r.Spec.PrimaryUpdateStrategy == "" {
+		return nil
+	}
+
+	var result field.ErrorList
+
+	if r.Spec.PrimaryUpdateStrategy != PrimaryUpdateStrategySupervised &&
+		r.Spec.PrimaryUpdateStrategy != PrimaryUpdateStrategyUnsupervised {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "primaryUpdateStrategy"),
+			r.Spec.PrimaryUpdateStrategy,
+			"primaryUpdateStrategy should be empty, 'supervised' or 'unsupervised'"))
+		return result
+	}
+
+	if r.Spec.PrimaryUpdateStrategy == PrimaryUpdateStrategySupervised && r.Spec.Instances == 1 {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "primaryUpdateStrategy"),
+			r.Spec.PrimaryUpdateStrategy,
+			"supervised update strategy is not allowed for clusters with a single instance"))
+		return result
+	}
+
+	return nil
 }
