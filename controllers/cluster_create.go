@@ -332,11 +332,16 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 func (r *ClusterReconciler) createRole(ctx context.Context, cluster *v1alpha1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
-	roleBinding := specs.CreateRole(*cluster)
+	openshift, err := utils.IsOpenShift()
+	if err != nil {
+		return fmt.Errorf("while creating cluster role: %w", err)
+	}
+
+	roleBinding := specs.CreateRole(*cluster, openshift)
 	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&roleBinding.ObjectMeta, versions.Version)
 
-	err := r.Create(ctx, &roleBinding)
+	err = r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
 		log.Error(err, "Unable to create the Role", "object", roleBinding)
 		return err
