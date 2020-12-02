@@ -395,7 +395,7 @@ var _ = Describe("recovery target", func() {
 				Bootstrap: &BootstrapConfiguration{
 					FullRecovery: &BootstrapFullRecovery{
 						RecoveryTarget: &RecoveryTarget{
-							TargetTLI:       nil,
+							TargetTLI:       "",
 							TargetXID:       "3",
 							TargetName:      "",
 							TargetLSN:       "",
@@ -425,5 +425,97 @@ var _ = Describe("recovery target", func() {
 		}
 
 		Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
+	})
+
+	When("recoveryTLI is specified", func() {
+		It("allows 'latest'", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Bootstrap: &BootstrapConfiguration{
+						FullRecovery: &BootstrapFullRecovery{
+							RecoveryTarget: &RecoveryTarget{
+								TargetTLI: "latest",
+							},
+						},
+					},
+				},
+			}
+			Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
+		})
+
+		It("allows 'current'", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Bootstrap: &BootstrapConfiguration{
+						FullRecovery: &BootstrapFullRecovery{
+							RecoveryTarget: &RecoveryTarget{
+								TargetTLI: "current",
+							},
+						},
+					},
+				},
+			}
+			Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
+		})
+
+		It("allows a positive integer", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Bootstrap: &BootstrapConfiguration{
+						FullRecovery: &BootstrapFullRecovery{
+							RecoveryTarget: &RecoveryTarget{
+								TargetTLI: "23",
+							},
+						},
+					},
+				},
+			}
+			Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
+		})
+
+		It("prevents 0 value", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Bootstrap: &BootstrapConfiguration{
+						FullRecovery: &BootstrapFullRecovery{
+							RecoveryTarget: &RecoveryTarget{
+								TargetTLI: "0",
+							},
+						},
+					},
+				},
+			}
+			Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
+		})
+
+		It("prevents negative values", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Bootstrap: &BootstrapConfiguration{
+						FullRecovery: &BootstrapFullRecovery{
+							RecoveryTarget: &RecoveryTarget{
+								TargetTLI: "-5",
+							},
+						},
+					},
+				},
+			}
+			Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
+		})
+
+		It("prevents everything else beside the empty string", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Bootstrap: &BootstrapConfiguration{
+						FullRecovery: &BootstrapFullRecovery{
+							RecoveryTarget: &RecoveryTarget{
+								TargetTLI: "I don't remember",
+							},
+						},
+					},
+				},
+			}
+			Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
+		})
 	})
 })

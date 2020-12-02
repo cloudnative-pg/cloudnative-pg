@@ -315,10 +315,9 @@ type BootstrapFullRecovery struct {
 // RecoveryTarget allows to configure the moment where the recovery process
 // will stop. All the target options except TargetTLI are mutually exclusive.
 type RecoveryTarget struct {
-	// The target timeline
+	// The target timeline ("latest", "current" or a positive integer)
 	// +optional
-	// +kubebuilder:validation:Minimum=1
-	TargetTLI *int32 `json:"targetTLI,omitempty"`
+	TargetTLI string `json:"targetTLI,omitempty"`
 
 	// The target transaction ID
 	// +optional
@@ -703,10 +702,10 @@ func (cluster Cluster) GetPostgresGID() int64 {
 // recover given a certain target
 func (target RecoveryTarget) BuildPostgresOptions() string {
 	result := ""
-	if target.TargetTLI != nil {
+	if target.TargetTLI != "" {
 		result += fmt.Sprintf(
 			"recovery_target_timeline = '%v'\n",
-			*target.TargetTLI)
+			target.TargetTLI)
 	}
 	if target.TargetXID != "" {
 		result += fmt.Sprintf(

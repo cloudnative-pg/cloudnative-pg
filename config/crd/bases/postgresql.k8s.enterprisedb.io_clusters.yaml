@@ -226,10 +226,9 @@ spec:
                             `pg_create_restore_point`)
                           type: string
                         targetTLI:
-                          description: The target timeline
-                          format: int32
-                          minimum: 1
-                          type: integer
+                          description: The target timeline ("latest", "current" or
+                            a positive integer)
+                          type: string
                         targetTime:
                           description: The target time, in any unambiguous representation
                             allowed by PostgreSQL
