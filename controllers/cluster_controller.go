@@ -66,7 +66,7 @@ type ClusterReconciler struct {
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=create;patch;update
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=configmaps/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=events,verbs=create
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is the operator reconciler loop
 func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
