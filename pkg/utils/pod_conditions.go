@@ -15,6 +15,20 @@ var (
 	log = ctrl.Log.WithName("utils")
 )
 
+// PodStatus represent the possible status of pods
+type PodStatus string
+
+const (
+	// PodHealthy means that a Pod is active and ready
+	PodHealthy = "healthy"
+
+	// PodReplicating means that a Pod is still not ready but still active
+	PodReplicating = "replicating"
+
+	// PodFailed means that a Pod will not be scheduled again (deleted or evicted)
+	PodFailed = "failed"
+)
+
 // IsPodReady check if a Pod is ready or not
 func IsPodReady(pod corev1.Pod) bool {
 	for _, c := range pod.Status.Conditions {
@@ -62,17 +76,17 @@ func CountReadyPods(podList []corev1.Pod) int {
 }
 
 // ListStatusPods return a list of active Pods
-func ListStatusPods(podList []corev1.Pod) map[string][]string {
-	var podsNames = make(map[string][]string)
+func ListStatusPods(podList []corev1.Pod) map[PodStatus][]string {
+	var podsNames = make(map[PodStatus][]string)
 
 	for _, pod := range podList {
 		switch {
 		case IsPodReady(pod):
-			podsNames["healthy"] = append(podsNames["healthy"], pod.Name)
+			podsNames[PodHealthy] = append(podsNames[PodHealthy], pod.Name)
 		case IsPodActive(pod):
-			podsNames["replicating"] = append(podsNames["replicating"], pod.Name)
+			podsNames[PodReplicating] = append(podsNames[PodReplicating], pod.Name)
 		default:
-			podsNames["failed"] = append(podsNames["failed"], pod.Name)
+			podsNames[PodFailed] = append(podsNames[PodFailed], pod.Name)
 		}
 	}
 

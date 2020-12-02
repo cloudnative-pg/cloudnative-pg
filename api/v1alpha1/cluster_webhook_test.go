@@ -571,3 +571,55 @@ var _ = Describe("primary update strategy", func() {
 		Expect(cluster.validatePrimaryUpdateStrategy()).ToNot(BeEmpty())
 	})
 })
+
+var _ = Describe("Number of synchronous replicas", func() {
+	It("should be a positive integer", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances:       3,
+				MaxSyncReplicas: -3,
+			},
+		}
+		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+	})
+
+	It("should not be equal than the number of replicas", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances:       3,
+				MaxSyncReplicas: 3,
+			},
+		}
+		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+	})
+
+	It("should not be greater than the number of replicas", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances:       3,
+				MaxSyncReplicas: 5,
+			},
+		}
+		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+	})
+
+	It("can be zero", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances:       3,
+				MaxSyncReplicas: 0,
+			},
+		}
+		Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+	})
+
+	It("can be lower than the number of replicas", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances:       3,
+				MaxSyncReplicas: 2,
+			},
+		}
+		Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+	})
+})

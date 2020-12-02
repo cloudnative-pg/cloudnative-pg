@@ -191,6 +191,8 @@ ClusterSpec defines the desired state of Cluster
 | postgresUID | The UID of the `postgres` user inside the image, defaults to `26` | int64 | false |
 | postgresGID | The GID of the `postgres` user inside the image, defaults to `26` | int64 | false |
 | instances | Number of instances required in the cluster | int32 | true |
+| minSyncReplicas | Minimum number of instances required in synchronous replication with the primary. Undefined or 0 allow writes to complete when no standby is available. | int32 | false |
+| maxSyncReplicas | The target value for the synchronous replication quorum, that can be decreased if the number of ready standbys is lower than this. Undefined or 0 disable synchronous replication. | int32 | false |
 | postgresql | Configuration of the PostgreSQL server | [PostgresConfiguration](#postgresconfiguration) | false |
 | bootstrap | Instructions to bootstrap this cluster | *[BootstrapConfiguration](#bootstrapconfiguration) | false |
 | superuserSecret | The secret containing the superuser password. If not defined a new secret will be created with a randomly generated password | *corev1.LocalObjectReference | false |
@@ -213,7 +215,7 @@ ClusterStatus defines the observed state of Cluster
 | -------------------- | ------------------------------ | -------------------- | -------- |
 | instances | Total number of instances in the cluster | int32 | false |
 | readyInstances | Total number of ready instances in the cluster | int32 | false |
-| instancesStatus | Instances status | map[string][]string | false |
+| instancesStatus | Instances status | map[utils.PodStatus][]string | false |
 | latestGeneratedNode | ID of the latest generated node (used to avoid node name clashing) | int32 | false |
 | currentPrimary | Current primary instance | string | false |
 | targetPrimary | Target primary instance, this is different from the previous one during a switchover or a failover | string | false |

@@ -1,0 +1,12 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+kind: Cluster
+metadata:
+  name: cluster-example-syncreplicas
+spec:
+  instances: 5
+
+  minSyncReplicas: 1
+  maxSyncReplicas: 3
+
+  storage:
+    size: 1G

@@ -104,14 +104,6 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	if cluster.Status.CurrentPrimary != "" && cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		log.Info("There is a switchover or a failover "+
-			"in progress, waiting for the operation to complete",
-			"currentPrimary", cluster.Status.CurrentPrimary,
-			"targetPrimary", cluster.Status.TargetPrimary)
-		return ctrl.Result{}, err
-	}
-
 	// Update the status section of this Cluster resource
 	if err = r.updateResourceStatus(ctx, &cluster, resources); err != nil {
 		if apierrs.IsConflict(err) {
@@ -121,6 +113,19 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		}
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
+	}
+
+	if cluster.Status.CurrentPrimary != "" && cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+		log.Info("There is a switchover or a failover "+
+			"in progress, waiting for the operation to complete",
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary)
+
+		// There is a switchover or a failover in progress.
+		// We need to ensure that we are keeping synchronous_standby_names
+		// aligned with the actual target primary server.
+		// This is the reason why we aligning the ConfigMap here
+		return ctrl.Result{}, r.createOrPatchPostgresConfigMap(ctx, &cluster)
 	}
 
 	// Ensure we have the required global objects

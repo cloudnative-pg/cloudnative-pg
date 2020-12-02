@@ -19,21 +19,44 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	}
 
 	It("apply the default settings", func() {
-		config := CreatePostgresqlConfiguration(CnpConfigurationSettings, 100000, settings, true)
+		info := ConfigurationInfo{
+			Settings:           CnpConfigurationSettings,
+			MajorVersion:       100000,
+			UserSettings:       settings,
+			IncludingMandatory: true,
+			Replicas:           nil,
+			SyncReplicas:       0,
+		}
+		config := CreatePostgresqlConfiguration(info)
 		Expect(len(config)).To(BeNumerically(">", 1))
 		Expect(config["hot_standby"]).To(Equal("true"))
 	})
 
 	It("enforce the mandatory values", func() {
-		testing := map[string]string{
-			"hot_standby": "off",
+		info := ConfigurationInfo{
+			Settings:     CnpConfigurationSettings,
+			MajorVersion: 100000,
+			UserSettings: map[string]string{
+				"hot_standby": "off",
+			},
+			IncludingMandatory: true,
+			Replicas:           nil,
+			SyncReplicas:       0,
 		}
-		config := CreatePostgresqlConfiguration(CnpConfigurationSettings, 100000, testing, true)
+		config := CreatePostgresqlConfiguration(info)
 		Expect(config["hot_standby"]).To(Equal("true"))
 	})
 
 	It("generate a config file", func() {
-		confFile := CreatePostgresqlConfFile(CreatePostgresqlConfiguration(CnpConfigurationSettings, 100000, settings, true))
+		info := ConfigurationInfo{
+			Settings:           CnpConfigurationSettings,
+			MajorVersion:       100000,
+			UserSettings:       settings,
+			IncludingMandatory: true,
+			Replicas:           nil,
+			SyncReplicas:       0,
+		}
+		confFile := CreatePostgresqlConfFile(CreatePostgresqlConfiguration(info))
 		Expect(confFile).To(Not(BeEmpty()))
 		Expect(len(strings.Split(confFile, "\n"))).To(BeNumerically(">", 2))
 	})
@@ -49,15 +72,50 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 
 	When("version is 10", func() {
 		It("will use appropriate settings", func() {
-			config := CreatePostgresqlConfiguration(CnpConfigurationSettings, 100000, settings, true)
+			info := ConfigurationInfo{
+				Settings:           CnpConfigurationSettings,
+				MajorVersion:       100000,
+				UserSettings:       settings,
+				IncludingMandatory: true,
+				Replicas:           nil,
+				SyncReplicas:       0,
+			}
+			config := CreatePostgresqlConfiguration(info)
 			Expect(config["wal_keep_segments"]).To(Equal("32"))
 		})
 	})
 
 	When("version is 13", func() {
 		It("will use appropriate settings", func() {
-			config := CreatePostgresqlConfiguration(CnpConfigurationSettings, 130000, settings, true)
+			info := ConfigurationInfo{
+				Settings:           CnpConfigurationSettings,
+				MajorVersion:       130000,
+				UserSettings:       settings,
+				IncludingMandatory: true,
+				Replicas:           nil,
+				SyncReplicas:       0,
+			}
+			config := CreatePostgresqlConfiguration(info)
 			Expect(config["wal_keep_size"]).To(Equal("512MB"))
+		})
+	})
+
+	When("we are using synchronous replication", func() {
+		It("generate the correct value for the synchronous_standby_names parameter", func() {
+			info := ConfigurationInfo{
+				Settings:           CnpConfigurationSettings,
+				MajorVersion:       130000,
+				UserSettings:       settings,
+				IncludingMandatory: true,
+				Replicas: []string{
+					"one",
+					"two",
+					"three",
+				},
+				SyncReplicas: 2,
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config["synchronous_standby_names"]).To(Equal("ANY 2 (\"one\",\"two\",\"three\")"))
 		})
 	})
 })
