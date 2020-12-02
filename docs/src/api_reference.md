@@ -49,7 +49,7 @@ Below you will find a description of the defined resources:
 Backup is the Schema for the backups API
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | metadata |  | [metav1.ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#objectmeta-v1-meta) | false |
 | spec | Specification of the desired behavior of the backup. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [BackupSpec](#backupspec) | false |
 | status | Most recently observed status of the backup. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [BackupStatus](#backupstatus) | false |
@@ -60,7 +60,7 @@ Backup is the Schema for the backups API
 BackupList contains a list of Backup
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | metadata | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#listmeta-v1-meta) | false |
 | items | List of backups | [][Backup](#backup) | true |
 
@@ -70,7 +70,7 @@ BackupList contains a list of Backup
 BackupSpec defines the desired state of Backup
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | cluster | The cluster to backup | [v1.LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#localobjectreference-v1-core) | false |
 
 
@@ -79,7 +79,7 @@ BackupSpec defines the desired state of Backup
 BackupStatus defines the observed state of Backup
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | s3Credentials | The credentials to use to upload data to S3 | [S3Credentials](#s3credentials) | true |
 | endpointURL | Endpoint to be used to upload data to the cloud, overriding the automatic endpoint discovery | string | false |
 | destinationPath | The path where to store the backup (i.e. s3://bucket/path/to/folder) this path, with different destination folders, will be used for WALs and for data | string | true |
@@ -99,7 +99,7 @@ BackupStatus defines the observed state of Backup
 AffinityConfiguration contains the info we need to create the affinity rules for Pods
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | enablePodAntiAffinity | Should we enable anti affinity or not? | bool | true |
 | topologyKey | TopologyKey to use for anti-affinity configuration. See k8s documentation for more info on that | string | true |
 
@@ -109,7 +109,7 @@ AffinityConfiguration contains the info we need to create the affinity rules for
 BackupConfiguration defines how the backup of the cluster are taken. Currently the only supported backup method is barmanObjectStore. For details and examples refer to the Backup and Recovery section of the documentation
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | barmanObjectStore | The configuration for the barman-cloud tool suite | *[BarmanObjectStoreConfiguration](#barmanobjectstoreconfiguration) | false |
 
 
@@ -118,7 +118,7 @@ BackupConfiguration defines how the backup of the cluster are taken. Currently t
 BarmanObjectStoreConfiguration contains the backup configuration using Barman against an S3-compatible object storage
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | s3Credentials | The credentials to use to upload data to S3 | [S3Credentials](#s3credentials) | true |
 | endpointURL | Endpoint to be used to upload data to the cloud, overriding the automatic endpoint discovery | string | false |
 | destinationPath | The path where to store the backup (i.e. s3://bucket/path/to/folder) this path, with different destination folders, will be used for WALs and for data | string | true |
@@ -132,7 +132,7 @@ BarmanObjectStoreConfiguration contains the backup configuration using Barman ag
 BootstrapConfiguration contains information about how to create the PostgreSQL cluster. Only a single bootstrap method can be defined among the supported ones. `initdb` will be used as the bootstrap method if left unspecified. Refer to the Bootstrap page of the documentation for more information.
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | initdb | Bootstrap the cluster via initdb | *[BootstrapInitDB](#bootstrapinitdb) | false |
 | fullRecovery | Bootstrap the cluster from a backup | *[BootstrapFullRecovery](#bootstrapfullrecovery) | false |
 
@@ -142,7 +142,7 @@ BootstrapConfiguration contains information about how to create the PostgreSQL c
 BootstrapFullRecovery contains the configuration required to restore the backup with the specified name and, after having changed the password with the one chosen for the superuser, will use it to bootstrap a full cluster cloning all the instances from the restored primary. Refer to the Bootstrap page of the documentation for more information.
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | backup | The backup we need to restore | corev1.LocalObjectReference | true |
 | recoveryTarget | By default the recovery will end as soon as a consistent state is reached: in this case that means at the end of a backup. This option allows to fine tune the recovery process | *[RecoveryTarget](#recoverytarget) | false |
 
@@ -152,7 +152,7 @@ BootstrapFullRecovery contains the configuration required to restore the backup 
 BootstrapInitDB is the configuration of the bootstrap process when initdb is used Refer to the Bootstrap page of the documentation for more information.
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | database | Name of the database used by the application. Default: `app`. | string | true |
 | owner | Name of the owner of the database in the instance to be used by applications. Defaults to the value of the `database` key. | string | true |
 | secret | Name of the secret containing the initial credentials for the owner of the user database. If empty a new secret will be created from scratch | *corev1.LocalObjectReference | false |
@@ -164,7 +164,7 @@ BootstrapInitDB is the configuration of the bootstrap process when initdb is use
 Cluster is the Schema for the postgresql API
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | metadata |  | [metav1.ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#objectmeta-v1-meta) | false |
 | spec | Specification of the desired behavior of the cluster. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [ClusterSpec](#clusterspec) | false |
 | status | Most recently observed status of the cluster. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [ClusterStatus](#clusterstatus) | false |
@@ -175,7 +175,7 @@ Cluster is the Schema for the postgresql API
 ClusterList contains a list of Cluster
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | metadata | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#listmeta-v1-meta) | false |
 | items | List of clusters | [][Cluster](#cluster) | true |
 
@@ -185,7 +185,7 @@ ClusterList contains a list of Cluster
 ClusterSpec defines the desired state of Cluster
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | description | Description of this PostgreSQL cluster | string | false |
 | imageName | Name of the container image | string | false |
 | postgresUID | The UID of the `postgres` user inside the image, defaults to `26` | int64 | false |
@@ -210,7 +210,7 @@ ClusterSpec defines the desired state of Cluster
 ClusterStatus defines the observed state of Cluster
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | instances | Total number of instances in the cluster | int32 | false |
 | readyInstances | Total number of ready instances in the cluster | int32 | false |
 | instancesStatus | Instances status | map[string][]string | false |
@@ -231,7 +231,7 @@ ClusterStatus defines the observed state of Cluster
 DataBackupConfiguration is the configuration of the backup of the data directory
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | compression | Compress a backup file (a tar file per tablespace) while streaming it to the object store. Available options are empty string (no compression, default), `gzip` or `bzip2`. | CompressionType | false |
 | encryption | Whenever to force the encryption of files (if the bucket is not already configured for that). Allowed options are empty string (use the bucket policy, default), `AES256` and `aws:kms` | EncryptionType | false |
 | immediateCheckpoint | Control whether the I/O workload for the backup initial checkpoint will be limited, according to the `checkpoint_completion_target` setting on the PostgreSQL server. If set to true, an immediate checkpoint will be used, meaning PostgreSQL will complete the checkpoint as soon as possible. `false` by default. | bool | false |
@@ -245,7 +245,7 @@ NodeMaintenanceWindow contains information that the operator will use while upgr
 This option is only useful when using local storage, as the Pods can't be freely moved between nodes in that configuration.
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | inProgress | Is there a node maintenance activity in progress? | bool | true |
 | reusePVC | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere) | *bool | true |
 
@@ -255,7 +255,7 @@ This option is only useful when using local storage, as the Pods can't be freely
 PostgresConfiguration defines the PostgreSQL configuration
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | parameters | PostgreSQL configuration options (postgresql.conf) | map[string]string | false |
 | pg_hba | PostgreSQL Host Based Authentication rules (lines to be appended to the pg_hba.conf file) | []string | false |
 
@@ -265,8 +265,8 @@ PostgresConfiguration defines the PostgreSQL configuration
 RecoveryTarget allows to configure the moment where the recovery process will stop. All the target options except TargetTLI are mutually exclusive.
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
-| targetTLI | The target timeline | *int32 | false |
+| -------------------- | ------------------------------ | -------------------- | -------- |
+| targetTLI | The target timeline (\"latest\", \"current\" or a positive integer) | string | false |
 | targetXID | The target transaction ID | string | false |
 | targetName | The target name (to be previously created with `pg_create_restore_point`) | string | false |
 | targetLSN | The target LSN (Log Sequence Number) | string | false |
@@ -280,7 +280,7 @@ RecoveryTarget allows to configure the moment where the recovery process will st
 RollingUpdateStatus contains the information about an instance which is being updated
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | imageName | The image which we put into the Pod | string | true |
 | startedAt | When the update has been started | metav1.Time | false |
 
@@ -290,7 +290,7 @@ RollingUpdateStatus contains the information about an instance which is being up
 S3Credentials is the type for the credentials to be used to upload files to S3
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | accessKeyId | The reference to the access key id | corev1.SecretKeySelector | true |
 | secretAccessKey | The reference to the secret access key | corev1.SecretKeySelector | true |
 
@@ -300,7 +300,7 @@ S3Credentials is the type for the credentials to be used to upload files to S3
 StorageConfiguration is the configuration of the storage of the PostgreSQL instances
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | storageClass | StorageClass to use for database data (`PGDATA`). Applied after evaluating the PVC template, if available. If not specified, generated PVCs will be satisfied by the default storage class | *string | false |
 | size | Size of the storage. Required if not already specified in the PVC template. | string | true |
 | pvcTemplate | Template to be used to generate the Persistent Volume Claim | *corev1.PersistentVolumeClaimSpec | false |
@@ -311,7 +311,7 @@ StorageConfiguration is the configuration of the storage of the PostgreSQL insta
 WalBackupConfiguration is the configuration of the backup of the WAL stream
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | compression | Compress a WAL file before sending it to the object store. Available options are empty string (no compression, default), `gzip` or `bzip2`. | CompressionType | false |
 | encryption | Whenever to force the encryption of files (if the bucket is not already configured for that). Allowed options are empty string (use the bucket policy, default), `AES256` and `aws:kms` | EncryptionType | false |
 
@@ -321,7 +321,7 @@ WalBackupConfiguration is the configuration of the backup of the WAL stream
 ScheduledBackup is the Schema for the scheduledbackups API
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | metadata |  | [metav1.ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#objectmeta-v1-meta) | false |
 | spec | Specification of the desired behavior of the ScheduledBackup. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [ScheduledBackupSpec](#scheduledbackupspec) | false |
 | status | Most recently observed status of the ScheduledBackup. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [ScheduledBackupStatus](#scheduledbackupstatus) | false |
@@ -332,7 +332,7 @@ ScheduledBackup is the Schema for the scheduledbackups API
 ScheduledBackupList contains a list of ScheduledBackup
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | metadata | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#listmeta-v1-meta) | false |
 | items | List of clusters | [][ScheduledBackup](#scheduledbackup) | true |
 
@@ -342,7 +342,7 @@ ScheduledBackupList contains a list of ScheduledBackup
 ScheduledBackupSpec defines the desired state of ScheduledBackup
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | suspend | If this backup is suspended of not | *bool | false |
 | schedule | The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron. | string | true |
 | cluster | The cluster to backup | [v1.LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#localobjectreference-v1-core) | false |
@@ -353,7 +353,7 @@ ScheduledBackupSpec defines the desired state of ScheduledBackup
 ScheduledBackupStatus defines the observed state of ScheduledBackup
 
 | Field | Description | Scheme | Required |
-| ----- | ----------- | ------ | -------- |
+| -------------------- | ------------------------------ | -------------------- | -------- |
 | lastCheckTime | The latest time the schedule | *metav1.Time | false |
 | lastScheduleTime | Information when was the last time that backup was successfully scheduled. | *metav1.Time | false |
 
