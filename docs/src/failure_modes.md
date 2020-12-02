@@ -16,14 +16,14 @@ and a **readiness**
 The liveness and readiness probes check if the database is up and able to accept
 connections using the superuser credentials.
 The two probes will report a failure if the probe command fails 3 times with a
-10 second interval between each check.
+10 seconds interval between each check.
 
-For now the operator doesn't configure a `startupProbe` on the Pods, since
+For now, the operator doesn't configure a `startupProbe` on the Pods, since
 startup probes have been introduced only in Kubernetes 1.17.
 
 The liveness probe is used to detect if the PostgreSQL instance is in a
-broken state and need to be restarted. The value in `startDelay` is used
-to delay the execution of the probe, and this is used to prevent an
+broken state and needs to be restarted. The value in `startDelay` is used
+to delay the probe's execution, which is used to prevent an
 instance with a long startup time from being restarted.
 
 ## Storage space usage
@@ -80,34 +80,34 @@ or starting from a physical backup of the *primary* otherwise.
 Effects on the services (as soon as the *apiserver* is notified):
 
 * `-rw`: if the pod is the current *primary*, the service will
-  point to the active pod with status ready having the lowest replication lag.
+  point to the active pod with status ready, having the lowest replication lag.
   That pod becomes the new primary. No effect otherwise.
 
 * `-r`: the pod is removed from the service.
 
 ### Readiness probe failure
 
-After 3 failures the pod will be considered *not ready*. The pod will still
+After 3 failures, the pod will be considered *not ready*. The pod will still
 be part of the `Cluster`, no new pod will be created.
 
-If the cause of the failure can't be fixed, it is possible to manually
-delete the pod. Otherwise, the pod will resume the previous role when
-the failure is solved.
+If the cause of the failure can't be fixed, it is possible to delete the pod
+manually. Otherwise, the pod will resume the previous role when the failure
+is solved.
 
 Effects on the services (after 3 failures):
 
 * `-rw`: if the pod is the current *primary*, the service will
-  point to the active pod with status ready having the lowest replication lag.
+  point to the active pod with status ready, having the lowest replication lag.
   That pod becomes the new primary. No effect otherwise.
 
 * `-r`: the pod is removed from the service.
 
 ### Liveness probe failure
 
-After 3 failures the `postgres` container will be considered failed. The
+After 3 failures, the `postgres` container will be considered failed. The
 pod will still be part of the `Cluster`, and the *kubelet* will try to restart
-the container. If the cause of the failure can't be fixed, it is possible to
-manually delete the pod.
+the container. If the cause of the failure can't be fixed, it is possible
+to delete the pod manually.
 
 Effects on the services (after 3 failures):
 
@@ -125,23 +125,23 @@ new pod will be created on a different worker node from a physical backup of the
 is set to `off` (default: `on` during maintenance windows, `off` otherwise).
 
 The `PodDisruptionBudget` may prevent the pod from being evicted if there
-is at least one node which is not ready.
+is at least one node that is not ready.
 
 Effects on the services (as soon as the *apiserver* is notified):
 
 * `-rw`: if the pod is the current *primary*, the service will
-  point to the active pod with status ready having  the lowest replication lag.
+  point to the active pod with status ready, having the lowest replication lag.
   That pod becomes the new primary. No effect otherwise.
 
 * `-r`: the pod is removed from the service.
 
 ### Worker node failure
 
-Since the node is failed, the *kubelet* won't be able to execute the liveness and
+Since the node is failed, the *kubelet* won't execute the liveness and
 the readiness probes. The pod will be marked for deletion after the
 toleration seconds configured by the Kubernetes cluster administrator for
-that specific failure cause. Based on the way the Kubernetes cluster is configured,
-the pod might be removed from the service at an earlier time.
+that specific failure cause. Based on how the Kubernetes cluster is configured,
+the pod might be removed from the service earlier.
 
 A new pod will be created on a different worker node from a physical backup
 of the *primary*. The default value for that parameter in a Kubernetes
@@ -150,15 +150,15 @@ cluster is 5 minutes.
 Effects on the services (after `tolerationSeconds`):
 
 * `-rw`: if the pod is the current *primary*, the service will
-  point to the active pod with status ready having the lowest replication lag.
+  point to the active pod with status ready, having the lowest replication lag.
   That pod becomes the new primary. No effect otherwise.
 
 * `-r`: the pod is removed from the service.
 
 ## Manual intervention
 
-In case of undocumented failure, it might be necessary to manually intervene to
-solve the problem.
+In the case of undocumented failure, it might be necessary to intervene
+to solve the problem manually.
 
 !!! Important
     In such cases, please do not perform any manual operation without the

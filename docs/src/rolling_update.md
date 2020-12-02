@@ -18,7 +18,7 @@ accepting these two values:
   and is entirely automated, with the *switchover* operation
   starting once all the replicas have been upgraded
 * `manual`: the rolling update process is suspended immediately
-  after all replicas have been upgraded, and can only be completed
+  after all replicas have been upgraded and can only be completed
   with a manual switchover triggered by an administrator with:
   `kubectl cnp promote [cluster] [pod]`
 
@@ -28,9 +28,9 @@ Every version of the operator comes with a default PostgreSQL image version.
 If a cluster doesn't have `imageName` specified, the operator will upgrade
 it to match its default.
 
-The upgrade keeps the Cloud Native PostgreSQL identity and do not
+The upgrade keeps the Cloud Native PostgreSQL identity and does not
 reclone the data.
 
 During the rolling update procedure, the services endpoints move to reflect
-the status of the cluster, so the applications ignore the node that
+the cluster's status, so the applications ignore the node that
 is updating.

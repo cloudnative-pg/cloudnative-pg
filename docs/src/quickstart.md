@@ -11,12 +11,12 @@ for OpenShift.
 
 !!! Warning
     The instructions contained in this section are for demonstration,
-    testing and practice purposes only and must not be used in production.
+    testing, and practice purposes only and must not be used in production.
 
 Like any other Kubernetes application, Cloud Native PostgreSQL is deployed using
 regular manifests written in YAML.
 
-By following the instructions in this page you should be able to start a PostgreSQL
+By following the instructions on this page you should be able to start a PostgreSQL
 cluster on your local Kubernetes/Openshift installation and experiment with it.
 
 !!! Important
@@ -31,7 +31,7 @@ cluster on your local Kubernetes/Openshift installation and experiment with it.
 
 ## Part 1 - Setup the local Kubernetes/Openshift playground
 
-The first part is about installing Minikube, Kind or CRC. Please spend some time
+The first part is about installing Minikube, Kind, or CRC. Please spend some time
 reading about the systems and decide which one to proceed with.
 After setting up one of them, please proceed with part 2.
 
@@ -43,14 +43,14 @@ users looking to try out Kubernetes or develop with it day-to-day. Normally, it
 is used in conjunction with VirtualBox.
 
 You can find more information in the official [Kubernetes documentation on how to
-install Minikube](https://kubernetes.io/docs/tasks/tools/install-minikube) in your personal local environment.
-When you installed it run the following command to create  minikube cluster:
+install Minikube](https://kubernetes.io/docs/tasks/tools/install-minikube) in your local personal environment.
+When you installed it, run the following command to create a minikube cluster:
 
 ```sh
 minikube start
 ```
 
-This will create the Kubernetes cluster and you will be ready to use it.
+This will create the Kubernetes cluster, and you will be ready to use it.
 Verify that it works with the following command:
 
 ```sh
@@ -84,7 +84,7 @@ crc start
 
 The `crc start` output will explain how to proceed. You'll then need to
 execute the output of the `crc oc-env` command.
-After that, you can login as `kubeadmin` with the printed `oc login`
+After that, you can log in as `kubeadmin` with the printed `oc login`
 command. You can also open the web console running `crc console`.
 User and password are the same as for the `oc login` command.
 
@@ -118,7 +118,7 @@ kubectl get deploy -n postgresql-operator-system postgresql-operator-controller-
 
 #### Using the web interface
 
-Log in the console as `kubeadmin` and navigate to the  `Operator → OperatorHub` page.
+Log in to the console as `kubeadmin` and navigate to the  `Operator → OperatorHub` page.
 
 Find the `Cloud Native PostgreSQL` box scrolling or using the search filter.
 
@@ -146,7 +146,7 @@ is available in the Openshift documentation.
 
 ## Part 3 - Deploy a PostgreSQL cluster
 
-As with any other deployment in Kubernetes, in order to deploy a PostgreSQL cluster
+As with any other deployment in Kubernetes, to deploy a PostgreSQL cluster
 you need to apply a configuration file that defines your desired `Cluster`.
 
 The [`cluster-example.yaml`](samples/cluster-example.yaml) sample file

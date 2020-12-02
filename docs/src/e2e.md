@@ -1,8 +1,8 @@
 # End-to-End Tests
 
-To ensure that Cloud Native PostgreSQL is able to act correctly while deploying
-and managing PostgreSQL clusters, the operator is automatically tested after each
-commit via a suite of **End-to-end (E2E) tests**.
+Cloud Native PostgreSQL operator is automatically tested after each
+commit via a suite of **End-to-end (E2E) tests**. It ensures that
+the operator correctly deploys and manages the PostgreSQL clusters.
 
 Moreover, the following Kubernetes versions are tested for each commit,
 ensuring failure and bugs detection at an early stage of the development
@@ -36,9 +36,9 @@ and the following suite of E2E tests are performed on that cluster:
 * Backup and ScheduledBackups execution;
 * Restore from backup;
 * Primary endpoint switch in case of failure in less than 5 seconds;
-* Recover from degraded state in less than 30 seconds.
+* Recover from a degraded state in less than 30 seconds.
 
-The E2E tests suite is also run for OpenShift 4.6 and for the latest Kubernetes
+The E2E tests suite is also run for OpenShift 4.6 and the latest Kubernetes
 and PostgreSQL releases on clusters created on the following services:
 
 * Google GKE

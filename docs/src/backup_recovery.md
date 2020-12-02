@@ -2,20 +2,20 @@
 
 The operator can orchestrate a continuous backup infrastructure
 that is based on the [Barman](https://pgbarman.org) tool. Instead
-of using the classical architecture with a Barman server which
+of using the classical architecture with a Barman server, which
 backup many PostgreSQL instances, the operator will use the
 `barman-cloud-wal-archive` and `barman-cloud-backup` tools.
 As a result, base backups will be *tarballs*. Both base backups and WAL files
 can be compressed and encrypted.
 
-For this it is required an image with `barman-cli-cloud` installed. The
-image `quay.io/enterprisedb/postgresql` can be used for this scope,
-as it is composed by a community PostgreSQL image and the latest
+For this, it is required an image with `barman-cli-cloud` installed.
+You can use the image `quay.io/enterprisedb/postgresql` for this scope,
+as it is composed of a community PostgreSQL image and the latest
 `barman-cli-cloud` package.
 
 ## Cloud credentials
 
-The backup files can be archived in any service whose API is compatible
+You can archive the backup files in any service whose API is compatible
 with AWS S3. You will need the following information about your
 environment:
 
@@ -26,7 +26,7 @@ environment:
 
 - `ACCESS_SESSION_TOKEN`: the optional session token in case it is required
 
-The access key used must have the permission to upload files in
+The access key used must have permission to upload files in
 the bucket. Given that, you must create a k8s secret with the
 credentials, and you can do that with the following command:
 
@@ -44,7 +44,7 @@ if encryption at rest is configured in your installation.
 
 ### S3
 
-Given that secret, your can configure your cluster like in
+Given that secret, you can configure your cluster like in
 the following example:
 
 ```yaml
@@ -70,11 +70,11 @@ the instance can upload the WAL files, e.g.
 
 ### Other S3-compatible Object Storages providers
 
-In case you're using an S3-compatible object storage, like MinIO or
+In case you're using S3-compatible object storage, like MinIO or
 Linode Object Storage, you can specify an endpoint instead of using the
 default S3 one.
 
-In this example it will use the `bucket` bucket of Linode in the region
+In this example, it will use the `bucket` bucket of Linode in the region
 `us-east1`.
 
 ```yaml
@@ -92,7 +92,7 @@ spec:
 
 ### MinIO Gateway
 
-Optionally, MinIO Gateway can be used as a common interface which
+Optionally, you can use MinIO Gateway as a common interface which
 relays backup objects to other cloud storage solutions, like S3, GCS or
 Azure. For more information, please refer to [MinIO official documentation](https://docs.min.io/).
 
@@ -100,7 +100,7 @@ Specifically, the Cloud Native PostgreSQL cluster can directly point to a local
 MinIO Gateway as an endpoint, using previously created credentials and service.
 
 MinIO secrets will be used by both the PostgreSQL cluster and the MinIO instance.
-Therefore they must be created in the same namespace:
+Therefore you must create them in the same namespace:
 
 ```sh
 kubectl create secret generic minio-creds \
@@ -112,7 +112,7 @@ kubectl create secret generic minio-creds \
     Cloud Object Storage credentials will be used only by MinIO Gateway in this case.
 
 !!! Important
-    In order to allow PostgreSQL reach MinIO Gateway, it is necessary to create a
+    In order to allow PostgreSQL to reach MinIO Gateway, it is necessary to create a
     `ClusterIP` service on port `9000` bound to the MinIO Gateway instance.
 
 For example:
@@ -137,7 +137,7 @@ spec:
     for Kubernetes does not support the gateway feature. As such, we will use a
     `deployment` instead.
 
-The MinIO deployment will the use cloud storage credentials to upload objects to the
+The MinIO deployment will use cloud storage credentials to upload objects to the
 remote bucket and relay backup files to different locations.
 
 Here is an example using AWS S3 as Cloud Object Storage:
@@ -211,9 +211,9 @@ spec:
 Verify on `s3://BUCKET_NAME/` the presence of archived WAL files before
 proceeding with a backup.
 
-## On demand backups
+## On-demand backups
 
-To request a new backup you need to create a new Backup resource
+To request a new backup, you need to create a new Backup resource
 like the following one:
 
 ```yaml
@@ -285,7 +285,7 @@ Events:         <none>
 ```
 
 !!!Important
-    This feature will not backup the secrets for the superuser and for the
+    This feature will not backup the secrets for the superuser and the
     application user. The secrets are supposed to be backed up as part of
     the standard backup procedures for the Kubernetes cluster.
 
@@ -293,7 +293,7 @@ Events:         <none>
 
 You can also schedule your backups periodically by creating a
 resource named `ScheduledBackup`. The latter is similar to a
-`Backup` but with an added field, named `schedule`.
+`Backup` but with an added field, called `schedule`.
 
 This field is a [Cron](https://en.wikipedia.org/wiki/Cron) schedule
 specification with a prepended field for seconds. This schedule format
@@ -335,14 +335,13 @@ spec:
         encryption: AES256
 ```
 
-The encryption can be configured directly in your bucket, and if
-you don't specify otherwise in the cluster, the operator will use
-that one.
+You can configure the encryption directly in your bucket, and the operator
+will use it unless you override it in the cluster configuration.
 
 ## Recovery
 
-The data uploaded to the object storage can be used to bootstrap a
-new cluster from a backup. The operator will orchestrate the restore
+You can use the data uploaded to the object storage to bootstrap a
+new cluster from a backup. The operator will orchestrate the recovery
 process using the `barman-cloud-restore` tool.
 
 When a backup is completed, the corresponding Kubernetes resource will
@@ -407,12 +406,12 @@ When the recovery process is completed, the operator will start the instance
 to allow it to recover the transaction log files needed for the
 consistency of the restored data directory.
 
-Once the recovery is complete, the required superuser password will be set
-into the instance. Having done that, the new primary instance will start
-as usual and the remaining instances will join the cluster as replicas.
+Once the recovery is complete, the operator will set the required
+superuser password into the instance. The new primary instance will start
+as usual, and the remaining instances will join the cluster as replicas.
 
-The process is transparent for the user, and managed by the instance manager
-running in the Pods.
+The process is transparent for the user and it is managed by the instance
+manager running in the Pods.
 
 You can optionally specify a `recoveryTarget` to perform a point in time
 recovery. If left unspecified, the recovery will continue up to the latest
