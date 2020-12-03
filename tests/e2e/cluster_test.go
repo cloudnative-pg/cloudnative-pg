@@ -1168,7 +1168,7 @@ var _ = Describe("Cluster", func() {
 						findCmd))
 
 					value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
-					return value, atoiErr, err
+					return value, err, atoiErr
 				}, timeout).Should(BeEquivalentTo(1))
 			})
 
@@ -1204,7 +1204,7 @@ var _ = Describe("Cluster", func() {
 						mcName,
 						findCmd))
 					value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
-					return value, atoiErr, err
+					return value, err, atoiErr
 				}, timeout).Should(BeEquivalentTo(1))
 			})
 
@@ -1376,7 +1376,7 @@ var _ = Describe("Cluster", func() {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
 							"psql", "-U", "postgres", "-tAc", "show work_mem")
 						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
-						return value, atoiErr, err
+						return value, err, atoiErr
 					}, timeout).Should(BeEquivalentTo(8))
 				}
 			})
@@ -1408,7 +1408,7 @@ var _ = Describe("Cluster", func() {
 					stdout, _, err = env.ExecCommand(env.Ctx, podList.Items[0], "postgres", &commandtimeout,
 						"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
-					return value, atoiErr, err
+					return value, err, atoiErr
 				}, timeout).Should(BeEquivalentTo(1))
 			})
 			By("restarting and switching Pg when a parameter requring restart is modified", func() {
@@ -1437,7 +1437,7 @@ var _ = Describe("Cluster", func() {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
 							"psql", "-U", "postgres", "-tAc", "show shared_buffers")
 						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
-						return value, atoiErr, err
+						return value, err, atoiErr
 					}, timeout).Should(BeEquivalentTo(256))
 				}
 				// Check that a switchover happened
@@ -1474,14 +1474,14 @@ var _ = Describe("Cluster", func() {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
 							"psql", "-U", "postgres", "-tAc", "show max_replication_slots")
 						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
-						return value, atoiErr, err
+						return value, err, atoiErr
 					}, timeout).Should(BeEquivalentTo(16))
 
 					Eventually(func() (int, error, error) {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
 							"psql", "-U", "postgres", "-tAc", "show maintenance_work_mem")
 						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
-						return value, atoiErr, err
+						return value, err, atoiErr
 					}, timeout).Should(BeEquivalentTo(128))
 				}
 				// Check that a switchover happened
@@ -1508,7 +1508,7 @@ var _ = Describe("Cluster", func() {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
 							"psql", "-U", "postgres", "-tAc", "show autovacuum_max_workers")
 						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
-						return value, atoiErr, err
+						return value, err, atoiErr
 					}, timeout).ShouldNot(BeEquivalentTo(4))
 				}
 			})
@@ -1528,7 +1528,7 @@ var _ = Describe("Cluster", func() {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
 							"psql", "-U", "postgres", "-tAc", "show autovacuum_max_workers")
 						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
-						return value, atoiErr, err
+						return value, err, atoiErr
 					}, timeout).ShouldNot(BeEquivalentTo(4))
 				}
 			})
