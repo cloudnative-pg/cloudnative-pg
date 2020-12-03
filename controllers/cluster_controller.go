@@ -123,15 +123,6 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
 	}
 
-	// If we are joining a node, we should wait for the process to finish
-	if resources.countRunningJobs() > 0 {
-		log.V(2).Info("Waiting for jobs to finish",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
-			"jobs", resources.jobs.Items)
-		return ctrl.Result{}, nil
-	}
-
 	// Ensure we have the required global objects
 	if err := r.createPostgresClusterObjects(ctx, &cluster); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot create Cluster auxiliary objects: %w", err)
@@ -156,7 +147,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	// Act on Pods only if there is nothing that is currently being created or deleted
 	if r.SatisfiedExpectations(&cluster) {
-		return r.ReconcilePods(ctx, req, &cluster, resources.pods, instancesStatus)
+		return r.ReconcilePods(ctx, req, &cluster, resources, instancesStatus)
 	}
 
 	log.V(2).Info("A managed resource is currently being created or deleted. Waiting")
@@ -181,8 +172,17 @@ func (r *ClusterReconciler) SatisfiedExpectations(cluster *v1alpha1.Cluster) boo
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
 func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request, cluster *v1alpha1.Cluster,
-	childPods corev1.PodList, instancesStatus postgres.PostgresqlStatusList) (ctrl.Result, error) {
+	resources *managedResources, instancesStatus postgres.PostgresqlStatusList) (ctrl.Result, error) {
 	log := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
+
+	// If we are joining a node, we should wait for the process to finish
+	if resources.countRunningJobs() > 0 {
+		log.V(2).Info("Waiting for jobs to finish",
+			"clusterName", cluster.Name,
+			"namespace", cluster.Namespace,
+			"jobs", resources.jobs.Items)
+		return ctrl.Result{}, nil
+	}
 
 	// Recreate missing Pods
 	if len(cluster.Status.DanglingPVC) > 0 {
@@ -217,7 +217,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 		}
 
 		// Check if we need to handle a rolling upgrade
-		return ctrl.Result{}, r.upgradeCluster(ctx, cluster, childPods, instancesStatus)
+		return ctrl.Result{}, r.upgradeCluster(ctx, cluster, resources.pods, instancesStatus)
 	}
 
 	// Find if we have Pods that are not ready, this is OK
@@ -241,7 +241,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 
 	// Are there nodes to be removed? Remove one of them
 	if cluster.Status.Instances > cluster.Spec.Instances {
-		if err := r.scaleDownCluster(ctx, cluster, childPods); err != nil {
+		if err := r.scaleDownCluster(ctx, cluster, resources.pods); err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot scale down cluster: %w", err)
 		}
 	}
