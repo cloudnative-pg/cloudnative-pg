@@ -547,11 +547,10 @@ var _ = Describe("Cluster", func() {
 					Name:      clusterName,
 				}
 				cr := &clusterv1alpha1.Cluster{}
-				if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
-					Fail("Unable to get Cluster " + clusterName)
-				}
-				cr.Status.TargetPrimary = targetPrimary
 				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					err := env.Client.Get(env.Ctx, namespacedName, cr)
+					Expect(err).ToNot(HaveOccurred())
+					cr.Status.TargetPrimary = targetPrimary
 					return env.Client.Status().Update(env.Ctx, cr)
 				})
 				Expect(err).ToNot(HaveOccurred())
@@ -664,10 +663,10 @@ var _ = Describe("Cluster", func() {
 				Namespace: namespace,
 				Name:      clusterName,
 			}
-			err = env.Client.Get(env.Ctx, namespacedName, cr)
-			Expect(err).To(BeNil())
-			cr.Spec.ImageName = updatedImageName
 			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := env.Client.Get(env.Ctx, namespacedName, cr)
+				Expect(err).ToNot(HaveOccurred())
+				cr.Spec.ImageName = updatedImageName
 				return env.Client.Update(env.Ctx, cr)
 			})
 			Expect(err).ToNot(HaveOccurred())
