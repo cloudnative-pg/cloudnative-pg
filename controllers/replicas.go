@@ -31,6 +31,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	status postgres.PostgresqlStatusList,
 ) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	// TODO: what if I delete the master with only 2 instances
 	if len(status.Items) <= 1 && cluster.Status.Instances <= 1 {
 		// Can't make a switchover of failover if we have
 		// less than two instances
