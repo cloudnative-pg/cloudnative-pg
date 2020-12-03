@@ -463,7 +463,7 @@ var _ = Describe("Cluster", func() {
 				err := env.DeletePod(namespace, currentPrimary, forceDelete)
 				Expect(err).To(BeNil())
 
-				timeout := 30
+				timeout := 120
 				Eventually(func() string {
 					cr := &clusterv1alpha1.Cluster{}
 					if err := env.Client.Get(env.Ctx, namespacedName, cr); err != nil {
