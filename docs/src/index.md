@@ -39,7 +39,8 @@ by Red Hat.
 * Rolling updates for PostgreSQL minor versions and operator upgrades
 * TLS connections and client certificate authentication
 * Continuous backup to an S3 compatible object store
-* Full recovery from an S3 compatible object store backup
+* Full recovery and Point-In-Time recovery from an S3 compatible object store backup
+* Support for Synchronous Replicas
 * Standard output logging of PostgreSQL error messages
 
 ## Requirements on Kubernetes
