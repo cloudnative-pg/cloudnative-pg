@@ -153,8 +153,8 @@ func CreatePrimaryJobViaInitdb(cluster v1alpha1.Cluster, nodeSerial int32) *batc
 	return job
 }
 
-// CreatePrimaryJobViaFullRecovery create a new primary instance in a Pod
-func CreatePrimaryJobViaFullRecovery(cluster v1alpha1.Cluster, nodeSerial int32, backup *v1alpha1.Backup) *batchv1.Job {
+// CreatePrimaryJobViaRecovery create a new primary instance in a Pod
+func CreatePrimaryJobViaRecovery(cluster v1alpha1.Cluster, nodeSerial int32, backup *v1alpha1.Backup) *batchv1.Job {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 	jobName := fmt.Sprintf("%s-%v-full-recovery", cluster.Name, nodeSerial)
 
@@ -164,13 +164,13 @@ func CreatePrimaryJobViaFullRecovery(cluster v1alpha1.Cluster, nodeSerial int32,
 		"restore",
 		"-pw-file", "/etc/superuser-secret/password",
 		"-parent-node", cluster.GetServiceReadWriteName(),
-		"-backup-name", cluster.Spec.Bootstrap.FullRecovery.Backup.Name,
+		"-backup-name", cluster.Spec.Bootstrap.Recovery.Backup.Name,
 	}
 
-	if cluster.Spec.Bootstrap.FullRecovery.RecoveryTarget != nil {
+	if cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
 		initCommand = append(initCommand,
 			"-target",
-			cluster.Spec.Bootstrap.FullRecovery.RecoveryTarget.BuildPostgresOptions())
+			cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
 	}
 
 	job := &batchv1.Job{

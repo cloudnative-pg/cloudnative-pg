@@ -31,7 +31,7 @@ The `initdb` bootstrap method is used.
 We currently support the following bootstrap methods:
 
 - `initdb`: initialise an empty PostgreSQL cluster
-- `fullRecovery`: create a PostgreSQL cluster restoring from an existing backup
+- `recovery`: create a PostgreSQL cluster restoring from an existing backup
    and replaying all the available WAL files.
 
 ## initdb
@@ -146,13 +146,13 @@ spec:
     size: 1Gi
 ```
 
-## fullRecovery
+## recovery
 
-The `fullRecovery` bootstrap mode lets you create a new cluster from
+The `recovery` bootstrap mode lets you create a new cluster from
 an existing backup. You can find more information about the recovery
 feature in the ["Backup and recovery" page](backup_recovery.md).
 
-The following example contains the full structure of the `fullRecovery`
+The following example contains the full structure of the `recovery`
 section:
 
 ```yaml
@@ -167,7 +167,7 @@ spec:
     name: superuser-secret
 
   bootstrap:
-    fullRecovery:
+    recovery:
       backup:
         name: backup-example
 
@@ -217,7 +217,7 @@ spec:
     size: 5Gi
 
   bootstrap:
-    fullRecovery:
+    recovery:
       backup:
         name: backup-example
 
@@ -261,7 +261,7 @@ spec:
     size: 5Gi
 
   bootstrap:
-    fullRecovery:
+    recovery:
       backup:
         name: backup-example
 

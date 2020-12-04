@@ -193,7 +193,36 @@ spec:
             bootstrap:
               description: Instructions to bootstrap this cluster
               properties:
-                fullRecovery:
+                initdb:
+                  description: Bootstrap the cluster via initdb
+                  properties:
+                    database:
+                      description: 'Name of the database used by the application.
+                        Default: `app`.'
+                      type: string
+                    options:
+                      description: The list of options that must be passed to initdb
+                        when creating the cluster
+                      items:
+                        type: string
+                      type: array
+                    owner:
+                      description: Name of the owner of the database in the instance
+                        to be used by applications. Defaults to the value of the `database`
+                        key.
+                      type: string
+                    secret:
+                      description: Name of the secret containing the initial credentials
+                        for the owner of the user database. If empty a new secret
+                        will be created from scratch
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                  type: object
+                recovery:
                   description: Bootstrap the cluster from a backup
                   properties:
                     backup:
@@ -239,35 +268,6 @@ spec:
                       type: object
                   required:
                   - backup
-                  type: object
-                initdb:
-                  description: Bootstrap the cluster via initdb
-                  properties:
-                    database:
-                      description: 'Name of the database used by the application.
-                        Default: `app`.'
-                      type: string
-                    options:
-                      description: The list of options that must be passed to initdb
-                        when creating the cluster
-                      items:
-                        type: string
-                      type: array
-                    owner:
-                      description: Name of the owner of the database in the instance
-                        to be used by applications. Defaults to the value of the `database`
-                        key.
-                      type: string
-                    secret:
-                      description: Name of the secret containing the initial credentials
-                        for the owner of the user database. If empty a new secret
-                        will be created from scratch
-                      properties:
-                        name:
-                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Add other useful fields. apiVersion, kind, uid?'
-                          type: string
-                      type: object
                   type: object
               type: object
             description:

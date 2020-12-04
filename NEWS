@@ -21,6 +21,8 @@ Version 0.6.0 - 4 Dec 2020
 - Introduce Kubernetes expectations for Pods, PVCs, and Jobs to prevent race
   conditions
 - Set `application_name` in PostgreSQL to the name of the Pod/instance
+- The `fullRecovery` bootstrap mode has been renamed to `recovery`
+  to address also Point-In-Time Recovery
 - Bug fixes and improvements
 
 Version 0.5.0 - 20 Nov 2020

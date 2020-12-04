@@ -62,7 +62,7 @@ type InitInfo struct {
 	InitDBOptions []string
 
 	// The recovery target options, only applicable for the
-	// fullRecovery bootstrap type
+	// recovery bootstrap type
 	RecoveryTarget string
 
 	// Whether it is a temporary instance that will never contain real data.

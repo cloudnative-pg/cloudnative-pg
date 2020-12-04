@@ -28,15 +28,15 @@ var _ = Describe("bootstrap methods validation", func() {
 		Expect(result).To(BeEmpty())
 	})
 
-	It("doesn't complain if we are using fullRecovery", func() {
-		fullRecoveryCluster := &Cluster{
+	It("doesn't complain if we are using recovery", func() {
+		recoveryCluster := &Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
-					FullRecovery: &BootstrapFullRecovery{},
+					Recovery: &BootstrapRecovery{},
 				},
 			},
 		}
-		result := fullRecoveryCluster.validateBootstrapMethod()
+		result := recoveryCluster.validateBootstrapMethod()
 		Expect(result).To(BeEmpty())
 	})
 
@@ -44,8 +44,8 @@ var _ = Describe("bootstrap methods validation", func() {
 		invalidCluster := &Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
-					FullRecovery: &BootstrapFullRecovery{},
-					InitDB:       &BootstrapInitDB{},
+					Recovery: &BootstrapRecovery{},
+					InitDB:   &BootstrapInitDB{},
 				},
 			},
 		}
@@ -393,7 +393,7 @@ var _ = Describe("recovery target", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
-					FullRecovery: &BootstrapFullRecovery{
+					Recovery: &BootstrapRecovery{
 						RecoveryTarget: &RecoveryTarget{
 							TargetTLI:       "",
 							TargetXID:       "3",
@@ -415,7 +415,7 @@ var _ = Describe("recovery target", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
-					FullRecovery: &BootstrapFullRecovery{
+					Recovery: &BootstrapRecovery{
 						RecoveryTarget: &RecoveryTarget{
 							TargetTime: "2020-01-01 01:01",
 						},
@@ -432,7 +432,7 @@ var _ = Describe("recovery target", func() {
 			cluster := Cluster{
 				Spec: ClusterSpec{
 					Bootstrap: &BootstrapConfiguration{
-						FullRecovery: &BootstrapFullRecovery{
+						Recovery: &BootstrapRecovery{
 							RecoveryTarget: &RecoveryTarget{
 								TargetTLI: "latest",
 							},
@@ -447,7 +447,7 @@ var _ = Describe("recovery target", func() {
 			cluster := Cluster{
 				Spec: ClusterSpec{
 					Bootstrap: &BootstrapConfiguration{
-						FullRecovery: &BootstrapFullRecovery{
+						Recovery: &BootstrapRecovery{
 							RecoveryTarget: &RecoveryTarget{
 								TargetTLI: "current",
 							},
@@ -462,7 +462,7 @@ var _ = Describe("recovery target", func() {
 			cluster := Cluster{
 				Spec: ClusterSpec{
 					Bootstrap: &BootstrapConfiguration{
-						FullRecovery: &BootstrapFullRecovery{
+						Recovery: &BootstrapRecovery{
 							RecoveryTarget: &RecoveryTarget{
 								TargetTLI: "23",
 							},
@@ -477,7 +477,7 @@ var _ = Describe("recovery target", func() {
 			cluster := Cluster{
 				Spec: ClusterSpec{
 					Bootstrap: &BootstrapConfiguration{
-						FullRecovery: &BootstrapFullRecovery{
+						Recovery: &BootstrapRecovery{
 							RecoveryTarget: &RecoveryTarget{
 								TargetTLI: "0",
 							},
@@ -492,7 +492,7 @@ var _ = Describe("recovery target", func() {
 			cluster := Cluster{
 				Spec: ClusterSpec{
 					Bootstrap: &BootstrapConfiguration{
-						FullRecovery: &BootstrapFullRecovery{
+						Recovery: &BootstrapRecovery{
 							RecoveryTarget: &RecoveryTarget{
 								TargetTLI: "-5",
 							},
@@ -507,7 +507,7 @@ var _ = Describe("recovery target", func() {
 			cluster := Cluster{
 				Spec: ClusterSpec{
 					Bootstrap: &BootstrapConfiguration{
-						FullRecovery: &BootstrapFullRecovery{
+						Recovery: &BootstrapRecovery{
 							RecoveryTarget: &RecoveryTarget{
 								TargetTLI: "I don't remember",
 							},
