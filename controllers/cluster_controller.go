@@ -269,7 +269,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 
 	// Are there nodes to be removed? Remove one of them
 	if cluster.Status.Instances > cluster.Spec.Instances {
-		if err := r.scaleDownCluster(ctx, cluster, resources.pods); err != nil {
+		if err := r.scaleDownCluster(ctx, cluster, resources); err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot scale down cluster: %w", err)
 		}
 	}

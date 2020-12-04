@@ -9,10 +9,12 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/expectations"
@@ -23,12 +25,12 @@ import (
 func (r *ClusterReconciler) scaleDownCluster(
 	ctx context.Context,
 	cluster *v1alpha1.Cluster,
-	childPods v1.PodList,
+	resources *managedResources,
 ) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	// Is there one pod to be deleted?
-	sacrificialPod := getSacrificialPod(childPods.Items)
+	sacrificialPod := getSacrificialPod(resources.pods.Items)
 	if sacrificialPod == nil {
 		log.Info("There are no instances to be sacrificed. Wait for the next sync loop")
 		return nil
@@ -80,6 +82,36 @@ func (r *ClusterReconciler) scaleDownCluster(
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialPod.Name, err)
+		}
+	}
+
+	// And now also the Job
+	for idx := range resources.jobs.Items {
+		if strings.HasPrefix(resources.jobs.Items[idx].Name, sacrificialPod.Name+"-") {
+			// We expect the deletion of the selected Job
+			if err := r.jobExpectations.ExpectDeletions(key, 1); err != nil {
+				log.Error(err, "Unable to set jobExpectations", "key", key, "dels", 1)
+			}
+
+			// This job was working against the PVC of this Pod,
+			// let's remove it
+			foreground := metav1.DeletePropagationForeground
+			err = r.Delete(
+				ctx,
+				&resources.jobs.Items[idx],
+				&client.DeleteOptions{
+					PropagationPolicy: &foreground,
+				},
+			)
+			if err != nil {
+				// We cannot observe a deletion if it was not accepted by the server
+				r.jobExpectations.DeletionObserved(key)
+
+				// Ignore if NotFound, otherwise report the error
+				if !apierrs.IsNotFound(err) {
+					return fmt.Errorf("scaling down node (job) %v: %v", sacrificialPod.Name, err)
+				}
+			}
 		}
 	}
 
