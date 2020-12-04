@@ -81,6 +81,14 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if apierrs.IsNotFound(err) {
 			log.Info("Resource has been deleted")
 
+			// Let's remove every expectation we have about this cluster
+			r.deleteExpectations(&v1alpha1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      req.Name,
+					Namespace: req.Namespace,
+				},
+			})
+
 			return ctrl.Result{}, nil
 		}
 
@@ -153,7 +161,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Act on Pods only if there is nothing that is currently being created or deleted
-	if r.SatisfiedExpectations(&cluster) {
+	if r.satisfiedExpectations(&cluster) {
 		return r.ReconcilePods(ctx, req, &cluster, resources, instancesStatus)
 	}
 
@@ -161,20 +169,33 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 
-// SatisfiedExpectations check if the expectations for a certain cluster are met
-func (r *ClusterReconciler) SatisfiedExpectations(cluster *v1alpha1.Cluster) bool {
+// satisfiedExpectations check if the expectations for a certain cluster are met
+func (r *ClusterReconciler) satisfiedExpectations(cluster *v1alpha1.Cluster) bool {
+	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	key := expectations.KeyFunc(cluster)
 	if !r.podExpectations.SatisfiedExpectations(key) {
+		log.Info("Pod expectations are not met")
 		return false
 	}
 	if !r.jobExpectations.SatisfiedExpectations(key) {
+		log.Info("Job expectations are not met")
 		return false
 	}
 	if !r.pvcExpectations.SatisfiedExpectations(key) {
+		log.Info("PVC expectations are not met")
 		return false
 	}
 
 	return true
+}
+
+// deleteExpectations remove expectations we have about a certain cluster
+func (r *ClusterReconciler) deleteExpectations(cluster *v1alpha1.Cluster) {
+	key := expectations.KeyFunc(cluster)
+	r.podExpectations.DeleteExpectations(key)
+	r.jobExpectations.DeleteExpectations(key)
+	r.pvcExpectations.DeleteExpectations(key)
 }
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
