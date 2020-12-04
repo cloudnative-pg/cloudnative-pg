@@ -280,7 +280,7 @@ type BootstrapConfiguration struct {
 	InitDB *BootstrapInitDB `json:"initdb,omitempty"`
 
 	// Bootstrap the cluster from a backup
-	FullRecovery *BootstrapFullRecovery `json:"fullRecovery,omitempty"`
+	Recovery *BootstrapRecovery `json:"recovery,omitempty"`
 }
 
 // BootstrapInitDB is the configuration of the bootstrap process when
@@ -307,12 +307,12 @@ type BootstrapInitDB struct {
 	Options []string `json:"options,omitempty"`
 }
 
-// BootstrapFullRecovery contains the configuration required to restore
+// BootstrapRecovery contains the configuration required to restore
 // the backup with the specified name and, after having changed the password
 // with the one chosen for the superuser, will use it to bootstrap a full
 // cluster cloning all the instances from the restored primary.
 // Refer to the Bootstrap page of the documentation for more information.
-type BootstrapFullRecovery struct {
+type BootstrapRecovery struct {
 	// The backup we need to restore
 	Backup corev1.LocalObjectReference `json:"backup"`
 

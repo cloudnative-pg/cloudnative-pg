@@ -418,10 +418,10 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	var backup v1alpha1.Backup
-	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.FullRecovery != nil {
+	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil {
 		backupObjectKey := client.ObjectKey{
 			Namespace: cluster.Namespace,
-			Name:      cluster.Spec.Bootstrap.FullRecovery.Backup.Name,
+			Name:      cluster.Spec.Bootstrap.Recovery.Backup.Name,
 		}
 		err := r.Get(ctx, backupObjectKey, &backup)
 		if err != nil {
@@ -432,7 +432,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 				// Missing backup
 				log.Info("Missing backup object, can't continue full recovery",
-					"backup", cluster.Spec.Bootstrap.FullRecovery.Backup)
+					"backup", cluster.Spec.Bootstrap.Recovery.Backup)
 				return ctrl.Result{
 					Requeue:      true,
 					RequeueAfter: time.Minute,
@@ -484,9 +484,9 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	// We are bootstrapping a cluster and in need to create the first node
 	var job *batchv1.Job
 
-	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.FullRecovery != nil {
+	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil {
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
-		job = specs.CreatePrimaryJobViaFullRecovery(*cluster, nodeSerial, &backup)
+		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, &backup)
 	} else {
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
 		job = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial)

@@ -334,7 +334,7 @@ spec:
             bootstrap:
               description: Instructions to bootstrap this cluster
               properties:
-                fullRecovery:
+                recovery:
                   description: Bootstrap the cluster from a backup
                   properties:
                     backup:

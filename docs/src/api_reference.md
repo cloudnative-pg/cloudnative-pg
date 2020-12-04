@@ -25,8 +25,8 @@ Below you will find a description of the defined resources:
 * [BackupConfiguration](#backupconfiguration)
 * [BarmanObjectStoreConfiguration](#barmanobjectstoreconfiguration)
 * [BootstrapConfiguration](#bootstrapconfiguration)
-* [BootstrapFullRecovery](#bootstrapfullrecovery)
 * [BootstrapInitDB](#bootstrapinitdb)
+* [BootstrapRecovery](#bootstraprecovery)
 * [Cluster](#cluster)
 * [ClusterList](#clusterlist)
 * [ClusterSpec](#clusterspec)
@@ -134,17 +134,7 @@ BootstrapConfiguration contains information about how to create the PostgreSQL c
 | Field | Description | Scheme | Required |
 | -------------------- | ------------------------------ | -------------------- | -------- |
 | initdb | Bootstrap the cluster via initdb | *[BootstrapInitDB](#bootstrapinitdb) | false |
-| fullRecovery | Bootstrap the cluster from a backup | *[BootstrapFullRecovery](#bootstrapfullrecovery) | false |
-
-
-## BootstrapFullRecovery
-
-BootstrapFullRecovery contains the configuration required to restore the backup with the specified name and, after having changed the password with the one chosen for the superuser, will use it to bootstrap a full cluster cloning all the instances from the restored primary. Refer to the Bootstrap page of the documentation for more information.
-
-| Field | Description | Scheme | Required |
-| -------------------- | ------------------------------ | -------------------- | -------- |
-| backup | The backup we need to restore | corev1.LocalObjectReference | true |
-| recoveryTarget | By default the recovery will end as soon as a consistent state is reached: in this case that means at the end of a backup. This option allows to fine tune the recovery process | *[RecoveryTarget](#recoverytarget) | false |
+| recovery | Bootstrap the cluster from a backup | *[BootstrapRecovery](#bootstraprecovery) | false |
 
 
 ## BootstrapInitDB
@@ -157,6 +147,16 @@ BootstrapInitDB is the configuration of the bootstrap process when initdb is use
 | owner | Name of the owner of the database in the instance to be used by applications. Defaults to the value of the `database` key. | string | true |
 | secret | Name of the secret containing the initial credentials for the owner of the user database. If empty a new secret will be created from scratch | *corev1.LocalObjectReference | false |
 | options | The list of options that must be passed to initdb when creating the cluster | []string | false |
+
+
+## BootstrapRecovery
+
+BootstrapRecovery contains the configuration required to restore the backup with the specified name and, after having changed the password with the one chosen for the superuser, will use it to bootstrap a full cluster cloning all the instances from the restored primary. Refer to the Bootstrap page of the documentation for more information.
+
+| Field | Description | Scheme | Required |
+| -------------------- | ------------------------------ | -------------------- | -------- |
+| backup | The backup we need to restore | corev1.LocalObjectReference | true |
+| recoveryTarget | By default the recovery will end as soon as a consistent state is reached: in this case that means at the end of a backup. This option allows to fine tune the recovery process | *[RecoveryTarget](#recoverytarget) | false |
 
 
 ## Cluster

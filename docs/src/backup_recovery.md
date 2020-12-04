@@ -393,7 +393,7 @@ spec:
     size: 5Gi
 
   bootstrap:
-    fullRecovery:
+    recovery:
       backup:
         name: backup-example
 ```

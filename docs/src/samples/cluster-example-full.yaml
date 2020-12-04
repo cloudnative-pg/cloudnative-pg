@@ -55,7 +55,7 @@ spec:
       secret:
         name: cluster-example-app-user
     # Alternative bootstrap method: start from a backup
-    #fullRecovery:
+    #recovery:
     #  backup:
     #    name: backup-example
 

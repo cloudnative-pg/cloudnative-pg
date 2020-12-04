@@ -53,7 +53,7 @@ func (r *Cluster) Default() {
 		r.Spec.Bootstrap = &BootstrapConfiguration{}
 	}
 
-	if r.Spec.Bootstrap.InitDB == nil && r.Spec.Bootstrap.FullRecovery == nil {
+	if r.Spec.Bootstrap.InitDB == nil && r.Spec.Bootstrap.Recovery == nil {
 		r.Spec.Bootstrap.InitDB = &BootstrapInitDB{
 			Database: "app",
 			Owner:    "app",
@@ -223,7 +223,7 @@ func (r *Cluster) validateBootstrapMethod() field.ErrorList {
 	if r.Spec.Bootstrap.InitDB != nil {
 		bootstrapMethods++
 	}
-	if r.Spec.Bootstrap.FullRecovery != nil {
+	if r.Spec.Bootstrap.Recovery != nil {
 		bootstrapMethods++
 	}
 
@@ -376,11 +376,11 @@ func (r *Cluster) validateImageChange(old string) field.ErrorList {
 // Validate the recovery target to ensure that the mutual exclusivity
 // of options is respected
 func (r *Cluster) validateRecoveryTarget() field.ErrorList {
-	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.FullRecovery == nil {
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil {
 		return nil
 	}
 
-	recoveryTarget := r.Spec.Bootstrap.FullRecovery.RecoveryTarget
+	recoveryTarget := r.Spec.Bootstrap.Recovery.RecoveryTarget
 	if recoveryTarget == nil {
 		return nil
 	}
@@ -406,7 +406,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 
 	if targets > 1 {
 		result = append(result, field.Invalid(
-			field.NewPath("spec", "bootstrap", "fullRecovery", "recoveryTarget"),
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 			recoveryTarget,
 			"Recovery target options are mutually exclusive"))
 	}
@@ -418,7 +418,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 		// Everything else must be a valid positive integer
 		if tli, err := strconv.Atoi(recoveryTarget.TargetTLI); err != nil || tli < 1 {
 			result = append(result, field.Invalid(
-				field.NewPath("spec", "bootstrap", "fullRecovery", "recoveryTarget", "targetTLI"),
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetTLI"),
 				recoveryTarget,
 				"recovery target timeline can be set to 'latest', 'current' or a positive integer"))
 		}

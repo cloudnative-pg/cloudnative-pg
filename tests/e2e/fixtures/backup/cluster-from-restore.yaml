@@ -9,6 +9,6 @@ spec:
     size: 1Gi
 
   bootstrap:
-    fullRecovery:
+    recovery:
       backup:
         name: cluster-backup
