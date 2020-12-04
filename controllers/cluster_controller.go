@@ -117,9 +117,9 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// Update the status section of this Cluster resource
 	if err = r.updateResourceStatus(ctx, &cluster, resources); err != nil {
 		if apierrs.IsConflict(err) {
-			// Let's wait for another reconciler loop, since the
-			// status already changed
-			return ctrl.Result{}, nil
+			// Requeue a new reconciliation cycle, as in this point we need
+			// to quickly react the changes
+			return ctrl.Result{Requeue: true}, nil
 		}
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
