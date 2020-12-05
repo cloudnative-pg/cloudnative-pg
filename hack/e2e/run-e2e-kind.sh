@@ -98,7 +98,7 @@ main() {
 
 	containerdConfigPatches:
 	- |-
-	  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${DOCKER_REGISTRY_MIRROR##*//}"]
+	  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
 	    endpoint = ["${DOCKER_REGISTRY_MIRROR}"]
 
 	EOF
