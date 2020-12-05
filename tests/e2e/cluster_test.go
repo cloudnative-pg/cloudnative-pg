@@ -8,7 +8,7 @@ package e2e
 
 import (
 	"fmt"
-	"regexp"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +24,7 @@ import (
 	clusterv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -635,26 +636,11 @@ var _ = Describe("Cluster", func() {
 		AssertUpdateImage := func(namespace string, clusterName string) {
 			timeout := 600
 
-			// Detect initial image name
-			var initialImageName string
-			podList := &corev1.PodList{}
-			err := env.Client.List(
-				env.Ctx, podList, ctrlclient.InNamespace(namespace),
-				ctrlclient.MatchingLabels{"postgresql": clusterName},
-			)
-			Expect(err).To(BeNil())
-			Expect(len(podList.Items) > 0).To(BeTrue())
-			pod := podList.Items[0]
-			for _, data := range pod.Spec.Containers {
-				if data.Name != specs.PostgresContainerName {
-					continue
-				}
-				initialImageName = data.Image
-				break
-			}
 			// Update to the latest minor
-			var re = regexp.MustCompile(`^(.*:\d+).*$`)
-			updatedImageName := re.ReplaceAllString(initialImageName, `$1`)
+			updatedImageName := os.Getenv("POSTGRES_IMG")
+			if updatedImageName == "" {
+				updatedImageName = versions.GetDefaultImageName()
+			}
 
 			// We should be able to apply the conf containing the new
 			// image
@@ -663,7 +649,7 @@ var _ = Describe("Cluster", func() {
 				Namespace: namespace,
 				Name:      clusterName,
 			}
-			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 				err := env.Client.Get(env.Ctx, namespacedName, cr)
 				Expect(err).ToNot(HaveOccurred())
 				cr.Spec.ImageName = updatedImageName
