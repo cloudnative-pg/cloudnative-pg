@@ -118,3 +118,13 @@ func (env TestingEnvironment) ExecCommand(
 	command ...string) (string, string, error) {
 	return utils.ExecCommand(ctx, env.Interface, env.RestClientConfig, pod, containerName, timeout, command...)
 }
+
+// GetClusterPodList gathers the current list of pods for a cluster in a namespace
+func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName string) (*corev1.PodList, error) {
+	podList := &corev1.PodList{}
+	err := env.Client.List(
+		env.Ctx, podList, client.InNamespace(namespace),
+		client.MatchingLabels{"postgresql": clusterName},
+	)
+	return podList, err
+}
