@@ -195,7 +195,8 @@ func (instance *Instance) GetApplicationDB() (*sql.DB, error) {
 
 	db, err := sql.Open(
 		"postgres",
-		fmt.Sprintf("host=%s port=5432 dbname=postgres user=postgres sslmode=disable", socketDir))
+		fmt.Sprintf("host=%s port=5432 dbname=%v user=postgres sslmode=disable",
+			socketDir, instance.ApplicationDatabase))
 	if err != nil {
 		return nil, errors.Wrap(err, "Can't create connection pool")
 	}
