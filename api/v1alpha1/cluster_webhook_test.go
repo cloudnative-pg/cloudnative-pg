@@ -623,3 +623,68 @@ var _ = Describe("Number of synchronous replicas", func() {
 		Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
 	})
 })
+
+var _ = Describe("storage size validation", func() {
+	It("complains if the storage size is not parsable", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					Size: "10 apples",
+				},
+			},
+		}
+		Expect(cluster.validateStorageSize()).ToNot(BeEmpty())
+	})
+
+	It("works fine if the size is good", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					Size: "10G",
+				},
+			},
+		}
+		Expect(cluster.validateStorageSize()).To(BeEmpty())
+	})
+
+	It("complains if the size is being reduced", func() {
+		clusterOld := Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					Size: "1G",
+				},
+			},
+		}
+
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					Size: "512M",
+				},
+			},
+		}
+
+		Expect(clusterNew.validateStorageSizeChange(&clusterOld)).ToNot(BeEmpty())
+	})
+
+	It("works fine is the size is being enlarged", func() {
+		clusterOld := Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					Size: "8G",
+				},
+			},
+		}
+
+		clusterNew := Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					Size: "10G",
+				},
+			},
+		}
+
+		Expect(clusterNew.validateStorageSizeChange(&clusterOld)).To(BeEmpty())
+
+	})
+})

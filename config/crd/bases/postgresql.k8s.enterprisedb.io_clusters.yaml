@@ -514,9 +514,13 @@ spec:
                         backing this claim.
                       type: string
                   type: object
+                resizeInUseVolumes:
+                  description: Resize existent PVCs, defaults to true
+                  type: boolean
                 size:
                   description: Size of the storage. Required if not already specified
-                    in the PVC template.
+                    in the PVC template. Changes to this field are automatically reapplied
+                    to the created PVCs. Size cannot be decreased.
                   type: string
                 storageClass:
                   description: StorageClass to use for database data (`PGDATA`). Applied

@@ -148,3 +148,22 @@ var _ = Describe("default UID/GID", func() {
 		Expect(cluster.GetPostgresGID()).To(Equal(int64(11)))
 	})
 })
+
+var _ = Describe("resize in use volumes", func() {
+	It("is enabled by default", func() {
+		cluster := Cluster{}
+		Expect(cluster.ShouldResizeInUseVolumes()).To(BeTrue())
+	})
+
+	It("can be disabled if needed", func() {
+		falseValue := false
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					ResizeInUseVolumes: &falseValue,
+				},
+			},
+		}
+		Expect(cluster.ShouldResizeInUseVolumes()).To(BeFalse())
+	})
+})

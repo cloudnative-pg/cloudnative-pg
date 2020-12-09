@@ -304,7 +304,7 @@ StorageConfiguration is the configuration of the storage of the PostgreSQL insta
 | Field | Description | Scheme | Required |
 | -------------------- | ------------------------------ | -------------------- | -------- |
 | storageClass | StorageClass to use for database data (`PGDATA`). Applied after evaluating the PVC template, if available. If not specified, generated PVCs will be satisfied by the default storage class | *string | false |
-| size | Size of the storage. Required if not already specified in the PVC template. | string | true |
+| size | Size of the storage. Required if not already specified in the PVC template. Changes to this field are automatically reapplied to the created PVCs. Size cannot be decreased. | string | true |
 | pvcTemplate | Template to be used to generate the Persistent Volume Claim | *corev1.PersistentVolumeClaimSpec | false |
 
 
