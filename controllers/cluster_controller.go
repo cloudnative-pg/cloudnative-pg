@@ -15,6 +15,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -47,26 +48,27 @@ type ClusterReconciler struct {
 	pvcExpectations *expectations.ControllerExpectations
 }
 
+// Alphabetical order to not repeat or miss permissions
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;update;list
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters/status,verbs=get;watch;update;patch
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters/finalizers,verbs=update
-// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch
-// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete
-// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
-// +kubebuilder:rbac:groups="batch",resources=jobs,verbs=get;list;delete;patch;create;watch
-// +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
-// +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
-// +kubebuilder:rbac:groups="",resources=services,verbs=get;create;delete;update;patch;list;watch
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=create;delete;get;list;watch;update;patch
-// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;patch;update
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=create;patch;update
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=create;patch;update
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=configmaps/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete;patch
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
+// +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
+// +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch
+// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;patch;update
+// +kubebuilder:rbac:groups="",resources=services,verbs=get;create;delete;update;patch;list;watch
 
 // Reconcile is the operator reconciler loop
 func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
@@ -160,8 +162,17 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, fmt.Errorf("cannot update labels on pods: %w", err)
 	}
 
-	// Act on Pods only if there is nothing that is currently being created or deleted
+	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
 	if r.satisfiedExpectations(&cluster) {
+		// Reconcile PVC resource requirements
+		if err = r.ReconcilePVCs(ctx, &cluster, resources); err != nil {
+			if apierrs.IsConflict(err) {
+				return ctrl.Result{Requeue: true}, nil
+			}
+			return ctrl.Result{}, err
+		}
+
+		// Reconcile Pods
 		return r.ReconcilePods(ctx, req, &cluster, resources, instancesStatus)
 	}
 
@@ -196,6 +207,54 @@ func (r *ClusterReconciler) deleteExpectations(cluster *v1alpha1.Cluster) {
 	r.podExpectations.DeleteExpectations(key)
 	r.jobExpectations.DeleteExpectations(key)
 	r.pvcExpectations.DeleteExpectations(key)
+}
+
+// ReconcilePVCs align the PVCs that are backing our cluster with the user specifications
+func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *v1alpha1.Cluster,
+	resources *managedResources) error {
+	if !cluster.ShouldResizeInUseVolumes() {
+		return nil
+	}
+
+	quantity, err := resource.ParseQuantity(cluster.Spec.StorageConfiguration.Size)
+	if err != nil {
+		return fmt.Errorf("while parsing PVC size %v: %w", cluster.Spec.StorageConfiguration.Size, err)
+	}
+
+	for idx := range resources.pvcs.Items {
+		oldPVC := resources.pvcs.Items[idx].DeepCopy()
+		oldQuantity, ok := resources.pvcs.Items[idx].Spec.Resources.Requests["storage"]
+
+		switch {
+		case !ok:
+			// Missing storage requirement for PVC
+			fallthrough
+
+		case oldQuantity.AsDec().Cmp(quantity.AsDec()) == -1:
+			// Increasing storage resources
+			resources.pvcs.Items[idx].Spec.Resources.Requests["storage"] = quantity
+			if err = r.Patch(ctx, &resources.pvcs.Items[idx], client.MergeFrom(oldPVC)); err != nil {
+				// Decreasing resources is not possible
+				log.Error(err, "error while changing PVC storage requirement",
+					"from", oldQuantity, "to", quantity,
+					"pvcName", resources.pvcs.Items[idx].Name)
+
+				// We are reaching two errors in two different conditions:
+				//
+				// 1. we hit a Conflict => a successive reconciliation loop will fix it
+				// 2. the StorageClass we used don't support PVC resizing => there's nothing we can do
+				//    about it
+			}
+
+		case oldQuantity.AsDec().Cmp(quantity.AsDec()) == 1:
+			// Decreasing resources is not possible
+			log.Info("cannot decrease storage requirement",
+				"from", oldQuantity, "to", quantity,
+				"pvcName", resources.pvcs.Items[idx].Name)
+		}
+	}
+
+	return nil
 }
 
 // ReconcilePods decides when to create, scale up/down or wait for pods

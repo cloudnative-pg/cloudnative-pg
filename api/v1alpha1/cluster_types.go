@@ -364,7 +364,13 @@ type StorageConfiguration struct {
 	StorageClass *string `json:"storageClass,omitempty"`
 
 	// Size of the storage. Required if not already specified in the PVC template.
+	// Changes to this field are automatically reapplied to the created PVCs.
+	// Size cannot be decreased.
 	Size string `json:"size"`
+
+	// Resize existent PVCs, defaults to true
+	// +optional
+	ResizeInUseVolumes *bool `json:"resizeInUseVolumes,omitempty"`
 
 	// Template to be used to generate the Persistent Volume Claim
 	// +optional
@@ -673,6 +679,16 @@ func (cluster *Cluster) IsNodeMaintenanceWindowNotReusePVC() bool {
 		reusePVC = *cluster.Spec.NodeMaintenanceWindow.ReusePVC
 	}
 	return !reusePVC
+}
+
+// ShouldResizeInUseVolumes is true when we should resize PVC we already
+// created
+func (cluster *Cluster) ShouldResizeInUseVolumes() bool {
+	if cluster.Spec.StorageConfiguration.ResizeInUseVolumes == nil {
+		return true
+	}
+
+	return *cluster.Spec.StorageConfiguration.ResizeInUseVolumes
 }
 
 // ShouldCreateApplicationDatabase returns true if for this cluster,

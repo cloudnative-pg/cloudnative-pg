@@ -28,6 +28,7 @@ nav:
   - rolling_update.md
   - backup_recovery.md
   - postgresql_conf.md
+  - storage.md
   - samples.md
   - expose_pg_services.md
   - ssl_connections.md

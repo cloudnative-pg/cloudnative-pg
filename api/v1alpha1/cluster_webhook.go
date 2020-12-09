@@ -99,6 +99,7 @@ func (r *Cluster) ValidateCreate() error {
 	allErrs = append(allErrs, r.validatePrimaryUpdateStrategy()...)
 	allErrs = append(allErrs, r.validateMinSyncReplicas()...)
 	allErrs = append(allErrs, r.validateMaxSyncReplicas()...)
+	allErrs = append(allErrs, r.validateStorageSize()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -122,6 +123,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validatePrimaryUpdateStrategy()...)
 	allErrs = append(allErrs, r.validateMinSyncReplicas()...)
 	allErrs = append(allErrs, r.validateMaxSyncReplicas()...)
+	allErrs = append(allErrs, r.validateStorageSize()...)
 
 	oldObject := old.(*Cluster)
 	if oldObject == nil {
@@ -130,6 +132,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	} else {
 		allErrs = append(allErrs, r.validateImageChange(oldObject.Spec.ImageName)...)
 		allErrs = append(allErrs, r.validateConfigurationChange(oldObject)...)
+		allErrs = append(allErrs, r.validateStorageSizeChange(oldObject)...)
 	}
 
 	if len(allErrs) == 0 {
@@ -494,6 +497,52 @@ func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
 			field.NewPath("spec", "minSyncReplicas"),
 			r.Spec.MinSyncReplicas,
 			"minSyncReplicas cannot be greater than maxSyncReplicas"))
+	}
+
+	return result
+}
+
+// Validate if the storage size is a parsable quantity
+func (r *Cluster) validateStorageSize() field.ErrorList {
+	var result field.ErrorList
+
+	_, err := resource.ParseQuantity(r.Spec.StorageConfiguration.Size)
+	if err != nil {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "storage", "size"),
+			r.Spec.StorageConfiguration.Size,
+			err.Error()))
+	}
+
+	return result
+}
+
+// Validate a change in the storage size
+func (r *Cluster) validateStorageSizeChange(old *Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	oldSize, err := resource.ParseQuantity(old.Spec.StorageConfiguration.Size)
+	if err != nil {
+		// Can't read the old size, so can't tell if the new size is great
+		// or less
+		return result
+	}
+
+	newSize, err := resource.ParseQuantity(r.Spec.StorageConfiguration.Size)
+	if err != nil {
+		// Can't read the new size, as this error should already been raised
+		// by the size validation
+		return result
+	}
+
+	if oldSize.AsDec().Cmp(newSize.AsDec()) == 1 {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "storage", "size"),
+			r.Spec.StorageConfiguration.Size,
+			fmt.Sprintf(
+				"can't shrink existing storage from %v to %v",
+				old.Spec.StorageConfiguration.Size,
+				r.Spec.StorageConfiguration.Size)))
 	}
 
 	return result
