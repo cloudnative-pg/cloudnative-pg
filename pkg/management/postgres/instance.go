@@ -260,6 +260,9 @@ func (instance *Instance) IsPrimary() (bool, error) {
 
 // Demote demote an existing PostgreSQL instance
 func (instance *Instance) Demote() error {
+	log.Log.Info("Demoting instance",
+		"pgpdata", instance.PgData)
+
 	major, err := postgres.GetMajorVersion(instance.PgData)
 	if err != nil {
 		return errors.Wrap(err, "Cannot detect major version")
@@ -270,6 +273,31 @@ func (instance *Instance) Demote() error {
 	}
 
 	return instance.createStandbySignal()
+}
+
+// Rewind use pg_rewind to align this data directory
+// with the contents of the master node
+func (instance *Instance) Rewind() error {
+	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
+	options := []string{
+		"-P",
+		"-c",
+		"--source-server", primaryConnInfo + " dbname=postgres",
+		"--target-pgdata", instance.PgData,
+	}
+
+	log.Log.Info("Starting up pg_rewind",
+		"pgdata", instance.PgData,
+		"options", options)
+
+	cmd := exec.Command("pg_rewind", options...) // #nosec
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("error executing pg_rewind: %w", err)
+	}
+
+	return nil
 }
 
 // createRecoveryConf create a recovery.conf file for PostgreSQL 11 and earlier

@@ -167,6 +167,12 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructur
 			return err
 		}
 
+		// Then let's go back to the point of the new master
+		err = r.instance.Rewind()
+		if err != nil {
+			return err
+		}
+
 		// Now I can demote myself
 		return r.instance.Demote()
 	}
