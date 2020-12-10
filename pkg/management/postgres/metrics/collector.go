@@ -86,6 +86,8 @@ func newMetrics() metrics {
 func newPgCollectors(instance *postgres.Instance) []PgCollector {
 	pgCollectors := []PgCollector{
 		newPgStatArchiverCollector(instance),
+		newPgStatActivityCollector(instance),
+		newPgLocksCollector(instance),
 	}
 	return pgCollectors
 }
