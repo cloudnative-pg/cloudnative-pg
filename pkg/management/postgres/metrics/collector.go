@@ -88,6 +88,7 @@ func newPgCollectors(instance *postgres.Instance) []PgCollector {
 		newPgStatArchiverCollector(instance),
 		newPgStatActivityCollector(instance),
 		newPgLocksCollector(instance),
+		newPgStatReplicationCollector(instance),
 	}
 	return pgCollectors
 }
