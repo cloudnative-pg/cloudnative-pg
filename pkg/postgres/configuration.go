@@ -24,6 +24,7 @@ local all all peer
 	// The content provided by the user is inserted before this text
 	hbaFooter = `
 # Require md5 authentication elsewhere
+hostssl all all all cert clientcert=1
 host all all all md5
 hostssl replication all all cert clientcert=1
 `

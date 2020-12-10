@@ -30,6 +30,15 @@ import (
 var (
 	// ErrInstanceInRecovery is raised while PostgreSQL is still in recovery mode
 	ErrInstanceInRecovery = fmt.Errorf("instance in recovery")
+
+	// RetryUntilRecoveryDone if the default retry configuration that is used
+	// to wait for a restored cluster to promote itself
+	RetryUntilRecoveryDone = wait.Backoff{
+		Duration: 5 * time.Second,
+		// Steps is declared as an "int", so we are capping
+		// to int32 to support ARM-based 32 bit architectures
+		Steps: math.MaxInt32,
+	}
 )
 
 // Restore restore a PostgreSQL cluster from a backup into the object storage
@@ -268,8 +277,8 @@ func (info InitInfo) writeRestoreHbaConf() error {
 
 // configureInstanceAfterRestore change the superuser password
 // of the instance to be coherent with the one specified in the
-// cluster. This function also ensure that the user for streaming
-// replication actually exist in the target cluster
+// cluster. This function also ensure that we can really connect
+// to this cluster using the password in the secrets
 func (info InitInfo) configureInstanceAfterRestore() error {
 	superUserPassword, err := fileutils.ReadFile(info.PasswordFile)
 	if err != nil {
@@ -304,32 +313,6 @@ func (info InitInfo) configureInstanceAfterRestore() error {
 			return fmt.Errorf("ALTER USER postgres error: %w", err)
 		}
 
-		var hasLoginRight, hasReplicationRight bool
-		row := db.QueryRow("SELECT rolcanlogin, rolreplication FROM pg_roles WHERE rolname = $1",
-			v1alpha1.StreamingReplicationUser)
-		err = row.Scan(&hasLoginRight, &hasReplicationRight)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				_, err = db.Exec(fmt.Sprintf(
-					"CREATE USER %v REPLICATION",
-					pq.QuoteIdentifier(v1alpha1.StreamingReplicationUser)))
-				if err != nil {
-					return fmt.Errorf("CREATE USER %v error: %w", v1alpha1.StreamingReplicationUser, err)
-				}
-			} else {
-				return fmt.Errorf("while creating streaming replication user: %w", err)
-			}
-		}
-
-		if !hasLoginRight || !hasReplicationRight {
-			_, err = db.Exec(fmt.Sprintf(
-				"ALTER USER %v LOGIN REPLICATION",
-				pq.QuoteIdentifier(v1alpha1.StreamingReplicationUser)))
-			if err != nil {
-				return fmt.Errorf("ALTER USER %v error: %w", v1alpha1.StreamingReplicationUser, err)
-			}
-		}
-
 		if majorVersion >= 12 {
 			return info.ConfigureReplica(db)
 		}
@@ -346,19 +329,7 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 		return err == ErrInstanceInRecovery
 	}
 
-	retryDelay := wait.Backoff{
-		Duration: 5 * time.Second,
-		Factor:   1,
-		Jitter:   0,
-		// Steps is declared as an "int", so we are capping
-		// to int32 to support ARM-based 32 bit architectures
-		Steps: math.MaxInt32,
-		// Cap is declared as "Duration", and durations are
-		// declared int64. No need to cap to 32 bit here
-		Cap: math.MaxInt64,
-	}
-
-	return retry.OnError(retryDelay, errorIsRetriable, func() error {
+	return retry.OnError(RetryUntilRecoveryDone, errorIsRetriable, func() error {
 		row := db.QueryRow("SELECT pg_is_in_recovery()")
 
 		var status bool

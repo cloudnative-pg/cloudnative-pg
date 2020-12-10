@@ -18,7 +18,6 @@ import (
 
 	"github.com/lib/pq"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
@@ -187,13 +186,6 @@ func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
 	_, err := db.Exec(fmt.Sprintf(
 		"CREATE USER %v",
 		pq.QuoteIdentifier(info.ApplicationUser)))
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(fmt.Sprintf(
-		"CREATE USER %v REPLICATION",
-		pq.QuoteIdentifier(v1alpha1.StreamingReplicationUser)))
 	if err != nil {
 		return err
 	}
