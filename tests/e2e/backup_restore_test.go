@@ -220,7 +220,7 @@ var _ = Describe("Backup and restore", func() {
 					}
 				}
 				return completed, nil
-			}, timeout).Should(BeEquivalentTo(2))
+			}, timeout).Should(BeNumerically(">=", 2))
 
 			// Two more data.tar files should be on minio
 			mcName := "mc"
@@ -236,7 +236,7 @@ var _ = Describe("Backup and restore", func() {
 					return 0, err
 				}
 				return strconv.Atoi(strings.Trim(out, "\n"))
-			}, timeout).Should(BeEquivalentTo(3))
+			}, timeout).Should(BeNumerically(">=", 3))
 		})
 
 		By("Restoring a backup in a new cluster", func() {
