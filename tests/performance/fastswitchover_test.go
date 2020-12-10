@@ -13,24 +13,25 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/client-go/util/retry"
 
 	clusterv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
+	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
 	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Fast failover", func() {
-
+var _ = Describe("Fast switchover", func() {
 	// Confirm that a standby closely following the primary doesn't need more
 	// than 10 seconds to be promoted and be able to start inserting records.
 	// We test this setting up an application pointing to the rw service,
-	// forcing a failover and measuring how much time passes between the
+	// forcing a switchover and measuring how much time passes between the
 	// last row written on timeline 1 and the first one on timeline 2
-	It("can fail over in less than ten seconds", func() {
-		const namespace = "primary-failover-time"
+	It("can switch over in less than ten seconds", func() {
+		const namespace = "primary-switchover-time"
 		const sampleFile = "./fixtures/base/cluster-example.yaml"
 		const clusterName = "cluster-example"
 		// Create a cluster in a namespace we'll delete after the test
@@ -40,6 +41,8 @@ var _ = Describe("Fast failover", func() {
 			err := env.DeleteNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 		}()
+
+		var oldPrimary, targetPrimary string
 
 		By(fmt.Sprintf("having a %v namespace", namespace), func() {
 			// Creating a namespace should be quick
@@ -83,11 +86,11 @@ var _ = Describe("Fast failover", func() {
 				Namespace: namespace,
 				Name:      endpointName,
 			}
-			podName := clusterName + "-1"
+			oldPrimary = clusterName + "-1"
 			pod := &corev1.Pod{}
 			podNamespacedName := types.NamespacedName{
 				Namespace: namespace,
-				Name:      podName,
+				Name:      oldPrimary,
 			}
 			err := env.Client.Get(env.Ctx, endpointNamespacedName,
 				endpoint)
@@ -109,11 +112,10 @@ var _ = Describe("Fast failover", func() {
 				")"
 
 			commandTimeout := time.Second * 5
-			primaryPodName := clusterName + "-1"
 			primaryPod := &corev1.Pod{}
 			primaryPodNamespacedName := types.NamespacedName{
 				Namespace: namespace,
-				Name:      primaryPodName,
+				Name:      oldPrimary,
 			}
 			err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
 			Expect(err).ToNot(HaveOccurred())
@@ -137,10 +139,9 @@ var _ = Describe("Fast failover", func() {
 
 			commandTimeout := time.Second * 2
 			timeout := 60
-			primaryPodName := clusterName + "-1"
 			primaryPodNamespacedName := types.NamespacedName{
 				Namespace: namespace,
-				Name:      primaryPodName,
+				Name:      oldPrimary,
 			}
 			Eventually(func() (string, error) {
 				primaryPod := &corev1.Pod{}
@@ -151,33 +152,36 @@ var _ = Describe("Fast failover", func() {
 				return strings.TrimSpace(out), err
 			}, timeout).Should(BeEquivalentTo("t"))
 		})
-		By("deleting the primary", func() {
-			// The primary is force-deleted.
-			zero := int64(0)
-			forceDelete := &ctrlclient.DeleteOptions{
-				GracePeriodSeconds: &zero,
+		By("setting the TargetPrimary to node2 to trigger a switchover", func() {
+			targetPrimary = clusterName + "-2"
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      clusterName,
 			}
-			lm := clusterName + "-1"
-			err := env.DeletePod(namespace, lm, forceDelete)
+			cluster := &clusterv1alpha1.Cluster{}
+			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+				Expect(err).ToNot(HaveOccurred())
+				cluster.Status.TargetPrimary = targetPrimary
+				return env.Client.Status().Update(env.Ctx, cluster)
+			})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		// Take the time when the pod was deleted
+		// Take the time when the switchover has been issued
 		start := time.Now()
 
 		By("waiting for the first write with on timeline 2", func() {
-			// One of the standbys will be promoted and the rw service
-			// should point to it. We'll be able to recognise the records
-			// inserted after the promotion because they'll be marked
-			// with timeline '00000002'. There should be one of them
-			// in the database soon.
+			// Node2 should be promoted and the rw service should point to it.
+			// We'll be able to recognise the records inserted after the
+			// promotion because they'll be marked with timeline '00000002'.
+			// There should be one of them in the database soon.
 
 			commandTimeout := time.Second * 2
 			timeout := 60
-			primaryPodName := clusterName + "-2"
 			primaryPodNamespacedName := types.NamespacedName{
 				Namespace: namespace,
-				Name:      primaryPodName,
+				Name:      targetPrimary,
 			}
 			Eventually(func() (string, error) {
 				primaryPod := &corev1.Pod{}
@@ -208,10 +212,9 @@ var _ = Describe("Fast failover", func() {
 				") " +
 				"ORDER BY t ASC " +
 				"LIMIT 1;"
-			primaryPodName := clusterName + "-2"
 			primaryPodNamespacedName := types.NamespacedName{
 				Namespace: namespace,
-				Name:      primaryPodName,
+				Name:      targetPrimary,
 			}
 			var switchTime float64
 			commandTimeout := time.Second * 5
@@ -221,28 +224,28 @@ var _ = Describe("Fast failover", func() {
 			out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, "postgres",
 				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 			switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
-			fmt.Printf("Failover performed in %v seconds\n", switchTime)
+			fmt.Printf("Switchover performed in %v seconds\n", switchTime)
 			Expect(switchTime, err).Should(BeNumerically("<", 10))
 		})
-
-		By("recovering from degraded state having a cluster with 3 instances ready", func() {
-			// Recreating an instance usually takes 15s`
+		By("checking that the old primary is now a standby", func() {
+			// Following the new master should usually take less than 15s
 			timeout := 45
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
-				Name:      clusterName,
+				Name:      oldPrimary,
 			}
 			var elapsed time.Duration
-			Eventually(func() (int32, error) {
-				cluster := &clusterv1alpha1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+
+			Eventually(func() (bool, error) {
+				pod := corev1.Pod{}
+				err := env.Client.Get(env.Ctx, namespacedName, &pod)
 				elapsed = time.Since(start)
-				return cluster.Status.ReadyInstances, err
-			}, timeout).Should(BeEquivalentTo(3))
+				return utils.IsPodActive(pod) && utils.IsPodReady(pod) && specs.IsPodStandby(pod), err
+			}, timeout).Should(BeTrue())
 
-			fmt.Printf("Cluster has been in a degraded state for %v seconds\n", elapsed)
+			fmt.Printf("oldPrimary has been reattached to the targetPrimary in %v seconds\n", elapsed)
 
-			Expect(elapsed / time.Second).Should(BeNumerically("<", 30))
+			Expect(elapsed / time.Second).Should(BeNumerically("<", 15))
 		})
 	})
 })

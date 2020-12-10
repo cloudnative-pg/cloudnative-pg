@@ -28,14 +28,16 @@ and the following suite of E2E tests are performed on that cluster:
 * Installation of the operator;
 * Creation of a `Cluster`;
 * Usage of a persistent volume for data storage;
+* Connection via services;
 * Scale-up of a `Cluster`;
 * Scale-down of a `Cluster`;
 * Failover;
 * Switchover;
+* Manage PostgreSQL configuration changes;
 * Rolling updates when changing PostgreSQL images;
 * Backup and ScheduledBackups execution;
 * Restore from backup;
-* Primary endpoint switch in case of failure in less than 5 seconds;
+* Primary endpoint switch in case of failure or switch in less than 10 seconds;
 * Recover from a degraded state in less than 30 seconds.
 
 The E2E tests suite is also run for OpenShift 4.6 and the latest Kubernetes
