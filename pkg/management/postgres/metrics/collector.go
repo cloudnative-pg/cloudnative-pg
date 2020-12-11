@@ -13,8 +13,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
 
 const namespace = "cnp"

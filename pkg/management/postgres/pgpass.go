@@ -12,8 +12,8 @@ import (
 	"os"
 	"path"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
 // PgPassEntry represent an entry inside the .pgpass file

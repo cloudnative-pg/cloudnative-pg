@@ -3,7 +3,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

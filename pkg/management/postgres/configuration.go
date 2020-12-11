@@ -10,14 +10,14 @@ import (
 	"fmt"
 	"path"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/internal/management/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
 // InstallCustomConfigurationFile install in the PgData the file with

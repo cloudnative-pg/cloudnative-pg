@@ -9,7 +9,7 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
 
 const pgStatReplicationCollectorName = "pg_stat_replication"

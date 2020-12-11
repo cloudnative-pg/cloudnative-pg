@@ -1,4 +1,4 @@
-module gitlab.2ndquadrant.com/k8s/cloud-native-postgresql
+module github.com/EnterpriseDB/cloud-native-postgresql
 
 go 1.13
 

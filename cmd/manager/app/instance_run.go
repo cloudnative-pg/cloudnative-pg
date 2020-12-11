@@ -13,9 +13,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/internal/management/controller"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/postgres/webserver"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
 )
 
 var (

@@ -15,10 +15,10 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	apiv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/internal/management/utils"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
-	postgresSpec "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
+	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // RefreshServerCertificateFiles get the latest certificates from the

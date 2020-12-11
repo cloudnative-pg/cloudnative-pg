@@ -96,8 +96,8 @@ docker-push:
 .PHONY: licenses
 licenses: go-licenses
 	# The following statement is expected to fail because our license is unrecognised
-	GOPRIVATE="gitlab.2ndquadrant.com/*" $(GO_LICENSES) \
-		save gitlab.2ndquadrant.com/k8s/cloud-native-postgresql \
+	GOPRIVATE="https://github.com/EnterpriseDB/*" $(GO_LICENSES) \
+		save github.com/EnterpriseDB/cloud-native-postgresql \
 		--save_path licenses/go-licenses --force || true
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete

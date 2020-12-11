@@ -13,7 +13,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
 // PromoteAndWait promotes this instance, and wait 60 seconds for it to happen

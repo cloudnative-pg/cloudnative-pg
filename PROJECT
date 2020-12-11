@@ -1,5 +1,5 @@
 domain: k8s.enterprisedb.io
-repo: gitlab.2ndquadrant.com/k8s/cloud-native-postgresql
+repo: github.com/EnterpriseDB/cloud-native-postgresql
 resources:
 - group: postgresql
   kind: Cluster
