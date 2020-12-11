@@ -182,7 +182,6 @@ func (instance Instance) WithActiveInstance(inner func() error) error {
 
 // GetApplicationDB gets the connection pool pointing to this instance, possibly creating
 // it if needed.
-// IMPORTANT: this function isn't strictly needed here in CNP, but it's needed in CNBDR
 func (instance *Instance) GetApplicationDB() (*sql.DB, error) {
 	if instance.applicationDB != nil {
 		return instance.applicationDB, nil

@@ -117,8 +117,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	e.metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
-	// TODO: should be GetApplicationDB, but that's not local
-	db, err := e.instance.GetSuperUserDB()
+	db, err := e.instance.GetApplicationDB()
 	if err != nil {
 		log.Log.Error(err, "Error opening connection to PostgreSQL")
 		e.metrics.Error.Set(1)
