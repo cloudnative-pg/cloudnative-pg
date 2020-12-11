@@ -93,7 +93,7 @@ var _ = Describe("Configuration update", func() {
 			}
 			cluster := &clusterv1alpha1.Cluster{}
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
-			Expect(cluster.Status.CurrentPrimary).To(BeEquivalentTo(cluster.Status.TargetPrimary), err)
+			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
 			// Update the configuration
 			_, _, err = tests.Run("kubectl apply -n " + namespace + " -f " + sample)
@@ -127,7 +127,7 @@ var _ = Describe("Configuration update", func() {
 			}
 			cluster := &clusterv1alpha1.Cluster{}
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
-			Expect(cluster.Status.CurrentPrimary).To(BeEquivalentTo(cluster.Status.TargetPrimary), err)
+			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
 			// Update the configuration
 			_, _, err = tests.Run("kubectl apply -n " + namespace + " -f " + sample)

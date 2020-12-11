@@ -67,7 +67,7 @@ func AssertConnection(host string, user string, dbname string,
 		timeout := time.Second * 2
 		stdout, stderr, err := env.ExecCommand(env.Ctx, queryingPod, "postgres", &timeout,
 			"psql", dsn, "-tAc", "SELECT 1")
-		Expect(stdout).To(Equal("1\n"), err)
+		Expect(stdout, err).To(Equal("1\n"))
 		Expect(stderr).To(BeEmpty())
 	})
 }

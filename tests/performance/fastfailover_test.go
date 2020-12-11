@@ -93,8 +93,8 @@ var _ = Describe("Fast failover", func() {
 				endpoint)
 			Expect(err).ToNot(HaveOccurred())
 			err = env.Client.Get(env.Ctx, podNamespacedName, pod)
-			Expect(endpoint.Subsets[0].Addresses[0].IP).To(
-				BeEquivalentTo(pod.Status.PodIP), err)
+			Expect(endpoint.Subsets[0].Addresses[0].IP, err).To(
+				BeEquivalentTo(pod.Status.PodIP))
 		})
 		By("preparing the db for the test scenario", func() {
 			// Create the table used by the scenario
@@ -222,7 +222,7 @@ var _ = Describe("Fast failover", func() {
 				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 			switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
 			fmt.Printf("Failover performed in %v seconds\n", switchTime)
-			Expect(switchTime).Should(BeNumerically("<", 10), err)
+			Expect(switchTime, err).Should(BeNumerically("<", 10))
 		})
 
 		By("recovering from degraded state having a cluster with 3 instances ready", func() {
