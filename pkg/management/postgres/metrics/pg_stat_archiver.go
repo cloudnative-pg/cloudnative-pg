@@ -54,8 +54,7 @@ func (pgStatArchiverCollector) name() string {
 // collect send the collected metrics on the received channel.
 // Implements PgCollector
 func (c pgStatArchiverCollector) collect(ch chan<- prometheus.Metric) error {
-	// TODO: should be GetApplicationDB, but it's not local
-	conn, err := c.instance.GetSuperUserDB()
+	conn, err := c.instance.GetApplicationDB()
 	if err != nil {
 		return err
 	}
