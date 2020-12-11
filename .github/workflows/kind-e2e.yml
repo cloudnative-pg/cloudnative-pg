@@ -1,0 +1,71 @@
+name: kind-e2e
+
+on:
+  repository_dispatch:
+    types:
+      - trigger-e2e
+  workflow_dispatch:
+
+env:
+  GOLANG_VERSION: "1.13.x"
+  KIND_VERSION: "v0.9.0"
+
+defaults:
+  run:
+    shell: 'bash -Eeuo pipefail -x {0}'
+
+jobs:
+
+  generate-jobs:
+    name: Generate Jobs
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate-jobs.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.client_payload.sha || github.sha }}
+      - id: generate-jobs
+        name: Generate Jobs
+        shell: bash
+        run: python hack/workflows/kind-e2e-matrix.py
+
+  e2e-kind:
+    name: e2e-kind
+    needs: generate-jobs
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-jobs.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    env:
+      K8S_VERSION: "${{ matrix.k8s_version }}"
+      POSTGRES_IMG: "${{ matrix.postgres_img }}"
+      E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
+
+      DOCKER_SERVER: ${{ secrets.GITLAB_REGISTRY }}
+      DOCKER_USERNAME: ${{ secrets.GITLAB_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.GITLAB_PASSWORD }}
+
+      DEBUG: "true"
+      E2E_DEFAULT_STORAGE_CLASS: standard
+      LOG_DIR: ${{ github.workspace }}/kind-logs/
+      DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.client_payload.sha || github.sha }}
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+      - name: Run Kind End-to-End tests
+        run:
+          make e2e-test-kind
+      - name: Archive Kind logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: kind-logs-${{ matrix.id }}
+          path: kind-logs/
+          retention-days: 7
