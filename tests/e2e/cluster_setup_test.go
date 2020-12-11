@@ -30,7 +30,7 @@ var _ = Describe("Cluster setup", func() {
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		By("having three PostgreSQL pods with status ready", func() {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
-			Expect(utils.CountReadyPods(podList.Items)).Should(BeEquivalentTo(3), err)
+			Expect(utils.CountReadyPods(podList.Items), err).Should(BeEquivalentTo(3))
 		})
 
 		By("being able to restart a killed pod without losing it", func() {

@@ -42,12 +42,12 @@ var _ = Describe("Switchover", func() {
 			}
 			cluster := &clusterv1alpha1.Cluster{}
 			err := env.Client.Get(env.Ctx, namespacedName, cluster)
-			Expect(cluster.Status.CurrentPrimary).To(BeEquivalentTo(cluster.Status.TargetPrimary), err)
+			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary = cluster.Status.CurrentPrimary
 
 			// Gather pod names
 			podList, err := env.GetClusterPodList(namespace, clusterName)
-			Expect(len(podList.Items)).To(BeEquivalentTo(3), err)
+			Expect(len(podList.Items), err).To(BeEquivalentTo(3))
 			for _, p := range podList.Items {
 				pods = append(pods, p.Name)
 			}

@@ -183,8 +183,8 @@ var _ = Describe("Rolling updates", func() {
 		}
 		err = env.Client.Get(env.Ctx, podNamespacedName, pod)
 
-		Expect(endpoint.Subsets[0].Addresses[0].IP).To(
-			BeEquivalentTo(pod.Status.PodIP), err)
+		Expect(endpoint.Subsets[0].Addresses[0].IP, err).To(
+			BeEquivalentTo(pod.Status.PodIP))
 	}
 
 	// Verify that the IPs of the pods match the ones in the -r endpoint and
@@ -200,7 +200,7 @@ var _ = Describe("Rolling updates", func() {
 			endpoint)
 		Expect(err).ToNot(HaveOccurred())
 		podList, err := env.GetClusterPodList(namespace, clusterName)
-		Expect(expectedEndpoints).To(BeEquivalentTo(len(podList.Items)), err)
+		Expect(expectedEndpoints, err).To(BeEquivalentTo(len(podList.Items)))
 		matchingIP := 0
 		for _, pod := range podList.Items {
 			ip := pod.Status.PodIP

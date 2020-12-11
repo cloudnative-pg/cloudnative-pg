@@ -258,7 +258,7 @@ var _ = Describe("Backup and restore", func() {
 				namespace,
 				primary,
 				cmd))
-			Expect(strings.Trim(out, "\n")).To(BeEquivalentTo("2"), err)
+			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 
 			// Restored primary should be on timeline 2
 			cmd = "psql -U postgres app -tAc 'select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)'"
@@ -267,7 +267,7 @@ var _ = Describe("Backup and restore", func() {
 				namespace,
 				primary,
 				cmd))
-			Expect(strings.Trim(out, "\n")).To(Equal("00000002"), err)
+			Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
 
 			// Restored standby should be attached to restored primary
 			cmd = "psql -U postgres app -tAc 'SELECT count(*) FROM pg_stat_replication'"
@@ -276,7 +276,7 @@ var _ = Describe("Backup and restore", func() {
 				namespace,
 				primary,
 				cmd))
-			Expect(strings.Trim(out, "\n")).To(BeEquivalentTo("2"), err)
+			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 		})
 	})
 })

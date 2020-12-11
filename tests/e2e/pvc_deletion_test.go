@@ -69,7 +69,7 @@ var _ = Describe("PVC Deletion", func() {
 			Expect(err).ToNot(HaveOccurred())
 			pvc = &corev1.PersistentVolumeClaim{}
 			err = env.Client.Get(env.Ctx, namespacedPVCName, pvc)
-			Expect(pvc.GetUID()).To(BeEquivalentTo(originalPVCUID), err)
+			Expect(pvc.GetUID(), err).To(BeEquivalentTo(originalPVCUID))
 		})
 
 		By("removing a PVC and delete the Pod", func() {
@@ -123,7 +123,7 @@ var _ = Describe("PVC Deletion", func() {
 				Name:      newPvcName,
 			}
 			err = env.Client.Get(env.Ctx, newNamespacedPVCName, newPvc)
-			Expect(newPvc.GetUID()).NotTo(BeEquivalentTo(originalPVCUID), err)
+			Expect(newPvc.GetUID(), err).NotTo(BeEquivalentTo(originalPVCUID))
 		})
 	})
 })

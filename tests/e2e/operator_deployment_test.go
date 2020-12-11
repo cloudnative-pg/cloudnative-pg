@@ -38,7 +38,7 @@ var _ = Describe("PostgreSQL operator deployment", func() {
 			deployment := &appsv1.Deployment{}
 
 			err := env.Client.Get(env.Ctx, namespacedName, deployment)
-			Expect(deployment.Status.ReadyReplicas).Should(BeEquivalentTo(1), err)
+			Expect(deployment.Status.ReadyReplicas, err).Should(BeEquivalentTo(1))
 		})
 	})
 })
