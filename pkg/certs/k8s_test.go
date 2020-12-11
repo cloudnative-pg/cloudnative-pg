@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

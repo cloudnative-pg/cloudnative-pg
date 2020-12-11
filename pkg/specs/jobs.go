@@ -14,8 +14,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
+	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 // CreatePrimaryJobViaInitdb create a new primary instance in a Pod

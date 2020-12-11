@@ -9,8 +9,8 @@ package postgres
 import (
 	"fmt"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // buildPrimaryConnInfo builds the connection string to connect to primaryHostname

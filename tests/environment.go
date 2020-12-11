@@ -22,7 +22,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"

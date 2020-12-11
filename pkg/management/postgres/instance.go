@@ -17,9 +17,9 @@ import (
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // Instance represent a PostgreSQL instance to be executed

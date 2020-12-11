@@ -22,9 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
 
-	apiv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/internal/management/utils"
-	postgresSpec "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
+	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
+	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // Reconcile is the main reconciliation loop for the instance

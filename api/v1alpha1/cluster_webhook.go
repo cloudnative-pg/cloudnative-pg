@@ -20,9 +20,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 // log is for logging in this package.

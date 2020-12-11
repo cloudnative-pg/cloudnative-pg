@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"os"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
 // BackupCommand start a backup via the manager HTTP interface

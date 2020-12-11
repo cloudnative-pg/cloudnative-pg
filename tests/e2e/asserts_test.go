@@ -7,8 +7,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	clusterv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/tests"
+	clusterv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

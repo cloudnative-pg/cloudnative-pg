@@ -19,7 +19,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	postgresqlv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	postgresqlv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 )
 
 const (

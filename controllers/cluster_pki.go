@@ -15,9 +15,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/certs"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 const (

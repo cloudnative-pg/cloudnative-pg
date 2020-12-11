@@ -11,7 +11,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package v1alpha1
 
 import (
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )

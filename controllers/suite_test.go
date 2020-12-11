@@ -19,7 +19,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	postgresqlv1alpha1 "gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
+	postgresqlv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 
 	. "github.com/onsi/ginkgo"

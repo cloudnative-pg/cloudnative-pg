@@ -16,10 +16,10 @@ import (
 
 	"github.com/kballard/go-shellquote"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/internal/management/controller"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
 
 var (

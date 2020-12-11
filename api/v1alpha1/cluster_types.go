@@ -12,8 +12,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 const (

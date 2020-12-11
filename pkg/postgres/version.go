@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 const firstMajorWithoutMinor = 10

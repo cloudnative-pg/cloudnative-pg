@@ -12,9 +12,9 @@ import (
 	"os/exec"
 	"path"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/fileutils"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/management/log"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // JoinInfo contains the information needed to bootstrap a new

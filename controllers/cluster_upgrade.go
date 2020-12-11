@@ -15,10 +15,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/expectations"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/postgres"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
 var (

@@ -22,11 +22,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/api/v1alpha1"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/expectations"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/specs"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/utils"
-	"gitlab.2ndquadrant.com/k8s/cloud-native-postgresql/pkg/versions"
+	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 const (
