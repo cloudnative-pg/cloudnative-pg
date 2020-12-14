@@ -1,0 +1,5 @@
+# The CODEOWNERS file is used to define individuals or teams that are
+# responsible for code in a repository. For details, please refer to
+# https://docs.github.com/en/free-pro-team@latest/github/creating-cloning-and-archiving-repositories/about-code-owners
+
+* @EnterpriseDB/cloud-native-admins
