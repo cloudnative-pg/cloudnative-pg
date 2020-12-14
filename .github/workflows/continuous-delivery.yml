@@ -1,0 +1,171 @@
+name: continuous-delivery
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GOLANG_VERSION: "1.13.x"
+  GOLANGCI_LINT_VERSION: "v1.33"
+  KUBEBUILDER_VERSION: "2.3.1"
+  KIND_VERSION: "v0.9.0"
+
+defaults:
+  run:
+    shell: 'bash -Eeuo pipefail -x {0}'
+
+jobs:
+
+  golangci:
+    name: Run linters
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v2
+      -
+        name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          args: --timeout 2m
+
+  tests:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v2
+      -
+        name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+      # Install kubebuilder that is a requirement to run tests
+      -
+        name: Install Kubebuilder
+        run: |
+          mkdir -p /tmp/kubebuilder
+          curl -sSL https://go.kubebuilder.io/dl/${{ env.KUBEBUILDER_VERSION }}/$(go env GOOS)/$(go env GOARCH) | tar --strip-components=1 -xz -C /tmp/kubebuilder
+          sudo mv /tmp/kubebuilder /usr/local/
+      -
+        name: Run unit tests
+        run:
+          make test
+
+  buildx:
+    name: Build containers
+    needs:
+      - golangci
+      - tests
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.docker-meta.outputs.tags }}
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2
+      -
+        name: Docker meta
+        id: docker-meta
+        uses: crazy-max/ghaction-docker-meta@v1
+        with:
+          images: quay.io/enterprisedb/cloud-native-postgresql-testing
+          tag-semver: |
+            {{version}}
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      -
+        name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+      -
+        name: Login to quay.io
+        uses: docker/login-action@v1
+        with:
+          registry: quay.io/enterprisedb
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+      -
+        name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          # Available architecture on UBI8 are: linux/amd64, linux/arm64, linux/ppc64le
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.docker-meta.outputs.tags }}
+          labels: quay.expires-after=2d
+
+  generate-jobs:
+    name: Generate Jobs
+    needs:
+      - buildx
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate-jobs.outputs.matrix }}
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v2
+      -
+        name: Docker meta
+        id: docker-meta
+        uses: crazy-max/ghaction-docker-meta@v1
+        with:
+          images: quay.io/enterprisedb/cloud-native-postgresql-testing
+          tag-semver: |
+            {{version}}
+      -
+        id: generate-jobs
+        name: Generate Jobs
+        shell: bash
+        run: python hack/workflows/kind-e2e-matrix.py
+
+  e2e-kind:
+    name: Run E2E on kind
+    needs:
+      - buildx
+      - generate-jobs
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-jobs.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    env:
+      K8S_VERSION: "${{ matrix.k8s_version }}"
+      POSTGRES_IMG: "${{ matrix.postgres_img }}"
+      E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
+
+      DOCKER_SERVER: quay.io/enterprisedb
+      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
+
+      DEBUG: "true"
+      BUILD_IMAGE: "false"
+      CONTROLLER_IMG: ${{ needs.buildx.outputs.image }}
+      E2E_DEFAULT_STORAGE_CLASS: standard
+      LOG_DIR: ${{ github.workspace }}/kind-logs/
+      DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v2
+      -
+        name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name: Run Kind End-to-End tests
+        run:
+          make e2e-test-kind
+      -
+        name: Archive Kind logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: kind-logs-${{ matrix.id }}
+          path: kind-logs/
+          retention-days: 7
