@@ -8,7 +8,7 @@ variables:
   CI_DEBUG_TRACE: "false"
   KUBEBUILDER_VERSION: "2.3.0"
   GOLANG_VERSION: "1.13"
-  GOLANGCI_LINT_VERSION: "1.25.0"
+  GOLANGCI_LINT_VERSION: "1.33.0"
   RUN_KIND_E2E: "false"
   RUN_GKE_E2E: "false"
   RUN_AKS_E2E: "false"
