@@ -7,11 +7,10 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package postgres
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
@@ -34,7 +33,7 @@ func (instance *Instance) PromoteAndWait() error {
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
-		return errors.Wrap(err, "Error promoting the PostgreSQL instance")
+		return fmt.Errorf("error promoting the PostgreSQL instance: %w", err)
 	}
 
 	timeLimit := time.Now().Add(1 * time.Minute)
@@ -42,7 +41,7 @@ func (instance *Instance) PromoteAndWait() error {
 		if time.Now().After(timeLimit) {
 			log.Log.Info("The standby.signal file still exists but timeout reached, " +
 				"error during PostgreSQL instance promotion")
-			return errors.New("standby.signal still existent")
+			return fmt.Errorf("standby.signal still existent")
 		}
 
 		if status, _ := instance.IsPrimary(); status {

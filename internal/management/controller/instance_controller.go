@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/common/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -291,7 +290,7 @@ func (r *InstanceReconciler) reconcilePrimary(cluster *unstructured.Unstructured
 	// I must promote my instance here
 	err = r.instance.PromoteAndWait()
 	if err != nil {
-		return errors.Wrap(err, "Error promoting instance")
+		return fmt.Errorf("error promoting instance: %w", err)
 	}
 
 	// Now I'm the primary, need to inform the operator

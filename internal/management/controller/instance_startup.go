@@ -8,8 +8,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -199,23 +199,23 @@ func (r *InstanceReconciler) waitForSwitchoverToBeCompleted() error {
 
 		event, ok := <-channel
 		if !ok {
-			return errors.Errorf("Watch expired while waiting for switchover to complete")
+			return fmt.Errorf("watch expired while waiting for switchover to complete")
 		}
 
 		object, err := objectToUnstructured(event.Object)
 		if err != nil {
-			return errors.Wrap(err, "Error while decoding runtime.Object data from watch")
+			return fmt.Errorf("error while decoding runtime.Object data from watch: %w", err)
 		}
 
 		targetPrimary, err := utils.GetTargetPrimary(object)
 		if err != nil {
-			return errors.Wrapf(err, "Error while extracting the targetPrimary from the cluster status: %v",
-				object)
+			return fmt.Errorf("error while extracting the targetPrimary from the cluster status %v: %w",
+				object, err)
 		}
 		currentPrimary, err := utils.GetCurrentPrimary(object)
 		if err != nil {
-			return errors.Wrapf(err, "Error while extracting the currentPrimary from the cluster status: %v",
-				object)
+			return fmt.Errorf("error while extracting the currentPrimary from the cluster status %v: %w",
+				object, err)
 		}
 
 		if targetPrimary == currentPrimary {
