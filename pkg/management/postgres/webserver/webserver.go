@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -164,7 +163,7 @@ func ListenAndServe(serverInstance *postgres.Instance) error {
 // Shutdown stops the web server
 func Shutdown() error {
 	if server == nil {
-		return errors.New("server not started")
+		return fmt.Errorf("server not started")
 	}
 	instance.ShutdownConnections()
 	return server.Shutdown(context.Background())

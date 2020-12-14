@@ -9,10 +9,9 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package postgres
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // LSN is a string composed by two hexadecimal numbers, separated by "/"
@@ -37,17 +36,17 @@ func (lsn LSN) Less(other LSN) bool {
 func (lsn LSN) Parse() (int64, error) {
 	components := strings.Split(string(lsn), "/")
 	if len(components) != 2 {
-		return 0, errors.Errorf("Error parsing LSN: %s", lsn)
+		return 0, fmt.Errorf("error parsing LSN %s", lsn)
 	}
 
 	segment, err := strconv.ParseInt(components[0], 16, 32)
 	if err != nil {
-		return 0, errors.Errorf("Error parsing LSN: %s", lsn)
+		return 0, fmt.Errorf("error parsing LSN %s: %w", lsn, err)
 	}
 
 	displacement, err := strconv.ParseInt(components[1], 16, 32)
 	if err != nil {
-		return 0, errors.Errorf("Error parsing LSN: %s", lsn)
+		return 0, fmt.Errorf("error parsing LSN %s: %w", lsn, err)
 	}
 
 	return (segment << 32) + displacement, nil

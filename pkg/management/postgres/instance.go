@@ -15,7 +15,6 @@ import (
 	"syscall"
 
 	"github.com/lib/pq"
-	"github.com/pkg/errors"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
@@ -74,7 +73,7 @@ func (instance Instance) Startup() error {
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
-		return errors.Wrap(err, "Error starting PostgreSQL instance")
+		return fmt.Errorf("error starting PostgreSQL instance: %w", err)
 	}
 
 	return nil
@@ -115,7 +114,7 @@ func (instance *Instance) Shutdown() error {
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
-		return errors.Wrap(err, "Error stopping PostgreSQL instance")
+		return fmt.Errorf("error stopping PostgreSQL instance: %w", err)
 	}
 
 	return nil
@@ -137,7 +136,7 @@ func (instance *Instance) Reload() error {
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
-		return errors.Wrap(err, "Error requesting configuration reload")
+		return fmt.Errorf("error requesting configuration reload: %w", err)
 	}
 
 	return nil
@@ -197,7 +196,7 @@ func (instance *Instance) GetApplicationDB() (*sql.DB, error) {
 		fmt.Sprintf("host=%s port=5432 dbname=%v user=postgres sslmode=disable",
 			socketDir, instance.ApplicationDatabase))
 	if err != nil {
-		return nil, errors.Wrap(err, "Can't create connection pool")
+		return nil, fmt.Errorf("cannot create connection pool: %w", err)
 	}
 
 	db.SetMaxOpenConns(2)
@@ -224,7 +223,7 @@ func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 		"postgres",
 		dsn)
 	if err != nil {
-		return nil, errors.Wrap(err, "Can't create connection pool")
+		return nil, fmt.Errorf("cannot create connection pool: %w", err)
 	}
 
 	db.SetMaxOpenConns(2)
@@ -265,7 +264,7 @@ func (instance *Instance) Demote() error {
 
 	major, err := postgres.GetMajorVersion(instance.PgData)
 	if err != nil {
-		return errors.Wrap(err, "Cannot detect major version")
+		return fmt.Errorf("cannot detect major version: %w", err)
 	}
 
 	if major < 12 {
