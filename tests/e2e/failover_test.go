@@ -1,7 +1,9 @@
 package e2e
 
 import (
+	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -83,6 +85,22 @@ var _ = Describe("Failover", func() {
 			_, _, err = env.ExecCommand(env.Ctx, primaryPod, "postgres", &timeout,
 				"psql", "-U", "postgres", "-c", "CHECKPOINT; SELECT pg_switch_wal()")
 			Expect(err).ToNot(HaveOccurred())
+			commandTimeout := 60
+			// The replay_lsn of the targetPrimary should be ahead
+			// compared to the pausedReplica one
+			Eventually(func() (string, error) {
+				primaryPod := corev1.Pod{}
+				err := env.Client.Get(env.Ctx, namespacedName, &primaryPod)
+				Expect(err).ToNot(HaveOccurred())
+				query := fmt.Sprintf("SELECT true FROM pg_stat_replication "+
+					"WHERE application_name = '%v' "+
+					"AND replay_lsn > (SELECT replay_lsn "+
+					"FROM pg_stat_replication WHERE "+
+					"application_name = '%v')", targetPrimary, pausedReplica)
+				out, _, err := env.ExecCommand(env.Ctx, primaryPod, "postgres", &timeout,
+					"psql", "-U", "postgres", "-tAc", query)
+				return strings.TrimSpace(out), err
+			}, commandTimeout).Should(BeEquivalentTo("t"))
 		})
 		// Force-delete the primary. Eventually the cluster should elect a
 		// new target primary (and we check that it's the expected one)
