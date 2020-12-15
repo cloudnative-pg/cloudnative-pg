@@ -61,7 +61,7 @@ make licenses
 # Release process
 
 * Update the `NEWS` file for the new version. A command like
-  `git log --pretty=oneline v0.1.0..master` where `v0.1.0`
+  `git log --pretty=oneline v0.1.0..main` where `v0.1.0`
   is the latest released version will be useful.
 
 * run `hack/release.sh v0.2.0` where `v0.2.0`
