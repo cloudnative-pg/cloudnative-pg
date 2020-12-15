@@ -11,7 +11,7 @@ To develop the BDR operator, you will need an UNIX based operating system that
 support the following softwares, which must be available in the `PATH`
 environment variable:
 
-- Go 1.13+ compiler
+- Go 1.14+ compiler
 - GNU Make
 - [Kind](https://kind.sigs.k8s.io/)
 - [golangci-lint](https://github.com/golangci/golangci-lint)
