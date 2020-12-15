@@ -19,7 +19,7 @@ before_script:
     if [ -n "${CI_COMMIT_TAG}" ]
     then
         export TARGET_IMAGE="${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
-    elif [ "${CI_COMMIT_REF_SLUG}" = master ]
+    elif [ "${CI_COMMIT_REF_SLUG}" = main ]
     then
         export TARGET_IMAGE="${CI_REGISTRY_IMAGE}:latest"
     else

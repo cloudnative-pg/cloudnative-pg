@@ -49,11 +49,11 @@ require_clean_work_tree () {
 
 require_clean_work_tree "release"
 
-if branch=$(git symbolic-ref --short -q HEAD) && [ $branch = 'master' ]
+if branch=$(git symbolic-ref --short -q HEAD) && [ $branch = 'main' ]
 then
     echo "Releasing ${release_version}"
 else
-    echo >&2 "Release is not possible because you are not on 'master' branch ($branch)"
+    echo >&2 "Release is not possible because you are not on 'main' branch ($branch)"
     exit 1
 fi
 
@@ -107,5 +107,5 @@ Tagged version ${release_version}
 
 Remember to push tags as well:
 
-git push origin master v${release_version}
+git push origin main v${release_version}
 EOF
