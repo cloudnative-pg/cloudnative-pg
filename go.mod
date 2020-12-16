@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/common v0.4.1
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.1.3
-	github.com/spf13/cobra v1.0.0
+	github.com/spf13/cobra v1.1.1
 	go.uber.org/zap v1.10.0
 	k8s.io/api v0.17.3
 	k8s.io/apimachinery v0.17.3
