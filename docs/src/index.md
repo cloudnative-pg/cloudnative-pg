@@ -45,7 +45,7 @@ by Red Hat.
 
 ## Requirements on Kubernetes
 
-Cloud Native PostgreSQL requires Kubernetes 1.15 or higher, tested on AWS, Google, Azure (with multiple availability zones).
+Cloud Native PostgreSQL requires Kubernetes 1.16 or higher, tested on AWS, Google, Azure (with multiple availability zones).
 
 !!! Warning
     These requirements do not apply to Cloud Native PostgreSQL on RedHat Open Container Platform.

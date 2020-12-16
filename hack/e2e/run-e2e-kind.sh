@@ -25,7 +25,7 @@ export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.
 
 PRESERVE_CLUSTER=${PRESERVE_CLUSTER:-false}
 BUILD_IMAGE=${BUILD_IMAGE:-false}
-K8S_VERSION=${K8S_VERSION:-v1.19.1}
+K8S_VERSION=${K8S_VERSION:-v1.20.0}
 KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 
 # Get the latest release of kind unless specified in the environment
@@ -50,12 +50,6 @@ cleanup() {
 trap cleanup EXIT
 
 install_kubectl() {
-    # We can't test a using kubectl version 1.15.x
-    # need to raise the version to 1.16.x
-    # see https://github.com/kubernetes/kubernetes/issues/80515
-    if [[ $K8S_VERSION =~ ^v?1.15 ]]; then
-        KUBECTL_VERSION=v1.16.9
-    fi
     # Requires 'tr' for Darwin vs darwin issue
     curl -sL "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION#v}/bin/$(uname | tr '[:upper:]' '[:lower:]')/amd64/kubectl" -o "${KUBECTL}"
     chmod +x "${KUBECTL}"

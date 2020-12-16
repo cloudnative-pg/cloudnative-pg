@@ -11,11 +11,11 @@ POSTGRES_REPO = "quay.io/enterprisedb/postgresql"
 
 # Kubernetes versions to use during the tests
 K8S_VERSIONS = [
-    "v1.19.1",
+    "v1.20.0",
+    "v1.19.4",
     "v1.18.8",
     "v1.17.11",
-    "v1.16.9",
-    "v1.15.12",
+    "v1.16.15",
 ]
 
 # PostgreSQL versions to use during the tests
