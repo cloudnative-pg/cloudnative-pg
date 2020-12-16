@@ -6,7 +6,7 @@ stages:
 
 variables:
   CI_DEBUG_TRACE: "false"
-  KUBEBUILDER_VERSION: "2.3.0"
+  KUBEBUILDER_VERSION: "2.3.1"
   GOLANG_VERSION: "1.14"
   GOLANGCI_LINT_VERSION: "1.33.0"
   RUN_KIND_E2E: "false"
@@ -89,23 +89,23 @@ kind_e2e:
       - POSTGRES_IMG: quay.io/enterprisedb/postgresql:13.1
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:13.0
         K8S_VERSION:
-          - v1.19.1
+          - v1.20.0
+          - v1.19.4
           - v1.18.8
           - v1.17.11
-          - v1.16.9
-          - v1.15.12
+          - v1.16.15
       - POSTGRES_IMG: quay.io/enterprisedb/postgresql:12.5
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:12.4
         K8S_VERSION:
-          - v1.19.1
+          - v1.20.0
       - POSTGRES_IMG: quay.io/enterprisedb/postgresql:11.10
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:11.9
         K8S_VERSION:
-          - v1.19.1
+          - v1.20.0
       - POSTGRES_IMG: quay.io/enterprisedb/postgresql:10.15
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:10.14
         K8S_VERSION:
-          - v1.19.1
+          - v1.20.0
   script:
     - apk add make bash curl go gettext
     - CONTROLLER_IMG="${TARGET_IMAGE}" BUILD_IMAGE=false hack/e2e/run-e2e-kind.sh
@@ -151,13 +151,6 @@ gke_e2e:
         cd -; rm -rf "${GO_TMP_DIR}"
       )
     - gcloud components install --quiet kubectl
-    # We can't test a using kubectl version 1.15.x
-    # need to raise the version to 1.16.x
-    # see https://github.com/kubernetes/kubernetes/issues/80515
-    - |
-      if [ "${K8S_VERSION#1.15}" != "${K8S_VERSION}" ]; then
-        cp -f $(which kubectl.1.16) $(which kubectl)
-      fi
     - gcloud auth activate-service-account --key-file="${GCP_SERVICE_ACCOUNT}"
     - kubetest2 gke --version "${K8S_VERSION}" --ignore-gcp-ssh-key --project "${PROJECT}"  --cluster-name "cnp-test-$CI_PIPELINE_ID-$CI_NODE_INDEX" --zone "${ZONE}" --up --down -v 10 --test exec -- hack/e2e/run-e2e.sh
   after_script:
@@ -188,21 +181,14 @@ eks_e2e:
       - POSTGRES_IMG: quay.io/enterprisedb/postgresql:13.1
         E2E_PRE_ROLLING_UPDATE_IMG: quay.io/enterprisedb/postgresql:13.0
         K8S_VERSION:
+          - "1.18"
           - "1.17"
           - "1.16"
-          - "1.15"
   script:
     - export CONTROLLER_IMG="${TARGET_IMAGE}"
     - yum install -y golang make tar gzip git gettext
     - export PATH="/root/go/bin:${PATH}"
     - curl -sL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /usr/local/bin
-    # Get the same version of kubectl and k8s
-    # but use version 1.16.x instead of 1.15.x
-    # due to https://github.com/kubernetes/kubernetes/issues/80515
-    - |
-      KUBECTL_VERSION=$(git -c 'versionsort.suffix=-' ls-remote --refs --sort='version:refname' --tags https://github.com/kubernetes/kubernetes.git | cut --delimiter='/' --fields=3 | grep "^v${K8S_VERSION/1.15/1.16}.[0-9]\+$"|tail -n 1)
-      curl -sL "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -o /usr/local/bin/kubectl
-      chmod +x /usr/local/bin/kubectl
     # Install tools avoiding to pollute go.mod
     - |
       (

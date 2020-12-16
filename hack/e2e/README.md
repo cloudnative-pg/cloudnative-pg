@@ -39,7 +39,7 @@ the following ones can be defined:
     Default: `false`.
 * `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
   the tests. Only useful if specified with `PRESERVE_CLUSTER=true`.
-* `K8S_VERSION`: the version of K8S to run. Default: `v1.19.1`.
+* `K8S_VERSION`: the version of K8S to run. Default: `v1.20.0`.
 * `KIND_VERSION`: the version of Kind. Defaults to the latest release.
 * `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
     false to get the image from a registry. Default: `false`.
