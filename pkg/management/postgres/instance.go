@@ -280,7 +280,6 @@ func (instance *Instance) Rewind() error {
 	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
 	options := []string{
 		"-P",
-		"-c",
 		"--source-server", primaryConnInfo + " dbname=postgres",
 		"--target-pgdata", instance.PgData,
 	}
