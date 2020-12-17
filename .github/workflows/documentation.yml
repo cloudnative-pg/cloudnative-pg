@@ -108,7 +108,8 @@ jobs:
           mkdir -p upload/latest
           cat > "upload/latest/.htaccess" <<EOF
           RewriteEngine On
-          RewriteRule ^(.*)$  /${PROJECT_NAME}/${{ steps.get-version.outputs.MATURITY }}/${{ steps.get-version.outputs.SHORT_VERSION }}/\$1 [R=302,L]
+          RewriteCond %{REQUEST_URI} ^(.*)/latest/(/?.*)
+          RewriteRule ^ %1/${{ steps.get-version.outputs.SHORT_VERSION }}/%2 [R=302,L]
           EOF
           cp -R docs/dist upload/${{ steps.get-version.outputs.SHORT_VERSION }}
       -
