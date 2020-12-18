@@ -7,18 +7,23 @@ with Local Persistent Volumes (PV).
 
 ## How to create a development environment
 
-To develop the BDR operator, you will need an UNIX based operating system that
-support the following softwares, which must be available in the `PATH`
+To develop the operator, you will need a UNIX based operating system that
+support the following software, which must be available in the `PATH`
 environment variable:
 
 - Go 1.14+ compiler
 - GNU Make
-- [Kind](https://kind.sigs.k8s.io/)
+- [Kind](https://kind.sigs.k8s.io/) v0.9.x or greater
 - [golangci-lint](https://github.com/golangci/golangci-lint)
 
 On Mac OS X, you can install the above components through `brew`:
 
     brew install go kind golangci/tap/golangci-lint
+
+!!! note
+    Kind version 0.9.x is required at the time of this writing.
+    If you already have kind, run `brew upgrade kind` to update
+    to the latest version.
 
 You can invoke the compilation procedure with:
 
@@ -31,24 +36,21 @@ You can invoke the compilation procedure with:
 
 ## Quickstart for local testing of a git branch
 
-If you want to deploy a cluster using the operator from your current git branch,
-you can use the following commands:
+If you want to deploy a cluster using the operator from your current git
+branch, you can use the procedure described in this paragraph.
 
-```bash
-kind create cluster --name pg
-kubectl create namespace postgresql-operator-system
-kubectl create secret docker-registry \
-    -n postgresql-operator-system \
-    postgresql-operator-pull-secret \
-    --docker-server=internal.2ndq.io \
-    --docker-username=$GITLAB_TOKEN_USERNAME \
-    --docker-password=$GITLAB_TOKEN_PASSWORD
-make deploy CONTROLLER_IMG=internal.2ndq.io/k8s/cloud-native-postgresql:$(git symbolic-ref --short HEAD | tr / _)
-kubectl apply -f docs/src/samples/cluster-example.yaml
-```
+You must set the `QUAY_USERNAME` and `QUAY_PASSWORD` environment variables to the
+values found in your Account Settings in quay.io. Navigate to https://quay.io/
+then click on your name in the upper-right and select "Account Settings". Ensure
+the User Settings tab on the left is selected, and click on "CLI Password" at the
+top of the settings. Enter your quay.io password to see your credentials.
+Select "Encrypted Password" on left and copy the "Username", and the "Encrypted Password"
+values into the environment variables `QUAY_USERNAME` and `QUAY_PASSWORD` respectively
+in your shell. You can now use the following commands:
 
-Replace `$GITLAB_TOKEN_USERNAME` and `$GITLAB_TOKEN_PASSWORD` with one with the permission to pull
-from the gitlab docker registry.
+* `make dev-init` to create a local cluster
+* `make dev-clean` to clean up the local cluster
+* `make dev-reset` to reinitialize the local cluster
 
 # How to upgrade the list of licenses
 

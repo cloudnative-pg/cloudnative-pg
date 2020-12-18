@@ -3,12 +3,16 @@
 # Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 
 # Image URL to use all building/pushing image targets
-CONTROLLER_IMG ?= internal.2ndq.io/k8s/cloud-native-postgresql:latest
+CONTROLLER_IMG ?= quay.io/enterprisedb/cloud-native-postgresql-testing:$(shell git symbolic-ref --short HEAD | tr / -)
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/enterprisedb/postgresql:13
-KUSTOMIZE_VERSION=v3.5.4
+KUSTOMIZE_VERSION ?= v3.5.4
+KIND_CLUSTER_NAME ?= pg
+KIND_CLUSTER_VERSION ?= v1.20.0
 
-export CONTROLLER_IMG BUILD_IMAGE POSTGRES_IMAGE_NAME
+export CONTROLLER_IMG
+export BUILD_IMAGE
+export POSTGRES_IMAGE_NAME
 
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
@@ -185,3 +189,30 @@ KUSTOMIZE=$(GOBIN)/kustomize
 else
 KUSTOMIZE=$(shell PATH="$(GOBIN):$${PATH}" which kustomize)
 endif
+
+# initialize a local development cluster using kind
+dev-init:
+	kind create cluster --name=$(KIND_CLUSTER_NAME) --image kindest/node:$(KIND_CLUSTER_VERSION)
+	$(MAKE) deploy
+	kubectl create secret docker-registry \
+	  postgresql-operator-pull-secret \
+	  -n postgresql-operator-system \
+	  --docker-username="${QUAY_USERNAME}" \
+	  --docker-password="${QUAY_PASSWORD}" \
+	  --docker-server="quay.io/enterprisedb"
+	echo
+	while [[ $$( kubectl get pods -n postgresql-operator-system -l control-plane=controller-manager -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' ) != "True" ]]; do \
+	    printf '\033[0K\r'; \
+	    kubectl get pods -n postgresql-operator-system -l control-plane=controller-manager \
+	        -o 'jsonpath=Waiting for pod: {..status.phase} {..status.containerStatuses[*].state.waiting.reason}' ; \
+	    sleep 2 ; \
+	done
+	echo
+	kubectl apply -f docs/src/samples/cluster-example.yaml
+
+# clean up the kind cluster created by dev-init command
+dev-clean:
+	kind delete cluster --name=$(KIND_CLUSTER_NAME)
+
+# reinitialize the local kind cluster
+dev-reset: dev-clean dev-init
