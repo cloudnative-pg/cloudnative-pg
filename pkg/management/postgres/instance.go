@@ -9,12 +9,16 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/lib/pq"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
@@ -49,6 +53,17 @@ type Instance struct {
 	// The name of the cluster of which this Pod is belonging
 	ClusterName string
 }
+
+var (
+	// RetryUntilPrimaryAvailable is the default retry configuration that is used
+	// to wait for a successful connection to the master server
+	RetryUntilPrimaryAvailable = wait.Backoff{
+		Duration: 5 * time.Second,
+		// Steps is declared as an "int", so we are capping
+		// to int32 to support ARM-based 32 bit architectures
+		Steps: math.MaxInt32,
+	}
+)
 
 // Startup starts up a PostgreSQL instance and wait for the instance to be
 // started
@@ -272,6 +287,35 @@ func (instance *Instance) Demote() error {
 	}
 
 	return instance.createStandbySignal()
+}
+
+// WaitForPrimaryAvailable waits until we can connect to the
+func (instance *Instance) WaitForPrimaryAvailable() error {
+	primaryConnInfo := buildPrimaryConnInfo(
+		instance.ClusterName+"-rw", instance.PodName) + " dbname=postgres"
+
+	log.Log.Info("Waiting for the new primary to be available",
+		"primaryConnInfo", primaryConnInfo)
+
+	errorIsRetryable := func(err error) bool {
+		return err != nil
+	}
+
+	return retry.OnError(RetryUntilPrimaryAvailable, errorIsRetryable, func() error {
+		db, err := sql.Open("postgres", primaryConnInfo)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = db.Close()
+		}()
+
+		err = db.Ping()
+		if err != nil {
+			log.Log.Info("Primary server is still not available", "err", err)
+		}
+		return err
+	})
 }
 
 // Rewind use pg_rewind to align this data directory
