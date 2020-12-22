@@ -23,7 +23,7 @@ var _ = Describe("Extract the used image name", func() {
 			Namespace: "default",
 		},
 	}
-	pod := PodWithExistingStorage(cluster, 1)
+	pod := PodWithExistingStorage(cluster, nil, 1)
 
 	It("extract the default image name", func() {
 		Expect(GetPostgreSQLImageName(*pod)).To(Equal(versions.GetDefaultImageName()))

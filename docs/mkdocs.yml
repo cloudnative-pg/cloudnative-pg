@@ -29,6 +29,7 @@ nav:
   - backup_recovery.md
   - postgresql_conf.md
   - storage.md
+  - pod_templates.md
   - samples.md
   - expose_pg_services.md
   - ssl_connections.md

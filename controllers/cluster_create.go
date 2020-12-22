@@ -655,7 +655,7 @@ func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *v1al
 		return fmt.Errorf("cannot detect serial from PVC %v: %v", pvc.Name, err)
 	}
 
-	pod := specs.PodWithExistingStorage(*cluster, int32(nodeSerial))
+	pod := specs.PodWithExistingStorage(*cluster, cluster.Spec.PodTemplate, int32(nodeSerial))
 
 	log.Info("Creating new Pod to reattach a PVC",
 		"pod", pod.Name,
