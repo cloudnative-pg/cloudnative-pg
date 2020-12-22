@@ -46,9 +46,11 @@ kubectl wait --for=condition=Available --timeout=2m \
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
 
+mkdir -p "${ROOT_DIR}/tests/e2e/out"
 # Create at most 4 testing nodes. Using -p instead of --nodes
 # would create CPUs-1 nodes and saturate the testing server
 ginkgo --nodes=4 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/e2e/..."
 
+mkdir -p "${ROOT_DIR}/tests/performance/out"
 # Performance tests need to run on a single node to avoid concurrency
 ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/performance/..."

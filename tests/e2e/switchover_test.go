@@ -16,18 +16,23 @@ import (
 )
 
 var _ = Describe("Switchover", func() {
-
+	const namespace = "switchover-e2e"
+	const sampleFile = samplesDir + "/cluster-example.yaml"
+	const clusterName = "cluster-example"
+	JustAfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+		}
+	})
+	AfterEach(func() {
+		err := env.DeleteNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
 	It("reacts to switchover requests", func() {
-		const namespace = "switchover-e2e"
-		const sampleFile = samplesDir + "/cluster-example.yaml"
-		const clusterName = "cluster-example"
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		}()
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -89,7 +94,7 @@ var _ = Describe("Switchover", func() {
 				Namespace: namespace,
 				Name:      oldPrimary,
 			}
-			timeout := 45
+			timeout := 120
 			Eventually(func() (bool, error) {
 				pod := corev1.Pod{}
 				err := env.Client.Get(env.Ctx, namespacedName, &pod)
@@ -102,7 +107,7 @@ var _ = Describe("Switchover", func() {
 				Namespace: namespace,
 				Name:      oldPrimary,
 			}
-			timeout := 45
+			timeout := 120
 			Eventually(func() (bool, error) {
 				pod := corev1.Pod{}
 				err := env.Client.Get(env.Ctx, namespacedName, &pod)

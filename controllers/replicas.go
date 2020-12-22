@@ -43,6 +43,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 		log.Info("Current primary isn't healthy, failing over",
 			"newPrimary", status.Items[0].PodName,
 			"clusterStatus", status)
+		log.Info("Current cluster status", "items", status.Items)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Current primary isn't healthy, failing over from %v to %v",
 			cluster.Status.TargetPrimary, status.Items[0].PodName)

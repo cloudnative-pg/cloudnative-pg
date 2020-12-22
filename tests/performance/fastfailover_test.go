@@ -23,24 +23,30 @@ import (
 )
 
 var _ = Describe("Fast failover", func() {
-
+	const namespace = "primary-failover-time"
+	const sampleFile = "./fixtures/base/cluster-example.yaml"
+	const clusterName = "cluster-example"
+	const maxFailoverTime = 10
+	const maxReattachTime = 60
+	JustAfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+		}
+	})
+	AfterEach(func() {
+		err := env.DeleteNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
 	// Confirm that a standby closely following the primary doesn't need more
 	// than 10 seconds to be promoted and be able to start inserting records.
 	// We test this setting up an application pointing to the rw service,
 	// forcing a failover and measuring how much time passes between the
 	// last row written on timeline 1 and the first one on timeline 2
-	It("can fail over in less than ten seconds", func() {
-		const namespace = "primary-failover-time"
-		const sampleFile = "./fixtures/base/cluster-example.yaml"
-		const clusterName = "cluster-example"
+	It(fmt.Sprintf("can fail over in less than %v seconds", maxFailoverTime), func() {
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		}()
-
 		By(fmt.Sprintf("having a %v namespace", namespace), func() {
 			// Creating a namespace should be quick
 			timeout := 20
@@ -189,10 +195,10 @@ var _ = Describe("Fast failover", func() {
 				return strings.TrimSpace(out), err
 			}, timeout).Should(BeEquivalentTo("t"))
 		})
-		By("resuming writing in less than 10 sec", func() {
+		By(fmt.Sprintf("resuming writing in less than %v sec", maxFailoverTime), func() {
 			// We measure the difference between the last entry with
 			// timeline 1 and the first one with timeline 2.
-			// It should be less than 10 seconds.
+			// It should be less than maxFailoverTime seconds.
 			query := "WITH a AS ( " +
 				"  SELECT * " +
 				"  , t-lag(t) OVER (order by t) AS timediff " +
@@ -222,12 +228,11 @@ var _ = Describe("Fast failover", func() {
 				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 			switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
 			fmt.Printf("Failover performed in %v seconds\n", switchTime)
-			Expect(switchTime, err).Should(BeNumerically("<", 10))
+			Expect(switchTime, err).Should(BeNumerically("<", maxFailoverTime))
 		})
 
 		By("recovering from degraded state having a cluster with 3 instances ready", func() {
 			// Recreating an instance usually takes 15s`
-			timeout := 45
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      clusterName,
@@ -238,11 +243,11 @@ var _ = Describe("Fast failover", func() {
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				elapsed = time.Since(start)
 				return cluster.Status.ReadyInstances, err
-			}, timeout).Should(BeEquivalentTo(3))
+			}, maxReattachTime).Should(BeEquivalentTo(3))
 
 			fmt.Printf("Cluster has been in a degraded state for %v seconds\n", elapsed)
 
-			Expect(elapsed / time.Second).Should(BeNumerically("<", 30))
+			Expect(elapsed / time.Second).Should(BeNumerically("<", maxReattachTime))
 		})
 	})
 })
