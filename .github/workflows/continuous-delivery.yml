@@ -97,7 +97,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.docker-meta.outputs.tags }}
-          labels: quay.expires-after=2d
+          labels: ${{ github.ref != 'refs/heads/main' && 'quay.expires-after=7d' }}
 
   generate-jobs:
     name: Generate Jobs
