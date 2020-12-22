@@ -5,78 +5,163 @@
 #
 
 import json
+import os
 import sys
+from operator import itemgetter
+from typing import Dict, List
 
 POSTGRES_REPO = "quay.io/enterprisedb/postgresql"
 
+
+class VersionList(list):
+    """List of versions"""
+
+    def __init__(self, versions: List[str]):
+        super().__init__(sorted(versions, reverse=True))
+
+    @property
+    def latest(self):
+        return self[0]
+
+    @property
+    def oldest(self):
+        return self[-1]
+
+
+class MajorVersionList(dict):
+    """List of major versions, with multiple patch levels"""
+
+    def __init__(self, version_lists: Dict[str, List[str]]):
+        sorted_versions = {
+            k: VersionList(version_lists[k])
+            for k in sorted(version_lists.keys(), reverse=True)
+        }
+        super().__init__(sorted_versions)
+        self.versions = list(self.keys())
+
+    @property
+    def latest(self):
+        return self.get(self.versions[0])
+
+    @property
+    def oldest(self):
+        return self.get(self.versions[-1])
+
+
 # Kubernetes versions to use during the tests
-K8S_VERSIONS = [
-    "v1.20.0",
-    "v1.19.4",
-    "v1.18.8",
-    "v1.17.11",
-    "v1.16.15",
-]
+K8S = VersionList(
+    [
+        "v1.20.0",
+        "v1.19.4",
+        "v1.18.8",
+        "v1.17.11",
+        "v1.16.15",
+    ]
+)
 
 # PostgreSQL versions to use during the tests
 # MAJOR: [VERSION, PRE_ROLLING_UPDATE_VERSION]
-POSTGRES_VERSION_LISTS = {
-    "13": ["13.1", "13.0"],
-    "12": ["12.5", "12.4"],
-    "11": ["11.9", "11.8"],
-    "10": ["10.15", "10.14"],
-}
+POSTGRES = MajorVersionList(
+    {
+        "13": ["13.1", "13.0"],
+        "12": ["12.5", "12.4"],
+        "11": ["11.9", "11.8"],
+        "10": ["10.15", "10.14"],
+    }
+)
 
 
-def build_job(k8s_version, postgres_version_list):
+class E2EJob(dict):
     """Build a single job of the matrix"""
-    postgres_version = postgres_version_list[0]
-    postgres_version_pre = postgres_version_list[1]
 
-    name = f"{k8s_version}-PostgreSQL-{postgres_version}"
-    repo = POSTGRES_REPO
+    def __init__(self, k8s_version, postgres_version_list):
+        postgres_version = postgres_version_list.latest
+        postgres_version_pre = postgres_version_list.oldest
 
-    print(f"Generating: {name}", file=sys.stderr)
+        name = f"{k8s_version}-PostgreSQL-{postgres_version}"
+        repo = POSTGRES_REPO
 
+        super().__init__(
+            {
+                "id": name,
+                "k8s_version": k8s_version,
+                "postgres_version": postgres_version,
+                "postgres_img": f"{repo}:{postgres_version}",
+                "postgres_pre_img": f"{repo}:{postgres_version_pre}",
+            }
+        )
+
+    def __hash__(self):
+        return hash(self["id"])
+
+
+def build_push_include():
+    """Build the list of tests running on push"""
     return {
-        "id": name,
-        "k8s_version": k8s_version,
-        "postgres_version": postgres_version,
-        "postgres_img": f"{repo}:{postgres_version}",
-        "postgres_pre_img": f"{repo}:{postgres_version_pre}",
+        E2EJob(K8S.latest, POSTGRES.latest),
+        E2EJob(K8S.oldest, POSTGRES.oldest),
     }
 
 
-def build_include():
-    """Build include Job list"""
-    include = []
-
-    # Sorted keys
-    postgres_versions = list(sorted(POSTGRES_VERSION_LISTS.keys(), reverse=True))
-
-    # Default versions
-    default_postgres_version = postgres_versions[0]
-    default_k8s_version = K8S_VERSIONS[0]
+def build_pull_request_include():
+    """Build the list of tests running on pull request"""
+    result = build_push_include()
 
     # Iterate over K8S versions
-    for k8s_version in K8S_VERSIONS:
-        include.append(
-            build_job(
-                k8s_version,
-                POSTGRES_VERSION_LISTS[default_postgres_version],
-            )
+    for k8s_version in K8S:
+        result |= {
+            E2EJob(k8s_version, POSTGRES.latest),
+        }
+
+    # Iterate over PostgreSQL versions
+    for postgres_version in POSTGRES.values():
+        print(postgres_version)
+        result |= {E2EJob(K8S.latest, postgres_version)}
+
+    return result
+
+
+def build_main_include():
+    """Build the list tests running on main"""
+    result = build_pull_request_include()
+
+    # Iterate over K8S versions
+    for k8s_version in K8S:
+        result |= {
+            E2EJob(k8s_version, POSTGRES.latest),
+        }
+
+    # Iterate over PostgreSQL versions
+    for postgres_version in POSTGRES.values():
+        result |= {E2EJob(K8S.latest, postgres_version)}
+
+    return result
+
+
+def build_schedule_include():
+    """Build the list of tests running on schedule"""
+    # For the moment scheduled tests are identical to main
+    return build_main_include()
+
+
+MODES = {
+    "push": build_push_include,
+    "pull_request": build_pull_request_include,
+    "main": build_main_include,
+    "schedule": build_schedule_include,
+}
+
+
+if __name__ == "__main__":
+    mode = os.getenv("GITHUB_EVENT_NAME", "push")
+
+    if mode not in MODES:
+        raise SystemExit(
+            f"GITHUB_EVENT_NAME='{mode}' is not supported. Possible values are: {', '.join(MODES)}"
         )
 
-    # Iterate over PostgreSQL versions except the first one
-    for postgres_version in postgres_versions:
-        include.append(
-            build_job(
-                default_k8s_version,
-                POSTGRES_VERSION_LISTS[postgres_version],
-            )
-        )
+    include = list(sorted(MODES[mode](), key=itemgetter("id")))
+    for job in include:
+        print(f"Generating: {job['id']}", file=sys.stderr)
 
-    return include
-
-
-print("::set-output name=matrix::" + json.dumps({"include": build_include()}))
+    print("::set-output name=matrix::" + json.dumps({"include": include}))
