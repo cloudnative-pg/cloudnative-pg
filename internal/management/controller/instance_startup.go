@@ -162,7 +162,14 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructur
 			"currentPrimary", currentPrimary,
 			"targetPrimary", targetPrimary)
 
+		// Wait for the switchover to be reflected in the cluster metadata
 		err = r.waitForSwitchoverToBeCompleted()
+		if err != nil {
+			return err
+		}
+
+		// Wait for the new master to really accept connections
+		err = r.instance.WaitForPrimaryAvailable()
 		if err != nil {
 			return err
 		}

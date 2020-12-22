@@ -31,7 +31,7 @@ var (
 	// ErrInstanceInRecovery is raised while PostgreSQL is still in recovery mode
 	ErrInstanceInRecovery = fmt.Errorf("instance in recovery")
 
-	// RetryUntilRecoveryDone if the default retry configuration that is used
+	// RetryUntilRecoveryDone is the default retry configuration that is used
 	// to wait for a restored cluster to promote itself
 	RetryUntilRecoveryDone = wait.Backoff{
 		Duration: 5 * time.Second,
