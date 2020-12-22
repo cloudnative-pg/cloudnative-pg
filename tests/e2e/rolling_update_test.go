@@ -52,7 +52,9 @@ var _ = Describe("Rolling updates", func() {
 	// Verify that after an update all the pods are ready and running
 	// an updated image
 	AssertUpdateImage := func(namespace string, clusterName string) {
-		timeout := 600
+		// TODO: the nodes are downloading the image sequentially,
+		// slowing this down
+		timeout := 900
 
 		// Update to the latest minor
 		updatedImageName := os.Getenv("POSTGRES_IMG")
@@ -165,26 +167,28 @@ var _ = Describe("Rolling updates", func() {
 
 	// Verify that the -rw endpoint points to the expected primary
 	AssertPrimary := func(namespace string, clusterName string, expectedPrimaryIdx int) {
-		endpointName := clusterName + "-rw"
-		endpoint := &corev1.Endpoints{}
-		endpointNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      endpointName,
-		}
-		err := env.Client.Get(env.Ctx, endpointNamespacedName,
-			endpoint)
-		Expect(err).ToNot(HaveOccurred())
-
 		podName := clusterName + "-" + strconv.Itoa(expectedPrimaryIdx)
 		pod := &corev1.Pod{}
 		podNamespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      podName,
 		}
-		err = env.Client.Get(env.Ctx, podNamespacedName, pod)
+		err := env.Client.Get(env.Ctx, podNamespacedName, pod)
+		Expect(err).ToNot(HaveOccurred())
 
-		Expect(endpoint.Subsets[0].Addresses[0].IP, err).To(
-			BeEquivalentTo(pod.Status.PodIP))
+		endpointName := clusterName + "-rw"
+		endpointNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      endpointName,
+		}
+		// we give 10 seconds to the apiserver to update the endpoint
+		timeout := 10
+		Eventually(func() (string, error) {
+			endpoint := &corev1.Endpoints{}
+			err := env.Client.Get(env.Ctx, endpointNamespacedName,
+				endpoint)
+			return endpoint.Subsets[0].Addresses[0].IP, err
+		}, timeout).Should(BeEquivalentTo(pod.Status.PodIP))
 	}
 
 	// Verify that the IPs of the pods match the ones in the -r endpoint and
@@ -268,39 +272,55 @@ var _ = Describe("Rolling updates", func() {
 		})
 	}
 
-	It("can do a rolling update on three instances", func() {
+	Context("Three Instances", func() {
 		const namespace = "cluster-rolling-e2e-three-instances"
-		// We set up a cluster with a previous release of the same PG major
-		// The yaml has been previously generated from a template and
-		// the image name has to be tagged as foo:MAJ.MIN. We'll update
-		// it to foo:MAJ, representing the latest minor.
 		const sampleFile = fixturesDir + "/rolling_updates/cluster-three-instances.yaml"
 		const clusterName = "postgresql-three-instances"
-		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-		defer func() {
+		JustAfterEach(func() {
+			if CurrentGinkgoTestDescription().Failed {
+				env.DumpClusterEnv(namespace, clusterName,
+					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+			}
+		})
+		AfterEach(func() {
 			err := env.DeleteNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
-		}()
-		AssertRollingUpdate(namespace, clusterName, sampleFile, 2)
+		})
+		It("can do a rolling update", func() {
+			// We set up a cluster with a previous release of the same PG major
+			// The yaml has been previously generated from a template and
+			// the image name has to be tagged as foo:MAJ.MIN. We'll update
+			// it to foo:MAJ, representing the latest minor.
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			AssertRollingUpdate(namespace, clusterName, sampleFile, 2)
+		})
 	})
 
-	It("can do a rolling updates on a single instance", func() {
+	Context("Single Instance", func() {
 		const namespace = "cluster-rolling-e2e-single-instance"
-		// We set up a cluster with a previous release of the same PG major
-		// The yaml has been previously generated from a template and
-		// the image name has to be tagged as foo:MAJ.MIN. We'll update
-		// it to foo:MAJ, representing the latest minor.
 		const sampleFile = fixturesDir + "/rolling_updates/cluster-single-instance.yaml"
 		const clusterName = "postgresql-single-instance"
-		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-		defer func() {
+		JustAfterEach(func() {
+			if CurrentGinkgoTestDescription().Failed {
+				env.DumpClusterEnv(namespace, clusterName,
+					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+			}
+		})
+		AfterEach(func() {
 			err := env.DeleteNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
-		}()
-		AssertRollingUpdate(namespace, clusterName, sampleFile, 1)
+		})
+		It("can do a rolling updates on a single instance", func() {
+			// We set up a cluster with a previous release of the same PG major
+			// The yaml has been previously generated from a template and
+			// the image name has to be tagged as foo:MAJ.MIN. We'll update
+			// it to foo:MAJ, representing the latest minor.
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			AssertRollingUpdate(namespace, clusterName, sampleFile, 1)
+		})
 	})
 })

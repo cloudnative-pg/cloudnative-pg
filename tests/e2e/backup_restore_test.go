@@ -21,17 +21,23 @@ import (
 
 var _ = Describe("Backup and restore", func() {
 
+	const namespace = "cluster-backup"
+	const sampleFile = fixturesDir + "/backup/cluster-with-backup.yaml"
+	const clusterName = "pg-backup"
+	JustAfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+		}
+	})
+	AfterEach(func() {
+		err := env.DeleteNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
 	It("restores a backed up cluster", func() {
-		const namespace = "cluster-backup"
-		const sampleFile = fixturesDir + "/backup/cluster-with-backup.yaml"
-		const clusterName = "pg-backup"
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		}()
 		// First we create the secrets for minio
 		By("creating the cloud storage credentials", func() {
 			secretFile := fixturesDir + "/backup/aws-creds.yaml"

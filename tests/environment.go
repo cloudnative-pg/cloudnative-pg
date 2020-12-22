@@ -7,7 +7,10 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package tests
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -17,11 +20,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	clusterv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
@@ -127,4 +132,49 @@ func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName st
 		client.MatchingLabels{"postgresql": clusterName},
 	)
 	return podList, err
+}
+
+// DumpClusterEnv logs the JSON for the a cluster in a namespace, its pods and endpoints
+func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName string, filename string) {
+	f, err := os.Create(filename)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	w := bufio.NewWriter(f)
+	namespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      clusterName,
+	}
+	cluster := &clusterv1alpha1.Cluster{}
+	_ = env.Client.Get(env.Ctx, namespacedName, cluster)
+	out, _ := json.MarshalIndent(cluster, "", "    ")
+	fmt.Fprintf(w, "Dumping %v/%v cluster\n", namespace, clusterName)
+	fmt.Fprintln(w, string(out))
+
+	podList, _ := env.GetClusterPodList(namespace, clusterName)
+	for _, pod := range podList.Items {
+		out, _ := json.MarshalIndent(pod, "", "    ")
+		fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)
+		fmt.Fprintln(w, string(out))
+	}
+	suffixes := []string{"-r", "-rw", "-any"}
+	for _, suffix := range suffixes {
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName + suffix,
+		}
+		endpoint := &corev1.Endpoints{}
+		_ = env.Client.Get(env.Ctx, namespacedName, endpoint)
+		out, _ := json.MarshalIndent(endpoint, "", "    ")
+		fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
+		fmt.Fprintln(w, string(out))
+	}
+	err = w.Flush()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	_ = f.Sync()
+	_ = f.Close()
 }

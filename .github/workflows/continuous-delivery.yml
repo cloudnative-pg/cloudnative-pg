@@ -169,3 +169,13 @@ jobs:
           name: kind-logs-${{ matrix.id }}
           path: kind-logs/
           retention-days: 7
+      -
+        name: Archive e2e failure contexts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-failure-contexts-${{ matrix.id }}
+          path: |
+            tests/e2e/out/
+            tests/performance/out/
+          retention-days: 7

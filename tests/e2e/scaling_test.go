@@ -13,18 +13,23 @@ import (
 )
 
 var _ = Describe("Cluster scale up and down", func() {
-
+	const namespace = "cluster-scale-e2e-storage-class"
+	const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
+	const clusterName = "postgresql-storage-class"
+	JustAfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+		}
+	})
+	AfterEach(func() {
+		err := env.DeleteNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
 	It("can scale the cluster size", func() {
-		const namespace = "cluster-scale-e2e-storage-class"
-		const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
-		const clusterName = "postgresql-storage-class"
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		}()
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		// Add a node to the cluster and verify the cluster has one more
@@ -49,7 +54,7 @@ var _ = Describe("Cluster scale up and down", func() {
 		By("removing an instance from the cluster", func() {
 			_, _, err := tests.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
 			Expect(err).ToNot(HaveOccurred())
-			timeout := 30
+			timeout := 60
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      clusterName,

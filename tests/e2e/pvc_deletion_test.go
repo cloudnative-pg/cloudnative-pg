@@ -14,18 +14,23 @@ import (
 )
 
 var _ = Describe("PVC Deletion", func() {
-
+	const namespace = "cluster-pvc-deletion"
+	const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
+	const clusterName = "postgresql-storage-class"
+	JustAfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+		}
+	})
+	AfterEach(func() {
+		err := env.DeleteNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
 	It("correctly manages PVCs", func() {
-		const namespace = "cluster-pvc-deletion"
-		const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
-		const clusterName = "postgresql-storage-class"
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		}()
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		// Reuse the same pvc after a deletion

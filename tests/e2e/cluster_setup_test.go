@@ -14,20 +14,25 @@ import (
 )
 
 var _ = Describe("Cluster setup", func() {
-
+	const namespace = "cluster-storageclass-e2e"
+	const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
+	const clusterName = "postgresql-storage-class"
+	JustAfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+		}
+	})
+	AfterEach(func() {
+		err := env.DeleteNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
 	It("sets up a cluster", func() {
-		const namespace = "cluster-storageclass-e2e"
-		const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
-		const clusterName = "postgresql-storage-class"
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		}()
-
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
 		By("having three PostgreSQL pods with status ready", func() {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(utils.CountReadyPods(podList.Items), err).Should(BeEquivalentTo(3))
@@ -35,7 +40,7 @@ var _ = Describe("Cluster setup", func() {
 
 		By("being able to restart a killed pod without losing it", func() {
 			aSecond := time.Second
-			timeout := 60
+			timeout := 120
 			podName := clusterName + "-1"
 			pod := &corev1.Pod{}
 			namespacedName := types.NamespacedName{

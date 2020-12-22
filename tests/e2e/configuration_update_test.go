@@ -15,19 +15,24 @@ import (
 )
 
 var _ = Describe("Configuration update", func() {
+	const namespace = "cluster-update-config-e2e"
+	const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
+	const clusterName = "postgresql-storage-class"
+	JustAfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+		}
+	})
+	AfterEach(func() {
+		err := env.DeleteNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
 
 	It("can manage cluster configuration changes", func() {
-		// Cluster identifiers
-		const namespace = "cluster-update-config-e2e"
-		const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
-		const clusterName = "postgresql-storage-class"
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		}()
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("reloading Pg when a parameter requring reload is modified", func() {
@@ -82,7 +87,7 @@ var _ = Describe("Configuration update", func() {
 				return value, err, atoiErr
 			}, timeout).Should(BeEquivalentTo(1))
 		})
-		By("restarting and switching Pg when a parameter requring restart is modified", func() {
+		By("restarting and switching Pg when a parameter requiring restart is modified", func() {
 			sample := fixturesDir + "/config_update/03-restart.yaml"
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())

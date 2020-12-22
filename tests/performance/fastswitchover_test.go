@@ -25,22 +25,32 @@ import (
 )
 
 var _ = Describe("Fast switchover", func() {
+	const namespace = "primary-switchover-time"
+	const sampleFile = "./fixtures/base/cluster-example.yaml"
+	const clusterName = "cluster-example"
+	const maxSwitchoverTime = 20
+	const maxReattachTime = 60
+	JustAfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+		}
+	})
+	AfterEach(func() {
+		err := env.DeleteNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
 	// Confirm that a standby closely following the primary doesn't need more
-	// than 10 seconds to be promoted and be able to start inserting records.
+	// than maxSwitchoverTime seconds to be promoted and be able to start
+	// inserting records. We then expect the old primary to be back in
+	// maxReattachTime.
 	// We test this setting up an application pointing to the rw service,
 	// forcing a switchover and measuring how much time passes between the
 	// last row written on timeline 1 and the first one on timeline 2
-	It("can switch over in less than ten seconds", func() {
-		const namespace = "primary-switchover-time"
-		const sampleFile = "./fixtures/base/cluster-example.yaml"
-		const clusterName = "cluster-example"
+	It(fmt.Sprintf("can switch over in less than %v seconds", maxSwitchoverTime), func() {
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() {
-			err := env.DeleteNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-		}()
 
 		var oldPrimary, targetPrimary string
 
@@ -193,10 +203,10 @@ var _ = Describe("Fast switchover", func() {
 				return strings.TrimSpace(out), err
 			}, timeout).Should(BeEquivalentTo("t"))
 		})
-		By("resuming writing in less than 10 sec", func() {
+		By(fmt.Sprintf("resuming writing in less than %v sec", maxSwitchoverTime), func() {
 			// We measure the difference between the last entry with
 			// timeline 1 and the first one with timeline 2.
-			// It should be less than 10 seconds.
+			// It should be less than maxSwitchoverTime seconds.
 			query := "WITH a AS ( " +
 				"  SELECT * " +
 				"  , t-lag(t) OVER (order by t) AS timediff " +
@@ -225,11 +235,11 @@ var _ = Describe("Fast switchover", func() {
 				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 			switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
 			fmt.Printf("Switchover performed in %v seconds\n", switchTime)
-			Expect(switchTime, err).Should(BeNumerically("<", 10))
+			Expect(switchTime, err).Should(BeNumerically("<", maxSwitchoverTime))
 		})
-		By("checking that the old primary is now a standby", func() {
+		By(fmt.Sprintf("having the old primary as a standby within %v seconds", maxReattachTime), func() {
 			// Following the new master should usually take less than 15s
-			timeout := 45
+			timeout := maxReattachTime
 			namespacedName := types.NamespacedName{
 				Namespace: namespace,
 				Name:      oldPrimary,
@@ -244,8 +254,6 @@ var _ = Describe("Fast switchover", func() {
 			}, timeout).Should(BeTrue())
 
 			fmt.Printf("oldPrimary has been reattached to the targetPrimary in %v seconds\n", elapsed)
-
-			Expect(elapsed / time.Second).Should(BeNumerically("<", 15))
 		})
 	})
 })
