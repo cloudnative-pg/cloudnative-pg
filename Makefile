@@ -126,13 +126,13 @@ apidoc: po-docgen
 .PHONY: controller-gen
 controller-gen:
 # download controller-gen if necessary
-ifneq ($(shell controller-gen --version), Version: v0.3.0)
+ifneq ($(shell controller-gen --version), Version: v0.4.1)
 	@{ \
 	set -e ;\
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0 ;\
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.1 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(GOBIN)/controller-gen

@@ -32,7 +32,9 @@ Below you will find a description of the defined resources:
 * [ClusterSpec](#clusterspec)
 * [ClusterStatus](#clusterstatus)
 * [DataBackupConfiguration](#databackupconfiguration)
+* [MetaSubset](#metasubset)
 * [NodeMaintenanceWindow](#nodemaintenancewindow)
+* [PodTemplateSpec](#podtemplatespec)
 * [PostgresConfiguration](#postgresconfiguration)
 * [RecoveryTarget](#recoverytarget)
 * [RollingUpdateStatus](#rollingupdatestatus)
@@ -201,6 +203,7 @@ ClusterSpec defines the desired state of Cluster
 | startDelay | The time in seconds that is allowed for a PostgreSQL instance to successfully start up (default 30) | int32 | false |
 | stopDelay | The time in seconds that is allowed for a PostgreSQL instance node to gracefully shutdown (default 30) | int32 | false |
 | affinity | Affinity/Anti-affinity rules for Pods | [AffinityConfiguration](#affinityconfiguration) | false |
+| podTemplate | This contains a Pod template which is applied when creating the actual instances | *[PodTemplateSpec](#podtemplatespec) | false |
 | resources | Resources requirements of every generated Pod. Please refer to https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ for more information. | corev1.ResourceRequirements | false |
 | primaryUpdateStrategy | Strategy to follow to upgrade the primary server during a rolling update procedure, after all replicas have been successfully updated: it can be automated (`unsupervised` - default) or manual (`supervised`) | PrimaryUpdateStrategy | false |
 | backup | The configuration to be used for backups | *[BackupConfiguration](#backupconfiguration) | false |
@@ -240,6 +243,16 @@ DataBackupConfiguration is the configuration of the backup of the data directory
 | jobs | The number of parallel jobs to be used to upload the backup, defaults to 2 | *int32 | false |
 
 
+## MetaSubset
+
+MetaSubset contains a subset of the standard object's metadata.
+
+| Field | Description | Scheme | Required |
+| -------------------- | ------------------------------ | -------------------- | -------- |
+| annotations | Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations | map[string]string | false |
+| labels | Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels | map[string]string | false |
+
+
 ## NodeMaintenanceWindow
 
 NodeMaintenanceWindow contains information that the operator will use while upgrading the underlying node.
@@ -250,6 +263,16 @@ This option is only useful when using local storage, as the Pods can't be freely
 | -------------------- | ------------------------------ | -------------------- | -------- |
 | inProgress | Is there a node maintenance activity in progress? | bool | true |
 | reusePVC | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere) | *bool | true |
+
+
+## PodTemplateSpec
+
+PodTemplateSpec describes the data a pod should have when created from a template.
+
+| Field | Description | Scheme | Required |
+| -------------------- | ------------------------------ | -------------------- | -------- |
+| metadata | Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata | [MetaSubset](#metasubset) | false |
+| spec | Specification of the desired behavior of the pod. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | corev1.PodSpec | false |
 
 
 ## PostgresConfiguration
@@ -305,6 +328,7 @@ StorageConfiguration is the configuration of the storage of the PostgreSQL insta
 | -------------------- | ------------------------------ | -------------------- | -------- |
 | storageClass | StorageClass to use for database data (`PGDATA`). Applied after evaluating the PVC template, if available. If not specified, generated PVCs will be satisfied by the default storage class | *string | false |
 | size | Size of the storage. Required if not already specified in the PVC template. Changes to this field are automatically reapplied to the created PVCs. Size cannot be decreased. | string | true |
+| resizeInUseVolumes | Resize existent PVCs, defaults to true | *bool | false |
 | pvcTemplate | Template to be used to generate the Persistent Volume Claim | *corev1.PersistentVolumeClaimSpec | false |
 
 
