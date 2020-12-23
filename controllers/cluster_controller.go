@@ -163,7 +163,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
-	if r.satisfiedExpectations(&cluster) {
+	if r.satisfiedExpectations(&cluster) && resources.allPodsAreActive() {
 		// Reconcile PVC resource requirements
 		if err = r.ReconcilePVCs(ctx, &cluster, resources); err != nil {
 			if apierrs.IsConflict(err) {
