@@ -10,6 +10,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
@@ -137,7 +138,7 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		// We need to ensure that we are keeping synchronous_standby_names
 		// aligned with the actual target primary server.
 		// This is the reason why we aligning the ConfigMap here
-		return ctrl.Result{}, r.createOrPatchPostgresConfigMap(ctx, &cluster)
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, r.createOrPatchPostgresConfigMap(ctx, &cluster)
 	}
 
 	// Ensure we have the required global objects
