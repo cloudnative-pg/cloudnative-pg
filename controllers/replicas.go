@@ -15,7 +15,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
-	controllerruntime "sigs.k8s.io/controller-runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
@@ -114,30 +114,48 @@ func (r *ClusterReconciler) getStatusFromInstances(
 func (r *ClusterReconciler) updateLabelsOnPods(
 	ctx context.Context,
 	cluster *v1alpha1.Cluster,
-	pods corev1.PodList) error {
+	pods corev1.PodList,
+) error {
 	// No current primary, no work to do
 	if cluster.Status.CurrentPrimary == "" {
 		return nil
 	}
 
+	primaryFound := false
 	for idx := range pods.Items {
 		pod := &pods.Items[idx]
 
-		if pod.Name == cluster.Status.CurrentPrimary && !specs.IsPodPrimary(pods.Items[idx]) {
-			patch := client.MergeFrom(pod.DeepCopy())
-			pod.Labels[specs.ClusterRoleLabelName] = specs.ClusterRoleLabelPrimary
-			if err := r.Patch(ctx, pod, patch); err != nil {
-				return err
+		if !utils.IsPodActive(*pod) {
+			r.Log.Info("Ignoring not active Pod during label update",
+				"pod", pod.Name, "status", pod.Status)
+			continue
+		}
+
+		if pod.Name == cluster.Status.CurrentPrimary {
+			primaryFound = true
+
+			if !specs.IsPodPrimary(pods.Items[idx]) {
+				r.Log.Info("Setting primary label", "pod", pod.Name)
+				patch := client.MergeFrom(pod.DeepCopy())
+				pod.Labels[specs.ClusterRoleLabelName] = specs.ClusterRoleLabelPrimary
+				if err := r.Patch(ctx, pod, patch); err != nil {
+					return err
+				}
 			}
 		}
 
 		if pod.Name != cluster.Status.CurrentPrimary && specs.IsPodPrimary(pods.Items[idx]) {
+			r.Log.Info("Removing primary label", "pod", pod.Name)
 			patch := client.MergeFrom(pod.DeepCopy())
 			delete(pod.Labels, specs.ClusterRoleLabelName)
 			if err := r.Patch(ctx, pod, patch); err != nil {
 				return err
 			}
 		}
+	}
+
+	if !primaryFound {
+		r.Log.Info("No primary instance found for this cluster")
 	}
 
 	return nil
@@ -149,7 +167,7 @@ func (r *ClusterReconciler) getReplicaStatusFromPod(
 	var result postgres.PostgresqlStatus
 
 	timeout := time.Second * 2
-	config := controllerruntime.GetConfigOrDie()
+	config := ctrl.GetConfigOrDie()
 	clientInterface := kubernetes.NewForConfigOrDie(config)
 	stdout, _, err := utils.ExecCommand(
 		ctx,
