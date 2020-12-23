@@ -141,12 +141,12 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.PVCCount = newPVCCount
 	cluster.Status.DanglingPVC = specs.DetectDanglingPVCs(resources.pods.Items, resources.pvcs.Items)
 
+	// Update the pvcExpectations for the cluster
+	r.pvcExpectations.LowerExpectationsDelta(key, int(newPVCCount-oldPVCCount))
+
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones
 	filteredPods := utils.FilterActivePods(resources.pods.Items)
-
-	// Update the pvcExpectations for the cluster
-	r.pvcExpectations.LowerExpectationsDelta(key, int(newPVCCount-oldPVCCount))
 
 	// Count pods
 	oldInstances := cluster.Status.Instances
