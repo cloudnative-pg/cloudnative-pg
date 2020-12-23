@@ -37,8 +37,10 @@ and the following suite of E2E tests are performed on that cluster:
 * Rolling updates when changing PostgreSQL images;
 * Backup and ScheduledBackups execution;
 * Restore from backup;
-* Primary endpoint switch in case of failure or switch in less than 10 seconds;
-* Recover from a degraded state in less than 30 seconds.
+* Metrics collection;
+* Primary endpoint switch in case of failover in less than 10 seconds;
+* Primary endpoint switch in case of switchover in less than 20 seconds;
+* Recover from a degraded state in less than 60 seconds.
 
 The E2E tests suite is also run for OpenShift 4.6 and the latest Kubernetes
 and PostgreSQL releases on clusters created on the following services:
