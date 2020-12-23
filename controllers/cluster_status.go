@@ -36,6 +36,16 @@ func (resources managedResources) countRunningJobs() int {
 	return jobCount - completeJobs
 }
 
+// Check if every managed Pod is active and will be schedules
+func (resources managedResources) allPodsAreActive() bool {
+	for idx := range resources.pods.Items {
+		if !utils.IsPodActive(resources.pods.Items[idx]) {
+			return false
+		}
+	}
+	return true
+}
+
 // getManagedResources get the managed resources of various types
 func (r *ClusterReconciler) getManagedResources(ctx context.Context,
 	cluster v1alpha1.Cluster) (*managedResources, error) {
