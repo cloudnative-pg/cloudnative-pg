@@ -51,6 +51,24 @@ func (instance *Instance) PromoteAndWait() error {
 		time.Sleep(1 * time.Second)
 	}
 
+	log.Log.Info("Requesting a checkpoint")
+
+	db, err := instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("after having promoted the instance: %v", err)
+	}
+
+	err = db.Ping()
+	if err != nil {
+		return fmt.Errorf("after having promoted the instance: %v", err)
+	}
+
+	// For pg_rewind to work we need to issue a checkpoint here
+	_, err = db.Exec("CHECKPOINT")
+	if err != nil {
+		return fmt.Errorf("checkpoint after instance promotion: %v", err)
+	}
+
 	log.Log.Info("The PostgreSQL instance has been promoted successfully")
 
 	return nil

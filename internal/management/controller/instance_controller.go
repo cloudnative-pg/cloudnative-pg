@@ -352,7 +352,9 @@ func (r *InstanceReconciler) reconcilePrimary(cluster *unstructured.Unstructured
 		// If we have a conflict, let's replace the cluster info
 		// with one more fresh
 		if apierrors.IsConflict(err) {
-			r.log.Error(err, "Error while setting current primary, retrying")
+			r.log.Info(
+				"Conflict detected while setting current primary, retrying",
+				"err", err.Error())
 
 			var errRefresh error
 			cluster, errRefresh = r.client.
