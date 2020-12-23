@@ -10,7 +10,6 @@ require (
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.4
 	github.com/prometheus/client_golang v1.0.0
-	github.com/prometheus/common v0.4.1
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.1.3
 	github.com/spf13/cobra v1.1.1
