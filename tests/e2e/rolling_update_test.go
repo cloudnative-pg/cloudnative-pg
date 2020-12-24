@@ -18,6 +18,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -185,9 +186,8 @@ var _ = Describe("Rolling updates", func() {
 		timeout := 10
 		Eventually(func() (string, error) {
 			endpoint := &corev1.Endpoints{}
-			err := env.Client.Get(env.Ctx, endpointNamespacedName,
-				endpoint)
-			return endpoint.Subsets[0].Addresses[0].IP, err
+			err := env.Client.Get(env.Ctx, endpointNamespacedName, endpoint)
+			return tests.FirstEndpointIP(endpoint), err
 		}, timeout).Should(BeEquivalentTo(pod.Status.PodIP))
 	}
 

@@ -99,7 +99,7 @@ var _ = Describe("Fast failover", func() {
 				endpoint)
 			Expect(err).ToNot(HaveOccurred())
 			err = env.Client.Get(env.Ctx, podNamespacedName, pod)
-			Expect(endpoint.Subsets[0].Addresses[0].IP, err).To(
+			Expect(tests.FirstEndpointIP(endpoint), err).To(
 				BeEquivalentTo(pod.Status.PodIP))
 		})
 		By("preparing the db for the test scenario", func() {
