@@ -14,6 +14,7 @@ import (
 	"os/exec"
 
 	"github.com/google/shlex"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // Run executes a command and process the information
@@ -33,4 +34,15 @@ func Run(command string) (stdout string, stderr string, err error) {
 	}
 
 	return outBuffer.String(), errBuffer.String(), nil
+}
+
+// FirstEndpointIP returns the IP of first Address in the Endpoint
+func FirstEndpointIP(endpoint *corev1.Endpoints) string {
+	if endpoint == nil {
+		return ""
+	}
+	if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
+		return ""
+	}
+	return endpoint.Subsets[0].Addresses[0].IP
 }
