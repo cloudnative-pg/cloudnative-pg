@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      depth:
+        description: 'Depth'
+        required: true
+        default: 'main'
 
 env:
   GOLANG_VERSION: "1.14.x"
@@ -121,8 +126,10 @@ jobs:
       -
         id: generate-jobs
         name: Generate Jobs
+        env:
+          E2E_DEPTH: ${{ github.event.inputs.depth || github.event_name }}
         shell: bash
-        run: python hack/workflows/kind-e2e-matrix.py
+        run: python .github/workflows/kind-e2e-matrix.py
 
   e2e-kind:
     name: Run E2E on kind

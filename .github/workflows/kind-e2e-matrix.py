@@ -153,7 +153,7 @@ MODES = {
 
 
 if __name__ == "__main__":
-    mode = os.getenv("GITHUB_EVENT_NAME", "push")
+    mode = os.getenv("E2E_DEPTH", "push")
 
     if mode not in MODES:
         raise SystemExit(
