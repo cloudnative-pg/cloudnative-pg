@@ -7,7 +7,6 @@ package performance
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -168,86 +167,8 @@ var _ = Describe("Fast failover", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		// Take the time when the pod was deleted
-		start := time.Now()
+		AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
 
-		By("waiting for the first write with on timeline 2", func() {
-			// One of the standbys will be promoted and the rw service
-			// should point to it. We'll be able to recognise the records
-			// inserted after the promotion because they'll be marked
-			// with timeline '00000002'. There should be one of them
-			// in the database soon.
-
-			commandTimeout := time.Second * 2
-			timeout := 60
-			primaryPodName := clusterName + "-2"
-			primaryPodNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      primaryPodName,
-			}
-			Eventually(func() (string, error) {
-				primaryPod := &corev1.Pod{}
-				err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
-				out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, "postgres",
-					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
-					"SELECT count(*) > 0 FROM tps.tl "+
-						"WHERE timeline = '00000002'")
-				return strings.TrimSpace(out), err
-			}, timeout).Should(BeEquivalentTo("t"))
-		})
-		By(fmt.Sprintf("resuming writing in less than %v sec", maxFailoverTime), func() {
-			// We measure the difference between the last entry with
-			// timeline 1 and the first one with timeline 2.
-			// It should be less than maxFailoverTime seconds.
-			query := "WITH a AS ( " +
-				"  SELECT * " +
-				"  , t-lag(t) OVER (order by t) AS timediff " +
-				"  FROM tps.tl " +
-				") " +
-				"SELECT EXTRACT ('EPOCH' FROM timediff) " +
-				"FROM a " +
-				"WHERE timeline = ( " +
-				"  SELECT timeline " +
-				"  FROM tps.tl " +
-				"  ORDER BY t DESC " +
-				"  LIMIT 1 " +
-				") " +
-				"ORDER BY t ASC " +
-				"LIMIT 1;"
-			primaryPodName := clusterName + "-2"
-			primaryPodNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      primaryPodName,
-			}
-			var switchTime float64
-			commandTimeout := time.Second * 5
-			primaryPod := &corev1.Pod{}
-			err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
-			Expect(err).ToNot(HaveOccurred())
-			out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, "postgres",
-				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-			switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
-			fmt.Printf("Failover performed in %v seconds\n", switchTime)
-			Expect(switchTime, err).Should(BeNumerically("<", maxFailoverTime))
-		})
-
-		By("recovering from degraded state having a cluster with 3 instances ready", func() {
-			// Recreating an instance usually takes 15s`
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
-			var elapsed time.Duration
-			Eventually(func() (int32, error) {
-				cluster := &clusterv1alpha1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
-				elapsed = time.Since(start)
-				return cluster.Status.ReadyInstances, err
-			}, maxReattachTime).Should(BeEquivalentTo(3))
-
-			fmt.Printf("Cluster has been in a degraded state for %v seconds\n", elapsed)
-
-			Expect(elapsed / time.Second).Should(BeNumerically("<", maxReattachTime))
-		})
+		AssertWritesResumedBeforeTimeout(namespace, clusterName, maxFailoverTime)
 	})
 })
