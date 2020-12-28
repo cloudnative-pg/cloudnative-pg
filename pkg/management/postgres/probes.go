@@ -73,6 +73,11 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 		if result.ReceivedLsn.Less(result.ReplayLsn) {
 			result.ReceivedLsn = result.ReplayLsn
 		}
+
+		result.IsWalReceiverActive, err = instance.IsWALReceiverActive()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &result, nil
