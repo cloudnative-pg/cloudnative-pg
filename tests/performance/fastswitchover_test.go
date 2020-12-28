@@ -7,7 +7,6 @@ package performance
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,8 +15,6 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	clusterv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -162,6 +159,7 @@ var _ = Describe("Fast switchover", func() {
 				return strings.TrimSpace(out), err
 			}, timeout).Should(BeEquivalentTo("t"))
 		})
+
 		By("setting the TargetPrimary to node2 to trigger a switchover", func() {
 			targetPrimary = clusterName + "-2"
 			namespacedName := types.NamespacedName{
@@ -178,82 +176,8 @@ var _ = Describe("Fast switchover", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		// Take the time when the switchover has been issued
-		start := time.Now()
+		AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
 
-		By("waiting for the first write with on timeline 2", func() {
-			// Node2 should be promoted and the rw service should point to it.
-			// We'll be able to recognise the records inserted after the
-			// promotion because they'll be marked with timeline '00000002'.
-			// There should be one of them in the database soon.
-
-			commandTimeout := time.Second * 2
-			timeout := 60
-			primaryPodNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      targetPrimary,
-			}
-			Eventually(func() (string, error) {
-				primaryPod := &corev1.Pod{}
-				err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
-				out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, "postgres",
-					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
-					"SELECT count(*) > 0 FROM tps.tl "+
-						"WHERE timeline = '00000002'")
-				return strings.TrimSpace(out), err
-			}, timeout).Should(BeEquivalentTo("t"))
-		})
-		By(fmt.Sprintf("resuming writing in less than %v sec", maxSwitchoverTime), func() {
-			// We measure the difference between the last entry with
-			// timeline 1 and the first one with timeline 2.
-			// It should be less than maxSwitchoverTime seconds.
-			query := "WITH a AS ( " +
-				"  SELECT * " +
-				"  , t-lag(t) OVER (order by t) AS timediff " +
-				"  FROM tps.tl " +
-				") " +
-				"SELECT EXTRACT ('EPOCH' FROM timediff) " +
-				"FROM a " +
-				"WHERE timeline = ( " +
-				"  SELECT timeline " +
-				"  FROM tps.tl " +
-				"  ORDER BY t DESC " +
-				"  LIMIT 1 " +
-				") " +
-				"ORDER BY t ASC " +
-				"LIMIT 1;"
-			primaryPodNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      targetPrimary,
-			}
-			var switchTime float64
-			commandTimeout := time.Second * 5
-			primaryPod := &corev1.Pod{}
-			err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
-			Expect(err).ToNot(HaveOccurred())
-			out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, "postgres",
-				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-			switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
-			fmt.Printf("Switchover performed in %v seconds\n", switchTime)
-			Expect(switchTime, err).Should(BeNumerically("<", maxSwitchoverTime))
-		})
-		By(fmt.Sprintf("having the old primary as a standby within %v seconds", maxReattachTime), func() {
-			// Following the new master should usually take less than 15s
-			timeout := maxReattachTime
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      oldPrimary,
-			}
-			var elapsed time.Duration
-
-			Eventually(func() (bool, error) {
-				pod := corev1.Pod{}
-				err := env.Client.Get(env.Ctx, namespacedName, &pod)
-				elapsed = time.Since(start)
-				return utils.IsPodActive(pod) && utils.IsPodReady(pod) && specs.IsPodStandby(pod), err
-			}, timeout).Should(BeTrue())
-
-			fmt.Printf("oldPrimary has been reattached to the targetPrimary in %v seconds\n", elapsed)
-		})
+		AssertWritesResumedBeforeTimeout(namespace, clusterName, maxSwitchoverTime)
 	})
 })
