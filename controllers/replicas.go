@@ -24,6 +24,12 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
+var (
+	// ErrWalReceiversRunning is raised when a new primary server can't be elected
+	// because there is a WAL receiver running in our Pod list
+	ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
+)
+
 // updateTargetPrimaryFromPods set the name of the target primary from the Pods status if needed
 func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	ctx context.Context,
@@ -31,6 +37,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	status postgres.PostgresqlStatusList,
 ) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	// TODO: what if I delete the master with only 2 instances
 	if len(status.Items) <= 1 && cluster.Status.Instances <= 1 {
 		// Can't make a switchover of failover if we have
@@ -40,10 +47,13 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 
 	// Set targetPrimary to do a failover if needed
 	if !status.Items[0].IsPrimary {
+		if !status.AreWalReceiversDown() {
+			return ErrWalReceiversRunning
+		}
+
 		log.Info("Current primary isn't healthy, failing over",
 			"newPrimary", status.Items[0].PodName,
 			"clusterStatus", status)
-		log.Info("Current cluster status", "items", status.Items)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Current primary isn't healthy, failing over from %v to %v",
 			cluster.Status.TargetPrimary, status.Items[0].PodName)

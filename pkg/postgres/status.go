@@ -10,13 +10,14 @@ import corev1 "k8s.io/api/core/v1"
 
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {
-	PodName        string `json:"podName"`
-	ReceivedLsn    LSN    `json:"receivedLsn,omitempty"`
-	ReplayLsn      LSN    `json:"replayLsn,omitempty"`
-	SystemID       string `json:"systemID,omitempty"`
-	IsPrimary      bool   `json:"isPrimary"`
-	ReplayPaused   bool   `json:"replayPaused,omitempty"`
-	PendingRestart bool   `json:"pendingRestart,omitempty"`
+	PodName             string `json:"podName"`
+	ReceivedLsn         LSN    `json:"receivedLsn,omitempty"`
+	ReplayLsn           LSN    `json:"replayLsn,omitempty"`
+	SystemID            string `json:"systemID"`
+	IsPrimary           bool   `json:"isPrimary"`
+	ReplayPaused        bool   `json:"replayPaused"`
+	PendingRestart      bool   `json:"pendingRestart"`
+	IsWalReceiverActive bool   `json:"isWalReceiverActive"`
 }
 
 // PostgresqlStatusList is a list of PostgreSQL instances status, useful to
@@ -62,6 +63,17 @@ func (list PostgresqlStatusList) Less(i, j int) bool {
 	}
 
 	return list.Items[i].PodName < list.Items[j].PodName
+}
+
+// AreWalReceiversDown check if every WAL receiver of the cluster is down
+func (list PostgresqlStatusList) AreWalReceiversDown() bool {
+	for idx := range list.Items {
+		if list.Items[idx].IsWalReceiverActive {
+			return false
+		}
+	}
+
+	return true
 }
 
 // ExtractPodFromList gets a certain Pod from a Pod list
