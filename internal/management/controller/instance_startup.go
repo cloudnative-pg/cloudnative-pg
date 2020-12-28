@@ -168,13 +168,21 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructur
 			return err
 		}
 
-		// Wait for the new master to really accept connections
+		// Wait for the new primary to really accept connections
 		err = r.instance.WaitForPrimaryAvailable()
 		if err != nil {
 			return err
 		}
 
-		// Then let's go back to the point of the new master
+		// pg_rewind requires a clean shutdown of the old primary to work.
+		// The only way to do that is to start the server again
+		// and wait for it to be available again.
+		err = r.instance.CompleteCrashRecovery()
+		if err != nil {
+			return err
+		}
+
+		// Then let's go back to the point of the new primary
 		err = r.instance.Rewind()
 		if err != nil {
 			return err

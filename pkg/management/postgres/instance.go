@@ -55,9 +55,9 @@ type Instance struct {
 }
 
 var (
-	// RetryUntilPrimaryAvailable is the default retry configuration that is used
-	// to wait for a successful connection to the master server
-	RetryUntilPrimaryAvailable = wait.Backoff{
+	// RetryUntilServerAvailable is the default retry configuration that is used
+	// to wait for a successful connection to a certain server
+	RetryUntilServerAvailable = wait.Backoff{
 		Duration: 5 * time.Second,
 		// Steps is declared as an "int", so we are capping
 		// to int32 to support ARM-based 32 bit architectures
@@ -289,7 +289,7 @@ func (instance *Instance) Demote() error {
 	return instance.createStandbySignal()
 }
 
-// WaitForPrimaryAvailable waits until we can connect to the
+// WaitForPrimaryAvailable waits until we can connect to the primary
 func (instance *Instance) WaitForPrimaryAvailable() error {
 	primaryConnInfo := buildPrimaryConnInfo(
 		instance.ClusterName+"-rw", instance.PodName) + " dbname=postgres"
@@ -297,20 +297,44 @@ func (instance *Instance) WaitForPrimaryAvailable() error {
 	log.Log.Info("Waiting for the new primary to be available",
 		"primaryConnInfo", primaryConnInfo)
 
+	db, err := sql.Open("postgres", primaryConnInfo)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	return waitForConnectionAvailable(db)
+}
+
+// CompleteCrashRecovery temporary starts up the server and wait for it
+// to be fully available for queries. This will ensure that the crash recovery
+// is fully done.
+func (instance *Instance) CompleteCrashRecovery() error {
+	log.Log.Info("Waiting for server to complete crash recovery")
+
+	db, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		instance.ShutdownConnections()
+	}()
+
+	return instance.WithActiveInstance(func() error {
+		return waitForConnectionAvailable(db)
+	})
+}
+
+// waitForConnectionAvailable waits until we can connect to the
+func waitForConnectionAvailable(db *sql.DB) error {
 	errorIsRetryable := func(err error) bool {
 		return err != nil
 	}
 
-	return retry.OnError(RetryUntilPrimaryAvailable, errorIsRetryable, func() error {
-		db, err := sql.Open("postgres", primaryConnInfo)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			_ = db.Close()
-		}()
-
-		err = db.Ping()
+	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
+		err := db.Ping()
 		if err != nil {
 			log.Log.Info("Primary server is still not available", "err", err)
 		}
