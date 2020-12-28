@@ -334,6 +334,7 @@ func (instance *Instance) Rewind() error {
 
 	cmd := exec.Command("pg_rewind", options...) // #nosec
 	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf("error executing pg_rewind: %w", err)
