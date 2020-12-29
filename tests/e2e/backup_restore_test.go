@@ -181,6 +181,46 @@ var _ = Describe("Backup and restore", func() {
 			}, timeout).Should(BeEquivalentTo(1))
 		})
 
+		By("Restoring a backup in a new cluster", func() {
+			backupFile := fixturesDir + "/backup/cluster-from-restore.yaml"
+			restoredClusterName := "cluster-restore"
+			_, _, err := tests.Run(fmt.Sprintf(
+				"kubectl apply -n %v -f %v",
+				namespace, backupFile))
+			Expect(err).ToNot(HaveOccurred())
+
+			// We give more time than the usual 600s, since the recovery is slower
+			AssertClusterIsReady(namespace, restoredClusterName, 800, env)
+
+			// Test data should be present on restored primary
+			primary := restoredClusterName + "-1"
+			cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM to_restore'"
+			out, _, err := tests.Run(fmt.Sprintf(
+				"kubectl exec -n %v %v -- %v",
+				namespace,
+				primary,
+				cmd))
+			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
+
+			// Restored primary should be on timeline 2
+			cmd = "psql -U postgres app -tAc 'select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)'"
+			out, _, err = tests.Run(fmt.Sprintf(
+				"kubectl exec -n %v %v -- %v",
+				namespace,
+				primary,
+				cmd))
+			Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
+
+			// Restored standby should be attached to restored primary
+			cmd = "psql -U postgres app -tAc 'SELECT count(*) FROM pg_stat_replication'"
+			out, _, err = tests.Run(fmt.Sprintf(
+				"kubectl exec -n %v %v -- %v",
+				namespace,
+				primary,
+				cmd))
+			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
+		})
+
 		By("scheduling backups", func() {
 			// We create a ScheduledBackup
 			backupFile := fixturesDir + "/backup/scheduled-backup.yaml"
@@ -243,46 +283,6 @@ var _ = Describe("Backup and restore", func() {
 				}
 				return strconv.Atoi(strings.Trim(out, "\n"))
 			}, timeout).Should(BeNumerically(">=", 3))
-		})
-
-		By("Restoring a backup in a new cluster", func() {
-			backupFile := fixturesDir + "/backup/cluster-from-restore.yaml"
-			restoredClusterName := "cluster-restore"
-			_, _, err := tests.Run(fmt.Sprintf(
-				"kubectl apply -n %v -f %v",
-				namespace, backupFile))
-			Expect(err).ToNot(HaveOccurred())
-
-			// We give more time than the usual 600s, since the recovery is slower
-			AssertClusterIsReady(namespace, restoredClusterName, 800, env)
-
-			// Test data should be present on restored primary
-			primary := restoredClusterName + "-1"
-			cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM to_restore'"
-			out, _, err := tests.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				primary,
-				cmd))
-			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
-
-			// Restored primary should be on timeline 2
-			cmd = "psql -U postgres app -tAc 'select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)'"
-			out, _, err = tests.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				primary,
-				cmd))
-			Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
-
-			// Restored standby should be attached to restored primary
-			cmd = "psql -U postgres app -tAc 'SELECT count(*) FROM pg_stat_replication'"
-			out, _, err = tests.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				primary,
-				cmd))
-			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 		})
 	})
 })
