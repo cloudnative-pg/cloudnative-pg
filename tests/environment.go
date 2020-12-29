@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -134,6 +136,42 @@ func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName st
 	return podList, err
 }
 
+// GetPodList gathers the current list of pods in a namespace
+func (env TestingEnvironment) GetPodList(namespace string) (*corev1.PodList, error) {
+	podList := &corev1.PodList{}
+	err := env.Client.List(
+		env.Ctx, podList, client.InNamespace(namespace),
+	)
+	return podList, err
+}
+
+// GetPVCList gathers the current list of PVCs in a namespace
+func (env TestingEnvironment) GetPVCList(namespace string) (*corev1.PersistentVolumeClaimList, error) {
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	err := env.Client.List(
+		env.Ctx, pvcList, client.InNamespace(namespace),
+	)
+	return pvcList, err
+}
+
+// GetJobList gathers the current list of jobs in a namespace
+func (env TestingEnvironment) GetJobList(namespace string) (*batchv1.JobList, error) {
+	jobList := &batchv1.JobList{}
+	err := env.Client.List(
+		env.Ctx, jobList, client.InNamespace(namespace),
+	)
+	return jobList, err
+}
+
+// GetEventList gathers the current list of events in a namespace
+func (env TestingEnvironment) GetEventList(namespace string) (*eventsv1beta1.EventList, error) {
+	eventList := &eventsv1beta1.EventList{}
+	err := env.Client.List(
+		env.Ctx, eventList, client.InNamespace(namespace),
+	)
+	return eventList, err
+}
+
 // DumpClusterEnv logs the JSON for the a cluster in a namespace, its pods and endpoints
 func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName string, filename string) {
 	f, err := os.Create(filename)
@@ -152,12 +190,32 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 	fmt.Fprintf(w, "Dumping %v/%v cluster\n", namespace, clusterName)
 	fmt.Fprintln(w, string(out))
 
-	podList, _ := env.GetClusterPodList(namespace, clusterName)
+	podList, _ := env.GetPodList(namespace)
 	for _, pod := range podList.Items {
 		out, _ := json.MarshalIndent(pod, "", "    ")
 		fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)
 		fmt.Fprintln(w, string(out))
 	}
+
+	pvcList, _ := env.GetPVCList(namespace)
+	for _, pvc := range pvcList.Items {
+		out, _ := json.MarshalIndent(pvc, "", "    ")
+		fmt.Fprintf(w, "Dumping %v/%v PVC\n", namespace, pvc.Name)
+		fmt.Fprintln(w, string(out))
+	}
+
+	jobList, _ := env.GetJobList(namespace)
+	for _, job := range jobList.Items {
+		out, _ := json.MarshalIndent(job, "", "    ")
+		fmt.Fprintf(w, "Dumping %v/%v job\n", namespace, job.Name)
+		fmt.Fprintln(w, string(out))
+	}
+
+	eventList, _ := env.GetEventList(namespace)
+	out, _ = json.MarshalIndent(eventList.Items, "", "    ")
+	fmt.Fprintf(w, "Dumping events for namespace %v\n", namespace)
+	fmt.Fprintln(w, string(out))
+
 	suffixes := []string{"-r", "-rw", "-any"}
 	for _, suffix := range suffixes {
 		namespacedName := types.NamespacedName{
