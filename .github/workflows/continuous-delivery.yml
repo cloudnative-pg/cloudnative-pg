@@ -170,7 +170,7 @@ jobs:
           make e2e-test-kind
       -
         name: Archive Kind logs
-        if: ${{ always() }}
+        if: always()
         uses: actions/upload-artifact@v2
         with:
           name: kind-logs-${{ matrix.id }}
@@ -178,7 +178,7 @@ jobs:
           retention-days: 7
       -
         name: Archive e2e failure contexts
-        if: ${{ always() }}
+        if: failure()
         uses: actions/upload-artifact@v2
         with:
           name: test-failure-contexts-${{ matrix.id }}
@@ -186,3 +186,4 @@ jobs:
             tests/e2e/out/
             tests/performance/out/
           retention-days: 7
+          if-no-files-found: ignore
