@@ -32,7 +32,7 @@ func runSubCommand() {
 		os.Exit(1)
 	}
 
-	err = instance.RefreshConfigurationFiles(reconciler.GetClient())
+	_, err = instance.RefreshConfigurationFiles(reconciler.GetClient())
 	if err != nil {
 		log.Log.Error(err, "Error while writing the bootstrap configuration")
 		os.Exit(1)

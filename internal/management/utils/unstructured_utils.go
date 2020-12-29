@@ -131,7 +131,7 @@ func GetPostgreSQLConfiguration(data *unstructured.Unstructured) (string, error)
 		return "", err
 	}
 
-	if !found {
+	if !found || result == "" {
 		return "", ErrPostgreSQLConfigurationMissing
 	}
 
@@ -146,7 +146,7 @@ func GetPostgreSQLHBA(data *unstructured.Unstructured) (string, error) {
 		return "", err
 	}
 
-	if !found {
+	if !found || result == "" {
 		return "", ErrPostgreSQLHBAMissing
 	}
 
