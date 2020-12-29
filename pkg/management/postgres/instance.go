@@ -311,23 +311,30 @@ func (instance *Instance) WaitForPrimaryAvailable() error {
 // CompleteCrashRecovery temporary starts up the server and wait for it
 // to be fully available for queries. This will ensure that the crash recovery
 // is fully done.
+// Important: this function must be called only when the instance isn't started
 func (instance *Instance) CompleteCrashRecovery() error {
 	log.Log.Info("Waiting for server to complete crash recovery")
 
-	db, err := instance.GetSuperUserDB()
-	if err != nil {
-		return err
-	}
 	defer func() {
 		instance.ShutdownConnections()
 	}()
 
-	return instance.WithActiveInstance(func() error {
-		return waitForConnectionAvailable(db)
-	})
+	return instance.WithActiveInstance(instance.WaitForSuperuserConnectionAvailable)
 }
 
-// waitForConnectionAvailable waits until we can connect to the
+// WaitForSuperuserConnectionAvailable waits until we can connect to this
+// instance using the superuser account
+func (instance *Instance) WaitForSuperuserConnectionAvailable() error {
+	db, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+
+	return waitForConnectionAvailable(db)
+}
+
+// waitForConnectionAvailable waits until we can connect to the passed
+// connection pool
 func waitForConnectionAvailable(db *sql.DB) error {
 	errorIsRetryable := func(err error) bool {
 		return err != nil

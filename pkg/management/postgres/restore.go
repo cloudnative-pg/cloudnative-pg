@@ -234,7 +234,7 @@ func (info InitInfo) writeInitialPostgresqlConf(client dynamic.Interface) error 
 	temporaryInstance.Namespace = info.Namespace
 	temporaryInstance.ClusterName = info.ClusterName
 
-	err = temporaryInstance.RefreshConfigurationFiles(client)
+	_, err = temporaryInstance.RefreshConfigurationFiles(client)
 	if err != nil {
 		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
 	}

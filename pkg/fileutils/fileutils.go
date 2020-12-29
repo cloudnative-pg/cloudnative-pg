@@ -9,6 +9,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package fileutils
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -79,20 +80,35 @@ func CopyFile(source, destination string) error {
 }
 
 // WriteStringToFile replace the contents of a certain file
-// with a string. If the file doesn't exit, it's created
-func WriteStringToFile(fileName string, contents string) error {
+// with a string. If the file doesn't exit, it's created.
+// Returns an error status and a flag telling if the file has been
+// changed or not.
+func WriteStringToFile(fileName string, contents string) (bool, error) {
+	changed := true
+	exist, err := FileExists(fileName)
+	if err != nil {
+		return false, err
+	}
+	if exist {
+		previousContents, err := ioutil.ReadFile(fileName) // #nosec
+		if err != nil {
+			return false, fmt.Errorf("while reading previous file contents: %w", err)
+		}
+		changed = string(previousContents) != contents
+	}
+
 	out, err := os.Create(fileName)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	_, err = io.WriteString(out, contents)
 	if err != nil {
 		_ = out.Close()
-		return err
+		return false, err
 	}
 
-	return out.Close()
+	return changed, out.Close()
 }
 
 // ReadFile Read source file and output the content as string
