@@ -254,27 +254,3 @@ func getSacrificialPod(podList []corev1.Pod) *corev1.Pod {
 	}
 	return &podList[resultIdx]
 }
-
-// getPrimaryPod get the Pod which is supposed to be the primary of this cluster
-func getPrimaryPod(podList []corev1.Pod) *corev1.Pod {
-	for idx, pod := range podList {
-		if !specs.IsPodPrimary(pod) {
-			continue
-		}
-
-		if !utils.IsPodReady(pod) || !utils.IsPodActive(pod) {
-			continue
-		}
-
-		_, err := specs.GetNodeSerial(pod.ObjectMeta)
-
-		// This isn't one of our Pods, since I can't get the node serial
-		if err != nil {
-			continue
-		}
-
-		return &podList[idx]
-	}
-
-	return nil
-}
