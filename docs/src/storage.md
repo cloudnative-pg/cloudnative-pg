@@ -62,7 +62,7 @@ spec:
 Kubernetes has an API allowing [expanding PVCs](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims)
 that is enabled by default but needs to be supported by the underlying `StorageClass`.
 
-To check if a certain `StorageClass` support volume expansion you can read the `allowVolumeExpansion`
+To check if a certain `StorageClass` supports volume expansion you can read the `allowVolumeExpansion`
 field for your storage class:
 
 ```
@@ -75,7 +75,7 @@ true
 Given the storage class supports volume expansion, you can change the size requirement
 of the `Cluster`, and the operator will apply the change to every PVC.
 
-If the `StorageClass` support [online volume resizing](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#resizing-an-in-use-persistentvolumeclaim)
+If the `StorageClass` supports [online volume resizing](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#resizing-an-in-use-persistentvolumeclaim)
 the change is immediately applied to the Pods. If the underlying Storage Class doesn't support
 that, you'll need to delete the Pod to trigger the resize.
 

@@ -77,13 +77,7 @@ or starting from a physical backup of the *primary* otherwise.
     In case of deliberate deletion of a pod, `PodDisruptionBudget` policies
     will not be enforced.
 
-Effects on the services (as soon as the *apiserver* is notified):
-
-* `-rw`: if the pod is the current *primary*, the service will
-  point to the active pod with status ready, having the lowest replication lag.
-  That pod becomes the new primary. No effect otherwise.
-
-* `-r`: the pod is removed from the service.
+Self-healing will happen as soon as the *apiserver* is notified.
 
 ### Readiness probe failure
 
@@ -94,13 +88,7 @@ If the cause of the failure can't be fixed, it is possible to delete the pod
 manually. Otherwise, the pod will resume the previous role when the failure
 is solved.
 
-Effects on the services (after 3 failures):
-
-* `-rw`: if the pod is the current *primary*, the service will
-  point to the active pod with status ready, having the lowest replication lag.
-  That pod becomes the new primary. No effect otherwise.
-
-* `-r`: the pod is removed from the service.
+Self-healing will happen after three failures of the probe.
 
 ### Liveness probe failure
 
@@ -109,13 +97,7 @@ pod will still be part of the `Cluster`, and the *kubelet* will try to restart
 the container. If the cause of the failure can't be fixed, it is possible
 to delete the pod manually.
 
-Effects on the services (after 3 failures):
-
-* `-rw`: if the pod is the current *primary*, the service will
-  point to the active pod with status ready having the lowest replication lag.
-  That pod becomes the new primary. No effect otherwise.
-
-* `-r`: the pod is removed from the service.
+Self-healing will happen after three failures of the probe.
 
 ### Worker node drained
 
@@ -127,13 +109,7 @@ is set to `off` (default: `on` during maintenance windows, `off` otherwise).
 The `PodDisruptionBudget` may prevent the pod from being evicted if there
 is at least one node that is not ready.
 
-Effects on the services (as soon as the *apiserver* is notified):
-
-* `-rw`: if the pod is the current *primary*, the service will
-  point to the active pod with status ready, having the lowest replication lag.
-  That pod becomes the new primary. No effect otherwise.
-
-* `-r`: the pod is removed from the service.
+Self-healing will happen as soon as the *apiserver* is notified.
 
 ### Worker node failure
 
@@ -147,13 +123,28 @@ A new pod will be created on a different worker node from a physical backup
 of the *primary*. The default value for that parameter in a Kubernetes
 cluster is 5 minutes.
 
-Effects on the services (after `tolerationSeconds`):
+Self-healing will happen after `tolerationSeconds`.
 
-* `-rw`: if the pod is the current *primary*, the service will
-  point to the active pod with status ready, having the lowest replication lag.
-  That pod becomes the new primary. No effect otherwise.
+## Self-healing
 
-* `-r`: the pod is removed from the service.
+If the failed pod is a standby, the pod is removed from the `-r` service.
+The pod is then restarted using its PVC if available; otherwise, a new
+pod will be created from a backup of the current primary. The pod
+will be added again to the `-r` service when ready.
+
+If the failed pod is the primary, the operator will promote the active pod
+with status ready and the lowest replication lag, then point the `-rw`service
+to it. The failed pod will be removed from the `-r` service.
+Other standbys will start replicating from the new primary. The former
+primary will use `pg_rewind` to synchronize itself with the new one if its
+PVC is available; otherwise, a new standby will be created from a backup of the
+current primary.
+
+!!! Important
+    Due to a [bug in PostgreSQL 13 streaming replication](https://www.postgresql.org/message-id/flat/20201209.174314.282492377848029776.horikyota.ntt%40gmail.com)
+    it is not guaranteed that an existing standby is able to follow a promoted
+    primary, even if the new primary contains all the required WALs. Standbys
+    will be able to follow a primary if WAL archiving is configured.
 
 ## Manual intervention
 
