@@ -18,8 +18,9 @@ import (
 
 // AppendStringToFile append the content of the given string to the
 // end of the target file prepending new data with a carriage return
-func AppendStringToFile(targetFile string, content string) error {
-	stream, err := os.OpenFile(
+func AppendStringToFile(targetFile string, content string) (err error) {
+	var stream *os.File
+	stream, err = os.OpenFile(
 		targetFile,
 		os.O_APPEND|os.O_WRONLY, 0600) // #nosec
 	if err != nil {
@@ -27,7 +28,7 @@ func AppendStringToFile(targetFile string, content string) error {
 	}
 	defer func() {
 		closeError := stream.Close()
-		if closeError != nil {
+		if err == nil && closeError != nil {
 			err = closeError
 		}
 	}()
@@ -38,6 +39,11 @@ func AppendStringToFile(targetFile string, content string) error {
 	}
 
 	_, err = stream.WriteString(content)
+	if err != nil {
+		return err
+	}
+
+	err = stream.Sync()
 	return err
 }
 
@@ -53,62 +59,84 @@ func FileExists(fileName string) (bool, error) {
 }
 
 // CopyFile copy a file from a location to another one
-func CopyFile(source, destination string) error {
-	in, err := os.Open(source) // #nosec
+func CopyFile(source, destination string) (err error) {
+	var in *os.File
+	in, err = os.Open(source) // #nosec
 	if err != nil {
 		return err
 	}
 	defer func() {
 		closeError := in.Close()
-		if closeError != nil {
+		if err == nil && closeError != nil {
 			err = closeError
 		}
 	}()
 
-	out, err := os.Create(destination)
+	var out *os.File
+	out, err = os.Create(destination)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		closeError := out.Close()
+		if err == nil && closeError != nil {
+			err = closeError
+		}
+	}()
 
 	_, err = io.Copy(out, in)
 	if err != nil {
 		return err
 	}
 
-	err = out.Close()
-	return err
+	return out.Sync()
 }
 
 // WriteStringToFile replace the contents of a certain file
-// with a string. If the file doesn't exit, it's created.
+// with a string. If the file doesn't exist, it's created.
 // Returns an error status and a flag telling if the file has been
 // changed or not.
-func WriteStringToFile(fileName string, contents string) (bool, error) {
-	changed := true
-	exist, err := FileExists(fileName)
+func WriteStringToFile(fileName string, contents string) (changed bool, err error) {
+	var exist bool
+	exist, err = FileExists(fileName)
 	if err != nil {
-		return false, err
+		return changed, err
 	}
 	if exist {
-		previousContents, err := ioutil.ReadFile(fileName) // #nosec
+		var previousContents []byte
+		previousContents, err = ioutil.ReadFile(fileName) // #nosec
 		if err != nil {
-			return false, fmt.Errorf("while reading previous file contents: %w", err)
+			err = fmt.Errorf("while reading previous file contents: %w", err)
+			return changed, err
 		}
-		changed = string(previousContents) != contents
+
+		// If nothing changed return immediately
+		if string(previousContents) == contents {
+			return changed, err
+		}
 	}
 
-	out, err := os.Create(fileName)
+	changed = true
+
+	var out *os.File
+	out, err = os.Create(fileName)
 	if err != nil {
-		return false, err
+		return changed, err
 	}
+	defer func() {
+		closeError := out.Close()
+		if err == nil && closeError != nil {
+			err = closeError
+		}
+	}()
 
 	_, err = io.WriteString(out, contents)
 	if err != nil {
-		_ = out.Close()
-		return false, err
+		return changed, err
 	}
 
-	return changed, out.Close()
+	err = out.Sync()
+	return changed, err
 }
 
 // ReadFile Read source file and output the content as string
@@ -142,8 +170,7 @@ func CreateEmptyFile(fileName string) error {
 	if err != nil {
 		return err
 	}
-	_ = file.Close()
-	return nil
+	return file.Close()
 }
 
 // FindinFile search for a pattern in a file return true
