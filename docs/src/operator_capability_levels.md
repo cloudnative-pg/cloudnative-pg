@@ -373,9 +373,8 @@ primary. As a consequence, the instance manager in each alive pod will
 initiate the required procedures to align itself with the requested status of
 the cluster, by either becoming the new primary or by following it.
 In case the former primary comes back up, the same mechanism will avoid a
-split-brain by restarting the server as a standby. In case of issues with
-standby resynchronization, manual intervention might be required (due to lack
-of support for `pg_rewind`).
+split-brain by preventing applications from reaching it, running `pg_rewind` on
+the server and restarting it as a standby.
 
 ### Automated recreation of a standby
 

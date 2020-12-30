@@ -14,13 +14,15 @@ The primary is the last node to be upgraded. This operation
 is configurable and managed by the `primaryUpdateStrategy` option,
 accepting these two values:
 
-* `switchover`: the rolling update process is managed by Kubernetes
+- `switchover`: the rolling update process is managed by Kubernetes
   and is entirely automated, with the *switchover* operation
   starting once all the replicas have been upgraded
-* `manual`: the rolling update process is suspended immediately
+- `manual`: the rolling update process is suspended immediately
   after all replicas have been upgraded and can only be completed
-  with a manual switchover triggered by an administrator with:
-  `kubectl cnp promote [cluster] [pod]`
+  with a manual switchover triggered by an administrator with
+  `kubectl cnp promote [cluster] [pod]`. The plugin can be downloaded from the
+  [`kubectl-cnp` project page](https://github.com/EnterpriseDB/kubectl-cnp)
+  on GitHub.
 
 The default and recommended value is `switchover`.
 
