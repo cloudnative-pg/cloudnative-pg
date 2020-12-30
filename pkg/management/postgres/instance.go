@@ -292,7 +292,7 @@ func (instance *Instance) Demote() error {
 // WaitForPrimaryAvailable waits until we can connect to the primary
 func (instance *Instance) WaitForPrimaryAvailable() error {
 	primaryConnInfo := buildPrimaryConnInfo(
-		instance.ClusterName+"-rw", instance.PodName) + " dbname=postgres"
+		instance.ClusterName+"-rw", instance.PodName) + " dbname=postgres connect_timeout=5"
 
 	log.Log.Info("Waiting for the new primary to be available",
 		"primaryConnInfo", primaryConnInfo)
