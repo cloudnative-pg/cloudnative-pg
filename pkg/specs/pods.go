@@ -253,41 +253,30 @@ func CreateAffinitySection(clusterName string, config v1alpha1.AffinityConfigura
 		return nil
 	}
 
-	return &corev1.Affinity{
-		PodAntiAffinity: CreatePodAntiAffinitySection(clusterName, config),
-	}
-}
-
-// CreatePodAntiAffinitySection creates the affinity sections for Pods, given the configuration
-// from the user
-func CreatePodAntiAffinitySection(clusterName string, config v1alpha1.AffinityConfiguration) *corev1.PodAntiAffinity {
-	// We have no anti affinity section if the user don't enabled it
-	if !config.EnablePodAntiAffinity {
-		return nil
-	}
-
 	topologyKey := config.TopologyKey
 	if len(topologyKey) == 0 {
 		topologyKey = "kubernetes.io/hostname"
 	}
 
-	return &corev1.PodAntiAffinity{
-		PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
-			{
-				Weight: 100,
-				PodAffinityTerm: corev1.PodAffinityTerm{
-					LabelSelector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      ClusterLabelName,
-								Operator: metav1.LabelSelectorOpIn,
-								Values: []string{
-									clusterName,
+	return &corev1.Affinity{
+		PodAntiAffinity: &corev1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+				{
+					Weight: 100,
+					PodAffinityTerm: corev1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      ClusterLabelName,
+									Operator: metav1.LabelSelectorOpIn,
+									Values: []string{
+										clusterName,
+									},
 								},
 							},
 						},
+						TopologyKey: topologyKey,
 					},
-					TopologyKey: topologyKey,
 				},
 			},
 		},
@@ -304,72 +293,58 @@ func CreatePostgresSecurityContext(postgresUser, postgresGroup int64) *corev1.Po
 	}
 }
 
-// PodWithExistingStorage create a new instance using an existing PVC
-func PodWithExistingStorage(cluster v1alpha1.Cluster,
-	podTemplate *v1alpha1.PodTemplateSpec, nodeSerial int32) *corev1.Pod {
+// PodWithExistingStorage create a new instance with an existing storage
+func PodWithExistingStorage(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 
-	pod := corev1.Pod{}
-	if podTemplate != nil {
-		pod.ObjectMeta.Annotations = podTemplate.Meta.Annotations
-		pod.ObjectMeta.Labels = podTemplate.Meta.Labels
-		pod.Spec = podTemplate.Spec
-	}
-
-	// Generate metadata
-	if pod.ObjectMeta.Labels == nil {
-		pod.ObjectMeta.Labels = make(map[string]string)
-	}
-	pod.ObjectMeta.Labels[ClusterLabelName] = cluster.Name
-	if pod.ObjectMeta.Annotations == nil {
-		pod.ObjectMeta.Annotations = make(map[string]string)
-	}
-	pod.ObjectMeta.Annotations[ClusterSerialAnnotationName] = strconv.Itoa(int(nodeSerial))
-	pod.ObjectMeta.Name = podName
-	pod.ObjectMeta.Namespace = cluster.Namespace
-
-	// Generate specification
-	pod.Spec.Hostname = podName
-	pod.Spec.Subdomain = cluster.GetServiceAnyName()
-	pod.Spec.ServiceAccountName = cluster.Name
-	pod.Spec.SecurityContext = CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID())
-	pod.Spec.InitContainers = UpsertContainers(pod.Spec.InitContainers, []corev1.Container{
-		{
-			Name:  "bootstrap-controller",
-			Image: versions.GetDefaultOperatorImageName(),
-			Command: []string{
-				"/manager",
-				"bootstrap",
-				"/controller/manager",
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				ClusterLabelName: cluster.Name,
 			},
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "controller",
-					MountPath: "/controller",
-				},
-				{
-					Name:      "socket",
-					MountPath: "/var/run/postgresql",
-				},
+			Annotations: map[string]string{
+				ClusterSerialAnnotationName: strconv.Itoa(int(nodeSerial)),
 			},
-			Env: []corev1.EnvVar{
-				{
-					Name:  "PGHOST",
-					Value: "/var/run/postgresql",
-				},
-			},
+			Name:      podName,
+			Namespace: cluster.Namespace,
 		},
-	})
-	pod.Spec.Containers = UpsertContainers(pod.Spec.Containers, createPostgresContainers(cluster, podName))
-	pod.Spec.Volumes = UpsertVolumes(pod.Spec.Volumes, createPostgresVolumes(cluster, podName))
-	podAntiAffinity := CreatePodAntiAffinitySection(cluster.Name, cluster.Spec.Affinity)
-	if podAntiAffinity != nil {
-		if pod.Spec.Affinity == nil {
-			pod.Spec.Affinity = &corev1.Affinity{
-				PodAntiAffinity: podAntiAffinity,
-			}
-		}
+		Spec: corev1.PodSpec{
+			Hostname:  podName,
+			Subdomain: cluster.GetServiceAnyName(),
+			InitContainers: []corev1.Container{
+				{
+					Name:  "bootstrap-controller",
+					Image: versions.GetDefaultOperatorImageName(),
+					Command: []string{
+						"/manager",
+						"bootstrap",
+						"/controller/manager",
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "controller",
+							MountPath: "/controller",
+						},
+						{
+							Name:      "socket",
+							MountPath: "/var/run/postgresql",
+						},
+					},
+					Env: []corev1.EnvVar{
+						{
+							Name:  "PGHOST",
+							Value: "/var/run/postgresql",
+						},
+					},
+				},
+			},
+			Containers:         createPostgresContainers(cluster, podName),
+			Volumes:            createPostgresVolumes(cluster, podName),
+			SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
+			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
+			ServiceAccountName: cluster.Name,
+		},
 	}
 
-	return &pod
+	return pod
 }

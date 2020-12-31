@@ -61,38 +61,6 @@ const (
 	defaultPostgresGID = 26
 )
 
-// MetaSubset contains a subset of the standard object's metadata.
-// TODO: Dissmiss this type if we can in the future
-type MetaSubset struct {
-	// Annotations is an unstructured key value map stored with a resource that may be
-	// set by external tools to store and retrieve arbitrary metadata. They are not
-	// queryable and should be preserved when modifying objects.
-	// More info: http://kubernetes.io/docs/user-guide/annotations
-	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// Map of string keys and values that can be used to organize and categorize
-	// (scope and select) objects. May match selectors of replication controllers
-	// and services.
-	// More info: http://kubernetes.io/docs/user-guide/labels
-	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
-}
-
-// PodTemplateSpec describes the data a pod should have when created from a template.
-// TODO: Dissmiss this type if we can in the future
-type PodTemplateSpec struct {
-	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-	// +optional
-	Meta MetaSubset `json:"metadata,omitempty"`
-
-	// Specification of the desired behavior of the pod.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
-	Spec corev1.PodSpec `json:"spec,omitempty"`
-}
-
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	// Description of this PostgreSQL cluster
@@ -153,11 +121,6 @@ type ClusterSpec struct {
 	// Affinity/Anti-affinity rules for Pods
 	// +optional
 	Affinity AffinityConfiguration `json:"affinity,omitempty"`
-
-	// This contains a Pod template which is applied when creating
-	// the actual instances
-	// +optional
-	PodTemplate *PodTemplateSpec `json:"podTemplate,omitempty"`
 
 	// Resources requirements of every generated Pod. Please refer to
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
