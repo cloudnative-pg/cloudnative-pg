@@ -1,6 +1,17 @@
 Cloud Native PostgreSQL  - History of user-visible changes
 Copyright (C) 2019-2020 EnterpriseDB.
 
+Version 0.7.0 - 31 Dec 2020
+
+- Support `pg_rewind` if needed following a failover or switchover to
+  let the former primary act as a standby
+- Add persistent volume expansion support, if permitted by the storage class
+- Enhance metrics exporter for PostgreSQL
+- Add support for Kubernetes version 1.20
+- Drop support for Kubernetes version 1.15
+- Refactor E2E tests, including conversion to Github actions
+- Bug fixes and improvements
+
 Version 0.6.0 - 4 Dec 2020
 
 - Add Point-In-Time Recovery based on timestamp, target name, or transaction
