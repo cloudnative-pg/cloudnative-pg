@@ -39,9 +39,10 @@ Node-local storage (or simply *local storage*) is used to enhance performance.
 
 !!! Note
     If your database files are on shared storage over the network,
-    you will not need to define a maintenance window, as the default
-    self-healing behavior of the operator will work fine
-    (you can then skip the rest of this section).
+    you may not need to define a maintenance window. If the volumes currently
+    used by the pods can be reused by pods running on different nodes after
+    the drain, the default self-healing behavior of the operator will work
+    fine (you can then skip the rest of this section).
 
 When using local storage for PostgreSQL, you are advised to temporarily
 put the cluster in **maintenance mode** through the `nodeMaintenanceWindow`

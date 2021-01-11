@@ -231,8 +231,8 @@ const (
 // NodeMaintenanceWindow contains information that the operator
 // will use while upgrading the underlying node.
 //
-// This option is only useful when using local storage, as the Pods
-// can't be freely moved between nodes in that configuration.
+// This option is only useful when the chosen storage prevents the Pods
+// from being freely moved across nodes.
 type NodeMaintenanceWindow struct {
 	// Is there a node maintenance activity in progress?
 	InProgress bool `json:"inProgress"`
