@@ -244,7 +244,7 @@ DataBackupConfiguration is the configuration of the backup of the data directory
 
 NodeMaintenanceWindow contains information that the operator will use while upgrading the underlying node.
 
-This option is only useful when using local storage, as the Pods can't be freely moved between nodes in that configuration.
+This option is only useful when the chosen storage prevents the Pods from being freely moved across nodes.
 
 | Field | Description | Scheme | Required |
 | -------------------- | ------------------------------ | -------------------- | -------- |

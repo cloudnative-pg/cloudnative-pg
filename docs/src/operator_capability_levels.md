@@ -316,8 +316,8 @@ number of instances to be created.
 The PodDisruptionBudget will be applied during the node draining operation,
 preventing any disruption of the cluster service.
 
-While this strategy is correct for most Kubernetes Clusters, where
-storage is shared in all the worker nodes, it may not be the best solution
+While this strategy is correct for Kubernetes Clusters where
+storage is shared among all the worker nodes, it may not be the best solution
 for clusters using Local Storage or for clusters installed in a private
 cloud. The operator allows users to specify a Maintenance Window and
 configure the reaction to any underlying node eviction. The `ReusePVC` option
