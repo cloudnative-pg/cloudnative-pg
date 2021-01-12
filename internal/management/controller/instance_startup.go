@@ -23,14 +23,14 @@ import (
 
 // RefreshServerCertificateFiles get the latest certificates from the
 // secrets
-func (r *InstanceReconciler) RefreshServerCertificateFiles() error {
+func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context) error {
 	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
 		Resource: "secrets",
 	}).
 		Namespace(r.instance.Namespace).
-		Get(r.instance.ClusterName+apiv1alpha1.ServerSecretSuffix, metav1.GetOptions{})
+		Get(ctx, r.instance.ClusterName+apiv1alpha1.ServerSecretSuffix, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -43,14 +43,14 @@ func (r *InstanceReconciler) RefreshServerCertificateFiles() error {
 
 // RefreshPostgresUserCertificate get the latest certificates from the
 // secrets
-func (r *InstanceReconciler) RefreshPostgresUserCertificate() error {
+func (r *InstanceReconciler) RefreshPostgresUserCertificate(ctx context.Context) error {
 	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
 		Resource: "secrets",
 	}).
 		Namespace(r.instance.Namespace).
-		Get(r.instance.ClusterName+apiv1alpha1.ReplicationSecretSuffix, metav1.GetOptions{})
+		Get(ctx, r.instance.ClusterName+apiv1alpha1.ReplicationSecretSuffix, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -63,14 +63,14 @@ func (r *InstanceReconciler) RefreshPostgresUserCertificate() error {
 
 // RefreshCA get the latest certificates from the
 // secrets
-func (r *InstanceReconciler) RefreshCA() error {
+func (r *InstanceReconciler) RefreshCA(ctx context.Context) error {
 	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
 		Resource: "secrets",
 	}).
 		Namespace(r.instance.Namespace).
-		Get(r.instance.ClusterName+apiv1alpha1.CaSecretSuffix, metav1.GetOptions{})
+		Get(ctx, r.instance.ClusterName+apiv1alpha1.CaSecretSuffix, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 	cluster, err := r.client.
 		Resource(apiv1alpha1.ClusterGVK).
 		Namespace(r.instance.Namespace).
-		Get(r.instance.ClusterName, metav1.GetOptions{})
+		Get(ctx, r.instance.ClusterName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 	r.log.Info("Instance type", "isPrimary", isPrimary)
 
 	if isPrimary {
-		return r.verifyPgDataCoherenceForPrimary(cluster)
+		return r.verifyPgDataCoherenceForPrimary(ctx, cluster)
 	}
 
 	return nil
@@ -112,7 +112,8 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 // This function will abort the execution if the current server is a primary
 // one from the PGDATA viewpoint, but is not classified as the target nor the
 // current primary
-func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructured.Unstructured) error {
+func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
+	ctx context.Context, cluster *unstructured.Unstructured) error {
 	targetPrimary, err := utils.GetTargetPrimary(cluster)
 	if err != nil {
 		return err
@@ -146,7 +147,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructur
 			_, err = r.client.
 				Resource(apiv1alpha1.ClusterGVK).
 				Namespace(r.instance.Namespace).
-				UpdateStatus(cluster, metav1.UpdateOptions{})
+				UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -163,7 +164,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructur
 			"targetPrimary", targetPrimary)
 
 		// Wait for the switchover to be reflected in the cluster metadata
-		err = r.waitForSwitchoverToBeCompleted()
+		err = r.waitForSwitchoverToBeCompleted(ctx)
 		if err != nil {
 			return err
 		}
@@ -197,11 +198,11 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(cluster *unstructur
 // is different from `currentPrimary`, meaning that a switchover procedure is in
 // progress. The function will create a watch on the cluster resource and wait
 // until the switchover is completed
-func (r *InstanceReconciler) waitForSwitchoverToBeCompleted() error {
+func (r *InstanceReconciler) waitForSwitchoverToBeCompleted(ctx context.Context) error {
 	switchoverWatch, err := r.client.
 		Resource(apiv1alpha1.ClusterGVK).
 		Namespace(r.instance.Namespace).
-		Watch(metav1.ListOptions{
+		Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName).String(),
 		})
 	if err != nil {

@@ -23,7 +23,7 @@ var (
 	reconciler      *controller.InstanceReconciler
 )
 
-func runSubCommand() {
+func runSubCommand(ctx context.Context) {
 	var err error
 
 	reconciler, err = controller.NewInstanceReconciler(&instance)
@@ -32,31 +32,31 @@ func runSubCommand() {
 		os.Exit(1)
 	}
 
-	_, err = instance.RefreshConfigurationFiles(reconciler.GetClient())
+	_, err = instance.RefreshConfigurationFiles(ctx, reconciler.GetClient())
 	if err != nil {
 		log.Log.Error(err, "Error while writing the bootstrap configuration")
 		os.Exit(1)
 	}
 
-	err = reconciler.RefreshServerCertificateFiles()
+	err = reconciler.RefreshServerCertificateFiles(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS server certificates")
 		os.Exit(1)
 	}
 
-	err = reconciler.RefreshPostgresUserCertificate()
+	err = reconciler.RefreshPostgresUserCertificate(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS server certificates")
 		os.Exit(1)
 	}
 
-	err = reconciler.RefreshCA()
+	err = reconciler.RefreshCA(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS CA certificates")
 		os.Exit(1)
 	}
 
-	err = reconciler.VerifyPgDataCoherence(context.Background())
+	err = reconciler.VerifyPgDataCoherence(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while checking Kubernetes cluster status")
 		os.Exit(1)

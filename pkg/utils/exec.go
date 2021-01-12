@@ -46,12 +46,19 @@ func ExecCommand(
 		return "", "", fmt.Errorf("could not find %s container to exec to", containerName)
 	}
 
+	// Unfortunately RESTClient doesn't still work with contexts but when it
+	// will, we'll use the context there.
+	//
+	// A similar consideration can be applied for the `container` parameter:
+	// in this moment we need to specify that parameter in the "Post" request
+	// and in the VersionedParams section too. This will hopefully be unified
+	// in a next client-go release.
 	req := client.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(pod.Name).
 		Namespace(pod.Namespace).
 		SubResource("exec").
-		Context(ctx)
+		Param("container", pod.Spec.Containers[targetContainer].Name)
 
 	if timeout != nil {
 		req.Timeout(*timeout)

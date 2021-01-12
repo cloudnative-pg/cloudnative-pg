@@ -9,6 +9,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package controller
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -80,12 +81,14 @@ func (r *InstanceReconciler) Run() {
 func (r *InstanceReconciler) Watch() error {
 	var err error
 
+	ctx := context.Background()
+
 	// This is an example of how to watch a certain object
 	// https://github.com/kubernetes/kubernetes/issues/43299
 	r.instanceWatch, err = r.client.
 		Resource(apiv1alpha1.ClusterGVK).
 		Namespace(r.instance.Namespace).
-		Watch(metav1.ListOptions{
+		Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName).String(),
 		})
 	if err != nil {
@@ -99,7 +102,7 @@ func (r *InstanceReconciler) Watch() error {
 			Resource: "configmaps",
 		}).
 		Namespace(r.instance.Namespace).
-		Watch(metav1.ListOptions{
+		Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName).String(),
 		})
 	if err != nil {
@@ -113,7 +116,7 @@ func (r *InstanceReconciler) Watch() error {
 			Resource: "secrets",
 		}).
 		Namespace(r.instance.Namespace).
-		Watch(metav1.ListOptions{
+		Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(
 				"metadata.name", r.instance.ClusterName+apiv1alpha1.ServerSecretSuffix).String(),
 		})
@@ -128,7 +131,7 @@ func (r *InstanceReconciler) Watch() error {
 			Resource: "secrets",
 		}).
 		Namespace(r.instance.Namespace).
-		Watch(metav1.ListOptions{
+		Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(
 				"metadata.name", r.instance.ClusterName+apiv1alpha1.CaSecretSuffix).String(),
 		})
@@ -143,7 +146,7 @@ func (r *InstanceReconciler) Watch() error {
 			Resource: "secrets",
 		}).
 		Namespace(r.instance.Namespace).
-		Watch(metav1.ListOptions{
+		Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(
 				"metadata.name", r.instance.ClusterName+apiv1alpha1.ReplicationSecretSuffix).String(),
 		})
@@ -174,7 +177,7 @@ func (r *InstanceReconciler) Watch() error {
 		}
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			return r.Reconcile(&event)
+			return r.Reconcile(ctx, &event)
 		})
 		if err != nil {
 			r.log.Error(err, "Reconciliation error")
