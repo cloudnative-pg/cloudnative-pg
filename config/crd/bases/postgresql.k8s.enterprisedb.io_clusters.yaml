@@ -61,13 +61,15 @@ spec:
                 description: Affinity/Anti-affinity rules for Pods
                 properties:
                   enablePodAntiAffinity:
-                    description: Should we enable anti affinity or not?
+                    description: Activates anti-affinity for the pods. The operator
+                      will define pods anti-affinity unless this field is explicitly
+                      set to false
                     type: boolean
                   nodeSelector:
                     additionalProperties:
                       type: string
-                    description: 'NodeSelector is a selector which must be true for
-                      the pod to fit on a node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
+                    description: 'NodeSelector is map of key-value pairs used to define
+                      the nodes on which the pods can run. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
                     type: object
                   topologyKey:
                     description: TopologyKey to use for anti-affinity configuration.
