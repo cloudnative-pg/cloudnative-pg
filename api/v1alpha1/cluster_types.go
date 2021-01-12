@@ -381,12 +381,19 @@ type StorageConfiguration struct {
 // affinity rules for Pods
 type AffinityConfiguration struct {
 	// Should we enable anti affinity or not?
+	// +optional
 	EnablePodAntiAffinity bool `json:"enablePodAntiAffinity"`
 
 	// TopologyKey to use for anti-affinity configuration. See k8s documentation
 	// for more info on that
 	// +optional
 	TopologyKey string `json:"topologyKey"`
+
+	// NodeSelector is map of key-value pairs used to define the nodes on which
+	// the pods can run.
+	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 }
 
 // RollingUpdateStatus contains the information about an instance which is

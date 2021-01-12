@@ -102,6 +102,7 @@ AffinityConfiguration contains the info we need to create the affinity rules for
 | -------------------- | ------------------------------ | -------------------- | -------- |
 | enablePodAntiAffinity | Should we enable anti affinity or not? | bool | true |
 | topologyKey | TopologyKey to use for anti-affinity configuration. See k8s documentation for more info on that | string | true |
+| nodeSelector | NodeSelector is map of key-value pairs used to define the nodes on which the pods can run. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/ | map[string]string | false |
 
 
 ## BackupConfiguration

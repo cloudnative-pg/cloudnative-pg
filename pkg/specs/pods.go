@@ -343,6 +343,7 @@ func PodWithExistingStorage(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.
 			SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
 			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 			ServiceAccountName: cluster.Name,
+			NodeSelector:       cluster.Spec.Affinity.NodeSelector,
 		},
 	}
 

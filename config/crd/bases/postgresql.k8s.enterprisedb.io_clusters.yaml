@@ -63,12 +63,16 @@ spec:
                   enablePodAntiAffinity:
                     description: Should we enable anti affinity or not?
                     type: boolean
+                  nodeSelector:
+                    additionalProperties:
+                      type: string
+                    description: 'NodeSelector is a selector which must be true for
+                      the pod to fit on a node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
+                    type: object
                   topologyKey:
                     description: TopologyKey to use for anti-affinity configuration.
                       See k8s documentation for more info on that
                     type: string
-                required:
-                - enablePodAntiAffinity
                 type: object
               backup:
                 description: The configuration to be used for backups
