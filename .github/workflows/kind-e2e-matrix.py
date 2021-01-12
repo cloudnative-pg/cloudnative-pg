@@ -17,7 +17,7 @@ class VersionList(list):
     """List of versions"""
 
     def __init__(self, versions: List[str]):
-        super().__init__(sorted(versions, reverse=True))
+        super().__init__(versions)
 
     @property
     def latest(self):
@@ -34,7 +34,7 @@ class MajorVersionList(dict):
     def __init__(self, version_lists: Dict[str, List[str]]):
         sorted_versions = {
             k: VersionList(version_lists[k])
-            for k in sorted(version_lists.keys(), reverse=True)
+            for k in version_lists.keys()
         }
         super().__init__(sorted_versions)
         self.versions = list(self.keys())
@@ -60,11 +60,17 @@ K8S = VersionList(
 )
 
 # PostgreSQL versions to use during the tests
-# MAJOR: [VERSION, PRE_ROLLING_UPDATE_VERSION]
+# Entries are expected to be ordered from newest to oldest
+# First entry is used as default testing version
+# Entries format:
+# MAJOR: [VERSION, PRE_ROLLING_UPDATE_VERSION],
 POSTGRES = MajorVersionList(
     {
-        "13": ["13.1", "13.0"],
+        # We cannot use PostgreSQL 13 as default testing version due to the bug
+        # https://postgr.es/m/20201209.174314.282492377848029776.horikyota.ntt%40gmail.com
+        # TODO: Reorder the versions when the bug will be fixed
         "12": ["12.5", "12.4"],
+        "13": ["13.1", "13.0"],
         "11": ["11.9", "11.8"],
         "10": ["10.15", "10.14"],
     }
