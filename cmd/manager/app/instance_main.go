@@ -7,6 +7,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package app
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -110,6 +111,8 @@ func InstanceManagerCommand(args []string) {
 		return
 	}
 
+	ctx := context.Background()
+
 	switch args[0] {
 	case "init":
 		// Ignore errors; initCommand is set for ExitOnError.
@@ -151,7 +154,7 @@ func InstanceManagerCommand(args []string) {
 			PodName:    podName,
 		}
 
-		joinSubCommand(info)
+		joinSubCommand(ctx, info)
 	case "run":
 		// Ignore errors; runCommand is set for ExitOnError.
 		_ = runCommand.Parse(args[1:])
@@ -161,7 +164,7 @@ func InstanceManagerCommand(args []string) {
 		instance.PodName = podName
 		instance.ClusterName = clusterName
 
-		runSubCommand()
+		runSubCommand(ctx)
 	case "status":
 		// Ignore errors; statusCommand is set for ExitOnError
 		_ = statusCommand.Parse(args[1:])
@@ -179,7 +182,7 @@ func InstanceManagerCommand(args []string) {
 			RecoveryTarget: recoveryTarget,
 		}
 
-		restoreSubCommand(info)
+		restoreSubCommand(ctx, info)
 	default:
 		fmt.Printf("%v is not a valid command\n", args[0])
 		os.Exit(1)
@@ -211,7 +214,7 @@ func initSubCommand(info postgres.InitInfo) {
 	}
 }
 
-func restoreSubCommand(info postgres.InitInfo) {
+func restoreSubCommand(ctx context.Context, info postgres.InitInfo) {
 	status, err := fileutils.FileExists(info.PgData)
 	if err != nil {
 		log.Log.Error(err, "Error while checking for an existent PGData")
@@ -229,14 +232,14 @@ func restoreSubCommand(info postgres.InitInfo) {
 		os.Exit(1)
 	}
 
-	err = info.Restore()
+	err = info.Restore(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while restoring a backup")
 		os.Exit(1)
 	}
 }
 
-func joinSubCommand(info postgres.JoinInfo) {
+func joinSubCommand(ctx context.Context, info postgres.JoinInfo) {
 	status, err := fileutils.FileExists(info.PgData)
 	if err != nil {
 		log.Log.Error(err, "Error while checking for an existent PGData")
@@ -255,13 +258,13 @@ func joinSubCommand(info postgres.JoinInfo) {
 		os.Exit(1)
 	}
 
-	err = reconciler.RefreshPostgresUserCertificate()
+	err = reconciler.RefreshPostgresUserCertificate(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS server certificates")
 		os.Exit(1)
 	}
 
-	err = reconciler.RefreshCA()
+	err = reconciler.RefreshCA(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS CA certificates")
 		os.Exit(1)

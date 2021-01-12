@@ -7,6 +7,8 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package main
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -79,13 +81,14 @@ func createKubernetesClient(cmd *cobra.Command, args []string) error {
 }
 
 func promote(cmd *cobra.Command, args []string) {
+	ctx := context.Background()
 	clusterName := args[0]
 	serverName := args[1]
 
 	// Check cluster status
 	object, err := kubeclient.Resource(apiv1alpha1.ClusterGVK).
 		Namespace(namespace).
-		Get(clusterName, metav1.GetOptions{})
+		Get(ctx, clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Log.Error(err, "Cannot find PostgreSQL cluster",
 			"namespace", namespace,
@@ -98,7 +101,7 @@ func promote(cmd *cobra.Command, args []string) {
 		Group:    "",
 		Version:  "v1",
 		Resource: "pods",
-	}).Namespace(namespace).Get(serverName, metav1.GetOptions{})
+	}).Namespace(namespace).Get(ctx, serverName, metav1.GetOptions{})
 	if err != nil {
 		log.Log.Error(err, "Cannot find PostgreSQL server",
 			"namespace", namespace,
@@ -119,7 +122,7 @@ func promote(cmd *cobra.Command, args []string) {
 		_, err = kubeclient.
 			Resource(apiv1alpha1.ClusterGVK).
 			Namespace(namespace).
-			UpdateStatus(object, metav1.UpdateOptions{})
+			UpdateStatus(ctx, object, metav1.UpdateOptions{})
 		return err
 	})
 	if err != nil {

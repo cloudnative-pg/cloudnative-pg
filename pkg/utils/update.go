@@ -9,7 +9,6 @@ package utils
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -19,7 +18,7 @@ import (
 func UpdateStatusAndRetry(
 	ctx context.Context,
 	client client.StatusClient,
-	obj runtime.Object,
+	obj client.Object,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		return client.Status().Update(ctx, obj)

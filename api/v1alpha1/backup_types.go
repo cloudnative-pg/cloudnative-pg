@@ -9,7 +9,7 @@ package v1alpha1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -164,7 +164,7 @@ func (backup *Backup) GetNamespace() string {
 }
 
 // GetKubernetesObject get the kubernetes object
-func (backup *Backup) GetKubernetesObject() runtime.Object {
+func (backup *Backup) GetKubernetesObject() client.Object {
 	return backup
 }
 

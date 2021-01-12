@@ -7,6 +7,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"path"
 
@@ -108,14 +109,14 @@ func (instance *Instance) RefreshConfigurationFilesFromObject(object *unstructur
 
 // RefreshConfigurationFiles get the latest version of the ConfigMap from the API
 // server and then write the configuration in PGDATA
-func (instance *Instance) RefreshConfigurationFiles(client dynamic.Interface) (bool, error) {
+func (instance *Instance) RefreshConfigurationFiles(ctx context.Context, client dynamic.Interface) (bool, error) {
 	unstructuredObject, err := client.Resource(schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
 		Resource: "configmaps",
 	}).
 		Namespace(instance.Namespace).
-		Get(instance.ClusterName, metav1.GetOptions{})
+		Get(ctx, instance.ClusterName, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}

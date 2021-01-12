@@ -42,7 +42,7 @@ var (
 )
 
 // Restore restore a PostgreSQL cluster from a backup into the object storage
-func (info InitInfo) Restore() error {
+func (info InitInfo) Restore(ctx context.Context) error {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func (info InitInfo) Restore() error {
 		return err
 	}
 
-	if err := info.writeInitialPostgresqlConf(dynamicClient); err != nil {
+	if err := info.writeInitialPostgresqlConf(ctx, dynamicClient); err != nil {
 		return err
 	}
 
@@ -207,7 +207,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *v1alpha1.Backup) error {
 }
 
 // writeInitialPostgresqlConf reset the postgresql.conf that there is in the instance
-func (info InitInfo) writeInitialPostgresqlConf(client dynamic.Interface) error {
+func (info InitInfo) writeInitialPostgresqlConf(ctx context.Context, client dynamic.Interface) error {
 	tempDataDir, err := ioutil.TempDir("/tmp", "datadir_")
 	if err != nil {
 		return fmt.Errorf("while creating a temporary data directory: %w", err)
@@ -234,7 +234,7 @@ func (info InitInfo) writeInitialPostgresqlConf(client dynamic.Interface) error 
 	temporaryInstance.Namespace = info.Namespace
 	temporaryInstance.ClusterName = info.ClusterName
 
-	_, err = temporaryInstance.RefreshConfigurationFiles(client)
+	_, err = temporaryInstance.RefreshConfigurationFiles(ctx, client)
 	if err != nil {
 		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
 	}

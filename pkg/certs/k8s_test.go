@@ -7,6 +7,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package certs
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path"
@@ -59,14 +60,14 @@ var (
 var _ = Describe("Root CA secret generation", func() {
 	It("must generate a new CA secret when it doesn't already exist", func() {
 		clientSet := fake.NewSimpleClientset()
-		secret, err := EnsureRootCACertificate(clientSet, "operator-namespace", "ca-secret-name")
+		secret, err := EnsureRootCACertificate(context.TODO(), clientSet, "operator-namespace", "ca-secret-name")
 		Expect(err).To(BeNil())
 
 		Expect(secret.Namespace).To(Equal("operator-namespace"))
 		Expect(secret.Name).To(Equal("ca-secret-name"))
 
 		_, err = clientSet.CoreV1().Secrets("operator-namespace").Get(
-			"ca-secret-name", metav1.GetOptions{})
+			context.TODO(), "ca-secret-name", metav1.GetOptions{})
 		Expect(err).To(BeNil())
 	})
 
@@ -77,7 +78,7 @@ var _ = Describe("Root CA secret generation", func() {
 		secret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(secret)
 
-		resultingSecret, err := EnsureRootCACertificate(clientSet, "operator-namespace", "ca-secret-name")
+		resultingSecret, err := EnsureRootCACertificate(context.TODO(), clientSet, "operator-namespace", "ca-secret-name")
 		Expect(err).To(BeNil())
 		Expect(resultingSecret.Namespace).To(Equal("operator-namespace"))
 		Expect(resultingSecret.Name).To(Equal("ca-secret-name"))
@@ -93,7 +94,7 @@ var _ = Describe("Root CA secret generation", func() {
 		clientSet := fake.NewSimpleClientset(secret)
 
 		// The secret should have been renewed now
-		resultingSecret, err := EnsureRootCACertificate(clientSet, "operator-namespace", "ca-secret-name")
+		resultingSecret, err := EnsureRootCACertificate(context.TODO(), clientSet, "operator-namespace", "ca-secret-name")
 		Expect(err).To(BeNil())
 		Expect(resultingSecret.Namespace).To(Equal("operator-namespace"))
 		Expect(resultingSecret.Name).To(Equal("ca-secret-name"))
@@ -117,7 +118,7 @@ var _ = Describe("Webhook certificate validation", func() {
 		pki := pkiEnvironmentTemplate
 
 		It("should correctly generate a pki certificate", func() {
-			webhookSecret, err := pki.EnsureCertificate(clientSet, caSecret)
+			webhookSecret, err := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
 			Expect(err).To(BeNil())
 			Expect(webhookSecret.Name).To(Equal(pki.SecretName))
 			Expect(webhookSecret.Namespace).To(Equal(pki.OperatorNamespace))
@@ -138,10 +139,10 @@ var _ = Describe("Webhook certificate validation", func() {
 		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(caSecret)
 		pki := pkiEnvironmentTemplate
-		webhookSecret, _ := pki.EnsureCertificate(clientSet, caSecret)
+		webhookSecret, _ := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
 
 		It("must reuse them", func() {
-			currentWebhookSecret, err := pki.EnsureCertificate(clientSet, caSecret)
+			currentWebhookSecret, err := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
 			Expect(err).To(BeNil())
 			Expect(webhookSecret.Data).To(BeEquivalentTo(currentWebhookSecret.Data))
 		})
@@ -160,7 +161,7 @@ var _ = Describe("Webhook certificate validation", func() {
 		pki := pkiEnvironmentTemplate
 
 		It("must renew the secret", func() {
-			currentServerSecret, err := pki.EnsureCertificate(clientSet, caSecret)
+			currentServerSecret, err := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
 			Expect(err).To(BeNil())
 			Expect(serverSecret.Data).To(Not(BeEquivalentTo(currentServerSecret.Data)))
 
@@ -181,7 +182,7 @@ var _ = Describe("Webhook certificate validation", func() {
 		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(caSecret)
 		pki := pkiEnvironmentTemplate
-		webhookSecret, err := pki.EnsureCertificate(clientSet, caSecret)
+		webhookSecret, err := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
 		Expect(err).To(BeNil())
 
 		tempDirName, err := ioutil.TempDir("/tmp", "cert_*")
@@ -213,11 +214,11 @@ var _ = Describe("TLS certificates injection", func() {
 		mutatingWebhook := mutatingWebhookTemplate
 		clientSet := fake.NewSimpleClientset(caSecret, webhookSecret, &mutatingWebhook)
 
-		err := pki.InjectPublicKeyIntoMutatingWebhook(clientSet, webhookSecret)
+		err := pki.InjectPublicKeyIntoMutatingWebhook(context.TODO(), clientSet, webhookSecret)
 		Expect(err).To(BeNil())
 
 		updatedWebhook, err := clientSet.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
-			pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
+			context.TODO(), pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 
 		Expect(updatedWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
@@ -228,11 +229,11 @@ var _ = Describe("TLS certificates injection", func() {
 		validatingWebhook := validatingWebhookTemplate
 		clientSet := fake.NewSimpleClientset(caSecret, webhookSecret, &validatingWebhook)
 
-		err := pki.InjectPublicKeyIntoValidatingWebhook(clientSet, webhookSecret)
+		err := pki.InjectPublicKeyIntoValidatingWebhook(context.TODO(), clientSet, webhookSecret)
 		Expect(err).To(BeNil())
 
 		updatedWebhook, err := clientSet.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
-			pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+			context.TODO(), pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 
 		Expect(updatedWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
@@ -253,22 +254,22 @@ var _ = Describe("Webhook environment creation", func() {
 		validatingWebhook := validatingWebhookTemplate
 		clientSet := fake.NewSimpleClientset(&mutatingWebhook, &validatingWebhook)
 
-		err = pki.Setup(clientSet)
+		err = pki.Setup(context.TODO(), clientSet)
 		Expect(err).To(BeNil())
 
 		webhookSecret, err := clientSet.CoreV1().Secrets(
-			pki.OperatorNamespace).Get(pki.SecretName, metav1.GetOptions{})
+			pki.OperatorNamespace).Get(context.TODO(), pki.SecretName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 		Expect(webhookSecret.Namespace).To(Equal(pki.OperatorNamespace))
 		Expect(webhookSecret.Name).To(Equal(pki.SecretName))
 
 		updatedMutatingWebhook, err := clientSet.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
-			pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
+			context.TODO(), pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 		Expect(updatedMutatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 
 		updatedValidatingWebhook, err := clientSet.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
-			pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+			context.TODO(), pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 		Expect(updatedValidatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 	})

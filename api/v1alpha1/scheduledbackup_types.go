@@ -9,7 +9,7 @@ package v1alpha1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -95,7 +95,7 @@ func (scheduledBackup *ScheduledBackup) GetStatus() *ScheduledBackupStatus {
 }
 
 // GetKubernetesObject gets the kubernetes object
-func (scheduledBackup *ScheduledBackup) GetKubernetesObject() runtime.Object {
+func (scheduledBackup *ScheduledBackup) GetKubernetesObject() client.Object {
 	return scheduledBackup
 }
 

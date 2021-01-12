@@ -38,8 +38,7 @@ type ScheduledBackupReconciler struct {
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=backups,verbs=get;list;create
 
 // Reconcile is the main reconciler logic
-func (r *ScheduledBackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("scheduledbackup", req.NamespacedName)
 
 	var scheduledBackup postgresqlv1alpha1.ScheduledBackup
@@ -75,7 +74,7 @@ func (r *ScheduledBackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		}
 	}
 
-	return ReconcileScheduledBackup(ctx, r, log, &scheduledBackup)
+	return ReconcileScheduledBackup(ctx, r.Client, log, &scheduledBackup)
 }
 
 // ReconcileScheduledBackup is the main reconciliation logic for a scheduled backup
@@ -184,12 +183,13 @@ func (r *ScheduledBackupReconciler) GetChildBackups(
 }
 
 // SetupWithManager install this controller in the controller manager
-func (r *ScheduledBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ScheduledBackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// Create a new indexed field on backups. This field will be used to easily
 	// find all the backups created by this controller
 	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
 		&postgresqlv1alpha1.Backup{},
-		backupOwnerKey, func(rawObj runtime.Object) []string {
+		backupOwnerKey, func(rawObj client.Object) []string {
 			pod := rawObj.(*postgresqlv1alpha1.Backup)
 			owner := metav1.GetControllerOf(pod)
 			if owner == nil {

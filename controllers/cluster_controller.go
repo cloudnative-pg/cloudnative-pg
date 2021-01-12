@@ -52,6 +52,7 @@ type ClusterReconciler struct {
 // Alphabetical order to not repeat or miss permissions
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;update;list
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;create;update
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters/status,verbs=get;watch;update;patch
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters/finalizers,verbs=update
@@ -72,8 +73,7 @@ type ClusterReconciler struct {
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;create;delete;update;patch;list;watch
 
 // Reconcile is the operator reconciler loop
-func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
 
 	var cluster v1alpha1.Cluster
@@ -274,7 +274,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 			"clusterName", cluster.Name,
 			"namespace", cluster.Namespace,
 			"jobs", resources.jobs.Items)
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	// Recreate missing Pods
@@ -282,10 +282,15 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 		if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
 			// A pod is not ready, let's retry
 			log.V(2).Info("Waiting for node to be ready before attaching PVCs")
-			return ctrl.Result{}, nil
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 
-		return ctrl.Result{}, r.handleDanglingPVC(ctx, cluster)
+		if err := r.handleDanglingPVC(ctx, cluster); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Do another reconcile cycle after handling a dangling PVC
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	// We have these cases now:
@@ -319,7 +324,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	if !cluster.IsNodeMaintenanceWindowReusePVC() && cluster.Status.ReadyInstances < cluster.Status.Instances {
 		// A Pod is not ready, let's retry
 		log.V(2).Info("Waiting for Pod to be ready")
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	// Are there missing nodes? Let's create one
@@ -343,7 +348,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 }
 
 // SetupWithManager creates a ClusterReconciler
-func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// Initialize expectations
 	r.podExpectations = expectations.NewControllerExpectations()
 	r.jobExpectations = expectations.NewControllerExpectations()
@@ -352,8 +357,9 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by this controller
 	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
 		&corev1.Pod{},
-		podOwnerKey, func(rawObj runtime.Object) []string {
+		podOwnerKey, func(rawObj client.Object) []string {
 			pod := rawObj.(*corev1.Pod)
 			owner := metav1.GetControllerOf(pod)
 			if owner == nil {
@@ -371,8 +377,9 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Create a new indexed field on PVCs.
 	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
 		&corev1.PersistentVolumeClaim{},
-		pvcOwnerKey, func(rawObj runtime.Object) []string {
+		pvcOwnerKey, func(rawObj client.Object) []string {
 			persistentVolumeClaim := rawObj.(*corev1.PersistentVolumeClaim)
 			owner := metav1.GetControllerOf(persistentVolumeClaim)
 			if owner == nil {
@@ -390,8 +397,9 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Create a new indexed field on Jobs.
 	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
 		&batchv1.Job{},
-		jobOwnerKey, func(rawObj runtime.Object) []string {
+		jobOwnerKey, func(rawObj client.Object) []string {
 			job := rawObj.(*batchv1.Job)
 			owner := metav1.GetControllerOf(job)
 			if owner == nil {

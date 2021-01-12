@@ -7,6 +7,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -91,6 +92,8 @@ func main() {
 		}
 	}
 
+	ctx := context.Background()
+
 	// No subcommand invoked, let's start the operator
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -138,7 +141,7 @@ func main() {
 		// injecting/creating certificates
 		certificatesGenerationFolder = ""
 	}
-	err = setupPKI(mgr.GetConfig(), certificatesGenerationFolder)
+	err = setupPKI(ctx, mgr.GetConfig(), certificatesGenerationFolder)
 
 	if err != nil {
 		setupLog.Error(err, "unable to setup PKI infrastructure")
@@ -150,7 +153,7 @@ func main() {
 		Log:      ctrl.Log.WithName("controllers").WithName("Cluster"),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cloud-native-postgresql"),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)
 	}
@@ -166,7 +169,7 @@ func main() {
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("ScheduledBackup"),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
 		os.Exit(1)
 	}
@@ -185,7 +188,7 @@ func main() {
 	}
 }
 
-func setupPKI(config *rest.Config, certDir string) error {
+func setupPKI(ctx context.Context, config *rest.Config, certDir string) error {
 	/*
 	   Ensure we have the required PKI infrastructure to make
 	   the operator and the clusters working
@@ -204,12 +207,12 @@ func setupPKI(config *rest.Config, certDir string) error {
 		MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
 	}
-	err = pkiConfig.Setup(clientSet)
+	err = pkiConfig.Setup(ctx, clientSet)
 	if err != nil {
 		return err
 	}
 
-	err = pkiConfig.SchedulePeriodicMaintenance(clientSet)
+	err = pkiConfig.SchedulePeriodicMaintenance(ctx, clientSet)
 	if err != nil {
 		return err
 	}

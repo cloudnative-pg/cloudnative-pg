@@ -7,7 +7,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // +kubebuilder:object:generate=false
@@ -24,5 +24,5 @@ type BackupCommon interface {
 	GetNamespace() string
 
 	// GetKubernetesObject gets the kubernetes object
-	GetKubernetesObject() runtime.Object
+	GetKubernetesObject() client.Object
 }

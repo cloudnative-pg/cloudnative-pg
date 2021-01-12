@@ -26,7 +26,6 @@ linters:
     - gosimple
     - govet
     - ineffassign
-    - interfacer
     - lll
     - maligned
     - misspell

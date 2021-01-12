@@ -7,6 +7,7 @@ Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadr
 package certs
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -54,12 +55,13 @@ type PublicKeyInfrastructure struct {
 }
 
 // EnsureRootCACertificate ensure that in the cluster there is a root CA Certificate
-func EnsureRootCACertificate(client kubernetes.Interface, namespace string, name string) (*v1.Secret, error) {
+func EnsureRootCACertificate(
+	ctx context.Context, client kubernetes.Interface, namespace string, name string) (*v1.Secret, error) {
 	// Checking if the root CA already exist
-	secret, err := client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+	secret, err := client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err == nil {
 		// Verify the temporal validity of this CA and renew the secret if needed
-		_, err := renewCACertificate(client, secret)
+		_, err := renewCACertificate(ctx, client, secret)
 		if err != nil {
 			return nil, err
 		}
@@ -76,7 +78,7 @@ func EnsureRootCACertificate(client kubernetes.Interface, namespace string, name
 	}
 
 	secret = pair.GenerateCASecret(namespace, name)
-	createdSecret, err := client.CoreV1().Secrets(namespace).Create(secret)
+	createdSecret, err := client.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +87,7 @@ func EnsureRootCACertificate(client kubernetes.Interface, namespace string, name
 
 // renewCACertificate renews a CA certificate if needed, returning the updated
 // secret if the secret has been renewed
-func renewCACertificate(client kubernetes.Interface, secret *v1.Secret) (*v1.Secret, error) {
+func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret *v1.Secret) (*v1.Secret, error) {
 	// Verify the temporal validity of this CA
 	pair, err := ParseCASecret(secret)
 	if err != nil {
@@ -111,7 +113,7 @@ func renewCACertificate(client kubernetes.Interface, secret *v1.Secret) (*v1.Sec
 	}
 
 	secret.Data["ca.crt"] = pair.Certificate
-	updatedSecret, err := client.CoreV1().Secrets(secret.Namespace).Update(secret)
+	updatedSecret, err := client.CoreV1().Secrets(secret.Namespace).Update(ctx, secret, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -122,8 +124,9 @@ func renewCACertificate(client kubernetes.Interface, secret *v1.Secret) (*v1.Sec
 // Setup will setup the PKI infrastructure that is needed for the operator
 // to correctly work, and copy the certificates which are required for the webhook
 // server to run in the right folder
-func (pki PublicKeyInfrastructure) Setup(client kubernetes.Interface) error {
+func (pki PublicKeyInfrastructure) Setup(ctx context.Context, client kubernetes.Interface) error {
 	caSecret, err := EnsureRootCACertificate(
+		ctx,
 		client,
 		pki.OperatorNamespace,
 		pki.CaSecretName)
@@ -132,7 +135,7 @@ func (pki PublicKeyInfrastructure) Setup(client kubernetes.Interface) error {
 	}
 
 	if pki.CertDir != "" {
-		if err = pki.setupWebhookCertificate(client, caSecret); err != nil {
+		if err = pki.setupWebhookCertificate(ctx, client, caSecret); err != nil {
 			return err
 		}
 	}
@@ -140,8 +143,9 @@ func (pki PublicKeyInfrastructure) Setup(client kubernetes.Interface) error {
 	return nil
 }
 
-func (pki PublicKeyInfrastructure) setupWebhookCertificate(client kubernetes.Interface, caSecret *v1.Secret) error {
-	webhookSecret, err := pki.EnsureCertificate(client, caSecret)
+func (pki PublicKeyInfrastructure) setupWebhookCertificate(
+	ctx context.Context, client kubernetes.Interface, caSecret *v1.Secret) error {
+	webhookSecret, err := pki.EnsureCertificate(ctx, client, caSecret)
 	if err != nil {
 		return err
 	}
@@ -152,6 +156,7 @@ func (pki PublicKeyInfrastructure) setupWebhookCertificate(client kubernetes.Int
 	}
 
 	err = pki.InjectPublicKeyIntoMutatingWebhook(
+		ctx,
 		client,
 		webhookSecret)
 	if err != nil && apierrors.IsNotFound(err) {
@@ -162,6 +167,7 @@ func (pki PublicKeyInfrastructure) setupWebhookCertificate(client kubernetes.Int
 	}
 
 	err = pki.InjectPublicKeyIntoValidatingWebhook(
+		ctx,
 		client,
 		webhookSecret)
 	if err != nil && apierrors.IsNotFound(err) {
@@ -176,10 +182,11 @@ func (pki PublicKeyInfrastructure) setupWebhookCertificate(client kubernetes.Int
 
 // SchedulePeriodicMaintenance schedule a background periodic certificate maintenance,
 // to automatically renew TLS certificates
-func (pki PublicKeyInfrastructure) SchedulePeriodicMaintenance(client kubernetes.Interface) error {
+func (pki PublicKeyInfrastructure) SchedulePeriodicMaintenance(
+	ctx context.Context, client kubernetes.Interface) error {
 	maintenance := func() {
 		log.Info("Periodic TLS certificates maintenance")
-		err := pki.Setup(client)
+		err := pki.Setup(ctx, client)
 		if err != nil {
 			log.Error(err, "TLS maintenance failed")
 		}
@@ -198,14 +205,14 @@ func (pki PublicKeyInfrastructure) SchedulePeriodicMaintenance(client kubernetes
 
 // EnsureCertificate will ensure that a webhook certificate exists and is usable
 func (pki PublicKeyInfrastructure) EnsureCertificate(
-	client kubernetes.Interface, caSecret *v1.Secret) (*v1.Secret, error) {
+	ctx context.Context, client kubernetes.Interface, caSecret *v1.Secret) (*v1.Secret, error) {
 	// Checking if the secret already exist
 	secret, err := client.CoreV1().Secrets(
-		pki.OperatorNamespace).Get(pki.SecretName, metav1.GetOptions{})
+		pki.OperatorNamespace).Get(ctx, pki.SecretName, metav1.GetOptions{})
 	if err == nil {
 		// Verify the temporal validity of this certificate and
 		// renew it if needed
-		return renewServerCertificate(client, *caSecret, secret)
+		return renewServerCertificate(ctx, client, *caSecret, secret)
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -227,7 +234,7 @@ func (pki PublicKeyInfrastructure) EnsureCertificate(
 
 	secret = webhookPair.GenerateServerSecret(pki.OperatorNamespace, pki.SecretName)
 	createdSecret, err := client.CoreV1().Secrets(
-		pki.OperatorNamespace).Create(secret)
+		pki.OperatorNamespace).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -280,14 +287,15 @@ func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) 
 
 // renewServerCertificate renews a server certificate if needed
 // Returns the renewed secret or the original one if unchanged
-func renewServerCertificate(client kubernetes.Interface, caSecret v1.Secret, secret *v1.Secret) (*v1.Secret, error) {
+func renewServerCertificate(
+	ctx context.Context, client kubernetes.Interface, caSecret v1.Secret, secret *v1.Secret) (*v1.Secret, error) {
 	hasBeenRenewed, err := RenewLeafCertificate(&caSecret, secret)
 	if err != nil {
 		return nil, err
 	}
 
 	if hasBeenRenewed {
-		updatedSecret, err := client.CoreV1().Secrets(secret.Namespace).Update(secret)
+		updatedSecret, err := client.CoreV1().Secrets(secret.Namespace).Update(ctx, secret, metav1.UpdateOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -350,9 +358,9 @@ func DumpSecretToDir(secret *v1.Secret, certDir string, basename string) error {
 // InjectPublicKeyIntoMutatingWebhook inject the TLS public key into the admitted
 // ones for a certain mutating webhook configuration
 func (pki PublicKeyInfrastructure) InjectPublicKeyIntoMutatingWebhook(
-	client kubernetes.Interface, tlsSecret *v1.Secret) error {
+	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret) error {
 	config, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
-		pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
+		ctx, pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -361,16 +369,18 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoMutatingWebhook(
 		config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
 	}
 
-	_, err = client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Update(config)
+	_, err = client.AdmissionregistrationV1beta1().
+		MutatingWebhookConfigurations().
+		Update(ctx, config, metav1.UpdateOptions{})
 	return err
 }
 
 // InjectPublicKeyIntoValidatingWebhook inject the TLS public key into the admitted
 // ones for a certain validating webhook configuration
 func (pki PublicKeyInfrastructure) InjectPublicKeyIntoValidatingWebhook(
-	client kubernetes.Interface, tlsSecret *v1.Secret) error {
+	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret) error {
 	config, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
-		pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+		ctx, pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -379,6 +389,8 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoValidatingWebhook(
 		config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
 	}
 
-	_, err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Update(config)
+	_, err = client.AdmissionregistrationV1beta1().
+		ValidatingWebhookConfigurations().
+		Update(ctx, config, metav1.UpdateOptions{})
 	return err
 }

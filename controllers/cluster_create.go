@@ -525,7 +525,6 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
-			// Let's reconcile another time
 			return ctrl.Result{}, nil
 		}
 
@@ -571,18 +570,17 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	// Retrieve the cluster key
 	key := expectations.KeyFunc(cluster)
 
-	// We expect the creation of a PVC
-	if err := r.pvcExpectations.ExpectCreations(key, 1); err != nil {
-		log.Error(err, "Unable to set pvcExpectations", "key", key, "adds", 1)
+	// We expect the creation of a Job
+	if err := r.jobExpectations.ExpectCreations(key, 1); err != nil {
+		log.Error(err, "Unable to set jobExpectations", "key", key, "adds", 1)
 	}
 
 	if err = r.Create(ctx, job); err != nil {
 		// We cannot observe a creation if it was not accepted by the server
-		r.pvcExpectations.CreationObserved(key)
+		r.jobExpectations.CreationObserved(key)
 
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
-			// Let's reconcile another time
 			log.Info("Job already exist, maybe the cache is stale", "pod", job.Name)
 			return ctrl.Result{}, nil
 		}

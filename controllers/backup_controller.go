@@ -36,8 +36,7 @@ type BackupReconciler struct {
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
 
 // Reconcile is the main reconciliation loop
-func (r *BackupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("backup", req.NamespacedName)
 
 	var backup postgresqlv1alpha1.Backup
