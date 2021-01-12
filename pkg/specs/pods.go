@@ -249,7 +249,7 @@ func CreateSecretAccessKeyEnvVar(backupConfiguration *v1alpha1.BackupConfigurati
 // from the user
 func CreateAffinitySection(clusterName string, config v1alpha1.AffinityConfiguration) *corev1.Affinity {
 	// We have no anti affinity section if the user don't have it configured
-	if !config.EnablePodAntiAffinity {
+	if config.EnablePodAntiAffinity != nil && !(*config.EnablePodAntiAffinity) {
 		return nil
 	}
 

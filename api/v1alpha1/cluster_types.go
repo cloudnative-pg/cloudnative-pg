@@ -380,9 +380,10 @@ type StorageConfiguration struct {
 // AffinityConfiguration contains the info we need to create the
 // affinity rules for Pods
 type AffinityConfiguration struct {
-	// Should we enable anti affinity or not?
+	// Activates anti-affinity for the pods. The operator will define pods
+	// anti-affinity unless this field is explicitly set to false
 	// +optional
-	EnablePodAntiAffinity bool `json:"enablePodAntiAffinity"`
+	EnablePodAntiAffinity *bool `json:"enablePodAntiAffinity,omitempty"`
 
 	// TopologyKey to use for anti-affinity configuration. See k8s documentation
 	// for more info on that
