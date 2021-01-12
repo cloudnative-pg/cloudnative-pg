@@ -13,7 +13,7 @@ require (
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.2.0
 	github.com/spf13/cobra v1.1.1
-	go.uber.org/zap v1.15.0
+	go.uber.org/zap v1.16.0
 	k8s.io/api v0.20.1
 	k8s.io/apimachinery v0.20.1
 	k8s.io/cli-runtime v0.20.1
