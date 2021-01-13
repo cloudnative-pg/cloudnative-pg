@@ -4,14 +4,11 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package v1alpha1
+package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 // ScheduledBackupSpec defines the desired state of ScheduledBackup
@@ -37,7 +34,6 @@ type ScheduledBackupStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 
 // ScheduledBackup is the Schema for the scheduledbackups API
@@ -65,59 +61,6 @@ type ScheduledBackupList struct {
 	// List of clusters
 	Items []ScheduledBackup `json:"items"`
 }
-
-// IsSuspended check if a scheduled backup has been suspended or not
-func (scheduledBackup ScheduledBackup) IsSuspended() bool {
-	if scheduledBackup.Spec.Suspend == nil {
-		return false
-	}
-
-	return *scheduledBackup.Spec.Suspend
-}
-
-// GetName gets the scheduled backup name
-func (scheduledBackup *ScheduledBackup) GetName() string {
-	return scheduledBackup.Name
-}
-
-// GetNamespace gets the scheduled backup name
-func (scheduledBackup *ScheduledBackup) GetNamespace() string {
-	return scheduledBackup.Namespace
-}
-
-// GetSchedule get the cron-like schedule of this scheduled backup
-func (scheduledBackup *ScheduledBackup) GetSchedule() string {
-	return scheduledBackup.Spec.Schedule
-}
-
-// GetStatus gets the status that the caller may update
-func (scheduledBackup *ScheduledBackup) GetStatus() *ScheduledBackupStatus {
-	return &scheduledBackup.Status
-}
-
-// GetKubernetesObject gets the kubernetes object
-func (scheduledBackup *ScheduledBackup) GetKubernetesObject() client.Object {
-	return scheduledBackup
-}
-
-// CreateBackup create a backup from this scheduled backup
-func (scheduledBackup *ScheduledBackup) CreateBackup(name string) BackupCommon {
-	backup := Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: scheduledBackup.Namespace,
-		},
-		Spec: BackupSpec{
-			Cluster: scheduledBackup.Spec.Cluster,
-		},
-	}
-	utils.SetAsOwnedBy(&backup.ObjectMeta, scheduledBackup.ObjectMeta, scheduledBackup.TypeMeta)
-	return &backup
-}
-
-// Hub marks this type as a conversion hub.
-// TODO: Use as hub the stable version, v1
-func (*ScheduledBackup) Hub() {}
 
 func init() {
 	SchemeBuilder.Register(&ScheduledBackup{}, &ScheduledBackupList{})

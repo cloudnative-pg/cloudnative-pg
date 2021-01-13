@@ -21,6 +21,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	postgresqlv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	postgresqlv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/cmd/manager/app"
 	"github.com/EnterpriseDB/cloud-native-postgresql/controllers"
@@ -55,6 +56,7 @@ func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
 	_ = postgresqlv1alpha1.AddToScheme(scheme)
+	_ = postgresqlv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -176,6 +178,11 @@ func main() {
 	}
 
 	if err = (&postgresqlv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
+		os.Exit(1)
+	}
+
+	if err = (&postgresqlv1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
 		os.Exit(1)
 	}

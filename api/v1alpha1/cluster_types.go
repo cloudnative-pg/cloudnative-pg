@@ -527,6 +527,7 @@ type S3Credentials struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.instances,statuspath=.status.instances
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
@@ -561,6 +562,10 @@ type ClusterList struct {
 	// List of clusters
 	Items []Cluster `json:"items"`
 }
+
+// Hub marks this type as a conversion hub.
+// TODO: Use as hub the stable version, v1
+func (*Cluster) Hub() {}
 
 // GetImageName get the name of the image that should be used
 // to create the pods
