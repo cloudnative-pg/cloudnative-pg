@@ -15,8 +15,8 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 )
 
-// log is for logging in this package.
-var clusterlog = logf.Log.WithName("cluster-resource")
+// clusterLog is for logging in this package.
+var clusterLog = logf.Log.WithName("cluster-resource")
 
 // SetupWebhookWithManager setup the webhook inside the controller manager
 func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -31,12 +31,12 @@ var _ webhook.Defaulter = &Cluster{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *Cluster) Default() {
-	clusterlog.Info("default", "name", r.Name)
+	clusterLog.Info("default", "name", r.Name)
 
 	v1alphaCluster := v1alpha1.Cluster{}
 	err := r.ConvertTo(&v1alphaCluster)
 	if err != nil {
-		clusterlog.Error(err, "Defaulting webhook for v1")
+		clusterLog.Error(err, "Defaulting webhook for v1")
 		return
 	}
 
@@ -44,7 +44,7 @@ func (r *Cluster) Default() {
 
 	err = r.ConvertFrom(&v1alphaCluster)
 	if err != nil {
-		clusterlog.Error(err, "Defaulting webhook for v1")
+		clusterLog.Error(err, "Defaulting webhook for v1")
 		return
 	}
 }
@@ -56,7 +56,7 @@ var _ webhook.Validator = &Cluster{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateCreate() error {
-	clusterlog.Info("validate create", "name", r.Name)
+	clusterLog.Info("validate create", "name", r.Name)
 
 	v1alphaCluster := v1alpha1.Cluster{}
 	if err := r.ConvertTo(&v1alphaCluster); err != nil {
@@ -80,7 +80,7 @@ func (r *Cluster) ValidateCreate() error {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateUpdate(old runtime.Object) error {
-	clusterlog.Info("validate update", "name", r.Name)
+	clusterLog.Info("validate update", "name", r.Name)
 
 	oldV1Alpha1Cluster := v1alpha1.Cluster{}
 	if err := old.(*Cluster).ConvertTo(&oldV1Alpha1Cluster); err != nil {
@@ -109,7 +109,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateDelete() error {
-	clusterlog.Info("validate delete", "name", r.Name)
+	clusterLog.Info("validate delete", "name", r.Name)
 
 	v1alphaCluster := v1alpha1.Cluster{}
 	if err := r.ConvertTo(&v1alphaCluster); err != nil {

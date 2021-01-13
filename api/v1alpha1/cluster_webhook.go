@@ -25,8 +25,8 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
-// log is for logging in this package.
-var log = logf.Log.WithName("cluster-resource")
+// clusterLog is for logging in this package.
+var clusterLog = logf.Log.WithName("cluster-resource")
 
 // SetupWebhookWithManager setup the webhook inside the controller manager
 func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -41,7 +41,7 @@ var _ webhook.Defaulter = &Cluster{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *Cluster) Default() {
-	log.Info("default", "name", r.Name)
+	clusterLog.Info("default", "name", r.Name)
 
 	// Defaulting the image name if not specified
 	if r.Spec.ImageName == "" {
@@ -88,7 +88,7 @@ var _ webhook.Validator = &Cluster{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateCreate() error {
 	var allErrs field.ErrorList
-	log.Info("validate create", "name", r.Name)
+	clusterLog.Info("validate create", "name", r.Name)
 
 	allErrs = append(allErrs, r.validateInitDB()...)
 	allErrs = append(allErrs, r.validateSuperuserSecret()...)
@@ -112,7 +112,7 @@ func (r *Cluster) ValidateCreate() error {
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	var allErrs field.ErrorList
-	log.Info("validate update", "name", r.Name)
+	clusterLog.Info("validate update", "name", r.Name)
 
 	allErrs = append(allErrs, r.validateInitDB()...)
 	allErrs = append(allErrs, r.validateSuperuserSecret()...)
@@ -127,7 +127,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 
 	oldObject := old.(*Cluster)
 	if oldObject == nil {
-		log.Info("Received invalid old object, skipping old object validation",
+		clusterLog.Info("Received invalid old object, skipping old object validation",
 			"old", old)
 	} else {
 		allErrs = append(allErrs, r.validateImageChange(oldObject.Spec.ImageName)...)
@@ -146,7 +146,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateDelete() error {
-	log.Info("validate delete", "name", r.Name)
+	clusterLog.Info("validate delete", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil
