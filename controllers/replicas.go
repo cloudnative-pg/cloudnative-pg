@@ -126,6 +126,8 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 	cluster *v1alpha1.Cluster,
 	pods corev1.PodList,
 ) error {
+	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	// No current primary, no work to do
 	if cluster.Status.CurrentPrimary == "" {
 		return nil
@@ -136,7 +138,7 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 		pod := &pods.Items[idx]
 
 		if !utils.IsPodActive(*pod) {
-			r.Log.Info("Ignoring not active Pod during label update",
+			log.Info("Ignoring not active Pod during label update",
 				"pod", pod.Name, "status", pod.Status)
 			continue
 		}
@@ -145,7 +147,7 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 			primaryFound = true
 
 			if !specs.IsPodPrimary(pods.Items[idx]) {
-				r.Log.Info("Setting primary label", "pod", pod.Name)
+				log.Info("Setting primary label", "pod", pod.Name)
 				patch := client.MergeFrom(pod.DeepCopy())
 				pod.Labels[specs.ClusterRoleLabelName] = specs.ClusterRoleLabelPrimary
 				if err := r.Patch(ctx, pod, patch); err != nil {
@@ -155,7 +157,7 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 		}
 
 		if pod.Name != cluster.Status.CurrentPrimary && specs.IsPodPrimary(pods.Items[idx]) {
-			r.Log.Info("Removing primary label", "pod", pod.Name)
+			log.Info("Removing primary label", "pod", pod.Name)
 			patch := client.MergeFrom(pod.DeepCopy())
 			delete(pod.Labels, specs.ClusterRoleLabelName)
 			if err := r.Patch(ctx, pod, patch); err != nil {
@@ -165,7 +167,7 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 	}
 
 	if !primaryFound {
-		r.Log.Info("No primary instance found for this cluster")
+		log.Info("No primary instance found for this cluster")
 	}
 
 	return nil
