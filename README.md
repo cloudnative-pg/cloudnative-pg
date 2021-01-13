@@ -31,8 +31,8 @@ You can invoke the compilation procedure with:
 
 !!! note
     Kustomize version v3.8.2 and greater is not compatible with the current version
-    of the build system. In case you have it installed it is advised to remove it
-    and let the build system to download a compatible version of the software.
+    of the build system. You should remove Kustomize and let the build system
+    download a compatible version if Kustomize is already installed.
 
 ## Quickstart for local testing of a git branch
 
@@ -66,7 +66,7 @@ make licenses
   `git log --pretty=oneline v0.1.0..main` where `v0.1.0`
   is the latest released version will be useful.
 
-* run `hack/release.sh v0.2.0` where `v0.2.0`
+* Run `hack/release.sh v0.2.0` where `v0.2.0`
   is the new version to be released.
 
 * Create the release on the Portal and upload the manifest generated in
