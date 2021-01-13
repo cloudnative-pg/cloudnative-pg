@@ -26,6 +26,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 const (
@@ -169,21 +170,27 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
-	if r.satisfiedExpectations(&cluster) && resources.allPodsAreActive() {
-		// Reconcile PVC resource requirements
-		if err = r.ReconcilePVCs(ctx, &cluster, resources); err != nil {
-			if apierrs.IsConflict(err) {
-				return ctrl.Result{Requeue: true}, nil
-			}
-			return ctrl.Result{}, err
-		}
-
-		// Reconcile Pods
-		return r.ReconcilePods(ctx, req, &cluster, resources, instancesStatus)
+	if !r.satisfiedExpectations(&cluster) {
+		// If an expectation is not met, let's try invoking a reconciliation loop
+		// in one seconds, just to see if something has changed or not
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	log.V(2).Info("A managed resource is currently being created or deleted. Waiting")
-	return ctrl.Result{}, nil
+	if !resources.allPodsAreActive() {
+		log.V(2).Info("A managed resource is currently being created or deleted. Waiting")
+		return ctrl.Result{}, nil
+	}
+
+	// Reconcile PVC resource requirements
+	if err = r.ReconcilePVCs(ctx, &cluster, resources); err != nil {
+		if apierrs.IsConflict(err) {
+			return ctrl.Result{Requeue: true}, nil
+		}
+		return ctrl.Result{}, err
+	}
+
+	// Reconcile Pods
+	return r.ReconcilePods(ctx, req, &cluster, resources, instancesStatus)
 }
 
 // satisfiedExpectations check if the expectations for a certain cluster are met
@@ -307,23 +314,12 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 		return r.createPrimaryInstance(ctx, cluster)
 	}
 
-	// When everything is reconciled, update the status
-	if cluster.Status.ReadyInstances == cluster.Status.Instances &&
-		cluster.Status.Instances == cluster.Spec.Instances {
-		if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseHealthy, ""); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Check if we need to handle a rolling upgrade
-		return ctrl.Result{}, r.upgradeCluster(ctx, cluster, resources.pods, instancesStatus)
-	}
-
-	// Find if we have Pods that are not ready, this is OK
-	// only if we are in upgrade mode and we have choose to just
-	// wait for the node to come up
-	if !cluster.IsNodeMaintenanceWindowReusePVC() && cluster.Status.ReadyInstances < cluster.Status.Instances {
-		// A Pod is not ready, let's retry
-		log.V(2).Info("Waiting for Pod to be ready")
+	// Stop acting here if there are non-ready Pods and cluster
+	// is in maintenance mode reusing PVCs.
+	// The user have choose to wait for the missing nodes to come up
+	if !cluster.IsNodeMaintenanceWindowReusePVC() &&
+		cluster.Status.ReadyInstances < cluster.Status.Instances {
+		log.V(2).Info("Waiting for Pods to be ready")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -344,7 +340,61 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 		}
 	}
 
-	return ctrl.Result{}, nil
+	// Stop acting here if there are non-ready Pods
+	// In the rest of the function we are sure that
+	// cluster.Status.Instances == cluster.Spec.Instances and
+	// we don't need to modify the cluster topology
+	if cluster.Status.ReadyInstances != cluster.Status.Instances {
+		log.V(2).Info("Waiting for Pods to be ready")
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
+	// When everything is reconciled, update the status
+	if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseHealthy, ""); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// If we need to apply an upgrade to the cluster, this is the right moment
+	if err := r.upgradeCluster(ctx, cluster, resources.pods, instancesStatus); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Cleanup stuff
+	return ctrl.Result{}, r.removeCompletedJobs(ctx, cluster, resources.jobs)
+}
+
+// removeCompletedJobs remove all the Jobs which are completed
+func (r *ClusterReconciler) removeCompletedJobs(
+	ctx context.Context,
+	cluster *v1alpha1.Cluster,
+	jobs batchv1.JobList) error {
+	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
+	// Retrieve the cluster key
+	key := expectations.KeyFunc(cluster)
+
+	for idx := range jobs.Items {
+		if utils.IsJobComplete(jobs.Items[idx]) {
+			log.V(2).Info("Removing job", "job", jobs.Items[idx].Name)
+
+			// We expect the deletion of the selected Job
+			if err := r.jobExpectations.ExpectDeletions(key, 1); err != nil {
+				log.Error(err, "Unable to set jobExpectations", "key", key, "dels", 1)
+			}
+
+			foreground := metav1.DeletePropagationForeground
+			if err := r.Delete(ctx, &jobs.Items[idx], &client.DeleteOptions{
+				PropagationPolicy: &foreground,
+			}); err != nil {
+				// We cannot observe a deletion if it was not accepted by the server
+				r.jobExpectations.DeletionObserved(key)
+
+				return fmt.Errorf("cannot delete job: %w", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // SetupWithManager creates a ClusterReconciler
