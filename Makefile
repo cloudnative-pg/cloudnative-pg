@@ -3,7 +3,7 @@
 # Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
 
 # Image URL to use all building/pushing image targets
-CONTROLLER_IMG ?= quay.io/enterprisedb/cloud-native-postgresql-testing:$(shell git symbolic-ref --short HEAD | tr / -)
+CONTROLLER_IMG ?= quay.io/enterprisedb/cloud-native-postgresql-testing:$(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/enterprisedb/postgresql:13
 KUSTOMIZE_VERSION ?= v3.5.4
