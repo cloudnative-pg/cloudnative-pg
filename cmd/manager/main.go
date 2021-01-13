@@ -180,12 +180,32 @@ func main() {
 	}
 
 	if err = (&postgresqlv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
+		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster", "version", "v1alpha1")
 		os.Exit(1)
 	}
 
 	if err = (&postgresqlv1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
+		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster", "version", "v1")
+		os.Exit(1)
+	}
+
+	if err = (&postgresqlv1alpha1.Backup{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "Backup", "version", "v1alpha1")
+		os.Exit(1)
+	}
+
+	if err = (&postgresqlv1.Backup{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "Backup", "version", "v1")
+		os.Exit(1)
+	}
+
+	if err = (&postgresqlv1alpha1.ScheduledBackup{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ScheduledBackup", "version", "v1alpha1")
+		os.Exit(1)
+	}
+
+	if err = (&postgresqlv1.ScheduledBackup{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "ScheduledBackup", "version", "v1")
 		os.Exit(1)
 	}
 
