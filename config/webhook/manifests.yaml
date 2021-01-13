@@ -1,52 +1,56 @@
 
 ---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
-- clientConfig:
-    caBundle: Cg==
+- admissionReviewVersions:
+  - v1
+  clientConfig:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-postgresql-k8s-enterprisedb-io-v1alpha1-cluster
+      path: /mutate-postgresql-k8s-enterprisedb-io-v1-cluster
   failurePolicy: Fail
   name: mcluster.kb.io
   rules:
   - apiGroups:
     - postgresql.k8s.enterprisedb.io
     apiVersions:
-    - v1alpha1
+    - v1
     operations:
     - CREATE
     - UPDATE
     resources:
     - clusters
+  sideEffects: None
 
 ---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
-- clientConfig:
-    caBundle: Cg==
+- admissionReviewVersions:
+  - v1
+  clientConfig:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-postgresql-k8s-enterprisedb-io-v1alpha1-cluster
+      path: /validate-postgresql-k8s-enterprisedb-io-v1-cluster
   failurePolicy: Fail
   name: vcluster.kb.io
   rules:
   - apiGroups:
     - postgresql.k8s.enterprisedb.io
     apiVersions:
-    - v1alpha1
+    - v1
     operations:
     - CREATE
     - UPDATE
     resources:
     - clusters
+  sideEffects: None

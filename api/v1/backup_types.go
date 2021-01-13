@@ -4,12 +4,11 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package v1alpha1
+package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // BackupPhase is the phase of the backup
@@ -79,7 +78,6 @@ type BackupStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 
 // Backup is the Schema for the backups API
@@ -107,68 +105,6 @@ type BackupList struct {
 	// List of backups
 	Items []Backup `json:"items"`
 }
-
-// SetAsFailed marks a certain backup as invalid
-func (backupStatus *BackupStatus) SetAsFailed(
-	stdout string,
-	stderr string,
-	err error,
-) {
-	backupStatus.Phase = BackupPhaseFailed
-	backupStatus.CommandOutput = stdout
-	backupStatus.CommandError = stderr
-
-	if err != nil {
-		backupStatus.Error = err.Error()
-	} else {
-		backupStatus.Error = ""
-	}
-}
-
-// SetAsCompleted marks a certain backup as invalid
-func (backupStatus *BackupStatus) SetAsCompleted(
-	stdout string,
-	stderr string,
-) {
-	backupStatus.Phase = BackupPhaseCompleted
-	backupStatus.CommandOutput = stdout
-	backupStatus.CommandError = stderr
-	backupStatus.Error = ""
-}
-
-// IsDone check if a backup is completed or still in progress
-func (backupStatus *BackupStatus) IsDone() bool {
-	return backupStatus.Phase == BackupPhaseCompleted || backupStatus.Phase == BackupPhaseFailed
-}
-
-// IsInProgress check if a certain backup is in progress or not
-func (backupStatus *BackupStatus) IsInProgress() bool {
-	return !backupStatus.IsDone()
-}
-
-// GetStatus gets the backup status
-func (backup *Backup) GetStatus() *BackupStatus {
-	return &backup.Status
-}
-
-// GetName get the backup name
-func (backup *Backup) GetName() string {
-	return backup.Name
-}
-
-// GetNamespace get the backup namespace
-func (backup *Backup) GetNamespace() string {
-	return backup.Namespace
-}
-
-// GetKubernetesObject get the kubernetes object
-func (backup *Backup) GetKubernetesObject() client.Object {
-	return backup
-}
-
-// Hub marks this type as a conversion hub.
-// TODO: Use as hub the stable version, v1
-func (*Backup) Hub() {}
 
 func init() {
 	SchemeBuilder.Register(&Backup{}, &BackupList{})
