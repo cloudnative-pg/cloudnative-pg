@@ -13,7 +13,7 @@ import (
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
 	//+kubebuilder:scaffold:imports
-	clusterv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -38,7 +38,7 @@ var _ = BeforeSuite(func() {
 		Fail(err.Error())
 	}
 	_ = k8sscheme.AddToScheme(env.Scheme)
-	_ = clusterv1alpha1.AddToScheme(env.Scheme)
+	_ = clusterv1.AddToScheme(env.Scheme)
 	//+kubebuilder:scaffold:scheme
 })
 

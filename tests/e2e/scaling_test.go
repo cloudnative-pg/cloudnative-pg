@@ -11,7 +11,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	clusterv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -49,7 +49,7 @@ var _ = Describe("Cluster scale up and down", func() {
 				Name:      clusterName,
 			}
 			Eventually(func() (int32, error) {
-				cluster := &clusterv1alpha1.Cluster{}
+				cluster := &clusterv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.ReadyInstances, err
 			}, timeout).Should(BeEquivalentTo(4))
@@ -66,7 +66,7 @@ var _ = Describe("Cluster scale up and down", func() {
 				Name:      clusterName,
 			}
 			Eventually(func() (int32, error) {
-				cluster := &clusterv1alpha1.Cluster{}
+				cluster := &clusterv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.ReadyInstances, err
 			}, timeout).Should(BeEquivalentTo(3))

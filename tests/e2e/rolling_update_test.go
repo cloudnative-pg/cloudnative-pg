@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
-	clusterv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
@@ -65,7 +65,7 @@ var _ = Describe("Rolling updates", func() {
 
 		// We should be able to apply the conf containing the new
 		// image
-		cluster := &clusterv1alpha1.Cluster{}
+		cluster := &clusterv1.Cluster{}
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      clusterName,
@@ -225,7 +225,7 @@ var _ = Describe("Rolling updates", func() {
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		// Gather the number of instances in this Cluster
-		cluster := &clusterv1alpha1.Cluster{}
+		cluster := &clusterv1.Cluster{}
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      clusterName,
