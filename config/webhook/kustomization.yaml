@@ -1,5 +1,5 @@
 resources:
-- manifests.yaml
+- manifests.v1beta1.yaml
 - service.yaml
 
 configurations:

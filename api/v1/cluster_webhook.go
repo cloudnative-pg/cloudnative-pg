@@ -25,9 +25,7 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-
-// +kubebuilder:webhook:path=/mutate-postgresql-k8s-enterprisedb-io-v1-cluster,mutating=true,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=clusters,verbs=create;update,versions=v1,name=mcluster.kb.io,sideEffects=None,admissionReviewVersions=v1
+// +kubebuilder:webhook:webhookVersions={v1beta1},admissionReviewVersions={v1beta1},path=/mutate-postgresql-k8s-enterprisedb-io-v1-cluster,mutating=true,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=clusters,verbs=create;update,versions=v1,name=mcluster.kb.io,sideEffects=None
 
 var _ webhook.Defaulter = &Cluster{}
 
@@ -52,7 +50,7 @@ func (r *Cluster) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-// +kubebuilder:webhook:verbs=create;update,path=/validate-postgresql-k8s-enterprisedb-io-v1-cluster,mutating=false,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=clusters,versions=v1,name=vcluster.kb.io,sideEffects=None,admissionReviewVersions=v1
+// +kubebuilder:webhook:webhookVersions={v1beta1},admissionReviewVersions={v1beta1},verbs=create;update,path=/validate-postgresql-k8s-enterprisedb-io-v1-cluster,mutating=false,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=clusters,versions=v1,name=vcluster.kb.io,sideEffects=None
 
 var _ webhook.Validator = &Cluster{}
 
