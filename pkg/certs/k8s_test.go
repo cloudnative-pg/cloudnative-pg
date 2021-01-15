@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"k8s.io/api/admissionregistration/v1beta1"
+	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	fakeApiExtension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -32,6 +34,10 @@ var (
 		OperatorNamespace:                  "operator-namespace",
 		MutatingWebhookConfigurationName:   "mutating-webhook",
 		ValidatingWebhookConfigurationName: "validating-webhook",
+		CustomResourceDefinitionsName: []string{
+			"clusters.postgresql.k8s.enterprisedb.io",
+			"backups.postgresql.k8s.enterprisedb.io",
+		},
 	}
 
 	mutatingWebhookTemplate = v1beta1.MutatingWebhookConfiguration{
@@ -52,6 +58,34 @@ var (
 		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				ClientConfig: v1beta1.WebhookClientConfig{},
+			},
+		},
+	}
+
+	firstCrdTemplate = apiextensionv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: pkiEnvironmentTemplate.CustomResourceDefinitionsName[0],
+		},
+		Spec: apiextensionv1.CustomResourceDefinitionSpec{
+			Conversion: &apiextensionv1.CustomResourceConversion{
+				Webhook: &apiextensionv1.WebhookConversion{
+					ConversionReviewVersions: []string{"v1", "v1alpha1"},
+					ClientConfig:             &apiextensionv1.WebhookClientConfig{},
+				},
+			},
+		},
+	}
+
+	secondCrdTemplate = apiextensionv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: pkiEnvironmentTemplate.CustomResourceDefinitionsName[1],
+		},
+		Spec: apiextensionv1.CustomResourceDefinitionSpec{
+			Conversion: &apiextensionv1.CustomResourceConversion{
+				Webhook: &apiextensionv1.WebhookConversion{
+					ConversionReviewVersions: []string{"v1", "v1alpha1"},
+					ClientConfig:             &apiextensionv1.WebhookClientConfig{},
+				},
 			},
 		},
 	}
@@ -249,28 +283,44 @@ var _ = Describe("Webhook environment creation", func() {
 			Expect(err).To(BeNil())
 		}()
 
+		ctx := context.Background()
+
 		pki := pkiEnvironmentTemplate
 		mutatingWebhook := mutatingWebhookTemplate
 		validatingWebhook := validatingWebhookTemplate
-		clientSet := fake.NewSimpleClientset(&mutatingWebhook, &validatingWebhook)
+		firstCrd := firstCrdTemplate
+		secondCrd := secondCrdTemplate
 
-		err = pki.Setup(context.TODO(), clientSet)
+		clientSet := fake.NewSimpleClientset(&mutatingWebhook, &validatingWebhook)
+		apiClientSet := fakeApiExtension.NewSimpleClientset(&firstCrd, &secondCrd)
+
+		err = pki.Setup(ctx, clientSet, apiClientSet)
 		Expect(err).To(BeNil())
 
 		webhookSecret, err := clientSet.CoreV1().Secrets(
-			pki.OperatorNamespace).Get(context.TODO(), pki.SecretName, metav1.GetOptions{})
+			pki.OperatorNamespace).Get(ctx, pki.SecretName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 		Expect(webhookSecret.Namespace).To(Equal(pki.OperatorNamespace))
 		Expect(webhookSecret.Name).To(Equal(pki.SecretName))
 
 		updatedMutatingWebhook, err := clientSet.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
-			context.TODO(), pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
+			ctx, pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 		Expect(updatedMutatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 
 		updatedValidatingWebhook, err := clientSet.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
-			context.TODO(), pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+			ctx, pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 		Expect(updatedValidatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
+
+		updatedFirstCrd, err := apiClientSet.ApiextensionsV1().CustomResourceDefinitions().Get(
+			ctx, pki.CustomResourceDefinitionsName[0], metav1.GetOptions{})
+		Expect(err).To(BeNil())
+		Expect(updatedFirstCrd.Spec.Conversion.Webhook.ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
+
+		updatedSecondCrd, err := apiClientSet.ApiextensionsV1().CustomResourceDefinitions().Get(
+			ctx, pki.CustomResourceDefinitionsName[1], metav1.GetOptions{})
+		Expect(err).To(BeNil())
+		Expect(updatedSecondCrd.Spec.Conversion.Webhook.ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 	})
 })
