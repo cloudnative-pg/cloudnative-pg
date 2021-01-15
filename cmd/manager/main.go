@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -198,6 +199,11 @@ func setupPKI(ctx context.Context, config *rest.Config, certDir string) error {
 		return fmt.Errorf("cannot create a K8s client: %w", err)
 	}
 
+	apiClientSet, err := apiextensionsclientset.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("cannot create a K8s API extension client: %w", err)
+	}
+
 	pkiConfig := certs.PublicKeyInfrastructure{
 		CaSecretName:                       controllers.CaSecretName,
 		CertDir:                            certDir,
@@ -206,13 +212,18 @@ func setupPKI(ctx context.Context, config *rest.Config, certDir string) error {
 		OperatorNamespace:                  controllers.GetOperatorNamespaceOrDie(),
 		MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
+		CustomResourceDefinitionsName: []string{
+			"backups.postgresql.k8s.enterprisedb.io",
+			"clusters.postgresql.k8s.enterprisedb.io",
+			"scheduledbackups.postgresql.k8s.enterprisedb.io",
+		},
 	}
-	err = pkiConfig.Setup(ctx, clientSet)
+	err = pkiConfig.Setup(ctx, clientSet, apiClientSet)
 	if err != nil {
 		return err
 	}
 
-	err = pkiConfig.SchedulePeriodicMaintenance(ctx, clientSet)
+	err = pkiConfig.SchedulePeriodicMaintenance(ctx, clientSet, apiClientSet)
 	if err != nil {
 		return err
 	}

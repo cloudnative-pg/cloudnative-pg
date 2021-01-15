@@ -15,6 +15,7 @@ import (
 
 	"github.com/robfig/cron"
 	v1 "k8s.io/api/core/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -52,6 +53,10 @@ type PublicKeyInfrastructure struct {
 	// The name of the validating webhook configuration in k8s, used
 	// to inject the caBundle
 	ValidatingWebhookConfigurationName string
+
+	// The name of every CRD that has a reference to a conversion webhook
+	// on which we need to inject our public key
+	CustomResourceDefinitionsName []string
 }
 
 // EnsureRootCACertificate ensure that in the cluster there is a root CA Certificate
@@ -124,7 +129,10 @@ func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret
 // Setup will setup the PKI infrastructure that is needed for the operator
 // to correctly work, and copy the certificates which are required for the webhook
 // server to run in the right folder
-func (pki PublicKeyInfrastructure) Setup(ctx context.Context, client kubernetes.Interface) error {
+func (pki PublicKeyInfrastructure) Setup(
+	ctx context.Context,
+	client kubernetes.Interface,
+	apiClient apiextensionsclientset.Interface) error {
 	caSecret, err := EnsureRootCACertificate(
 		ctx,
 		client,
@@ -135,7 +143,7 @@ func (pki PublicKeyInfrastructure) Setup(ctx context.Context, client kubernetes.
 	}
 
 	if pki.CertDir != "" {
-		if err = pki.setupWebhookCertificate(ctx, client, caSecret); err != nil {
+		if err = pki.setupWebhooksCertificate(ctx, client, apiClient, caSecret); err != nil {
 			return err
 		}
 	}
@@ -143,8 +151,11 @@ func (pki PublicKeyInfrastructure) Setup(ctx context.Context, client kubernetes.
 	return nil
 }
 
-func (pki PublicKeyInfrastructure) setupWebhookCertificate(
-	ctx context.Context, client kubernetes.Interface, caSecret *v1.Secret) error {
+func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
+	ctx context.Context,
+	client kubernetes.Interface,
+	apiClient apiextensionsclientset.Interface,
+	caSecret *v1.Secret) error {
 	webhookSecret, err := pki.EnsureCertificate(ctx, client, caSecret)
 	if err != nil {
 		return err
@@ -177,16 +188,24 @@ func (pki PublicKeyInfrastructure) setupWebhookCertificate(
 		return err
 	}
 
+	for _, name := range pki.CustomResourceDefinitionsName {
+		if err = pki.InjectPublicKeyIntoCRD(ctx, apiClient, name, webhookSecret); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 // SchedulePeriodicMaintenance schedule a background periodic certificate maintenance,
 // to automatically renew TLS certificates
 func (pki PublicKeyInfrastructure) SchedulePeriodicMaintenance(
-	ctx context.Context, client kubernetes.Interface) error {
+	ctx context.Context,
+	client kubernetes.Interface,
+	apiClient apiextensionsclientset.Interface) error {
 	maintenance := func() {
 		log.Info("Periodic TLS certificates maintenance")
-		err := pki.Setup(ctx, client)
+		err := pki.Setup(ctx, client, apiClient)
 		if err != nil {
 			log.Error(err, "TLS maintenance failed")
 		}
@@ -392,5 +411,28 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoValidatingWebhook(
 	_, err = client.AdmissionregistrationV1beta1().
 		ValidatingWebhookConfigurations().
 		Update(ctx, config, metav1.UpdateOptions{})
+	return err
+}
+
+// InjectPublicKeyIntoCRD inject the TLS public key into the admitted
+// ones from a certain conversion webhook inside a CRD
+func (pki PublicKeyInfrastructure) InjectPublicKeyIntoCRD(
+	ctx context.Context,
+	apiClient apiextensionsclientset.Interface,
+	name string,
+	tlsSecret *v1.Secret) error {
+	crd, err := apiClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if crd.Spec.Conversion != nil {
+		if crd.Spec.Conversion.Webhook != nil {
+			if crd.Spec.Conversion.Webhook.ClientConfig != nil {
+				crd.Spec.Conversion.Webhook.ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
+			}
+		}
+	}
+	_, err = apiClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
 	return err
 }
