@@ -187,3 +187,18 @@ jobs:
             tests/performance/out/
           retention-days: 7
           if-no-files-found: ignore
+
+  trigger-ocp:
+    name: Trigger OCP bundle
+    needs:
+      - golangci
+      - tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          repository: enterprisedb/cloud-native-postgresql-ocp-certified
+          event-type: cnp-trigger
+          client-payload: '{"upstream_commit": "${{ github.sha }}"}'
