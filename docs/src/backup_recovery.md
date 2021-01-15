@@ -48,7 +48,7 @@ Given that secret, you can configure your cluster like in
 the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 [...]
 spec:
@@ -78,7 +78,7 @@ In this example, it will use the `bucket` bucket of Linode in the region
 `us-east1`.
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 [...]
 spec:
@@ -190,7 +190,7 @@ Proceed by configuring MinIO Gateway service as the `endpointURL` in the `Cluste
 definition, then choose a bucket name to replace `BUCKET_NAME`:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 [...]
 spec:
@@ -217,7 +217,7 @@ To request a new backup, you need to create a new Backup resource
 like the following one:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Backup
 metadata:
   name: backup-example
@@ -235,11 +235,11 @@ command:
 Name:         backup-example
 Namespace:    default
 Labels:       <none>
-Annotations:  API Version:  postgresql.k8s.enterprisedb.io/v1alpha1
+Annotations:  API Version:  postgresql.k8s.enterprisedb.io/v1
 Kind:         Backup
 Metadata:
   Creation Timestamp:  2020-10-26T13:57:40Z
-  Self Link:         /apis/postgresql.k8s.enterprisedb.io/v1alpha1/namespaces/default/backups/backup-example
+  Self Link:         /apis/postgresql.k8s.enterprisedb.io/v1/namespaces/default/backups/backup-example
   UID:               ad5f855c-2ffd-454a-a157-900d5f1f6584
 Spec:
   Cluster:
@@ -257,11 +257,11 @@ like in the following example:
 Name:         backup-example
 Namespace:    default
 Labels:       <none>
-Annotations:  API Version:  postgresql.k8s.enterprisedb.io/v1alpha1
+Annotations:  API Version:  postgresql.k8s.enterprisedb.io/v1
 Kind:         Backup
 Metadata:
   Creation Timestamp:  2020-10-26T13:57:40Z
-  Self Link:         /apis/postgresql.k8s.enterprisedb.io/v1alpha1/namespaces/default/backups/backup-example
+  Self Link:         /apis/postgresql.k8s.enterprisedb.io/v1/namespaces/default/backups/backup-example
   UID:               ad5f855c-2ffd-454a-a157-900d5f1f6584
 Spec:
   Cluster:
@@ -302,7 +302,7 @@ is the same used in Kubernetes CronJobs.
 This is an example of a scheduled backup:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: ScheduledBackup
 metadata:
   name: backup-example
@@ -323,7 +323,7 @@ If required, you can choose to compress WAL files as soon as they
 are uploaded and/or encrypt them:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 [...]
 spec:
@@ -352,11 +352,11 @@ following example:
 Name:         backup-example
 Namespace:    default
 Labels:       <none>
-Annotations:  API Version:  postgresql.k8s.enterprisedb.io/v1alpha1
+Annotations:  API Version:  postgresql.k8s.enterprisedb.io/v1
 Kind:         Backup
 Metadata:
   Creation Timestamp:  2020-10-26T13:57:40Z
-  Self Link:         /apis/postgresql.k8s.enterprisedb.io/v1alpha1/namespaces/default/backups/backup-example
+  Self Link:         /apis/postgresql.k8s.enterprisedb.io/v1/namespaces/default/backups/backup-example
   UID:               ad5f855c-2ffd-454a-a157-900d5f1f6584
 Spec:
   Cluster:
@@ -382,7 +382,7 @@ Events:         <none>
 Given the following cluster definition:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: cluster-restore
