@@ -155,7 +155,7 @@ disk space:
 
 ```yaml
 # Example of PostgreSQL cluster
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: cluster-example

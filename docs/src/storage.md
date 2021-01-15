@@ -7,7 +7,7 @@ The easier way to configure the storage for a PostgreSQL class is to just
 request storage of a certain size, like in the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: postgresql-storage-class
@@ -22,7 +22,7 @@ class. If the target Kubernetes cluster has no default storage class, or if you 
 to satisfied by a known storage class, you can set it into the custom resource:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: postgresql-storage-class
@@ -39,7 +39,7 @@ To further customize the generated PVCs, you can provide a PVC template inside t
 like in the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: postgresql-pvc-template
@@ -92,7 +92,7 @@ While you do that, you need to prevent the operator from changing the existing P
 by disabling the `resizeInUseVolumes` flag, like in the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: postgresql-pvc-template

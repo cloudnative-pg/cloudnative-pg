@@ -7,7 +7,7 @@ custom resources:
 -   [Cluster](#cluster)
 -   [ScheduledBackup](#scheduledbackup)
 
-All the resources are defined in the `postgresql.k8s.enterprisedb.io/v1alpha1`
+All the resources are defined in the `postgresql.k8s.enterprisedb.io/v1`
 API.
 
 Please refer to the ["Configuration Samples" page](samples.md)" of the

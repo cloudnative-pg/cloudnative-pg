@@ -10,7 +10,7 @@ specification.
 In the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: cluster-example-initdb
@@ -42,7 +42,7 @@ scratch. It is the default one unless specified differently.
 The following example contains the full structure of the `initdb` configuration:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: cluster-example-initdb
@@ -128,7 +128,7 @@ add data checksums), you can add them to the `options` section like in
 the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: cluster-example-initdb
@@ -156,7 +156,7 @@ The following example contains the full structure of the `recovery`
 section:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: cluster-example-initdb
@@ -206,7 +206,7 @@ feature to work if a recovery target is specified like in the following
 example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: cluster-restore-pitr
@@ -250,7 +250,7 @@ stopping right after the recovery target, setting the `exclusive` parameter to
 `false` like in the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: cluster-restore-pitr
