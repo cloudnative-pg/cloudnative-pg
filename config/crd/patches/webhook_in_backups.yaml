@@ -10,6 +10,8 @@ spec:
     webhook:
       conversionReviewVersions:
       - v1alpha1
+        # This is unfortunately needed for K8s v1.16
+      - v1beta1
       - v1
       clientConfig:
         # this is "\n" used as a placeholder, otherwise it will be rejected by the apiserver for being blank,
