@@ -13,7 +13,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	clusterv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -102,7 +102,7 @@ var _ = Describe("Configuration update", func() {
 				Namespace: namespace,
 				Name:      clusterName,
 			}
-			cluster := &clusterv1alpha1.Cluster{}
+			cluster := &clusterv1.Cluster{}
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
@@ -136,7 +136,7 @@ var _ = Describe("Configuration update", func() {
 				Namespace: namespace,
 				Name:      clusterName,
 			}
-			cluster := &clusterv1alpha1.Cluster{}
+			cluster := &clusterv1.Cluster{}
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary

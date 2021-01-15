@@ -1,5 +1,4 @@
-# Example of PostgreSQL cluster using a storage class
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
   name: postgresql-storage-class
