@@ -18,5 +18,4 @@ Agreement (2Q-EULA). 2Q-EULA is contained within the `/licenses/2ndquadrant`
 folder of the container image.  If it is not  visible please see
 [licenses.2ndq.io/2Q-EULA](https://licenses.2ndq.io/2Q-EULA).
 
-Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to
-2ndQuadrant Limited.
+Copyright (C) 2019-2021 EnterpriseDB Corporation.
