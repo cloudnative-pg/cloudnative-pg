@@ -1,6 +1,6 @@
 # This file is part of Cloud Native PostgreSQL.
 #
-# Copyright (C) 2019-2020 2ndQuadrant Italia SRL. Exclusively licensed to 2ndQuadrant Limited.
+# Copyright (C) 2019-2021 EnterpriseDB Corporation.
 
 # Image URL to use all building/pushing image targets
 CONTROLLER_IMG ?= quay.io/enterprisedb/cloud-native-postgresql-testing:$(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
