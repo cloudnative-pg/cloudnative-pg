@@ -1,14 +1,34 @@
 # Cloud Native PostgreSQL
 
-**Cloud Native PostgreSQL** is a stack designed by [EnterpriseDB](https://www.enterprisedb.com)
-to manage [PostgreSQL](https://www.postgresql.org/) workloads on [Kubernetes](https://kubernetes.io),
-particularly optimised for private cloud environments with Local Persistent Volumes (PV).
+**Cloud Native PostgreSQL** is an [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
+designed by [EnterpriseDB](https://www.enterprisedb.com)
+to manage [PostgreSQL](https://www.postgresql.org/) workloads on any supported [Kubernetes](https://kubernetes.io)
+cluster running in private, public, or hybrid cloud environments.
+Cloud Native PostgreSQL adheres to DevOps principles and concepts
+such as declarative configuration and immutable infrastructure.
 
-Cloud Native PostgreSQL defines a new Kubernetes resource called *Cluster* that
-represents a PostgreSQL cluster made up of a single primary and an optional number
-of High Availability replicas that co-exist in a chosen Kubernetes namespace.
+It defines a new Kubernetes resource called "Cluster" representing a PostgreSQL
+cluster made up of a single primary and an optional number of replicas that co-exist
+in a chosen Kubernetes namespace for High Availability and offloading of
+read-only queries.
 
-PostgreSQL 13, 12, 11 and 10 are currently supported.
+Applications that reside in the same Kubernetes cluster can access the
+PostgreSQL database using a service which is solely managed by the operator,
+without having to worry about changes of the primary role following a failover
+or a switchover. Applications that reside outside the Kubernetes cluster, need
+to configure an Ingress object to expose the service via TCP.
+
+Cloud Native PostgreSQL works with PostgreSQL and is available under the
+[EnterpriseDB Limited Use License](https://www.enterprisedb.com/limited-use-license).
+
+!!! IMPORTANT
+    Currently, based on the [Operator Capability Levels model](operator_capability_levels.md),
+    users can expect a **"Level III - Full Lifecycle"** set of capabilities from the
+    Cloud Native PostgreSQL Operator.
+
+## Requirements
+
+Cloud Native PostgreSQL requires Kubernetes 1.16 or higher, tested on AWS, Google, Azure (with multiple availability zones).
 
 Cloud Native PostgreSQL has also been certified for
 [RedHat OpenShift Container Platform (OCP)](https://www.openshift.com/products/container-platform)
@@ -17,10 +37,9 @@ OpenShift Container Platform is an open-source distribution of Kubernetes which 
 [maintained and commercially supported](https://access.redhat.com/support/policy/updates/openshift#ocp4)
 by Red Hat.
 
-!!! IMPORTANT
-    Currently, based on the [Operator Capability Levels model](operator_capability_levels.md),
-    users can expect a **"Level III - Full Lifecycle"** set of capabilities from the
-    Cloud Native PostgreSQL Operator.
+## Supported PostgreSQL versions
+
+PostgreSQL 13, 12, 11 and 10 are currently supported.
 
 ## Main features
 
@@ -41,14 +60,8 @@ by Red Hat.
 * Continuous backup to an S3 compatible object store
 * Full recovery and Point-In-Time recovery from an S3 compatible object store backup
 * Support for Synchronous Replicas
+* Support for node affinity via `nodeSelector`
 * Standard output logging of PostgreSQL error messages
-
-## Requirements on Kubernetes
-
-Cloud Native PostgreSQL requires Kubernetes 1.16 or higher, tested on AWS, Google, Azure (with multiple availability zones).
-
-!!! Warning
-    These requirements do not apply to Cloud Native PostgreSQL on RedHat Open Container Platform.
 
 ## About this guide
 
