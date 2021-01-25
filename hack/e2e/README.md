@@ -23,7 +23,9 @@ specifying the following variable
 
 * `DOCKER_REGISTRY_MIRROR`: DockerHub mirror URL (i.e. https://mirror.gcr.io)
 
-## Local test on Kind
+## Local test
+
+### On kind
 
 You can test the operator locally on kind running
 
@@ -32,6 +34,23 @@ run-e2e-kind.sh
 ```
 
 It will take care of creating a Kind cluster and run the tests on it.
+
+### On k3d
+
+You can test the operator locally on k3d running
+
+``` bash
+run-e2e-k3d.sh
+```
+
+NOTE: error messages, like the example below, that will be shown during cluster creation are **NOT** an issue:
+
+```
+Error response from daemon: manifest for rancher/k3s:v1.20.0-k3s5 not found: manifest unknown: manifest unknown
+```
+
+It will take care of creating a K3d cluster and run the tests on it.
+
 In addition to the environment variables for the script,
 the following ones can be defined:
 
@@ -44,6 +63,22 @@ the following ones can be defined:
 * `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
     false to get the image from a registry. Default: `false`.
 * `LOG_DIR`: the directory where the container logs are exported. Default:
-    `kind-logs` directory in the project root.
+    `_logs/` directory in the project root.
 
-`run-e2e-kind.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard`
+`run-e2e-kind.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard` while `run-e2e-k3d.sh` forces `E2E_DEFAULT_STORAGE_CLASS=local-path`
+
+Both scripts use the `setup-cluster.sh` script to initialize the cluster
+choosing between Kind or K3d engine.
+
+## Local cluster
+
+`setup-cluster.sh` can be used to create a local cluster for developer
+purposes, specifying the environment variable `CLUSTER_ENGINE`, as
+follows:
+
+``` bash
+CLUSTER_ENGINE=k3d setup-cluster.sh
+```
+By default it will use Kind as engine.
+
+When running this script standalone, it can take the following set of variables: `BUILD_IMAGE`, `K8S_VERSION`, `CLUSTER_NAME`

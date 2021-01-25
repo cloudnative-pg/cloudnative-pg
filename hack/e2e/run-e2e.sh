@@ -19,7 +19,6 @@ POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versi
 
 # Process the e2e templates
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
-export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-standard}
 find "${ROOT_DIR}"/tests/*/fixtures -name "*.template" | \
 while read -r f; do
   envsubst <"${f}" >"${f%.template}"

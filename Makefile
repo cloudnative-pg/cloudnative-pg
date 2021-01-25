@@ -34,6 +34,9 @@ test: generate fmt vet manifests
 e2e-test-kind:
 	hack/e2e/run-e2e-kind.sh
 
+e2e-test-k3d:
+	hack/e2e/run-e2e-k3d.sh
+
 # Build binaries
 build: generate fmt vet
 	go build -o bin/manager ./cmd/manager
