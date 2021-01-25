@@ -12,3 +12,7 @@ spec:
         envFrom:
         - configMapRef:
             name: controller-manager-env
+        args:
+        - --enable-leader-election
+        - --zap-devel
+        - --zap-log-level=4

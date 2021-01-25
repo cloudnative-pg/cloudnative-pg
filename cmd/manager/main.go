@@ -100,13 +100,15 @@ func main() {
 	// No subcommand invoked, let's start the operator
 	var metricsAddr string
 	var enableLeaderElection bool
+	var opts zap.Options
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	setupLog.Info("Starting Cloud Native PostgreSQL Operator", "version", versions.Version)
 
