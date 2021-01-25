@@ -25,18 +25,17 @@ export KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 export CLUSTER_NAME=pg-operator-e2e-${K8S_VERSION//./-}
 export TEMP_DIR=$(mktemp -d)
 export LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
-export KIND_VERSION=${KIND_VERSION:-$(curl -s -LH "Accept:application/json" https://github.com/kubernetes-sigs/kind/releases/latest | sed 's/.*"tag_name":"\([^"]\+\)".*/\1/')}
 
 export CONTROLLER_IMG=${CONTROLLER_IMG:-quay.io/enterprisedb/cloud-native-postgresql-testing:$( (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)}
 export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
-export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-standard}
+export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-local-path}
 
 export DOCKER_REGISTRY_MIRROR=${DOCKER_REGISTRY_MIRROR:-}
 
 KUBECTL="${TEMP_DIR}/kubectl"
 
-install_go_tools_kind() {
+install_go_tools_k3d() {
     local GO_TMP_DIR
     GO_TMP_DIR=$(mktemp -d)
     cd "$GO_TMP_DIR"
@@ -50,13 +49,13 @@ install_go_tools_kind() {
 
 cleanup() {
     if [ "${PRESERVE_CLUSTER}" = false ]; then
-        kind delete cluster --name "${CLUSTER_NAME}" || true
+        k3d cluster delete "${CLUSTER_NAME}" || true
         rm -rf "${TEMP_DIR}"
     else
         set +x
         echo "You've chosen not to delete the Kubernetes cluster."
         echo "You can delete it manually later running:"
-        echo "kind delete cluster --name ${CLUSTER_NAME}"
+        echo "k3d cluster delete ${CLUSTER_NAME}"
         echo "rm -rf ${TEMP_DIR}"
     fi
 }
@@ -64,7 +63,7 @@ cleanup() {
 trap cleanup EXIT
 
 main() {
-    install_go_tools_kind
+    install_go_tools_k3d
 
     if [ "${BUILD_IMAGE}" == false ]; then
         export DOCKER_SERVER
@@ -74,7 +73,7 @@ main() {
         export CONTROLLER_IMG=cloud-native-postgresql:e2e
     fi
 
-    eval CLUSTER_ENGINE=kind ${HACK_DIR}/setup-cluster.sh
+    eval CLUSTER_ENGINE=k3d ${HACK_DIR}/setup-cluster.sh
 
     ${KUBECTL} apply -f "${E2E_DIR}/kind-fluentd.yaml"
     # Run the tests and destroy the cluster
@@ -83,10 +82,17 @@ main() {
     ${E2E_DIR}/run-e2e.sh || RC=$?
 
     ## Export logs
-    kind export logs "${LOG_DIR}" --name "${CLUSTER_NAME}"
+    while IFS= read -r line
+    do
+        NODES_LIST+=("$line")
+    done < <(k3d node list | awk 'NR > 1 {print $1}')
+    for i in "${NODES_LIST[@]}"; do
+      mkdir -p ${LOG_DIR}/${i}
+      docker cp -L $i:/var/log/. ${LOG_DIR}/${i}
+    done
 
     if [ "${PRESERVE_CLUSTER}" = false ]; then
-        kind delete cluster --name "${CLUSTER_NAME}"
+        k3d cluster delete ${CLUSTER_NAME}
     fi
     exit $RC
 }

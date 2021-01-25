@@ -19,9 +19,8 @@
 *.swo
 *~
 
-# Testing artifacts
-_artifacts/
-kind-logs/
+# Testing artifacts and logs
+_*/
 
 # goreleaser
 /dist/
