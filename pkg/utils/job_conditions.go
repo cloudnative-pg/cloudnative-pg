@@ -19,8 +19,18 @@ func IsJobComplete(job batchv1.Job) bool {
 	return job.Status.Succeeded == requestedCompletions
 }
 
-// CountCompleteJobs count the number of jobs which
-// are not complete
+// FilterCompleteJobs returns jobs that are complete
+func FilterCompleteJobs(jobList []batchv1.Job) []batchv1.Job {
+	var result []batchv1.Job
+	for _, job := range jobList {
+		if IsJobComplete(job) {
+			result = append(result, job)
+		}
+	}
+	return result
+}
+
+// CountCompleteJobs count the number complete jobs
 func CountCompleteJobs(jobList []batchv1.Job) int {
 	result := 0
 

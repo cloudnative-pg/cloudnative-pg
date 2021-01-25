@@ -374,24 +374,29 @@ func (r *ClusterReconciler) removeCompletedJobs(
 	// Retrieve the cluster key
 	key := expectations.KeyFunc(cluster)
 
-	for idx := range jobs.Items {
-		if utils.IsJobComplete(jobs.Items[idx]) {
-			log.V(2).Info("Removing job", "job", jobs.Items[idx].Name)
+	completeJobs := utils.FilterCompleteJobs(jobs.Items)
+	if len(completeJobs) == 0 {
+		return nil
+	}
 
-			// We expect the deletion of the selected Job
-			if err := r.jobExpectations.ExpectDeletions(key, 1); err != nil {
-				log.Error(err, "Unable to set jobExpectations", "key", key, "dels", 1)
-			}
+	if err := r.jobExpectations.ExpectDeletions(key, 0); err != nil {
+		log.Error(err, "Unable to initialize jobExpectations", "key", key, "dels", 0)
+	}
 
-			foreground := metav1.DeletePropagationForeground
-			if err := r.Delete(ctx, &jobs.Items[idx], &client.DeleteOptions{
-				PropagationPolicy: &foreground,
-			}); err != nil {
-				// We cannot observe a deletion if it was not accepted by the server
-				r.jobExpectations.DeletionObserved(key)
+	for idx := range completeJobs {
+		log.V(2).Info("Removing job", "job", jobs.Items[idx].Name)
 
-				return fmt.Errorf("cannot delete job: %w", err)
-			}
+		// We expect the deletion of the selected Job
+		r.jobExpectations.RaiseExpectations(key, 0, 1)
+
+		foreground := metav1.DeletePropagationForeground
+		if err := r.Delete(ctx, &jobs.Items[idx], &client.DeleteOptions{
+			PropagationPolicy: &foreground,
+		}); err != nil {
+			// We cannot observe a deletion if it was not accepted by the server
+			r.jobExpectations.DeletionObserved(key)
+
+			return fmt.Errorf("cannot delete job: %w", err)
 		}
 	}
 
