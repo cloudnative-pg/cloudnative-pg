@@ -461,42 +461,71 @@ func (r *InstanceReconciler) configureInstancePermissions() error {
 
 	r.log.Info("Configuring primary instance")
 
+	// A transaction is required to temporarily disable synchronous replication
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("creating a new transaction to setup the instance: %w", err)
+	}
+
+	_, err = tx.Exec("SET LOCAL synchronous_commit TO LOCAL")
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	hasSuperuser, err := r.configureStreamingReplicaUser(tx)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	err = r.configurePgRewindPrivileges(majorVersion, hasSuperuser, tx)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// configureStreamingReplicaUser makes sure the the streaming replication user exists
+// and has the required rights
+func (r *InstanceReconciler) configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
 	var hasLoginRight, hasReplicationRight, hasSuperuser bool
-	row := db.QueryRow("SELECT rolcanlogin, rolreplication, rolsuper FROM pg_roles WHERE rolname = $1",
+	row := tx.QueryRow("SELECT rolcanlogin, rolreplication, rolsuper FROM pg_roles WHERE rolname = $1",
 		apiv1alpha1.StreamingReplicationUser)
-	err = row.Scan(&hasLoginRight, &hasReplicationRight, &hasSuperuser)
+	err := row.Scan(&hasLoginRight, &hasReplicationRight, &hasSuperuser)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			_, err = db.Exec(fmt.Sprintf(
+			_, err = tx.Exec(fmt.Sprintf(
 				"CREATE USER %v REPLICATION",
 				pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
 			if err != nil {
-				return fmt.Errorf("CREATE USER %v error: %w", apiv1alpha1.StreamingReplicationUser, err)
+				return false, fmt.Errorf("CREATE USER %v error: %w", apiv1alpha1.StreamingReplicationUser, err)
 			}
 		} else {
-			return fmt.Errorf("while creating streaming replication user: %w", err)
+			return false, fmt.Errorf("while creating streaming replication user: %w", err)
 		}
 	}
 
 	if !hasLoginRight || !hasReplicationRight {
-		_, err = db.Exec(fmt.Sprintf(
+		_, err = tx.Exec(fmt.Sprintf(
 			"ALTER USER %v LOGIN REPLICATION",
 			pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
 		if err != nil {
-			return fmt.Errorf("ALTER USER %v error: %w", apiv1alpha1.StreamingReplicationUser, err)
+			return false, fmt.Errorf("ALTER USER %v error: %w", apiv1alpha1.StreamingReplicationUser, err)
 		}
 	}
-
-	return r.configurePgRewindPrivileges(majorVersion, hasSuperuser, db)
+	return hasSuperuser, nil
 }
 
 // configurePgRewindPrivileges ensures that the StreamingReplicationUser has enough rights to execute pg_rewind
-func (r *InstanceReconciler) configurePgRewindPrivileges(majorVersion int, hasSuperuser bool, db *sql.DB) error {
+func (r *InstanceReconciler) configurePgRewindPrivileges(majorVersion int, hasSuperuser bool, tx *sql.Tx) error {
 	// We need the superuser bit for the streaming-replication user since pg_rewind in PostgreSQL <= 10
 	// will require it.
 	if majorVersion <= 10 {
 		if !hasSuperuser {
-			_, err := db.Exec(fmt.Sprintf(
+			_, err := tx.Exec(fmt.Sprintf(
 				"ALTER USER %v SUPERUSER",
 				pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
 			if err != nil {
@@ -508,7 +537,7 @@ func (r *InstanceReconciler) configurePgRewindPrivileges(majorVersion int, hasSu
 
 	// Ensure the user has rights to execute the functions needed for pg_rewind
 	var hasPgRewindPrivileges bool
-	row := db.QueryRow(
+	row := tx.QueryRow(
 		`
 			SELECT has_function_privilege($1, 'pg_ls_dir(text, boolean, boolean)', 'execute') AND
 			       has_function_privilege($2, 'pg_stat_file(text, boolean)', 'execute') AND
@@ -524,28 +553,28 @@ func (r *InstanceReconciler) configurePgRewindPrivileges(majorVersion int, hasSu
 	}
 
 	if !hasPgRewindPrivileges {
-		_, err = db.Exec(fmt.Sprintf(
+		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_ls_dir(text, boolean, boolean) TO %v",
 			pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
 		if err != nil {
 			return fmt.Errorf("while granting pgrewind privileges: %w", err)
 		}
 
-		_, err = db.Exec(fmt.Sprintf(
+		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_stat_file(text, boolean) TO %v",
 			pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
 		if err != nil {
 			return fmt.Errorf("while granting pgrewind privileges: %w", err)
 		}
 
-		_, err = db.Exec(fmt.Sprintf(
+		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_read_binary_file(text) TO %v",
 			pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
 		if err != nil {
 			return fmt.Errorf("while granting pgrewind privileges: %w", err)
 		}
 
-		_, err = db.Exec(fmt.Sprintf(
+		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_read_binary_file(text, bigint, bigint, boolean) TO %v",
 			pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
 		if err != nil {
