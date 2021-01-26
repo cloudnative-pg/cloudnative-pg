@@ -8,6 +8,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 
@@ -692,5 +693,45 @@ var _ = Describe("storage size validation", func() {
 
 		Expect(clusterNew.validateStorageSizeChange(&clusterOld)).To(BeEmpty())
 
+	})
+})
+
+var _ = Describe("Cluster name validation", func() {
+	It("should be a valid DNS label", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test.one",
+			},
+		}
+		Expect(cluster.validateName()).ToNot(BeEmpty())
+	})
+
+	It("should not be too long", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abcdefghi" +
+					"abcdefghi" +
+					"abcdefghi" +
+					"abcdefghi" +
+					"abcdefghi" +
+					"abcdefghi" +
+					"abcdefghi" +
+					"abcdefghi" +
+					"abcdefghi",
+			},
+		}
+		Expect(cluster.validateName()).ToNot(BeEmpty())
+	})
+
+	It("should not raise errors when the name is ok", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abcdefghi" +
+					"abcdefghi" +
+					"abcdefghi" +
+					"abcdefghi",
+			},
+		}
+		Expect(cluster.validateName()).To(BeEmpty())
 	})
 })
