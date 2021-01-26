@@ -16,6 +16,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
@@ -58,7 +59,7 @@ func pgStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // This function schedule a backup
-func requestBackup(typedClient client.Client, w http.ResponseWriter, r *http.Request) {
+func requestBackup(typedClient client.Client, recorder record.EventRecorder, w http.ResponseWriter, r *http.Request) {
 	var cluster apiv1alpha1.Cluster
 	var backup apiv1alpha1.Backup
 
@@ -106,6 +107,7 @@ func requestBackup(typedClient client.Client, w http.ResponseWriter, r *http.Req
 	err = instance.Backup(
 		ctx,
 		typedClient,
+		recorder,
 		*cluster.Spec.Backup.BarmanObjectStore,
 		&backup,
 		backupLog)
@@ -124,9 +126,14 @@ func requestBackup(typedClient client.Client, w http.ResponseWriter, r *http.Req
 func ListenAndServe(serverInstance *postgres.Instance) error {
 	instance = serverInstance
 
-	typedClient, err := management.NewClient()
+	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
-		return fmt.Errorf("creating k8s client: %v", err)
+		return fmt.Errorf("creating controller-runtine client: %v", err)
+	}
+
+	eventRecorder, err := management.NewEventRecorder()
+	if err != nil {
+		return fmt.Errorf("creating kubernetes event recorder: %v", err)
 	}
 
 	serveMux := http.NewServeMux()
@@ -135,7 +142,7 @@ func ListenAndServe(serverInstance *postgres.Instance) error {
 	serveMux.HandleFunc("/pg/status", pgStatus)
 	serveMux.HandleFunc("/pg/backup",
 		func(w http.ResponseWriter, r *http.Request) {
-			requestBackup(typedClient, w, r)
+			requestBackup(typedClient, eventRecorder, w, r)
 		},
 	)
 

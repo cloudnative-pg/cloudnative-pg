@@ -104,6 +104,18 @@ func CreateRole(cluster v1alpha1.Cluster, openshift bool) rbacv1.Role {
 				"update",
 			},
 		},
+		{
+			APIGroups: []string{
+				"",
+			},
+			Resources: []string{
+				"events",
+			},
+			Verbs: []string{
+				"create",
+				"patch",
+			},
+		},
 	}
 
 	if openshift {

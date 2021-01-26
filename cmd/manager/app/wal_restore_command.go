@@ -42,7 +42,7 @@ func WalRestoreCommand(args []string) {
 	walName := flag.Arg(0)
 	destinationPath := flag.Arg(1)
 
-	typedClient, err := management.NewClient()
+	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		log.Log.Error(err, "Error while creating k8s client")
 		os.Exit(1)
