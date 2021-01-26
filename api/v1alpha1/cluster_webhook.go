@@ -9,6 +9,7 @@ package v1alpha1
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,6 +28,7 @@ import (
 
 // clusterLog is for logging in this package.
 var clusterLog = logf.Log.WithName("cluster-resource")
+var dnsLabelNamesRegexp = regexp.MustCompile("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 
 // SetupWebhookWithManager setup the webhook inside the controller manager
 func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -100,6 +102,7 @@ func (r *Cluster) ValidateCreate() error {
 	allErrs = append(allErrs, r.validateMinSyncReplicas()...)
 	allErrs = append(allErrs, r.validateMaxSyncReplicas()...)
 	allErrs = append(allErrs, r.validateStorageSize()...)
+	allErrs = append(allErrs, r.validateName()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -124,6 +127,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validateMinSyncReplicas()...)
 	allErrs = append(allErrs, r.validateMaxSyncReplicas()...)
 	allErrs = append(allErrs, r.validateStorageSize()...)
+	allErrs = append(allErrs, r.validateName()...)
 
 	oldObject := old.(*Cluster)
 	if oldObject == nil {
@@ -543,6 +547,29 @@ func (r *Cluster) validateStorageSizeChange(old *Cluster) field.ErrorList {
 				"can't shrink existing storage from %v to %v",
 				old.Spec.StorageConfiguration.Size,
 				r.Spec.StorageConfiguration.Size)))
+	}
+
+	return result
+}
+
+// Validate the cluster name. This is important to avoid issues
+// while generating services, which don't support having dots in
+// their name
+func (r *Cluster) validateName() field.ErrorList {
+	var result field.ErrorList
+
+	if !dnsLabelNamesRegexp.Match([]byte(r.Name)) {
+		result = append(result, field.Invalid(
+			field.NewPath("metadata", "name"),
+			r.Name,
+			"cluster name must be a valid DNS label"))
+	}
+
+	if len(r.Name) > 50 {
+		result = append(result, field.Invalid(
+			field.NewPath("metadata", "name"),
+			r.Name,
+			"the maximum length of a cluster name is 50 characters"))
 	}
 
 	return result
