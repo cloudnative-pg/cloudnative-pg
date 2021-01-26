@@ -125,7 +125,7 @@ func (info InitInfo) getBackupObjectKey() client.ObjectKey {
 
 // loadBackup loads the backup manifest from the API server
 func (info InitInfo) loadBackup() (*v1alpha1.Backup, error) {
-	typedClient, err := management.NewClient()
+	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return nil, err
 	}

@@ -34,11 +34,18 @@ type ScheduledBackupStatus struct {
 	// Information when was the last time that backup was successfully scheduled.
 	// +optional
 	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
+
+	// Next time we will run a backup
+	// +optional
+	NextScheduleTime *metav1.Time `json:"nextScheduleTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
+// +kubebuilder:printcolumn:name="Last Backup",type="date",JSONPath=".status.lastScheduleTime"
 
 // ScheduledBackup is the Schema for the scheduledbackups API
 type ScheduledBackup struct {

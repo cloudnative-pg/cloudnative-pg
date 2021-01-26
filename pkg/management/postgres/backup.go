@@ -16,6 +16,8 @@ import (
 
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
@@ -65,8 +67,9 @@ type BarmanBackup struct {
 func (instance *Instance) Backup(
 	ctx context.Context,
 	client client.StatusClient,
+	recorder record.EventRecorder,
 	configuration apiv1alpha1.BarmanObjectStoreConfiguration,
-	backup apiv1alpha1.BackupCommon,
+	backupObject runtime.Object,
 	log logr.Logger,
 ) error {
 	var options []string
@@ -99,6 +102,11 @@ func (instance *Instance) Backup(
 		serverName)
 
 	// Mark the backup as running
+	backup := backupObject.(apiv1alpha1.BackupCommon)
+	if backup == nil {
+		return fmt.Errorf("backup object not recognized")
+	}
+
 	backup.GetStatus().S3Credentials = configuration.S3Credentials
 	backup.GetStatus().EndpointURL = configuration.EndpointURL
 	backup.GetStatus().DestinationPath = configuration.DestinationPath
@@ -124,6 +132,8 @@ func (instance *Instance) Backup(
 			"options",
 			options)
 
+		recorder.Event(backupObject, "Normal", "Starting", "Backup started")
+
 		cmd := exec.Command("barman-cloud-backup", options...) // #nosec G204
 		var stdoutBuffer bytes.Buffer
 		var stderrBuffer bytes.Buffer
@@ -135,8 +145,10 @@ func (instance *Instance) Backup(
 
 		if err != nil {
 			backup.GetStatus().SetAsFailed(stdoutBuffer.String(), stderrBuffer.String(), err)
+			recorder.Event(backupObject, "Normal", "Failed", "Backup failed")
 		} else {
 			backup.GetStatus().SetAsCompleted(stdoutBuffer.String(), stderrBuffer.String())
+			recorder.Event(backupObject, "Normal", "Completed", "Backup completed")
 		}
 		backup.GetStatus().StoppedAt = &metav1.Time{
 			Time: time.Now(),

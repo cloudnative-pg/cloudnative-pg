@@ -14,6 +14,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -25,13 +26,15 @@ import (
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=backups/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters,verbs=get
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
 
@@ -63,10 +66,15 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}, &cluster); err != nil {
 		if apierrs.IsNotFound(err) {
 			backup.Status.SetAsFailed("Unknown cluster", "", err)
+			r.Recorder.Eventf(&backup, "Warning", "FindingCluster", "Unknown cluster %v", clusterName)
 			return ctrl.Result{}, r.Status().Update(ctx, &backup)
 		}
+
+		r.Recorder.Event(&backup, "Warning", "FindingCluster", "Unknown cluster")
 		return ctrl.Result{}, err
 	}
+
+	r.Recorder.Eventf(&backup, "Normal", "FindingCluster", "Found cluster %v", clusterName)
 
 	// Detect the pod where a backup will be executed
 	var pod corev1.Pod
@@ -76,15 +84,21 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}, &pod)
 	if err != nil {
 		backup.Status.SetAsFailed("Unknown pod", "", err)
+		r.Recorder.Event(&backup, "Warning", "FindingPod", "Couldn't found target pods")
 		return ctrl.Result{}, r.Status().Update(ctx, &backup)
 	}
 
+	r.Recorder.Eventf(&backup, "Normal", "Starting", "Started backup for cluster %v", clusterName)
 	log.Info("Starting backup",
 		"cluster", cluster.Name,
 		"pod", pod.Name)
 
 	// This backup has been started
 	err = StartBackup(ctx, r, &backup, pod)
+	if err != nil {
+		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
+	}
+
 	return ctrl.Result{}, err
 }
 

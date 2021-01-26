@@ -74,7 +74,17 @@ spec:
     storage: false
     subresources:
       status: {}
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - jsonPath: .spec.cluster.name
+      name: Cluster
+      type: string
+    - jsonPath: .status.lastScheduleTime
+      name: Last Backup
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ScheduledBackup is the Schema for the scheduledbackups API
@@ -124,6 +134,10 @@ spec:
               lastScheduleTime:
                 description: Information when was the last time that backup was successfully
                   scheduled.
+                format: date-time
+                type: string
+              nextScheduleTime:
+                description: Next time we will run a backup
                 format: date-time
                 type: string
             type: object

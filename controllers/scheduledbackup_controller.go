@@ -16,6 +16,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -29,13 +30,15 @@ const (
 // ScheduledBackupReconciler reconciles a ScheduledBackup object
 type ScheduledBackupReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=scheduledbackups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=scheduledbackups/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=backups,verbs=get;list;create
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 // Reconcile is the main reconciler logic
 func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -74,12 +77,13 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	return ReconcileScheduledBackup(ctx, r.Client, log, &scheduledBackup)
+	return ReconcileScheduledBackup(ctx, r.Recorder, r.Client, log, &scheduledBackup)
 }
 
 // ReconcileScheduledBackup is the main reconciliation logic for a scheduled backup
 func ReconcileScheduledBackup(
 	ctx context.Context,
+	event record.EventRecorder,
 	client client.Client,
 	log logr.Logger,
 	scheduledBackup postgresqlv1alpha1.ScheduledBackupCommon,
@@ -112,6 +116,8 @@ func ReconcileScheduledBackup(
 
 		nextTime := schedule.Next(scheduledBackup.GetStatus().LastCheckTime.Time)
 		log.Info("Next backup schedule", "next", nextTime)
+		event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
+			"BackupSchedule", "Scheduled first backup by %v", nextTime)
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
@@ -139,6 +145,8 @@ func ReconcileScheduledBackup(
 		log.Error(
 			err, "Error while creating backup object",
 			"backupName", backup.GetName())
+		event.Event(scheduledBackup.GetKubernetesObject(), "Warning",
+			"BackupCreation", "Error while creating backup object")
 		return ctrl.Result{}, err
 	}
 
@@ -149,6 +157,11 @@ func ReconcileScheduledBackup(
 	scheduledBackup.GetStatus().LastScheduleTime = &metav1.Time{
 		Time: nextTime,
 	}
+	nextTime = schedule.Next(now)
+	scheduledBackup.GetStatus().NextScheduleTime = &metav1.Time{
+		Time: nextTime,
+	}
+
 	if err = client.Status().Update(ctx, scheduledBackup.GetKubernetesObject()); err != nil {
 		if apierrs.IsConflict(err) {
 			// Retry later, the cache is stale
@@ -157,8 +170,10 @@ func ReconcileScheduledBackup(
 		return ctrl.Result{}, err
 	}
 
-	nextTime = schedule.Next(now)
 	log.Info("Next backup schedule", "next", nextTime)
+	event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
+		"BackupSchedule", "Next backup scheduled by %v", nextTime)
+
 	return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 }
 
