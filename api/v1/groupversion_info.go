@@ -18,6 +18,16 @@ var (
 	// GroupVersion is group version used to register these objects
 	GroupVersion = schema.GroupVersion{Group: "postgresql.k8s.enterprisedb.io", Version: "v1"}
 
+	// ClusterGVK is the triple to reach Cluster resources in k8s
+	ClusterGVK = schema.GroupVersionResource{
+		Group:    GroupVersion.Group,
+		Version:  GroupVersion.Version,
+		Resource: "clusters",
+	}
+
+	// ClusterKind is the kind name of Clusters
+	ClusterKind = "Cluster"
+
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 

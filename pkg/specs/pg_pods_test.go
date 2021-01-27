@@ -9,7 +9,7 @@ package specs
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 
 	. "github.com/onsi/ginkgo"
@@ -17,7 +17,7 @@ import (
 )
 
 var _ = Describe("Extract the used image name", func() {
-	cluster := v1alpha1.Cluster{
+	cluster := apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "clusterName",
 			Namespace: "default",

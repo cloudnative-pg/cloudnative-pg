@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
 var (
@@ -38,7 +38,7 @@ func isControlledObject(object client.Object) bool {
 		return false
 	}
 
-	if owner.APIVersion != apiGVString || owner.Kind != v1alpha1.ClusterKind {
+	if owner.APIVersion != apiGVString || owner.Kind != apiv1.ClusterKind {
 		return false
 	}
 
@@ -47,7 +47,7 @@ func isControlledObject(object client.Object) bool {
 
 // isCluster checks if a certain object is a cluster
 func isCluster(object client.Object) bool {
-	_, ok := object.(*v1alpha1.Cluster)
+	_, ok := object.(*apiv1.Cluster)
 	return ok
 }
 

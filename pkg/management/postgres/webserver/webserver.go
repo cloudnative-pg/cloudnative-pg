@@ -19,7 +19,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
@@ -60,8 +60,8 @@ func pgStatus(w http.ResponseWriter, r *http.Request) {
 
 // This function schedule a backup
 func requestBackup(typedClient client.Client, recorder record.EventRecorder, w http.ResponseWriter, r *http.Request) {
-	var cluster apiv1alpha1.Cluster
-	var backup apiv1alpha1.Backup
+	var cluster apiv1.Cluster
+	var backup apiv1.Backup
 
 	ctx := context.Background()
 

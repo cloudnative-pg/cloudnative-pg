@@ -114,7 +114,7 @@ apidoc: po-docgen
 	set -e ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
 	echo $$CONFIG_TMP_DIR ;\
-	$(PO_DOCGEN) api api/v1alpha1/*_types.go | sed 's/\\n/\n/g' | \
+	$(PO_DOCGEN) api api/v1/*_types.go | sed 's/\\n/\n/g' | \
 	  sed -n '/## Table of Contents/,$$p' | \
 	  sed 's/^## Table of Contents/<!-- TOC -->/' | \
 	  grep -v '#table-of-contents' > $${CONFIG_TMP_DIR}/api_reference.new.md ;\

@@ -22,7 +22,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
@@ -36,7 +36,7 @@ const (
 )
 
 // createPostgresClusterObjects ensure that we have the required global objects
-func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cluster *apiv1.Cluster) error {
 	err := r.createOrPatchPostgresConfigMap(ctx, cluster)
 	if err != nil {
 		return err
@@ -86,7 +86,7 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 	return nil
 }
 
-func (r *ClusterReconciler) createOrPatchPostgresConfigMap(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) createOrPatchPostgresConfigMap(ctx context.Context, cluster *apiv1.Cluster) error {
 	var configMap corev1.ConfigMap
 	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &configMap); err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -119,7 +119,7 @@ func (r *ClusterReconciler) createOrPatchPostgresConfigMap(ctx context.Context, 
 	return nil
 }
 
-func (r *ClusterReconciler) createPostgresConfigMap(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) createPostgresConfigMap(ctx context.Context, cluster *apiv1.Cluster) error {
 	generatedConfigMap, err := specs.CreatePostgresConfigMap(cluster)
 	if err != nil {
 		return err
@@ -136,7 +136,7 @@ func (r *ClusterReconciler) createPostgresConfigMap(ctx context.Context, cluster
 	return nil
 }
 
-func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *apiv1.Cluster) error {
 	if cluster.Spec.SuperuserSecret == nil ||
 		cluster.Spec.SuperuserSecret.Name == "" {
 		postgresPassword, err := password.Generate(64, 10, 0, false, true)
@@ -187,7 +187,7 @@ func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *
 	return nil
 }
 
-func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster *apiv1.Cluster) error {
 	anyService := specs.CreateClusterAnyService(*cluster)
 	utils.SetAsOwnedBy(&anyService.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&anyService.ObjectMeta, versions.Version)
@@ -219,7 +219,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 }
 
 // createOrUpdatePodDisruptionBudget ensure that we have a PDB requiring to remove one node at a time
-func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	targetPdb := specs.CreatePodDisruptionBudget(*cluster)
@@ -240,7 +240,7 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 }
 
 // deletePodDisruptionBudget ensure that we delete the PDB requiring to remove one node at a time
-func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	// If we have a PDB, we need to delete it
@@ -268,7 +268,7 @@ func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, clust
 }
 
 // createServiceAccount create the service account for this PostgreSQL cluster
-func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
 	var pullSecretNames []string
 
 	// Try to copy the secret from the operator
@@ -302,7 +302,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *v
 // operator was downloaded via a Secret.
 // It will return "true" if a secret need to be used to use the operator, false
 // if not
-func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, cluster *v1alpha1.Cluster) (bool, error) {
+func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
 	operatorDeployNamespace := os.Getenv("OPERATOR_NAMESPACE")
 	if operatorDeployNamespace == "" {
 		// We are not getting started via a k8s deployment. Perhaps we are running in our development environment
@@ -343,7 +343,7 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 }
 
 // createRole create the role
-func (r *ClusterReconciler) createRole(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	openshift, err := utils.IsOpenShift()
@@ -365,7 +365,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *v1alpha1.Cl
 }
 
 // createRoleBinding create the role binding
-func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
@@ -382,7 +382,7 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *v1al
 }
 
 // generateNodeSerial extract the first free node serial in this pods
-func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *v1alpha1.Cluster) (int32, error) {
+func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *apiv1.Cluster) (int32, error) {
 	cluster.Status.LatestGeneratedNode++
 	if err := r.Status().Update(ctx, cluster); err != nil {
 		return 0, err
@@ -393,7 +393,7 @@ func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *v1a
 
 func (r *ClusterReconciler) createPrimaryInstance(
 	ctx context.Context,
-	cluster *v1alpha1.Cluster,
+	cluster *apiv1.Cluster,
 ) (ctrl.Result, error) {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -417,7 +417,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, nil
 	}
 
-	var backup v1alpha1.Backup
+	var backup apiv1.Backup
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil {
 		backupObjectKey := client.ObjectKey{
 			Namespace: cluster.Namespace,
@@ -502,7 +502,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, err
 	}
 
-	err = r.RegisterPhase(ctx, cluster, v1alpha1.PhaseFirstPrimary,
+	err = r.RegisterPhase(ctx, cluster, apiv1.PhaseFirstPrimary,
 		fmt.Sprintf("Creating primary instance %v", job.Name))
 	if err != nil {
 		return ctrl.Result{}, err
@@ -538,7 +538,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 func (r *ClusterReconciler) joinReplicaInstance(
 	ctx context.Context,
 	nodeSerial int32,
-	cluster *v1alpha1.Cluster,
+	cluster *apiv1.Cluster,
 ) (ctrl.Result, error) {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -555,7 +555,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		"Creating instance %v-%v", cluster.Name, nodeSerial)
 
 	if err := r.RegisterPhase(ctx, cluster,
-		v1alpha1.PhaseCreatingReplica,
+		apiv1.PhaseCreatingReplica,
 		fmt.Sprintf("Creating replica %v", job.Name)); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -623,7 +623,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 }
 
 // handleDanglingPVC reattach a dangling PVC
-func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	pvcToReattach := electPvcToReattach(cluster)
@@ -691,7 +691,7 @@ func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *v1al
 
 // electPvcToReattach will choose a PVC between the dangling ones that should be reattached to the cluster,
 // giving precedence to the target master if between the set
-func electPvcToReattach(cluster *v1alpha1.Cluster) string {
+func electPvcToReattach(cluster *apiv1.Cluster) string {
 	if len(cluster.Status.DanglingPVC) == 0 {
 		return ""
 	}
@@ -706,7 +706,7 @@ func electPvcToReattach(cluster *v1alpha1.Cluster) string {
 }
 
 // removeDanglingPVCs will remove dangling PVCs
-func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *apiv1.Cluster) error {
 	for _, pvcName := range cluster.Status.DanglingPVC {
 		var pvc corev1.PersistentVolumeClaim
 

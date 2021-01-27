@@ -15,7 +15,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
@@ -47,7 +47,7 @@ func WalArchiveCommand(args []string) {
 		os.Exit(1)
 	}
 
-	var cluster apiv1alpha1.Cluster
+	var cluster apiv1.Cluster
 	err = typedClient.Get(context.Background(), client.ObjectKey{
 		Namespace: namespace,
 		Name:      clusterName,

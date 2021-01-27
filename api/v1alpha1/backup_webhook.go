@@ -11,10 +11,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
 // backupLog is for logging in this package.
-var backupLog = logf.Log.WithName("backup-resource")
+var backupLog = logf.Log.WithName("backup-resource").WithValues("version", "v1alpha1")
 
 // SetupWebhookWithManager setup the webhook inside the controller manager
 func (r *Backup) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -23,34 +25,108 @@ func (r *Backup) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:webhookVersions={v1beta1},admissionReviewVersions={v1beta1},path=/mutate-postgresql-k8s-enterprisedb-io-v1alpha1-backup,mutating=true,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=backups,verbs=create;update,versions=v1alpha1,name=mwebhook-backup.kb.io
+// +kubebuilder:webhook:webhookVersions={v1beta1},admissionReviewVersions={v1beta1},path=/mutate-postgresql-k8s-enterprisedb-io-v1alpha1-backup,mutating=true,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=backups,verbs=create;update,versions=v1alpha1,name=mbackupv1alpha1.kb.io,sideEffects=None
 
 var _ webhook.Defaulter = &Backup{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *Backup) Default() {
 	backupLog.Info("default", "name", r.Name)
+
+	v1Backup := v1.Backup{}
+	err := r.ConvertTo(&v1Backup)
+	if err != nil {
+		clusterLog.Error(err, "Invoking defaulting webhook from v1")
+		return
+	}
+
+	v1Backup.Default()
+
+	err = r.ConvertFrom(&v1Backup)
+	if err != nil {
+		clusterLog.Error(err, "Invoking defaulting webhook from v1")
+		return
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-// +kubebuilder:webhook:webhookVersions={v1beta1},admissionReviewVersions={v1beta1},verbs=create,path=/validate-postgresql-k8s-enterprisedb-io-v1alpha1-backup,mutating=false,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=backups,versions=v1alpha1,name=vwebhook-backup.kb.io
+// +kubebuilder:webhook:webhookVersions={v1beta1},admissionReviewVersions={v1beta1},verbs=create;update,path=/validate-postgresql-k8s-enterprisedb-io-v1alpha1-backup,mutating=false,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=backups,versions=v1alpha1,name=vbackupv1alpha1.kb.io,sideEffects=None
 
 var _ webhook.Validator = &Backup{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Backup) ValidateCreate() error {
 	backupLog.Info("validate create", "name", r.Name)
+
+	v1Backup := v1.Backup{}
+	if err := r.ConvertTo(&v1Backup); err != nil {
+		return err
+	}
+
+	if err := v1Backup.ValidateCreate(); err != nil {
+		return err
+	}
+
+	// TODO: Remove the ConvertFrom call
+	// This code is not useful because the ValidateCreate function
+	// is not supposed to change the object. However this call helps to catch
+	// issues in the conversion code
+	if err := r.ConvertFrom(&v1Backup); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Backup) ValidateUpdate(old runtime.Object) error {
 	backupLog.Info("validate update", "name", r.Name)
+
+	oldV1Backup := v1.Backup{}
+	if err := old.(*Cluster).ConvertTo(&oldV1Backup); err != nil {
+		return err
+	}
+
+	v1Backup := v1.Backup{}
+	if err := r.ConvertTo(&v1Backup); err != nil {
+		return err
+	}
+
+	if err := v1Backup.ValidateUpdate(&oldV1Backup); err != nil {
+		return err
+	}
+
+	// TODO: Remove the ConvertFrom call
+	// This code is not useful because the ValidateUpdate function
+	// is not supposed to change the object. However this call helps to catch
+	// issues in the conversion code
+	if err := r.ConvertFrom(&v1Backup); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *Backup) ValidateDelete() error {
 	backupLog.Info("validate delete", "name", r.Name)
+
+	v1Backup := v1.Backup{}
+	if err := r.ConvertTo(&v1Backup); err != nil {
+		return err
+	}
+
+	if err := v1Backup.ValidateDelete(); err != nil {
+		return err
+	}
+
+	// TODO: Remove the ConvertFrom call
+	// This code is not useful because the ValidateDelete function
+	// is not supposed to change the object. However this call helps to catch
+	// issues in the conversion code
+	if err := r.ConvertFrom(&v1Backup); err != nil {
+		return err
+	}
+
 	return nil
 }

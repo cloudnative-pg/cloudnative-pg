@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 )
 
@@ -24,7 +24,7 @@ import (
 // the scale up operation is handled by the instances creation code
 func (r *ClusterReconciler) scaleDownCluster(
 	ctx context.Context,
-	cluster *v1alpha1.Cluster,
+	cluster *apiv1.Cluster,
 	resources *managedResources,
 ) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)

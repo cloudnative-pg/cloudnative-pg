@@ -11,11 +11,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
 // CreateClusterAnyService create a service insisting on all the pods
-func CreateClusterAnyService(cluster v1alpha1.Cluster) *corev1.Service {
+func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceAnyName(),
@@ -40,7 +40,7 @@ func CreateClusterAnyService(cluster v1alpha1.Cluster) *corev1.Service {
 }
 
 // CreateClusterReadService create a service insisting on all the ready pods
-func CreateClusterReadService(cluster v1alpha1.Cluster) *corev1.Service {
+func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceReadName(),
@@ -64,7 +64,7 @@ func CreateClusterReadService(cluster v1alpha1.Cluster) *corev1.Service {
 }
 
 // CreateClusterReadWriteService create a service insisting on the primary pod
-func CreateClusterReadWriteService(cluster v1alpha1.Cluster) *corev1.Service {
+func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.GetServiceReadWriteName(),

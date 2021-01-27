@@ -12,63 +12,6 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-postgresql-k8s-enterprisedb-io-v1alpha1-backup
-  failurePolicy: Fail
-  name: mwebhook-backup.kb.io
-  rules:
-  - apiGroups:
-    - postgresql.k8s.enterprisedb.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - backups
-- admissionReviewVersions:
-  - v1beta1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-postgresql-k8s-enterprisedb-io-v1alpha1-cluster
-  failurePolicy: Fail
-  name: mcluster.kb.io
-  rules:
-  - apiGroups:
-    - postgresql.k8s.enterprisedb.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - clusters
-- admissionReviewVersions:
-  - v1beta1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-postgresql-k8s-enterprisedb-io-v1alpha1-scheduledbackup
-  failurePolicy: Fail
-  name: mwebhook-scheduledbackup.kb.io
-  rules:
-  - apiGroups:
-    - postgresql.k8s.enterprisedb.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - scheduledbackups
-- admissionReviewVersions:
-  - v1beta1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
       path: /mutate-postgresql-k8s-enterprisedb-io-v1-backup
   failurePolicy: Fail
   name: mbackup.kb.io
@@ -123,23 +66,15 @@ webhooks:
     resources:
     - scheduledbackups
   sideEffects: None
-
----
-apiVersion: admissionregistration.k8s.io/v1beta1
-kind: ValidatingWebhookConfiguration
-metadata:
-  creationTimestamp: null
-  name: validating-webhook-configuration
-webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-postgresql-k8s-enterprisedb-io-v1alpha1-backup
+      path: /mutate-postgresql-k8s-enterprisedb-io-v1alpha1-backup
   failurePolicy: Fail
-  name: vwebhook-backup.kb.io
+  name: mbackupv1alpha1.kb.io
   rules:
   - apiGroups:
     - postgresql.k8s.enterprisedb.io
@@ -147,17 +82,19 @@ webhooks:
     - v1alpha1
     operations:
     - CREATE
+    - UPDATE
     resources:
     - backups
+  sideEffects: None
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-postgresql-k8s-enterprisedb-io-v1alpha1-cluster
+      path: /mutate-postgresql-k8s-enterprisedb-io-v1alpha1-cluster
   failurePolicy: Fail
-  name: vcluster.kb.io
+  name: mclusterv1alpha1.kb.io
   rules:
   - apiGroups:
     - postgresql.k8s.enterprisedb.io
@@ -168,15 +105,16 @@ webhooks:
     - UPDATE
     resources:
     - clusters
+  sideEffects: None
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-postgresql-k8s-enterprisedb-io-v1alpha1-scheduledbackup
+      path: /mutate-postgresql-k8s-enterprisedb-io-v1alpha1-scheduledbackup
   failurePolicy: Fail
-  name: vwebhook-scheduledbackup.kb.io
+  name: mscheduledbackupv1alpha1.kb.io
   rules:
   - apiGroups:
     - postgresql.k8s.enterprisedb.io
@@ -184,8 +122,18 @@ webhooks:
     - v1alpha1
     operations:
     - CREATE
+    - UPDATE
     resources:
     - scheduledbackups
+  sideEffects: None
+
+---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  creationTimestamp: null
+  name: validating-webhook-configuration
+webhooks:
 - admissionReviewVersions:
   - v1beta1
   clientConfig:
@@ -240,6 +188,66 @@ webhooks:
     - postgresql.k8s.enterprisedb.io
     apiVersions:
     - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - scheduledbackups
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-postgresql-k8s-enterprisedb-io-v1alpha1-backup
+  failurePolicy: Fail
+  name: vbackupv1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - postgresql.k8s.enterprisedb.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - backups
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-postgresql-k8s-enterprisedb-io-v1alpha1-cluster
+  failurePolicy: Fail
+  name: vclusterv1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - postgresql.k8s.enterprisedb.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-postgresql-k8s-enterprisedb-io-v1alpha1-scheduledbackup
+  failurePolicy: Fail
+  name: vscheduledbackupv1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - postgresql.k8s.enterprisedb.io
+    apiVersions:
+    - v1alpha1
     operations:
     - CREATE
     - UPDATE

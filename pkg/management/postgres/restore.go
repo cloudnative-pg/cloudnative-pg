@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
@@ -84,7 +84,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 }
 
 // restoreDataDir restore PGDATA from an existing backup
-func (info InitInfo) restoreDataDir(backup *v1alpha1.Backup) error {
+func (info InitInfo) restoreDataDir(backup *apiv1.Backup) error {
 	options := []string{}
 	if backup.Status.EndpointURL != "" {
 		options = append(options, "--endpoint-url", backup.Status.EndpointURL)
@@ -124,14 +124,14 @@ func (info InitInfo) getBackupObjectKey() client.ObjectKey {
 }
 
 // loadBackup loads the backup manifest from the API server
-func (info InitInfo) loadBackup() (*v1alpha1.Backup, error) {
+func (info InitInfo) loadBackup() (*apiv1.Backup, error) {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return nil, err
 	}
 
 	ctx := context.Background()
-	var backup v1alpha1.Backup
+	var backup apiv1.Backup
 	err = typedClient.Get(ctx, info.getBackupObjectKey(), &backup)
 	if err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (info InitInfo) loadBackup() (*v1alpha1.Backup, error) {
 // writeRestoreWalConfig write a `custom.config` allowing PostgreSQL
 // to complete the WAL recovery from the object storage and then start
 // as a new master
-func (info InitInfo) writeRestoreWalConfig(backup *v1alpha1.Backup) error {
+func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 	// Ensure restore_command is used to correctly recover WALs
 	// from the object storage
 	major, err := postgres.GetMajorVersion(info.PgData)

@@ -18,7 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
@@ -33,7 +33,7 @@ var (
 // updateTargetPrimaryFromPods set the name of the target primary from the Pods status if needed
 func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	ctx context.Context,
-	cluster *v1alpha1.Cluster,
+	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
 ) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
@@ -57,7 +57,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Current primary isn't healthy, failing over from %v to %v",
 			cluster.Status.TargetPrimary, status.Items[0].PodName)
-		if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseFailOver,
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
 			fmt.Sprintf("Failing over to %v", status.Items[0].PodName)); err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 			"Current primary %v is needing a restart and the replicas "+
 				"are ready, switching over to %v to complete configuration apply",
 			cluster.Status.TargetPrimary, status.Items[1].PodName)
-		if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseFailOver,
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
 			fmt.Sprintf("Switching over to %v to complete configuration apply",
 				status.Items[1].PodName)); err != nil {
 			return err
@@ -123,7 +123,7 @@ func (r *ClusterReconciler) getStatusFromInstances(
 // Make sure that only the currentPrimary has the label forward write traffic to him
 func (r *ClusterReconciler) updateLabelsOnPods(
 	ctx context.Context,
-	cluster *v1alpha1.Cluster,
+	cluster *apiv1.Cluster,
 	pods corev1.PodList,
 ) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)

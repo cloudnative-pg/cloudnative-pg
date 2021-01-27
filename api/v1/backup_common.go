@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package v1alpha1
+package v1
 
 import "sigs.k8s.io/controller-runtime/pkg/client"
 

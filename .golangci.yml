@@ -71,5 +71,5 @@ issues:
       path: api/
     - linters:
       - dupl
-      path: api/v1/.*_webhook\.go
+      path: api/v1alpha1/.*_webhook\.go
   exclude-use-default: false

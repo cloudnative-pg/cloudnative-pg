@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
@@ -166,11 +166,11 @@ var _ = Describe("Backup and restore", func() {
 				Namespace: namespace,
 				Name:      backupName,
 			}
-			Eventually(func() (clusterv1.BackupPhase, error) {
-				backup := &clusterv1.Backup{}
+			Eventually(func() (apiv1.BackupPhase, error) {
+				backup := &apiv1.Backup{}
 				err := env.Client.Get(env.Ctx, backupNamespacedName, backup)
 				return backup.Status.Phase, err
-			}, timeout).Should(BeEquivalentTo(clusterv1.BackupPhaseCompleted))
+			}, timeout).Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 
 			// A file called data.tar should be available on minio
 			mcName := "mc"
@@ -244,7 +244,7 @@ var _ = Describe("Backup and restore", func() {
 				Name:      scheduledBackupName,
 			}
 			Eventually(func() (*v1.Time, error) {
-				scheduledBackup := &clusterv1.ScheduledBackup{}
+				scheduledBackup := &apiv1.ScheduledBackup{}
 				err := env.Client.Get(env.Ctx,
 					scheduledBackupNamespacedName, scheduledBackup)
 				return scheduledBackup.Status.LastScheduleTime, err
@@ -253,12 +253,12 @@ var _ = Describe("Backup and restore", func() {
 			// Within a few minutes we should have at least two backups
 			Eventually(func() (int, error) {
 				// Get all the backups children of the ScheduledBackup
-				scheduledBackup := &clusterv1.ScheduledBackup{}
+				scheduledBackup := &apiv1.ScheduledBackup{}
 				err := env.Client.Get(env.Ctx, scheduledBackupNamespacedName,
 					scheduledBackup)
 				Expect(err).NotTo(HaveOccurred())
 				// Get all the backups children of the ScheduledBackup
-				backups := &clusterv1.BackupList{}
+				backups := &apiv1.BackupList{}
 				err = env.Client.List(env.Ctx, backups,
 					ctrlclient.InNamespace(namespace))
 				Expect(err).NotTo(HaveOccurred())
@@ -266,7 +266,7 @@ var _ = Describe("Backup and restore", func() {
 				for _, backup := range backups.Items {
 					for _, owner := range backup.GetObjectMeta().GetOwnerReferences() {
 						if owner.Name == scheduledBackup.Name &&
-							backup.Status.Phase == clusterv1.BackupPhaseCompleted {
+							backup.Status.Phase == apiv1.BackupPhaseCompleted {
 							completed++
 						}
 					}

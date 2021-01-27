@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -75,7 +75,7 @@ var _ = Describe("Fast failover", func() {
 			}
 
 			Eventually(func() (int32, error) {
-				cluster := &clusterv1.Cluster{}
+				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.ReadyInstances, err
 			}, timeout).Should(BeEquivalentTo(3))

@@ -15,7 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
@@ -48,7 +48,7 @@ func (resources managedResources) allPodsAreActive() bool {
 
 // getManagedResources get the managed resources of various types
 func (r *ClusterReconciler) getManagedResources(ctx context.Context,
-	cluster v1alpha1.Cluster) (*managedResources, error) {
+	cluster apiv1.Cluster) (*managedResources, error) {
 	// Update the status of this resource
 	childPods, err := r.getManagedPods(ctx, cluster)
 	if err != nil {
@@ -74,7 +74,7 @@ func (r *ClusterReconciler) getManagedResources(ctx context.Context,
 
 func (r *ClusterReconciler) getManagedPods(
 	ctx context.Context,
-	cluster v1alpha1.Cluster,
+	cluster apiv1.Cluster,
 ) (corev1.PodList, error) {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -92,7 +92,7 @@ func (r *ClusterReconciler) getManagedPods(
 
 func (r *ClusterReconciler) getManagedPVCs(
 	ctx context.Context,
-	cluster v1alpha1.Cluster,
+	cluster apiv1.Cluster,
 ) (corev1.PersistentVolumeClaimList, error) {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -112,7 +112,7 @@ func (r *ClusterReconciler) getManagedPVCs(
 // by this cluster
 func (r *ClusterReconciler) getManagedJobs(
 	ctx context.Context,
-	cluster v1alpha1.Cluster,
+	cluster apiv1.Cluster,
 ) (batchv1.JobList, error) {
 	var childJobs batchv1.JobList
 	if err := r.List(ctx, &childJobs,
@@ -127,7 +127,7 @@ func (r *ClusterReconciler) getManagedJobs(
 
 func (r *ClusterReconciler) updateResourceStatus(
 	ctx context.Context,
-	cluster *v1alpha1.Cluster,
+	cluster *apiv1.Cluster,
 	resources *managedResources,
 ) error {
 	// Retrieve the cluster key
@@ -180,7 +180,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 func (r *ClusterReconciler) setPrimaryInstance(
 	ctx context.Context,
-	cluster *v1alpha1.Cluster,
+	cluster *apiv1.Cluster,
 	podName string,
 ) error {
 	cluster.Status.TargetPrimary = podName
@@ -188,7 +188,7 @@ func (r *ClusterReconciler) setPrimaryInstance(
 		return err
 	}
 
-	if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseSwitchover,
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
 		fmt.Sprintf("Switching over to %v", podName)); err != nil {
 		return err
 	}
@@ -199,7 +199,7 @@ func (r *ClusterReconciler) setPrimaryInstance(
 // RegisterPhase update phase in the status cluster with the
 // proper reason
 func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
-	cluster *v1alpha1.Cluster,
+	cluster *apiv1.Cluster,
 	phase string,
 	reason string,
 ) error {

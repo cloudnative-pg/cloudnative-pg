@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
@@ -30,7 +30,7 @@ func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context) 
 		Resource: "secrets",
 	}).
 		Namespace(r.instance.Namespace).
-		Get(ctx, r.instance.ClusterName+apiv1alpha1.ServerSecretSuffix, metav1.GetOptions{})
+		Get(ctx, r.instance.ClusterName+apiv1.ServerSecretSuffix, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,7 @@ func (r *InstanceReconciler) RefreshPostgresUserCertificate(ctx context.Context)
 		Resource: "secrets",
 	}).
 		Namespace(r.instance.Namespace).
-		Get(ctx, r.instance.ClusterName+apiv1alpha1.ReplicationSecretSuffix, metav1.GetOptions{})
+		Get(ctx, r.instance.ClusterName+apiv1.ReplicationSecretSuffix, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func (r *InstanceReconciler) RefreshCA(ctx context.Context) error {
 		Resource: "secrets",
 	}).
 		Namespace(r.instance.Namespace).
-		Get(ctx, r.instance.ClusterName+apiv1alpha1.CaSecretSuffix, metav1.GetOptions{})
+		Get(ctx, r.instance.ClusterName+apiv1.CaSecretSuffix, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 	r.log.Info("Checking PGDATA coherence")
 
 	cluster, err := r.client.
-		Resource(apiv1alpha1.ClusterGVK).
+		Resource(apiv1.ClusterGVK).
 		Namespace(r.instance.Namespace).
 		Get(ctx, r.instance.ClusterName, metav1.GetOptions{})
 	if err != nil {
@@ -145,7 +145,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 			}
 
 			_, err = r.client.
-				Resource(apiv1alpha1.ClusterGVK).
+				Resource(apiv1.ClusterGVK).
 				Namespace(r.instance.Namespace).
 				UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
 			if err != nil {
@@ -200,7 +200,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 // until the switchover is completed
 func (r *InstanceReconciler) waitForSwitchoverToBeCompleted(ctx context.Context) error {
 	switchoverWatch, err := r.client.
-		Resource(apiv1alpha1.ClusterGVK).
+		Resource(apiv1.ClusterGVK).
 		Namespace(r.instance.Namespace).
 		Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName).String(),

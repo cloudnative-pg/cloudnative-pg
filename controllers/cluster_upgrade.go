@@ -15,7 +15,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
@@ -30,7 +30,7 @@ var (
 // updateCluster update a Cluster to a new image, if needed
 func (r *ClusterReconciler) upgradeCluster(
 	ctx context.Context,
-	cluster *v1alpha1.Cluster,
+	cluster *apiv1.Cluster,
 	podList v1.PodList, clusterStatus postgres.PostgresqlStatusList,
 ) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
@@ -55,7 +55,7 @@ func (r *ClusterReconciler) upgradeCluster(
 			continue
 		}
 
-		if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseUpgrade,
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
 			fmt.Sprintf("Upgrading cluster to image: %v", targetImageName)); err != nil {
 			return err
 		}
@@ -64,7 +64,7 @@ func (r *ClusterReconciler) upgradeCluster(
 		if err != nil {
 			log.Error(
 				err, "Error checking image versions", "from", usedImageName, "to", targetImageName)
-			return r.RegisterPhase(ctx, cluster, v1alpha1.PhaseUpgradeFailed,
+			return r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgradeFailed,
 				fmt.Sprintf("Upgrade Failed, wrong image version: %v", err))
 		}
 
@@ -74,7 +74,7 @@ func (r *ClusterReconciler) upgradeCluster(
 				"to", targetImageName,
 				"pod", pod.Name)
 			return r.RegisterPhase(ctx, cluster,
-				v1alpha1.PhaseUpgradeFailed,
+				apiv1.PhaseUpgradeFailed,
 				fmt.Sprintf("Upgrade Failed, can't upgrade from %v to %v",
 					usedImageName, targetImageName))
 		}
@@ -106,11 +106,11 @@ func (r *ClusterReconciler) upgradeCluster(
 
 	// We still need to upgrade the primary server, let's see
 	// if the user prefer to do it manually
-	if cluster.GetPrimaryUpdateStrategy() == v1alpha1.PrimaryUpdateStrategySupervised {
+	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
 		log.Info(
 			"Waiting for the user to request a switchover to complete the rolling update",
 			"primaryPod", sortedPodList[primaryIdx].Name)
-		return r.RegisterPhase(ctx, cluster, v1alpha1.PhaseWaitingForUser,
+		return r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser,
 			"User must issue a supervised switchover")
 	}
 
@@ -141,7 +141,7 @@ func (r *ClusterReconciler) upgradeCluster(
 }
 
 // updatePod update an instance to a newer image version
-func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *v1alpha1.Cluster, pod *v1.Pod) error {
+func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *apiv1.Cluster, pod *v1.Pod) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	log.Info("Deleting old Pod",

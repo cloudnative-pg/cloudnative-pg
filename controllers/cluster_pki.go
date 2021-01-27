@@ -15,7 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -37,7 +37,7 @@ func GetOperatorNamespaceOrDie() string {
 
 // createPostgresPKI create all the PKI infrastructure that PostgreSQL need to work
 // if using ssl=on
-func (r *ClusterReconciler) createPostgresPKI(ctx context.Context, cluster *v1alpha1.Cluster) error {
+func (r *ClusterReconciler) createPostgresPKI(ctx context.Context, cluster *apiv1.Cluster) error {
 	// This is the CA of cluster
 	caSecret, err := r.ensureCASecret(ctx, cluster)
 	if err != nil {
@@ -70,7 +70,7 @@ func (r *ClusterReconciler) createPostgresPKI(ctx context.Context, cluster *v1al
 		ctx,
 		cluster,
 		replicationSecretName,
-		v1alpha1.StreamingReplicationUser,
+		apiv1.StreamingReplicationUser,
 		caSecret,
 		certs.CertTypeClient)
 	if err != nil {
@@ -82,7 +82,7 @@ func (r *ClusterReconciler) createPostgresPKI(ctx context.Context, cluster *v1al
 
 // ensureCASecret ensure that the cluster CA really exist and is
 // valid
-func (r *ClusterReconciler) ensureCASecret(ctx context.Context, cluster *v1alpha1.Cluster) (*v1.Secret, error) {
+func (r *ClusterReconciler) ensureCASecret(ctx context.Context, cluster *apiv1.Cluster) (*v1.Secret, error) {
 	var secret v1.Secret
 	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.GetNamespace(), Name: cluster.GetCASecretName()}, &secret)
 	if err == nil {
@@ -145,7 +145,7 @@ func (r *ClusterReconciler) renewCASecret(ctx context.Context, secret *v1.Secret
 // ensureLeafCertificate check if we have a certificate for PostgreSQL and generate/renew it
 func (r *ClusterReconciler) ensureLeafCertificate(
 	ctx context.Context,
-	cluster *v1alpha1.Cluster,
+	cluster *apiv1.Cluster,
 	secretName client.ObjectKey,
 	commonName string,
 	caSecret *v1.Secret,

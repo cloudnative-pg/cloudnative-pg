@@ -18,7 +18,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
 var (
@@ -28,7 +28,7 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(Scheme)
-	_ = apiv1alpha1.AddToScheme(Scheme)
+	_ = apiv1.AddToScheme(Scheme)
 }
 
 // NewControllerRuntimeClient create a new typed K8s client where

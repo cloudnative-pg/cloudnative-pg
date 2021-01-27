@@ -20,7 +20,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
@@ -68,7 +68,7 @@ func (instance *Instance) Backup(
 	ctx context.Context,
 	client client.StatusClient,
 	recorder record.EventRecorder,
-	configuration apiv1alpha1.BarmanObjectStoreConfiguration,
+	configuration apiv1.BarmanObjectStoreConfiguration,
 	backupObject runtime.Object,
 	log logr.Logger,
 ) error {
@@ -102,7 +102,7 @@ func (instance *Instance) Backup(
 		serverName)
 
 	// Mark the backup as running
-	backup := backupObject.(apiv1alpha1.BackupCommon)
+	backup := backupObject.(apiv1.BackupCommon)
 	if backup == nil {
 		return fmt.Errorf("backup object not recognized")
 	}
@@ -117,7 +117,7 @@ func (instance *Instance) Backup(
 	if len(configuration.ServerName) != 0 {
 		backup.GetStatus().ServerName = configuration.ServerName
 	}
-	backup.GetStatus().Phase = apiv1alpha1.BackupPhaseRunning
+	backup.GetStatus().Phase = apiv1.BackupPhaseRunning
 	backup.GetStatus().StartedAt = &metav1.Time{
 		Time: time.Now(),
 	}

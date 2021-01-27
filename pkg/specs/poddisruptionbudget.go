@@ -11,12 +11,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
 // CreatePodDisruptionBudget create a pud disruption budget telling
 // k8s to avoid removing more than one node at a time
-func CreatePodDisruptionBudget(cluster v1alpha1.Cluster) policyv1beta1.PodDisruptionBudget {
+func CreatePodDisruptionBudget(cluster apiv1.Cluster) policyv1beta1.PodDisruptionBudget {
 	one := intstr.FromInt(1)
 
 	return policyv1beta1.PodDisruptionBudget{

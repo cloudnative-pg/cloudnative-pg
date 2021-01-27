@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
@@ -40,7 +40,7 @@ const (
 	PostgresContainerName = "postgres"
 )
 
-func createPostgresVolumes(cluster v1alpha1.Cluster, podName string) []corev1.Volume {
+func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
 		{
 			Name: "pgdata",
@@ -101,7 +101,7 @@ func createPostgresVolumes(cluster v1alpha1.Cluster, podName string) []corev1.Vo
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
 func createPostgresContainers(
-	cluster v1alpha1.Cluster,
+	cluster apiv1.Cluster,
 	podName string,
 ) []corev1.Container {
 	return []corev1.Container{
@@ -211,7 +211,7 @@ func createPostgresContainers(
 
 // CreateAccessKeyIDEnvVar create the environment variable giving
 // the AWS access key ID
-func CreateAccessKeyIDEnvVar(backupConfiguration *v1alpha1.BackupConfiguration) corev1.EnvVar {
+func CreateAccessKeyIDEnvVar(backupConfiguration *apiv1.BackupConfiguration) corev1.EnvVar {
 	if backupConfiguration == nil || backupConfiguration.BarmanObjectStore == nil {
 		return corev1.EnvVar{
 			Name:  "AWS_ACCESS_KEY_ID",
@@ -229,7 +229,7 @@ func CreateAccessKeyIDEnvVar(backupConfiguration *v1alpha1.BackupConfiguration) 
 
 // CreateSecretAccessKeyEnvVar create the environment variable giving
 // the AWS access key ID
-func CreateSecretAccessKeyEnvVar(backupConfiguration *v1alpha1.BackupConfiguration) corev1.EnvVar {
+func CreateSecretAccessKeyEnvVar(backupConfiguration *apiv1.BackupConfiguration) corev1.EnvVar {
 	if backupConfiguration == nil || backupConfiguration.BarmanObjectStore == nil {
 		return corev1.EnvVar{
 			Name:  "AWS_SECRET_ACCESS_KEY",
@@ -247,7 +247,7 @@ func CreateSecretAccessKeyEnvVar(backupConfiguration *v1alpha1.BackupConfigurati
 
 // CreateAffinitySection creates the affinity sections for Pods, given the configuration
 // from the user
-func CreateAffinitySection(clusterName string, config v1alpha1.AffinityConfiguration) *corev1.Affinity {
+func CreateAffinitySection(clusterName string, config apiv1.AffinityConfiguration) *corev1.Affinity {
 	// We have no anti affinity section if the user don't have it configured
 	if config.EnablePodAntiAffinity != nil && !(*config.EnablePodAntiAffinity) {
 		return nil
@@ -294,7 +294,7 @@ func CreatePostgresSecurityContext(postgresUser, postgresGroup int64) *corev1.Po
 }
 
 // PodWithExistingStorage create a new instance with an existing storage
-func PodWithExistingStorage(cluster v1alpha1.Cluster, nodeSerial int32) *corev1.Pod {
+func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 
 	pod := &corev1.Pod{

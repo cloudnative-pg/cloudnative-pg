@@ -15,7 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -62,11 +62,11 @@ func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout
 			Namespace: namespace,
 			Name:      clusterName,
 		}
-		cluster := &clusterv1.Cluster{}
+		cluster := &apiv1.Cluster{}
 		err := env.Client.Get(env.Ctx, clusterNamespacedName, cluster)
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(func() (int32, error) {
-			cluster := &clusterv1.Cluster{}
+			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx, clusterNamespacedName, cluster)
 			return cluster.Status.ReadyInstances, err
 		}, timeout).Should(BeEquivalentTo(cluster.Spec.Instances))

@@ -28,7 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
@@ -184,7 +184,7 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 		Namespace: namespace,
 		Name:      clusterName,
 	}
-	cluster := &clusterv1.Cluster{}
+	cluster := &apiv1.Cluster{}
 	_ = env.Client.Get(env.Ctx, namespacedName, cluster)
 	out, _ := json.MarshalIndent(cluster, "", "    ")
 	fmt.Fprintf(w, "Dumping %v/%v cluster\n", namespace, clusterName)
