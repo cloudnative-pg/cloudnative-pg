@@ -45,6 +45,12 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 		return nil
 	}
 
+	if len(status.Items) == 0 {
+		// We have no status to check and we can't make a
+		// switchover under those conditions
+		return nil
+	}
+
 	// Set targetPrimary to do a failover if needed
 	if !status.Items[0].IsPrimary {
 		if !status.AreWalReceiversDown() {
