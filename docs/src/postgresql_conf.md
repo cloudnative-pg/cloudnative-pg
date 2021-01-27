@@ -111,22 +111,28 @@ Fixed rules:
 
 ```text
 local all all peer
+
+hostssl postgres streaming_replica all cert clientcert=1
+hostssl replication streaming_replica all cert clientcert=1
 ```
 
 Default rules:
 
 ```text
 host all all all md5
-hostssl replication all all cert certclient=1
 ```
 
 The resulting `pg_hba.conf` will look like this:
 
 ```text
 local all all peer
+
+hostssl postgres streaming_replica all cert clientcert=1
+hostssl replication streaming_replica all cert clientcert=1
+
 <user defined rules>
+
 host all all all md5
-hostssl replication all all cert clientcert=1
 ```
 
 Refer to the PostgreSQL documentation for [more information on `pg_hba.conf`](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html).

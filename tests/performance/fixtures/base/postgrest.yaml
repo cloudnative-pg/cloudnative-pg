@@ -32,7 +32,7 @@ spec:
                 name: cluster-example-superuser
                 key: username
           - name: PGRST_DB_URI
-            value: "postgres://$(USER):$(PASSWORD)@cluster-example-rw/app?sslmode=disable"
+            value: "postgres://$(USER):$(PASSWORD)@cluster-example-rw/app?sslmode=require"
           - name: PGRST_DB_SCHEMA
             value: tps
           - name: PGRST_DB_ANON_ROLE
