@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
 var (
@@ -25,7 +25,7 @@ var (
 
 // CreatePVC create spec of a PVC, given its name and the storage configuration
 func CreatePVC(
-	storageConfiguration v1alpha1.StorageConfiguration,
+	storageConfiguration apiv1.StorageConfiguration,
 	name string,
 	namespace string,
 	nodeSerial int32,

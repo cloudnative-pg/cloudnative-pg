@@ -23,7 +23,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	apiGVString = v1alpha1.GroupVersion.String()
+	apiGVString = apiv1.GroupVersion.String()
 )
 
 // ClusterReconciler reconciles a Cluster objects
@@ -78,7 +78,7 @@ type ClusterReconciler struct {
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
 
-	var cluster v1alpha1.Cluster
+	var cluster apiv1.Cluster
 	if err := r.Get(ctx, req.NamespacedName, &cluster); err != nil {
 		// This also happens when you delete a Cluster resource in k8s. If
 		// that's the case, let's just wait for the Kubernetes garbage collector
@@ -87,7 +87,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Info("Resource has been deleted")
 
 			// Let's remove every expectation we have about this cluster
-			r.deleteExpectations(&v1alpha1.Cluster{
+			r.deleteExpectations(&apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      req.Name,
 					Namespace: req.Namespace,
@@ -195,7 +195,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // satisfiedExpectations check if the expectations for a certain cluster are met
-func (r *ClusterReconciler) satisfiedExpectations(cluster *v1alpha1.Cluster) bool {
+func (r *ClusterReconciler) satisfiedExpectations(cluster *apiv1.Cluster) bool {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	key := expectations.KeyFunc(cluster)
@@ -216,7 +216,7 @@ func (r *ClusterReconciler) satisfiedExpectations(cluster *v1alpha1.Cluster) boo
 }
 
 // deleteExpectations remove expectations we have about a certain cluster
-func (r *ClusterReconciler) deleteExpectations(cluster *v1alpha1.Cluster) {
+func (r *ClusterReconciler) deleteExpectations(cluster *apiv1.Cluster) {
 	key := expectations.KeyFunc(cluster)
 	r.podExpectations.DeleteExpectations(key)
 	r.jobExpectations.DeleteExpectations(key)
@@ -224,7 +224,7 @@ func (r *ClusterReconciler) deleteExpectations(cluster *v1alpha1.Cluster) {
 }
 
 // ReconcilePVCs align the PVCs that are backing our cluster with the user specifications
-func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *v1alpha1.Cluster,
+func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cluster,
 	resources *managedResources) error {
 	if !cluster.ShouldResizeInUseVolumes() {
 		return nil
@@ -272,7 +272,7 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *v1alpha1
 }
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
-func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request, cluster *v1alpha1.Cluster,
+func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request, cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList) (ctrl.Result, error) {
 	log := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
 
@@ -351,7 +351,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	}
 
 	// When everything is reconciled, update the status
-	if err := r.RegisterPhase(ctx, cluster, v1alpha1.PhaseHealthy, ""); err != nil {
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -367,7 +367,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 // removeCompletedJobs remove all the Jobs which are completed
 func (r *ClusterReconciler) removeCompletedJobs(
 	ctx context.Context,
-	cluster *v1alpha1.Cluster,
+	cluster *apiv1.Cluster,
 	jobs batchv1.JobList) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -422,7 +422,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 				return nil
 			}
 
-			if owner.APIVersion != apiGVString || owner.Kind != v1alpha1.ClusterKind {
+			if owner.APIVersion != apiGVString || owner.Kind != apiv1.ClusterKind {
 				return nil
 			}
 
@@ -442,7 +442,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 				return nil
 			}
 
-			if owner.APIVersion != apiGVString || owner.Kind != v1alpha1.ClusterKind {
+			if owner.APIVersion != apiGVString || owner.Kind != apiv1.ClusterKind {
 				return nil
 			}
 
@@ -462,7 +462,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 				return nil
 			}
 
-			if owner.APIVersion != apiGVString || owner.Kind != v1alpha1.ClusterKind {
+			if owner.APIVersion != apiGVString || owner.Kind != apiv1.ClusterKind {
 				return nil
 			}
 
@@ -472,7 +472,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.Cluster{}).
+		For(&apiv1.Cluster{}).
 		Owns(&corev1.Pod{}).
 		Owns(&batchv1.Job{}).
 		WithEventFilter(&ClusterPredicate{}).

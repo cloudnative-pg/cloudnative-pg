@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -61,7 +61,7 @@ var _ = Describe("Failover", func() {
 				Namespace: namespace,
 				Name:      clusterName,
 			}
-			cluster := &clusterv1.Cluster{}
+			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(cluster.Status.CurrentPrimary, err).To(
 				BeEquivalentTo(cluster.Status.TargetPrimary))
@@ -197,7 +197,7 @@ var _ = Describe("Failover", func() {
 			// to be disconnected. We can send the SIGCONT now.
 			timeout := 60
 			Eventually(func() (int32, error) {
-				cluster := &clusterv1alpha1.Cluster{}
+				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.ReadyInstances, err
 			}, timeout).Should(BeEquivalentTo(2))
@@ -218,11 +218,11 @@ var _ = Describe("Failover", func() {
 			// the instance we expect to take that role (-3).
 			timeout = 120
 			Eventually(func() (string, error) {
-				cluster := &clusterv1.Cluster{}
+				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.TargetPrimary, err
 			}, timeout).ShouldNot(BeEquivalentTo(currentPrimary))
-			cluster := &clusterv1.Cluster{}
+			cluster := &apiv1.Cluster{}
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(cluster.Status.TargetPrimary, err).To(
 				BeEquivalentTo(targetPrimary))
@@ -237,7 +237,7 @@ var _ = Describe("Failover", func() {
 			}
 			timeout := 30
 			Eventually(func() (string, error) {
-				cluster := &clusterv1.Cluster{}
+				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.CurrentPrimary, err
 			}, timeout).Should(BeEquivalentTo(targetPrimary))

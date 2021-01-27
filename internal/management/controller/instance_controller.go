@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
 
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
@@ -114,7 +114,7 @@ func (r *InstanceReconciler) reconcileSecret(event *watch.Event) error {
 	}
 
 	switch {
-	case strings.HasSuffix(name, apiv1alpha1.ServerSecretSuffix):
+	case strings.HasSuffix(name, apiv1.ServerSecretSuffix):
 		err = r.refreshCertificateFilesFromObject(
 			object,
 			postgres.ServerCertificateLocation,
@@ -123,7 +123,7 @@ func (r *InstanceReconciler) reconcileSecret(event *watch.Event) error {
 			return err
 		}
 
-	case strings.HasSuffix(name, apiv1alpha1.ReplicationSecretSuffix):
+	case strings.HasSuffix(name, apiv1.ReplicationSecretSuffix):
 		err = r.refreshCertificateFilesFromObject(
 			object,
 			postgres.StreamingReplicaCertificateLocation,
@@ -132,7 +132,7 @@ func (r *InstanceReconciler) reconcileSecret(event *watch.Event) error {
 			return err
 		}
 
-	case strings.HasSuffix(name, apiv1alpha1.CaSecretSuffix):
+	case strings.HasSuffix(name, apiv1.CaSecretSuffix):
 		err = r.refreshCAFromObject(object)
 		if err != nil {
 			return err
@@ -200,7 +200,7 @@ func (r *InstanceReconciler) reconcileConfigMap(ctx context.Context, event *watc
 	}
 
 	cluster, err := r.client.
-		Resource(apiv1alpha1.ClusterGVK).
+		Resource(apiv1.ClusterGVK).
 		Namespace(r.instance.Namespace).
 		Get(ctx, r.instance.ClusterName, metav1.GetOptions{})
 	if err != nil {
@@ -337,7 +337,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *unst
 		}
 
 		_, err = r.client.
-			Resource(apiv1alpha1.ClusterGVK).
+			Resource(apiv1.ClusterGVK).
 			Namespace(r.instance.Namespace).
 			UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
 		if err == nil {
@@ -353,7 +353,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *unst
 
 			var errRefresh error
 			cluster, errRefresh = r.client.
-				Resource(apiv1alpha1.ClusterGVK).
+				Resource(apiv1.ClusterGVK).
 				Namespace(r.instance.Namespace).
 				Get(ctx, r.instance.ClusterName, metav1.GetOptions{})
 
@@ -493,15 +493,15 @@ func (r *InstanceReconciler) configureInstancePermissions() error {
 func (r *InstanceReconciler) configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
 	var hasLoginRight, hasReplicationRight, hasSuperuser bool
 	row := tx.QueryRow("SELECT rolcanlogin, rolreplication, rolsuper FROM pg_roles WHERE rolname = $1",
-		apiv1alpha1.StreamingReplicationUser)
+		apiv1.StreamingReplicationUser)
 	err := row.Scan(&hasLoginRight, &hasReplicationRight, &hasSuperuser)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			_, err = tx.Exec(fmt.Sprintf(
 				"CREATE USER %v REPLICATION",
-				pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
+				pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
 			if err != nil {
-				return false, fmt.Errorf("CREATE USER %v error: %w", apiv1alpha1.StreamingReplicationUser, err)
+				return false, fmt.Errorf("CREATE USER %v error: %w", apiv1.StreamingReplicationUser, err)
 			}
 		} else {
 			return false, fmt.Errorf("while creating streaming replication user: %w", err)
@@ -511,9 +511,9 @@ func (r *InstanceReconciler) configureStreamingReplicaUser(tx *sql.Tx) (bool, er
 	if !hasLoginRight || !hasReplicationRight {
 		_, err = tx.Exec(fmt.Sprintf(
 			"ALTER USER %v LOGIN REPLICATION",
-			pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
+			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
 		if err != nil {
-			return false, fmt.Errorf("ALTER USER %v error: %w", apiv1alpha1.StreamingReplicationUser, err)
+			return false, fmt.Errorf("ALTER USER %v error: %w", apiv1.StreamingReplicationUser, err)
 		}
 	}
 	return hasSuperuser, nil
@@ -527,9 +527,9 @@ func (r *InstanceReconciler) configurePgRewindPrivileges(majorVersion int, hasSu
 		if !hasSuperuser {
 			_, err := tx.Exec(fmt.Sprintf(
 				"ALTER USER %v SUPERUSER",
-				pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
+				pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
 			if err != nil {
-				return fmt.Errorf("ALTER USER %v error: %w", apiv1alpha1.StreamingReplicationUser, err)
+				return fmt.Errorf("ALTER USER %v error: %w", apiv1.StreamingReplicationUser, err)
 			}
 		}
 		return nil
@@ -543,10 +543,10 @@ func (r *InstanceReconciler) configurePgRewindPrivileges(majorVersion int, hasSu
 			       has_function_privilege($2, 'pg_stat_file(text, boolean)', 'execute') AND
 			       has_function_privilege($3, 'pg_read_binary_file(text)', 'execute') AND
 			       has_function_privilege($4, 'pg_read_binary_file(text, bigint, bigint, boolean)', 'execute')`,
-		apiv1alpha1.StreamingReplicationUser,
-		apiv1alpha1.StreamingReplicationUser,
-		apiv1alpha1.StreamingReplicationUser,
-		apiv1alpha1.StreamingReplicationUser)
+		apiv1.StreamingReplicationUser,
+		apiv1.StreamingReplicationUser,
+		apiv1.StreamingReplicationUser,
+		apiv1.StreamingReplicationUser)
 	err := row.Scan(&hasPgRewindPrivileges)
 	if err != nil {
 		return fmt.Errorf("while getting streaming replication user privileges: %w", err)
@@ -555,28 +555,28 @@ func (r *InstanceReconciler) configurePgRewindPrivileges(majorVersion int, hasSu
 	if !hasPgRewindPrivileges {
 		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_ls_dir(text, boolean, boolean) TO %v",
-			pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
+			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
 		if err != nil {
 			return fmt.Errorf("while granting pgrewind privileges: %w", err)
 		}
 
 		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_stat_file(text, boolean) TO %v",
-			pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
+			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
 		if err != nil {
 			return fmt.Errorf("while granting pgrewind privileges: %w", err)
 		}
 
 		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_read_binary_file(text) TO %v",
-			pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
+			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
 		if err != nil {
 			return fmt.Errorf("while granting pgrewind privileges: %w", err)
 		}
 
 		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_read_binary_file(text, bigint, bigint, boolean) TO %v",
-			pq.QuoteIdentifier(apiv1alpha1.StreamingReplicationUser)))
+			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
 		if err != nil {
 			return fmt.Errorf("while granting pgrewind privileges: %w", err)
 		}

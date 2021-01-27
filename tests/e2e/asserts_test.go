@@ -13,7 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -53,11 +53,11 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 		}
 		// Eventually the number of ready instances should be equal to the
 		// amount of instances defined in the cluster
-		cluster := &clusterv1.Cluster{}
+		cluster := &apiv1.Cluster{}
 		err := env.Client.Get(env.Ctx, namespacedName, cluster)
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(func() (int32, error) {
-			cluster := &clusterv1.Cluster{}
+			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx, namespacedName, cluster)
 			return cluster.Status.ReadyInstances, err
 		}, timeout).Should(BeEquivalentTo(cluster.Spec.Instances))

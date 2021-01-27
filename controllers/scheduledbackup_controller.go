@@ -20,7 +20,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	postgresqlv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
 const (
@@ -44,7 +44,7 @@ type ScheduledBackupReconciler struct {
 func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("scheduledbackup", req.NamespacedName)
 
-	var scheduledBackup postgresqlv1alpha1.ScheduledBackup
+	var scheduledBackup apiv1.ScheduledBackup
 	if err := r.Get(ctx, req.NamespacedName, &scheduledBackup); err != nil {
 		// This also happens when you delete a Backup resource in k8s.
 		// If that's the case, we have nothing to do
@@ -86,7 +86,7 @@ func ReconcileScheduledBackup(
 	event record.EventRecorder,
 	client client.Client,
 	log logr.Logger,
-	scheduledBackup postgresqlv1alpha1.ScheduledBackupCommon,
+	scheduledBackup apiv1.ScheduledBackupCommon,
 ) (ctrl.Result, error) {
 	// Let's check
 	schedule, err := cron.Parse(scheduledBackup.GetSchedule())
@@ -180,9 +180,9 @@ func ReconcileScheduledBackup(
 // GetChildBackups gets all the backups scheduled by a certain scheduler
 func (r *ScheduledBackupReconciler) GetChildBackups(
 	ctx context.Context,
-	scheduledBackup postgresqlv1alpha1.ScheduledBackup,
-) ([]postgresqlv1alpha1.Backup, error) {
-	var childBackups postgresqlv1alpha1.BackupList
+	scheduledBackup apiv1.ScheduledBackup,
+) ([]apiv1.Backup, error) {
+	var childBackups apiv1.BackupList
 
 	if err := r.List(ctx, &childBackups,
 		client.InNamespace(scheduledBackup.Namespace),
@@ -203,9 +203,9 @@ func (r *ScheduledBackupReconciler) SetupWithManager(ctx context.Context, mgr ct
 	// find all the backups created by this controller
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
-		&postgresqlv1alpha1.Backup{},
+		&apiv1.Backup{},
 		backupOwnerKey, func(rawObj client.Object) []string {
-			pod := rawObj.(*postgresqlv1alpha1.Backup)
+			pod := rawObj.(*apiv1.Backup)
 			owner := metav1.GetControllerOf(pod)
 			if owner == nil {
 				return nil
@@ -221,6 +221,6 @@ func (r *ScheduledBackupReconciler) SetupWithManager(ctx context.Context, mgr ct
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&postgresqlv1alpha1.ScheduledBackup{}).
+		For(&apiv1.ScheduledBackup{}).
 		Complete(r)
 }

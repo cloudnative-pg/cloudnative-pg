@@ -14,12 +14,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 // CreatePrimaryJobViaInitdb create a new primary instance in a Pod
-func CreatePrimaryJobViaInitdb(cluster v1alpha1.Cluster, nodeSerial int32) *batchv1.Job {
+func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 	jobName := fmt.Sprintf("%s-%v-initdb", cluster.Name, nodeSerial)
 
@@ -155,7 +155,7 @@ func CreatePrimaryJobViaInitdb(cluster v1alpha1.Cluster, nodeSerial int32) *batc
 }
 
 // CreatePrimaryJobViaRecovery create a new primary instance in a Pod
-func CreatePrimaryJobViaRecovery(cluster v1alpha1.Cluster, nodeSerial int32, backup *v1alpha1.Backup) *batchv1.Job {
+func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup *apiv1.Backup) *batchv1.Job {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 	jobName := fmt.Sprintf("%s-%v-full-recovery", cluster.Name, nodeSerial)
 
@@ -289,7 +289,7 @@ func CreatePrimaryJobViaRecovery(cluster v1alpha1.Cluster, nodeSerial int32, bac
 }
 
 // JoinReplicaInstance create a new PostgreSQL node, copying the contents from another Pod
-func JoinReplicaInstance(cluster v1alpha1.Cluster, nodeSerial int32) *batchv1.Job {
+func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 	jobName := fmt.Sprintf("%s-%v-join", cluster.Name, nodeSerial)
 

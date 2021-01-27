@@ -162,7 +162,7 @@ BootstrapRecovery contains the configuration required to restore the backup with
 
 ## Cluster
 
-Cluster is the Schema for the postgresql API
+Cluster is the Schema for the PostgreSQL API
 
 | Field | Description | Scheme | Required |
 | -------------------- | ------------------------------ | -------------------- | -------- |
@@ -360,4 +360,5 @@ ScheduledBackupStatus defines the observed state of ScheduledBackup
 | -------------------- | ------------------------------ | -------------------- | -------- |
 | lastCheckTime | The latest time the schedule | *metav1.Time | false |
 | lastScheduleTime | Information when was the last time that backup was successfully scheduled. | *metav1.Time | false |
+| nextScheduleTime | Next time we will run a backup | *metav1.Time | false |
 

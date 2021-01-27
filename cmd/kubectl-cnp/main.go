@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
@@ -86,7 +86,7 @@ func promote(cmd *cobra.Command, args []string) {
 	serverName := args[1]
 
 	// Check cluster status
-	object, err := kubeclient.Resource(apiv1alpha1.ClusterGVK).
+	object, err := kubeclient.Resource(apiv1.ClusterGVK).
 		Namespace(namespace).
 		Get(ctx, clusterName, metav1.GetOptions{})
 	if err != nil {
@@ -120,7 +120,7 @@ func promote(cmd *cobra.Command, args []string) {
 	// Update, considering possible conflicts
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, err = kubeclient.
-			Resource(apiv1alpha1.ClusterGVK).
+			Resource(apiv1.ClusterGVK).
 			Namespace(namespace).
 			UpdateStatus(ctx, object, metav1.UpdateOptions{})
 		return err

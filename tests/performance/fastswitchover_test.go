@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
-	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -80,7 +80,7 @@ var _ = Describe("Fast switchover", func() {
 			}
 
 			Eventually(func() (int32, error) {
-				cluster := &clusterv1.Cluster{}
+				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.ReadyInstances, err
 			}, timeout).Should(BeEquivalentTo(3))
@@ -167,7 +167,7 @@ var _ = Describe("Fast switchover", func() {
 				Namespace: namespace,
 				Name:      clusterName,
 			}
-			cluster := &clusterv1.Cluster{}
+			cluster := &apiv1.Cluster{}
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				Expect(err).ToNot(HaveOccurred())

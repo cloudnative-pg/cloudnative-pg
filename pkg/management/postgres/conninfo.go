@@ -9,14 +9,14 @@ package postgres
 import (
 	"fmt"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // buildPrimaryConnInfo builds the connection string to connect to primaryHostname
 func buildPrimaryConnInfo(primaryHostname, applicationName string) string {
 	primaryConnInfo := fmt.Sprintf("host=%v ", primaryHostname) +
-		fmt.Sprintf("user=%v ", v1alpha1.StreamingReplicationUser) +
+		fmt.Sprintf("user=%v ", apiv1.StreamingReplicationUser) +
 		"port=5432 " +
 		fmt.Sprintf("sslkey=%v ", postgres.StreamingReplicaKeyLocation) +
 		fmt.Sprintf("sslcert=%v ", postgres.StreamingReplicaCertificateLocation) +

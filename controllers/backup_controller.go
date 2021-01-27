@@ -18,7 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	postgresqlv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -42,7 +42,7 @@ type BackupReconciler struct {
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("backup", req.NamespacedName)
 
-	var backup postgresqlv1alpha1.Backup
+	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
 		// This also happens when you delete a Backup resource in k8s.
 		// If that's the case, we have nothing to do
@@ -59,7 +59,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// We need to start a backup
 	clusterName := backup.Spec.Cluster.Name
-	var cluster postgresqlv1alpha1.Cluster
+	var cluster apiv1.Cluster
 	if err := r.Get(ctx, client.ObjectKey{
 		Namespace: backup.Namespace,
 		Name:      clusterName,
@@ -107,11 +107,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 func StartBackup(
 	ctx context.Context,
 	client client.StatusClient,
-	backup postgresqlv1alpha1.BackupCommon,
+	backup apiv1.BackupCommon,
 	pod corev1.Pod,
 ) error {
 	// This backup has been started
-	backup.GetStatus().Phase = postgresqlv1alpha1.BackupPhaseStarted
+	backup.GetStatus().Phase = apiv1.BackupPhaseStarted
 	if err := utils.UpdateStatusAndRetry(ctx, client, backup.GetKubernetesObject()); err != nil {
 		backup.GetStatus().SetAsFailed("Can't update backup", "", err)
 		return err
@@ -140,6 +140,6 @@ func StartBackup(
 // SetupWithManager sets up this controller given a controller manager
 func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&postgresqlv1alpha1.Backup{}).
+		For(&apiv1.Backup{}).
 		Complete(r)
 }

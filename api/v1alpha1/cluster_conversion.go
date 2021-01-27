@@ -4,17 +4,17 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
-// ConvertTo converts this Cluster to the Hub version (v1alpha1).
+// ConvertTo converts this Cluster to the Hub version (v1).
 func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
-	dst := dstRaw.(*v1alpha1.Cluster)
+	dst := dstRaw.(*v1.Cluster)
 
 	// objectmeta
 	dst.ObjectMeta = src.ObjectMeta
@@ -34,13 +34,13 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 
 	// spec.bootstrap
 	if src.Spec.Bootstrap != nil {
-		dst.Spec.Bootstrap = &v1alpha1.BootstrapConfiguration{}
+		dst.Spec.Bootstrap = &v1.BootstrapConfiguration{}
 
 		// spec.bootstrap.initdb
 		if src.Spec.Bootstrap.InitDB != nil {
 			srcInitDB := src.Spec.Bootstrap.InitDB
 
-			dst.Spec.Bootstrap.InitDB = &v1alpha1.BootstrapInitDB{}
+			dst.Spec.Bootstrap.InitDB = &v1.BootstrapInitDB{}
 			dst.Spec.Bootstrap.InitDB.Database = srcInitDB.Database
 			dst.Spec.Bootstrap.InitDB.Owner = srcInitDB.Owner
 			dst.Spec.Bootstrap.InitDB.Secret = srcInitDB.Secret
@@ -49,13 +49,13 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 
 		// spec.bootstrap.recovery
 		if src.Spec.Bootstrap.Recovery != nil {
-			dst.Spec.Bootstrap.Recovery = &v1alpha1.BootstrapRecovery{}
+			dst.Spec.Bootstrap.Recovery = &v1.BootstrapRecovery{}
 			dst.Spec.Bootstrap.Recovery.Backup = src.Spec.Bootstrap.Recovery.Backup
 
 			if src.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
 				srcRecoveryTarget := src.Spec.Bootstrap.Recovery.RecoveryTarget
 
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget = &v1alpha1.RecoveryTarget{}
+				dst.Spec.Bootstrap.Recovery.RecoveryTarget = &v1.RecoveryTarget{}
 				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTLI = srcRecoveryTarget.TargetTLI
 				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetXID = srcRecoveryTarget.TargetXID
 				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetName = srcRecoveryTarget.TargetName
@@ -86,16 +86,16 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 	dst.Spec.Affinity.NodeSelector = src.Spec.Affinity.NodeSelector
 
 	dst.Spec.Resources = src.Spec.Resources
-	dst.Spec.PrimaryUpdateStrategy = v1alpha1.PrimaryUpdateStrategy(src.Spec.PrimaryUpdateStrategy)
+	dst.Spec.PrimaryUpdateStrategy = v1.PrimaryUpdateStrategy(src.Spec.PrimaryUpdateStrategy)
 
 	// spec.backup
 	if src.Spec.Backup != nil {
-		dst.Spec.Backup = &v1alpha1.BackupConfiguration{}
+		dst.Spec.Backup = &v1.BackupConfiguration{}
 
 		// spec.backup.barmanObjectStore
 		if src.Spec.Backup.BarmanObjectStore != nil {
 			s3Credentials := src.Spec.Backup.BarmanObjectStore.S3Credentials
-			dst.Spec.Backup.BarmanObjectStore = &v1alpha1.BarmanObjectStoreConfiguration{}
+			dst.Spec.Backup.BarmanObjectStore = &v1.BarmanObjectStoreConfiguration{}
 			dst.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference = s3Credentials.AccessKeyIDReference
 			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference = s3Credentials.SecretAccessKeyReference
 		}
@@ -107,20 +107,20 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 		// spec.backup.barmanObjectStore.wal
 		if src.Spec.Backup.BarmanObjectStore.Wal != nil {
 			wal := src.Spec.Backup.BarmanObjectStore.Wal
-			dst.Spec.Backup.BarmanObjectStore.Wal = &v1alpha1.WalBackupConfiguration{}
-			dst.Spec.Backup.BarmanObjectStore.Wal.Compression = v1alpha1.CompressionType(
+			dst.Spec.Backup.BarmanObjectStore.Wal = &v1.WalBackupConfiguration{}
+			dst.Spec.Backup.BarmanObjectStore.Wal.Compression = v1.CompressionType(
 				wal.Compression)
-			dst.Spec.Backup.BarmanObjectStore.Wal.Encryption = v1alpha1.EncryptionType(
+			dst.Spec.Backup.BarmanObjectStore.Wal.Encryption = v1.EncryptionType(
 				wal.Encryption)
 		}
 
 		// spec.backup.barmanObjectStore.data
 		if src.Spec.Backup.BarmanObjectStore.Data != nil {
 			data := src.Spec.Backup.BarmanObjectStore.Data
-			dst.Spec.Backup.BarmanObjectStore.Data = &v1alpha1.DataBackupConfiguration{}
-			dst.Spec.Backup.BarmanObjectStore.Data.Compression = v1alpha1.CompressionType(
+			dst.Spec.Backup.BarmanObjectStore.Data = &v1.DataBackupConfiguration{}
+			dst.Spec.Backup.BarmanObjectStore.Data.Compression = v1.CompressionType(
 				data.Compression)
-			dst.Spec.Backup.BarmanObjectStore.Data.Encryption = v1alpha1.EncryptionType(
+			dst.Spec.Backup.BarmanObjectStore.Data.Encryption = v1.EncryptionType(
 				data.Encryption)
 			dst.Spec.Backup.BarmanObjectStore.Data.ImmediateCheckpoint = data.ImmediateCheckpoint
 			dst.Spec.Backup.BarmanObjectStore.Data.Jobs = data.Jobs
@@ -129,7 +129,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 
 	// spec.nodeMaintenanceWindow
 	if src.Spec.NodeMaintenanceWindow != nil {
-		dst.Spec.NodeMaintenanceWindow = &v1alpha1.NodeMaintenanceWindow{}
+		dst.Spec.NodeMaintenanceWindow = &v1.NodeMaintenanceWindow{}
 		dst.Spec.NodeMaintenanceWindow.InProgress = src.Spec.NodeMaintenanceWindow.InProgress
 		dst.Spec.NodeMaintenanceWindow.ReusePVC = src.Spec.NodeMaintenanceWindow.ReusePVC
 	}
@@ -152,9 +152,9 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 	return nil
 }
 
-// ConvertFrom converts from the Hub version (v1alpha1) to this version.
+// ConvertFrom converts from the Hub version (v1) to this version.
 func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:golint
-	src := srcRaw.(*v1alpha1.Cluster)
+	src := srcRaw.(*v1.Cluster)
 
 	// objectmeta
 	dst.ObjectMeta = src.ObjectMeta

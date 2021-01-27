@@ -9,14 +9,14 @@ package specs
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Configmap creation", func() {
-	cluster := v1alpha1.Cluster{
+	cluster := apiv1.Cluster{
 		ObjectMeta: v1.ObjectMeta{
 			Namespace: "thisnamespace",
 			Name:      "thisname",

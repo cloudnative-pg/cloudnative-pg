@@ -9,26 +9,26 @@ package expectations
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Key function", func() {
-	firstCluster := &v1alpha1.Cluster{
+	firstCluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "first",
 			Namespace: "default",
 		},
 	}
-	secondCluster := &v1alpha1.Cluster{
+	secondCluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "second",
 			Namespace: "default",
 		},
 	}
-	thirdCluster := &v1alpha1.Cluster{
+	thirdCluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "first",
 			Namespace: "another",

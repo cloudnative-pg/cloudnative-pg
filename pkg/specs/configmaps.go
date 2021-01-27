@@ -12,7 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -30,7 +30,7 @@ const (
 )
 
 // CreatePostgresConfigMap create a configMap for this cluster
-func CreatePostgresConfigMap(cluster *v1alpha1.Cluster) (*corev1.ConfigMap, error) {
+func CreatePostgresConfigMap(cluster *apiv1.Cluster) (*corev1.ConfigMap, error) {
 	// put the user provided content between header and footer
 	hbaContent := postgres.CreateHBARules(cluster.Spec.PostgresConfiguration.PgHBA)
 

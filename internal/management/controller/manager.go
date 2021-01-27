@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
@@ -86,7 +86,7 @@ func (r *InstanceReconciler) Watch() error {
 	// This is an example of how to watch a certain object
 	// https://github.com/kubernetes/kubernetes/issues/43299
 	r.instanceWatch, err = r.client.
-		Resource(apiv1alpha1.ClusterGVK).
+		Resource(apiv1.ClusterGVK).
 		Namespace(r.instance.Namespace).
 		Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName).String(),
@@ -118,7 +118,7 @@ func (r *InstanceReconciler) Watch() error {
 		Namespace(r.instance.Namespace).
 		Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(
-				"metadata.name", r.instance.ClusterName+apiv1alpha1.ServerSecretSuffix).String(),
+				"metadata.name", r.instance.ClusterName+apiv1.ServerSecretSuffix).String(),
 		})
 	if err != nil {
 		return fmt.Errorf("error watching certificate secret: %w", err)
@@ -133,7 +133,7 @@ func (r *InstanceReconciler) Watch() error {
 		Namespace(r.instance.Namespace).
 		Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(
-				"metadata.name", r.instance.ClusterName+apiv1alpha1.CaSecretSuffix).String(),
+				"metadata.name", r.instance.ClusterName+apiv1.CaSecretSuffix).String(),
 		})
 	if err != nil {
 		return fmt.Errorf("error watching CA secret: %w", err)
@@ -148,7 +148,7 @@ func (r *InstanceReconciler) Watch() error {
 		Namespace(r.instance.Namespace).
 		Watch(ctx, metav1.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(
-				"metadata.name", r.instance.ClusterName+apiv1alpha1.ReplicationSecretSuffix).String(),
+				"metadata.name", r.instance.ClusterName+apiv1.ReplicationSecretSuffix).String(),
 		})
 	if err != nil {
 		return fmt.Errorf("error watching 'postgres' user secret: %w", err)

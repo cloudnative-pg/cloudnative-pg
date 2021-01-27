@@ -10,11 +10,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
-func CreateRole(cluster v1alpha1.Cluster, openshift bool) rbacv1.Role {
+func CreateRole(cluster apiv1.Cluster, openshift bool) rbacv1.Role {
 	rules := []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
