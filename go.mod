@@ -3,7 +3,7 @@ module github.com/EnterpriseDB/cloud-native-postgresql
 go 1.14
 
 require (
-	github.com/go-logr/logr v0.3.0
+	github.com/go-logr/logr v0.4.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/lib/pq v1.9.0
