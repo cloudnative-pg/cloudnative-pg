@@ -18,15 +18,17 @@ const (
 	hbaHeader = `
 # Grant local access
 local all all peer
+
+# Require client certificate authentication for the streaming_replica user
+hostssl postgres streaming_replica all cert clientcert=1
+hostssl replication streaming_replica all cert clientcert=1
 `
 
 	// hbaFooter is the footer of generated pg_hba.conf.
 	// The content provided by the user is inserted before this text
 	hbaFooter = `
-# Require md5 authentication elsewhere
-hostssl all all all cert clientcert=1
+# Otherwise use md5 authentication
 host all all all md5
-hostssl replication all all cert clientcert=1
 `
 	// fixedConfigurationParameter are the configuration parameters
 	// whose value is managed by the operator and should not be changed

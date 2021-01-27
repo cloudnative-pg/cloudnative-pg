@@ -69,7 +69,7 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 func AssertConnection(host string, user string, dbname string,
 	password string, queryingPod corev1.Pod, env *tests.TestingEnvironment) {
 	By(fmt.Sprintf("connecting to the %v service as %v", host, user), func() {
-		dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v", host, user, dbname, password)
+		dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require", host, user, dbname, password)
 		timeout := time.Second * 2
 		stdout, stderr, err := env.ExecCommand(env.Ctx, queryingPod, "postgres", &timeout,
 			"psql", dsn, "-tAc", "SELECT 1")
