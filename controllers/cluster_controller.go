@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
@@ -36,7 +37,8 @@ const (
 )
 
 var (
-	apiGVString = apiv1.GroupVersion.String()
+	apiGVString         = apiv1.GroupVersion.String()
+	apiv1alpha1GVString = apiv1alpha1.GroupVersion.String()
 )
 
 // ClusterReconciler reconciles a Cluster objects
@@ -422,7 +424,11 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 				return nil
 			}
 
-			if owner.APIVersion != apiGVString || owner.Kind != apiv1.ClusterKind {
+			if owner.Kind != apiv1.ClusterKind {
+				return nil
+			}
+
+			if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
 				return nil
 			}
 
@@ -442,7 +448,11 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 				return nil
 			}
 
-			if owner.APIVersion != apiGVString || owner.Kind != apiv1.ClusterKind {
+			if owner.Kind != apiv1.ClusterKind {
+				return nil
+			}
+
+			if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
 				return nil
 			}
 
@@ -462,7 +472,11 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 				return nil
 			}
 
-			if owner.APIVersion != apiGVString || owner.Kind != apiv1.ClusterKind {
+			if owner.Kind != apiv1.ClusterKind {
+				return nil
+			}
+
+			if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
 				return nil
 			}
 
