@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 )
 
 var (
@@ -38,7 +39,11 @@ func isControlledObject(object client.Object) bool {
 		return false
 	}
 
-	if owner.APIVersion != apiGVString || owner.Kind != apiv1.ClusterKind {
+	if owner.Kind != apiv1.ClusterKind {
+		return false
+	}
+
+	if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
 		return false
 	}
 
@@ -47,8 +52,13 @@ func isControlledObject(object client.Object) bool {
 
 // isCluster checks if a certain object is a cluster
 func isCluster(object client.Object) bool {
-	_, ok := object.(*apiv1.Cluster)
-	return ok
+	_, okv1 := object.(*apiv1.Cluster)
+	if okv1 {
+		return true
+	}
+
+	_, okv1alpha1 := object.(*apiv1alpha1.Cluster)
+	return okv1alpha1
 }
 
 // Create implements Predicate

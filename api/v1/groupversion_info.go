@@ -28,6 +28,9 @@ var (
 	// ClusterKind is the kind name of Clusters
 	ClusterKind = "Cluster"
 
+	// BackupKind is the kind name of Backups
+	BackupKind = "Backup"
+
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 

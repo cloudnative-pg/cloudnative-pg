@@ -211,7 +211,11 @@ func (r *ScheduledBackupReconciler) SetupWithManager(ctx context.Context, mgr ct
 				return nil
 			}
 
-			if owner.APIVersion != apiGVString || owner.Kind != "Backup" {
+			if owner.Kind != apiv1.BackupKind {
+				return nil
+			}
+
+			if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
 				return nil
 			}
 
