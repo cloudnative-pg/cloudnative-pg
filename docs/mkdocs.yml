@@ -21,6 +21,7 @@ nav:
   - before_you_start.md
   - use_cases.md
   - architecture.md
+  - installation.md
   - quickstart.md
   - cloud_setup.md
   - bootstrap.md

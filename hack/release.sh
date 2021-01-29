@@ -78,7 +78,7 @@ sed -i -e "s/version=\".*\"/version=\"${release_version}\"/" \
     Dockerfile
 
 sed -i "s/postgresql-operator-[0-9.]*.yaml/postgresql-operator-${release_version}.yaml/g" \
-    docs/src/quickstart.md
+    docs/src/installation.md
 
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
