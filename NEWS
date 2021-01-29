@@ -1,6 +1,16 @@
 Cloud Native PostgreSQL  - History of user-visible changes
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 
+Version 0.8.0 - 29 Jan 2021
+
+- Upgraded API version to v1
+- Implement node affinity via `nodeSelector`
+- Activate `AntiAffinity` by default
+- Documentation improvements
+- Remove completed `Jobs` from the cluster
+- Upgrade controller-runtime to v0.8.1
+- Bug fixes and improvements
+
 Version 0.7.0 - 31 Dec 2020
 
 - Support `pg_rewind` if needed following a failover or switchover to
