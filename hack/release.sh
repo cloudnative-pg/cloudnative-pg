@@ -95,7 +95,7 @@ cp "${release_manifest}" "docs/src/samples/postgresql-operator-${release_version
 git add \
     pkg/versions/versions.go \
     Dockerfile \
-    docs/src/quickstart.md \
+    docs/src/installation.md \
     "${release_manifest}" \
     "docs/src/samples/postgresql-operator-${release_version}.yaml"
 git commit -sm "Version tag to ${release_version}"
