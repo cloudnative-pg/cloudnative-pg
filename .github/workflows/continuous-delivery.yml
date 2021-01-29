@@ -67,17 +67,44 @@ jobs:
       - tests
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ steps.docker-meta.outputs.tags }}
+      image: ${{ steps.image-meta.outputs.image }}
     steps:
       -
         name: Checkout
         uses: actions/checkout@v2
       -
+        name: Build meta
+        id: build-meta
+        run: |
+          # By default, set the "testing" target repository on Quay.io
+          # (every built container is pushed there)
+          images='quay.io/enterprisedb/cloud-native-postgresql-testing'
+          tags=''
+          labels=''
+          # In case we have a tag, add the main target repository
+          if [ "${GITHUB_REF#refs/tags/}" != "${GITHUB_REF}" ]
+          then
+            images="${images},quay.io/enterprisedb/cloud-native-postgresql"
+          fi
+          # In case of commit on the "main" branch or tag, set the "latest"
+          # label to the container image on the target repositories.
+          # Otherwise set expiration to 7 days.
+          if [ "${GITHUB_REF#refs/heads/}" == main ] || [ "${GITHUB_REF#refs/tags/}" != "${GITHUB_REF}" ]
+          then
+            tags='latest'
+          else
+            labels='quay.expires-after=7d'
+          fi
+          echo "::set-output name=images::${images}"
+          echo "::set-output name=tags::${tags}"
+          echo "::set-output name=labels::${labels}"
+      -
         name: Docker meta
         id: docker-meta
         uses: crazy-max/ghaction-docker-meta@v1
         with:
-          images: quay.io/enterprisedb/cloud-native-postgresql-testing
+          images: ${{ steps.build-meta.outputs.images }}
+          tag-custom: ${{ steps.build-meta.outputs.tags }}
           tag-semver: |
             {{version}}
       -
@@ -102,7 +129,17 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.docker-meta.outputs.tags }}
-          labels: ${{ github.ref != 'refs/heads/main' && 'quay.expires-after=7d' || ''}}
+          labels: ${{ steps.build-meta.outputs.labels }}
+      -
+        name: Image Meta
+        id: image-meta
+        env:
+          TAGS: ${{ steps.docker-meta.outputs.tags }}
+        run: |
+          # If there is more than one tag, take the first one
+          # TAGS could be separated by newlines or commas
+          image=$(sed -n '1{s/,.*//; p}' <<< "$TAGS")
+          echo "::set-output name=image::${image}"
 
   generate-jobs:
     name: Generate Jobs
