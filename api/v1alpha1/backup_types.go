@@ -79,6 +79,10 @@ type BackupStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="Error",type="string",JSONPath=".status.error"
 
 // Backup is the Schema for the backups API
 type Backup struct {

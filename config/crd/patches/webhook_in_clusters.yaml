@@ -7,18 +7,4 @@ metadata:
 spec:
   preserveUnknownFields: false
   conversion:
-    strategy: Webhook
-    webhook:
-      conversionReviewVersions:
-      - v1alpha1
-      # This is unfortunately needed for K8s v1.16
-      - v1beta1
-      - v1
-      clientConfig:
-        # this is "\n" used as a placeholder, otherwise it will be rejected by the apiserver for being blank,
-        # but we're going to set it later using the cert-manager (or potentially a patch if not using cert-manager)
-        caBundle: Cg==
-        service:
-          namespace: system
-          name: webhook-service
-          path: /convert
+    strategy: None
