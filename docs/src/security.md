@@ -42,6 +42,16 @@ PostgreSQL servers run as `postgres` system user. No component whatsoever requir
 Likewise, Volumes access does not require *privileges* mode or `root` privileges either.
 Proper permissions must be properly assigned by the Kubernetes platform and/or administrators.
 
+### Network Policies
+
+The pods created by the `Cluster` resource can be controlled by Kubernetes
+[network policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+to enable/disable inbound and outbound network access at IP and TCP level.
+
+Network policies are beyond the scope of this document.
+Please refer to the ["Network policies"](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+section of the Kubernetes documentation for further information.
+
 ### Resources
 
 In a typical Kubernetes cluster, containers run with unlimited resources. By default,
@@ -79,6 +89,11 @@ passwords and `.pgpass` files for the `postgres` superuser and the database owne
 See the ["Secrets" section in the "Architecture" page](architecture.md#secrets).
 
 You can use those files to configure application access to the database.
+
+By default, every replica is automatically configured to connect in **physical
+async streaming replication** with the current primary instance, with a special
+user called `streaming_replica`.  The connection between nodes is **encrypted**
+and authentication is via **TLS client certificates**.
 
 Currently, the operator allows administrators to add `pg_hba.conf` lines directly in the manifest
 as part of the `pg_hba` section of the `postgresql` configuration. The lines defined in the
