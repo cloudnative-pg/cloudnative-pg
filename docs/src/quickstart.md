@@ -22,7 +22,8 @@ cluster on your local Kubernetes/Openshift installation and experiment with it.
 !!! Important
     Make sure that you have `kubectl` installed on your machine in order
     to connect to the Kubernetes cluster, or `oc` if using CRC for OpenShift.
-    Please follow the Kubernetes documentation on [how to install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/) or the Openshift one on [how to install `oc`](https://docs.openshift.com/container-platform/4.6/cli_reference/openshift_cli/getting-started-cli.html).
+    Please follow the Kubernetes documentation on [how to install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+    or the Openshift one on [how to install `oc`](https://docs.openshift.com/container-platform/4.6/cli_reference/openshift_cli/getting-started-cli.html).
 
 
 !!! Note
@@ -97,52 +98,8 @@ and install `rancher/local-path-provisioner`.
 Now that you have a Kubernetes or OpenShift installation up and running
 on your laptop, you can proceed with Cloud Native PostgreSQL installation.
 
-
-### Kubernetes
-
-Download the [latest operator manifest](samples/postgresql-operator-0.7.0.yaml)
-and run:
-
-```sh
-kubectl apply -f postgresql-operator-0.7.0.yaml
-```
-
-Once you have run the `kubectl` command, Cloud Native PostgreSQL will be installed in your Kubernetes cluster.
-You can verify that with:
-
-```sh
-kubectl get deploy -n postgresql-operator-system postgresql-operator-controller-manager
-```
-
-### Openshift
-
-#### Using the web interface
-
-Log in to the console as `kubeadmin` and navigate to the  `Operator → OperatorHub` page.
-
-Find the `Cloud Native PostgreSQL` box scrolling or using the search filter.
-
-Select the operator and click `Install`. Click `Install` again in the following
-`Install Operator`, using the default settings. For an in-depth explanation of
-those settings, see the [Openshift documentation](https://docs.openshift.com/container-platform/4.6/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster).
-
-The operator will soon be available in all the namespaces.
-
-### Using the cli
-
-You can apply the subscription on [`subscription.yaml`](samples/subscription.yaml)
-to install the operator in all the namespaces.
-Download the yaml file and run:
-
-```sh
-oc apply -f subscription.yaml
-```
-
-The operator will soon be available in all the namespaces.
-
-More information on
-[how to install operators via CLI](https://docs.openshift.com/container-platform/4.6/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-operator-from-operatorhub-using-cli_olm-adding-operators-to-a-cluster)
-is available in the Openshift documentation.
+Please refer to the ["Installation"](installation.md) section and then proceed
+with the deployment of a PostgreSQL cluster.
 
 ## Part 3 - Deploy a PostgreSQL cluster
 
@@ -189,3 +146,26 @@ You can check that the pods are being created with the `get pods` command:
 ```sh
 kubectl get pods
 ```
+
+By default, the operator will install the latest available minor version
+of the latest major version of PostgreSQL when the operator was released.
+You can override this by setting the `imageName` key in the `spec` section of
+the `Cluster` definition. For example, to install PostgreSQL 12.5:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+   # [...]
+spec:
+   # [...]
+   imageName: quay.io/enterprisedb/postgresql:12.5
+   #[...]
+```
+
+!!! Important
+    The immutable infrastructure paradigm requires that you always
+    point to a specific version of the container image.
+    Never use tags like `latest` or `13` in a production environment
+    as it might lead to unpredictable scenarios in terms of update
+    policies and version consistency in the cluster.
