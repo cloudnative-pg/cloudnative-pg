@@ -33,9 +33,12 @@ var server *http.Server
 func isServerHealthy(w http.ResponseWriter, r *http.Request) {
 	err := instance.IsHealthy()
 	if err != nil {
+		log.Log.Info("Server doesn't look healthy", "err", err.Error())
 		http.Error(w, err.Error(), 500)
 		return
 	}
+
+	log.Log.V(1).Info("Readiness probe succeeded")
 
 	_, _ = fmt.Fprint(w, "OK")
 }
@@ -44,12 +47,20 @@ func isServerHealthy(w http.ResponseWriter, r *http.Request) {
 func pgStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := instance.GetStatus()
 	if err != nil {
+		log.Log.Info(
+			"Server doesn't look healthy, cannot extract instance status",
+			"err", err.Error())
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
+	log.Log.V(1).Info("Cluster status extraction succeeded")
+
 	js, err := json.Marshal(status)
 	if err != nil {
+		log.Log.Info(
+			"Internal error marshalling instance status",
+			"err", err.Error())
 		http.Error(w, err.Error(), 500)
 		return
 	}

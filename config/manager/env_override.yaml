@@ -12,6 +12,9 @@ spec:
         envFrom:
         - configMapRef:
             name: controller-manager-env
+        env:
+          - name: POD_DEBUG
+            value: "1"
         args:
         - --enable-leader-election
         - --zap-devel

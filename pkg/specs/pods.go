@@ -10,6 +10,7 @@ package specs
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -104,7 +105,7 @@ func createPostgresContainers(
 	cluster apiv1.Cluster,
 	podName string,
 ) []corev1.Container {
-	return []corev1.Container{
+	containers := []corev1.Container{
 		{
 			Name:  PostgresContainerName,
 			Image: cluster.GetImageName(),
@@ -207,6 +208,16 @@ func createPostgresContainers(
 			},
 		},
 	}
+
+	podDebugActive, err := strconv.ParseBool(os.Getenv("POD_DEBUG"))
+	if podDebugActive && err != nil {
+		containers[0].Env = append(containers[0].Env, corev1.EnvVar{
+			Name:  "DEBUG",
+			Value: "1",
+		})
+	}
+
+	return containers
 }
 
 // CreateAccessKeyIDEnvVar create the environment variable giving

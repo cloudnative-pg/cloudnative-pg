@@ -158,7 +158,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Update the target primary name from the Pods status.
 	// This means issuing a failover or switchover when needed.
-	if err = r.updateTargetPrimaryFromPods(ctx, &cluster, instancesStatus); err != nil {
+	if err = r.updateTargetPrimaryFromPods(ctx, &cluster, instancesStatus, resources); err != nil {
 		if err == ErrWalReceiversRunning {
 			log.Info("Waiting for the all WAL receivers to be down to elect a new primary")
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
