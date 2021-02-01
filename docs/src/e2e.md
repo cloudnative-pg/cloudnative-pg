@@ -36,6 +36,7 @@ and the following suite of E2E tests are performed on that cluster:
 * Manage PostgreSQL configuration changes;
 * Rolling updates when changing PostgreSQL images;
 * Backup and ScheduledBackups execution;
+* Synchronous replication;
 * Restore from backup;
 * Metrics collection;
 * Primary endpoint switch in case of failover in less than 10 seconds;
