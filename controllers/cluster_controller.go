@@ -181,7 +181,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if !resources.allPodsAreActive() {
 		log.V(2).Info("A managed resource is currently being created or deleted. Waiting")
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	// Reconcile PVC resource requirements
@@ -347,18 +347,25 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	// In the rest of the function we are sure that
 	// cluster.Status.Instances == cluster.Spec.Instances and
 	// we don't need to modify the cluster topology
-	if cluster.Status.ReadyInstances != cluster.Status.Instances {
+	if cluster.Status.ReadyInstances != cluster.Status.Instances ||
+		cluster.Status.ReadyInstances != int32(len(instancesStatus.Items)) {
 		log.V(2).Info("Waiting for Pods to be ready")
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
+	// If we need to apply an upgrade to the cluster, this is the right moment
+	upgradedPod, err := r.upgradeCluster(ctx, cluster, resources.pods, instancesStatus)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if upgradedPod != "" {
+		// Rolling upgrade is in progress, let's avoid marking stuff as synchronized
+		// (but recheck in one second, just to be sure)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	// When everything is reconciled, update the status
 	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// If we need to apply an upgrade to the cluster, this is the right moment
-	if err := r.upgradeCluster(ctx, cluster, resources.pods, instancesStatus); err != nil {
 		return ctrl.Result{}, err
 	}
 

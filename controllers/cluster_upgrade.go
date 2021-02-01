@@ -19,6 +19,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 var (
@@ -32,7 +33,7 @@ func (r *ClusterReconciler) upgradeCluster(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	podList v1.PodList, clusterStatus postgres.PostgresqlStatusList,
-) error {
+) (string, error) {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	targetImageName := cluster.GetImageName()
@@ -44,64 +45,56 @@ func (r *ClusterReconciler) upgradeCluster(
 	})
 
 	// Ensure we really have an upgrade strategy between the involved versions
-	for _, pod := range sortedPodList {
-		usedImageName, err := specs.GetPostgreSQLImageName(pod)
-		if err != nil {
-			log.Error(err, "pod", pod.Name)
-			continue
-		}
-
-		if usedImageName == targetImageName {
-			continue
-		}
-
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
-			fmt.Sprintf("Upgrading cluster to image: %v", targetImageName)); err != nil {
-			return err
-		}
-
-		status, err := postgres.CanUpgrade(usedImageName, targetImageName)
-		if err != nil {
-			log.Error(
-				err, "Error checking image versions", "from", usedImageName, "to", targetImageName)
-			return r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgradeFailed,
-				fmt.Sprintf("Upgrade Failed, wrong image version: %v", err))
-		}
-
-		if !status {
-			log.Info("Can't upgrade between these PostgreSQL versions",
-				"from", usedImageName,
-				"to", targetImageName,
-				"pod", pod.Name)
-			return r.RegisterPhase(ctx, cluster,
-				apiv1.PhaseUpgradeFailed,
-				fmt.Sprintf("Upgrade Failed, can't upgrade from %v to %v",
-					usedImageName, targetImageName))
-		}
+	upgradePathAvailable, err := r.upgradePathAvailable(ctx, cluster, sortedPodList, targetImageName)
+	if err != nil {
+		return "", err
+	}
+	if !upgradePathAvailable {
+		return "", nil
 	}
 
 	primaryIdx := -1
+	standbyIdx := -1
 	for idx, pod := range sortedPodList {
-		usedImageName, err := specs.GetPostgreSQLImageName(pod)
+		pgCurrentImageName, err := specs.GetPostgresImageName(pod)
 		if err != nil {
 			log.Error(err, "pod", pod.Name)
 			continue
 		}
 
-		if usedImageName != targetImageName {
+		opCurrentImageName, err := specs.GetBootstrapControllerImageName(pod)
+		if err != nil {
+			log.Error(err, "pod", pod.Name)
+			continue
+		}
+
+		if pgCurrentImageName != targetImageName || opCurrentImageName != versions.GetDefaultOperatorImageName() {
 			if cluster.Status.CurrentPrimary == pod.Name {
 				// This is the primary, and we cannot upgrade it on the fly
 				primaryIdx = idx
 			} else {
-				pod := pod // pin the variable before taking its reference
-				return r.upgradePod(ctx, cluster, &pod)
+				// Select the standby to upgrade. We can stop here because primaryIdx
+				// is only used when all the standbys are already up-to-date
+				standbyIdx = idx
+				break
 			}
 		}
 	}
 
-	if primaryIdx == -1 {
-		// The primary has been updated too, everything is OK
-		return nil
+	if primaryIdx == -1 && standbyIdx == -1 {
+		// Everything is up-to-date
+		return "", nil
+	}
+
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
+		fmt.Sprintf("Upgrading cluster to image: %v", targetImageName)); err != nil {
+		return "", err
+	}
+
+	// Update the selected standby
+	if standbyIdx != -1 {
+		pod := sortedPodList[standbyIdx]
+		return pod.Name, r.upgradePod(ctx, cluster, &pod)
 	}
 
 	// We still need to upgrade the primary server, let's see
@@ -110,7 +103,7 @@ func (r *ClusterReconciler) upgradeCluster(
 		log.Info(
 			"Waiting for the user to request a switchover to complete the rolling update",
 			"primaryPod", sortedPodList[primaryIdx].Name)
-		return r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser,
+		return sortedPodList[0].Name, r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser,
 			"User must issue a supervised switchover")
 	}
 
@@ -120,13 +113,13 @@ func (r *ClusterReconciler) upgradeCluster(
 	// we "just" need to delete the Pod we have, waiting for it to be
 	// created again with the same storage.
 	if cluster.Spec.Instances == 1 {
-		return r.upgradePod(ctx, cluster, &sortedPodList[0])
+		return sortedPodList[0].Name, r.upgradePod(ctx, cluster, &sortedPodList[0])
 	}
 
 	// If we have replicas, let's switch over to the most up-to-date and
 	// then the procedure will continue with the old master.
 	if len(clusterStatus.Items) < 2 || clusterStatus.Items[1].IsPrimary {
-		return ErrorInconsistentClusterStatus
+		return "", ErrorInconsistentClusterStatus
 	}
 
 	// Let's switch over to this server
@@ -137,7 +130,50 @@ func (r *ClusterReconciler) upgradeCluster(
 	r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
 		"Switching over from %v to %v to complete upgrade",
 		cluster.Status.TargetPrimary, clusterStatus.Items[1].PodName)
-	return r.setPrimaryInstance(ctx, cluster, clusterStatus.Items[1].PodName)
+	return sortedPodList[0].Name, r.setPrimaryInstance(ctx, cluster, clusterStatus.Items[1].PodName)
+}
+
+// upgradePathAvailable check if we have an available upgrade path to the PostgreSQL version
+// whose name in in `targetImageName`
+func (r *ClusterReconciler) upgradePathAvailable(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	podList []v1.Pod,
+	targetImageName string) (bool, error) {
+	for _, pod := range podList {
+		usedImageName, err := specs.GetPostgresImageName(pod)
+		if err != nil {
+			log.Error(err, "pod", pod.Name)
+			continue
+		}
+
+		if usedImageName == targetImageName {
+			continue
+		}
+
+		status, err := postgres.CanUpgrade(usedImageName, targetImageName)
+		if err != nil {
+			log.Error(
+				err, "Error checking image versions", "from", usedImageName, "to", targetImageName)
+			_ = r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgradeFailed,
+				fmt.Sprintf("Upgrade Failed, wrong image version: %v", err))
+			return false, err
+		}
+
+		if !status {
+			log.Info("Can't upgrade between these PostgreSQL versions",
+				"from", usedImageName,
+				"to", targetImageName,
+				"pod", pod.Name)
+			_ = r.RegisterPhase(ctx, cluster,
+				apiv1.PhaseUpgradeFailed,
+				fmt.Sprintf("Upgrade Failed, can't upgrade from %v to %v",
+					usedImageName, targetImageName))
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // updatePod update an instance to a newer image version

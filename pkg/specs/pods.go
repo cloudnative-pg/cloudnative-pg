@@ -39,6 +39,10 @@ const (
 	// PostgresContainerName is the name of the container executing PostgreSQL
 	// inside one Pod
 	PostgresContainerName = "postgres"
+
+	// BootstrapControllerContainerName is the name of the container copying the bootstrap
+	// controller inside the Pod file system
+	BootstrapControllerContainerName = "bootstrap-controller"
 )
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
@@ -324,7 +328,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod
 			Subdomain: cluster.GetServiceAnyName(),
 			InitContainers: []corev1.Container{
 				{
-					Name:  "bootstrap-controller",
+					Name:  BootstrapControllerContainerName,
 					Image: versions.GetDefaultOperatorImageName(),
 					Command: []string{
 						"/manager",
