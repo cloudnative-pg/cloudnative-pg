@@ -26,6 +26,10 @@ var _ = Describe("Extract the used image name", func() {
 	pod := PodWithExistingStorage(cluster, 1)
 
 	It("extract the default image name", func() {
-		Expect(GetPostgreSQLImageName(*pod)).To(Equal(versions.GetDefaultImageName()))
+		Expect(GetPostgresImageName(*pod)).To(Equal(versions.GetDefaultImageName()))
+	})
+
+	It("extract the init container image name", func() {
+		Expect(GetBootstrapControllerImageName(*pod)).To(Equal(versions.GetDefaultOperatorImageName()))
 	})
 })

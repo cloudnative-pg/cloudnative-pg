@@ -85,7 +85,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
 						{
-							Name:  "bootstrap-controller",
+							Name:  BootstrapControllerContainerName,
 							Image: versions.GetDefaultOperatorImageName(),
 							Command: []string{
 								"/manager",
@@ -186,7 +186,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 					Subdomain: cluster.GetServiceAnyName(),
 					InitContainers: []corev1.Container{
 						{
-							Name:  "bootstrap-controller",
+							Name:  BootstrapControllerContainerName,
 							Image: versions.GetDefaultOperatorImageName(),
 							Command: []string{
 								"/manager",
@@ -305,7 +305,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 					Subdomain: cluster.GetServiceAnyName(),
 					InitContainers: []corev1.Container{
 						{
-							Name:  "bootstrap-controller",
+							Name:  BootstrapControllerContainerName,
 							Image: versions.GetDefaultOperatorImageName(),
 							Command: []string{
 								"/manager",
