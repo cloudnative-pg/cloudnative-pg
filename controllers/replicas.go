@@ -35,6 +35,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
+	resources *managedResources,
 ) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -60,6 +61,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 		log.Info("Current primary isn't healthy, failing over",
 			"newPrimary", status.Items[0].PodName,
 			"clusterStatus", status)
+		log.V(1).Info("Cluster status before failover", "pods", resources.pods)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Current primary isn't healthy, failing over from %v to %v",
 			cluster.Status.TargetPrimary, status.Items[0].PodName)
@@ -88,6 +90,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 			"are ready, switching over to complete configuration apply",
 			"newPrimary", status.Items[1].PodName,
 			"clusterStatus", status)
+		log.V(1).Info("Cluster status before switching over to apply configuration", "pods", resources.pods)
 		r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
 			"Current primary %v is needing a restart and the replicas "+
 				"are ready, switching over to %v to complete configuration apply",
