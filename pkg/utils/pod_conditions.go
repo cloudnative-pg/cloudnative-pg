@@ -54,7 +54,7 @@ func FilterActivePods(pods []corev1.Pod) []corev1.Pod {
 		if IsPodActive(p) {
 			result = append(result, p)
 		} else {
-			log.V(4).Info("Ignoring inactive pod %v/%v in state %v, deletion time %v",
+			log.V(4).Info("Ignoring inactive pod",
 				"namespace", p.Namespace,
 				"name", p.Name,
 				"phase", p.Status.Phase,
