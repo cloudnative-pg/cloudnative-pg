@@ -74,36 +74,6 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 		return status.Items[0].PodName, r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
 	}
 
-	// If our primary instance need a restart and all the replicas
-	// already are restarted and ready, let's just switchover
-	// to a replica to finish the configuration changes
-	instancesNeedingRestart := 0
-	for _, status := range status.Items {
-		if status.PendingRestart {
-			instancesNeedingRestart++
-		}
-	}
-
-	primaryPendingRestart := status.Items[0].PendingRestart
-	allInstancesReady := cluster.Status.ReadyInstances == cluster.Spec.Instances
-	if instancesNeedingRestart == 1 && primaryPendingRestart && allInstancesReady {
-		log.Info("current primary is needing a restart and the replicas "+
-			"are ready, switching over to complete configuration apply",
-			"newPrimary", status.Items[1].PodName,
-			"clusterStatus", status)
-		log.V(1).Info("Cluster status before switching over to apply configuration", "pods", resources.pods)
-		r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
-			"Current primary %v is needing a restart and the replicas "+
-				"are ready, switching over to %v to complete configuration apply",
-			cluster.Status.TargetPrimary, status.Items[1].PodName)
-		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
-			fmt.Sprintf("Switching over to %v to complete configuration apply",
-				status.Items[1].PodName)); err != nil {
-			return "", err
-		}
-		return status.Items[1].PodName, r.setPrimaryInstance(ctx, cluster, status.Items[1].PodName)
-	}
-
 	return "", nil
 }
 
