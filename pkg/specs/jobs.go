@@ -222,7 +222,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 								},
 								{
 									Name:  "POD_NAME",
-									Value: jobName,
+									Value: podName,
 								},
 								{
 									Name:  "CLUSTER_NAME",
