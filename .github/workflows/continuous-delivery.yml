@@ -207,7 +207,7 @@ jobs:
           make e2e-test-kind
       -
         name: Archive Kind logs
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v2
         with:
           name: kind-logs-${{ matrix.id }}
