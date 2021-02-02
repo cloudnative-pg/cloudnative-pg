@@ -31,31 +31,32 @@ var (
 )
 
 // updateTargetPrimaryFromPods set the name of the target primary from the Pods status if needed
+// this function will returns the name of the new primary selected for promotion
 func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
 	resources *managedResources,
-) error {
+) (string, error) {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	// TODO: what if I delete the master with only 2 instances
 	if len(status.Items) <= 1 && cluster.Status.Instances <= 1 {
 		// Can't make a switchover of failover if we have
 		// less than two instances
-		return nil
+		return "", nil
 	}
 
 	if len(status.Items) == 0 {
 		// We have no status to check and we can't make a
 		// switchover under those conditions
-		return nil
+		return "", nil
 	}
 
 	// Set targetPrimary to do a failover if needed
-	if !status.Items[0].IsPrimary {
+	if !status.Items[0].IsPrimary && cluster.Status.TargetPrimary != status.Items[0].PodName {
 		if !status.AreWalReceiversDown() {
-			return ErrWalReceiversRunning
+			return "", ErrWalReceiversRunning
 		}
 
 		log.Info("Current primary isn't healthy, failing over",
@@ -67,10 +68,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 			cluster.Status.TargetPrimary, status.Items[0].PodName)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
 			fmt.Sprintf("Failing over to %v", status.Items[0].PodName)); err != nil {
-			return err
+			return "", err
 		}
 		// No primary, no party. Failover please!
-		return r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
+		return status.Items[0].PodName, r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
 	}
 
 	// If our primary instance need a restart and all the replicas
@@ -98,12 +99,12 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
 			fmt.Sprintf("Switching over to %v to complete configuration apply",
 				status.Items[1].PodName)); err != nil {
-			return err
+			return "", err
 		}
-		return r.setPrimaryInstance(ctx, cluster, status.Items[1].PodName)
+		return status.Items[1].PodName, r.setPrimaryInstance(ctx, cluster, status.Items[1].PodName)
 	}
 
-	return nil
+	return "", nil
 }
 
 // getStatusFromInstances get the replication status from the PostgreSQL instances,
