@@ -188,15 +188,14 @@ func (r *InstanceReconciler) reconcileConfigMap(ctx context.Context, event *watc
 	// has been actually received and sent to the children.
 	// What shall we do? Wait for a bit of time? Or inject
 	// a configuration marker and wait for it to appear somewhere?
-
 	status, err := r.instance.GetStatus()
 	if err != nil {
 		return fmt.Errorf("while applying new configuration: %w", err)
 	}
 
-	isPrimary, err := r.instance.IsPrimary()
-	if err != nil {
-		return fmt.Errorf("while applying new configuration: %w", err)
+	if !status.PendingRestart {
+		// Everything fine
+		return nil
 	}
 
 	cluster, err := r.client.
@@ -207,33 +206,45 @@ func (r *InstanceReconciler) reconcileConfigMap(ctx context.Context, event *watc
 		return fmt.Errorf("while applying new configuration: %w", err)
 	}
 
-	instances, err := utils.GetInstances(cluster)
+	// TODO: stop here if the phase is already "Applying configuration"
+	err = utils.SetPhase(cluster, "Applying configuration", "PostgreSQL configuration changed")
 	if err != nil {
-		return fmt.Errorf("while applying new configuration: %w", err)
+		return err
 	}
 
-	if status.PendingRestart && (!isPrimary || instances == 1) {
-		// We'll restart this instance because the configuration
-		// change requires it (PendingRestart) and one of the
-		// following condition applies:
-		//
-		// 1. this is the only instance composing the cluster,
-		//    and this is the only way to apply a configuration
-		//    change in this condition;
-		//
-		// 2. this is a replica server and we can restart it
-		//    painlessly (the operator will require
-		//    a switchover when all replicas are updated
-		//    to refresh the configuration server to the primary
-		//    server).
+	// Let's wake up the operator as I need to be restarted
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		_, err = r.client.
+			Resource(apiv1.ClusterGVK).
+			Namespace(r.instance.Namespace).
+			UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
+		if err == nil {
+			return nil
+		}
 
-		// TODO: probably we need a restartMode flag in the cluster
-		// configuration to disable or enable this auto-restart behavior
-		r.log.Info("restarting this server to apply the new configuration")
-		return r.instance.Shutdown()
-	}
+		// If we have a conflict, let's replace the cluster info
+		// with one more fresh
+		if apierrors.IsConflict(err) {
+			r.log.Info(
+				"Conflict detected while setting current primary, retrying",
+				"err", err.Error())
 
-	return nil
+			cluster, err = r.client.
+				Resource(apiv1.ClusterGVK).
+				Namespace(r.instance.Namespace).
+				Get(ctx, r.instance.ClusterName, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("while applying new configuration: %w", err)
+			}
+
+			// TODO: stop here if the phase is already "Applying configuration"
+			err = utils.SetPhase(cluster, "Applying configuration", "PostgreSQL configuration changed")
+			if err != nil {
+				return err
+			}
+		}
+		return err
+	})
 }
 
 // refreshConfigurationFilesFromObject receive an unstructured object representing

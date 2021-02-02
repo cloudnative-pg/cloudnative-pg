@@ -8,7 +8,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -207,16 +206,7 @@ func (r *ClusterReconciler) setPrimaryInstance(
 	podName string,
 ) error {
 	cluster.Status.TargetPrimary = podName
-	if err := r.Status().Update(ctx, cluster); err != nil {
-		return err
-	}
-
-	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
-		fmt.Sprintf("Switching over to %v", podName)); err != nil {
-		return err
-	}
-
-	return nil
+	return r.Status().Update(ctx, cluster)
 }
 
 // RegisterPhase update phase in the status cluster with the

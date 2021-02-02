@@ -204,3 +204,13 @@ func SetCurrentPrimary(data *unstructured.Unstructured, name string) error {
 func SetTargetPrimary(data *unstructured.Unstructured, name string) error {
 	return unstructured.SetNestedField(data.Object, name, "status", "targetPrimary")
 }
+
+// SetPhase set the current phase and phaseReason in the cluster object
+func SetPhase(data *unstructured.Unstructured, name string, reason string) error {
+	err := unstructured.SetNestedField(data.Object, name, "status", "phase")
+	if err != nil {
+		return err
+	}
+
+	return unstructured.SetNestedField(data.Object, reason, "status", "phaseReason")
+}

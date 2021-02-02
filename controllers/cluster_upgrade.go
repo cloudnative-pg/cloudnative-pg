@@ -32,7 +32,8 @@ var (
 func (r *ClusterReconciler) upgradeCluster(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	podList v1.PodList, clusterStatus postgres.PostgresqlStatusList,
+	podList v1.PodList,
+	clusterStatus postgres.PostgresqlStatusList,
 ) (string, error) {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -56,19 +57,13 @@ func (r *ClusterReconciler) upgradeCluster(
 	primaryIdx := -1
 	standbyIdx := -1
 	for idx, pod := range sortedPodList {
-		pgCurrentImageName, err := specs.GetPostgresImageName(pod)
+		podNeedsRestart, err := r.isPodNeedingRestart(cluster, clusterStatus, pod)
 		if err != nil {
 			log.Error(err, "pod", pod.Name)
 			continue
 		}
 
-		opCurrentImageName, err := specs.GetBootstrapControllerImageName(pod)
-		if err != nil {
-			log.Error(err, "pod", pod.Name)
-			continue
-		}
-
-		if pgCurrentImageName != targetImageName || opCurrentImageName != versions.GetDefaultOperatorImageName() {
+		if podNeedsRestart {
 			if cluster.Status.CurrentPrimary == pod.Name {
 				// This is the primary, and we cannot upgrade it on the fly
 				primaryIdx = idx
@@ -174,6 +169,45 @@ func (r *ClusterReconciler) upgradePathAvailable(
 	}
 
 	return true, nil
+}
+
+// isPodNeedingRestart return true if we need to restart the
+// Pod to apply a configuration change or a new version of
+// PostgreSQL
+func (r *ClusterReconciler) isPodNeedingRestart(
+	cluster *apiv1.Cluster,
+	clusterStatus postgres.PostgresqlStatusList,
+	pod v1.Pod) (bool, error) {
+	targetImageName := cluster.GetImageName()
+
+	pgCurrentImageName, err := specs.GetPostgresImageName(pod)
+	if err != nil {
+		return false, err
+	}
+
+	opCurrentImageName, err := specs.GetBootstrapControllerImageName(pod)
+	if err != nil {
+		return false, err
+	}
+
+	if pgCurrentImageName != targetImageName {
+		// We need to apply a different PostgreSQL version
+		return true, nil
+	}
+
+	if opCurrentImageName != versions.GetDefaultOperatorImageName() {
+		// We need to apply a different version of the instance manager
+		return true, nil
+	}
+
+	for _, entry := range clusterStatus.Items {
+		if entry.PodName == pod.Name && entry.PendingRestart {
+			// We need to apply a new configuration
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // updatePod update an instance to a newer image version

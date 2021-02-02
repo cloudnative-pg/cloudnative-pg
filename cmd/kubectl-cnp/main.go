@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,6 +112,15 @@ func promote(cmd *cobra.Command, args []string) {
 
 	// The Pod exists, let's do it!
 	err = utils.SetTargetPrimary(object, serverName)
+	if err != nil {
+		log.Log.Error(err, "Cannot find status field of cluster",
+			"object", object)
+		return
+	}
+
+	// Register the phase in the cluster
+	err = utils.SetPhase(object, apiv1.PhaseSwitchover,
+		fmt.Sprintf("Switching over to %v", serverName))
 	if err != nil {
 		log.Log.Error(err, "Cannot find status field of cluster",
 			"object", object)
