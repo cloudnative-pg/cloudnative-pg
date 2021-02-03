@@ -1,0 +1,66 @@
+# Example of PostgreSQL cluster
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-v1alpha1
+spec:
+  instances: 3
+  imageName: "${POSTGRES_IMG}"
+  description: "Example of cluster"
+  startDelay: 300
+  stopDelay: 300
+  primaryUpdateStrategy: unsupervised
+
+  postgresql:
+    parameters:
+      work_mem: "8MB"
+      shared_buffers: "128MB"
+      max_replication_slots: "16"
+      maintenance_work_mem: "128MB"
+    pg_hba:
+      - host all all all trust
+
+  bootstrap:
+    initdb:
+      database: appdb
+      owner: appuser
+      secret:
+        name: cluster-app-user
+  superuserSecret:
+    name: cluster-superuser
+
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://cluster-v1alpha1-full-backup/
+      endpointURL: http://minio-service:9000
+      s3Credentials:
+        accessKeyId:
+          name: aws-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: aws-creds
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+        immediateCheckpoint: true
+        jobs: 2
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "0.1"
+    limits:
+      memory: "1Gi"
+      cpu: "2"
+
+  affinity:
+    enablePodAntiAffinity: true
+
+  nodeMaintenanceWindow:
+    inProgress: false
+    reusePVC: false
+
+  storage:
+    size: 1Gi

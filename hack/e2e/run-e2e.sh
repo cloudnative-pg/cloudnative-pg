@@ -14,7 +14,8 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
-CONTROLLER_IMG=${CONTROLLER_IMG:-internal.2ndq.io/k8s/cloud-native-postgresql:latest}
+CONTROLLER_IMG=${CONTROLLER_IMG:-quay.io/enterprisedb/cloud-native-postgresql-testing:latest}
+TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 
 # Process the e2e templates
@@ -33,6 +34,37 @@ if [ -n "${DOCKER_SERVER-}" ] && [ -n "${DOCKER_USERNAME-}" ] && [ -n "${DOCKER_
     --docker-server="${DOCKER_SERVER}" \
     --docker-username="${DOCKER_USERNAME}" \
     --docker-password="${DOCKER_PASSWORD}"
+fi
+
+if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
+  # Install a version of the operator using v1alpha1
+  kubectl apply -f ${ROOT_DIR}/docs/src/samples/postgresql-operator-0.7.0.yaml
+
+  # Generate a manifest for the operator after the api upgrade
+  # TODO: this is almost a "make deploy". Refactor.
+  make manifests kustomize
+  CONFIG_TMP_DIR=$(mktemp -d)
+  cp -r ${ROOT_DIR}/config/* ${CONFIG_TMP_DIR}
+  (
+      cd ${CONFIG_TMP_DIR}/default
+      kustomize edit add patch manager_image_pull_secret.yaml
+      cd ${CONFIG_TMP_DIR}/manager
+      kustomize edit set image controller=${CONTROLLER_IMG}
+      kustomize edit add patch env_override.yaml
+      kustomize edit add configmap controller-manager-env --from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMG}
+  )
+  kustomize build ${CONFIG_TMP_DIR}/default > ${ROOT_DIR}/tests/upgrade/fixtures/current-manifest.yaml
+
+  # Wait for the v1alpha1 operator (0.7.0) to be up and running
+  kubectl wait --for=condition=Available --timeout=2m \
+    -n postgresql-operator-system deployments \
+    postgresql-operator-controller-manager
+
+  # Run the upgrade tests
+  mkdir -p "${ROOT_DIR}/tests/upgrade/out"
+  # Unset DEBUG to prevent k8s from spamming messages
+  unset DEBUG
+  ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/upgrade/..."
 fi
 
 CONTROLLER_IMG="${CONTROLLER_IMG}" \

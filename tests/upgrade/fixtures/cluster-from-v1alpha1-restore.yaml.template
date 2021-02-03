@@ -1,0 +1,20 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  instances: 3
+  imageName: "${POSTGRES_IMG}"
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      backup:
+        name: cluster-backup
+      recoveryTarget:
+        targetTLI: "1"
+
+  superuserSecret:
+    name: cluster-superuser

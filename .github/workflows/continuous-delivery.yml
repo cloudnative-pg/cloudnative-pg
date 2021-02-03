@@ -222,6 +222,7 @@ jobs:
           path: |
             tests/e2e/out/
             tests/performance/out/
+            tests/upgrade/out/
           retention-days: 7
           if-no-files-found: ignore
 
