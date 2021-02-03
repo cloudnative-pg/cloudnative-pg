@@ -24,7 +24,7 @@ jobs:
 
   golangci:
     name: Run linters
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       -
         name: Checkout code
@@ -38,7 +38,7 @@ jobs:
 
   tests:
     name: Run unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       -
         name: Checkout code
@@ -65,7 +65,7 @@ jobs:
     needs:
       - golangci
       - tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
     steps:
@@ -145,7 +145,7 @@ jobs:
     name: Generate Jobs
     needs:
       - buildx
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     outputs:
       matrix: ${{ steps.generate-jobs.outputs.matrix }}
     steps:
@@ -176,7 +176,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.generate-jobs.outputs.matrix) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     env:
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
@@ -230,7 +230,7 @@ jobs:
     needs:
       - golangci
       - tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Repository Dispatch
         uses: peter-evans/repository-dispatch@v1
