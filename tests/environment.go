@@ -246,3 +246,10 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 	_ = f.Sync()
 	_ = f.Close()
 }
+
+// GetNodeList gathers the current list of Nodes
+func (env TestingEnvironment) GetNodeList() (*corev1.NodeList, error) {
+	nodeList := &corev1.NodeList{}
+	err := env.Client.List(env.Ctx, nodeList, client.InNamespace(""))
+	return nodeList, err
+}

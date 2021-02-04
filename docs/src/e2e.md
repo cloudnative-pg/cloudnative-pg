@@ -38,6 +38,7 @@ and the following suite of E2E tests are performed on that cluster:
 * Backup and ScheduledBackups execution;
 * Synchronous replication;
 * Restore from backup;
+* Pod affinity using `NodeSelector`;
 * Metrics collection;
 * Primary endpoint switch in case of failover in less than 10 seconds;
 * Primary endpoint switch in case of switchover in less than 20 seconds;
