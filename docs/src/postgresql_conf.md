@@ -144,12 +144,8 @@ the `Cluster` resource.
 
 After the change, the cluster instances will immediately reload the
 configuration to apply the changes.
-If the change involves a parameter requiring a restart, the
-following behavior will depend on the number of instances in the cluster:
-
-- If there is a single instance, that instance is restarted.
-- If there is more than one instance, the standbys are restarted, and a switchover
-  on a restarted standby is performed. Finally, the former primary is restarted.
+If the change involves a parameter requiring a restart, the operator will
+perform a rolling upgrade.
 
 ## Fixed parameters
 

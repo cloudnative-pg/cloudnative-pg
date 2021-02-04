@@ -6,13 +6,21 @@ applications are running against it.
 !!! Important
     Only upgrades for PostgreSQL minor releases are supported.
 
-To initiate a rolling update, the user can change the `imageName`
-attribute of the cluster. The operator starts upgrading all the
-replicas, one Pod at a time, starting from the one with the highest
-serial.
-The primary is the last node to be upgraded. This operation
-is configurable and managed by the `primaryUpdateStrategy` option,
-accepting these two values:
+Rolling upgrades are started when:
+
+- the user changes the `imageName` attribute of the cluster specification;
+
+- after the operator is updated, to ensure the Pods run the latest instance
+  manager;
+
+- when a change in the PostgreSQL configuration requires a restart to be
+  applied.
+
+The operator starts upgrading all the replicas, one Pod at a time, starting
+from the one with the highest serial.
+
+The primary is the last node to be upgraded. This operation is configurable and
+managed by the `primaryUpdateStrategy` option, accepting these two values:
 
 - `switchover`: the rolling update process is managed by Kubernetes
   and is entirely automated, with the *switchover* operation
@@ -26,12 +34,8 @@ accepting these two values:
 
 The default and recommended value is `switchover`.
 
-Every version of the operator comes with a default PostgreSQL image version.
-If a cluster doesn't have `imageName` specified, the operator will upgrade
-it to match its default.
-
 The upgrade keeps the Cloud Native PostgreSQL identity and does not
-reclone the data.
+reclone the data. Pods will be deleted and created again with the same PVCs.
 
 During the rolling update procedure, the services endpoints move to reflect
 the cluster's status, so the applications ignore the node that
