@@ -20,19 +20,18 @@ On Mac OS X, you can install the above components through `brew`:
 
     brew install go kind golangci/tap/golangci-lint
 
-!!! note
-    Kind version 0.9.x is required at the time of this writing.
-    If you already have kind, run `brew upgrade kind` to update
-    to the latest version.
+**⚠️ Note:**
+Kind version 0.9.x is required at the time of this writing.  If you already
+have kind, run `brew upgrade kind` to update to the latest version.
 
 You can invoke the compilation procedure with:
 
     make
 
-!!! note
-    Kustomize version v3.8.2 and greater is not compatible with the current version
-    of the build system. You should remove Kustomize and let the build system
-    download a compatible version if Kustomize is already installed.
+**⚠️ Note:**
+Kustomize version v3.8.2 and greater is not compatible with the current version
+of the build system. You should remove Kustomize and let the build system
+download a compatible version if Kustomize is already installed.
 
 ## Quickstart for local testing of a git branch
 
