@@ -123,10 +123,13 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 			continue
 		}
 
-		if pod.Name == cluster.Status.CurrentPrimary {
+		podRole, hasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
+
+		switch {
+		case pod.Name == cluster.Status.CurrentPrimary:
 			primaryFound = true
 
-			if !specs.IsPodPrimary(pods.Items[idx]) {
+			if !hasRole || podRole != specs.ClusterRoleLabelPrimary {
 				log.Info("Setting primary label", "pod", pod.Name)
 				patch := client.MergeFrom(pod.DeepCopy())
 				pod.Labels[specs.ClusterRoleLabelName] = specs.ClusterRoleLabelPrimary
@@ -134,14 +137,15 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 					return err
 				}
 			}
-		}
 
-		if pod.Name != cluster.Status.CurrentPrimary && specs.IsPodPrimary(pods.Items[idx]) {
-			log.Info("Removing primary label", "pod", pod.Name)
-			patch := client.MergeFrom(pod.DeepCopy())
-			delete(pod.Labels, specs.ClusterRoleLabelName)
-			if err := r.Patch(ctx, pod, patch); err != nil {
-				return err
+		default:
+			if !hasRole || podRole != specs.ClusterRoleLabelReplica {
+				log.Info("Setting replica label", "pod", pod.Name)
+				patch := client.MergeFrom(pod.DeepCopy())
+				pod.Labels[specs.ClusterRoleLabelName] = specs.ClusterRoleLabelReplica
+				if err := r.Patch(ctx, pod, patch); err != nil {
+					return err
+				}
 			}
 		}
 	}

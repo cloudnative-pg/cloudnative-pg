@@ -206,6 +206,15 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 		}
 	}
 
+	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
+	utils.SetAsOwnedBy(&readOnlyService.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&readOnlyService.ObjectMeta, versions.Version)
+	if err := r.Create(ctx, readOnlyService); err != nil {
+		if !apierrs.IsAlreadyExists(err) {
+			return err
+		}
+	}
+
 	readWriteService := specs.CreateClusterReadWriteService(*cluster)
 	utils.SetAsOwnedBy(&readWriteService.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&readWriteService.ObjectMeta, versions.Version)

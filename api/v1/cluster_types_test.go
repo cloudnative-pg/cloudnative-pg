@@ -52,6 +52,10 @@ var _ = Describe("PostgreSQL services name", func() {
 		Expect(postgresql.GetServiceReadName()).To(Equal("clustername-r"))
 	})
 
+	It("has a correct service-readonly name", func() {
+		Expect(postgresql.GetServiceReadOnlyName()).To(Equal("clustername-ro"))
+	})
+
 	It("has a correct service-write name", func() {
 		Expect(postgresql.GetServiceReadWriteName()).To(Equal("clustername-rw"))
 	})

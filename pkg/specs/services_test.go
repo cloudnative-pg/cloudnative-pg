@@ -36,6 +36,14 @@ var _ = Describe("Services specification", func() {
 		Expect(service.Spec.Selector["postgresql"]).To(Equal("clustername"))
 	})
 
+	It("create a configured -ro service", func() {
+		service := CreateClusterReadOnlyService(postgresql)
+		Expect(service.Name).To(Equal("clustername-ro"))
+		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
+		Expect(service.Spec.Selector["postgresql"]).To(Equal("clustername"))
+		Expect(service.Spec.Selector[ClusterRoleLabelName]).To(Equal(ClusterRoleLabelReplica))
+	})
+
 	It("create a configured -rw service", func() {
 		service := CreateClusterReadWriteService(postgresql)
 		Expect(service.Name).To(Equal("clustername-rw"))

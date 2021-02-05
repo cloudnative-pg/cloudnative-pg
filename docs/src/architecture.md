@@ -9,6 +9,7 @@ Cloud Native PostgreSQL currently supports clusters based on asynchronous and sy
 * One primary, with optional multiple hot standby replicas for High Availability
 * Available services for applications:
     * `-rw`: applications connect to the only primary instance of the cluster
+    * `-ro`: applications connect to the only hot standby replicas for read-only-workloads
     * `-r`: applications connect to any of the instances for read-only workloads
 * Shared-nothing architecture recommended for better resilience of the PostgreSQL cluster:
     * PostgreSQL instances should reside on different Kubernetes worker nodes and share only the network
@@ -41,12 +42,17 @@ The following diagram shows the architecture:
 
 ![Applications reading from any instance in round robin](./images/architecture-r.png)
 
+Applications can also access hot standby replicas through the `-ro` service made available
+by the operator. This service enables the application to offload read-only queries from the
+primary node.
+
 ## Application deployments
 
 Applications are supposed to work with the services created by Cloud Native PostgreSQL
 in the same Kubernetes cluster:
 
 * `[cluster name]-rw`
+* `[cluster name]-ro`
 * `[cluster name]-r`
 
 Those services are entirely managed by the Kubernetes cluster and
@@ -92,6 +98,9 @@ you can use the following environment variables in your applications:
 
 * `PG_DATABASE_R_SERVICE_HOST`: the IP address of the service
   pointing to all the PostgreSQL instances for read-only workloads
+
+* `PG_DATABASE_RO_SERVICE_HOST`: the IP address of the
+  service pointing to all hot-standby replicas of the cluster
 
 * `PG_DATABASE_RW_SERVICE_HOST`: the IP address of the
   service pointing to the *primary* instance of the cluster

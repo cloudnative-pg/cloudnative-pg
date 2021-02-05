@@ -63,6 +63,31 @@ func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 	}
 }
 
+// CreateClusterReadOnlyService create a service insisting on all the ready pods
+func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.GetServiceReadOnlyName(),
+			Namespace: cluster.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "postgres",
+					Protocol:   corev1.ProtocolTCP,
+					TargetPort: intstr.FromInt(5432),
+					Port:       5432,
+				},
+			},
+			Selector: map[string]string{
+				"postgresql":         cluster.Name,
+				ClusterRoleLabelName: ClusterRoleLabelReplica,
+			},
+		},
+	}
+}
+
 // CreateClusterReadWriteService create a service insisting on the primary pod
 func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 	return &corev1.Service{
