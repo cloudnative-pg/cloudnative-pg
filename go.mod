@@ -8,7 +8,7 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/lib/pq v1.9.0
 	github.com/onsi/ginkgo v1.15.0
-	github.com/onsi/gomega v1.10.4
+	github.com/onsi/gomega v1.10.5
 	github.com/prometheus/client_golang v1.9.0
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.2.0
