@@ -42,8 +42,12 @@ const (
 	ServiceAnySuffix = "-any"
 
 	// ServiceReadSuffix is the suffix appended to the cluster name to get the
-	// service name for every ready node that you can use to read data
+	// service name for every ready node that you can use to read data (including the primary)
 	ServiceReadSuffix = "-r"
+
+	// ServiceReadOnlySuffix is the suffix appended to the cluster name to get the
+	// service name for every ready node that you can use to read data (excluding the primary)
+	ServiceReadOnlySuffix = "-ro"
 
 	// ServiceReadWriteSuffix is the suffix appended to the cluster name to get
 	// the se service name for every node that you can use to read and write
@@ -631,9 +635,15 @@ func (cluster *Cluster) GetServiceAnyName() string {
 }
 
 // GetServiceReadName return the name of the service that is used for
-// read-only transactions
+// read transactions (including the primary)
 func (cluster *Cluster) GetServiceReadName() string {
 	return fmt.Sprintf("%v%v", cluster.Name, ServiceReadSuffix)
+}
+
+// GetServiceReadOnlyName return the name of the service that is used for
+// read-only transactions (excluding the primary)
+func (cluster *Cluster) GetServiceReadOnlyName() string {
+	return fmt.Sprintf("%v%v", cluster.Name, ServiceReadOnlySuffix)
 }
 
 // GetServiceReadWriteName return the name of the service that is used for

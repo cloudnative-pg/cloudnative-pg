@@ -32,6 +32,9 @@ const (
 	// ClusterRoleLabelPrimary is written in labels to represent primary servers
 	ClusterRoleLabelPrimary = "primary"
 
+	// ClusterRoleLabelReplica is written in labels to represent replica servers
+	ClusterRoleLabelReplica = "replica"
+
 	// ClusterLabelName label is applied to Pods to link them to the owning
 	// cluster
 	ClusterLabelName = "postgresql"
