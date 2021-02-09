@@ -4,7 +4,7 @@ This section explains how to expose a PostgreSQL service externally, allowing ac
 to your PostgreSQL database **from outside your Kubernetes cluster** using
 NGINX Ingress Controller.
 
-If you followed the [QuickStart](/quickstart), you should have by now
+If you followed the [QuickStart](./quickstart.md), you should have by now
 a database that can be accessed inside the cluster via the
 `cluster-example-rw` (primary) and `cluster-example-r` (read-only)
 services in the `default` namespace. Both services use port `5432`.
