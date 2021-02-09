@@ -79,6 +79,22 @@ main() {
     ${KUBECTL} apply -f "${E2E_DIR}/kind-fluentd.yaml"
     # Run the tests and destroy the cluster
     # Do not fail out if the tests fail. We want the logs anyway.
+    ITER=0
+    #Number of nodes need to be changed if cluster nodes are more than 4
+    NODE=4
+    while true; do
+      NUMBERREADY=$(${KUBECTL} get ds fluentd -n kube-system -ojsonpath='{.status.numberReady}')
+      ITER=$((ITER + 1))
+      sleep 5
+      if [[ $ITER -gt 60 ]]; then
+        echo "Time out"
+        exit 1
+      fi
+      if [[ $NUMBERREADY == $NODE ]]; then
+        echo "FluentD is Ready"
+        break
+      fi
+    done
     RC=0
     ${E2E_DIR}/run-e2e.sh || RC=$?
 
