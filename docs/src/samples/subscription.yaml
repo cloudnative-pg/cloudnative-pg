@@ -4,7 +4,7 @@ metadata:
   name: cloud-native-postgresql
   namespace: openshift-operators
 spec:
-  channel: beta
+  channel: stable
   name: cloud-native-postgresql
   source: certified-operators
   sourceNamespace: openshift-marketplace
