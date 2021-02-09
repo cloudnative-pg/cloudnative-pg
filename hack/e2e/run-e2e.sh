@@ -38,7 +38,7 @@ fi
 
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
   # Install a version of the operator using v1alpha1
-  kubectl apply -f ${ROOT_DIR}/docs/src/samples/postgresql-operator-0.7.0.yaml
+  kubectl apply -f ${ROOT_DIR}/releases/postgresql-operator-0.7.0.yaml
 
   # Generate a manifest for the operator after the api upgrade
   # TODO: this is almost a "make deploy". Refactor.

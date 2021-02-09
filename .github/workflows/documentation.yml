@@ -58,15 +58,18 @@ jobs:
           # Set outputs for different maturity levels
           if [ "$git_seq" -eq 0 ]
           then
-              echo "::set-output name=SHORT_VERSION::${git_tag}"
-              echo "::set-output name=VERSION::${git_tag}"
-              echo "::set-output name=MATURITY::release"
+              SHORT_VERSION=${git_tag}
+              VERSION=${git_tag}
+              MATURITY=release
           else
               # Otherwise increment the last version component and build it as a pre-release
-              echo "::set-output name=SHORT_VERSION::$(echo "${git_tag}" | awk -F. -vOFS=. '{$NF+=1; print $0}')"
-              echo "::set-output name=VERSION::$(echo "${git_tag}" | awk -F. -vOFS=. '{$NF+=1; print $0}')-dev${git_seq}"
-              echo "::set-output name=MATURITY::snapshot"
+              SHORT_VERSION=$(echo "${git_tag}" | awk -F. -vOFS=. '{$NF+=1; print $0}')
+              VERSION="$(echo "${git_tag}" | awk -F. -vOFS=. '{$NF+=1; print $0}')-dev${git_seq}"
+              MATURITY=snapshot
           fi
+          echo "::set-output name=SHORT_VERSION::${SHORT_VERSION}"
+          echo "::set-output name=VERSION::${VERSION}"
+          echo "::set-output name=MATURITY::${MATURITY}"
       -
         name: Add a page to download the documentation in PDF version
         run: |
@@ -99,19 +102,21 @@ jobs:
                 -e PDF_TITLE="${PDF_TITLE}" \
                 -e PROJECT_NAME="${PROJECT_NAME}" \
                 -e SRCDIR="${GITHUB_WORKSPACE}" \
-                --entrypoint=  \
+                --entrypoint= \
                 quay.io/enterprisedb/cloud-native-docutils:publisher \
                 /tools/build_pdf_docs.sh ${GITHUB_WORKSPACE}
       -
         name: Prepare data for upload
         run: |
-          mkdir -p upload/latest
+          mkdir -p upload/latest upload/manifests
           cat > "upload/latest/.htaccess" <<EOF
           RewriteEngine On
           RewriteCond %{REQUEST_URI} ^(.*)/latest/(/?.*)
           RewriteRule ^ %1/${{ steps.get-version.outputs.SHORT_VERSION }}/%2 [R=302,L]
           EOF
           cp -R docs/dist upload/${{ steps.get-version.outputs.SHORT_VERSION }}
+          cp -R releases upload/${{ steps.get-version.outputs.SHORT_VERSION }}/manifests
+          cp -R $(ls releases/postgresql-operator-*.yaml | sort -rV | head -n 1) upload/manifests
       -
         name: Upload the documentation via FTP
         working-directory: upload

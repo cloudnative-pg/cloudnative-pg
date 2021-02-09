@@ -90,14 +90,11 @@ cp -r config/* "${CONFIG_TMP_DIR}"
 "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${release_manifest}"
 rm -fr "${CONFIG_TMP_DIR}"
 
-cp "${release_manifest}" "docs/src/samples/postgresql-operator-${release_version}.yaml"
-
 git add \
     pkg/versions/versions.go \
     Dockerfile \
     docs/src/installation.md \
-    "${release_manifest}" \
-    "docs/src/samples/postgresql-operator-${release_version}.yaml"
+    "${release_manifest}"
 git commit -sm "Version tag to ${release_version}"
 git tag -sam "Release ${release_version}" "v${release_version}"
 
