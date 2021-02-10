@@ -49,7 +49,7 @@ require_clean_work_tree () {
 
 require_clean_work_tree "release"
 
-if branch=$(git symbolic-ref --short -q HEAD) && [ $branch = 'main' ]
+if branch=$(git symbolic-ref --short -q HEAD) && [ "$branch" = 'main' ]
 then
     echo "Releasing ${release_version}"
 else
@@ -65,7 +65,7 @@ else
 fi
 
 make kustomize
-KUSTOMIZE=$(PATH="${GOBIN}:${PATH}" which kustomize)
+KUSTOMIZE=$(PATH="${GOBIN}:${PATH}" command -v kustomize)
 
 mkdir -p releases/
 release_manifest="releases/postgresql-operator-${release_version}.yaml"

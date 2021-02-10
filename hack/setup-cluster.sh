@@ -7,7 +7,7 @@
 ##
 
 # standard bash error handling
-set -eEuo pipefail;
+set -eEuo pipefail
 
 if [ "${DEBUG-}" = true ]; then
     set -x
@@ -57,7 +57,7 @@ cleanup_kind() {
     fi
 }
 
-trap cleanup_${ENGINE} ERR
+trap 'cleanup_${ENGINE}' ERR
 
 manual_cleanup_k3d() {
     set +x
@@ -109,9 +109,9 @@ create_cluster_k3d() {
     # TODO: Evaluate a better way to define
     # the latest K3S version released
     K3S_VERSION=5
-    while ! docker pull -q rancher/k3s:${K8S_VERSION}-k3s${K3S_VERSION}
+    while ! docker pull -q "rancher/k3s:${K8S_VERSION}-k3s${K3S_VERSION}"
     do
-      let K3S_VERSION--
+       (( K3S_VERSION-- ))
     done
 
     if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
@@ -122,9 +122,9 @@ mirrors:
     endpoint:
       - "${DOCKER_REGISTRY_MIRROR}"
 EOF
-      k3d cluster create --volume "${config_file}:/etc/rancher/k3s/registries.yaml" -a 3 -i rancher/k3s:${K8S_VERSION}-k3s${K3S_VERSION} "${CLUSTER_NAME}"
+      k3d cluster create --volume "${config_file}:/etc/rancher/k3s/registries.yaml" -a 3 -i "rancher/k3s:${K8S_VERSION}-k3s${K3S_VERSION}" "${CLUSTER_NAME}"
     else
-      k3d cluster create -a 3 -i rancher/k3s:${K8S_VERSION}-k3s${K3S_VERSION} "${CLUSTER_NAME}"
+      k3d cluster create -a 3 -i "rancher/k3s:${K8S_VERSION}-k3s${K3S_VERSION}" "${CLUSTER_NAME}"
     fi
 }
 
@@ -152,8 +152,8 @@ main() {
     export PATH
 
     install_kubectl
-    install_${ENGINE}
-    create_cluster_${ENGINE}
+    "install_${ENGINE}"
+    "create_cluster_${ENGINE}"
 
     # Support for docker:dind service
     if [ "${DOCKER_HOST:-}" == "tcp://docker:2376" ]; then
@@ -163,11 +163,11 @@ main() {
     # Build an image or use a pull secret
     if [ "${BUILD_IMAGE}" = true ]; then
         CONTROLLER_IMG=${CONTROLLER_IMG:-cloud-native-postgresql:local}
-        build_and_load_operator_${ENGINE}
+        "build_and_load_operator_${ENGINE}"
     fi
 
     if [ "${PRESERVE_CLUSTER}" = true ]; then
-        manual_cleanup_${ENGINE}
+        "manual_cleanup_${ENGINE}"
     fi
 }
 
