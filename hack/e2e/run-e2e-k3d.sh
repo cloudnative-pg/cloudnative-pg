@@ -79,8 +79,7 @@ main() {
     # Run the tests and destroy the cluster
     # Do not fail out if the tests fail. We want the logs anyway.
     ITER=0
-    #Number of nodes need to be changed if cluster nodes are more than 4
-    NODE=4
+    NODE=$("${KUBECTL}" get nodes --no-headers | wc -l)
     while true; do
       if [[ $ITER -ge 300 ]]; then
         echo "Time out"
