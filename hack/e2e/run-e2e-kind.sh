@@ -17,13 +17,14 @@ fi
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 HACK_DIR="${ROOT_DIR}/hack"
 E2E_DIR="${HACK_DIR}/e2e"
+TEMP_DIR=$(mktemp -d)
 
 export PRESERVE_CLUSTER=${PRESERVE_CLUSTER:-false}
 export BUILD_IMAGE=${BUILD_IMAGE:-false}
 export K8S_VERSION=${K8S_VERSION:-v1.20.0}
 export KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 export CLUSTER_NAME=pg-operator-e2e-${K8S_VERSION//./-}
-export TEMP_DIR=$(mktemp -d)
+export TEMP_DIR
 export LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
 export KIND_VERSION=${KIND_VERSION:-$(curl -s -LH "Accept:application/json" https://github.com/kubernetes-sigs/kind/releases/latest | sed 's/.*"tag_name":"\([^"]\+\)".*/\1/')}
 
@@ -74,29 +75,30 @@ main() {
         export CONTROLLER_IMG=cloud-native-postgresql:e2e
     fi
 
-    eval CLUSTER_ENGINE=kind ${HACK_DIR}/setup-cluster.sh
+    eval CLUSTER_ENGINE=kind "${HACK_DIR}/setup-cluster.sh"
 
-    ${KUBECTL} apply -f "${E2E_DIR}/kind-fluentd.yaml"
+    "${KUBECTL}" apply -f "${E2E_DIR}/kind-fluentd.yaml"
     # Run the tests and destroy the cluster
     # Do not fail out if the tests fail. We want the logs anyway.
     ITER=0
     #Number of nodes need to be changed if cluster nodes are more than 4
     NODE=4
     while true; do
-      NUMBERREADY=$(${KUBECTL} get ds fluentd -n kube-system -ojsonpath='{.status.numberReady}')
-      ITER=$((ITER + 1))
-      sleep 5
-      if [[ $ITER -gt 60 ]]; then
+      if [[ $ITER -ge 300 ]]; then
         echo "Time out"
         exit 1
       fi
-      if [[ $NUMBERREADY == $NODE ]]; then
+      NUM_READY=$(${KUBECTL} get ds fluentd -n kube-system -o jsonpath='{.status.numberReady}')
+      if [[ "$NUM_READY" == "$NODE" ]]; then
         echo "FluentD is Ready"
         break
       fi
+      sleep 1
+      (( ++ITER ))
     done
+
     RC=0
-    ${E2E_DIR}/run-e2e.sh || RC=$?
+    "${E2E_DIR}/run-e2e.sh" || RC=$?
 
     ## Export logs
     kind export logs "${LOG_DIR}" --name "${CLUSTER_NAME}"
@@ -106,6 +108,5 @@ main() {
     fi
     exit $RC
 }
-
 
 main

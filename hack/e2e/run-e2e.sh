@@ -38,22 +38,22 @@ fi
 
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
   # Install a version of the operator using v1alpha1
-  kubectl apply -f ${ROOT_DIR}/releases/postgresql-operator-0.7.0.yaml
+  kubectl apply -f "${ROOT_DIR}/releases/postgresql-operator-0.7.0.yaml"
 
   # Generate a manifest for the operator after the api upgrade
   # TODO: this is almost a "make deploy". Refactor.
   make manifests kustomize
   CONFIG_TMP_DIR=$(mktemp -d)
-  cp -r ${ROOT_DIR}/config/* ${CONFIG_TMP_DIR}
+  cp -r "${ROOT_DIR}/config"/* "${CONFIG_TMP_DIR}"
   (
-      cd ${CONFIG_TMP_DIR}/default
+      cd "${CONFIG_TMP_DIR}/default"
       kustomize edit add patch manager_image_pull_secret.yaml
-      cd ${CONFIG_TMP_DIR}/manager
-      kustomize edit set image controller=${CONTROLLER_IMG}
+      cd "${CONFIG_TMP_DIR}/manager"
+      kustomize edit set image "controller=${CONTROLLER_IMG}"
       kustomize edit add patch env_override.yaml
-      kustomize edit add configmap controller-manager-env --from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMG}
+      kustomize edit add configmap controller-manager-env "--from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMG}"
   )
-  kustomize build ${CONFIG_TMP_DIR}/default > ${ROOT_DIR}/tests/upgrade/fixtures/current-manifest.yaml
+  kustomize build "${CONFIG_TMP_DIR}/default" > "${ROOT_DIR}/tests/upgrade/fixtures/current-manifest.yaml"
 
   # Wait for the v1alpha1 operator (0.7.0) to be up and running
   kubectl wait --for=condition=Available --timeout=2m \
