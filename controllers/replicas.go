@@ -8,13 +8,10 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -91,7 +88,12 @@ func (r *ClusterReconciler) getStatusFromInstances(
 		return postgres.PostgresqlStatusList{}, nil
 	}
 
-	status, err := r.extractInstancesStatus(ctx, filteredPods)
+	config, err := ctrl.GetConfig()
+	if err != nil {
+		return postgres.PostgresqlStatusList{}, err
+	}
+
+	status, err := postgres.ExtractInstancesStatus(ctx, config, filteredPods, specs.PostgresContainerName)
 	if err != nil {
 		return postgres.PostgresqlStatusList{}, err
 	}
@@ -155,59 +157,6 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 	}
 
 	return nil
-}
-
-func (r *ClusterReconciler) getReplicaStatusFromPod(
-	ctx context.Context,
-	pod corev1.Pod) (postgres.PostgresqlStatus, error) {
-	var result postgres.PostgresqlStatus
-
-	timeout := time.Second * 2
-	config := ctrl.GetConfigOrDie()
-	clientInterface := kubernetes.NewForConfigOrDie(config)
-	stdout, _, err := utils.ExecCommand(
-		ctx,
-		clientInterface,
-		config,
-		pod,
-		specs.PostgresContainerName,
-		&timeout,
-		"/controller/manager", "instance", "status")
-
-	if err != nil {
-		return result, err
-	}
-
-	err = json.Unmarshal([]byte(stdout), &result)
-	if err != nil {
-		return result, err
-	}
-
-	result.PodName = pod.Name
-	return result, nil
-}
-
-func (r *ClusterReconciler) extractInstancesStatus(
-	ctx context.Context,
-	filteredPods []corev1.Pod,
-) (postgres.PostgresqlStatusList, error) {
-	var result postgres.PostgresqlStatusList
-
-	for idx := range filteredPods {
-		if utils.IsPodReady(filteredPods[idx]) {
-			instanceStatus, err := r.getReplicaStatusFromPod(ctx, filteredPods[idx])
-			if err != nil {
-				r.Log.Error(err, "Error while extracting instance status",
-					"name", filteredPods[idx].Name,
-					"namespace", filteredPods[idx].Namespace)
-				return result, err
-			}
-
-			result.Items = append(result.Items, instanceStatus)
-		}
-	}
-
-	return result, nil
 }
 
 // getSacrificialPod get the Pod who is supposed to be deleted

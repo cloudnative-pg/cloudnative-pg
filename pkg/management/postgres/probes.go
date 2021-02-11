@@ -6,7 +6,9 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 
 package postgres
 
-import "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+import (
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+)
 
 // IsHealthy check if the instance can really accept connections
 func (instance *Instance) IsHealthy() error {
@@ -57,30 +59,66 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	}
 	result.PendingRestart = settingsPendingRestart > 0
 
-	if !result.IsPrimary {
-		row = superUserDB.QueryRow(
-			"SELECT pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), pg_is_wal_replay_paused()")
-		err = row.Scan(&result.ReceivedLsn, &result.ReplayLsn, &result.ReplayPaused)
-		if err != nil {
-			return nil, err
-		}
-
-		// Sometimes pg_last_wal_replay_lsn is getting evaluated after
-		// pg_last_wal_receive_lsn and this, if other WALs are received,
-		// can result in a replay being greater then received. Since
-		// we can't force the planner to execute functions in a required
-		// order, we fix the result here
-		if result.ReceivedLsn.Less(result.ReplayLsn) {
-			result.ReceivedLsn = result.ReplayLsn
-		}
-
-		result.IsWalReceiverActive, err = instance.IsWALReceiverActive()
-		if err != nil {
-			return nil, err
-		}
+	err = instance.fillWalStatus(&result)
+	if err != nil {
+		return nil, err
 	}
 
 	return &result, nil
+}
+
+// fillWalStatus extract the current WAL information into the PostgresqlStatus
+// structure
+func (instance *Instance) fillWalStatus(result *postgres.PostgresqlStatus) error {
+	if result.IsPrimary {
+		return instance.fillWalStatusPrimary(result)
+	}
+
+	return instance.fillWalStatusReplica(result)
+}
+
+// fillWalStatusPrimary get WAL information for primary servers
+func (instance *Instance) fillWalStatusPrimary(result *postgres.PostgresqlStatus) error {
+	var err error
+
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+
+	row := superUserDB.QueryRow(
+		"SELECT pg_current_wal_lsn()")
+	return row.Scan(&result.CurrentLsn)
+}
+
+// fillWalStatusReplica get WAL information for replica servers
+func (instance *Instance) fillWalStatusReplica(result *postgres.PostgresqlStatus) error {
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+
+	row := superUserDB.QueryRow(
+		"SELECT pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), pg_is_wal_replay_paused()")
+	err = row.Scan(&result.ReceivedLsn, &result.ReplayLsn, &result.ReplayPaused)
+	if err != nil {
+		return err
+	}
+
+	// Sometimes pg_last_wal_replay_lsn is getting evaluated after
+	// pg_last_wal_receive_lsn and this, if other WALs are received,
+	// can result in a replay being greater then received. Since
+	// we can't force the planner to execute functions in a required
+	// order, we fix the result here
+	if result.ReceivedLsn.Less(result.ReplayLsn) {
+		result.ReceivedLsn = result.ReplayLsn
+	}
+
+	result.IsWalReceiverActive, err = instance.IsWALReceiverActive()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // IsWALReceiverActive check if the WAL receiver process is active by looking

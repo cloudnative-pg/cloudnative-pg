@@ -28,6 +28,7 @@ nav:
   - ssl_connections.md
   - kubernetes_upgrade.md
   - e2e.md
+  - cnp-plugin.md
   - container_images.md
   - operator_capability_levels.md
   - api_reference.md

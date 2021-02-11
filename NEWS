@@ -6,6 +6,9 @@ Version 1.1.0 - TBD
 - Add the `-ro` service to route connections to the available hot
   standby replicas only, enabling offload of read-only queries from
   the cluster's primary instance
+- Add `kubectl cnp status` to pretty-print the status of a cluster
+  and `kubectl cnp certificate` to enable the user to use TLS authentication
+  for the applications.
 
 Version 1.0.0 - 4 Feb 2021
 
