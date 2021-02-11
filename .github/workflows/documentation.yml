@@ -18,7 +18,10 @@ jobs:
 
   mkdocs_documentation:
     name: Create mkdocs documentation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
+    outputs:
+      version: ${{ steps.get-version.outputs.VERSION }}
+      maturity: ${{ steps.get-version.outputs.MATURITY }}
     env:
       PROJECT_NAME: "cloud-native-postgresql"
       PDF_TITLE: "Cloud Native PostgreSQL"
@@ -131,3 +134,22 @@ jobs:
                   -u ${{ secrets.DOCS_FTP_USERNAME }}:${{ secrets.DOCS_FTP_PASSWORD }} \
                   ftp://${{ secrets.DOCS_FTP_SERVER }}/${PROJECT_NAME}/${{ steps.get-version.outputs.MATURITY }}/{} \
                   --upload-file {}
+
+  trigger-ocp:
+    name: Trigger EDB Docs
+    needs:
+      - mkdocs_documentation
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          repository: enterprisedb/docs
+          event-type: cloud-native-postgresql
+          client-payload: |
+            {
+              "commit_sha": "${{ github.sha }}",
+              "maturity": "${{ needs.mkdocs_documentation.outputs.maturity }}",
+              "version": "${{ needs.mkdocs_documentation.outputs.version }}"
+            }
