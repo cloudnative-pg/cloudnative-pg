@@ -11,6 +11,7 @@ import corev1 "k8s.io/api/core/v1"
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {
 	PodName             string `json:"podName"`
+	CurrentLsn          LSN    `json:"currentLsn,omitempty"`
 	ReceivedLsn         LSN    `json:"receivedLsn,omitempty"`
 	ReplayLsn           LSN    `json:"replayLsn,omitempty"`
 	SystemID            string `json:"systemID"`
@@ -23,7 +24,7 @@ type PostgresqlStatus struct {
 // PostgresqlStatusList is a list of PostgreSQL instances status, useful to
 // be easily sorted
 type PostgresqlStatusList struct {
-	Items []PostgresqlStatus
+	Items []PostgresqlStatus `json:"items"`
 }
 
 // Len implements sort.Interface extracting the length of the list

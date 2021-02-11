@@ -11,139 +11,116 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/util/retry"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/cnp"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/cnp/certificate"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/cnp/promote"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/cnp/status"
 )
 
 var (
 	configFlags *genericclioptions.ConfigFlags
 
 	rootCmd = &cobra.Command{
-		Use:               "kubectl cnp",
-		Short:             "An interface to manage your Cloud Native PostgreSQL clusters",
-		PersistentPreRunE: createKubernetesClient,
+		Use:   "kubectl cnp",
+		Short: "An interface to manage your Cloud Native PostgreSQL clusters",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return cnp.CreateKubernetesClient(configFlags)
+		},
 	}
 
 	promoteCmd = &cobra.Command{
 		Use:   "promote [cluster] [server]",
 		Short: "Promote a certain server as a primary",
 		Args:  cobra.ExactArgs(2),
-		Run:   promote,
+		Run: func(cmd *cobra.Command, args []string) {
+			ctx := context.Background()
+			clusterName := args[0]
+			serverName := args[1]
+
+			promote.Promote(ctx, clusterName, serverName)
+		},
 	}
 
 	statusCmd = &cobra.Command{
 		Use:   "status [cluster]",
 		Short: "Get the status of a PostgreSQL cluster",
 		Args:  cobra.ExactArgs(1),
-		Run:   status,
+		Run: func(cmd *cobra.Command, args []string) {
+			ctx := context.Background()
+			clusterName := args[0]
+
+			verbose, _ := cmd.Flags().GetBool("verbose")
+			output, _ := cmd.Flags().GetString("output")
+
+			err := status.Status(ctx, clusterName, verbose, cnp.OutputFormat(output))
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			}
+		},
 	}
 
-	// Namespace to operate in
-	namespace string
+	certificateCmd = &cobra.Command{
+		Use:   "certificate [secretName]",
+		Short: `Create a client certificate to connect to PostgreSQL using TLS and Certificate authentication`,
+		Long: `This command create a new Kubernetes secret containing the crypto-material
+needed to configure TLS with Certificate authentication access for an application to
+connect to the PostgreSQL cluster.`,
+		Args: cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			ctx := context.Background()
+			secretName := args[0]
 
-	// Kubernetes dynamic client
-	kubeclient dynamic.Interface
+			user, _ := cmd.Flags().GetString("cnp-user")
+			cluster, _ := cmd.Flags().GetString("cnp-cluster")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
+			output, _ := cmd.Flags().GetString("output")
+
+			if user == "" {
+				fmt.Println("Missing PostgreSQL user name. Hint: is the `--cnp-user` option specified?")
+				return
+			}
+
+			if cluster == "" {
+				fmt.Println("Missing cluster name. Hint: is the `--cnp-cluster` option specified?")
+				return
+			}
+
+			params := certificate.Params{
+				Name:        secretName,
+				Namespace:   cnp.Namespace,
+				User:        user,
+				ClusterName: cluster,
+			}
+
+			err := certificate.Generate(ctx, params, dryRun, cnp.OutputFormat(output))
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			}
+		},
+	}
 )
 
 func main() {
 	configFlags = genericclioptions.NewConfigFlags(true)
 	configFlags.AddFlags(rootCmd.PersistentFlags())
-	rootCmd.AddCommand(promoteCmd, statusCmd)
+
+	statusCmd.Flags().BoolP(
+		"verbose", "v", false, "Print also the PostgreSQL configuration and HBA rules")
+	statusCmd.Flags().StringP(
+		"output", "o", "text", "Output format. One of text|json")
+
+	certificateCmd.Flags().String(
+		"cnp-user", "", "The name of the PostgreSQL user")
+	certificateCmd.Flags().String(
+		"cnp-cluster", "", "The name of the PostgreSQL cluster")
+	certificateCmd.Flags().StringP(
+		"output", "o", "", "Output format. One of json|yaml")
+	certificateCmd.Flags().Bool(
+		"dry-run", false, "If specified the secret is not created")
+
+	rootCmd.AddCommand(promoteCmd, statusCmd, certificateCmd)
 
 	_ = rootCmd.Execute()
-}
-
-func createKubernetesClient(cmd *cobra.Command, args []string) error {
-	kubeconfig := configFlags.ToRawKubeConfigLoader()
-
-	config, err := kubeconfig.ClientConfig()
-	if err != nil {
-		return err
-	}
-
-	kubeclient, err = dynamic.NewForConfig(config)
-	if err != nil {
-		return err
-	}
-
-	namespace, _, err = kubeconfig.Namespace()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func promote(cmd *cobra.Command, args []string) {
-	ctx := context.Background()
-	clusterName := args[0]
-	serverName := args[1]
-
-	// Check cluster status
-	object, err := kubeclient.Resource(apiv1.ClusterGVK).
-		Namespace(namespace).
-		Get(ctx, clusterName, metav1.GetOptions{})
-	if err != nil {
-		log.Log.Error(err, "Cannot find PostgreSQL cluster",
-			"namespace", namespace,
-			"name", clusterName)
-		return
-	}
-
-	// Check if the Pod exist
-	_, err = kubeclient.Resource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "pods",
-	}).Namespace(namespace).Get(ctx, serverName, metav1.GetOptions{})
-	if err != nil {
-		log.Log.Error(err, "Cannot find PostgreSQL server",
-			"namespace", namespace,
-			"name", serverName)
-		return
-	}
-
-	// The Pod exists, let's do it!
-	err = utils.SetTargetPrimary(object, serverName)
-	if err != nil {
-		log.Log.Error(err, "Cannot find status field of cluster",
-			"object", object)
-		return
-	}
-
-	// Register the phase in the cluster
-	err = utils.SetPhase(object, apiv1.PhaseSwitchover,
-		fmt.Sprintf("Switching over to %v", serverName))
-	if err != nil {
-		log.Log.Error(err, "Cannot find status field of cluster",
-			"object", object)
-		return
-	}
-
-	// Update, considering possible conflicts
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, err = kubeclient.
-			Resource(apiv1.ClusterGVK).
-			Namespace(namespace).
-			UpdateStatus(ctx, object, metav1.UpdateOptions{})
-		return err
-	})
-	if err != nil {
-		log.Log.Error(err, "Cannot update PostgreSQL cluster status",
-			"namespace", namespace,
-			"name", serverName,
-			"object", object)
-		return
-	}
-}
-
-func status(cmd *cobra.Command, args []string) {
-	panic("TODO")
 }

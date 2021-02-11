@@ -151,6 +151,7 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 	caSecret *v1.Secret,
 	usage certs.CertType,
 ) error {
+	// TODO: refactor and extract this to power kubectl-cnp
 	var secret v1.Secret
 	err := r.Get(ctx, secretName, &secret)
 	if err == nil {
