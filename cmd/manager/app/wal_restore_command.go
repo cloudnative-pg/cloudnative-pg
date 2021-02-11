@@ -72,7 +72,7 @@ func WalRestoreCommand(args []string) {
 	}
 
 	if cluster.Status.CurrentPrimary == podName {
-		// Why a request to restore a WAL file is arriving from the master server?
+		// Why a request to restore a WAL file is arriving from the primary server?
 		// Something strange is happening here
 		log.Log.Info("Received request to restore a WAL file on the current primary",
 			"walName", walName,

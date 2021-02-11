@@ -120,7 +120,7 @@ var _ = Describe("Backup and restore", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		// Create a WAL on the lead-master and check if it arrives on
+		// Create a WAL on the primary and check if it arrives on
 		// minio within a short time.
 		By("archiving WALs on minio", func() {
 			primary := clusterName + "-1"
