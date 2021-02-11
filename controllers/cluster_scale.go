@@ -29,6 +29,19 @@ func (r *ClusterReconciler) scaleDownCluster(
 ) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
+	if cluster.Spec.MinSyncReplicas > 0 && cluster.Spec.Instances < (cluster.Spec.MinSyncReplicas + 1) {
+		cluster.Spec.Instances = cluster.Status.Instances
+		if err := r.Update(ctx, cluster); err != nil {
+			return err
+		}
+
+		r.Recorder.Eventf(cluster, "Warning", "NoScaleDown",
+			"Can't scale down lower than minSyncReplicas, going back to %v",
+			cluster.Spec.Instances)
+
+		return nil
+	}
+
 	// Is there one pod to be deleted?
 	sacrificialPod := getSacrificialPod(resources.pods.Items)
 	if sacrificialPod == nil {
@@ -36,7 +49,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 		return nil
 	}
 
-	r.Recorder.Eventf(cluster, "Normal", "DeletingInstance",
+	r.Recorder.Eventf(cluster, "Normal", "ScaleDown",
 		"Scaling down: removing instance %v", sacrificialPod.Name)
 
 	// Retrieve the cluster key
