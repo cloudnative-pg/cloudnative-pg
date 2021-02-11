@@ -350,7 +350,7 @@ func waitForConnectionAvailable(db *sql.DB) error {
 }
 
 // Rewind use pg_rewind to align this data directory
-// with the contents of the master node
+// with the contents of the primary node
 func (instance *Instance) Rewind() error {
 	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
 	options := []string{

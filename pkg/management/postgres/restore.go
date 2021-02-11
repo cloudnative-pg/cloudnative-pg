@@ -142,7 +142,7 @@ func (info InitInfo) loadBackup() (*apiv1.Backup, error) {
 
 // writeRestoreWalConfig write a `custom.config` allowing PostgreSQL
 // to complete the WAL recovery from the object storage and then start
-// as a new master
+// as a new primary
 func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 	// Ensure restore_command is used to correctly recover WALs
 	// from the object storage

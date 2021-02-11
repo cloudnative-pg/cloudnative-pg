@@ -112,7 +112,7 @@ func (r *ClusterReconciler) upgradeCluster(
 	}
 
 	// If we have replicas, let's switch over to the most up-to-date and
-	// then the procedure will continue with the old master.
+	// then the procedure will continue with the old primary.
 	if len(clusterStatus.Items) < 2 || clusterStatus.Items[1].IsPrimary {
 		return "", ErrorInconsistentClusterStatus
 	}

@@ -52,7 +52,7 @@ func (info JoinInfo) Join() error {
 	}
 
 	// The generated recovery.conf / postgresql.auto.conf doesn't instruct
-	// the instance to follow the timeline changes of the master, so we
+	// the instance to follow the timeline changes of the primary, so we
 	// need to include another parameter in the configuration.
 	major, err := postgres.GetMajorVersion(info.PgData)
 	if err != nil {

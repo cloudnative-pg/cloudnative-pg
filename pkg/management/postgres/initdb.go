@@ -238,7 +238,7 @@ func (info InitInfo) ConfigureReplica(db *sql.DB) error {
 		return err
 	}
 
-	// The following parameters will be used when this master is being demoted.
+	// The following parameters will be used when this primary is being demoted.
 	// PostgreSQL <= 11 will have this parameter written to the
 	// 'recovery.conf' when needed.
 

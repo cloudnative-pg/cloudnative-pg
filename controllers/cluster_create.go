@@ -407,7 +407,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	if cluster.Status.LatestGeneratedNode != 0 {
-		// We are we creating a new blank master when we had previously generated
+		// We are we creating a new blank primary when we had previously generated
 		// other nodes and we don't have any PVC to reuse?
 		// This can happen when:
 		//
@@ -421,7 +421,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		// healing this cluster as we have nothing to do.
 		// For the second option we can just retry when the next
 		// reconciliation loop is started by the informers.
-		log.Info("refusing to create the master instance while the latest generated serial is not zero",
+		log.Info("refusing to create the primary instance while the latest generated serial is not zero",
 			"latestGeneratedNode", cluster.Status.LatestGeneratedNode)
 		return ctrl.Result{}, nil
 	}
@@ -699,7 +699,7 @@ func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *apiv
 }
 
 // electPvcToReattach will choose a PVC between the dangling ones that should be reattached to the cluster,
-// giving precedence to the target master if between the set
+// giving precedence to the target primary if between the set
 func electPvcToReattach(cluster *apiv1.Cluster) string {
 	if len(cluster.Status.DanglingPVC) == 0 {
 		return ""
