@@ -130,9 +130,9 @@ func registerSignalHandler() {
 
 		if postgresCommand != nil {
 			log.Log.Info("Shutting down PostgreSQL instance")
-			err := postgresCommand.Process.Signal(syscall.SIGTERM)
+			err := postgresCommand.Process.Signal(syscall.SIGINT)
 			if err != nil {
-				log.Log.Error(err, "Unable to send SIGTERM to PostgreSQL instance")
+				log.Log.Error(err, "Unable to send SIGINT to PostgreSQL instance")
 			}
 		}
 	}()
