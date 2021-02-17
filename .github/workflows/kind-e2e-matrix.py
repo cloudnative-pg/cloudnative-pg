@@ -66,13 +66,10 @@ K8S = VersionList(
 # MAJOR: [VERSION, PRE_ROLLING_UPDATE_VERSION],
 POSTGRES = MajorVersionList(
     {
-        # We cannot use PostgreSQL 13 as default testing version due to the bug
-        # https://postgr.es/m/20201209.174314.282492377848029776.horikyota.ntt%40gmail.com
-        # TODO: Reorder the versions when the bug will be fixed
-        "12": ["12.5", "12.4"],
-        "13": ["13.1", "13.0"],
-        "11": ["11.9", "11.8"],
-        "10": ["10.15", "10.14"],
+        "13": ["13.2", "13.1"],
+        "12": ["12.6", "12.5"],
+        "11": ["11.11", "11.10"],
+        "10": ["10.16", "10.15"],
     }
 )
 
