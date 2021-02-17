@@ -1,14 +1,9 @@
-# Example of PostgreSQL cluster using a node selector
 apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-nodeselector
+  name: cluster-example
 spec:
   instances: 3
-
-  affinity:
-    nodeSelector:
-      nodeselectortest: notexists
 
   postgresql:
     parameters:
@@ -20,7 +15,5 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
 
-  # Persistent storage configuration
   storage:
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi

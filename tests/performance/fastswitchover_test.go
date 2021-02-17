@@ -139,10 +139,10 @@ var _ = Describe("Fast switchover", func() {
 			// step.
 
 			_, _, err := tests.Run("kubectl create -n " + namespace +
-				" -f ./fixtures/base/postgrest.yaml")
+				" -f ./fixtures/base/webtest.yaml")
 			Expect(err).ToNot(HaveOccurred())
 			_, _, err = tests.Run("kubectl create -n " + namespace +
-				" -f ./fixtures/base/hey-job.yaml")
+				" -f ./fixtures/base/hey-job-webtest.yaml")
 			Expect(err).ToNot(HaveOccurred())
 
 			commandTimeout := time.Second * 2
