@@ -135,7 +135,7 @@ jobs:
                   ftp://${{ secrets.DOCS_FTP_SERVER }}/${PROJECT_NAME}/${{ steps.get-version.outputs.MATURITY }}/{} \
                   --upload-file {}
 
-  trigger-ocp:
+  trigger-edb-docs:
     name: Trigger EDB Docs
     needs:
       - mkdocs_documentation
