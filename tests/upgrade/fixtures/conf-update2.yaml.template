@@ -17,6 +17,13 @@ spec:
       shared_buffers: "128MB"
       max_replication_slots: "16"
       maintenance_work_mem: "128MB"
+      log_checkpoints: "on"
+      log_line_prefix: '%m [%p]: u=[%u] db=[%d] app=[%a] c=[%h] s=[%c:%l] tx=[%v:%x] '
+      log_lock_waits: "on"
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
     pg_hba:
       - host all all all trust
 

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: webtest
+  name: webtest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webtest
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: webtest
+    spec:
+      containers:
+        - image: leonardoce/webtest
+          name: webtest
+          env:
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cluster-example-superuser
+                  key: password
+            - name: USER
+              valueFrom:
+                secretKeyRef:
+                  name: cluster-example-superuser
+                  key: username
+            - name: DATABASE_URL
+              value: "postgres://$(USER):$(PASSWORD)@cluster-example-rw/app?sslmode=require"
+            - name: SQL_QUERY
+              value: "insert into tps.tl(source) values ('hey');"
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: webtest
+  name: webtest
+spec:
+  ports:
+    - port: 8080
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: webtest
+  type: ClusterIP
+

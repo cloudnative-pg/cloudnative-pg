@@ -15,10 +15,6 @@ spec:
          - "-c"
          - "5"
          - "-m"
-         - "POST"
-         - "-T"
-         - "application/json"
-         - "-d"
-         - '{ "source": "hey" }'
-         - "http://postgrest:3000/tl"
+         - "GET"
+         - "http://webtest:8080/tx"
       restartPolicy: Never
