@@ -142,12 +142,6 @@ primary will use `pg_rewind` to synchronize itself with the new one if its
 PVC is available; otherwise, a new standby will be created from a backup of the
 current primary.
 
-!!! Important
-    Due to a [bug in PostgreSQL 13 streaming replication](https://www.postgresql.org/message-id/flat/20201209.174314.282492377848029776.horikyota.ntt%40gmail.com)
-    it is not guaranteed that an existing standby is able to follow a promoted
-    primary, even if the new primary contains all the required WALs. Standbys
-    will be able to follow a primary if WAL archiving is configured.
-
 ## Manual intervention
 
 In the case of undocumented failure, it might be necessary to intervene
