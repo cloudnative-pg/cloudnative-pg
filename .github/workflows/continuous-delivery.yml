@@ -36,6 +36,18 @@ jobs:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout 4m
 
+  shellcheck:
+    name: Run shellcheck linter
+    runs-on: ubuntu-20.04
+    env:
+        SHELLCHECK_OPTS: -a -S style
+    steps:
+    -
+      uses: actions/checkout@v2
+    -
+      name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@master
+
   tests:
     name: Run unit tests
     runs-on: ubuntu-20.04
@@ -64,6 +76,7 @@ jobs:
     name: Build containers
     needs:
       - golangci
+      - shellcheck
       - tests
     runs-on: ubuntu-20.04
     outputs:
@@ -230,6 +243,7 @@ jobs:
     name: Trigger OCP bundle
     needs:
       - golangci
+      - shellcheck
       - tests
     runs-on: ubuntu-20.04
     steps:

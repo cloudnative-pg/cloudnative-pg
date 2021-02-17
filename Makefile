@@ -125,6 +125,13 @@ apidoc: po-docgen
 	sed -i 's/| ----- | ----------- | ------ | -------- |/| -------------------- | ------------------------------ | -------------------- | -------- |/' $${CONFIG_TMP_DIR}/api_reference.md ;\
 	cp $${CONFIG_TMP_DIR}/api_reference.md docs/src/api_reference.md
 
+# Shellcheck for the hack directory
+shellcheck:
+	@{ \
+	set -e ;\
+	find -name '*.sh' -exec shellcheck -a -S style {} + ;\
+	}
+
 # find or download controller-gen
 .PHONY: controller-gen
 controller-gen:
