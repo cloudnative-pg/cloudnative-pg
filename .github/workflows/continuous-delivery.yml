@@ -6,9 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       depth:
-        description: 'Depth'
+        description: 'Depth (push, pull_request, main, schedule)'
         required: true
         default: 'main'
+      limit:
+        description: 'Limit to the specified engines list (local, eks)'
+        required: false
 
 env:
   GOLANG_VERSION: "1.14.x"
@@ -154,13 +157,32 @@ jobs:
           image=$(sed -n '1{s/,.*//; p}' <<< "$TAGS")
           echo "::set-output name=image::${image}"
 
+  trigger-ocp:
+    name: Trigger OCP bundle
+    needs:
+      - golangci
+      - shellcheck
+      - tests
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          repository: enterprisedb/cloud-native-postgresql-ocp-certified
+          event-type: cnp-trigger
+          client-payload: '{"upstream_commit": "${{ github.sha }}"}'
+
   generate-jobs:
-    name: Generate Jobs
+    name: Generate jobs for E2E tests
     needs:
       - buildx
     runs-on: ubuntu-20.04
     outputs:
-      matrix: ${{ steps.generate-jobs.outputs.matrix }}
+      localMatrix: ${{ steps.generate-jobs.outputs.localMatrix }}
+      localEnabled: ${{ steps.generate-jobs.outputs.localEnabled }}
+      eksMatrix: ${{ steps.generate-jobs.outputs.eksMatrix }}
+      eksEnabled: ${{ steps.generate-jobs.outputs.eksEnabled }}
     steps:
       -
         name: Checkout code
@@ -176,19 +198,21 @@ jobs:
       -
         id: generate-jobs
         name: Generate Jobs
-        env:
-          E2E_DEPTH: ${{ github.event.inputs.depth || github.event_name }}
         shell: bash
-        run: python .github/workflows/kind-e2e-matrix.py
+        run: |
+          python .github/e2e-matrix-generator.py \
+            -m '${{ github.event.inputs.depth || github.event_name }}' \
+            -l '${{ github.event.inputs.limit }}'
 
-  e2e-kind:
-    name: Run E2E on kind
+  e2e-local:
+    name: Run E2E on local executors
+    if: needs.generate-jobs.outputs.localEnabled == 'true'
     needs:
       - buildx
       - generate-jobs
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.generate-jobs.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
     runs-on: ubuntu-20.04
     env:
       K8S_VERSION: "${{ matrix.k8s_version }}"
@@ -233,24 +257,109 @@ jobs:
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
-            tests/e2e/out/
-            tests/performance/out/
-            tests/upgrade/out/
+            tests/*/out/
           retention-days: 7
           if-no-files-found: ignore
 
-  trigger-ocp:
-    name: Trigger OCP bundle
+  e2e-eks:
+    name: Run E2E on Amazon EKS
+    if: needs.generate-jobs.outputs.eksEnabled == 'true'
     needs:
-      - golangci
-      - shellcheck
-      - tests
+      - buildx
+      - generate-jobs
+    strategy:
+      fail-fast: false
+      matrix:
+         ${{ fromJSON(needs.generate-jobs.outputs.eksMatrix) }}
     runs-on: ubuntu-20.04
+    env:
+      K8S_VERSION: "${{ matrix.k8s_version }}"
+      POSTGRES_IMG: "${{ matrix.postgres_img }}"
+      E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
+
+      DOCKER_SERVER: quay.io/enterprisedb
+      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
+
+      DEBUG: "true"
+      BUILD_IMAGE: "false"
+      CONTROLLER_IMG: ${{ needs.buildx.outputs.image }}
+      E2E_DEFAULT_STORAGE_CLASS: gp2
+
+      AWS_REGION: eu-central-1
     steps:
-      - name: Repository Dispatch
-        uses: peter-evans/repository-dispatch@v1
+      -
+        name: Set cluster name
+        run: |
+          echo "CLUSTER_NAME=cnp-test-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )" >> $GITHUB_ENV
+      -
+        name: Checkout code
+        uses: actions/checkout@v2
+      -
+        name: Install Go
+        uses: actions/setup-go@v2
         with:
-          token: ${{ secrets.REPO_GHA_PAT }}
-          repository: enterprisedb/cloud-native-postgresql-ocp-certified
-          event-type: cnp-trigger
-          client-payload: '{"upstream_commit": "${{ github.sha }}"}'
+          go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name:  Install ginkgo
+        run: |
+          go install -mod=readonly github.com/onsi/ginkgo/ginkgo
+      -
+        name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      -
+        name: Install eksctl
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" \
+            | tar xz -C $HOME/.local/bin
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      -
+        name: Configure EKS setup
+        run: |
+          envsubst < hack/e2e/eks-cluster.yaml.template > hack/e2e/eks-cluster.yaml
+      -
+        name: Setup EKS
+        run: |
+          eksctl create cluster -f hack/e2e/eks-cluster.yaml
+      -
+        name: Setup log archiving via fluentd and insights
+        run: |
+          curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml \
+            | sed "s/{{cluster_name}}/${{ env.CLUSTER_NAME }}/;s/{{region_name}}/${{ env.AWS_REGION }}/" \
+            | kubectl apply -f -
+      -
+        name: Run E2E tests
+        run: hack/e2e/run-e2e.sh
+      -
+        name: Archive e2e failure contexts
+        if: failure()
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-failure-contexts-${{ matrix.id }}
+          path: |
+            tests/*/out/
+          retention-days: 7
+          if-no-files-found: ignore
+      -
+        name: Clean up
+        if: always()
+        run: |
+          while true; do
+              output=$( eksctl delete cluster -n ${{ env.CLUSTER_NAME }} -r "${{ env.AWS_REGION }}" --wait 2>&1 )
+              status=$?
+              if [[ $status == 0 ]]; then
+                  echo "EKS cluster deleted"
+                  break
+              fi
+              if ( grep "ResourceNotFoundException: No cluster found for name: ${{ env.CLUSTER_NAME }}" <<< "$output" ); then
+                  echo "EKS cluster doesn't exist, nothing to remove"
+                  break
+              fi
+              echo "Failed deleting cluster ${{ env.CLUSTER_NAME }}, retrying"
+              sleep 5
+          done

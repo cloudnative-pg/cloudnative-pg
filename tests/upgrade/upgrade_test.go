@@ -141,7 +141,7 @@ var _ = Describe("Upgrade", func() {
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
-			// Update the configuration. It may take a few seconds after the
+			// Update the configuration. It may take some time after the
 			// upgrade for the webhook "mcluster.kb.io" to work and accept
 			// the apply
 			timeout := 60
@@ -183,7 +183,7 @@ var _ = Describe("Upgrade", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			commandTimeout := time.Second * 2
-			timeout := 30
+			timeout := 120
 			_, _, err = env.ExecCommand(env.Ctx, *primary, "postgres", &commandTimeout,
 				"psql", "-U", "postgres", "appdb", "-tAc", "CREATE TABLE postswitch(i int)")
 			Expect(err).ToNot(HaveOccurred())
