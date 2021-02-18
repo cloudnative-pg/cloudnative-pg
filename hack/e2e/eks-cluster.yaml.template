@@ -2,12 +2,12 @@ apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 
 metadata:
-  name: "cnp-test-${CI_PIPELINE_ID}-${CI_NODE_INDEX}"
-  region: "${REGION}"
+  name: "${CLUSTER_NAME}"
+  region: "${AWS_REGION}"
   version: "${K8S_VERSION}"
 
 nodeGroups:
-  - name: "cnp-test-${CI_PIPELINE_ID}-${CI_NODE_INDEX}"
+  - name: "${CLUSTER_NAME}"
     instanceType: m5.large
     desiredCapacity: 3
     iam:

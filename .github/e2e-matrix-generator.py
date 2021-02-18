@@ -4,8 +4,9 @@
 # Copyright (C) 2019-2021 EnterpriseDB Corporation.
 #
 
+import argparse
 import json
-import os
+import re
 import sys
 from operator import itemgetter
 from typing import Dict, List
@@ -33,8 +34,7 @@ class MajorVersionList(dict):
 
     def __init__(self, version_lists: Dict[str, List[str]]):
         sorted_versions = {
-            k: VersionList(version_lists[k])
-            for k in version_lists.keys()
+            k: VersionList(version_lists[k]) for k in version_lists.keys()
         }
         super().__init__(sorted_versions)
         self.versions = list(self.keys())
@@ -59,6 +59,15 @@ K8S = VersionList(
     ]
 )
 
+
+# Kubernetes versions on EKS to use during the tests
+EKS_K8S = VersionList(
+    [
+        "1.18",
+        "1.17",
+        "1.16",
+    ]
+)
 # PostgreSQL versions to use during the tests
 # Entries are expected to be ordered from newest to oldest
 # First entry is used as default testing version
@@ -98,7 +107,7 @@ class E2EJob(dict):
         return hash(self["id"])
 
 
-def build_push_include():
+def build_push_include_local():
     """Build the list of tests running on push"""
     return {
         E2EJob(K8S.latest, POSTGRES.latest),
@@ -106,9 +115,9 @@ def build_push_include():
     }
 
 
-def build_pull_request_include():
+def build_pull_request_include_local():
     """Build the list of tests running on pull request"""
-    result = build_push_include()
+    result = build_push_include_local()
 
     # Iterate over K8S versions
     for k8s_version in K8S:
@@ -124,9 +133,9 @@ def build_pull_request_include():
     return result
 
 
-def build_main_include():
+def build_main_include_local():
     """Build the list tests running on main"""
-    result = build_pull_request_include()
+    result = build_pull_request_include_local()
 
     # Iterate over K8S versions
     for k8s_version in K8S:
@@ -141,30 +150,95 @@ def build_main_include():
     return result
 
 
-def build_schedule_include():
+def build_schedule_include_local():
     """Build the list of tests running on schedule"""
     # For the moment scheduled tests are identical to main
-    return build_main_include()
+    return build_main_include_local()
 
 
-MODES = {
-    "push": build_push_include,
-    "pull_request": build_pull_request_include,
-    "main": build_main_include,
-    "schedule": build_schedule_include,
+def build_push_include_cloud(engine_version_list):
+    return {}
+
+
+def build_pull_request_include_cloud(engine_version_list):
+    return {}
+
+
+def build_main_include_cloud(engine_version_list):
+    return {
+        E2EJob(engine_version_list.latest, POSTGRES.latest),
+    }
+
+
+def build_schedule_include_cloud(engine_version_list):
+    """Build the list of tests running on schedule"""
+    result = set()
+    # Iterate over K8S versions
+    for k8s_version in engine_version_list:
+        result |= {
+            E2EJob(k8s_version, POSTGRES.latest),
+        }
+
+    # Iterate over PostgreSQL versions
+    for postgres_version in POSTGRES.values():
+        result |= {E2EJob(engine_version_list.latest, postgres_version)}
+
+    return result
+
+
+ENGINE_MODES = {
+    "local": {
+        "push": build_push_include_local,
+        "pull_request": build_pull_request_include_local,
+        "main": build_main_include_local,
+        "schedule": build_schedule_include_local,
+    },
+    "eks": {
+        "push": lambda: build_push_include_cloud(EKS_K8S),
+        "pull_request": lambda: build_pull_request_include_cloud(EKS_K8S),
+        "main": lambda: build_main_include_cloud(EKS_K8S),
+        "schedule": lambda: build_schedule_include_cloud(EKS_K8S),
+    },
 }
 
 
 if __name__ == "__main__":
-    mode = os.getenv("E2E_DEPTH", "push")
 
-    if mode not in MODES:
-        raise SystemExit(
-            f"GITHUB_EVENT_NAME='{mode}' is not supported. Possible values are: {', '.join(MODES)}"
-        )
+    parser = argparse.ArgumentParser(description="Create the job matrix")
+    parser.add_argument(
+        "-m",
+        "--mode",
+        type=str,
+        choices={"push", "pull_request", "main", "schedule"},
+        default="push",
+        help="set of tests to run",
+    )
+    parser.add_argument(
+        "-l",
+        "--limit",
+        type=str,
+        default="",
+        help="limit to a list of engines",
+    )
+    args = parser.parse_args()
 
-    include = list(sorted(MODES[mode](), key=itemgetter("id")))
-    for job in include:
-        print(f"Generating: {job['id']}", file=sys.stderr)
+    engines = set(ENGINE_MODES.keys())
+    if args.limit:
+        required_engines = set(re.split(r"[, ]+", args.limit.strip()))
+        if len(wrong_engines := required_engines - engines):
+            raise SystemExit(
+                f"Limit contains unknown engines {wrong_engines}. Available engines: {engines}"
+            )
+        engines = required_engines
 
-    print("::set-output name=matrix::" + json.dumps({"include": include}))
+    matrix = {}
+    for engine in ENGINE_MODES:
+        include = {}
+        if engine in engines:
+            include = list(
+                sorted(ENGINE_MODES[engine][args.mode](), key=itemgetter("id"))
+            )
+        for job in include:
+            print(f"Generating {engine}: {job['id']}", file=sys.stderr)
+        print(f"::set-output name={engine}Matrix::" + json.dumps({"include": include}))
+        print(f"::set-output name={engine}Enabled::" + str(len(include) > 0))
