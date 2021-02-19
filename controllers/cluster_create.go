@@ -238,11 +238,11 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 	err := r.Create(ctx, &targetPdb)
 	if err != nil {
 		if !apierrs.IsAlreadyExists(err) {
-			log.Error(err, "Unable to create PodDisruptionBugdet", "object", targetPdb)
+			log.Error(err, "Unable to create PodDisruptionBudget", "object", targetPdb)
 			return err
 		}
 	} else {
-		r.Recorder.Event(cluster, "Normal", "CreatingPodDisruptionBugdet", "Creating Pod Disruption Budget")
+		r.Recorder.Event(cluster, "Normal", "CreatingPodDisruptionBudget", "Creating Pod Disruption Budget")
 	}
 
 	return nil
@@ -257,18 +257,18 @@ func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, clust
 	err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &targetPdb)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
-			log.Error(err, "Unable to retrieve PodDisruptionBugdet")
+			log.Error(err, "Unable to retrieve PodDisruptionBudget")
 			return err
 		}
 		return nil
 	}
 
-	r.Recorder.Event(cluster, "Normal", "DeletingPodDisruptionBugdet", "Deleting Pod Disruption Budget")
+	r.Recorder.Event(cluster, "Normal", "DeletingPodDisruptionBudget", "Deleting Pod Disruption Budget")
 
 	err = r.Delete(ctx, &targetPdb)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
-			log.Error(err, "Unable to delete PodDisruptionBugdet", "object", targetPdb)
+			log.Error(err, "Unable to delete PodDisruptionBudget", "object", targetPdb)
 			return err
 		}
 		return nil
