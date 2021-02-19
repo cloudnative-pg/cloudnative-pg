@@ -11,7 +11,10 @@ spec:
     parameters:
       max_worker_processes: "60"
     pg_hba:
-      - host all all all trust
+      # To access through TCP/IP you will need to get username
+      # and password from the secret cluster-example-custom-app
+      - host all all all md5
+
 
   # Example of rolling update strategy:
   # - unsupervised: automated update of the primary once all
