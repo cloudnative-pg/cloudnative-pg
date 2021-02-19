@@ -435,7 +435,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		err := r.Get(ctx, backupObjectKey, &backup)
 		if err != nil {
 			if apierrs.IsNotFound(err) {
-				r.Recorder.Eventf(cluster, "Normal", "ErrorNoBackup",
+				r.Recorder.Eventf(cluster, "Warning", "ErrorNoBackup",
 					"Backup object \"%v/%v\" is missing",
 					backupObjectKey.Namespace, backupObjectKey.Name)
 
