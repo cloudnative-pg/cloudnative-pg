@@ -29,14 +29,14 @@ func (r *ClusterReconciler) scaleDownCluster(
 ) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
-	if cluster.Spec.MinSyncReplicas > 0 && cluster.Spec.Instances < (cluster.Spec.MinSyncReplicas + 1) {
+	if cluster.Spec.MaxSyncReplicas > 0 && cluster.Spec.Instances < (cluster.Spec.MaxSyncReplicas+1) {
 		cluster.Spec.Instances = cluster.Status.Instances
 		if err := r.Update(ctx, cluster); err != nil {
 			return err
 		}
 
 		r.Recorder.Eventf(cluster, "Warning", "NoScaleDown",
-			"Can't scale down lower than minSyncReplicas, going back to %v",
+			"Can't scale down lower than maxSyncReplicas, going back to %v",
 			cluster.Spec.Instances)
 
 		return nil
