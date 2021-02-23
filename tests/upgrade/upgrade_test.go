@@ -146,7 +146,8 @@ var _ = Describe("Upgrade", func() {
 			// the apply
 			timeout := 60
 			Eventually(func() error {
-				_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + updateConfFile)
+				stdout, stderr, err := tests.Run("kubectl apply -n " + namespace + " -f " + updateConfFile)
+				fmt.Printf("STDOUT: %v\nSTDERR: %v\n ERR: %v", stdout, stderr, err)
 				return err
 			}, timeout).ShouldNot(HaveOccurred())
 
@@ -204,7 +205,7 @@ var _ = Describe("Upgrade", func() {
 						"SELECT count(*) = 0 FROM postswitch")
 					return strings.TrimSpace(out), err
 				}, timeout).Should(BeEquivalentTo("t"),
-					"Pod %v should followed the new primary", podName)
+					"Pod %v should have followed the new primary", podName)
 			}
 		})
 	}

@@ -10,7 +10,7 @@ on:
         required: true
         default: 'main'
       limit:
-        description: 'Limit to the specified engines list (local, eks)'
+        description: 'Limit to the specified engines list (local, eks, aks)'
         required: false
 
 env:
@@ -161,7 +161,6 @@ jobs:
     name: Trigger OCP bundle
     needs:
       - golangci
-      - shellcheck
       - tests
     runs-on: ubuntu-20.04
     steps:
@@ -183,6 +182,8 @@ jobs:
       localEnabled: ${{ steps.generate-jobs.outputs.localEnabled }}
       eksMatrix: ${{ steps.generate-jobs.outputs.eksMatrix }}
       eksEnabled: ${{ steps.generate-jobs.outputs.eksEnabled }}
+      aksMatrix: ${{ steps.generate-jobs.outputs.aksMatrix }}
+      aksEnabled: ${{ steps.generate-jobs.outputs.aksEnabled }}
     steps:
       -
         name: Checkout code
@@ -208,7 +209,6 @@ jobs:
     name: Run E2E on local executors
     if: needs.generate-jobs.outputs.localEnabled == 'true'
     needs:
-      - buildx
       - generate-jobs
     strategy:
       fail-fast: false
@@ -261,11 +261,131 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  e2e-aks:
+    name: Run E2E on Microsoft AKS
+    if: needs.generate-jobs.outputs.aksEnabled == 'true'
+    needs:
+      - generate-jobs
+    strategy:
+      fail-fast: false
+      matrix:
+         ${{ fromJSON(needs.generate-jobs.outputs.aksMatrix) }}
+    runs-on: ubuntu-20.04
+    env:
+      K8S_VERSION: "${{ matrix.k8s_version }}"
+      POSTGRES_IMG: "${{ matrix.postgres_img }}"
+      E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
+
+      DOCKER_SERVER: quay.io/enterprisedb
+      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
+
+      DEBUG: "true"
+      BUILD_IMAGE: "false"
+      CONTROLLER_IMG: ${{ needs.buildx.outputs.image }}
+      E2E_DEFAULT_STORAGE_CLASS: rook-ceph-block
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v2
+      -
+        name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name:  Install ginkgo
+        run: |
+          go install -mod=readonly github.com/onsi/ginkgo/ginkgo
+      -
+        name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      -
+        name: Install kubectl
+        uses: azure/setup-kubectl@v1
+        with:
+          version: ${{ env.K8S_VERSION }}
+      -
+        name: Create AKS cluster
+        run: |
+            az extension add --name aks-preview
+            az aks create --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
+              --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' ) \
+              --node-count 3 -k ${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
+              --workspace-resource-id ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
+              --aks-custom-headers EnableAzureDiskFileCSIDriver=true
+            az aks get-credentials --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
+              --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )
+      -
+        # Azure is slow in provisioning disks, and we can't wait two minutes
+        # every time we create a pod, otherwise all the tests will time out.
+        # We set up a few large disks now, we run Rook on top of them and we
+        # use rook to get the small PV we use in the tests.
+        # It can still take a while to deploy rook.
+        name: Set up Rook
+        run: |
+          GO111MODULE=on go get github.com/mikefarah/yq/v4
+          kubectl apply -f \
+            https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/ceph/crds.yaml
+          kubectl apply -f \
+            https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/ceph/common.yaml
+          kubectl apply -f \
+            https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/ceph/operator.yaml
+          curl \
+            https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/ceph/cluster-on-pvc.yaml | \
+            sed '/^ *#/d;/^ *$/d' | \
+            yq e '.spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = "50Gi" |
+              .spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.storageClassName = "managed-csi" |
+              .spec.mon.volumeClaimTemplate.spec.storageClassName = "managed-csi" ' - | \
+            kubectl apply -f -
+          ITER=0
+          MAX_ITER=120
+          while true; do
+            output=$( kubectl get deploy -n rook-ceph -l app=rook-ceph-osd --no-headers -o name )
+            if [[ $(wc -w <<< $output)  == 3 ]]; then
+              break
+            fi
+
+            (( ++ITER ))
+            if [[ ${ITER} -ge ${MAX_ITER} ]]; then
+              echo "Time out waiting for Rook OSDs deployments"
+              exit 1
+            fi
+            echo "$(wc -w <<< $output) out of 3 Rook OSDs deployments exist, waiting 10s (${ITER}/${MAX_ITER})."
+            sleep 10
+          done
+          echo "Waiting for Rook OSDs to be available"
+          kubectl wait deploy -n rook-ceph --for condition=available --timeout 480s -l app=rook-ceph-osd
+          kubectl apply -f \
+            https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/ceph/csi/rbd/storageclass.yaml
+      -
+        name: Run E2E tests
+        run: hack/e2e/run-e2e.sh
+      -
+        name: Archive e2e failure contexts
+        if: failure()
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-failure-contexts-${{ matrix.id }}
+          path: |
+            tests/*/out/
+          retention-days: 7
+          if-no-files-found: ignore
+      -
+        name: Clean up
+        if: always()
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y \
+              --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )
+
   e2e-eks:
     name: Run E2E on Amazon EKS
     if: needs.generate-jobs.outputs.eksEnabled == 'true'
     needs:
-      - buildx
       - generate-jobs
     strategy:
       fail-fast: false

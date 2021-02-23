@@ -119,7 +119,8 @@ var _ = Describe("Configuration update", func() {
 						"psql", "-U", "postgres", "-tAc", "show shared_buffers")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
 					return value, err, atoiErr
-				}, timeout).Should(BeEquivalentTo(256))
+				}, timeout).Should(BeEquivalentTo(256),
+					"Pod %v should have updated its configuration", pod.Name)
 			}
 			// Check that a switchover happened
 			Eventually(func() (string, error) {
