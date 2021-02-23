@@ -24,8 +24,8 @@ import (
 
 var _ = Describe("Failover", func() {
 	const namespace = "failover-e2e"
-	const sampleFile = samplesDir + "/cluster-example.yaml"
-	const clusterName = "cluster-example"
+	const sampleFile = samplesDir + "/cluster-storage-class.yaml"
+	const clusterName = "postgresql-storage-class"
 	JustAfterEach(func() {
 		if CurrentGinkgoTestDescription().Failed {
 			env.DumpClusterEnv(namespace, clusterName,

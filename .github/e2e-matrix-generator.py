@@ -59,7 +59,6 @@ K8S = VersionList(
     ]
 )
 
-
 # Kubernetes versions on EKS to use during the tests
 EKS_K8S = VersionList(
     [
@@ -68,6 +67,17 @@ EKS_K8S = VersionList(
         "1.16",
     ]
 )
+
+# Kubernetes versions on AKS to use during the tests
+AKS_K8S = VersionList(
+    [
+        "v1.20.2",
+        "v1.19.7",
+        "v1.18.14",
+        "v1.17.16",
+    ]
+)
+
 # PostgreSQL versions to use during the tests
 # Entries are expected to be ordered from newest to oldest
 # First entry is used as default testing version
@@ -198,6 +208,12 @@ ENGINE_MODES = {
         "pull_request": lambda: build_pull_request_include_cloud(EKS_K8S),
         "main": lambda: build_main_include_cloud(EKS_K8S),
         "schedule": lambda: build_schedule_include_cloud(EKS_K8S),
+    },
+    "aks": {
+        "push": lambda: build_push_include_cloud(AKS_K8S),
+        "pull_request": lambda: build_pull_request_include_cloud(AKS_K8S),
+        "main": lambda: build_main_include_cloud(AKS_K8S),
+        "schedule": lambda: build_schedule_include_cloud(AKS_K8S),
     },
 }
 

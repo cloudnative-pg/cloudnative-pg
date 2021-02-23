@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -8,3 +9,4 @@ spec:
   resources:
     requests:
       storage: 2Gi
+  storageClassName: ${E2E_DEFAULT_STORAGE_CLASS}
