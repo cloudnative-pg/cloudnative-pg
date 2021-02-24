@@ -388,6 +388,18 @@ func (r *InstanceReconciler) reconcileReplica() error {
 		return nil
 	}
 
+	r.log.Info("This is an old primary node. Requesting a checkpoint before demotion")
+
+	db, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		r.log.Error(err, "Cannot connect to primary server")
+	} else {
+		_, err = db.Exec("CHECKPOINT")
+		if err != nil {
+			r.log.Error(err, "Error while requesting a checkpoint")
+		}
+	}
+
 	r.log.Info("This is an old primary node. Shutting it down to get it demoted to a replica")
 
 	// I was the primary, but now I'm not the primary anymore.
