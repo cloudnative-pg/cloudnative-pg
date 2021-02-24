@@ -35,7 +35,7 @@ managed by the `primaryUpdateStrategy` option, accepting these two values:
 The default and recommended value is `switchover`.
 
 The upgrade keeps the Cloud Native PostgreSQL identity and does not
-reclone the data. Pods will be deleted and created again with the same PVCs.
+re-clone the data. Pods will be deleted and created again with the same PVCs.
 
 During the rolling update procedure, the services endpoints move to reflect
 the cluster's status, so the applications ignore the node that

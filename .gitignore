@@ -24,3 +24,6 @@ _*/
 
 # goreleaser
 /dist/
+
+# Spellcheck dictionary
+dictionary.dic

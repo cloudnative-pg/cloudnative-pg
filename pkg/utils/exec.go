@@ -9,7 +9,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package utils
 
 // Look here: https://github.com/kubernetes/kubernetes/blob/release-1.17/test/e2e/framework/exec_util.go
-// also here: https://github.com/kubernetes-client/python/blob/master/examples/pod_exec.py
+// also here: https://github.com/kubernetes-client/python/blob/master/examples/pod_exec.py //wokeignore:rule=master
 
 import (
 	"bytes"
