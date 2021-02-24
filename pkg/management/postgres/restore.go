@@ -270,7 +270,7 @@ func (info InitInfo) writeInitialPostgresqlConf(ctx context.Context, client dyna
 }
 
 // writeRestoreHbaConf write a pg_hba.conf allowing access without password from localhost.
-// this is needed to set the PostgreSQL password after the postmaster is started and active
+// this is needed to set the PostgreSQL password after the postgres server is started and active
 func (info InitInfo) writeRestoreHbaConf() error {
 	// We allow every access from localhost, and this is needed to correctly restore
 	// the database

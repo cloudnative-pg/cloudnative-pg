@@ -76,7 +76,7 @@ When **disabled**, Kubernetes forces the recreation of the
 Pod on a different node with a new PVC by relying on
 PostgreSQL's physical streaming replication, then destroys
 the old PVC together with the Pod. This scenario is generally
-not recommended unless the database's size is small, and recloning
+not recommended unless the database's size is small, and re-cloning
 the new PostgreSQL instance takes shorter than waiting.
 
 !!! Note

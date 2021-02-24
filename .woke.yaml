@@ -1,0 +1,9 @@
+
+# Default internal rules refer https://github.com/get-woke/woke/blob/main/internal/rule/default.yaml
+rules:
+  - name: master
+    terms:
+      - master
+    alternatives:
+      - leader
+      - primary

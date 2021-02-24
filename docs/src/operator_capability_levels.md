@@ -66,7 +66,7 @@ PostgreSQL instance and to reconcile the pod status with the instance itself
 based on the PostgreSQL cluster topology. The instance manager also starts a
 web server that is invoked by the `kubelet` for probes. Unix signals invoked
 by the `kubelet` are filtered by the instance manager and, where appropriate,
-forwarded to the `postmaster` process for fast and controlled reactions to
+forwarded to the `postgres` process for fast and controlled reactions to
 external events. The instance manager is written in Go and has no external
 dependencies.
 
@@ -356,7 +356,7 @@ for PostgreSQL have been implemented.
 ### Kubernetes events
 
 Record major events as expected by the Kubernetes API, such as creating resources,
-removing nodes, upgrading, and so on. Events can be displayed throught
+removing nodes, upgrading, and so on. Events can be displayed through
 the `kubectl describe` and `kubectl get events` command.
 
 ## Level 5 - Auto Pilot

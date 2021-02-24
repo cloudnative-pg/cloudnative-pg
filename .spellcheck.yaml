@@ -1,0 +1,24 @@
+matrix:
+- name: markdown
+  sources:
+  - 'docs/src/*.md'
+  default_encoding: utf-8
+  aspell:
+    lang: en
+    d: en_US
+  dictionary:
+    wordlists:
+    - .wordlist-en-custom.txt
+  pipeline:
+    - pyspelling.filters.context:
+        context_visible_first: true
+        delimiters:
+          # Ignore multiline content between fences (fences can have 3 or more back ticks)
+          # ```
+          # content
+          # ```
+          - open: '(?s)^(?P<open> *`{3,})$'
+            close: '^(?P=open)$'
+            # Ignore text between inline back ticks
+          - open: '(?P<open>`+)'
+            close: '(?P=open)'

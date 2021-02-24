@@ -182,7 +182,7 @@ func (r *InstanceReconciler) reconcileConfigMap(ctx context.Context, event *watc
 		return fmt.Errorf("while applying new configuration: %w", err)
 	}
 
-	// TODO: we already sighup the postmaster and
+	// TODO: we already sighup the postgres server and
 	// probably it has already reloaded the configuration
 	// anyway there's no guarantee here that the signal
 	// has been actually received and sent to the children.

@@ -84,7 +84,7 @@ spec:
       serviceAccount: fluentd
       serviceAccountName: fluentd
       tolerations:
-      - key: node-role.kubernetes.io/master
+      - key: node-role.kubernetes.io/master # wokeignore:rule=master
         effect: NoSchedule
       containers:
       - name: fluentd

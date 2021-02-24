@@ -34,7 +34,7 @@ type Instance struct {
 	// Application database name
 	ApplicationDatabase string
 
-	// Command line options to pass to the postmaster, see the
+	// Command line options to pass to the postgres process, see the
 	// '-c' option of pg_ctl for an useful example
 	StartupOptions []string
 
@@ -75,7 +75,7 @@ func (instance Instance) Startup() error {
 		"-o", "-c port=5432 -c unix_socket_directories=/var/run/postgresql",
 	}
 
-	// Add postmaster command line options
+	// Add postgres server command line options
 	for _, opt := range instance.StartupOptions {
 		options = append(options, "-o", "-c "+opt)
 	}
