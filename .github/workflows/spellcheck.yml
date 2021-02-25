@@ -28,4 +28,4 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Spellcheck
-        uses: rojopolis/spellcheck-github-actions@0.10.0
+        uses: rojopolis/spellcheck-github-actions@0.12.0
