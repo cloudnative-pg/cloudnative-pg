@@ -12,6 +12,8 @@ on:
       limit:
         description: 'Limit to the specified engines list (local, eks, aks)'
         required: false
+  schedule:
+    - cron:  '0 1 * * *'
 
 env:
   GOLANG_VERSION: "1.14.x"
