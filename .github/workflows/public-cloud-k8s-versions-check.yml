@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       limit:
-        description: 'Limit to the specified engines list (eks, aks)'
+        description: 'Limit to the specified engines list (eks, aks, gke)'
         required: false
 
 defaults:
@@ -40,6 +40,34 @@ jobs:
           az aks get-versions --location westeurope --query 'reverse(sort(orchestrators[].orchestratorVersion))' -o tsv | sort -urk 1,1.5 | \
             jq -Rn '[inputs]' > .github/aks_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
+      -
+        name: Set up Cloud SDK for GKE
+        uses: google-github-actions/setup-gcloud@master #wokeignore:rule=master
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          export_default_credentials: true
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
+      -
+        name: Install YQ
+        uses: chrisdickinson/setup-yq@latest
+        with:
+          yq-version: v4.6.3
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
+      -
+        name: Get updated GKE versions
+        run: |
+          # Get the valid major versions from all the channels, convert them
+          # to json and write them to file.
+          YQEXPR=".validMasterVersions" #wokeignore:rule=master
+          gcloud container get-server-config --zone europe-west3-a --quiet | \
+          yq e ${YQEXPR} - | \
+          cut -d'.' -f '1-2' | \
+          uniq | \
+          sed 's/\([[:digit:]]\+\.[[:digit:]]\+\)/"\1"/' | \
+          grep -v "1.15" | \
+          yq -j e - > .github/gke_versions.json
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
       -
         name: Create Pull Request if public clouds k8s versions have been updated
         uses: gr2m/create-or-update-pull-request-action@v1

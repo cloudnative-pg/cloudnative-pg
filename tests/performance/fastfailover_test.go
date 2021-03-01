@@ -26,8 +26,6 @@ var _ = Describe("Fast failover", func() {
 	const namespace = "primary-failover-time"
 	const sampleFile = "./fixtures/base/cluster-example.yaml"
 	const clusterName = "cluster-example"
-	const maxFailoverTime = 10
-	const maxReattachTime = 60
 	JustAfterEach(func() {
 		if CurrentGinkgoTestDescription().Failed {
 			env.DumpClusterEnv(namespace, clusterName,
@@ -43,7 +41,7 @@ var _ = Describe("Fast failover", func() {
 	// We test this setting up an application pointing to the rw service,
 	// forcing a failover and measuring how much time passes between the
 	// last row written on timeline 1 and the first one on timeline 2
-	It(fmt.Sprintf("can fail over in less than %v seconds", maxFailoverTime), func() {
+	It("can do a fast failover", func() {
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
@@ -167,6 +165,22 @@ var _ = Describe("Fast failover", func() {
 			err := env.DeletePod(namespace, lm, forceDelete)
 			Expect(err).ToNot(HaveOccurred())
 		})
+
+		var maxReattachTime int32 = 60
+		var maxFailoverTime int32 = 10
+
+		// GKE has an higher kube-proxy timeout, and the connections could try
+		// using a service for which the routing table hasn't changed, getting
+		// stuck for a while. We raise the timeout, since we can't intervene
+		// on GKE configuration.
+		isGKE, err := env.IsGKE()
+		if err != nil {
+			fmt.Println("Couldn't verify if tests are running on GKE, assuming they aren't")
+		}
+		if isGKE {
+			maxReattachTime = 180
+			maxFailoverTime = 20
+		}
 
 		AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
 

@@ -14,6 +14,7 @@ from typing import Dict, List
 POSTGRES_REPO = "quay.io/enterprisedb/postgresql"
 AKS_VERSIONS_FILE = ".github/aks_versions.json"
 EKS_VERSIONS_FILE = ".github/eks_versions.json"
+GKE_VERSIONS_FILE = ".github/gke_versions.json"
 
 
 class VersionList(list):
@@ -70,6 +71,11 @@ EKS_K8S = VersionList(eks_versions)
 with open(AKS_VERSIONS_FILE) as json_file:
     aks_versions = json.load(json_file)
 AKS_K8S = VersionList(aks_versions)
+
+# Kubernetes versions on GKE to use during the tests
+with open(GKE_VERSIONS_FILE) as json_file:
+    gke_versions = json.load(json_file)
+GKE_K8S = VersionList(gke_versions)
 
 # PostgreSQL versions to use during the tests
 # Entries are expected to be ordered from newest to oldest
@@ -206,6 +212,12 @@ ENGINE_MODES = {
         "pull_request": lambda: build_pull_request_include_cloud(AKS_K8S),
         "main": lambda: build_main_include_cloud(AKS_K8S),
         "schedule": lambda: build_schedule_include_cloud(AKS_K8S),
+    },
+    "gke": {
+        "push": lambda: build_push_include_cloud(GKE_K8S),
+        "pull_request": lambda: build_pull_request_include_cloud(GKE_K8S),
+        "main": lambda: build_main_include_cloud(GKE_K8S),
+        "schedule": lambda: build_schedule_include_cloud(GKE_K8S),
     },
 }
 

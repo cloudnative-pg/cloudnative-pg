@@ -26,8 +26,6 @@ var _ = Describe("Fast switchover", func() {
 	const namespace = "primary-switchover-time"
 	const sampleFile = "./fixtures/base/cluster-example.yaml"
 	const clusterName = "cluster-example"
-	const maxSwitchoverTime = 20
-	const maxReattachTime = 60
 	JustAfterEach(func() {
 		if CurrentGinkgoTestDescription().Failed {
 			env.DumpClusterEnv(namespace, clusterName,
@@ -45,7 +43,7 @@ var _ = Describe("Fast switchover", func() {
 	// We test this setting up an application pointing to the rw service,
 	// forcing a switchover and measuring how much time passes between the
 	// last row written on timeline 1 and the first one on timeline 2
-	It(fmt.Sprintf("can switch over in less than %v seconds", maxSwitchoverTime), func() {
+	It("can do a fast switchover", func() {
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
@@ -176,6 +174,18 @@ var _ = Describe("Fast switchover", func() {
 			})
 			Expect(err).ToNot(HaveOccurred())
 		})
+
+		var maxReattachTime int32 = 60
+		var maxSwitchoverTime int32 = 20
+
+		// GKE has an higher kube-proxy timeout, and the connections could try
+		// using a service for which the routing table hasn't changed, getting
+		// stuck for a while. We raise the timeout, since we can't intervene
+		// on GKE configuration.
+		isGKE, err := env.IsGKE()
+		if err != nil && isGKE {
+			maxReattachTime = 180
+		}
 
 		AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
 
