@@ -26,14 +26,13 @@ func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout
 	// timeout.
 	start := time.Now()
 
-	By("having all the instances on timeline 2", func() {
+	By(fmt.Sprintf("having all the instances on timeline 2 in less than %v sec", timeout), func() {
 		// One of the standbys will be promoted and the rw service
 		// should point to it, so the application can keep writing.
 		// Records inserted after the promotion will be marked
 		// with timeline '00000002'. If all the instances are back
 		// and are following the promotion, we should find those
 		// records on each of them.
-		// We check all of them using the
 
 		commandTimeout := time.Second * 2
 		for i := 1; i < 4; i++ {

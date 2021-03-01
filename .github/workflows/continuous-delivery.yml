@@ -10,7 +10,7 @@ on:
         required: true
         default: 'main'
       limit:
-        description: 'Limit to the specified engines list (local, eks, aks)'
+        description: 'Limit to the specified engines list (local, eks, aks, gke)'
         required: false
   schedule:
     - cron:  '0 1 * * *'
@@ -230,6 +230,8 @@ jobs:
       eksEnabled: ${{ steps.generate-jobs.outputs.eksEnabled }}
       aksMatrix: ${{ steps.generate-jobs.outputs.aksMatrix }}
       aksEnabled: ${{ steps.generate-jobs.outputs.aksEnabled }}
+      gkeMatrix: ${{ steps.generate-jobs.outputs.gkeMatrix }}
+      gkeEnabled: ${{ steps.generate-jobs.outputs.gkeEnabled }}
     steps:
       -
         name: Checkout code
@@ -536,4 +538,119 @@ jobs:
               fi
               echo "Failed deleting cluster ${{ env.CLUSTER_NAME }}, retrying"
               sleep 5
+          done
+
+  e2e-gke:
+    name: Run E2E on Google GKE
+    if: needs.generate-jobs.outputs.gkeEnabled == 'true'
+    needs:
+      - generate-jobs
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        ${{ fromJSON(needs.generate-jobs.outputs.gkeMatrix) }}
+    runs-on: ubuntu-20.04
+    env:
+      K8S_VERSION: "${{ matrix.k8s_version }}"
+      POSTGRES_IMG: "${{ matrix.postgres_img }}"
+      E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
+
+      DOCKER_SERVER: quay.io/enterprisedb
+      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
+
+      DEBUG: "true"
+      BUILD_IMAGE: "false"
+      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
+      E2E_DEFAULT_STORAGE_CLASS: standard
+
+      ZONE: europe-west3-a
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v2
+      -
+        name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name:  Install ginkgo
+        run: |
+          go install -mod=readonly github.com/onsi/ginkgo/ginkgo
+      -
+        name: Set cluster name
+        run: |
+          # GKE cluster names rules:
+          # only lowercase alphanumerics and '-' allowed, must start with a letter and end with an alphanumeric,
+          # and must be no longer than 40 characters
+          # We need to shorten the name and lower the case
+          SHORT_ID=$( echo ${{ matrix.id }} | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
+          echo "CLUSTER_NAME=cnp-test-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
+      -
+        name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@master #wokeignore:rule=master
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          export_default_credentials: true
+      -
+        name: Install kubectl
+        run: gcloud components install --quiet kubectl
+      -
+        name: Create GKE cluster
+        run: |
+          # We may go over the amount of API requests allowed
+          # by Google when creating all the clusters at the same time.
+          # We give a few attempts at creating the cluster before giving up
+          for i in `seq 1 5`; do
+            if gcloud container clusters create ${{ env.CLUSTER_NAME }} \
+              --num-nodes=3 \
+              --cluster-version=${{ env.K8S_VERSION }} \
+              --zone=${{ env.ZONE }} \
+              --disk-size=20 \
+              --machine-type=e2-standard-2
+            then
+              exit 0
+            fi
+            echo "Couldn't create the cluster. Retrying in 100s."
+            sleep 100
+          done
+          echo "Couldn't create the cluster. Failing."
+          exit 1
+      -
+        name: Get GKE kubeconfig credentials
+        uses: google-github-actions/get-gke-credentials@main
+        with:
+          cluster_name: ${{ env.CLUSTER_NAME }}
+          location: ${{ env.ZONE }}
+          credentials: ${{ secrets.gcp_credentials }}
+          use_auth_provider: true
+      -
+        name: Run E2E tests
+        run: hack/e2e/run-e2e.sh
+      -
+        name: Archive e2e failure contexts
+        if: failure()
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-failure-contexts-${{ matrix.id }}
+          path: |
+            tests/*/out/
+          retention-days: 7
+          if-no-files-found: ignore
+      -
+        name: Clean up
+        if: always()
+        run: |
+          gcloud container clusters delete ${{ env.CLUSTER_NAME }} --zone=${{ env.ZONE }} --quiet
+          # Disks are not automatically deleted when the cluster is removed and
+          # their name only contains the run number, so we can't find the actual cluster from
+          # the matrix that created them. We delete all the disks of a run that are not
+          # owned by anyone, without worrying to much if some other job deleted them first.
+          IDS=$(gcloud compute disks list --filter="name~cnp-test-${{github.run_number}} AND zone:${{env.ZONE}} AND -users:*" --format="value(id)")
+          for ID in ${IDS}
+          do
+            gcloud compute disks delete --zone "${{env.ZONE}}" --quiet "${ID}" || true
           done

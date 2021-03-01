@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -252,4 +253,20 @@ func (env TestingEnvironment) GetNodeList() (*corev1.NodeList, error) {
 	nodeList := &corev1.NodeList{}
 	err := env.Client.List(env.Ctx, nodeList, client.InNamespace(""))
 	return nodeList, err
+}
+
+// IsGKE returns true if we run on Google Kubernetes Engine. We check that
+// by verifying if all the node names start with "gke-"
+func (env TestingEnvironment) IsGKE() (bool, error) {
+	nodeList := &corev1.NodeList{}
+	if err := env.Client.List(env.Ctx, nodeList, client.InNamespace("")); err != nil {
+		return false, err
+	}
+	for _, node := range nodeList.Items {
+		re := regexp.MustCompile("^gke-")
+		if len(re.FindAllString(node.Name, -1)) == 0 {
+			return false, nil
+		}
+	}
+	return true, nil
 }

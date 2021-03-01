@@ -30,7 +30,7 @@ spec:
                   name: cluster-example-superuser
                   key: username
             - name: DATABASE_URL
-              value: "postgres://$(USER):$(PASSWORD)@cluster-example-rw/app?sslmode=require"
+              value: "postgres://$(USER):$(PASSWORD)@cluster-example-rw/app?sslmode=require&connect_timeout=2"
             - name: SQL_QUERY
               value: "insert into tps.tl(source) values ('hey');"
           ports:
