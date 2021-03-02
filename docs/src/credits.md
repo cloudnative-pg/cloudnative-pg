@@ -7,6 +7,7 @@ developed, and tested by the EnterpriseDB Cloud Native team:
 - Jonathan Battiato
 - Francesco Canovai
 - Leonardo Cecchi
+- Valerio Del Sarto
 - Niccolò Fei
 - Jonathan Gonzalez
 - Danish Khan
