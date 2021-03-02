@@ -28,7 +28,7 @@ and the following suite of E2E tests are performed on that cluster:
 * Installation of the operator;
 * Creation of a `Cluster`;
 * Usage of a persistent volume for data storage;
-* Connection via services;
+* Connection via services, including read-only;
 * Scale-up of a `Cluster`;
 * Scale-down of a `Cluster`;
 * Failover;
