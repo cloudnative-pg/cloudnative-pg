@@ -5,12 +5,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://get.enterprisedb.io/cnp/postgresql-operator-1.0.0.yaml)
+You can install the [latest operator manifest](https://get.enterprisedb.io/cnp/postgresql-operator-1.1.0.yaml)
 as follows:
 
 ```sh
 kubectl apply -f \
-  https://get.enterprisedb.io/cnp/postgresql-operator-1.0.0.yaml
+  https://get.enterprisedb.io/cnp/postgresql-operator-1.1.0.yaml
 ```
 
 Once you have run the `kubectl` command, Cloud Native PostgreSQL will be installed in your Kubernetes cluster.
