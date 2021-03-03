@@ -75,25 +75,31 @@ For example, you can request an initial amount of RAM of 32MiB (scalable to 128M
       cpu: "100m"
 ```
 
-Memory requests and limits are associated with Containers, but it is useful to think of a Pod as having a memory request
-and limit. The memory request for the Pod is the sum of the memory requests for all the Containers in the Pod.
+Memory requests and limits are associated with containers, but it is useful to think of a pod as having a memory request
+and limit. The memory request for the pod is the sum of the memory requests for all the containers in the pod.
 
-Pod scheduling is based on requests and not limits. A Pod is scheduled to run on a Node only if the Node has enough
-available memory to satisfy the Pod's memory request.
+Pod scheduling is based on requests and not limits. A pod is scheduled to run on a Node only if the Node has enough
+available memory to satisfy the pod's memory request.
 
-For each resource, we divide containers into 3 QoS classes: Guaranteed, Burstable, and
-Best-Effort, in decreasing order of priority.
-For more details, please refer to ["Resource Quality of Service in Kubernetes"](https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/#qos-classes)
+For each resource, we divide containers into 3 Quality of Service (QoS) classes, in decreasing order of priority:
 
-To avoid resources related issues in k8s, we can refer the best practices for out of resource handling while creating
+- *Guaranteed*
+- *Burstable*
+- *Best-Effort*
+
+For more details, please refer to the ["Configure Quality of Service for Pods"](https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/#qos-classes) section in the Kubernetes documentation.
+
+For a PostgreSQL workload it is recommended to set a "Guaranteed" QoS.
+
+In order to avoid resources related issues in Kubernetes, we can refer to the best practices for "out of resource" handling while creating
 a cluster:
 
--  Specify our required values for memory and CPU in the resources section of the manifest file.
-   This way we can avoid the `OOM Killed` (where OOM stands for Out Of Memory) and `CPU throttle` or any other resources
+-  Specify your required values for memory and CPU in the resources section of the manifest file.
+   This way you can avoid the `OOM Killed` (where "OOM" stands for Out Of Memory) and `CPU throttle` or any other resources
    related issues on running instances.
--  In order for the pods of your cluster to get assigned to the `Guaranteed` QoS class, you must set limits and requests
+-  In order for the pods of your cluster to get assigned to the "Guaranteed" QoS class, you must set limits and requests
    for both memory and CPU to the same value.
--  Specify our required PostgreSQL memory parameters that can be helpful to manage memory in PostgreSQL.
+-  Specify your required PostgreSQL memory parameters consistently with the pod resources (like you would do in a VM or physical machine scenario - see below).
 -  Set up database server pods on a dedicated node using nodeSelector.
    See the ["nodeSelector field of the affinityconfiguration resource on the API reference page"](api_reference.md#affinityconfiguration).
 
@@ -124,14 +130,15 @@ spec:
     size: 1Gi
 ```
 
-In the above example, we have specified `shared_buffers` parameter whose value is `256 MB` i.e. how much memory is
-dedicated to the server for caching data (The default value for this parameter is 128 MB in case it's not defined)
+In the above example, we have specified `shared_buffers` parameter with a value of `256MB` - i.e. how much memory is
+dedicated to the PostgreSQL server for caching data (the default value for this parameter is `128MB` in case it's not defined).
 
-A reasonable starting value for shared_buffers is 25% of the memory in your system.
-For example: if your `shared_buffers` is 256 MB then the recommended value for your container memory size is 1 GB,
-which means that within a pod all the containers will have a total of 1 GB memory that Kubernetes will always preserve
-so that our containers will work as expected.
-For more details, please refer to the ["Performance tuning parameters of postgresql"](https://www.postgresql.org/docs/current/runtime-config-resource.html)
+A reasonable starting value for `shared_buffers` is 25% of the memory in your system.
+For example: if your `shared_buffers` is 256 MB, then the recommended value for your container memory size is 1 GB,
+which means that within a pod all the containers will have a total of 1 GB memory that Kubernetes will always preserve,
+enabling our containers to work as expected.
+For more details, please refer to the ["Resource Consumption"](https://www.postgresql.org/docs/current/runtime-config-resource.html)
+section in the PostgreSQL documentation.
 
 !!! See also "Managing Compute Resources for Containers"
     For more details on resource management, please refer to the
