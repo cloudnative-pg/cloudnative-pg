@@ -38,7 +38,7 @@ LABEL summary="$SUMMARY" \
       name="Cloud Native PostgreSQL Operator" \
       vendor="EnterpriseDB Corporation" \
       url="https://www.enterprisedb.com/" \
-      version="1.0.0" \
+      version="1.1.0" \
       release="1"
 
 COPY licenses /licenses
