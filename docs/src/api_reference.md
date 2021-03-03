@@ -62,7 +62,7 @@ BackupList contains a list of Backup
 | Field | Description | Scheme | Required |
 | -------------------- | ------------------------------ | -------------------- | -------- |
 | metadata | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#listmeta-v1-meta) | false |
-| items | List of backups | [][Backup](#backup) | true |
+| items | List of backups | \[][Backup](#backup) | true |
 
 
 ## BackupSpec
@@ -178,7 +178,7 @@ ClusterList contains a list of Cluster
 | Field | Description | Scheme | Required |
 | -------------------- | ------------------------------ | -------------------- | -------- |
 | metadata | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#listmeta-v1-meta) | false |
-| items | List of clusters | [][Cluster](#cluster) | true |
+| items | List of clusters | \[][Cluster](#cluster) | true |
 
 
 ## ClusterSpec
@@ -338,7 +338,7 @@ ScheduledBackupList contains a list of ScheduledBackup
 | Field | Description | Scheme | Required |
 | -------------------- | ------------------------------ | -------------------- | -------- |
 | metadata | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#listmeta-v1-meta) | false |
-| items | List of clusters | [][ScheduledBackup](#scheduledbackup) | true |
+| items | List of clusters | \[][ScheduledBackup](#scheduledbackup) | true |
 
 
 ## ScheduledBackupSpec
