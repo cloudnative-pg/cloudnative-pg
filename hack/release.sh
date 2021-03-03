@@ -90,19 +90,19 @@ cp -r config/* "${CONFIG_TMP_DIR}"
 "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${release_manifest}"
 rm -fr "${CONFIG_TMP_DIR}"
 
+git checkout -b "release/v${release_version}"
 git add \
     pkg/versions/versions.go \
     Dockerfile \
     docs/src/installation.md \
     "${release_manifest}"
 git commit -sm "Version tag to ${release_version}"
-git tag -sam "Release ${release_version}" "v${release_version}"
 
 cat <<EOF
 Generated release manifest ${release_manifest}
-Tagged version ${release_version}
+Created branch release/v${release_version}
 
-Remember to push tags as well:
+Remember to push and then open a pull request:
 
-git push origin main v${release_version}
+git push origin release/v${release_version}
 EOF
