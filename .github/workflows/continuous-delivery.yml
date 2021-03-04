@@ -308,14 +308,14 @@ jobs:
         name: Install kubectl
         uses: azure/setup-kubectl@v1
         with:
-          version: ${{ env.K8S_VERSION }}
+          version: v${{ env.K8S_VERSION }}
       -
         name: Create AKS cluster
         run: |
             az extension add --name aks-preview
             az aks create --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' ) \
-              --node-count 3 -k ${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
+              --node-count 3 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
               --workspace-resource-id ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
               --aks-custom-headers EnableAzureDiskFileCSIDriver=true
             az aks get-credentials --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
