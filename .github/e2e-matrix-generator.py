@@ -12,6 +12,8 @@ from operator import itemgetter
 from typing import Dict, List
 
 POSTGRES_REPO = "quay.io/enterprisedb/postgresql"
+AKS_VERSIONS_FILE = ".github/aks_versions.json"
+EKS_VERSIONS_FILE = ".github/eks_versions.json"
 
 
 class VersionList(list):
@@ -60,23 +62,14 @@ K8S = VersionList(
 )
 
 # Kubernetes versions on EKS to use during the tests
-EKS_K8S = VersionList(
-    [
-        "1.18",
-        "1.17",
-        "1.16",
-    ]
-)
+with open(EKS_VERSIONS_FILE) as json_file:
+    eks_versions = json.load(json_file)
+EKS_K8S = VersionList(eks_versions)
 
 # Kubernetes versions on AKS to use during the tests
-AKS_K8S = VersionList(
-    [
-        "v1.20.2",
-        "v1.19.7",
-        "v1.18.14",
-        "v1.17.16",
-    ]
-)
+with open(AKS_VERSIONS_FILE) as json_file:
+    aks_versions = json.load(json_file)
+AKS_K8S = VersionList(aks_versions)
 
 # PostgreSQL versions to use during the tests
 # Entries are expected to be ordered from newest to oldest
@@ -137,7 +130,6 @@ def build_pull_request_include_local():
 
     # Iterate over PostgreSQL versions
     for postgres_version in POSTGRES.values():
-        print(postgres_version)
         result |= {E2EJob(K8S.latest, postgres_version)}
 
     return result
