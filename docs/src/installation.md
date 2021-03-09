@@ -25,9 +25,10 @@ kubectl get deploy -n postgresql-operator-system postgresql-operator-controller-
 
 ### Using the Operator Lifecycle Manager (OLM)
 
-OperatorHub is a community-sourced index of operators available via the
-[Operator Lifecycle Manager](https://github.com/operator-framework/operator-lifecycle-manager),
-which is a package managing system for operators.
+You can install Cloud Native PostgreSQL using the metadata available in the
+[Cloud Native Postgresql page](https://operatorhub.io/operator/cloud-native-postgresql)
+in the [OperatorHub.io website](https://operatorhub.io), following
+the installation steps listed on that page.
 
 You can install Cloud Native PostgreSQL using the metadata available in the
 [Cloud Native Postgresql page](https://operatorhub.io/operator/cloud-native-postgresql)
