@@ -2,6 +2,8 @@
 
 ## Installation on Kubernetes
 
+### Directly using the operator manifest
+
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
@@ -20,6 +22,16 @@ You can verify that with:
 ```sh
 kubectl get deploy -n postgresql-operator-system postgresql-operator-controller-manager
 ```
+
+### Using the Operator Lifecycle Manager (OLM)
+
+OperatorHub is a community-sourced index of operators available via the
+[Operator Lifecycle Manager](https://github.com/operator-framework/operator-lifecycle-manager),
+which is a package managing system for operators.
+
+You can install Cloud Native PostgreSQL using the metadata available in the
+[Cloud Native Postgresql page](https://operatorhub.io/operator/cloud-native-postgresql)
+in the [OperatorHub.io website](https://operatorhub.io), following the installation steps listed on that page.
 
 ## Installation on Openshift
 
