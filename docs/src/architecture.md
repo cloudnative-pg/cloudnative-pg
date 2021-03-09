@@ -35,16 +35,15 @@ purposes.
     Applications must be aware of the limitations that [Hot Standby](https://www.postgresql.org/docs/current/hot-standby.html)
     presents and familiar with the way PostgreSQL operates when dealing with these workloads.
 
-Applications can access any PostgreSQL instance at any time through the `-r`
-service made available by the operator at connection time.
+Applications can access hot standby replicas through the `-ro` service made available
+by the operator. This service enables the application to offload read-only queries from the
+primary node.
 
 The following diagram shows the architecture:
 
-![Applications reading from any instance in round robin](./images/architecture-r.png)
+![Applications reading from hot standby replicas in round robin](./images/architecture-read-only.png)
 
-Applications can also access hot standby replicas through the `-ro` service made available
-by the operator. This service enables the application to offload read-only queries from the
-primary node.
+Applications can also access any PostgreSQL instance at any time through the `-r` service at connection time.
 
 ## Application deployments
 
