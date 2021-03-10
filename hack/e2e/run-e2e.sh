@@ -77,6 +77,10 @@ kubectl wait --for=condition=Available --timeout=2m \
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
 
+# Build kubectl-cnp and export its path
+make build
+export PATH=${ROOT_DIR}/bin/:${PATH}
+
 mkdir -p "${ROOT_DIR}/tests/e2e/out"
 # Create at most 4 testing nodes. Using -p instead of --nodes
 # would create CPUs-1 nodes and saturate the testing server
