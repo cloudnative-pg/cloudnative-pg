@@ -330,6 +330,9 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *unst
 	r.log.Info("I'm the target primary, wait for every pending WAL record to be applied")
 
 	err = r.waitForApply()
+	if err != nil {
+		return err
+	}
 
 	r.log.Info("I'm the target primary, promoting my instance")
 
@@ -431,7 +434,7 @@ func (r *InstanceReconciler) waitForApply() error {
 			break
 		}
 
-		r.log.Info("Still need to apply transaction log info, waiting for 2 seconds",
+		r.log.Info("Still need to apply transaction log info, waiting for 1 second",
 			"lag", lag)
 		time.Sleep(time.Second * 1)
 	}
