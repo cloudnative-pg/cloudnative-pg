@@ -27,7 +27,6 @@ linters:
     - govet
     - ineffassign
     - lll
-    - maligned
     - misspell
     - nakedret
     - nestif
