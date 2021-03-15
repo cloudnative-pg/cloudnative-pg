@@ -62,7 +62,11 @@ func runSubCommand(ctx context.Context) {
 		os.Exit(1)
 	}
 
-	startWebServer()
+	if err = startWebServer(); err != nil {
+		log.Log.Error(err, "Error while starting the web server")
+		os.Exit(1)
+	}
+
 	startReconciler()
 	registerSignalHandler()
 
@@ -93,13 +97,19 @@ func runSubCommand(ctx context.Context) {
 
 // startWebServer start the web server for handling probes given
 // a certain PostgreSQL instance
-func startWebServer() {
+func startWebServer() error {
+	if err := webserver.Setup(&instance); err != nil {
+		return err
+	}
+
 	go func() {
-		err := webserver.ListenAndServe(&instance)
+		err := webserver.ListenAndServe()
 		if err != nil {
 			log.Log.Error(err, "Error while starting the web server")
 		}
 	}()
+
+	return nil
 }
 
 // startReconciler start the reconciliation loop

@@ -38,13 +38,13 @@ func newPgLocksCollector(instance *postgres.Instance) PgCollector {
 }
 
 // name returns the name of the collector. Implements PgCollector
-func (pgLocksCollector) name() string {
+func (pgLocksCollector) Name() string {
 	return pgLocksCollectorName
 }
 
 // collect send the collected metrics on the received channel.
 // Implements PgCollector
-func (c pgLocksCollector) collect(ch chan<- prometheus.Metric) error {
+func (c pgLocksCollector) Collect(ch chan<- prometheus.Metric) error {
 	conn, err := c.instance.GetApplicationDB()
 	if err != nil {
 		return err
@@ -76,4 +76,9 @@ func (c pgLocksCollector) collect(ch chan<- prometheus.Metric) error {
 	c.waitingBackends.Set(float64(waitingBackends))
 	c.waitingBackends.Collect(ch)
 	return nil
+}
+
+// Describe implements the prometheus.Collector interface
+func (c pgLocksCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- c.waitingBackends.Desc()
 }

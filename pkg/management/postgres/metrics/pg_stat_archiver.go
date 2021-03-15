@@ -47,13 +47,13 @@ func newPgStatArchiverCollector(instance *postgres.Instance) PgCollector {
 }
 
 // name returns the name of the collector. Implements PgCollector
-func (pgStatArchiverCollector) name() string {
+func (pgStatArchiverCollector) Name() string {
 	return pgStatArchiverCollectorName
 }
 
 // collect send the collected metrics on the received channel.
 // Implements PgCollector
-func (c pgStatArchiverCollector) collect(ch chan<- prometheus.Metric) error {
+func (c pgStatArchiverCollector) Collect(ch chan<- prometheus.Metric) error {
 	conn, err := c.instance.GetApplicationDB()
 	if err != nil {
 		return err
@@ -73,4 +73,10 @@ func (c pgStatArchiverCollector) collect(ch chan<- prometheus.Metric) error {
 		c.failedCount, prometheus.CounterValue, float64(failedCount))
 
 	return nil
+}
+
+// Describe puts on the channel the metadata about the metrics we collect
+func (c pgStatArchiverCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- c.archivedCount
+	ch <- c.failedCount
 }

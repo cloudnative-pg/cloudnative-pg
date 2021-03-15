@@ -15,6 +15,28 @@ import (
 
 // CreateRole create a role with the permissions needed by the instance manager
 func CreateRole(cluster apiv1.Cluster, openshift bool) rbacv1.Role {
+	involvedSecretNames := []string{
+		cluster.GetCASecretName(),
+		cluster.GetServerSecretName(),
+		cluster.GetReplicationSecretName(),
+	}
+
+	involvedConfigMapNames := []string{
+		cluster.Name,
+	}
+
+	if cluster.Spec.Monitoring != nil {
+		// If custom queries are used, the instance manager need privileges to read those
+		// entries
+		for _, secretName := range cluster.Spec.Monitoring.CustomQueriesSecret {
+			involvedSecretNames = append(involvedSecretNames, secretName.Name)
+		}
+
+		for _, configMapName := range cluster.Spec.Monitoring.CustomQueriesConfigMap {
+			involvedConfigMapNames = append(involvedConfigMapNames, configMapName.Name)
+		}
+	}
+
 	rules := []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
@@ -27,9 +49,7 @@ func CreateRole(cluster apiv1.Cluster, openshift bool) rbacv1.Role {
 				"get",
 				"watch",
 			},
-			ResourceNames: []string{
-				cluster.Name,
-			},
+			ResourceNames: involvedConfigMapNames,
 		},
 		{
 			APIGroups: []string{
@@ -42,11 +62,7 @@ func CreateRole(cluster apiv1.Cluster, openshift bool) rbacv1.Role {
 				"get",
 				"watch",
 			},
-			ResourceNames: []string{
-				cluster.GetCASecretName(),
-				cluster.GetServerSecretName(),
-				cluster.GetReplicationSecretName(),
-			},
+			ResourceNames: involvedSecretNames,
 		},
 		{
 			APIGroups: []string{

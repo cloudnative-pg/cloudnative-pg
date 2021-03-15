@@ -32,6 +32,7 @@ Below you will find a description of the defined resources:
 * [ClusterSpec](#clusterspec)
 * [ClusterStatus](#clusterstatus)
 * [DataBackupConfiguration](#databackupconfiguration)
+* [MonitoringConfiguration](#monitoringconfiguration)
 * [NodeMaintenanceWindow](#nodemaintenancewindow)
 * [PostgresConfiguration](#postgresconfiguration)
 * [RecoveryTarget](#recoverytarget)
@@ -206,6 +207,7 @@ ClusterSpec defines the desired state of Cluster
 | primaryUpdateStrategy | Strategy to follow to upgrade the primary server during a rolling update procedure, after all replicas have been successfully updated: it can be automated (`unsupervised` - default) or manual (`supervised`) | PrimaryUpdateStrategy | false |
 | backup | The configuration to be used for backups | *[BackupConfiguration](#backupconfiguration) | false |
 | nodeMaintenanceWindow | Define a maintenance window for the Kubernetes nodes | *[NodeMaintenanceWindow](#nodemaintenancewindow) | false |
+| monitoring | The configuration of the monitoring infrastructure of this cluster | *[MonitoringConfiguration](#monitoringconfiguration) | false |
 
 
 ## ClusterStatus
@@ -239,6 +241,16 @@ DataBackupConfiguration is the configuration of the backup of the data directory
 | encryption | Whenever to force the encryption of files (if the bucket is not already configured for that). Allowed options are empty string (use the bucket policy, default), `AES256` and `aws:kms` | EncryptionType | false |
 | immediateCheckpoint | Control whether the I/O workload for the backup initial checkpoint will be limited, according to the `checkpoint_completion_target` setting on the PostgreSQL server. If set to true, an immediate checkpoint will be used, meaning PostgreSQL will complete the checkpoint as soon as possible. `false` by default. | bool | false |
 | jobs | The number of parallel jobs to be used to upload the backup, defaults to 2 | *int32 | false |
+
+
+## MonitoringConfiguration
+
+MonitoringConfiguration is the type containing all the monitoring configuration for a certain cluster
+
+| Field | Description | Scheme | Required |
+| -------------------- | ------------------------------ | -------------------- | -------- |
+| customQueriesConfigMap | The list of config maps containing the custom queries | []corev1.LocalObjectReference | false |
+| customQueriesSecret | The list of secrets containing the custom queries | []corev1.LocalObjectReference | false |
 
 
 ## NodeMaintenanceWindow

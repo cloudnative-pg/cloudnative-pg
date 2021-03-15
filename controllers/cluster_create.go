@@ -17,6 +17,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -73,7 +74,7 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
-	err = r.createRole(ctx, cluster)
+	err = r.createOrPatchRole(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -351,20 +352,52 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 	return true, nil
 }
 
-// createRole create the role
-func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster) error {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
-
+// createOrPatchRole ensure that the required role for the instance manager exists and
+// contains the right rules
+func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv1.Cluster) error {
 	openshift, err := utils.IsOpenShift()
 	if err != nil {
 		return fmt.Errorf("while creating cluster role: %w", err)
 	}
 
+	var role rbacv1.Role
+	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &role); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while getting role: %w", err)
+		}
+
+		r.Recorder.Event(cluster, "Normal", "CreatingRole", "Creating Cluster Role")
+		return r.createRole(ctx, cluster, openshift)
+	}
+
+	generatedRole := specs.CreateRole(*cluster, openshift)
+	if reflect.DeepEqual(generatedRole.Rules, role.Rules) {
+		// Everything fine, the two config maps are exactly the same
+		return nil
+	}
+
+	r.Recorder.Event(cluster, "Normal", "UpdatingRole", "Updating Cluster Role")
+
+	// The configuration changed, and we need the patch the
+	// configMap we have
+	patchedRole := role
+	patchedRole.Rules = generatedRole.Rules
+	if err := r.Patch(ctx, &patchedRole, client.MergeFrom(&role)); err != nil {
+		return fmt.Errorf("while patching role: %w", err)
+	}
+
+	return nil
+}
+
+// createRole create the role
+func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster, openshift bool) error {
+	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	roleBinding := specs.CreateRole(*cluster, openshift)
 	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	specs.SetOperatorVersion(&roleBinding.ObjectMeta, versions.Version)
 
-	err = r.Create(ctx, &roleBinding)
+	err := r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
 		log.Error(err, "Unable to create the Role", "object", roleBinding)
 		return err

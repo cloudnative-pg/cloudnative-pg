@@ -109,20 +109,6 @@ func GetTargetPrimary(data *unstructured.Unstructured) (string, error) {
 	return result, nil
 }
 
-// GetInstances get the current number of instances
-func GetInstances(data *unstructured.Unstructured) (int64, error) {
-	result, found, err := unstructured.NestedInt64(data.Object, "spec", "instances")
-	if err != nil {
-		return 0, err
-	}
-
-	if !found {
-		return 0, ErrInstancesNotFound
-	}
-
-	return result, nil
-}
-
 // GetPostgreSQLConfiguration get the current PostgreSQL configuration
 // from the ConfigMag generated for this cluster
 func GetPostgreSQLConfiguration(data *unstructured.Unstructured) (string, error) {

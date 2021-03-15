@@ -312,6 +312,35 @@ spec:
                   standby is available.
                 format: int32
                 type: integer
+              monitoring:
+                description: The configuration of the monitoring infrastructure of
+                  this cluster
+                properties:
+                  customQueriesConfigMap:
+                    description: The list of config maps containing the custom queries
+                    items:
+                      description: LocalObjectReference contains enough information
+                        to let you locate the referenced object inside the same namespace.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    type: array
+                  customQueriesSecret:
+                    description: The list of secrets containing the custom queries
+                    items:
+                      description: LocalObjectReference contains enough information
+                        to let you locate the referenced object inside the same namespace.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    type: array
+                type: object
               nodeMaintenanceWindow:
                 description: Define a maintenance window for the Kubernetes nodes
                 properties:
@@ -913,6 +942,38 @@ spec:
                   standby is available.
                 format: int32
                 type: integer
+              monitoring:
+                description: The configuration of the monitoring infrastructure of
+                  this cluster
+                properties:
+                  customQueriesConfigMap:
+                    description: The list of config maps containing the custom queries
+                    items:
+                      description: LocalObjectReference contains enough information
+                        to let you locate the referenced object inside the same namespace.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    type: array
+                  customQueriesSecret:
+                    description: The list of secrets containing the custom queries
+                    items:
+                      description: LocalObjectReference contains enough information
+                        to let you locate the referenced object inside the same namespace.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    type: array
+                required:
+                - customQueriesConfigMap
+                - customQueriesSecret
+                type: object
               nodeMaintenanceWindow:
                 description: Define a maintenance window for the Kubernetes nodes
                 properties:
