@@ -313,6 +313,7 @@ jobs:
         name: Create AKS cluster
         run: |
             az extension add --name aks-preview
+            az account set --subscription "Cloud Native Development"
             az aks create --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' ) \
               --node-count 3 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
@@ -328,6 +329,11 @@ jobs:
         # It can still take a while to deploy rook.
         name: Set up Rook
         run: |
+          if [ "${K8S_VERSION}" \> "1.20.1" ]; then
+            STORAGECLASSNAME=default
+          else
+            STORAGECLASSNAME=managed-csi
+          fi
           GO111MODULE=on go get github.com/mikefarah/yq/v4
           ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/ceph #wokeignore:rule=master
           kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
@@ -335,9 +341,9 @@ jobs:
           kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
           curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
             sed '/^ *#/d;/^ *$/d' | \
-            yq e '.spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = "50Gi" |
-              .spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.storageClassName = "managed-csi" |
-              .spec.mon.volumeClaimTemplate.spec.storageClassName = "managed-csi" ' - | \
+            yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
+              .spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.storageClassName = \"${STORAGECLASSNAME}\" |
+              .spec.mon.volumeClaimTemplate.spec.storageClassName = \"${STORAGECLASSNAME}\" " - | \
             kubectl apply -f -
           ITER=0
           MAX_ITER=120
@@ -377,6 +383,7 @@ jobs:
         uses: azure/CLI@v1
         with:
           inlineScript: |
+            az account set --subscription "Cloud Native Development"
             az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y \
               --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )
 
