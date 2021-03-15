@@ -131,7 +131,7 @@ func requestBackup(typedClient client.Client, recorder record.EventRecorder, w h
 		ctx,
 		typedClient,
 		recorder,
-		*cluster.Spec.Backup.BarmanObjectStore,
+		&cluster,
 		&backup,
 		backupLog)
 	if err != nil {

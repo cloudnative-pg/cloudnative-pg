@@ -141,8 +141,6 @@ func createPostgresContainers(
 					Name:  "PGHOST",
 					Value: "/var/run/postgresql",
 				},
-				CreateAccessKeyIDEnvVar(cluster.Spec.Backup),
-				CreateSecretAccessKeyEnvVar(cluster.Spec.Backup),
 			},
 			VolumeMounts: []corev1.VolumeMount{
 				{
@@ -225,42 +223,6 @@ func createPostgresContainers(
 	}
 
 	return containers
-}
-
-// CreateAccessKeyIDEnvVar create the environment variable giving
-// the AWS access key ID
-func CreateAccessKeyIDEnvVar(backupConfiguration *apiv1.BackupConfiguration) corev1.EnvVar {
-	if backupConfiguration == nil || backupConfiguration.BarmanObjectStore == nil {
-		return corev1.EnvVar{
-			Name:  "AWS_ACCESS_KEY_ID",
-			Value: "",
-		}
-	}
-
-	return corev1.EnvVar{
-		Name: "AWS_ACCESS_KEY_ID",
-		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &backupConfiguration.BarmanObjectStore.S3Credentials.AccessKeyIDReference,
-		},
-	}
-}
-
-// CreateSecretAccessKeyEnvVar create the environment variable giving
-// the AWS access key ID
-func CreateSecretAccessKeyEnvVar(backupConfiguration *apiv1.BackupConfiguration) corev1.EnvVar {
-	if backupConfiguration == nil || backupConfiguration.BarmanObjectStore == nil {
-		return corev1.EnvVar{
-			Name:  "AWS_SECRET_ACCESS_KEY",
-			Value: "",
-		}
-	}
-
-	return corev1.EnvVar{
-		Name: "AWS_SECRET_ACCESS_KEY",
-		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &backupConfiguration.BarmanObjectStore.S3Credentials.SecretAccessKeyReference,
-		},
-	}
 }
 
 // CreateAffinitySection creates the affinity sections for Pods, given the configuration

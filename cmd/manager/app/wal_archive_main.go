@@ -18,6 +18,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
 
 // WalArchiveCommand archives a certain WAL into the cloud
@@ -26,6 +27,7 @@ func WalArchiveCommand(args []string) {
 	var clusterName string
 	var namespace string
 	var podName string
+	ctx := context.Background()
 
 	flag.StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
 		"current cluster in k8s")
@@ -48,7 +50,7 @@ func WalArchiveCommand(args []string) {
 	}
 
 	var cluster apiv1.Cluster
-	err = typedClient.Get(context.Background(), client.ObjectKey{
+	err = typedClient.Get(ctx, client.ObjectKey{
 		Namespace: namespace,
 		Name:      clusterName,
 	}, &cluster)
@@ -59,7 +61,7 @@ func WalArchiveCommand(args []string) {
 
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		// Backup not configured, skipping WAL
-		log.Log.V(4).Info("Skipping WAL",
+		log.Log.V(4).Info("Backup not configured, skipping WAL",
 			"walName", walName,
 			"pod", podName,
 			"cluster", clusterName,
@@ -106,6 +108,18 @@ func WalArchiveCommand(args []string) {
 		configuration.DestinationPath,
 		serverName,
 		flag.Arg(0))
+
+	if err = postgres.SetAWSCredentials(ctx, typedClient, &cluster); err != nil {
+		log.Log.Error(err, "Error while settings AWS environment variables",
+			"walName", walName,
+			"pod", podName,
+			"cluster", clusterName,
+			"namespace", namespace,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary,
+			"options", options)
+		os.Exit(1)
+	}
 
 	cmd := exec.Command("barman-cloud-wal-archive", options...) // #nosec G204
 	cmd.Stdout = os.Stdout

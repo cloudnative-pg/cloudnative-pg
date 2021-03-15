@@ -491,12 +491,14 @@ type BackupConfiguration struct {
 type WalBackupConfiguration struct {
 	// Compress a WAL file before sending it to the object store. Available
 	// options are empty string (no compression, default), `gzip` or `bzip2`.
+	// +kubebuilder:validation:Enum=gzip;bzip2
 	Compression CompressionType `json:"compression,omitempty"`
 
 	// Whenever to force the encryption of files (if the bucket is
 	// not already configured for that).
 	// Allowed options are empty string (use the bucket policy, default),
 	// `AES256` and `aws:kms`
+	// +kubebuilder:validation:Enum=AES256;"aws:kms"
 	Encryption EncryptionType `json:"encryption,omitempty"`
 }
 
@@ -506,12 +508,14 @@ type DataBackupConfiguration struct {
 	// Compress a backup file (a tar file per tablespace) while streaming it
 	// to the object store. Available options are empty string (no
 	// compression, default), `gzip` or `bzip2`.
+	// +kubebuilder:validation:Enum=gzip;bzip2
 	Compression CompressionType `json:"compression,omitempty"`
 
 	// Whenever to force the encryption of files (if the bucket is
 	// not already configured for that).
 	// Allowed options are empty string (use the bucket policy, default),
 	// `AES256` and `aws:kms`
+	// +kubebuilder:validation:Enum=AES256;"aws:kms"
 	Encryption EncryptionType `json:"encryption,omitempty"`
 
 	// Control whether the I/O workload for the backup initial checkpoint will

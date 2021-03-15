@@ -93,12 +93,18 @@ spec:
                               while streaming it to the object store. Available options
                               are empty string (no compression, default), `gzip` or
                               `bzip2`.
+                            enum:
+                            - gzip
+                            - bzip2
                             type: string
                           encryption:
                             description: Whenever to force the encryption of files
                               (if the bucket is not already configured for that).
                               Allowed options are empty string (use the bucket policy,
                               default), `AES256` and `aws:kms`
+                            enum:
+                            - AES256
+                            - aws:kms
                             type: string
                           immediateCheckpoint:
                             description: Control whether the I/O workload for the
@@ -183,12 +189,18 @@ spec:
                             description: Compress a WAL file before sending it to
                               the object store. Available options are empty string
                               (no compression, default), `gzip` or `bzip2`.
+                            enum:
+                            - gzip
+                            - bzip2
                             type: string
                           encryption:
                             description: Whenever to force the encryption of files
                               (if the bucket is not already configured for that).
                               Allowed options are empty string (use the bucket policy,
                               default), `AES256` and `aws:kms`
+                            enum:
+                            - AES256
+                            - aws:kms
                             type: string
                         type: object
                     required:
