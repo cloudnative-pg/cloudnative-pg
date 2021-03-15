@@ -77,12 +77,32 @@ jobs:
         run:
           make test
 
+  apidoc:
+    name: Verify API doc is up to date
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Run make apidoc
+      run: |
+        make apidoc
+
+    - name: Verify apidoc changes
+      run: |
+        apidoc_file_path='docs/src/api_reference.md'
+        if git status --porcelain $apidoc_file_path | grep '^ M'; then
+          echo "The API documentation doesn't reflect the current API. Please run make apidoc."
+          exit 1
+        fi
+
   buildx:
     name: Build containers
     needs:
       - golangci
       - shellcheck
       - tests
+      - apidoc
     runs-on: ubuntu-20.04
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
@@ -164,6 +184,7 @@ jobs:
     needs:
       - golangci
       - tests
+      - apidoc
     runs-on: ubuntu-20.04
     steps:
       - name: Repository Dispatch
