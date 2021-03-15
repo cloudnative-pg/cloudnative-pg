@@ -8,6 +8,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package metrics
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -15,15 +16,17 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics/custom"
 )
 
 const namespace = "cnp"
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
-	instance     *postgres.Instance
-	metrics      metrics
-	pgCollectors []PgCollector
+	instance      *postgres.Instance
+	metrics       metrics
+	pgCollectors  []PgCollector
+	customQueries []PgCollector
 }
 
 // metrics here are related to the exporter itself, which is instrumented to
@@ -100,6 +103,14 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.metrics.PgCollectionErrors.Describe(ch)
 	ch <- e.metrics.PostgreSQLUp.Desc()
 	e.metrics.CollectionDuration.Describe(ch)
+
+	for _, collector := range e.pgCollectors {
+		collector.Describe(ch)
+	}
+
+	for _, collector := range e.customQueries {
+		collector.Describe(ch)
+	}
 }
 
 // Collect implements prometheus.Collector, collecting the metrics values to
@@ -129,24 +140,27 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		log.Log.Error(err, "Error pinging PostgreSQL")
 		e.metrics.PostgreSQLUp.Set(0)
 		e.metrics.Error.Set(1)
-		e.metrics.CollectionDuration.WithLabelValues("collect.up").Set(time.Since(collectionStart).Seconds())
+		e.metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 		return
 	}
 
 	e.metrics.PostgreSQLUp.Set(1)
 	e.metrics.Error.Set(0)
-	e.metrics.CollectionDuration.WithLabelValues("collect.up").Set(time.Since(collectionStart).Seconds())
+	e.metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
+
+	// Work on predefined metrics and custom queries
+	collectors := append(e.pgCollectors, e.customQueries...)
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
-	for _, pgCollector := range e.pgCollectors {
+	for _, pgCollector := range collectors {
 		wg.Add(1)
 		go func(pgCollector PgCollector) {
 			defer wg.Done()
-			label := "collect." + pgCollector.name()
+			label := "Collect." + pgCollector.Name()
 			collectionStart := time.Now()
-			if err := pgCollector.collect(ch); err != nil {
-				log.Log.Error(err, "Error during collection", "collector", pgCollector.name())
+			if err := pgCollector.Collect(ch); err != nil {
+				log.Log.Error(err, "Error during collection", "collector", pgCollector.Name())
 				e.metrics.PgCollectionErrors.WithLabelValues(label).Inc()
 				e.metrics.Error.Set(1)
 			}
@@ -158,9 +172,30 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 // PgCollector is the interface for all the collectors that need to do queries
 // on PostgreSQL to gather the results
 type PgCollector interface {
-	// name is the unique name of the collector
-	name() string
+	// Name is the unique name of the collector
+	Name() string
 
-	// collect collects data and send the metrics on the channel
-	collect(ch chan<- prometheus.Metric) error
+	// Collect collects data and send the metrics on the channel
+	Collect(ch chan<- prometheus.Metric) error
+
+	// Describe collects metadata about the metrics we work with
+	Describe(ch chan<- *prometheus.Desc)
+}
+
+// ClearCustomQueries removes every custom queries previously added to this
+// collector
+func (e *Exporter) ClearCustomQueries() {
+	e.customQueries = nil
+}
+
+// AddCustomQueries read the custom queries from the passed content
+// and add the relative Prometheus collector
+func (e *Exporter) AddCustomQueries(queriesContent []byte) error {
+	newQueriesCollector, err := custom.NewQueriesCollector("custom", e.instance, queriesContent)
+	if err != nil {
+		return fmt.Errorf("while parsing custom queries: %s", err)
+	}
+
+	e.customQueries = append(e.customQueries, newQueriesCollector)
+	return nil
 }

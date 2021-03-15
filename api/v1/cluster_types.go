@@ -146,10 +146,12 @@ type ClusterSpec struct {
 
 	// Define a maintenance window for the Kubernetes nodes
 	NodeMaintenanceWindow *NodeMaintenanceWindow `json:"nodeMaintenanceWindow,omitempty"`
+
+	// The configuration of the monitoring infrastructure of this cluster
+	Monitoring *MonitoringConfiguration `json:"monitoring,omitempty"`
 }
 
 const (
-
 	// PhaseSwitchover when a cluster is changing the primary node
 	PhaseSwitchover = "Switchover in progress"
 
@@ -532,6 +534,16 @@ type S3Credentials struct {
 
 	// The reference to the secret access key
 	SecretAccessKeyReference corev1.SecretKeySelector `json:"secretAccessKey"`
+}
+
+// MonitoringConfiguration is the type containing all the monitoring
+// configuration for a certain cluster
+type MonitoringConfiguration struct {
+	// The list of config maps containing the custom queries
+	CustomQueriesConfigMap []corev1.LocalObjectReference `json:"customQueriesConfigMap,omitempty"`
+
+	// The list of secrets containing the custom queries
+	CustomQueriesSecret []corev1.LocalObjectReference `json:"customQueriesSecret,omitempty"`
 }
 
 // +kubebuilder:object:root=true

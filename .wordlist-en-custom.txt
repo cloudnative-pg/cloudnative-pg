@@ -65,6 +65,7 @@ LocalObjectReference
 MiB
 MinIO
 Minikube
+MonitoringConfiguration
 NGINX
 Namespaces
 Nenciarini
@@ -136,6 +137,7 @@ apiserver
 appdb
 appuser
 args
+archiver
 async
 auth
 authn
@@ -144,6 +146,7 @@ aws
 az
 ba
 backend
+backends
 backupId
 backupconfiguration
 backuplist
@@ -161,6 +164,7 @@ bs
 bzip
 cGFzc
 checksums
+classid
 cli
 clientcert
 clusterlist
@@ -182,6 +186,9 @@ creds
 cron
 crt
 currentPrimary
+customizable
+customQueriesConfigMap
+customQueriesSecret
 danglingPVC
 databackupconfiguration
 declaratively
@@ -196,6 +203,7 @@ endpointURL
 enterprisedb
 executables
 failover
+fastpath
 ffd
 gce
 github
@@ -247,6 +255,7 @@ linters
 listmeta
 liveness
 localobjectreference
+locktype
 lt
 maxSyncReplicas
 md
@@ -255,6 +264,7 @@ microsoft
 minSyncReplicas
 minikube
 minio
+monitoringconfiguration
 myAKSCluster
 myResourceGroup
 namespace
@@ -267,6 +277,8 @@ nodeSelector
 nodemaintenancewindow
 ntt
 objectmeta
+objid
+objsubid
 observability
 oc
 ocp
@@ -282,6 +294,7 @@ pgBouncer
 pgbarman
 pgpass
 phaseReason
+pid
 pitr
 pluggable
 png
@@ -313,6 +326,7 @@ rollingupdatestatus
 runtime
 rw
 sSfL
+sa
 scalability
 scalable
 scheduledbackup
@@ -326,6 +340,7 @@ securego
 serverName
 sig
 sigs
+sql
 src
 sre
 ssl
@@ -354,12 +369,16 @@ tcp
 tmp
 tolerations
 topologyKey
+transactionid
+tx
 ul
 unencrypted
 unix
+usename
 usr
 utils
 virtualized
+virtualxid
 volumeMode
 wal
 walbackupconfiguration
@@ -368,4 +387,5 @@ webhook
 wikipedia
 writeService
 www
+xact
 yaml

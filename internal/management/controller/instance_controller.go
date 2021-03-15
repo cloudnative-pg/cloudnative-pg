@@ -26,6 +26,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
@@ -62,12 +63,19 @@ func (r *InstanceReconciler) reconcileCluster(ctx context.Context, event *watch.
 			err)
 	}
 
-	targetPrimary, err := utils.GetTargetPrimary(object)
+	var cluster apiv1.Cluster
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("error decoding cluster resource: %w", err)
 	}
 
-	if targetPrimary == r.instance.PodName {
+	// Reconcile monitoring section
+	if cluster.Spec.Monitoring != nil {
+		r.reconcileMonitoringQueries(ctx, cluster.Spec.Monitoring)
+	}
+
+	// Reconcile replica role
+	if cluster.Status.TargetPrimary == r.instance.PodName {
 		// This is a primary server
 		err := r.reconcilePrimary(ctx, object)
 		if err != nil {
@@ -90,6 +98,53 @@ func (r *InstanceReconciler) reconcileCluster(ctx context.Context, event *watch.
 	}
 
 	return r.reconcileReplica()
+}
+
+// reconcileMonitoringQueries applies the custom monitoring queries to the
+// web server
+func (r *InstanceReconciler) reconcileMonitoringQueries(
+	ctx context.Context,
+	configuration *apiv1.MonitoringConfiguration,
+) {
+	exporter := webserver.GetExporter()
+	r.log.Info("Reconciling custom monitoring queries")
+
+	// TODO: avoid replacing unchanged queries
+	exporter.ClearCustomQueries()
+
+	for _, reference := range configuration.CustomQueriesConfigMap {
+		configMap, err := r.GetStaticClient().CoreV1().ConfigMaps(r.instance.Namespace).Get(
+			ctx, reference.Name, metav1.GetOptions{})
+		if err != nil {
+			r.log.Info("Unable to get configMap containing custom monitoring queries",
+				"name", reference.Name,
+				"clusterName", r.instance.ClusterName,
+				"namespace", r.instance.Namespace)
+			continue
+		}
+
+		// TODO: Avoid magic strings "queries.yaml"
+		data, ok := configMap.Data["queries.yaml"]
+		if !ok {
+			r.log.Info("Missing 'queries.yaml' entry in configMap",
+				"name", reference.Name,
+				"clusterName", r.instance.ClusterName,
+				"namespace", r.instance.Namespace)
+			continue
+		}
+
+		err = exporter.AddCustomQueries([]byte(data))
+		if err != nil {
+			r.log.Info("Error while parsing custom queries",
+				"name", reference.Name,
+				"clusterName", r.instance.ClusterName,
+				"namespace", r.instance.Namespace,
+				"error", err.Error())
+			continue
+		}
+	}
+
+	// TODO: support secrets
 }
 
 // reconcileSecret is called when the PostgreSQL secrets are changes

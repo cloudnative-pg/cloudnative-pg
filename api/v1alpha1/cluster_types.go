@@ -90,6 +90,9 @@ type ClusterSpec struct {
 
 	// Define a maintenance window for the Kubernetes nodes
 	NodeMaintenanceWindow *NodeMaintenanceWindow `json:"nodeMaintenanceWindow,omitempty"`
+
+	// The configuration of the monitoring infrastructure of this cluster
+	Monitoring *MonitoringConfiguration `json:"monitoring,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -423,6 +426,16 @@ const (
 	// EncryptionTypeNoneAWSKMS means to use aws:kms encryption
 	EncryptionTypeNoneAWSKMS = "aws:kms"
 )
+
+// MonitoringConfiguration is the type containing all the monitoring
+// configuration for a certain cluster
+type MonitoringConfiguration struct {
+	// The list of config maps containing the custom queries
+	CustomQueriesConfigMap []corev1.LocalObjectReference `json:"customQueriesConfigMap"`
+
+	// The list of secrets containing the custom queries
+	CustomQueriesSecret []corev1.LocalObjectReference `json:"customQueriesSecret"`
+}
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status

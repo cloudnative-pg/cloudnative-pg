@@ -104,13 +104,13 @@ func newPgStatReplicationCollector(instance *postgres.Instance) PgCollector {
 }
 
 // name returns the name of the collector. Implements PgCollector
-func (pgStatReplicationCollector) name() string {
+func (pgStatReplicationCollector) Name() string {
 	return pgStatReplicationCollectorName
 }
 
 // collect send the collected metrics on the received channel.
 // Implements PgCollector
-func (c pgStatReplicationCollector) collect(ch chan<- prometheus.Metric) error {
+func (c pgStatReplicationCollector) Collect(ch chan<- prometheus.Metric) error {
 	conn, err := c.instance.GetApplicationDB()
 	if err != nil {
 		return err
@@ -191,4 +191,15 @@ func (c pgStatReplicationCollector) collect(ch chan<- prometheus.Metric) error {
 	}
 
 	return nil
+}
+
+// Describe puts in the channel the metadata for the queries
+func (c pgStatReplicationCollector) Describe(ch chan<- *prometheus.Desc) {
+	c.flushDiffBytes.Describe(ch)
+	c.flushLagSeconds.Describe(ch)
+	c.replayDiffBytes.Describe(ch)
+	c.replayDiffBytes.Describe(ch)
+	c.writeDiffBytes.Describe(ch)
+	c.writeLagSeconds.Describe(ch)
+	c.sentDiffBytes.Describe(ch)
 }

@@ -49,13 +49,13 @@ func newPgStatActivityCollector(instance *postgres.Instance) PgCollector {
 }
 
 // name returns the name of the collector. Implements PgCollector
-func (pgStatActivityCollector) name() string {
+func (pgStatActivityCollector) Name() string {
 	return pgStatActivityCollectorName
 }
 
 // collect send the collected metrics on the received channel.
 // Implements PgCollector
-func (c pgStatActivityCollector) collect(ch chan<- prometheus.Metric) error {
+func (c pgStatActivityCollector) Collect(ch chan<- prometheus.Metric) error {
 	conn, err := c.instance.GetApplicationDB()
 	if err != nil {
 		return err
@@ -106,4 +106,10 @@ func (c pgStatActivityCollector) collect(ch chan<- prometheus.Metric) error {
 	}
 
 	return nil
+}
+
+// Describe puts on the channel the metadata for the metrics we collect
+func (c pgStatActivityCollector) Describe(ch chan<- *prometheus.Desc) {
+	c.backends.Describe(ch)
+	c.maxTxDurationSeconds.Describe(ch)
 }

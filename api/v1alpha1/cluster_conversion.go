@@ -134,6 +134,13 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 		dst.Spec.NodeMaintenanceWindow.ReusePVC = src.Spec.NodeMaintenanceWindow.ReusePVC
 	}
 
+	// spec.monitoring
+	if src.Spec.Monitoring != nil {
+		dst.Spec.Monitoring = &v1.MonitoringConfiguration{}
+		dst.Spec.Monitoring.CustomQueriesConfigMap = src.Spec.Monitoring.CustomQueriesConfigMap
+		dst.Spec.Monitoring.CustomQueriesSecret = src.Spec.Monitoring.CustomQueriesSecret
+	}
+
 	// status
 	dst.Status.Instances = src.Status.Instances
 	dst.Status.ReadyInstances = src.Status.ReadyInstances

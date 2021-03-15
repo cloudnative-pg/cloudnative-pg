@@ -20,6 +20,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 
@@ -33,9 +34,10 @@ import (
 // ConfigMap is applied when needed
 type InstanceReconciler struct {
 	client              dynamic.Interface
+	staticClient        kubernetes.Interface
 	instance            *postgres.Instance
 	log                 logr.Logger
-	instanceWatch       watch.Interface
+	clusterWatch        watch.Interface
 	configMapWatch      watch.Interface
 	serverSecretWatch   watch.Interface
 	caSecretWatch       watch.Interface
@@ -54,10 +56,16 @@ func NewInstanceReconciler(instance *postgres.Instance) (*InstanceReconciler, er
 		return nil, err
 	}
 
+	staticClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
 	return &InstanceReconciler{
-		instance: instance,
-		log:      log.Log,
-		client:   client,
+		instance:     instance,
+		log:          log.Log,
+		client:       client,
+		staticClient: staticClient,
 	}, nil
 }
 
@@ -85,7 +93,7 @@ func (r *InstanceReconciler) Watch() error {
 
 	// This is an example of how to watch a certain object
 	// https://github.com/kubernetes/kubernetes/issues/43299
-	r.instanceWatch, err = r.client.
+	r.clusterWatch, err = r.client.
 		Resource(apiv1.ClusterGVK).
 		Namespace(r.instance.Namespace).
 		Watch(ctx, metav1.ListOptions{
@@ -154,7 +162,7 @@ func (r *InstanceReconciler) Watch() error {
 		return fmt.Errorf("error watching 'postgres' user secret: %w", err)
 	}
 
-	instanceChannel := r.instanceWatch.ResultChan()
+	clusterChannel := r.clusterWatch.ResultChan()
 	configMapChannel := r.configMapWatch.ResultChan()
 	secretChannel := r.serverSecretWatch.ResultChan()
 	caSecretChannel := r.caSecretWatch.ResultChan()
@@ -165,7 +173,7 @@ func (r *InstanceReconciler) Watch() error {
 		var ok bool
 
 		select {
-		case event, ok = <-instanceChannel:
+		case event, ok = <-clusterChannel:
 		case event, ok = <-configMapChannel:
 		case event, ok = <-secretChannel:
 		case event, ok = <-caSecretChannel:
@@ -184,7 +192,7 @@ func (r *InstanceReconciler) Watch() error {
 		}
 	}
 
-	r.instanceWatch.Stop()
+	r.clusterWatch.Stop()
 	r.configMapWatch.Stop()
 	r.serverSecretWatch.Stop()
 	r.caSecretWatch.Stop()
@@ -194,10 +202,15 @@ func (r *InstanceReconciler) Watch() error {
 
 // Stop stops the controller
 func (r *InstanceReconciler) Stop() {
-	r.instanceWatch.Stop()
+	r.clusterWatch.Stop()
 }
 
-// GetClient returns the client that is being used for a certain reconciler
+// GetClient returns the dynamic client that is being used for a certain reconciler
 func (r *InstanceReconciler) GetClient() dynamic.Interface {
 	return r.client
+}
+
+// GetStaticClient returns the static client that is being used for a certain reconciler
+func (r *InstanceReconciler) GetStaticClient() kubernetes.Interface {
+	return r.staticClient
 }
