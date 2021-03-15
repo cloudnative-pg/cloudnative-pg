@@ -11,10 +11,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -66,40 +68,20 @@ type BarmanBackup struct {
 // barman-cloud-backup
 func (instance *Instance) Backup(
 	ctx context.Context,
-	client client.StatusClient,
+	client client.Client,
 	recorder record.EventRecorder,
-	configuration apiv1.BarmanObjectStoreConfiguration,
+	cluster *apiv1.Cluster,
 	backupObject runtime.Object,
 	log logr.Logger,
 ) error {
-	var options []string
-	if configuration.Data != nil {
-		if len(configuration.Data.Compression) != 0 {
-			options = append(
-				options,
-				fmt.Sprintf("--%v", configuration.Data.Compression))
-		}
-		if len(configuration.Data.Encryption) != 0 {
-			options = append(
-				options,
-				"-e",
-				string(configuration.Data.Encryption))
-		}
-	}
-	if len(configuration.EndpointURL) > 0 {
-		options = append(
-			options,
-			"--endpoint-url",
-			configuration.EndpointURL)
-	}
+	configuration := cluster.Spec.Backup.BarmanObjectStore
+
 	serverName := instance.ClusterName
 	if len(configuration.ServerName) != 0 {
 		serverName = configuration.ServerName
 	}
-	options = append(
-		options,
-		configuration.DestinationPath,
-		serverName)
+
+	options := instance.getBarmanCloudBackupOptions(configuration, serverName)
 
 	// Mark the backup as running
 	backup := backupObject.(apiv1.BackupCommon)
@@ -131,6 +113,11 @@ func (instance *Instance) Backup(
 		log.Info("Backup started",
 			"options",
 			options)
+
+		if err := SetAWSCredentials(ctx, client, cluster); err != nil {
+			log.Error(err, "Cannot recover AWS credentials", "err", err)
+			return
+		}
 
 		recorder.Event(backupObject, "Normal", "Starting", "Backup started")
 
@@ -207,6 +194,37 @@ func (instance *Instance) Backup(
 	return nil
 }
 
+// getBarmanCloudBackupOptions extract the list of command line options to be used with
+// barman-cloud-backup
+func (instance *Instance) getBarmanCloudBackupOptions(
+	configuration *apiv1.BarmanObjectStoreConfiguration, serverName string) []string {
+	var options []string
+	if configuration.Data != nil {
+		if len(configuration.Data.Compression) != 0 {
+			options = append(
+				options,
+				fmt.Sprintf("--%v", configuration.Data.Compression))
+		}
+		if len(configuration.Data.Encryption) != 0 {
+			options = append(
+				options,
+				"-e",
+				string(configuration.Data.Encryption))
+		}
+	}
+	if len(configuration.EndpointURL) > 0 {
+		options = append(
+			options,
+			"--endpoint-url",
+			configuration.EndpointURL)
+	}
+	options = append(
+		options,
+		configuration.DestinationPath,
+		serverName)
+	return options
+}
+
 // parse the output of barman-cloud-backup-list
 func parseBarmanCloudBackupList(output string) (*BackupListResult, error) {
 	var result BackupListResult
@@ -215,4 +233,50 @@ func parseBarmanCloudBackupList(output string) (*BackupListResult, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+// SetAWSCredentials set the AWS environment variables given the configuration
+// inside the cluster
+func SetAWSCredentials(ctx context.Context, c client.Client, cluster *apiv1.Cluster) error {
+	configuration := cluster.Spec.Backup.BarmanObjectStore
+	var accessKeyIDSecret corev1.Secret
+	var secretAccessKeySecret corev1.Secret
+
+	// Get access key ID
+	secretName := configuration.S3Credentials.AccessKeyIDReference.Name
+	secretKey := configuration.S3Credentials.AccessKeyIDReference.Key
+	err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: secretName}, &accessKeyIDSecret)
+	if err != nil {
+		return fmt.Errorf("while getting access key ID secret: %w", err)
+	}
+
+	accessKeyID, ok := accessKeyIDSecret.Data[secretKey]
+	if !ok {
+		return fmt.Errorf("missing key inside access key ID secret")
+	}
+
+	// Get secret access key
+	secretName = configuration.S3Credentials.SecretAccessKeyReference.Name
+	secretKey = configuration.S3Credentials.SecretAccessKeyReference.Key
+	err = c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: secretName}, &secretAccessKeySecret)
+	if err != nil {
+		return fmt.Errorf("while getting secret access key secret: %w", err)
+	}
+
+	secretAccessKey, ok := secretAccessKeySecret.Data[secretKey]
+	if !ok {
+		return fmt.Errorf("missing key inside secret access key secret")
+	}
+
+	// Setting environment variables
+	err = os.Setenv("AWS_ACCESS_KEY_ID", string(accessKeyID))
+	if err != nil {
+		return err
+	}
+	err = os.Setenv("AWS_SECRET_ACCESS_KEY", string(secretAccessKey))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

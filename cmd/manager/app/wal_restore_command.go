@@ -18,14 +18,16 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
 
 // WalRestoreCommand restore a certain WAL file from the cloud
-// using barman-wal-restore
+// using barman-cloud-wal-restore
 func WalRestoreCommand(args []string) {
 	var clusterName string
 	var namespace string
 	var podName string
+	ctx := context.Background()
 
 	flag.StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
 		"current cluster in k8s")
@@ -49,7 +51,7 @@ func WalRestoreCommand(args []string) {
 	}
 
 	var cluster apiv1.Cluster
-	err = typedClient.Get(context.Background(), client.ObjectKey{
+	err = typedClient.Get(ctx, client.ObjectKey{
 		Namespace: namespace,
 		Name:      clusterName,
 	}, &cluster)
@@ -115,6 +117,18 @@ func WalRestoreCommand(args []string) {
 		serverName,
 		walName,
 		destinationPath)
+
+	if err = postgres.SetAWSCredentials(ctx, typedClient, &cluster); err != nil {
+		log.Log.Error(err, "Error while settings AWS environment variables",
+			"walName", walName,
+			"pod", podName,
+			"cluster", clusterName,
+			"namespace", namespace,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary,
+			"options", options)
+		os.Exit(1)
+	}
 
 	cmd := exec.Command("barman-cloud-wal-restore", options...) // #nosec G204
 	cmd.Stdout = os.Stdout

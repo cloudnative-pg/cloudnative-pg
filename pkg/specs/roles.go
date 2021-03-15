@@ -37,6 +37,14 @@ func CreateRole(cluster apiv1.Cluster, openshift bool) rbacv1.Role {
 		}
 	}
 
+	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
+		// If there is a backup section, the instance manager will need to access
+		// the S3 secret too
+		involvedSecretNames = append(involvedSecretNames,
+			cluster.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Name,
+			cluster.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Name)
+	}
+
 	rules := []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
