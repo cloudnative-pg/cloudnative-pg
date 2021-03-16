@@ -48,6 +48,7 @@ func NewExporter(instance *postgres.Instance) *Exporter {
 	}
 }
 
+// newMetrics returns collector metrics
 func newMetrics() metrics {
 	subsystem := "collector"
 	return metrics{
