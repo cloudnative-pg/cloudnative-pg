@@ -15,12 +15,22 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
 
 // MetricMap stores the prometheus metric description which a given column will
 // be mapped to by the collector
 type MetricMap struct {
-	// Should metric be discarded during mapping?
+	// The name of this metric
+	Name string
+
+	// Is this metric a label?
+	Label bool
+
+	// Should metric be discarded during metrics generation?
+	// Labels should be discarded because they are used while generating
+	// names and not values
 	Discard bool
 
 	// Should metric be treated as a histogram?
@@ -38,14 +48,14 @@ type MetricMap struct {
 }
 
 // MetricMapSet is a set of MetricMap, usually associated to a UserQuery
-type MetricMapSet map[string]MetricMap
+type MetricMapSet []MetricMap
+
+// VariableSet is a set of strings used as a collection of prometheus labels
+type VariableSet []string
 
 // ToMetricMap transform this user query in the metadata for a collection of Prometheus metrics,
 // returning the metrics map and the list of variable labels
-func (userQuery UserQuery) ToMetricMap(namespace string) (MetricMapSet, []string) {
-	result := make(map[string]MetricMap)
-	var variableLabels []string
-
+func (userQuery UserQuery) ToMetricMap(namespace string) (result MetricMapSet, variableLabels VariableSet) {
 	for _, columnMapping := range userQuery.Metrics {
 		// Create the list of variable labels
 		for columnName, columnDescriptor := range columnMapping {
@@ -56,10 +66,8 @@ func (userQuery UserQuery) ToMetricMap(namespace string) (MetricMapSet, []string
 
 		// Create a mapping given the list of variable names
 		for columnName, columnDescriptor := range columnMapping {
-			intermediate := columnDescriptor.ToMetricMap(columnName, namespace, variableLabels)
-			for mappingName, mapping := range intermediate {
-				result[mappingName] = mapping
-			}
+			result = append(
+				result, columnDescriptor.ToMetricMap(columnName, namespace, variableLabels)...)
 		}
 	}
 
@@ -68,61 +76,83 @@ func (userQuery UserQuery) ToMetricMap(namespace string) (MetricMapSet, []string
 
 // ToMetricMap transform this query mapping in the metadata for a Prometheus metric. Since a query
 // from the user can result in multiple metrics being generated (histograms are an example
-// of this behavior) we are returning a mapping, which should then be collected together
-func (columnMapping ColumnMapping) ToMetricMap(columnName, namespace string, variableLabels []string) MetricMapSet {
-	result := make(map[string]MetricMap)
-
+// of this behavior), we are returning a mapping, which therefore should be collected together
+func (columnMapping ColumnMapping) ToMetricMap(
+	columnName, namespace string, variableLabels []string) (result MetricMapSet) {
 	// Determine how to convert the column based on its usage.
 	// nolint: dupl
 	switch columnMapping.Usage {
-	case DISCARD, LABEL:
-		result[columnName] = MetricMap{
+	case DISCARD:
+		result = append(result, MetricMap{
+			Name:       columnName,
 			Discard:    true,
 			Conversion: nil,
-		}
+			Label:      false,
+		})
+
+	case LABEL:
+		result = append(result, MetricMap{
+			Name:       columnName,
+			Discard:    true,
+			Conversion: nil,
+			Label:      true,
+		})
 
 	case COUNTER:
-		result[columnName] = MetricMap{
+		result = append(result, MetricMap{
+			Name:  columnName,
 			Vtype: prometheus.CounterValue,
 			Desc: prometheus.NewDesc(
 				fmt.Sprintf("%s_%s", namespace, columnName),
 				columnMapping.Description, variableLabels, nil),
-			Conversion: DBToFloat64,
-		}
+			Conversion: postgres.DBToFloat64,
+			Label:      false,
+		})
 
 	case GAUGE:
-		result[columnName] = MetricMap{
+		result = append(result, MetricMap{
+			Name:  columnName,
 			Vtype: prometheus.GaugeValue,
 			Desc: prometheus.NewDesc(
 				fmt.Sprintf("%s_%s", namespace, columnName),
 				columnMapping.Description, variableLabels, nil),
-			Conversion: DBToFloat64,
-		}
+			Conversion: postgres.DBToFloat64,
+			Label:      false,
+		})
 
 	case HISTOGRAM:
-		result[columnName] = MetricMap{
+		result = append(result, MetricMap{
+			Name:      columnName,
 			Histogram: true,
 			Vtype:     prometheus.UntypedValue,
 			Desc: prometheus.NewDesc(
 				fmt.Sprintf("%s_%s", namespace, columnName),
 				columnMapping.Description, variableLabels, nil),
-			Conversion: DBToFloat64,
-		}
-		result[columnName+"_bucket"] = MetricMap{
+			Conversion: postgres.DBToFloat64,
+			Label:      false,
+		})
+		result = append(result, MetricMap{
+			Name:      columnName + "_bucket",
 			Histogram: true,
 			Discard:   true,
-		}
-		result[columnName+"_sum"] = MetricMap{
+			Label:     false,
+		})
+		result = append(result, MetricMap{
+			Name:      columnName + "_sum",
 			Histogram: true,
 			Discard:   true,
-		}
-		result[columnName+"_count"] = MetricMap{
+			Label:     false,
+		})
+		result = append(result, MetricMap{
+			Name:      columnName + "_count",
 			Histogram: true,
 			Discard:   true,
-		}
+			Label:     false,
+		})
 
 	case MAPPEDMETRIC:
-		result[columnName] = MetricMap{
+		result = append(result, MetricMap{
+			Name:  columnName,
 			Vtype: prometheus.GaugeValue,
 			Desc: prometheus.NewDesc(
 				fmt.Sprintf("%s_%s", namespace, columnName),
@@ -139,10 +169,12 @@ func (columnMapping ColumnMapping) ToMetricMap(columnName, namespace string, var
 				}
 				return val, true
 			},
-		}
+			Label: false,
+		})
 
 	case DURATION:
-		result[columnName] = MetricMap{
+		result = append(result, MetricMap{
+			Name:  columnName,
 			Vtype: prometheus.GaugeValue,
 			Desc: prometheus.NewDesc(
 				fmt.Sprintf("%s_%s_milliseconds", namespace, columnName),
@@ -168,7 +200,8 @@ func (columnMapping ColumnMapping) ToMetricMap(columnName, namespace string, var
 				}
 				return float64(d / time.Millisecond), true
 			},
-		}
+			Label: false,
+		})
 	}
 
 	return result

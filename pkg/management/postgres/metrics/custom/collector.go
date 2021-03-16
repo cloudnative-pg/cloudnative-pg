@@ -12,13 +12,12 @@ package custom
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
-	"github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics/histogram"
 )
 
 // QueriesCollector is the implementation of PgCollector for a certain
@@ -29,7 +28,7 @@ type QueriesCollector struct {
 
 	userQueries    UserQueries
 	mappings       map[string]MetricMapSet
-	variableLabels map[string][]string
+	variableLabels map[string]VariableSet
 }
 
 // Name returns the name of this collector, as supplied by the user in the configMap
@@ -117,9 +116,9 @@ func NewQueriesCollector(name string, instance *postgres.Instance, customQueries
 	}
 
 	result.mappings = make(map[string]MetricMapSet)
-	result.variableLabels = make(map[string][]string)
-	for name, queries := range result.userQueries {
-		result.mappings[name], result.variableLabels[name] = queries.ToMetricMap(name)
+	result.variableLabels = make(map[string]VariableSet)
+	for queryName, queries := range result.userQueries {
+		result.mappings[queryName], result.variableLabels[queryName] = queries.ToMetricMap(queryName)
 	}
 
 	return &result, nil
@@ -130,8 +129,8 @@ func NewQueriesCollector(name string, instance *postgres.Instance, customQueries
 type QueryCollector struct {
 	namespace      string
 	userQuery      UserQuery
-	columnMapping  map[string]MetricMap
-	variableLabels []string
+	columnMapping  MetricMapSet
+	variableLabels VariableSet
 }
 
 // collect collect the result from query and writes it to the prometheus
@@ -143,10 +142,12 @@ func (c QueryCollector) collect(tx *sql.Tx, ch chan<- prometheus.Metric) error {
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			log.Log.Info("Error while closing metrics extraction", "err", err.Error())
+			log.Log.Info("Error while closing metrics extraction",
+				"err", err.Error())
 		}
 		if rows.Err() != nil {
-			log.Log.Info("Error while closing metrics extraction", "err", err.Error())
+			log.Log.Info("Error while loading metrics",
+				"err", err.Error())
 		}
 	}()
 
@@ -161,45 +162,61 @@ func (c QueryCollector) collect(tx *sql.Tx, ch chan<- prometheus.Metric) error {
 		scanArgs[i] = &columnData[i]
 	}
 
+	if len(columns) != len(c.columnMapping) {
+		log.Log.Info("Columns number mismatch",
+			"name", c.namespace,
+			"columnNumberFromDB", len(columns),
+			"columnNumberFromConfiguration", len(c.columnMapping))
+		return nil
+	}
+
 	for rows.Next() {
 		if err = rows.Scan(scanArgs...); err != nil {
 			return err
 		}
 
-		// This lookup map will be useful to find columns by name
-		columnIdx := make(map[string]int)
-		for idx, columnName := range columns {
-			columnIdx[columnName] = idx
-		}
-
 		// Get the list of variable label names
-		labels := make([]string, len(c.variableLabels))
-		for idx, labelName := range c.variableLabels {
-			labelIdx, ok := columnIdx[labelName]
-			if ok {
-				labels[idx], _ = DBToString(columnData[labelIdx])
-			} else {
-				log.Log.Info("Cannot find column for label",
-					"labelName", labelName,
-					"namespace", c.namespace)
+		var labels []string
+		for idx, mapping := range c.columnMapping {
+			if mapping.Label {
+				value, ok := postgres.DBToString(columnData[idx])
+				if !ok {
+					log.Log.Info("Label value cannot be converted to string",
+						"value", value,
+						"mapping", mapping)
+					return nil
+				}
+
+				labels = append(labels, value)
 			}
 		}
 
 		for idx, columnName := range columns {
-			mapping, ok := c.columnMapping[columnName]
+			mapping := c.columnMapping[idx]
+
+			// There is a strong difference between histogram and non-histogram metrics in
+			// pg_exporter. The first ones are looked up by column name and the second
+			// ones are looked up just using the index.
+			//
+			// We implemented the same behavior here.
 
 			switch {
-			case ok && mapping.Discard:
+			case mapping.Discard:
 				continue
 
-			case ok && mapping.Histogram:
-				c.collectHistogramMetric(mapping, columnName, columnIdx, columnData, labels, ch)
+			case mapping.Histogram:
+				histogramData, err := histogram.NewFromRawData(columnData, columns, columnName)
+				if err != nil {
+					log.Log.Error(err, "Cannot process histogram metric",
+						"columns", columns,
+						"columnData", columnData,
+						"labels", labels)
+				} else {
+					c.collectHistogramMetric(mapping, histogramData, labels, ch)
+				}
 
-			case ok && !mapping.Histogram:
+			case !mapping.Histogram:
 				c.collectConstMetric(mapping, columnData[idx], labels, ch)
-
-			default:
-				c.collectUnknownMetric(columnName, columnData[idx], labels, ch)
 			}
 		}
 	}
@@ -214,34 +231,10 @@ func (c QueryCollector) describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
-// collectUnknownMetric reports to the prometheus library an unknown metric
-func (c QueryCollector) collectUnknownMetric(
-	columnName string, value interface{}, variableLabels []string, ch chan<- prometheus.Metric) {
-	// This metric is unknown, so let's pass it as untyped
-	metricLabel := fmt.Sprintf("%s_%s", c.namespace, columnName)
-	desc := prometheus.NewDesc(
-		metricLabel,
-		fmt.Sprintf("Unknown metric from %s", c.namespace), nil, nil)
-
-	// Its not an error to fail here since we don't know how
-	// to interpret this column
-	floatData, ok := DBToFloat64(value)
-	if !ok {
-		log.Log.Info("Unparsable column type, discarding it",
-			"namespace", c.namespace,
-			"columnName", columnName,
-			"value", value)
-		return
-	}
-
-	metric := prometheus.MustNewConstMetric(desc, prometheus.UntypedValue, floatData, variableLabels...)
-	ch <- metric
-}
-
 // collectConstMetric reports to the prometheus library a constant metric
 func (c QueryCollector) collectConstMetric(
 	mapping MetricMap, value interface{}, variableLabels []string, ch chan<- prometheus.Metric) {
-	floatData, ok := DBToFloat64(value)
+	floatData, ok := postgres.DBToFloat64(value)
 	if !ok {
 		log.Log.Info("Error while parsing value",
 			"namespace", c.namespace,
@@ -258,102 +251,12 @@ func (c QueryCollector) collectConstMetric(
 // collectHistogramMetric reports to the prometheus library an histogram-based metric
 func (c QueryCollector) collectHistogramMetric(
 	mapping MetricMap,
-	columnName string,
-	columnMap map[string]int,
-	columnValues []interface{},
+	columnData *histogram.Value,
 	variableLabels []string,
 	ch chan<- prometheus.Metric) {
-	keysIdx, ok := columnMap[columnName]
-	if !ok {
-		log.Log.Info("Cannot find histogram keys in query result",
-			"namespace", c.namespace,
-			"columnName", columnName,
-			"columnMap", columnMap,
-			"columnValues", columnValues)
-		return
-	}
-
-	var keys []float64
-	err := pq.Array(&keys).Scan(columnValues[keysIdx])
-	if err != nil {
-		log.Log.Info("Error while parsing bucket keys",
-			"namespace", c.namespace,
-			"value", columnValues[keysIdx],
-			"mapping", mapping,
-			"err", err.Error())
-		return
-	}
-
-	var values []int64
-	bucketsColumnName := columnName + "_bucket"
-	valuesIdx, ok := columnMap[bucketsColumnName]
-	if !ok {
-		log.Log.Info("Cannot find histogram values in query result",
-			"namespace", c.namespace,
-			"columnName", bucketsColumnName,
-			"columnMap", columnMap,
-			"columnValues", columnValues)
-		return
-	}
-	err = pq.Array(&values).Scan(columnValues[valuesIdx])
-	if err != nil {
-		log.Log.Info("Error while parsing bucket values",
-			"namespace", c.namespace,
-			"value", columnValues[valuesIdx],
-			"mapping", mapping,
-			"err", err.Error())
-		return
-	}
-
-	buckets := make(map[float64]uint64, len(keys))
-	for i, key := range keys {
-		if i >= len(values) {
-			break
-		}
-		buckets[key] = uint64(values[i])
-	}
-
-	sumColumnName := columnName + "_sum"
-	sumIdx, ok := columnMap[sumColumnName]
-	if !ok {
-		log.Log.Info("Cannot find histogram sum in query result",
-			"namespace", c.namespace,
-			"columnName", sumColumnName,
-			"columnMap", columnMap,
-			"columnValues", columnValues)
-		return
-	}
-	sum, ok := DBToFloat64(columnValues[sumIdx])
-	if !ok {
-		log.Log.Info("Error while parsing bucket sum",
-			"namespace", c.namespace,
-			"value", columnValues[valuesIdx],
-			"mapping", mapping)
-		return
-	}
-
-	countColumnName := columnName + "_count"
-	countIdx, ok := columnMap[countColumnName]
-	if !ok {
-		log.Log.Info("Cannot find histogram count in query result",
-			"namespace", c.namespace,
-			"columnName", countColumnName,
-			"columnMap", columnMap,
-			"columnValues", columnValues)
-		return
-	}
-	count, ok := DBToUint64(columnValues[countIdx])
-	if !ok {
-		log.Log.Info("Error while parsing bucket count",
-			"namespace", c.namespace,
-			"value", columnValues[valuesIdx],
-			"mapping", mapping)
-		return
-	}
-
 	metric := prometheus.MustNewConstHistogram(
 		mapping.Desc,
-		count, sum, buckets,
+		columnData.Count, columnData.Sum, columnData.Buckets,
 		variableLabels...,
 	)
 	ch <- metric

@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package custom
+package postgres
 
 // This code is heavily based on [pg_exporter](https://github.com/prometheus-community/postgres_exporter)
 // since we are reusing the custom query infrastructure that that project already have.
