@@ -1,6 +1,7 @@
 AES
 AKS
 AffinityConfiguration
+Anand
 BackupConfiguration
 BackupList
 BackupPhase
@@ -68,6 +69,7 @@ Minikube
 MonitoringConfiguration
 NGINX
 Namespaces
+Nednur
 Nenciarini
 Niccolò
 NodeMaintenanceWindow
@@ -88,6 +90,7 @@ PodStatus
 Postgres
 PostgresConfiguration
 PrimaryUpdateStrategy
+Quaresima
 QuickStart
 RBAC
 RPO
