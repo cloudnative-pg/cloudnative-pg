@@ -262,6 +262,10 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
+        name: Clean up all the left overs in docker
+        run:
+          docker system prune -a -f
+      -
         name: Run Kind End-to-End tests
         run:
           make e2e-test-kind
