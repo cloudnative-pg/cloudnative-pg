@@ -295,6 +295,7 @@ jobs:
       - generate-jobs
     strategy:
       fail-fast: false
+      max-parallel: 15
       matrix:
          ${{ fromJSON(needs.generate-jobs.outputs.aksMatrix) }}
     runs-on: ubuntu-20.04
