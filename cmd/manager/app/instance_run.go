@@ -67,7 +67,7 @@ func runSubCommand(ctx context.Context) {
 		os.Exit(1)
 	}
 
-	startReconciler()
+	startReconciler(ctx)
 	registerSignalHandler()
 
 	// Print the content of PostgreSQL control data, for debugging and tracing
@@ -113,8 +113,8 @@ func startWebServer() error {
 }
 
 // startReconciler start the reconciliation loop
-func startReconciler() {
-	go reconciler.Run()
+func startReconciler(ctx context.Context) {
+	go reconciler.Run(ctx)
 }
 
 // registerSignalHandler handles signals from k8s, notifying postgres as
