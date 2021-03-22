@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -33,15 +32,11 @@ import (
 // the one of this PostgreSQL instance. Also the configuration in the
 // ConfigMap is applied when needed
 type InstanceReconciler struct {
-	client              dynamic.Interface
-	staticClient        kubernetes.Interface
-	instance            *postgres.Instance
-	log                 logr.Logger
-	clusterWatch        watch.Interface
-	configMapWatch      watch.Interface
-	serverSecretWatch   watch.Interface
-	caSecretWatch       watch.Interface
-	postgresSecretWatch watch.Interface
+	client          dynamic.Interface
+	staticClient    kubernetes.Interface
+	instance        *postgres.Instance
+	log             logr.Logger
+	watchCollection *WatchCollection
 }
 
 // NewInstanceReconciler create a new instance reconciler
@@ -70,13 +65,15 @@ func NewInstanceReconciler(instance *postgres.Instance) (*InstanceReconciler, er
 }
 
 // Run runs the reconciliation loop for this resource
-func (r *InstanceReconciler) Run() {
+func (r *InstanceReconciler) Run(ctx context.Context) {
 	for {
 		// Retry with exponential back-off unless it is a connection refused error
 		err := retry.OnError(retry.DefaultBackoff, func(err error) bool {
 			r.log.Error(err, "Error calling Watch", "cluster", r.instance.ClusterName)
 			return !utilnet.IsConnectionRefused(err)
-		}, r.Watch)
+		}, func() error {
+			return r.watch(ctx)
+		})
 		if err != nil {
 			// If this is "connection refused" error, it means that most likely apiserver is not responsive.
 			// If that's the case wait and resend watch request.
@@ -85,15 +82,16 @@ func (r *InstanceReconciler) Run() {
 	}
 }
 
-// Watch contains the main reconciler loop
-func (r *InstanceReconciler) Watch() error {
+// watch contains the main reconciler loop
+func (r *InstanceReconciler) watch(ctx context.Context) error {
 	var err error
 
-	ctx := context.Background()
+	// 1. Prepare the set of watches for objects we are interested in
+	//    keeping synchronized with the instance status
 
 	// This is an example of how to watch a certain object
 	// https://github.com/kubernetes/kubernetes/issues/43299
-	r.clusterWatch, err = r.client.
+	clusterWatch, err := r.client.
 		Resource(apiv1.ClusterGVK).
 		Namespace(r.instance.Namespace).
 		Watch(ctx, metav1.ListOptions{
@@ -103,7 +101,7 @@ func (r *InstanceReconciler) Watch() error {
 		return fmt.Errorf("error watching cluster: %w", err)
 	}
 
-	r.configMapWatch, err = r.client.
+	configMapWatch, err := r.client.
 		Resource(schema.GroupVersionResource{
 			Group:    "",
 			Version:  "v1",
@@ -117,7 +115,7 @@ func (r *InstanceReconciler) Watch() error {
 		return fmt.Errorf("error watching configmap: %w", err)
 	}
 
-	r.serverSecretWatch, err = r.client.
+	serverSecretWatch, err := r.client.
 		Resource(schema.GroupVersionResource{
 			Group:    "",
 			Version:  "v1",
@@ -132,7 +130,7 @@ func (r *InstanceReconciler) Watch() error {
 		return fmt.Errorf("error watching certificate secret: %w", err)
 	}
 
-	r.caSecretWatch, err = r.client.
+	caSecretWatch, err := r.client.
 		Resource(schema.GroupVersionResource{
 			Group:    "",
 			Version:  "v1",
@@ -147,7 +145,7 @@ func (r *InstanceReconciler) Watch() error {
 		return fmt.Errorf("error watching CA secret: %w", err)
 	}
 
-	r.postgresSecretWatch, err = r.client.
+	replicationSecretWatch, err := r.client.
 		Resource(schema.GroupVersionResource{
 			Group:    "",
 			Version:  "v1",
@@ -162,47 +160,33 @@ func (r *InstanceReconciler) Watch() error {
 		return fmt.Errorf("error watching 'postgres' user secret: %w", err)
 	}
 
-	clusterChannel := r.clusterWatch.ResultChan()
-	configMapChannel := r.configMapWatch.ResultChan()
-	secretChannel := r.serverSecretWatch.ResultChan()
-	caSecretChannel := r.caSecretWatch.ResultChan()
-	postgresSecretChannel := r.postgresSecretWatch.ResultChan()
+	r.watchCollection = NewWatchCollection(
+		clusterWatch,
+		configMapWatch,
+		serverSecretWatch,
+		caSecretWatch,
+		replicationSecretWatch,
+	)
+	defer r.watchCollection.Stop()
 
-	for {
-		var event watch.Event
-		var ok bool
-
-		select {
-		case event, ok = <-clusterChannel:
-		case event, ok = <-configMapChannel:
-		case event, ok = <-secretChannel:
-		case event, ok = <-caSecretChannel:
-		case event, ok = <-postgresSecretChannel:
-		}
-
-		if !ok {
-			break
-		}
-
+	for event := range r.watchCollection.ResultChan() {
+		receivedEvent := event
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			return r.Reconcile(ctx, &event)
+			return r.Reconcile(ctx, &receivedEvent)
 		})
 		if err != nil {
 			r.log.Error(err, "Reconciliation error")
 		}
 	}
 
-	r.clusterWatch.Stop()
-	r.configMapWatch.Stop()
-	r.serverSecretWatch.Stop()
-	r.caSecretWatch.Stop()
-	r.postgresSecretWatch.Stop()
 	return nil
 }
 
 // Stop stops the controller
 func (r *InstanceReconciler) Stop() {
-	r.clusterWatch.Stop()
+	if r.watchCollection != nil {
+		r.watchCollection.Stop()
+	}
 }
 
 // GetClient returns the dynamic client that is being used for a certain reconciler
