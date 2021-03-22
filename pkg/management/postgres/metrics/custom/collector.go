@@ -12,6 +12,7 @@ package custom
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -29,6 +30,9 @@ type QueriesCollector struct {
 	userQueries    UserQueries
 	mappings       map[string]MetricMapSet
 	variableLabels map[string]VariableSet
+
+	errorUserQueries      *prometheus.CounterVec
+	errorUserQueriesGauge prometheus.Gauge
 }
 
 // Name returns the name of this collector, as supplied by the user in the configMap
@@ -38,8 +42,6 @@ func (q QueriesCollector) Name() string {
 
 // Collect load data from the actual PostgreSQL instance
 func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
-	ctx := context.Background()
-
 	isPrimary, err := q.instance.IsPrimary()
 	if err != nil {
 		return err
@@ -50,22 +52,8 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 		return err
 	}
 
-	tx, err := conn.BeginTx(ctx, &sql.TxOptions{
-		ReadOnly: true,
-	})
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Log.Info("Error while rolling back metrics extraction", "err", err.Error())
-		}
-	}()
-
-	_, err = tx.Exec("SET ROLE TO pg_monitor")
-	if err != nil {
-		return err
-	}
+	// reset before collecting
+	q.errorUserQueries.Reset()
 
 	for name, userQuery := range q.userQueries {
 		collector := QueryCollector{
@@ -75,15 +63,25 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 			variableLabels: q.variableLabels[name],
 		}
 
+		log.Log.V(1).Info("Collecting query: ", "name", name)
+
 		if (userQuery.Primary || userQuery.Master) && !isPrimary { // wokeignore:rule=master
 			continue
 		}
 
-		err := collector.collect(tx, ch)
+		err = collector.collect(conn, ch)
+
 		if err != nil {
-			return err
+			log.Log.Error(err, "Error collecting user query", "query name", name)
+			// increment metrics counters.
+			q.errorUserQueries.WithLabelValues(name + ": " + err.Error()).Inc()
+			q.errorUserQueriesGauge.Set(1)
 		}
 	}
+
+	// add err it into errorUserQueriesVec and errorUserQueriesGauge metrics.
+	q.errorUserQueriesGauge.Collect(ch)
+	q.errorUserQueries.Collect(ch)
 
 	return nil
 }
@@ -99,6 +97,10 @@ func (q QueriesCollector) Describe(ch chan<- *prometheus.Desc) {
 
 		collector.describe(ch)
 	}
+
+	// add error user queries description
+	q.errorUserQueries.Describe(ch)
+	q.errorUserQueriesGauge.Describe(ch)
 }
 
 // NewQueriesCollector create a new PgCollector working over a set of custom queries
@@ -118,8 +120,22 @@ func NewQueriesCollector(name string, instance *postgres.Instance, customQueries
 	result.mappings = make(map[string]MetricMapSet)
 	result.variableLabels = make(map[string]VariableSet)
 	for queryName, queries := range result.userQueries {
-		result.mappings[queryName], result.variableLabels[queryName] = queries.ToMetricMap(queryName)
+		result.mappings[queryName], result.variableLabels[queryName] = queries.ToMetricMap(
+			fmt.Sprintf("%v_%v", name, queryName))
 	}
+
+	// assign error metrics
+	result.errorUserQueries = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: name,
+		Name:      "errors_total",
+		Help:      "Total errors occurred performing user queries.",
+	}, []string{"errorUserQueries"})
+
+	result.errorUserQueriesGauge = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: name,
+		Name:      "last_error",
+		Help:      "1 if the last collection ended with error, 0 otherwise.",
+	})
 
 	return &result, nil
 }
@@ -133,9 +149,20 @@ type QueryCollector struct {
 	variableLabels VariableSet
 }
 
-// collect collect the result from query and writes it to the prometheus
+// collect collects the result from query and writes it to the prometheus
 // infrastructure
-func (c QueryCollector) collect(tx *sql.Tx, ch chan<- prometheus.Metric) error {
+func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error {
+	tx, err := createMonitoringTx(conn)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Log.Info("Error while rolling back metrics extraction", "err", err.Error())
+		}
+	}()
+
 	rows, err := tx.Query(c.userQuery.Query)
 	if err != nil {
 		return err
@@ -175,53 +202,82 @@ func (c QueryCollector) collect(tx *sql.Tx, ch chan<- prometheus.Metric) error {
 			return err
 		}
 
-		// Get the list of variable label names
-		var labels []string
-		for idx, mapping := range c.columnMapping {
-			if mapping.Label {
-				value, ok := postgres.DBToString(columnData[idx])
-				if !ok {
-					log.Log.Info("Label value cannot be converted to string",
-						"value", value,
-						"mapping", mapping)
-					return nil
-				}
-
-				labels = append(labels, value)
-			}
-		}
-
-		for idx, columnName := range columns {
-			mapping := c.columnMapping[idx]
-
-			// There is a strong difference between histogram and non-histogram metrics in
-			// pg_exporter. The first ones are looked up by column name and the second
-			// ones are looked up just using the index.
-			//
-			// We implemented the same behavior here.
-
-			switch {
-			case mapping.Discard:
-				continue
-
-			case mapping.Histogram:
-				histogramData, err := histogram.NewFromRawData(columnData, columns, columnName)
-				if err != nil {
-					log.Log.Error(err, "Cannot process histogram metric",
-						"columns", columns,
-						"columnData", columnData,
-						"labels", labels)
-				} else {
-					c.collectHistogramMetric(mapping, histogramData, labels, ch)
-				}
-
-			case !mapping.Histogram:
-				c.collectConstMetric(mapping, columnData[idx], labels, ch)
-			}
+		labels, done := c.collectLabels(columnData)
+		if done {
+			c.collectColumns(columns, columnData, labels, ch)
 		}
 	}
-
 	return nil
+}
+
+// Collect the list of labels from the database, and returns true if the
+// label extraction succeeded, false otherwise
+func (c QueryCollector) collectLabels(columnData []interface{}) ([]string, bool) {
+	var labels []string
+	for idx, mapping := range c.columnMapping {
+		if mapping.Label {
+			value, ok := postgres.DBToString(columnData[idx])
+			if !ok {
+				log.Log.Info("Label value cannot be converted to string",
+					"value", value,
+					"mapping", mapping)
+				return nil, false
+			}
+
+			labels = append(labels, value)
+		}
+	}
+	return labels, true
+}
+
+// Collect the metrics from the database columns
+func (c QueryCollector) collectColumns(columns []string, columnData []interface{},
+	labels []string, ch chan<- prometheus.Metric) {
+	for idx, columnName := range columns {
+		mapping := c.columnMapping[idx]
+
+		// There is a strong difference between histogram and non-histogram metrics in
+		// pg_exporter. The first ones are looked up by column name and the second
+		// ones are looked up just using the index.
+		//
+		// We implemented the same behavior here.
+
+		switch {
+		case mapping.Discard:
+			continue
+
+		case mapping.Histogram:
+			histogramData, err := histogram.NewFromRawData(columnData, columns, columnName)
+			if err != nil {
+				log.Log.Error(err, "Cannot process histogram metric",
+					"columns", columns,
+					"columnData", columnData,
+					"labels", labels)
+			} else {
+				c.collectHistogramMetric(mapping, histogramData, labels, ch)
+			}
+
+		case !mapping.Histogram:
+			c.collectConstMetric(mapping, columnData[idx], labels, ch)
+		}
+	}
+}
+
+// createMonitoringTx create a monitoring transaction with read-only access
+// and role set to `pg_monitor`
+func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
+	ctx := context.Background()
+	defer ctx.Done()
+
+	tx, err := conn.BeginTx(ctx, &sql.TxOptions{
+		ReadOnly: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec("SET ROLE TO pg_monitor")
+	return tx, err
 }
 
 // describe puts in the channel the metadata we have for the queries we collect
