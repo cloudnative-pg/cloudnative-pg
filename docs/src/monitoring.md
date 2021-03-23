@@ -12,6 +12,15 @@ The exporter can be accessed as follows:
 curl http://<pod ip>:8000/metrics
 ```
 
+All monitoring queries are:
+
+- transactionally atomic (one transaction per query)
+- executed with the `pg_monitor` role
+
+Please refer to the
+["Default roles" section in PostgreSQL documentation](https://www.postgresql.org/docs/current/default-roles.html)
+for details on the `pg_monitor` role.
+
 ## Predefined internal metrics
 
 The operator provides a set of internal metrics and publishes them by default.
