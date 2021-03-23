@@ -9,7 +9,12 @@ package e2e
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -48,10 +53,17 @@ var _ = Describe("Certificate for tls authentication", func() {
 		By(fmt.Sprintf("creating an app Pod in the %v namespace", namespace), func() {
 			_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + sampleAppFile)
 			Expect(err).ToNot(HaveOccurred())
-			_, _, podErr := tests.Run(fmt.Sprintf(
-				"kubectl wait --for=condition=Ready --timeout=300s pod cert-test -n %v",
-				namespace))
-			Expect(podErr).ToNot(HaveOccurred())
+			// The pod should be ready
+			timeout := 300
+			podNamespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      "cert-test",
+			}
+			Eventually(func() (bool, error) {
+				pod := &corev1.Pod{}
+				err := env.Client.Get(env.Ctx, podNamespacedName, pod)
+				return utils.IsPodActive(*pod) && utils.IsPodReady(*pod), err
+			}, timeout).Should(BeTrue())
 		})
 
 		By("connecting to DB using Certificate authentication", func() {
