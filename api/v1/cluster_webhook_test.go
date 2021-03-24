@@ -10,7 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -200,7 +200,7 @@ var _ = Describe("Defaulting webhook", func() {
 	It("should fill the image name if isn't already set", func() {
 		cluster := Cluster{}
 		cluster.Default()
-		Expect(cluster.Spec.ImageName).To(Equal(versions.GetDefaultImageName()))
+		Expect(cluster.Spec.ImageName).To(Equal(configuration.GetDefaultPostgresImageName()))
 	})
 
 	It("shouldn't set the image name if already present", func() {

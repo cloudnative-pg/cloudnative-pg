@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 )
 
 const (
@@ -294,7 +294,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod
 			InitContainers: []corev1.Container{
 				{
 					Name:  BootstrapControllerContainerName,
-					Image: versions.GetDefaultOperatorImageName(),
+					Image: configuration.GetOperatorImageName(),
 					Command: []string{
 						"/manager",
 						"bootstrap",

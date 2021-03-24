@@ -13,6 +13,8 @@ import (
 	"os"
 
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -25,15 +27,24 @@ import (
 	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/cmd/manager/app"
 	"github.com/EnterpriseDB/cloud-native-postgresql/controllers"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 	// +kubebuilder:scaffold:imports
 )
 
 var (
-	scheme         = runtime.NewScheme()
-	setupLog       = ctrl.Log.WithName("setup")
-	webhookCertDir = os.Getenv("WEBHOOK_CERT_DIR")
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+
+	// clientset is the kubernetes client used during
+	// the initialization of the operator
+	clientSet *kubernetes.Clientset
+
+	// apiClientset is the kubernetes client set with
+	// support for the apiextensions that is used
+	// during the initialization of the operator
+	apiClientSet *apiextensionsclientset.Clientset
 )
 
 const (
@@ -99,12 +110,14 @@ func main() {
 
 	// No subcommand invoked, let's start the operator
 	var metricsAddr string
+	var configMapName string
 	var enableLeaderElection bool
 	var opts zap.Options
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&configMapName, "config-map-name", "", "The name of the ConfigMap")
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
@@ -112,8 +125,7 @@ func main() {
 
 	setupLog.Info("Starting Cloud Native PostgreSQL Operator", "version", versions.Version)
 
-	watchNamespace := os.Getenv("WATCH_NAMESPACE")
-	setupLog.Info("Listening for changes", "watchNamespace", watchNamespace)
+	setupLog.Info("Listening for changes", "watchNamespace", configuration.GetWatchNamespace())
 
 	managerOptions := ctrl.Options{
 		Scheme:             scheme,
@@ -121,13 +133,13 @@ func main() {
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "db9c8771.k8s.enterprisedb.io",
-		Namespace:          watchNamespace,
+		Namespace:          configuration.GetWatchNamespace(),
 		CertDir:            "/tmp",
 	}
-	if webhookCertDir != "" {
+	if configuration.GetWebhookCertDir() != "" {
 		// If OLM will generate certificates for us, let's just
 		// use those
-		managerOptions.CertDir = webhookCertDir
+		managerOptions.CertDir = configuration.GetWebhookCertDir()
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), managerOptions)
@@ -141,13 +153,28 @@ func main() {
 	mgr.GetWebhookServer().KeyName = "apiserver.key"
 
 	certificatesGenerationFolder := mgr.GetWebhookServer().CertDir
-	if webhookCertDir != "" {
+	if configuration.GetWebhookCertDir() != "" {
 		// OLM is generating certificates for us so we can avoid
 		// injecting/creating certificates
 		certificatesGenerationFolder = ""
 	}
-	err = setupPKI(ctx, mgr.GetConfig(), certificatesGenerationFolder)
 
+	err = createKubernetesClient(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create Kubernetes clients")
+		os.Exit(1)
+	}
+
+	if configMapName != "" {
+		err := readConfigMap(ctx, configuration.GetOperatorNamespace(), configMapName)
+		if err != nil {
+			setupLog.Error(err, "unable to read ConfigMap",
+				"namespace", configuration.GetOperatorNamespace(),
+				"name", configMapName)
+		}
+	}
+
+	err = setupPKI(ctx, certificatesGenerationFolder)
 	if err != nil {
 		setupLog.Error(err, "unable to setup PKI infrastructure")
 		os.Exit(1)
@@ -220,27 +247,32 @@ func main() {
 	}
 }
 
-func setupPKI(ctx context.Context, config *rest.Config, certDir string) error {
-	/*
-	   Ensure we have the required PKI infrastructure to make
-	   the operator and the clusters working
-	*/
-	clientSet, err := kubernetes.NewForConfig(config)
+// createKubernetesClient creates the Kubernetes client that will be used during
+// the operator initialization
+func createKubernetesClient(config *rest.Config) error {
+	var err error
+	clientSet, err = kubernetes.NewForConfig(config)
 	if err != nil {
 		return fmt.Errorf("cannot create a K8s client: %w", err)
 	}
 
-	apiClientSet, err := apiextensionsclientset.NewForConfig(config)
+	apiClientSet, err = apiextensionsclientset.NewForConfig(config)
 	if err != nil {
 		return fmt.Errorf("cannot create a K8s API extension client: %w", err)
 	}
 
+	return nil
+}
+
+// setupPKI ensures that we have the required PKI infrastructure to make
+// the operator and the clusters working
+func setupPKI(ctx context.Context, certDir string) error {
 	pkiConfig := certs.PublicKeyInfrastructure{
 		CaSecretName:                       controllers.CaSecretName,
 		CertDir:                            certDir,
 		SecretName:                         webhookSecretName,
 		ServiceName:                        webhookServiceName,
-		OperatorNamespace:                  controllers.GetOperatorNamespaceOrDie(),
+		OperatorNamespace:                  configuration.GetOperatorNamespace(),
 		MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
 		CustomResourceDefinitionsName: []string{
@@ -249,7 +281,7 @@ func setupPKI(ctx context.Context, config *rest.Config, certDir string) error {
 			"scheduledbackups.postgresql.k8s.enterprisedb.io",
 		},
 	}
-	err = pkiConfig.Setup(ctx, clientSet, apiClientSet)
+	err := pkiConfig.Setup(ctx, clientSet, apiClientSet)
 	if err != nil {
 		return err
 	}
@@ -258,6 +290,33 @@ func setupPKI(ctx context.Context, config *rest.Config, certDir string) error {
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// readConfigMap reads the configMap
+func readConfigMap(ctx context.Context, namespace, name string) error {
+	if name == "" {
+		return nil
+	}
+
+	if namespace == "" {
+		return nil
+	}
+
+	setupLog.Info("Loading configuration from ConfigMap",
+		"namespace", namespace,
+		"name", name)
+
+	configMap, err := clientSet.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
+	if apierrs.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	configuration.ReadConfigMap(configMap.Data)
 
 	return nil
 }

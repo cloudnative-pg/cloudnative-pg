@@ -15,9 +15,9 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -60,7 +60,7 @@ var _ = Describe("Rolling updates", func() {
 		// Update to the latest minor
 		updatedImageName := os.Getenv("POSTGRES_IMG")
 		if updatedImageName == "" {
-			updatedImageName = versions.GetDefaultImageName()
+			updatedImageName = configuration.GetDefaultPostgresImageName()
 		}
 
 		// We should be able to apply the conf containing the new

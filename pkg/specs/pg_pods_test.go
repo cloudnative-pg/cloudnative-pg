@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -26,10 +26,10 @@ var _ = Describe("Extract the used image name", func() {
 	pod := PodWithExistingStorage(cluster, 1)
 
 	It("extract the default image name", func() {
-		Expect(GetPostgresImageName(*pod)).To(Equal(versions.GetDefaultImageName()))
+		Expect(GetPostgresImageName(*pod)).To(Equal(configuration.GetDefaultPostgresImageName()))
 	})
 
 	It("extract the init container image name", func() {
-		Expect(GetBootstrapControllerImageName(*pod)).To(Equal(versions.GetDefaultOperatorImageName()))
+		Expect(GetBootstrapControllerImageName(*pod)).To(Equal(configuration.GetOperatorImageName()))
 	})
 })
