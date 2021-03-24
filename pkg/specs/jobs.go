@@ -15,7 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 )
 
 // CreatePrimaryJobViaInitdb create a new primary instance in a Pod
@@ -86,7 +86,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 					InitContainers: []corev1.Container{
 						{
 							Name:  BootstrapControllerContainerName,
-							Image: versions.GetDefaultOperatorImageName(),
+							Image: configuration.GetOperatorImageName(),
 							Command: []string{
 								"/manager",
 								"bootstrap",
@@ -187,7 +187,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 					InitContainers: []corev1.Container{
 						{
 							Name:  BootstrapControllerContainerName,
-							Image: versions.GetDefaultOperatorImageName(),
+							Image: configuration.GetOperatorImageName(),
 							Command: []string{
 								"/manager",
 								"bootstrap",
@@ -306,7 +306,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 					InitContainers: []corev1.Container{
 						{
 							Name:  BootstrapControllerContainerName,
-							Image: versions.GetDefaultOperatorImageName(),
+							Image: configuration.GetOperatorImageName(),
 							Command: []string{
 								"/manager",
 								"bootstrap",

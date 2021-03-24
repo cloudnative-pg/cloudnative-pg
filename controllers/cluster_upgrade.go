@@ -16,10 +16,10 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 var (
@@ -195,7 +195,7 @@ func (r *ClusterReconciler) isPodNeedingRestart(
 		return true, nil
 	}
 
-	if opCurrentImageName != versions.GetDefaultOperatorImageName() {
+	if opCurrentImageName != configuration.GetOperatorImageName() {
 		// We need to apply a different version of the instance manager
 		return true, nil
 	}

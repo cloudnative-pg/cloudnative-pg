@@ -9,7 +9,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"time"
 
@@ -24,16 +23,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
-)
-
-const (
-	// This is the name of the secret that we may be using to
-	// download the operator image
-	operatorSecretName = "postgresql-operator-pull-secret" //nolint:gosec
 )
 
 // createPostgresClusterObjects ensure that we have the required global objects
@@ -288,7 +282,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 	}
 
 	if operatorPullSecret {
-		pullSecretNames = append(pullSecretNames, operatorSecretName)
+		pullSecretNames = append(pullSecretNames, configuration.GetOperatorPullSecretName())
 	}
 
 	// Append the secrets specified by the user
@@ -313,8 +307,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 // It will return "true" if a secret need to be used to use the operator, false
 // if not
 func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
-	operatorDeployNamespace := os.Getenv("OPERATOR_NAMESPACE")
-	if operatorDeployNamespace == "" {
+	if configuration.GetOperatorNamespace() == "" {
 		// We are not getting started via a k8s deployment. Perhaps we are running in our development environment
 		return false, nil
 	}
@@ -322,8 +315,8 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 	// Let's find the operator secret
 	var operatorSecret corev1.Secret
 	if err := r.Get(ctx, client.ObjectKey{
-		Name:      operatorSecretName,
-		Namespace: operatorDeployNamespace,
+		Name:      configuration.GetOperatorPullSecretName(),
+		Namespace: configuration.GetOperatorNamespace(),
 	}, &operatorSecret); err != nil {
 		if apierrs.IsNotFound(err) {
 			// There is no secret like that, probably because we are running in our development environment
@@ -336,7 +329,7 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
-			Name:      operatorSecretName,
+			Name:      configuration.GetOperatorPullSecretName(),
 		},
 		Data: operatorSecret.Data,
 		Type: operatorSecret.Type,

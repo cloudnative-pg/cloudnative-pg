@@ -21,9 +21,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 // clusterLog is for logging in this package.
@@ -48,7 +48,7 @@ func (r *Cluster) Default() {
 
 	// Defaulting the image name if not specified
 	if r.Spec.ImageName == "" {
-		r.Spec.ImageName = versions.GetDefaultImageName()
+		r.Spec.ImageName = configuration.GetDefaultPostgresImageName()
 	}
 
 	// Defaulting the bootstrap method if not specified
@@ -353,11 +353,11 @@ func (r *Cluster) validateImageChange(old string) field.ErrorList {
 	newVersion := r.Spec.ImageName
 	if newVersion == "" {
 		// We'll use the default one
-		newVersion = versions.GetDefaultImageName()
+		newVersion = configuration.GetDefaultPostgresImageName()
 	}
 
 	if old == "" {
-		old = versions.GetDefaultImageName()
+		old = configuration.GetDefaultPostgresImageName()
 	}
 
 	status, err := postgres.CanUpgrade(old, newVersion)

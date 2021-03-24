@@ -10,3 +10,10 @@ vars:
       apiVersion: apps/v1
     fieldref:
       fieldpath: spec.template.spec.containers[0].image
+  - name: OPERATOR_DEPLOYMENT_NAME
+    objref:
+      kind: Deployment
+      name: controller-manager
+      apiVersion: apps/v1
+    fieldref:
+      fieldpath: metadata.name

@@ -9,7 +9,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"os"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,16 +23,6 @@ const (
 	// CaSecretName is the name of the secret which is hosting the Operator CA
 	CaSecretName = "postgresql-operator-ca-secret" // #nosec
 )
-
-// GetOperatorNamespaceOrDie get the namespace where the operator is running from
-// the environment variables or panic
-func GetOperatorNamespaceOrDie() string {
-	operatorNamespace := os.Getenv("OPERATOR_NAMESPACE")
-	if operatorNamespace == "" {
-		panic("missing OPERATOR_NAMESPACE environment variable")
-	}
-	return operatorNamespace
-}
 
 // createPostgresPKI create all the PKI infrastructure that PostgreSQL need to work
 // if using ssl=on
