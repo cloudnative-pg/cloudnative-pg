@@ -427,13 +427,17 @@ func (in *MonitoringConfiguration) DeepCopyInto(out *MonitoringConfiguration) {
 	*out = *in
 	if in.CustomQueriesConfigMap != nil {
 		in, out := &in.CustomQueriesConfigMap, &out.CustomQueriesConfigMap
-		*out = make([]corev1.LocalObjectReference, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.ConfigMapKeySelector, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.CustomQueriesSecret != nil {
 		in, out := &in.CustomQueriesSecret, &out.CustomQueriesSecret
-		*out = make([]corev1.LocalObjectReference, len(*in))
-		copy(*out, *in)
+		*out = make([]corev1.SecretKeySelector, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 

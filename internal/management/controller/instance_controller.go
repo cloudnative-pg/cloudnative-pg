@@ -117,17 +117,16 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			ctx, reference.Name, metav1.GetOptions{})
 		if err != nil {
 			r.log.Info("Unable to get configMap containing custom monitoring queries",
-				"name", reference.Name,
+				"reference", reference,
 				"clusterName", r.instance.ClusterName,
 				"namespace", r.instance.Namespace)
 			continue
 		}
 
-		// TODO: Avoid magic strings "queries.yaml"
-		data, ok := configMap.Data["queries.yaml"]
+		data, ok := configMap.Data[reference.Key]
 		if !ok {
-			r.log.Info("Missing 'queries.yaml' entry in configMap",
-				"name", reference.Name,
+			r.log.Info("Missing key in configMap",
+				"reference", reference,
 				"clusterName", r.instance.ClusterName,
 				"namespace", r.instance.Namespace)
 			continue
@@ -136,7 +135,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		err = exporter.AddCustomQueries([]byte(data))
 		if err != nil {
 			r.log.Info("Error while parsing custom queries",
-				"name", reference.Name,
+				"reference", reference,
 				"clusterName", r.instance.ClusterName,
 				"namespace", r.instance.Namespace,
 				"error", err.Error())

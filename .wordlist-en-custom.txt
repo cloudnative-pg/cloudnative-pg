@@ -26,6 +26,7 @@ ClusterStatus
 CodeReady
 CompressionType
 ConfigMap
+ConfigMapKeySelector
 Coverity
 Cron
 CronJobs
@@ -189,9 +190,9 @@ creds
 cron
 crt
 currentPrimary
-customizable
 customQueriesConfigMap
 customQueriesSecret
+customizable
 danglingPVC
 databackupconfiguration
 declaratively

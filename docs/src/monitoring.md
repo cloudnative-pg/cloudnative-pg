@@ -145,12 +145,13 @@ spec:
   monitoring:
     customQueriesConfigMap:
       - name: example-monitoring
+        key: custom-queries
 ```
 
 Specifically, the `monitoring` section looks for an array with the name
 `customQueriesConfigMap`, which, as the name suggests, needs a list of
-`ConfigMap` names to be used as the source of custom queries. The `ConfigMap`
-must have a data field called `queries.yaml` which contains YAML content only.
+`ConfigMap` key references to be used as the source of custom queries.
+
 For example:
 
 ```yaml
@@ -161,7 +162,7 @@ metadata:
   namespace: default
   name: example-monitoring
 data:
-  queries.yaml: |
+  custom-queries: |
     pg_replication:
       query: "SELECT CASE WHEN NOT pg_is_in_recovery()
               THEN 0
@@ -180,9 +181,9 @@ Note that the above query will be executed on the `primary` node, with the
 following output.
 
 ```text
-# HELP pg_replication_lag Replication lag behind primary in seconds
-# TYPE pg_replication_lag gauge
-pg_replication_lag 0
+# HELP custom_pg_replication_lag Replication lag behind primary in seconds
+# TYPE custom_pg_replication_lag gauge
+custom_pg_replication_lag 0
 ```
 
 This framework enables the definition of custom metrics to monitor the database

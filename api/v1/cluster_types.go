@@ -544,10 +544,10 @@ type S3Credentials struct {
 // configuration for a certain cluster
 type MonitoringConfiguration struct {
 	// The list of config maps containing the custom queries
-	CustomQueriesConfigMap []corev1.LocalObjectReference `json:"customQueriesConfigMap,omitempty"`
+	CustomQueriesConfigMap []corev1.ConfigMapKeySelector `json:"customQueriesConfigMap,omitempty"`
 
 	// The list of secrets containing the custom queries
-	CustomQueriesSecret []corev1.LocalObjectReference `json:"customQueriesSecret,omitempty"`
+	CustomQueriesSecret []corev1.SecretKeySelector `json:"customQueriesSecret,omitempty"`
 }
 
 // +kubebuilder:object:root=true
