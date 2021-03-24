@@ -431,10 +431,10 @@ const (
 // configuration for a certain cluster
 type MonitoringConfiguration struct {
 	// The list of config maps containing the custom queries
-	CustomQueriesConfigMap []corev1.LocalObjectReference `json:"customQueriesConfigMap"`
+	CustomQueriesConfigMap []corev1.ConfigMapKeySelector `json:"customQueriesConfigMap"`
 
 	// The list of secrets containing the custom queries
-	CustomQueriesSecret []corev1.LocalObjectReference `json:"customQueriesSecret"`
+	CustomQueriesSecret []corev1.SecretKeySelector `json:"customQueriesSecret"`
 }
 
 // +kubebuilder:object:root=true

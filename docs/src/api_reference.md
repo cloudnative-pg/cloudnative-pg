@@ -249,8 +249,8 @@ MonitoringConfiguration is the type containing all the monitoring configuration 
 
 | Field | Description | Scheme | Required |
 | -------------------- | ------------------------------ | -------------------- | -------- |
-| customQueriesConfigMap | The list of config maps containing the custom queries | []corev1.LocalObjectReference | false |
-| customQueriesSecret | The list of secrets containing the custom queries | []corev1.LocalObjectReference | false |
+| customQueriesConfigMap | The list of config maps containing the custom queries | []corev1.ConfigMapKeySelector | false |
+| customQueriesSecret | The list of secrets containing the custom queries | []corev1.SecretKeySelector | false |
 
 
 ## NodeMaintenanceWindow
