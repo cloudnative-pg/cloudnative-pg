@@ -232,6 +232,7 @@ jobs:
     name: Run E2E on local executors
     if: needs.generate-jobs.outputs.localEnabled == 'true'
     needs:
+      - buildx
       - generate-jobs
     strategy:
       fail-fast: false
@@ -292,6 +293,7 @@ jobs:
     name: Run E2E on Microsoft AKS
     if: needs.generate-jobs.outputs.aksEnabled == 'true'
     needs:
+      - buildx
       - generate-jobs
     strategy:
       fail-fast: false
@@ -417,6 +419,7 @@ jobs:
     name: Run E2E on Amazon EKS
     if: needs.generate-jobs.outputs.eksEnabled == 'true'
     needs:
+      - buildx
       - generate-jobs
     strategy:
       fail-fast: false
