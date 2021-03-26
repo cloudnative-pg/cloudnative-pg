@@ -183,6 +183,7 @@ jobs:
     name: Trigger OCP bundle
     needs:
       - golangci
+      - shellcheck
       - tests
       - apidoc
     runs-on: ubuntu-20.04
@@ -201,6 +202,7 @@ jobs:
       - buildx
     runs-on: ubuntu-20.04
     outputs:
+      image: ${{ needs.buildx.outputs.image }}
       localMatrix: ${{ steps.generate-jobs.outputs.localMatrix }}
       localEnabled: ${{ steps.generate-jobs.outputs.localEnabled }}
       eksMatrix: ${{ steps.generate-jobs.outputs.eksMatrix }}
@@ -232,7 +234,6 @@ jobs:
     name: Run E2E on local executors
     if: needs.generate-jobs.outputs.localEnabled == 'true'
     needs:
-      - buildx
       - generate-jobs
     strategy:
       fail-fast: false
@@ -249,7 +250,7 @@ jobs:
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
-      CONTROLLER_IMG: ${{ needs.buildx.outputs.image }}
+      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
       E2E_DEFAULT_STORAGE_CLASS: standard
       LOG_DIR: ${{ github.workspace }}/kind-logs/
       DOCKER_REGISTRY_MIRROR: https://mirror.gcr.io
@@ -293,7 +294,6 @@ jobs:
     name: Run E2E on Microsoft AKS
     if: needs.generate-jobs.outputs.aksEnabled == 'true'
     needs:
-      - buildx
       - generate-jobs
     strategy:
       fail-fast: false
@@ -312,7 +312,7 @@ jobs:
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
-      CONTROLLER_IMG: ${{ needs.buildx.outputs.image }}
+      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
       E2E_DEFAULT_STORAGE_CLASS: rook-ceph-block
     steps:
       -
@@ -419,7 +419,6 @@ jobs:
     name: Run E2E on Amazon EKS
     if: needs.generate-jobs.outputs.eksEnabled == 'true'
     needs:
-      - buildx
       - generate-jobs
     strategy:
       fail-fast: false
@@ -437,7 +436,7 @@ jobs:
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
-      CONTROLLER_IMG: ${{ needs.buildx.outputs.image }}
+      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
       E2E_DEFAULT_STORAGE_CLASS: gp2
 
       AWS_REGION: eu-central-1
