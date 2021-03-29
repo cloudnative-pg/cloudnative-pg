@@ -105,39 +105,41 @@ func (q QueriesCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // NewQueriesCollector create a new PgCollector working over a set of custom queries
 // supplied by the user
-func NewQueriesCollector(name string, instance *postgres.Instance, customQueries []byte) (*QueriesCollector, error) {
-	result := QueriesCollector{
-		collectorName: name,
-		instance:      instance,
-	}
+func NewQueriesCollector(name string, instance *postgres.Instance) *QueriesCollector {
+	return &QueriesCollector{
+		collectorName:  name,
+		instance:       instance,
+		mappings:       make(map[string]MetricMapSet),
+		variableLabels: make(map[string]VariableSet),
+		userQueries:    make(UserQueries),
+		errorUserQueries: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: name,
+			Name:      "errors_total",
+			Help:      "Total errors occurred performing user queries.",
+		}, []string{"errorUserQueries"}),
+		errorUserQueriesGauge: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: name,
+			Name:      "last_error",
+			Help:      "1 if the last collection ended with error, 0 otherwise.",
+		})}
+}
 
+// ParseQueries parse a YAML file containing custom queries and add it
+// to the set of gathered one
+func (q *QueriesCollector) ParseQueries(customQueries []byte) error {
 	var err error
-	result.userQueries, err = ParseQueries(customQueries)
+
+	parsedQueries, err := ParseQueries(customQueries)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	for name, query := range parsedQueries {
+		q.userQueries[name] = query
+		q.mappings[name], q.variableLabels[name] = query.ToMetricMap(
+			fmt.Sprintf("%v_%v", q.collectorName, name))
 	}
 
-	result.mappings = make(map[string]MetricMapSet)
-	result.variableLabels = make(map[string]VariableSet)
-	for queryName, queries := range result.userQueries {
-		result.mappings[queryName], result.variableLabels[queryName] = queries.ToMetricMap(
-			fmt.Sprintf("%v_%v", name, queryName))
-	}
-
-	// assign error metrics
-	result.errorUserQueries = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: name,
-		Name:      "errors_total",
-		Help:      "Total errors occurred performing user queries.",
-	}, []string{"errorUserQueries"})
-
-	result.errorUserQueriesGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: name,
-		Name:      "last_error",
-		Help:      "1 if the last collection ended with error, 0 otherwise.",
-	})
-
-	return &result, nil
+	return nil
 }
 
 // QueryCollector is the implementation of PgCollector for a certain

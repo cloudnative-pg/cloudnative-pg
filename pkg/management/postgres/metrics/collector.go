@@ -26,7 +26,7 @@ type Exporter struct {
 	instance      *postgres.Instance
 	metrics       metrics
 	pgCollectors  []PgCollector
-	customQueries []PgCollector
+	customQueries *custom.QueriesCollector
 }
 
 // metrics here are related to the exporter itself, which is instrumented to
@@ -109,8 +109,8 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 		collector.Describe(ch)
 	}
 
-	for _, collector := range e.customQueries {
-		collector.Describe(ch)
+	if e.customQueries != nil {
+		e.customQueries.Describe(ch)
 	}
 }
 
@@ -150,7 +150,10 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	e.metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 
 	// Work on predefined metrics and custom queries
-	collectors := append(e.pgCollectors, e.customQueries...)
+	collectors := e.pgCollectors
+	if e.customQueries != nil {
+		collectors = append(collectors, e.customQueries)
+	}
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -192,11 +195,14 @@ func (e *Exporter) ClearCustomQueries() {
 // AddCustomQueries read the custom queries from the passed content
 // and add the relative Prometheus collector
 func (e *Exporter) AddCustomQueries(queriesContent []byte) error {
-	newQueriesCollector, err := custom.NewQueriesCollector("custom", e.instance, queriesContent)
+	if e.customQueries == nil {
+		e.customQueries = custom.NewQueriesCollector("cnp", e.instance)
+	}
+
+	err := e.customQueries.ParseQueries(queriesContent)
 	if err != nil {
 		return fmt.Errorf("while parsing custom queries: %s", err)
 	}
 
-	e.customQueries = append(e.customQueries, newQueriesCollector)
 	return nil
 }
