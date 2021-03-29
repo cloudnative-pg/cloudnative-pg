@@ -134,7 +134,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 
 		err = exporter.AddCustomQueries([]byte(data))
 		if err != nil {
-			r.log.Info("Error while parsing custom queries",
+			r.log.Info("Error while parsing custom queries in ConfigMap",
 				"reference", reference,
 				"clusterName", r.instance.ClusterName,
 				"namespace", r.instance.Namespace,
@@ -143,7 +143,36 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		}
 	}
 
-	// TODO: support secrets
+	for _, reference := range configuration.CustomQueriesSecret {
+		secret, err := r.GetStaticClient().CoreV1().Secrets(r.instance.Namespace).Get(
+			ctx, reference.Name, metav1.GetOptions{})
+		if err != nil {
+			r.log.Info("Unable to get secret containing custom monitoring queries",
+				"reference", reference,
+				"clusterName", r.instance.ClusterName,
+				"namespace", r.instance.Namespace)
+			continue
+		}
+
+		data, ok := secret.Data[reference.Key]
+		if !ok {
+			r.log.Info("Missing key in secret",
+				"reference", reference,
+				"clusterName", r.instance.ClusterName,
+				"namespace", r.instance.Namespace)
+			continue
+		}
+
+		err = exporter.AddCustomQueries(data)
+		if err != nil {
+			r.log.Info("Error while parsing custom queries in Secret",
+				"reference", reference,
+				"clusterName", r.instance.ClusterName,
+				"namespace", r.instance.Namespace,
+				"error", err.Error())
+			continue
+		}
+	}
 }
 
 // reconcileSecret is called when the PostgreSQL secrets are changes

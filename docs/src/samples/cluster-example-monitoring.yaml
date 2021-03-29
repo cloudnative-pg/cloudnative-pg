@@ -12,6 +12,9 @@ spec:
     customQueriesConfigMap:
       - name: example-monitoring
         key: custom-queries
+    customQueriesSecret:
+      - name: example-monitoring-secret
+        key: pg-database
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -168,18 +171,6 @@ data:
             usage: "COUNTER"
             description: "Number of buffer hits in this table's TOAST table indexes (if any)"
 
-    pg_database:
-      query: "SELECT pg_database.datname, pg_database_size(pg_database.datname) as size_bytes FROM pg_database"
-      primary: true
-      cache_seconds: 30
-      metrics:
-        - datname:
-            usage: "LABEL"
-            description: "Name of the database"
-        - size_bytes:
-            usage: "GAUGE"
-            description: "Disk space used by the database"
-
     pg_stat_activity:
       query: |
         WITH
@@ -223,3 +214,22 @@ data:
         - process_idle_seconds:
             usage: "HISTOGRAM"
             description: "Idle time of server processes"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: default
+  name: example-monitoring-secret
+stringData:
+  pg-database: |
+    pg_database:
+      query: "SELECT pg_database.datname, pg_database_size(pg_database.datname) as size_bytes FROM pg_database"
+      primary: true
+      cache_seconds: 30
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of the database"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Disk space used by the database"
