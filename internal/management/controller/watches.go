@@ -32,17 +32,22 @@ func NewWatchCollection(watches ...watch.Interface) *WatchCollection {
 
 // ResultChan get a channel multiplexing events from all the watches in
 // the collection.
-func (r *WatchCollection) ResultChan() chan watch.Event {
+func (r *WatchCollection) ResultChan() <-chan watch.Event {
 	return r.multiplexedStream
 }
 
 // Stop will close the channel returned by ResultChan(). Releases
 // any resources used by the watch.
 func (r *WatchCollection) Stop() {
-	for _, w := range r.watches {
-		w.Stop()
+	select {
+	case <-r.done:
+		// the channel is closed. do nothing
+	default:
+		for _, w := range r.watches {
+			w.Stop()
+		}
+		close(r.done)
 	}
-	close(r.done)
 }
 
 // watchFanIn multiplexes a series of watches into a single channel, with
@@ -52,13 +57,16 @@ func watchFanIn(watches []watch.Interface, done chan interface{}) chan watch.Eve
 
 	multiplexedChannel := make(chan watch.Event)
 
-	multiplex := func(c <-chan watch.Event) {
+	multiplex := func(w watch.Interface) {
 		defer wg.Done()
 		for {
 			select {
 			case <-done:
 				return
-			case o := <-c:
+			case o, ok := <-w.ResultChan():
+				if !ok {
+					return
+				}
 				multiplexedChannel <- o
 			}
 		}
@@ -66,7 +74,7 @@ func watchFanIn(watches []watch.Interface, done chan interface{}) chan watch.Eve
 
 	wg.Add(len(watches))
 	for _, w := range watches {
-		go multiplex(w.ResultChan())
+		go multiplex(w)
 	}
 
 	go func() {

@@ -167,7 +167,7 @@ func (r *InstanceReconciler) watch(ctx context.Context) error {
 		caSecretWatch,
 		replicationSecretWatch,
 	)
-	defer r.watchCollection.Stop()
+	defer r.Stop()
 
 	for event := range r.watchCollection.ResultChan() {
 		receivedEvent := event
