@@ -4,205 +4,317 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-// Package metrics enables to expose a set of metrics and collectors on a given postgres instance
+// This code is inspired on [pg_exporter](https://github.com/prometheus-community/postgres_exporter)
+
 package metrics
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
-	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics/custom"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics/histogram"
 )
 
-const namespace = "cnp"
-
-// Exporter exports a set of metrics and collectors on a given postgres instance
-type Exporter struct {
+// QueriesCollector is the implementation of PgCollector for a certain
+// collection of custom queries supplied by the user
+type QueriesCollector struct {
 	instance      *postgres.Instance
-	metrics       metrics
-	pgCollectors  []PgCollector
-	customQueries *custom.QueriesCollector
+	collectorName string
+
+	userQueries    UserQueries
+	mappings       map[string]MetricMapSet
+	variableLabels map[string]VariableSet
+
+	errorUserQueries      *prometheus.CounterVec
+	errorUserQueriesGauge prometheus.Gauge
 }
 
-// metrics here are related to the exporter itself, which is instrumented to
-// expose them
-type metrics struct {
-	CollectionsTotal   prometheus.Counter
-	PgCollectionErrors *prometheus.CounterVec
-	Error              prometheus.Gauge
-	PostgreSQLUp       prometheus.Gauge
-	CollectionDuration *prometheus.GaugeVec
+// Name returns the name of this collector, as supplied by the user in the configMap
+func (q QueriesCollector) Name() string {
+	return q.collectorName
 }
 
-// NewExporter creates an exporter
-func NewExporter(instance *postgres.Instance) *Exporter {
-	return &Exporter{
-		instance:     instance,
-		pgCollectors: newPgCollectors(instance),
-		metrics:      newMetrics(),
+// Collect load data from the actual PostgreSQL instance
+func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
+	isPrimary, err := q.instance.IsPrimary()
+	if err != nil {
+		return err
 	}
+
+	conn, err := q.instance.GetApplicationDB()
+	if err != nil {
+		return err
+	}
+
+	// reset before collecting
+	q.errorUserQueries.Reset()
+
+	for name, userQuery := range q.userQueries {
+		collector := QueryCollector{
+			namespace:      name,
+			userQuery:      userQuery,
+			columnMapping:  q.mappings[name],
+			variableLabels: q.variableLabels[name],
+		}
+
+		log.Log.V(1).Info("Collecting query: ", "name", name)
+
+		if (userQuery.Primary || userQuery.Master) && !isPrimary { // wokeignore:rule=master
+			continue
+		}
+
+		err = collector.collect(conn, ch)
+
+		if err != nil {
+			log.Log.Error(err, "Error collecting user query", "query name", name)
+			// increment metrics counters.
+			q.errorUserQueries.WithLabelValues(name + ": " + err.Error()).Inc()
+			q.errorUserQueriesGauge.Set(1)
+		}
+	}
+
+	// add err it into errorUserQueriesVec and errorUserQueriesGauge metrics.
+	q.errorUserQueriesGauge.Collect(ch)
+	q.errorUserQueries.Collect(ch)
+
+	return nil
 }
 
-// newMetrics returns collector metrics
-func newMetrics() metrics {
-	subsystem := "collector"
-	return metrics{
-		CollectionsTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "collections_total",
-			Help:      "Total number of times PostgreSQL was accessed for metrics.",
-		}),
-		PgCollectionErrors: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "collection_errors_total",
-			Help:      "Total errors occurred accessing PostgreSQL for metrics.",
-		}, []string{"collector"}),
-		Error: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "last_collection_error",
+// Describe implements the prometheus.Collector and defines the metrics with return
+func (q QueriesCollector) Describe(ch chan<- *prometheus.Desc) {
+	for name, userQuery := range q.userQueries {
+		collector := QueryCollector{
+			namespace:     name,
+			userQuery:     userQuery,
+			columnMapping: q.mappings[name],
+		}
+
+		collector.describe(ch)
+	}
+
+	// add error user queries description
+	q.errorUserQueries.Describe(ch)
+	q.errorUserQueriesGauge.Describe(ch)
+}
+
+// NewQueriesCollector create a new PgCollector working over a set of custom queries
+// supplied by the user
+func NewQueriesCollector(name string, instance *postgres.Instance) *QueriesCollector {
+	return &QueriesCollector{
+		collectorName:  name,
+		instance:       instance,
+		mappings:       make(map[string]MetricMapSet),
+		variableLabels: make(map[string]VariableSet),
+		userQueries:    make(UserQueries),
+		errorUserQueries: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: name,
+			Name:      "errors_total",
+			Help:      "Total errors occurred performing user queries.",
+		}, []string{"errorUserQueries"}),
+		errorUserQueriesGauge: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: name,
+			Name:      "last_error",
 			Help:      "1 if the last collection ended with error, 0 otherwise.",
-		}),
-		PostgreSQLUp: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "up",
-			Help:      "1 if PostgreSQL is up, 0 otherwise.",
-		}),
-		CollectionDuration: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "collection_duration_seconds",
-			Help:      "Collection time duration in seconds",
-		}, []string{"collector"}),
-	}
+		})}
 }
 
-// newPgCollectors returns an array of the PgCollectors that will be run on the
-// instance
-func newPgCollectors(instance *postgres.Instance) []PgCollector {
-	pgCollectors := []PgCollector{
-		newPgStatArchiverCollector(instance),
-		newPgStatActivityCollector(instance),
-		newPgLocksCollector(instance),
-		newPgStatReplicationCollector(instance),
-	}
-	return pgCollectors
-}
+// ParseQueries parse a YAML file containing custom queries and add it
+// to the set of gathered one
+func (q *QueriesCollector) ParseQueries(customQueries []byte) error {
+	var err error
 
-// Describe implements prometheus.Collector, defining the metrics we return.
-func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
-	ch <- e.metrics.CollectionsTotal.Desc()
-	ch <- e.metrics.Error.Desc()
-	e.metrics.PgCollectionErrors.Describe(ch)
-	ch <- e.metrics.PostgreSQLUp.Desc()
-	e.metrics.CollectionDuration.Describe(ch)
-
-	for _, collector := range e.pgCollectors {
-		collector.Describe(ch)
-	}
-
-	if e.customQueries != nil {
-		e.customQueries.Describe(ch)
-	}
-}
-
-// Collect implements prometheus.Collector, collecting the metrics values to
-// export.
-func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	e.collectPgMetrics(ch)
-
-	ch <- e.metrics.CollectionsTotal
-	ch <- e.metrics.Error
-	e.metrics.PgCollectionErrors.Collect(ch)
-	ch <- e.metrics.PostgreSQLUp
-	e.metrics.CollectionDuration.Collect(ch)
-}
-
-func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
-	e.metrics.CollectionsTotal.Inc()
-	collectionStart := time.Now()
-	db, err := e.instance.GetApplicationDB()
+	parsedQueries, err := ParseQueries(customQueries)
 	if err != nil {
-		log.Log.Error(err, "Error opening connection to PostgreSQL")
-		e.metrics.Error.Set(1)
-		return
+		return err
 	}
-
-	// First, let's check the connection. No need to proceed if this fails.
-	if err := db.Ping(); err != nil {
-		log.Log.Error(err, "Error pinging PostgreSQL")
-		e.metrics.PostgreSQLUp.Set(0)
-		e.metrics.Error.Set(1)
-		e.metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
-		return
-	}
-
-	e.metrics.PostgreSQLUp.Set(1)
-	e.metrics.Error.Set(0)
-	e.metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
-
-	// Work on predefined metrics and custom queries
-	collectors := e.pgCollectors
-	if e.customQueries != nil {
-		collectors = append(collectors, e.customQueries)
-	}
-
-	var wg sync.WaitGroup
-	defer wg.Wait()
-	for _, pgCollector := range collectors {
-		wg.Add(1)
-		go func(pgCollector PgCollector) {
-			defer wg.Done()
-			label := "Collect." + pgCollector.Name()
-			collectionStart := time.Now()
-			if err := pgCollector.Collect(ch); err != nil {
-				log.Log.Error(err, "Error during collection", "collector", pgCollector.Name())
-				e.metrics.PgCollectionErrors.WithLabelValues(label).Inc()
-				e.metrics.Error.Set(1)
-			}
-			e.metrics.CollectionDuration.WithLabelValues(label).Set(time.Since(collectionStart).Seconds())
-		}(pgCollector)
-	}
-}
-
-// PgCollector is the interface for all the collectors that need to do queries
-// on PostgreSQL to gather the results
-type PgCollector interface {
-	// Name is the unique name of the collector
-	Name() string
-
-	// Collect collects data and send the metrics on the channel
-	Collect(ch chan<- prometheus.Metric) error
-
-	// Describe collects metadata about the metrics we work with
-	Describe(ch chan<- *prometheus.Desc)
-}
-
-// ClearCustomQueries removes every custom queries previously added to this
-// collector
-func (e *Exporter) ClearCustomQueries() {
-	e.customQueries = nil
-}
-
-// AddCustomQueries read the custom queries from the passed content
-// and add the relative Prometheus collector
-func (e *Exporter) AddCustomQueries(queriesContent []byte) error {
-	if e.customQueries == nil {
-		e.customQueries = custom.NewQueriesCollector("cnp", e.instance)
-	}
-
-	err := e.customQueries.ParseQueries(queriesContent)
-	if err != nil {
-		return fmt.Errorf("while parsing custom queries: %s", err)
+	for name, query := range parsedQueries {
+		q.userQueries[name] = query
+		q.mappings[name], q.variableLabels[name] = query.ToMetricMap(
+			fmt.Sprintf("%v_%v", q.collectorName, name))
 	}
 
 	return nil
+}
+
+// QueryCollector is the implementation of PgCollector for a certain
+// custom query supplied by the user
+type QueryCollector struct {
+	namespace      string
+	userQuery      UserQuery
+	columnMapping  MetricMapSet
+	variableLabels VariableSet
+}
+
+// collect collects the result from query and writes it to the prometheus
+// infrastructure
+func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error {
+	tx, err := createMonitoringTx(conn)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Log.Info("Error while rolling back metrics extraction", "err", err.Error())
+		}
+	}()
+
+	rows, err := tx.Query(c.userQuery.Query)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Log.Info("Error while closing metrics extraction",
+				"err", err.Error())
+		}
+		if rows.Err() != nil {
+			log.Log.Info("Error while loading metrics",
+				"err", err.Error())
+		}
+	}()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	columnData := make([]interface{}, len(columns))
+	scanArgs := make([]interface{}, len(columns))
+	for i := range columnData {
+		scanArgs[i] = &columnData[i]
+	}
+
+	if len(columns) != len(c.columnMapping) {
+		log.Log.Info("Columns number mismatch",
+			"name", c.namespace,
+			"columnNumberFromDB", len(columns),
+			"columnNumberFromConfiguration", len(c.columnMapping))
+		return nil
+	}
+
+	for rows.Next() {
+		if err = rows.Scan(scanArgs...); err != nil {
+			return err
+		}
+
+		labels, done := c.collectLabels(columnData)
+		if done {
+			c.collectColumns(columns, columnData, labels, ch)
+		}
+	}
+	return nil
+}
+
+// Collect the list of labels from the database, and returns true if the
+// label extraction succeeded, false otherwise
+func (c QueryCollector) collectLabels(columnData []interface{}) ([]string, bool) {
+	var labels []string
+	for idx, mapping := range c.columnMapping {
+		if mapping.Label {
+			value, ok := postgres.DBToString(columnData[idx])
+			if !ok {
+				log.Log.Info("Label value cannot be converted to string",
+					"value", value,
+					"mapping", mapping)
+				return nil, false
+			}
+
+			labels = append(labels, value)
+		}
+	}
+	return labels, true
+}
+
+// Collect the metrics from the database columns
+func (c QueryCollector) collectColumns(columns []string, columnData []interface{},
+	labels []string, ch chan<- prometheus.Metric) {
+	for idx, columnName := range columns {
+		mapping := c.columnMapping[idx]
+
+		// There is a strong difference between histogram and non-histogram metrics in
+		// pg_exporter. The first ones are looked up by column name and the second
+		// ones are looked up just using the index.
+		//
+		// We implemented the same behavior here.
+
+		switch {
+		case mapping.Discard:
+			continue
+
+		case mapping.Histogram:
+			histogramData, err := histogram.NewFromRawData(columnData, columns, columnName)
+			if err != nil {
+				log.Log.Error(err, "Cannot process histogram metric",
+					"columns", columns,
+					"columnData", columnData,
+					"labels", labels)
+			} else {
+				c.collectHistogramMetric(mapping, histogramData, labels, ch)
+			}
+
+		case !mapping.Histogram:
+			c.collectConstMetric(mapping, columnData[idx], labels, ch)
+		}
+	}
+}
+
+// createMonitoringTx create a monitoring transaction with read-only access
+// and role set to `pg_monitor`
+func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
+	ctx := context.Background()
+	defer ctx.Done()
+
+	tx, err := conn.BeginTx(ctx, &sql.TxOptions{
+		ReadOnly: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec("SET ROLE TO pg_monitor")
+	return tx, err
+}
+
+// describe puts in the channel the metadata we have for the queries we collect
+func (c QueryCollector) describe(ch chan<- *prometheus.Desc) {
+	for _, mapSet := range c.columnMapping {
+		ch <- mapSet.Desc
+	}
+}
+
+// collectConstMetric reports to the prometheus library a constant metric
+func (c QueryCollector) collectConstMetric(
+	mapping MetricMap, value interface{}, variableLabels []string, ch chan<- prometheus.Metric) {
+	floatData, ok := postgres.DBToFloat64(value)
+	if !ok {
+		log.Log.Info("Error while parsing value",
+			"namespace", c.namespace,
+			"value", value,
+			"mapping", mapping)
+		return
+	}
+
+	// Generate the metric
+	metric := prometheus.MustNewConstMetric(mapping.Desc, mapping.Vtype, floatData, variableLabels...)
+	ch <- metric
+}
+
+// collectHistogramMetric reports to the prometheus library an histogram-based metric
+func (c QueryCollector) collectHistogramMetric(
+	mapping MetricMap,
+	columnData *histogram.Value,
+	variableLabels []string,
+	ch chan<- prometheus.Metric) {
+	metric := prometheus.MustNewConstHistogram(
+		mapping.Desc,
+		columnData.Count, columnData.Sum, columnData.Buckets,
+		variableLabels...,
+	)
+	ch <- metric
 }

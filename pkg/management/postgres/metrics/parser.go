@@ -4,8 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-// Package custom contains the code required to work with user defined metrics
-package custom
+package metrics
 
 import (
 	"fmt"
