@@ -622,6 +622,12 @@ spec:
                 items:
                   type: string
                 type: array
+              initializingPVC:
+                description: List of all the PVCs that are being initialized by this
+                  cluster
+                items:
+                  type: string
+                type: array
               instances:
                 description: Total number of instances in the cluster
                 format: int32

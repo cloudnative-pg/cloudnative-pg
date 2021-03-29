@@ -138,7 +138,9 @@ func (r *ClusterReconciler) updateResourceStatus(
 	oldPVCCount := cluster.Status.PVCCount
 	newPVCCount := int32(len(resources.pvcs.Items))
 	cluster.Status.PVCCount = newPVCCount
-	cluster.Status.DanglingPVC = specs.DetectDanglingPVCs(resources.pods.Items, resources.pvcs.Items)
+	pvcClassification := specs.DetectPVCs(resources.pods.Items, resources.jobs.Items, resources.pvcs.Items)
+	cluster.Status.DanglingPVC = pvcClassification.Dangling
+	cluster.Status.InitializingPVC = pvcClassification.Initializing
 
 	// Update the pvcExpectations for the cluster
 	r.pvcExpectations.LowerExpectationsDelta(key, int(newPVCCount-oldPVCCount))

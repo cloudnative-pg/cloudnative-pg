@@ -657,8 +657,8 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	return ctrl.Result{}, nil
 }
 
-// handleDanglingPVC reattach a dangling PVC
-func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *apiv1.Cluster) error {
+// reconcilePVCs reattach a dangling PVC
+func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	pvcToReattach := electPvcToReattach(cluster)
@@ -666,15 +666,16 @@ func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *apiv
 		return nil
 	}
 
-	if cluster.IsNodeMaintenanceWindowNotReusePVC() || cluster.Spec.Instances <= cluster.Status.Instances {
-		log.Info(
-			"Detected unneeded PVCs, removing them",
-			"statusInstances", cluster.Status.Instances,
-			"specInstances", cluster.Spec.Instances,
-			"maintenanceWindow", cluster.IsNodeMaintenanceWindowInProgress(),
-			"maintenanceWindowReusePVC", cluster.IsNodeMaintenanceWindowReusePVC(),
-			"danglingPVCs", cluster.Status.DanglingPVC)
-		return r.removeDanglingPVCs(ctx, cluster)
+	if len(cluster.Status.DanglingPVC) > 0 {
+		if cluster.IsNodeMaintenanceWindowNotReusePVC() || cluster.Spec.Instances <= cluster.Status.Instances {
+			log.Info(
+				"Detected unneeded PVCs, removing them",
+				"statusInstances", cluster.Status.Instances,
+				"specInstances", cluster.Spec.Instances,
+				"maintenanceWindow", cluster.Spec.NodeMaintenanceWindow,
+				"danglingPVCs", cluster.Status.DanglingPVC)
+			return r.removeDanglingPVCs(ctx, cluster)
+		}
 	}
 
 	pvc := corev1.PersistentVolumeClaim{}
@@ -725,19 +726,21 @@ func (r *ClusterReconciler) handleDanglingPVC(ctx context.Context, cluster *apiv
 }
 
 // electPvcToReattach will choose a PVC between the dangling ones that should be reattached to the cluster,
-// giving precedence to the target primary if between the set
+// giving precedence to the target primary if between the set. If the target primary is fine, let's start
+// using the PVC we have initialized. After that we use the PVC that are dangling
 func electPvcToReattach(cluster *apiv1.Cluster) string {
-	if len(cluster.Status.DanglingPVC) == 0 {
+	pvcs := append(cluster.Status.InitializingPVC, cluster.Status.DanglingPVC...)
+	if len(pvcs) == 0 {
 		return ""
 	}
 
-	for _, name := range cluster.Status.DanglingPVC {
+	for _, name := range pvcs {
 		if name == cluster.Status.TargetPrimary {
 			return name
 		}
 	}
 
-	return cluster.Status.DanglingPVC[0]
+	return pvcs[0]
 }
 
 // removeDanglingPVCs will remove dangling PVCs

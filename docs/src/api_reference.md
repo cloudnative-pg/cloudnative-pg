@@ -225,6 +225,7 @@ ClusterStatus defines the observed state of Cluster
 | pvcCount | How many PVCs have been created by this cluster | int32 | false |
 | jobCount | How many Jobs have been created by this cluster | int32 | false |
 | danglingPVC | List of all the PVCs created by this cluster and still available which are not attached to a Pod | []string | false |
+| initializingPVC | List of all the PVCs that are being initialized by this cluster | []string | false |
 | writeService | Current write pod | string | false |
 | readService | Current list of read pods | string | false |
 | phase | Current phase of the cluster | string | false |

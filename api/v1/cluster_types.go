@@ -208,6 +208,9 @@ type ClusterStatus struct {
 	// which are not attached to a Pod
 	DanglingPVC []string `json:"danglingPVC,omitempty"`
 
+	// List of all the PVCs that are being initialized by this cluster
+	InitializingPVC []string `json:"initializingPVC,omitempty"`
+
 	// Current write pod
 	WriteService string `json:"writeService,omitempty"`
 

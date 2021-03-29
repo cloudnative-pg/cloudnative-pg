@@ -294,15 +294,16 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// Recreate missing Pods
-	if len(cluster.Status.DanglingPVC) > 0 {
+	// Work on the PVCs we currently have
+	pvcNeedingMaintenance := len(cluster.Status.DanglingPVC) + len(cluster.Status.InitializingPVC)
+	if pvcNeedingMaintenance > 0 {
 		if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
 			// A pod is not ready, let's retry
 			log.V(2).Info("Waiting for node to be ready before attaching PVCs")
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 
-		if err := r.handleDanglingPVC(ctx, cluster); err != nil {
+		if err := r.reconcilePVCs(ctx, cluster); err != nil {
 			return ctrl.Result{}, err
 		}
 
