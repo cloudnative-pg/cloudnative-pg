@@ -23,7 +23,7 @@ var (
 	configFlags *genericclioptions.ConfigFlags
 
 	rootCmd = &cobra.Command{
-		Use:   "kubectl cnp",
+		Use:   "kubectl-cnp",
 		Short: "An interface to manage your Cloud Native PostgreSQL clusters",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return cnp.CreateKubernetesClient(configFlags)
