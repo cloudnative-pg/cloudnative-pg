@@ -167,7 +167,11 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	}
 
 	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		fmt.Println(aurora.Red("Switchover in progress"))
+		if cluster.Status.CurrentPrimary == "" {
+			fmt.Println(aurora.Red("Primary server is initializing"))
+		} else {
+			fmt.Println(aurora.Red("Switchover in progress"))
+		}
 	}
 	summary.Print()
 	fmt.Println()
