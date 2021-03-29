@@ -233,6 +233,8 @@ inProgress
 init
 initdb
 initialise
+inProgress
+initializingPVC
 instancesStatus
 io
 ip
