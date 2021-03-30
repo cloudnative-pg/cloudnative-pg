@@ -26,6 +26,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
@@ -106,11 +107,9 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	ctx context.Context,
 	configuration *apiv1.MonitoringConfiguration,
 ) {
-	exporter := webserver.GetExporter()
 	r.log.Info("Reconciling custom monitoring queries")
 
-	// TODO: avoid replacing unchanged queries
-	exporter.ClearCustomQueries()
+	queries := metrics.NewQueriesCollector("cnp", r.instance)
 
 	for _, reference := range configuration.CustomQueriesConfigMap {
 		configMap, err := r.GetStaticClient().CoreV1().ConfigMaps(r.instance.Namespace).Get(
@@ -132,7 +131,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			continue
 		}
 
-		err = exporter.AddCustomQueries([]byte(data))
+		err = queries.ParseQueries([]byte(data))
 		if err != nil {
 			r.log.Info("Error while parsing custom queries in ConfigMap",
 				"reference", reference,
@@ -163,7 +162,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			continue
 		}
 
-		err = exporter.AddCustomQueries(data)
+		err = queries.ParseQueries(data)
 		if err != nil {
 			r.log.Info("Error while parsing custom queries in Secret",
 				"reference", reference,
@@ -173,6 +172,9 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			continue
 		}
 	}
+
+	exporter := webserver.GetExporter()
+	exporter.SetCustomQueries(queries)
 }
 
 // reconcileSecret is called when the PostgreSQL secrets are changes
