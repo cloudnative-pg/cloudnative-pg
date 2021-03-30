@@ -8,7 +8,6 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package metrics
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -155,23 +154,7 @@ type PgCollector interface {
 	Describe(ch chan<- *prometheus.Desc)
 }
 
-// ClearCustomQueries removes every custom queries previously added to this
-// collector
-func (e *Exporter) ClearCustomQueries() {
-	e.queries = nil
-}
-
-// AddCustomQueries read the custom queries from the passed content
-// and add the relative Prometheus collector
-func (e *Exporter) AddCustomQueries(queriesContent []byte) error {
-	if e.queries == nil {
-		e.queries = NewQueriesCollector("cnp", e.instance)
-	}
-
-	err := e.queries.ParseQueries(queriesContent)
-	if err != nil {
-		return fmt.Errorf("while parsing custom queries: %s", err)
-	}
-
-	return nil
+// SetCustomQueries sets the custom queries from the passed content
+func (e *Exporter) SetCustomQueries(queries *QueriesCollector) {
+	e.queries = queries
 }
