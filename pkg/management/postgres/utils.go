@@ -6,7 +6,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 
 package postgres
 
-// This code is inspired on [pg_exporter](https://github.com/prometheus-community/postgres_exporter)
+// This code is inspired on [postgres_exporter](https://github.com/prometheus-community/postgres_exporter)
 
 import (
 	"fmt"

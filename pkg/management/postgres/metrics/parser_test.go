@@ -19,7 +19,7 @@ func TestUtils(t *testing.T) {
 }
 
 var _ = Describe("Metrics parser", func() {
-	It("correctly handles the pg_exporter example queries", func() {
+	It("correctly handles the postgres_exporter example queries", func() {
 		result, err := ParseQueries([]byte(pgExporterQueries))
 		Expect(err).To(BeNil())
 

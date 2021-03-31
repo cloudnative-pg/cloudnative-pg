@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-// This code is inspired on [pg_exporter](https://github.com/prometheus-community/postgres_exporter)
+// This code is inspired on [postgres_exporter](https://github.com/prometheus-community/postgres_exporter)
 
 package metrics
 
@@ -238,7 +238,7 @@ func (c QueryCollector) collectColumns(columns []string, columnData []interface{
 		mapping := c.columnMapping[idx]
 
 		// There is a strong difference between histogram and non-histogram metrics in
-		// pg_exporter. The first ones are looked up by column name and the second
+		// postgres_exporter. The first ones are looked up by column name and the second
 		// ones are looked up just using the index.
 		//
 		// We implemented the same behavior here.
