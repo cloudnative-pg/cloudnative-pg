@@ -161,14 +161,16 @@ var _ = Describe("Upgrade", func() {
 						"psql", "-U", "postgres", "-tAc", "show max_replication_slots")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
 					return value, err, atoiErr
-				}, timeout).Should(BeEquivalentTo(16))
+				}, timeout).Should(BeEquivalentTo(16),
+					"Pod %v should have updated its config", pod.Name)
 
 				Eventually(func() (int, error, error) {
 					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
 						"psql", "-U", "postgres", "-tAc", "show maintenance_work_mem")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
 					return value, err, atoiErr
-				}, timeout).Should(BeEquivalentTo(128))
+				}, timeout).Should(BeEquivalentTo(128),
+					"Pod %v should have updated its config", pod.Name)
 			}
 			// Check that a switchover happened
 			Eventually(func() (string, error) {
