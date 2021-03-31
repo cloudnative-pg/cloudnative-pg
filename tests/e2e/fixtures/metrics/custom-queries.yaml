@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-01
+  labels:
+    e2e: metrics
+data:
+  queries.yaml: |
+    pg_postmaster: # wokeignore:rule=master
+      query: "SELECT EXTRACT(EPOCH FROM (now() - pg_postmaster_start_time())) AS start_time_seconds" # wokeignore:rule=master
+      primary: false
+      metrics:
+        - start_time_seconds:
+            usage: "COUNTER"
+            description: "Seconds since the postgres server start"
+  additional-queries: |
+    pg_wal_files:
+      query: "SELECT COALESCE(sum(1), 0) AS total FROM pg_ls_waldir() AS d (file) WHERE file ~ '^[0-9A-F]{8}[0-9A-F]{8}[0-9A-F]{8}$'"
+      primary: false
+      metrics:
+        - total:
+            usage: "GAUGE"
+            description: "Total no. of WAL files on disk"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-02
+  labels:
+    e2e: metrics
+data:
+  queries.yaml: |
+    pg_database:
+      query: "SELECT pg_database.datname, pg_database_size(pg_database.datname) as size_bytes FROM pg_database"
+      primary: false
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of the database"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Disk space used by the database"
+
+  additional-queries: |
+    pg_replication_slots:
+      query: "SELECT count(*) AS inactive FROM pg_replication_slots WHERE NOT active"
+      primary: false
+      metrics:
+        - inactive:
+            usage: "GAUGE"
+            description: "Amount of inactive replication slots"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: monitoring-01
+  labels:
+    e2e: metrics
+stringData:
+  queries.yaml: |
+    pg_stat_archiver:
+      query: "SELECT archived_count, failed_count FROM pg_stat_archiver"
+      primary: false
+      metrics:
+        - archived:
+            usage: "COUNTER"
+            description: "Amount of WALs archived"
+        - failed:
+            usage: "COUNTER"
+            description: "Amount of failures in archiving WALs"
+
+  additional-queries: |
+    pg_locks:
+      query: |
+        SELECT count(*)
+        FROM pg_catalog.pg_locks blocked_locks
+        JOIN pg_catalog.pg_locks blocking_locks
+          ON blocking_locks.locktype = blocked_locks.locktype
+            AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database
+            AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation
+            AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page
+            AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple
+            AND blocking_locks.virtualxid IS NOT DISTINCT FROM blocked_locks.virtualxid
+            AND blocking_locks.transactionid IS NOT DISTINCT FROM blocked_locks.transactionid
+            AND blocking_locks.classid IS NOT DISTINCT FROM blocked_locks.classid
+            AND blocking_locks.objid IS NOT DISTINCT FROM blocked_locks.objid
+            AND blocking_locks.objsubid IS NOT DISTINCT FROM blocked_locks.objsubid
+            AND blocking_locks.pid != blocked_locks.pid
+        JOIN pg_catalog.pg_stat_activity blocking_activity
+          ON blocking_activity.pid = blocking_locks.pid
+        WHERE NOT blocked_locks.granted;
+      primary: false
+      metrics:
+        - blocked_queries:
+            usage: "GAUGE"
+            description: "Total amount of queries blocked by regular locks"
