@@ -1,16 +1,23 @@
 # Security
 
-This section contains information about security for Cloud Native PostgreSQL,
-from a few standpoints: source code, Kubernetes, and PostgreSQL.
+This section contains information about security for Cloud Native PostgreSQL
+analyzed at 3 different layers: Code, Container and Cluster.
 
 !!! Warning
     The information contained in this page must not exonerate you from
-    performing regular InfoSec duties on your Kubernetes cluster.
+    performing regular InfoSec duties on your Kubernetes cluster. Please
+    familiarize with the ["Overview of Cloud Native Security"](https://kubernetes.io/docs/concepts/security/overview/)
+    page from the Kubernetes documentation.
 
-## Source code static analysis
+!!! Seealso "About the 4C's Security Model"
+    Please refer to ["The 4C’s Security Model in Kubernetes"](https://www.enterprisedb.com/blog/4cs-security-model-kubernetes)
+    blog article to get a better understanding and context of the approach EDB
+    has taken with security in Cloud Native PostgreSQL.
+
+## Code
 
 Source code of Cloud Native PostgreSQL is *systematically scanned* for static analysis purposes,
-including **security problems**, using a popular open-source for Go called
+including **security problems**, using a popular open-source linter for Go called
 [GolangCI-Lint](https://github.com/golangci/golangci-lint) directly in the CI/CD pipeline.
 GolangCI-Lint can run several *linters* on the same source code.
 
@@ -27,7 +34,39 @@ the code such as hard-coded credentials, integer overflows and SQL injections - 
 Source code is also regularly inspected through [Coverity Scan by Synopsys](https://scan.coverity.com/)
 via EnterpriseDB's internal CI/CD pipeline.
 
-## Kubernetes
+## Container
+
+Every container image that is part of Cloud Native PostgreSQL is automatically built via CI/CD pipelines following every commit.
+Such images include not only the operator's, but also the operands' - specifically every supported PostgreSQL version.
+Within the pipelines, images are scanned with:
+
+- [Dockle](https://github.com/goodwithtech/dockle): for best practices in terms
+  of the container build process
+- [Clair](https://github.com/quay/clair): for vulnerabilities found in both the
+  underlying operating system as well as libraries and applications that they run
+
+!!! Important
+    All operand images are automatically rebuilt once a day by our pipelines in case
+    of security updates at the base image and package level, providing **patch level updates**
+    for the container images that EDB distributes.
+
+The following guidelines and frameworks have been taken into account for container-level security:
+
+- the ["Container Image Creation and Deployment Guide"](https://dl.dod.cyber.mil/wp-content/uploads/devsecops/pdf/DevSecOps_Enterprise_Container_Image_Creation_and_Deployment_Guide_2.6-Public-Release.pdf),
+  developed by the Defense Information Systems Agency (DISA) of the United States Department of Defense (DoD)
+- the ["CIS Benchmark for Docker"](https://www.cisecurity.org/benchmark/docker/),
+  developed by the Center for Internet Security (CIS)
+
+!!! Seealso "About the Container level security"
+    Please refer to ["Security and Containers in Cloud Native PostgreSQL"](https://www.enterprisedb.com/blog/security-and-containers-cloud-native-postgresql)
+    blog article for more information about the approach that EDB has taken on
+    security at container level in Cloud Native PostgreSQL.
+
+## Cluster
+
+Security at the cluster level takes into account all Kubernetes components that
+form both the control plane and the nodes, as well as the applications that run in
+the cluster (PostgreSQL included).
 
 ### Pod Security Policies
 
@@ -52,100 +91,7 @@ Network policies are beyond the scope of this document.
 Please refer to the ["Network policies"](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 section of the Kubernetes documentation for further information.
 
-### Resources
-
-In a typical Kubernetes cluster, containers run with unlimited resources. By default,
-they might be allowed to use as much CPU and RAM as needed.
-
-Cloud Native PostgreSQL allows administrators to control and manage resource usage by the pods of the cluster,
-through the `resources` section of the manifest, with two knobs:
-
-- `requests`: initial requirement
-- `limits`: maximum usage, in case of dynamic increase of resource needs
-
-For example, you can request an initial amount of RAM of 32MiB (scalable to 128MiB) and 50m of CPU (scalable to 100m) as follows:
-
-```yaml
-  resources:
-    requests:
-      memory: "32Mi"
-      cpu: "50m"
-    limits:
-      memory: "128Mi"
-      cpu: "100m"
-```
-
-Memory requests and limits are associated with containers, but it is useful to think of a pod as having a memory request
-and limit. The memory request for the pod is the sum of the memory requests for all the containers in the pod.
-
-Pod scheduling is based on requests and not limits. A pod is scheduled to run on a Node only if the Node has enough
-available memory to satisfy the pod's memory request.
-
-For each resource, we divide containers into 3 Quality of Service (QoS) classes, in decreasing order of priority:
-
-- *Guaranteed*
-- *Burstable*
-- *Best-Effort*
-
-For more details, please refer to the ["Configure Quality of Service for Pods"](https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/#qos-classes) section in the Kubernetes documentation.
-
-For a PostgreSQL workload it is recommended to set a "Guaranteed" QoS.
-
-In order to avoid resources related issues in Kubernetes, we can refer to the best practices for "out of resource" handling while creating
-a cluster:
-
--  Specify your required values for memory and CPU in the resources section of the manifest file.
-   This way you can avoid the `OOM Killed` (where "OOM" stands for Out Of Memory) and `CPU throttle` or any other resources
-   related issues on running instances.
--  In order for the pods of your cluster to get assigned to the "Guaranteed" QoS class, you must set limits and requests
-   for both memory and CPU to the same value.
--  Specify your required PostgreSQL memory parameters consistently with the pod resources (like you would do in a VM or physical machine scenario - see below).
--  Set up database server pods on a dedicated node using nodeSelector.
-   See the ["nodeSelector field of the affinityconfiguration resource on the API reference page"](api_reference.md#affinityconfiguration).
-
-You can refer the following example manifest:
-
-```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
-kind: Cluster
-metadata:
-  name: postgresql-resources
-spec:
-
-  instances: 3
-
-  postgresql:
-    parameters:
-      shared_buffers: "256MB"
-
-  resources:
-    requests:
-      memory: "1024Mi"
-      cpu: 1
-    limits:
-      memory: "1024Mi"
-      cpu: 1
-
-  storage:
-    size: 1Gi
-```
-
-In the above example, we have specified `shared_buffers` parameter with a value of `256MB` - i.e. how much memory is
-dedicated to the PostgreSQL server for caching data (the default value for this parameter is `128MB` in case it's not defined).
-
-A reasonable starting value for `shared_buffers` is 25% of the memory in your system.
-For example: if your `shared_buffers` is 256 MB, then the recommended value for your container memory size is 1 GB,
-which means that within a pod all the containers will have a total of 1 GB memory that Kubernetes will always preserve,
-enabling our containers to work as expected.
-For more details, please refer to the ["Resource Consumption"](https://www.postgresql.org/docs/current/runtime-config-resource.html)
-section in the PostgreSQL documentation.
-
-!!! See also "Managing Compute Resources for Containers"
-    For more details on resource management, please refer to the
-    ["Managing Compute Resources for Containers"](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
-    page from the Kubernetes documentation.
-
-## PostgreSQL
+### PostgreSQL
 
 The current implementation of Cloud Native PostgreSQL automatically creates
 passwords and `.pgpass` files for the `postgres` superuser and the database owner.

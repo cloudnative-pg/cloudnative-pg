@@ -13,6 +13,7 @@ Battiato
 BootstrapConfiguration
 BootstrapInitDB
 BootstrapRecovery
+CIS
 CONFIG
 CR's
 CRC
@@ -35,6 +36,10 @@ CustomResourceDefinitions
 DNS
 DataBackupConfiguration
 DevOps
+DevSecOps
+DISA
+Dockle
+DoD
 EBS
 EDB
 EKS
@@ -168,6 +173,8 @@ bs
 bzip
 cGFzc
 checksums
+cisecurity
+clair
 classid
 cli
 clientcert
@@ -193,11 +200,16 @@ currentPrimary
 customQueriesConfigMap
 customQueriesSecret
 customizable
+cyber
 danglingPVC
 databackupconfiguration
 declaratively
 destinationPath
 devel
+devsecops
+dl
+dockle
+dod
 downtimes
 dvcmQ
 edb
@@ -213,6 +225,7 @@ gce
 github
 gmail
 golangci
+goodwithtech
 gosec
 gzip
 hba
@@ -294,6 +307,7 @@ openshift
 operatorframework
 operatorgroups
 operatorhub
+pdf
 persistentvolumeclaim
 persistentvolumeclaims
 pgBouncer
@@ -390,6 +404,7 @@ wal
 walbackupconfiguration
 walkthrough
 webhook
+wp
 wikipedia
 writeService
 www
