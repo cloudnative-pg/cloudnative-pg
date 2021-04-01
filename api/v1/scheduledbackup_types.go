@@ -10,8 +10,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 // ScheduledBackupSpec defines the desired state of ScheduledBackup
@@ -118,7 +116,6 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) BackupCommon {
 			Cluster: scheduledBackup.Spec.Cluster,
 		},
 	}
-	utils.SetAsOwnedBy(&backup.ObjectMeta, scheduledBackup.ObjectMeta, scheduledBackup.TypeMeta)
 	return &backup
 }
 
