@@ -264,11 +264,9 @@ var _ = Describe("Backup and restore", func() {
 				Expect(err).NotTo(HaveOccurred())
 				completed := 0
 				for _, backup := range backups.Items {
-					for _, owner := range backup.GetObjectMeta().GetOwnerReferences() {
-						if owner.Name == scheduledBackup.Name &&
-							backup.Status.Phase == apiv1.BackupPhaseCompleted {
-							completed++
-						}
+					if strings.HasPrefix(backup.Name, scheduledBackup.Name+"-") &&
+						backup.Status.Phase == apiv1.BackupPhaseCompleted {
+						completed++
 					}
 				}
 				return completed, nil
