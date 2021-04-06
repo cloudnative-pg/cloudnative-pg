@@ -3,7 +3,16 @@
 # Copyright (C) 2019-2021 EnterpriseDB Corporation.
 
 # Image URL to use all building/pushing image targets
-CONTROLLER_IMG ?= quay.io/enterprisedb/cloud-native-postgresql-testing:$(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
+
+# Prevent e2e tests to proceed with empty tag which
+# will be considered as "latest" (#CNP-289).
+ifeq (,$(CONTROLLER_IMG))
+IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
+ifneq (,${IMAGE_TAG})
+CONTROLLER_IMG = quay.io/enterprisedb/cloud-native-postgresql-testing:${IMAGE_TAG}
+endif
+endif
+
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/enterprisedb/postgresql:13
 KUSTOMIZE_VERSION ?= v3.5.4
