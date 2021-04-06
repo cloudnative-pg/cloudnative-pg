@@ -28,6 +28,8 @@ ENV SUMMARY="Cloud Native PostgreSQL Operator Container Image." \
     DESCRIPTION="This Docker image contains Cloud Native PostgreSQL Operator \
 based on RedHat Universal Base Images (UBI) 8."
 
+RUN microdnf update && microdnf clean all
+
 # TODO - automate version?
 # For Certified Operator Image Dockerfile labels and license(s) are required
 # See: https://redhat-connect.gitbook.io/certified-operator-guide/helm-operators/building-a-helm-operator/dockerfile-requirements-helm
