@@ -96,6 +96,25 @@ jobs:
           exit 1
         fi
 
+  crd:
+    name: Verify CRD is up to date
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Run make manifests
+        run: |
+          make manifests
+
+      - name: Check CRD manifests are up to date
+        run: |
+          crd_path='config/crd'
+          if git status --porcelain $crd_path | grep '^ M'; then
+            echo "The CRD manifests do not reflect the current API. Please run make manifests."
+            exit 1
+          fi
+
   buildx:
     name: Build containers
     needs:
@@ -103,6 +122,7 @@ jobs:
       - shellcheck
       - tests
       - apidoc
+      - crd
     runs-on: ubuntu-20.04
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
@@ -186,6 +206,7 @@ jobs:
       - shellcheck
       - tests
       - apidoc
+      - crd
     runs-on: ubuntu-20.04
     steps:
       - name: Repository Dispatch
