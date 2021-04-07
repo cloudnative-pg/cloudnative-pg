@@ -159,7 +159,7 @@ jobs:
       -
         name: Docker meta
         id: docker-meta
-        uses: crazy-max/ghaction-docker-meta@v1
+        uses: crazy-max/ghaction-docker-meta@v2.2.1
         with:
           images: ${{ steps.build-meta.outputs.images }}
           tag-custom: ${{ steps.build-meta.outputs.tags }}
@@ -237,7 +237,7 @@ jobs:
       -
         name: Docker meta
         id: docker-meta
-        uses: crazy-max/ghaction-docker-meta@v1
+        uses: crazy-max/ghaction-docker-meta@v2.2.1
         with:
           images: quay.io/enterprisedb/cloud-native-postgresql-testing
           tag-semver: |
