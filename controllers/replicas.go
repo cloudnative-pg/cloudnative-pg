@@ -93,11 +93,11 @@ func (r *ClusterReconciler) getStatusFromInstances(
 		return postgres.PostgresqlStatusList{}, err
 	}
 
-	status, err := postgres.ExtractInstancesStatus(ctx, config, filteredPods, specs.PostgresContainerName)
-	if err != nil {
-		return postgres.PostgresqlStatusList{}, err
-	}
-
+	status := postgres.ExtractInstancesStatus(
+		ctx,
+		config,
+		filteredPods,
+		specs.PostgresContainerName)
 	sort.Sort(&status)
 	return status, nil
 }

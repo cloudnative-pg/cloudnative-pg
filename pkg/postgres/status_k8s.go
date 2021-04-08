@@ -14,46 +14,39 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
-var log = ctrl.Log.WithName("instance-status")
-
 // ExtractInstancesStatus run an "exec" call to the passed Pods and extract, using the
-// instance manager, the status of the underlying PostgreSQL instance
+// instance manager, the status of the underlying PostgreSQL instance. If an Exec call
+// cannot reach a Pod, the result list will contain errors
 func ExtractInstancesStatus(
 	ctx context.Context,
 	config *rest.Config,
 	filteredPods []corev1.Pod,
 	postgresContainerName string,
-) (PostgresqlStatusList, error) {
+) PostgresqlStatusList {
 	var result PostgresqlStatusList
 
 	for idx := range filteredPods {
-		if utils.IsPodReady(filteredPods[idx]) {
-			instanceStatus, err := getReplicaStatusFromPod(ctx, config, filteredPods[idx], postgresContainerName)
-			if err != nil {
-				log.Error(err, "Error while extracting instance status",
-					"name", filteredPods[idx].Name,
-					"namespace", filteredPods[idx].Namespace)
-				return result, err
-			}
-
-			result.Items = append(result.Items, instanceStatus)
-		}
+		instanceStatus := getReplicaStatusFromPod(
+			ctx, config, filteredPods[idx], postgresContainerName)
+		instanceStatus.IsReady = utils.IsPodReady(filteredPods[idx])
+		result.Items = append(result.Items, instanceStatus)
 	}
 
-	return result, nil
+	return result
 }
 
 func getReplicaStatusFromPod(
 	ctx context.Context,
 	config *rest.Config,
 	pod corev1.Pod,
-	postgresContainerName string) (PostgresqlStatus, error) {
-	var result PostgresqlStatus
+	postgresContainerName string) PostgresqlStatus {
+	result := PostgresqlStatus{
+		PodName: pod.Name,
+	}
 
 	timeout := time.Second * 2
 	clientInterface := kubernetes.NewForConfigOrDie(config)
@@ -67,14 +60,17 @@ func getReplicaStatusFromPod(
 		"/controller/manager", "instance", "status")
 
 	if err != nil {
-		return result, err
+		result.PodName = pod.Name
+		result.ExecError = err
+		return result
 	}
 
 	err = json.Unmarshal([]byte(stdout), &result)
 	if err != nil {
-		return result, err
+		result.PodName = pod.Name
+		result.ExecError = err
+		return result
 	}
 
-	result.PodName = pod.Name
-	return result, nil
+	return result
 }
