@@ -19,6 +19,11 @@ type PostgresqlStatus struct {
 	ReplayPaused        bool   `json:"replayPaused"`
 	PendingRestart      bool   `json:"pendingRestart"`
 	IsWalReceiverActive bool   `json:"isWalReceiverActive"`
+
+	// This field is set when there is an error while extracting the
+	// status of a Pod
+	ExecError error `json:"-"`
+	IsReady   bool  `json:"isReady"`
 }
 
 // PostgresqlStatusList is a list of PostgreSQL instances status, useful to
@@ -41,6 +46,25 @@ func (list *PostgresqlStatusList) Swap(i, j int) {
 // name (split brain?), and secondaries always go by their replication status with
 // the more updated one coming as first
 func (list PostgresqlStatusList) Less(i, j int) bool {
+	// Incomplete status records go to the bottom of
+	// the list, since this is used to elect a new primary
+	// when needed.
+	switch {
+	case list.Items[i].ExecError != nil && list.Items[j].ExecError == nil:
+		return false
+	case list.Items[i].ExecError == nil && list.Items[j].ExecError != nil:
+		return true
+	}
+
+	// Non ready Pods go to the bottom of the list,
+	// since we prefer ready Pods as new primary
+	switch {
+	case list.Items[i].IsReady && !list.Items[j].IsReady:
+		return true
+	case !list.Items[i].IsReady && list.Items[j].IsReady:
+		return false
+	}
+
 	// Manage primary servers
 	switch {
 	case list.Items[i].IsPrimary && list.Items[j].IsPrimary:
@@ -70,6 +94,19 @@ func (list PostgresqlStatusList) Less(i, j int) bool {
 func (list PostgresqlStatusList) AreWalReceiversDown() bool {
 	for idx := range list.Items {
 		if list.Items[idx].IsWalReceiverActive {
+			return false
+		}
+	}
+
+	return true
+}
+
+// IsComplete check the PostgreSQL status list for Pods which
+// contain errors. Returns true if everything is green and
+// false otherwise
+func (list PostgresqlStatusList) IsComplete() bool {
+	for idx := range list.Items {
+		if list.Items[idx].ExecError != nil {
 			return false
 		}
 	}

@@ -109,17 +109,10 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 		}
 	}
 
-	instancesStatus, err = postgres.ExtractInstancesStatus(
+	instancesStatus = postgres.ExtractInstancesStatus(
 		ctx,
 		cnp.Config,
 		managedPods, specs.PostgresContainerName)
-	if err != nil {
-		log.Log.Error(err, "Cannot find PostgreSQL configmap",
-			"namespace", cnp.Namespace,
-			"name", clusterName)
-		// Let's avoid blocking this command if the user has not enough permissions
-		// to exec info the Pods
-	}
 
 	// Extract the status from the instances
 	status := PostgresqlStatus{
@@ -203,18 +196,34 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		"Primary",
 		"Replicating",
 		"Replay paused",
-		"Pending restart")
+		"Pending restart",
+		"Status")
 	for _, instance := range instanceStatus.Items {
-		status.AddLine(
-			instance.PodName,
-			instance.CurrentLsn,
-			instance.ReceivedLsn,
-			instance.ReplayLsn,
-			instance.SystemID,
-			boolToCheck(instance.IsPrimary),
-			boolToCheck(instance.IsWalReceiverActive),
-			boolToCheck(instance.ReplayPaused),
-			boolToCheck(instance.PendingRestart))
+		if instance.ExecError != nil {
+			status.AddLine(
+				instance.PodName,
+				"-",
+				"-",
+				"-",
+				"-",
+				"-",
+				"-",
+				"-",
+				"-",
+				instance.ExecError.Error())
+		} else {
+			status.AddLine(
+				instance.PodName,
+				instance.CurrentLsn,
+				instance.ReceivedLsn,
+				instance.ReplayLsn,
+				instance.SystemID,
+				boolToCheck(instance.IsPrimary),
+				boolToCheck(instance.IsWalReceiverActive),
+				boolToCheck(instance.ReplayPaused),
+				boolToCheck(instance.PendingRestart),
+				"OK")
+		}
 	}
 	status.Print()
 }

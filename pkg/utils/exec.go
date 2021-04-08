@@ -24,6 +24,12 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
+var (
+	// ErrorContainerNotFound is raised when an Exec call is invoked against
+	// a non existing container
+	ErrorContainerNotFound = fmt.Errorf("container not found")
+)
+
 // ExecCommand executes arbitrary command inside the pod, and returns his result
 func ExecCommand(
 	ctx context.Context,
@@ -43,7 +49,7 @@ func ExecCommand(
 	}
 
 	if targetContainer < 0 {
-		return "", "", fmt.Errorf("could not find %s container to exec to", containerName)
+		return "", "", ErrorContainerNotFound
 	}
 
 	// Unfortunately RESTClient doesn't still work with contexts but when it

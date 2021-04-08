@@ -356,7 +356,8 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	// cluster.Status.Instances == cluster.Spec.Instances and
 	// we don't need to modify the cluster topology
 	if cluster.Status.ReadyInstances != cluster.Status.Instances ||
-		cluster.Status.ReadyInstances != int32(len(instancesStatus.Items)) {
+		cluster.Status.ReadyInstances != int32(len(instancesStatus.Items)) ||
+		!instancesStatus.IsComplete() {
 		log.V(2).Info("Waiting for Pods to be ready")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
