@@ -73,7 +73,7 @@ type ClusterReconciler struct {
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch
-// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;patch;update
+// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;patch;update;list;watch;get
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;create;delete;update;patch;list;watch
 
 // Reconcile is the operator reconciler loop
