@@ -63,7 +63,7 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
-	err = r.createServiceAccount(ctx, cluster)
+	err = r.createOrPatchServiceAccount(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -271,14 +271,96 @@ func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, clust
 	return nil
 }
 
+// createOrPatchServiceAccount create or synchronize the ServiceAccount used by the
+// cluster with the latest cluster specification
+func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
+	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
+	var sa corev1.ServiceAccount
+	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &sa); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while getting service account: %w", err)
+		}
+
+		r.Recorder.Event(cluster, "Normal", "CreatingServiceAccount", "Creating ServiceAccount")
+		return r.createServiceAccount(ctx, cluster)
+	}
+
+	generatedPullSecretNames, err := r.generateServiceAccountPullSecretsNames(ctx, cluster)
+	if err != nil {
+		return fmt.Errorf("while generating pull secret names: %w", err)
+	}
+
+	serviceAccountAligned, err := specs.IsServiceAccountAligned(&sa, generatedPullSecretNames)
+	if err != nil {
+		log.Error(err, "Cannot detect if a ServiceAccount need to be refreshed or not, refreshing it",
+			"serviceAccount", sa)
+		serviceAccountAligned = false
+	}
+
+	if serviceAccountAligned {
+		return nil
+	}
+
+	generatedServiceAccount, err := r.generateServiceAccountForCluster(cluster, generatedPullSecretNames)
+	if err != nil {
+		return fmt.Errorf("while generating service accouynt: %w", err)
+	}
+
+	r.Recorder.Event(cluster, "Normal", "UpdatingServiceAccount", "Updating ServiceAccount")
+	patchedServiceAccount := sa
+	patchedServiceAccount.Annotations = generatedServiceAccount.Annotations
+	patchedServiceAccount.ImagePullSecrets = generatedServiceAccount.ImagePullSecrets
+	if err := r.Patch(ctx, &patchedServiceAccount, client.MergeFrom(&sa)); err != nil {
+		return fmt.Errorf("while patching service account: %w", err)
+	}
+
+	return nil
+}
+
 // createServiceAccount create the service account for this PostgreSQL cluster
 func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
-	var pullSecretNames []string
+	generatedPullSecretNames, err := r.generateServiceAccountPullSecretsNames(ctx, cluster)
+	if err != nil {
+		return fmt.Errorf("while generating pull secret names: %w", err)
+	}
+
+	serviceAccount, err := r.generateServiceAccountForCluster(cluster, generatedPullSecretNames)
+	if err != nil {
+		return fmt.Errorf("while creating new ServiceAccount: %w", err)
+	}
+
+	err = r.Create(ctx, serviceAccount)
+	if err != nil && !apierrs.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
+}
+
+// generateServiceAccountForCluster create a serviceAccount entity for the cluster
+func (r *ClusterReconciler) generateServiceAccountForCluster(
+	cluster *apiv1.Cluster, pullSecretNames []string) (*corev1.ServiceAccount, error) {
+	serviceAccount, err := specs.CreateServiceAccount(cluster.ObjectMeta, pullSecretNames)
+	if err != nil {
+		return nil, err
+	}
+	utils.SetAsOwnedBy(&serviceAccount.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	specs.SetOperatorVersion(&serviceAccount.ObjectMeta, versions.Version)
+
+	return serviceAccount, nil
+}
+
+// generateServiceAccountPullSecretsNames extract the list of pull secret names given
+// the cluster configuration
+func (r *ClusterReconciler) generateServiceAccountPullSecretsNames(
+	ctx context.Context, cluster *apiv1.Cluster) ([]string, error) {
+	pullSecretNames := make([]string, 0, len(cluster.Spec.ImagePullSecrets))
 
 	// Try to copy the secret from the operator
 	operatorPullSecret, err := r.copyPullSecretFromOperator(ctx, cluster)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if operatorPullSecret {
@@ -290,16 +372,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 		pullSecretNames = append(pullSecretNames, secretReference.Name)
 	}
 
-	serviceAccount := specs.CreateServiceAccount(cluster.ObjectMeta, pullSecretNames)
-	utils.SetAsOwnedBy(&serviceAccount.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
-	specs.SetOperatorVersion(&serviceAccount.ObjectMeta, versions.Version)
-
-	err = r.Create(ctx, &serviceAccount)
-	if err != nil && !apierrs.IsAlreadyExists(err) {
-		return err
-	}
-
-	return nil
+	return pullSecretNames, nil
 }
 
 // copyPullSecretFromOperator will create a secret to download the operator, if the
