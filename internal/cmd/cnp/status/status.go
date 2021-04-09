@@ -9,19 +9,24 @@ package status
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/cheynewallace/tabby"
 	"github.com/logrusorgru/aurora/v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/cnp"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 // PostgresqlStatus contains the status of the Cluster and of all its instances
@@ -109,10 +114,11 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 		}
 	}
 
-	instancesStatus = postgres.ExtractInstancesStatus(
+	instancesStatus = extractInstancesStatus(
 		ctx,
 		cnp.Config,
-		managedPods, specs.PostgresContainerName)
+		managedPods,
+		specs.PostgresContainerName)
 
 	// Extract the status from the instances
 	status := PostgresqlStatus{
@@ -233,4 +239,58 @@ func boolToCheck(val bool) string {
 		return "\u2713"
 	}
 	return "\u2717"
+}
+
+func extractInstancesStatus(
+	ctx context.Context,
+	config *rest.Config,
+	filteredPods []corev1.Pod,
+	postgresContainerName string,
+) postgres.PostgresqlStatusList {
+	var result postgres.PostgresqlStatusList
+
+	for idx := range filteredPods {
+		instanceStatus := getReplicaStatusFromPodViaExec(
+			ctx, config, filteredPods[idx], postgresContainerName)
+		instanceStatus.IsReady = utils.IsPodReady(filteredPods[idx])
+		result.Items = append(result.Items, instanceStatus)
+	}
+
+	return result
+}
+
+func getReplicaStatusFromPodViaExec(
+	ctx context.Context,
+	config *rest.Config,
+	pod corev1.Pod,
+	postgresContainerName string) postgres.PostgresqlStatus {
+	result := postgres.PostgresqlStatus{
+		PodName: pod.Name,
+	}
+
+	timeout := time.Second * 2
+	clientInterface := kubernetes.NewForConfigOrDie(config)
+	stdout, _, err := utils.ExecCommand(
+		ctx,
+		clientInterface,
+		config,
+		pod,
+		postgresContainerName,
+		&timeout,
+		"/controller/manager", "instance", "status")
+
+	if err != nil {
+		result.PodName = pod.Name
+		result.ExecError = err
+		return result
+	}
+
+	err = json.Unmarshal([]byte(stdout), &result)
+	if err != nil {
+		result.PodName = pod.Name
+		result.ExecError = err
+		return result
+	}
+
+	return result
 }

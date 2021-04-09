@@ -6,8 +6,6 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 
 package postgres
 
-import corev1 "k8s.io/api/core/v1"
-
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {
 	PodName             string `json:"podName"`
@@ -56,7 +54,7 @@ func (list PostgresqlStatusList) Less(i, j int) bool {
 		return true
 	}
 
-	// Non ready Pods go to the bottom of the list,
+	// Non-ready Pods go to the bottom of the list
 	// since we prefer ready Pods as new primary
 	switch {
 	case list.Items[i].IsReady && !list.Items[j].IsReady:
@@ -112,15 +110,4 @@ func (list PostgresqlStatusList) IsComplete() bool {
 	}
 
 	return true
-}
-
-// ExtractPodFromList gets a certain Pod from a Pod list
-func ExtractPodFromList(pods []corev1.Pod, podName string) *corev1.Pod {
-	for idx := range pods {
-		if pods[idx].Name == podName {
-			return &pods[idx]
-		}
-	}
-
-	return nil
 }

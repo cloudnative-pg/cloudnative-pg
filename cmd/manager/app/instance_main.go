@@ -21,6 +21,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 )
 
 var (
@@ -278,7 +279,7 @@ func joinSubCommand(ctx context.Context, info postgres.JoinInfo) {
 }
 
 func statusSubCommand() {
-	resp, err := http.Get("http://localhost:8000/pg/status")
+	resp, err := http.Get(url.Local(url.PathPgStatus))
 	if err != nil {
 		log.Log.Error(err, "Error while requesting instance status")
 		os.Exit(1)

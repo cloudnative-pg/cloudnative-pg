@@ -12,7 +12,6 @@ import (
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
@@ -80,26 +79,24 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 func (r *ClusterReconciler) getStatusFromInstances(
 	ctx context.Context,
 	pods corev1.PodList,
-) (postgres.PostgresqlStatusList, error) {
+) postgres.PostgresqlStatusList {
 	// Only work on Pods which can still become active in the future
 	filteredPods := utils.FilterActivePods(pods.Items)
 	if len(filteredPods) == 0 {
 		// No instances to control
-		return postgres.PostgresqlStatusList{}, nil
+		return postgres.PostgresqlStatusList{}
 	}
 
-	config, err := ctrl.GetConfig()
-	if err != nil {
-		return postgres.PostgresqlStatusList{}, err
-	}
-
-	status := postgres.ExtractInstancesStatus(
-		ctx,
-		config,
-		filteredPods,
-		specs.PostgresContainerName)
+	status := ExtractInstancesStatus(ctx, filteredPods)
 	sort.Sort(&status)
-	return status, nil
+	for idx := range status.Items {
+		if status.Items[idx].ExecError != nil {
+			r.Log.Info("Cannot extract Pod status",
+				"name", status.Items[idx].PodName,
+				"error", status.Items[idx].ExecError.Error())
+		}
+	}
+	return status
 }
 
 // Make sure that only the currentPrimary has the label forward write traffic to him
