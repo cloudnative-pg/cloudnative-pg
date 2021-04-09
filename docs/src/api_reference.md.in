@@ -1,0 +1,36 @@
+# API Reference
+
+Cloud Native PostgreSQL extends the Kubernetes API defining the following
+custom resources:
+
+-   [Backup](#backup)
+-   [Cluster](#cluster)
+-   [ScheduledBackup](#scheduledbackup)
+
+All the resources are defined in the `postgresql.k8s.enterprisedb.io/v1`
+API.
+
+Please refer to the ["Configuration Samples" page](samples.md)" of the
+documentation for examples of usage.
+
+Below you will find a description of the defined resources:
+
+<!-- Everything from now on is generated via `make apidoc` -->
+
+{{ range $ -}}
+- [{{ .Name -}}](#{{ .Name -}})
+{{end}}
+
+{{ range $ -}}
+## {{ .NameWithAnchor }}
+
+{{ .Doc -}}
+{{if .Items }}
+
+{{ .TableFieldName }} | {{ .TableFieldDoc }} | {{ .TableFieldRawType }}
+{{ .TableFieldNameDashSize }} | {{ .TableFieldDocDashSize }} | {{ .TableFieldRawTypeDashSize }}
+{{end}}
+{{- range .Items -}}
+`{{ .Name }}` | {{ .Doc }}{{if .Mandatory }} - *mandatory* {{ end }} | {{ .RawType }}
+{{ end }}
+{{ end -}}

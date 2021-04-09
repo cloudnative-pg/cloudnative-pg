@@ -1,0 +1,29 @@
+# Table fields
+name: "Name"
+doc:  "Description"
+type: "Type"
+mandatory : "Required"
+
+# K8s web documentation URL
+k8s_url: "https://kubernetes.io/docs/reference/generated/kubernetes-api"
+version: "v1.20"
+
+# hyperlinks will be completed by the tool in the following way
+# k8s_url + "/" + version + "/" + section element
+# e.g. metav1.ObjectMeta --> https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#objectmeta-v1-meta
+sections:
+  metav1.ObjectMeta: "#objectmeta-v1-meta"
+  metav1.ListMeta: "#listmeta-v1-meta"
+  metav1.LabelSelector: "#labelselector-v1-meta"
+  metav1.Time: "#time-v1-meta"
+  v1.ResourceRequirements: "#resourcerequirements-v1-core"
+  v1.LocalObjectReference: "#localobjectreference-v1-core"
+  v1.SecretKeySelector: "#secretkeyselector-v1-core"
+  v1.PersistentVolumeClaim: "#persistentvolumeclaim-v1-core"
+  v1.EmptyDirVolumeSource: "#emptydirvolumesource-v1-core"
+  apiextensionsv1.JSON: "#json-v1-apiextensions-k8s-io"
+  corev1.LocalObjectReference: "#localobjectreference-v1-core"
+  corev1.ResourceRequirements: "#resourcerequirements-v1-core"
+  corev1.PersistentVolumeClaimSpec: "#persistentvolumeclaim-v1-core"
+  corev1.SecretKeySelector: "#secretkeyselector-v1-core"
+  corev1.ConfigMapKeySelector: "#configmapkeyselector-v1-core"

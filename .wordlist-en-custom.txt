@@ -188,6 +188,7 @@ commandOutput
 conf
 config
 configmap
+configmapkeyselector
 containerPort
 corev
 coverity
@@ -341,6 +342,7 @@ recoveryTarget
 recoverytarget
 redhat
 resizeInUseVolumes
+resourcerequirements
 reusePVC
 rollingupdatestatus
 runtime
@@ -356,6 +358,7 @@ scheduledbackupspec
 scheduledbackupstatus
 sdk
 secretAccessKey
+secretkeyselector
 securego
 serverName
 sig

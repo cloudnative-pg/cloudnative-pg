@@ -119,20 +119,15 @@ licenses: go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete
 
 # Update the API Reference section of the documentation
-apidoc: po-docgen
+apidoc: k8s-api-docgen
 	set -e ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
 	echo $$CONFIG_TMP_DIR ;\
-	$(PO_DOCGEN) api api/v1/*_types.go | sed 's/\\n/\n/g' | \
-	  sed 's/\([^\]\)\[]\[/\1\\[][/' | \
-	  sed -n '/## Table of Contents/,$$p' | \
-	  sed 's/^## Table of Contents/<!-- TOC -->/' | \
-	  grep -v '#table-of-contents' > $${CONFIG_TMP_DIR}/api_reference.new.md ;\
-	sed '/<!-- TOC -->/,$${/<!-- TOC -->/!d;}' \
-	  docs/src/api_reference.md > $${CONFIG_TMP_DIR}/api_reference.md ;\
-	sed 1d \
-	  $${CONFIG_TMP_DIR}/api_reference.new.md >> $${CONFIG_TMP_DIR}/api_reference.md ;\
-	sed -i 's/| ----- | ----------- | ------ | -------- |/| -------------------- | ------------------------------ | -------------------- | -------- |/' $${CONFIG_TMP_DIR}/api_reference.md ;\
+	$(K8S_API_DOCGEN) -t md \
+	  -c docs/k8s-api-docgen.yaml \
+	  -m docs/src/api_reference.md.in \
+	  -o $${CONFIG_TMP_DIR}/api_reference.md \
+	  api/v1/*_types.go ;\
 	cp $${CONFIG_TMP_DIR}/api_reference.md docs/src/api_reference.md
 
 # Shellcheck for the hack directory
@@ -178,22 +173,22 @@ else
 GO_LICENSES=$(shell which go-licenses)
 endif
 
-# find or download po-docgen
-.PHONY: po-docgen
-po-docgen:
-# download po-docgen if necessary
-ifeq (, $(shell which po-docgen))
+# find or download k8s-api-docgen
+.PHONY: k8s-api-docgen
+k8s-api-docgen:
+# download k8s-api-docgen if necessary
+ifeq (, $(shell which k8s-api-docgen))
 	@{ \
 	set -e ;\
-	PO_DOCGEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$PO_DOCGEN_TMP_DIR ;\
+	K8S_API_DOCGEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$K8S_API_DOCGEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go get github.com/prometheus-operator/prometheus-operator/cmd/po-docgen@v0.43.0 ;\
-	rm -rf $$PO_DOCGEN_TMP_DIR ;\
+	go get github.com/EnterpriseDB/k8s-api-docgen/cmd/k8s-api-docgen ;\
+	rm -rf $$K8S_API_DOCGEN_TMP_DIR ;\
 	}
-PO_DOCGEN=$(GOBIN)/po-docgen
+K8S_API_DOCGEN=$(GOBIN)/k8s-api-docgen
 else
-PO_DOCGEN=$(shell which po-docgen)
+K8S_API_DOCGEN=$(shell which k8s-api-docgen)
 endif
 
 # find or download kustomize
