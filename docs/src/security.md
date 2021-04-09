@@ -87,6 +87,11 @@ The pods created by the `Cluster` resource can be controlled by Kubernetes
 [network policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 to enable/disable inbound and outbound network access at IP and TCP level.
 
+!!! Important
+    The operator needs to communicate to each instance on TCP port 8000
+    to get information about the status of the PostgreSQL server. Make sure
+    you keep this in mind in case you add any network policy.
+
 Network policies are beyond the scope of this document.
 Please refer to the ["Network policies"](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 section of the Kubernetes documentation for further information.

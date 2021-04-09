@@ -24,6 +24,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 )
 
 var (
@@ -180,17 +181,17 @@ func ListenAndServe() error {
 	}
 
 	serveMux := http.NewServeMux()
-	serveMux.HandleFunc("/healthz", isServerHealthy)
-	serveMux.HandleFunc("/readyz", isServerHealthy)
-	serveMux.HandleFunc("/pg/status", pgStatus)
-	serveMux.HandleFunc("/pg/backup",
+	serveMux.HandleFunc(url.PathHealth, isServerHealthy)
+	serveMux.HandleFunc(url.PathReady, isServerHealthy)
+	serveMux.HandleFunc(url.PathPgStatus, pgStatus)
+	serveMux.HandleFunc(url.PathPgBackup,
 		func(w http.ResponseWriter, r *http.Request) {
 			requestBackup(typedClient, eventRecorder, w, r)
 		},
 	)
-	serveMux.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+	serveMux.Handle(url.PathMetrics, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 
-	server = &http.Server{Addr: ":8000", Handler: serveMux}
+	server = &http.Server{Addr: fmt.Sprintf(":%d", url.Port), Handler: serveMux}
 	err = server.ListenAndServe()
 
 	// The server has been shut down. Ok

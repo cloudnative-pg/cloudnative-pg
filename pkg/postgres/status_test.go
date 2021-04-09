@@ -10,9 +10,6 @@ import (
 	"fmt"
 	"sort"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -108,33 +105,5 @@ var _ = Describe("PostgreSQL status", func() {
 			Expect(list.Items[5].PodName).To(Equal("server-04"))
 			Expect(list.Items[5].PodName).To(Equal("server-04"))
 		})
-	})
-})
-
-var _ = Describe("PostgreSQL instance ordering", func() {
-	podList := []corev1.Pod{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod1",
-				Namespace: "default",
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod2",
-				Namespace: "default",
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod3",
-				Namespace: "default",
-			},
-		},
-	}
-
-	It("select a Pod by its name", func() {
-		Expect(ExtractPodFromList(podList, "pod2").Name).To(Equal("pod2"))
-		Expect(ExtractPodFromList(podList, "nonexisteng")).To(BeNil())
 	})
 })

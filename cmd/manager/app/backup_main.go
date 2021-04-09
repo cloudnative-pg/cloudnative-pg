@@ -14,6 +14,7 @@ import (
 	"os"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 )
 
 // BackupCommand start a backup via the manager HTTP interface
@@ -23,7 +24,7 @@ func BackupCommand(args []string) {
 		os.Exit(1)
 	}
 
-	resp, err := http.Get("http://localhost:8000/pg/backup?name=" + args[0])
+	resp, err := http.Get(url.Local(url.PathPgBackup) + "?name=" + args[0])
 	if err != nil {
 		log.Log.Error(err, "Error while requesting backup")
 		os.Exit(1)

@@ -8,6 +8,10 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"reflect"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -16,6 +20,8 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -230,4 +236,71 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	}
 
 	return nil
+}
+
+// ExtractInstancesStatus extracts the status of the underlying PostgreSQL instance from
+// the requested Pod, via the instance manager. In case of failure, errors are passed
+// in the result list
+func ExtractInstancesStatus(
+	ctx context.Context,
+	filteredPods []corev1.Pod,
+) postgres.PostgresqlStatusList {
+	var result postgres.PostgresqlStatusList
+
+	for idx := range filteredPods {
+		instanceStatus := getReplicaStatusFromPodViaHTTP(ctx, filteredPods[idx])
+		instanceStatus.IsReady = utils.IsPodReady(filteredPods[idx])
+		result.Items = append(result.Items, instanceStatus)
+	}
+	return result
+}
+
+// getReplicaStatusFromPodViaHTTP retrieves the status of PostgreSQL pods via an HTTP request with GET method.
+func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) postgres.PostgresqlStatus {
+	var result postgres.PostgresqlStatus
+
+	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus)
+	req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
+	if err != nil {
+		result.PodName = pod.Name
+		result.ExecError = err
+		return result
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		result.PodName = pod.Name
+		result.ExecError = err
+		return result
+	}
+
+	if resp.StatusCode != 200 {
+		bytes, _ := ioutil.ReadAll(resp.Body)
+		result.PodName = pod.Name
+		result.ExecError = fmt.Errorf("%v - %v", resp.StatusCode, string(bytes))
+		_ = resp.Body.Close()
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		result.PodName = pod.Name
+		result.ExecError = err
+		return result
+	}
+
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		result.PodName = pod.Name
+		result.ExecError = err
+		return result
+	}
+
+	err = resp.Body.Close()
+	if err != nil {
+		result.PodName = pod.Name
+		result.ExecError = err
+		return result
+	}
+
+	return result
 }

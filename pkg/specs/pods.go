@@ -19,6 +19,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 )
 
 const (
@@ -164,8 +165,8 @@ func createPostgresContainers(
 				TimeoutSeconds: 5,
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/readyz",
-						Port: intstr.FromInt(8000),
+						Path: url.PathReady,
+						Port: intstr.FromInt(url.Port),
 					},
 				},
 			},
@@ -179,8 +180,8 @@ func createPostgresContainers(
 				TimeoutSeconds:      5,
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/healthz",
-						Port: intstr.FromInt(8000),
+						Path: url.PathHealth,
+						Port: intstr.FromInt(url.Port),
 					},
 				},
 			},

@@ -151,10 +151,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Get the replication status
-	var instancesStatus postgres.PostgresqlStatusList
-	if instancesStatus, err = r.getStatusFromInstances(ctx, resources.pods); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot get status from instances: %w", err)
-	}
+	instancesStatus := r.getStatusFromInstances(ctx, resources.pods)
 
 	// Update the target primary name from the Pods status.
 	// This means issuing a failover or switchover when needed.
