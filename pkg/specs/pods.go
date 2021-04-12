@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 )
 
@@ -293,31 +292,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod
 			Hostname:  podName,
 			Subdomain: cluster.GetServiceAnyName(),
 			InitContainers: []corev1.Container{
-				{
-					Name:  BootstrapControllerContainerName,
-					Image: configuration.GetOperatorImageName(),
-					Command: []string{
-						"/manager",
-						"bootstrap",
-						"/controller/manager",
-					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "controller",
-							MountPath: "/controller",
-						},
-						{
-							Name:      "socket",
-							MountPath: "/var/run/postgresql",
-						},
-					},
-					Env: []corev1.EnvVar{
-						{
-							Name:  "PGHOST",
-							Value: "/var/run/postgresql",
-						},
-					},
-				},
+				createBootstrapContainer(cluster.Spec.Resources),
 			},
 			Containers:         createPostgresContainers(cluster, podName),
 			Volumes:            createPostgresVolumes(cluster, podName),
