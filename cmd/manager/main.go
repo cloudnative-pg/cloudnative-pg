@@ -10,6 +10,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -238,6 +239,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Setup the handler used by the readiness and liveliness probe
+	mgr.GetWebhookServer().WebhookMux.HandleFunc("/readyz", readinessProbeHandler)
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
@@ -245,6 +249,11 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+// readinessProbeHandler is used to implement the readiness probe handler
+func readinessProbeHandler(w http.ResponseWriter, _r *http.Request) {
+	_, _ = fmt.Fprint(w, "OK")
 }
 
 // createKubernetesClient creates the Kubernetes client that will be used during

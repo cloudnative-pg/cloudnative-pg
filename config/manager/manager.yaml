@@ -52,4 +52,14 @@ spec:
           requests:
             cpu: 100m
             memory: 100Mi
+        livenessProbe:
+          httpGet:
+            port: 9443
+            scheme: HTTPS
+            path: /readyz
+        readinessProbe:
+          httpGet:
+            port: 9443
+            scheme: HTTPS
+            path: /readyz
       terminationGracePeriodSeconds: 10
