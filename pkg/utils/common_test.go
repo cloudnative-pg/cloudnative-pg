@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package specs
+package utils
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -12,6 +12,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 )
 
 var _ = Describe("Operator version annotation management", func() {
@@ -33,5 +35,16 @@ var _ = Describe("Operator version annotation management", func() {
 		SetOperatorVersion(&podTwo.ObjectMeta, "2.3.3")
 		Expect(podTwo.ObjectMeta.Annotations[OperatorVersionAnnotationName]).To(Equal("2.3.3"))
 		Expect(podTwo.ObjectMeta.Annotations["test"]).To(Equal("toast"))
+	})
+})
+
+var _ = Describe("Annotation management", func() {
+	config := &configuration.Data{}
+	config.ReadConfigMap(map[string]string{"INHERITED_ANNOTATIONS": "one,two"})
+
+	It("must inherit annotations to be inherited", func() {
+		pod := &corev1.Pod{}
+		InheritAnnotations(&pod.ObjectMeta, map[string]string{"one": "1", "two": "2", "three": "3"}, config)
+		Expect(pod.Annotations).To(Equal(map[string]string{"one": "1", "two": "2"}))
 	})
 })

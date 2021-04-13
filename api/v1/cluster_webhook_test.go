@@ -200,7 +200,7 @@ var _ = Describe("Defaulting webhook", func() {
 	It("should fill the image name if isn't already set", func() {
 		cluster := Cluster{}
 		cluster.Default()
-		Expect(cluster.Spec.ImageName).To(Equal(configuration.GetDefaultPostgresImageName()))
+		Expect(cluster.Spec.ImageName).To(Equal(configuration.Current.PostgresImageName))
 	})
 
 	It("shouldn't set the image name if already present", func() {

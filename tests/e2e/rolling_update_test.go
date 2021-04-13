@@ -60,7 +60,7 @@ var _ = Describe("Rolling updates", func() {
 		// Update to the latest minor
 		updatedImageName := os.Getenv("POSTGRES_IMG")
 		if updatedImageName == "" {
-			updatedImageName = configuration.GetDefaultPostgresImageName()
+			updatedImageName = configuration.Current.PostgresImageName
 		}
 
 		// We should be able to apply the conf containing the new
