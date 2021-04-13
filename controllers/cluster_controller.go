@@ -27,7 +27,6 @@ import (
 	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 const (
@@ -138,11 +137,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
 
-		// There is a switchover or a failover in progress.
-		// We need to ensure that we are keeping synchronous_standby_names
-		// aligned with the actual target primary server.
-		// This is the reason why we aligning the ConfigMap here
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, r.createOrPatchPostgresConfigMap(ctx, &cluster)
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	// Ensure we have the required global objects
@@ -376,46 +371,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	}
 
 	// Cleanup stuff
-	return ctrl.Result{}, r.removeCompletedJobs(ctx, cluster, resources.jobs)
-}
-
-// removeCompletedJobs remove all the Jobs which are completed
-func (r *ClusterReconciler) removeCompletedJobs(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	jobs batchv1.JobList) error {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
-
-	// Retrieve the cluster key
-	key := expectations.KeyFunc(cluster)
-
-	completeJobs := utils.FilterCompleteJobs(jobs.Items)
-	if len(completeJobs) == 0 {
-		return nil
-	}
-
-	if err := r.jobExpectations.ExpectDeletions(key, 0); err != nil {
-		log.Error(err, "Unable to initialize jobExpectations", "key", key, "dels", 0)
-	}
-
-	for idx := range completeJobs {
-		log.V(2).Info("Removing job", "job", jobs.Items[idx].Name)
-
-		// We expect the deletion of the selected Job
-		r.jobExpectations.RaiseExpectations(key, 0, 1)
-
-		foreground := metav1.DeletePropagationForeground
-		if err := r.Delete(ctx, &jobs.Items[idx], &client.DeleteOptions{
-			PropagationPolicy: &foreground,
-		}); err != nil {
-			// We cannot observe a deletion if it was not accepted by the server
-			r.jobExpectations.DeletionObserved(key)
-
-			return fmt.Errorf("cannot delete job: %w", err)
-		}
-	}
-
-	return nil
+	return ctrl.Result{}, r.cleanupCluster(ctx, cluster, resources.jobs)
 }
 
 // SetupWithManager creates a ClusterReconciler

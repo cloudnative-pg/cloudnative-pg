@@ -32,12 +32,7 @@ import (
 
 // createPostgresClusterObjects ensure that we have the required global objects
 func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cluster *apiv1.Cluster) error {
-	err := r.createOrPatchPostgresConfigMap(ctx, cluster)
-	if err != nil {
-		return err
-	}
-
-	err = r.createPostgresPKI(ctx, cluster)
+	err := r.createPostgresPKI(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -78,57 +73,6 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
-	return nil
-}
-
-func (r *ClusterReconciler) createOrPatchPostgresConfigMap(ctx context.Context, cluster *apiv1.Cluster) error {
-	var configMap corev1.ConfigMap
-	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &configMap); err != nil {
-		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("while getting config map: %w", err)
-		}
-
-		r.Recorder.Event(cluster, "Normal", "CreatingConfigMap", "Creating Cluster ConfigMap")
-		return r.createPostgresConfigMap(ctx, cluster)
-	}
-
-	generatedConfigMap, err := specs.CreatePostgresConfigMap(cluster)
-	if err != nil {
-		return err
-	}
-	if reflect.DeepEqual(generatedConfigMap.Data, configMap.Data) {
-		// Everything fine, the two config maps are exactly the same
-		return nil
-	}
-
-	r.Recorder.Event(cluster, "Normal", "UpdatingConfigMap", "Updating Cluster ConfigMap")
-
-	// The configuration changed, and we need the patch the
-	// configMap we have
-	patchedConfigMap := configMap
-	patchedConfigMap.Data = generatedConfigMap.Data
-	if err := r.Patch(ctx, &patchedConfigMap, client.MergeFrom(&configMap)); err != nil {
-		return fmt.Errorf("while patching config map: %w", err)
-	}
-
-	return nil
-}
-
-func (r *ClusterReconciler) createPostgresConfigMap(ctx context.Context, cluster *apiv1.Cluster) error {
-	generatedConfigMap, err := specs.CreatePostgresConfigMap(cluster)
-	if err != nil {
-		return err
-	}
-	utils.SetAsOwnedBy(&generatedConfigMap.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
-	utils.SetOperatorVersion(&generatedConfigMap.ObjectMeta, versions.Version)
-	utils.InheritAnnotations(&generatedConfigMap.ObjectMeta, cluster.Annotations, configuration.Current)
-
-	if err := r.Create(ctx, generatedConfigMap); err != nil {
-		if apierrs.IsAlreadyExists(err) {
-			return nil
-		}
-		return fmt.Errorf("while creating config map: %w", err)
-	}
 	return nil
 }
 

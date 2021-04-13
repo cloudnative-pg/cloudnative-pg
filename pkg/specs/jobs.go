@@ -43,10 +43,6 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 			MountPath: "/var/lib/postgresql/data",
 		},
 		{
-			Name:      "config",
-			MountPath: "/etc/configuration",
-		},
-		{
 			Name:      "superuser-secret",
 			MountPath: "/etc/superuser-secret",
 		},
@@ -206,10 +202,6 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 								{
 									Name:      "pgdata",
 									MountPath: "/var/lib/postgresql/data",
-								},
-								{
-									Name:      "config",
-									MountPath: "/etc/configuration",
 								},
 								{
 									Name:      "superuser-secret",

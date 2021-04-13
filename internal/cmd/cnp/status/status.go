@@ -34,9 +34,6 @@ type PostgresqlStatus struct {
 	// Cluster is the Cluster we are investigating
 	Cluster *apiv1.Cluster `json:"cluster"`
 
-	// ConfigMap is the PostgreSQL configuaration
-	ConfigMap *corev1.ConfigMap `json:"configMap"`
-
 	// InstanceStatus is the status of each instance, extracted directly
 	// from the instance manager running into each Pod
 	InstanceStatus *postgres.PostgresqlStatusList `json:"instanceStatus"`
@@ -60,7 +57,10 @@ func Status(ctx context.Context, clusterName string, verbose bool, format cnp.Ou
 
 	status.printBasicInfo()
 	if verbose {
-		status.printPostgresConfiguration()
+		err = status.printPostgresConfiguration()
+		if err != nil {
+			log.Log.Error(err, "Cannot extract configuration from cluster!")
+		}
 	}
 	status.printInstancesStatus()
 
@@ -83,15 +83,6 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &cluster)
 	if err != nil {
 		log.Log.Error(err, "Error decoding Cluster resource")
-		return nil, err
-	}
-
-	// Get the configmap object
-	configMap, err := cnp.GoClient.CoreV1().ConfigMaps(cnp.Namespace).Get(ctx, clusterName, metav1.GetOptions{})
-	if err != nil {
-		log.Log.Error(err, "Cannot find PostgreSQL configmap",
-			"namespace", cnp.Namespace,
-			"name", clusterName)
 		return nil, err
 	}
 
@@ -123,7 +114,6 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 	// Extract the status from the instances
 	status := PostgresqlStatus{
 		Cluster:        &cluster,
-		ConfigMap:      configMap,
 		InstanceStatus: &instancesStatus,
 	}
 	return &status, nil
@@ -176,16 +166,24 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	fmt.Println()
 }
 
-func (fullStatus *PostgresqlStatus) printPostgresConfiguration() {
-	configMap := fullStatus.ConfigMap
+func (fullStatus *PostgresqlStatus) printPostgresConfiguration() error {
+	// TODO this is not the real configuration. It must be removed or taken from the primary.
+	configuration, err := fullStatus.Cluster.CreatePostgresqlConfiguration()
+	if err != nil {
+		return err
+	}
+
+	hba := fullStatus.Cluster.CreatePostgresqlHBA()
 
 	fmt.Println(aurora.Green("PostgreSQL Configuration"))
-	fmt.Println(configMap.Data[specs.PostgreSQLConfigurationKeyName])
+	fmt.Println(configuration)
 	fmt.Println()
 
 	fmt.Println(aurora.Green("PostgreSQL HBA Rules"))
-	fmt.Println(configMap.Data[specs.PostgreSQLHBAKeyName])
+	fmt.Println(hba)
 	fmt.Println()
+
+	return nil
 }
 
 func (fullStatus *PostgresqlStatus) printInstancesStatus() {

@@ -9,194 +9,157 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package utils
 
 import (
-	"errors"
+	"context"
+	"fmt"
+	"math"
+	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/util/retry"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
 var (
-	// ErrCurrentPrimaryNotFound means that we can't find which server is the primary
-	// one in the cluster status
-	ErrCurrentPrimaryNotFound = errors.New("current primary not found")
-
-	// ErrTargetPrimaryNotFound means that we can't find which server is the target
-	// one in the cluster status
-	ErrTargetPrimaryNotFound = errors.New("target primary not found")
-
-	// ErrInstancesNotFound means that we can't find the required instance number
-	ErrInstancesNotFound = errors.New("instances not found")
-
-	// ErrPostgreSQLConfigurationMissing means that the ConfigMap does not contain
-	// the PostgreSQL configuration of this cluster
-	ErrPostgreSQLConfigurationMissing = errors.New("missing postgresConfiguration in ConfigMap")
-
-	// ErrPostgreSQLHBAMissing means that the ConfigMap does not contain
-	// the PostgreSQL HBA rules of this cluster
-	ErrPostgreSQLHBAMissing = errors.New("missing postgresHBA in ConfigMap")
-
-	// ErrCertificateMissing means that the tls.crt file is missing in
-	// a TLS secret
-	ErrCertificateMissing = errors.New("missing tls.crt data in secret")
-
-	// ErrCACertificateMissing means that the tls.crt file is missing in
-	// a TLS secret
-	ErrCACertificateMissing = errors.New("missing ca.crt data in secret")
-
-	// ErrPrivateKeyMissing means that the tls.key file is missing in
-	// a TLS secret
-	ErrPrivateKeyMissing = errors.New("missing tls.key data in secret")
-
-	// ErrInvalidObject means that the metadata of the passed object are
-	// missing or invalid
-	ErrInvalidObject = errors.New("missing object metadata")
+	// RetrySettingPrimary is the default retry configuration that is used
+	// for promotions
+	RetrySettingPrimary = wait.Backoff{
+		Duration: 1 * time.Second,
+		// Steps is declared as an "int", so we are capping
+		// to int32 to support ARM-based 32 bit architectures
+		Steps: math.MaxInt32,
+	}
 )
 
-// GetNamespace get the namespace of an object
-func GetNamespace(data *unstructured.Unstructured) (string, error) {
-	result, found, err := unstructured.NestedString(data.Object, "metadata", "namespace")
+// ClusterModifier is a function that apply a change
+// to a cluster object. This encapsulation is useful to have
+// the operator retried when needed
+type ClusterModifier func(cluster *apiv1.Cluster) error
+
+// objectToUnstructured convert a runtime Object into an unstructured one
+func objectToUnstructured(object runtime.Object) (*unstructured.Unstructured, error) {
+	data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if !found {
-		return "", ErrInvalidObject
-	}
-
-	return result, nil
+	return &unstructured.Unstructured{Object: data}, nil
 }
 
-// GetName get the name of an object
-func GetName(data *unstructured.Unstructured) (string, error) {
-	result, found, err := unstructured.NestedString(data.Object, "metadata", "name")
+// GetCluster get a Cluster resource from Kubernetes using a dynamic interface
+func GetCluster(ctx context.Context, client dynamic.Interface, namespace, name string) (*apiv1.Cluster, error) {
+	object, err := client.Resource(apiv1.ClusterGVK).
+		Namespace(namespace).
+		Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if !found {
-		return "", ErrInvalidObject
-	}
-
-	return result, nil
-}
-
-// GetCurrentPrimary get the current primary name from a cluster object
-func GetCurrentPrimary(data *unstructured.Unstructured) (string, error) {
-	result, found, err := unstructured.NestedString(data.Object, "status", "currentPrimary")
+	cluster, err := ObjectToCluster(object)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if !found {
-		return "", ErrCurrentPrimaryNotFound
-	}
-
-	return result, nil
+	return cluster, nil
 }
 
-// GetTargetPrimary get the current primary name from a cluster object
-func GetTargetPrimary(data *unstructured.Unstructured) (string, error) {
-	result, found, err := unstructured.NestedString(data.Object, "status", "targetPrimary")
-	if err != nil {
-		return "", err
-	}
-
-	if !found {
-		return "", ErrTargetPrimaryNotFound
-	}
-
-	return result, nil
-}
-
-// GetPostgreSQLConfiguration get the current PostgreSQL configuration
-// from the ConfigMag generated for this cluster
-func GetPostgreSQLConfiguration(data *unstructured.Unstructured) (string, error) {
-	result, found, err := unstructured.NestedString(data.Object, "data", specs.PostgreSQLConfigurationKeyName)
-	if err != nil {
-		return "", err
-	}
-
-	if !found || result == "" {
-		return "", ErrPostgreSQLConfigurationMissing
-	}
-
-	return result, nil
-}
-
-// GetPostgreSQLHBA get the current PostgreSQL HBA configuration
-// from the ConfigMap generated for this cluster
-func GetPostgreSQLHBA(data *unstructured.Unstructured) (string, error) {
-	result, found, err := unstructured.NestedString(data.Object, "data", specs.PostgreSQLHBAKeyName)
-	if err != nil {
-		return "", err
-	}
-
-	if !found || result == "" {
-		return "", ErrPostgreSQLHBAMissing
-	}
-
-	return result, nil
-}
-
-// GetCertificate get the tls certificate from a secret of TLS type
-func GetCertificate(data *unstructured.Unstructured) (string, error) {
-	result, found, err := unstructured.NestedString(data.Object, "data", "tls.crt")
-	if err != nil {
-		return "", err
-	}
-
-	if !found {
-		return "", ErrCertificateMissing
-	}
-
-	return result, nil
-}
-
-// GetPrivateKey get the tls private key from a secret of TLS type
-func GetPrivateKey(data *unstructured.Unstructured) (string, error) {
-	result, found, err := unstructured.NestedString(data.Object, "data", "tls.key")
-	if err != nil {
-		return "", err
-	}
-
-	if !found {
-		return "", ErrPrivateKeyMissing
-	}
-
-	return result, nil
-}
-
-// GetCACertificate get the tls certificate from a secret of TLS type
-func GetCACertificate(data *unstructured.Unstructured) (string, error) {
-	result, found, err := unstructured.NestedString(data.Object, "data", "ca.crt")
-	if err != nil {
-		return "", err
-	}
-
-	if !found {
-		return "", ErrCACertificateMissing
-	}
-
-	return result, nil
-}
-
-// SetCurrentPrimary set the current primary name in the cluster object
-func SetCurrentPrimary(data *unstructured.Unstructured, name string) error {
-	return unstructured.SetNestedField(data.Object, name, "status", "currentPrimary")
-}
-
-// SetTargetPrimary set the current primary name in the cluster object
-func SetTargetPrimary(data *unstructured.Unstructured, name string) error {
-	return unstructured.SetNestedField(data.Object, name, "status", "targetPrimary")
-}
-
-// SetPhase set the current phase and phaseReason in the cluster object
-func SetPhase(data *unstructured.Unstructured, name string, reason string) error {
-	err := unstructured.SetNestedField(data.Object, name, "status", "phase")
+// UpdateClusterStatus store the Cluster status inside Kubernetes using a
+// dynamic interface
+func UpdateClusterStatus(ctx context.Context, client dynamic.Interface, cluster *apiv1.Cluster) error {
+	object, err := clusterToUnstructured(cluster)
 	if err != nil {
 		return err
 	}
 
-	return unstructured.SetNestedField(data.Object, reason, "status", "phaseReason")
+	_, err = client.
+		Resource(apiv1.ClusterGVK).
+		Namespace(cluster.Namespace).
+		UpdateStatus(ctx, object, metav1.UpdateOptions{})
+	return err
+}
+
+// ObjectToCluster convert an unstructured object to a Cluster object
+func ObjectToCluster(runtimeObject runtime.Object) (*apiv1.Cluster, error) {
+	object, err := objectToUnstructured(runtimeObject)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"decoding runtime.Object data from watch: %w",
+			err)
+	}
+
+	var cluster apiv1.Cluster
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &cluster)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding Cluster resource: %w", err)
+	}
+
+	return &cluster, nil
+}
+
+// ObjectToSecret convert an unstructured object to a Secret object
+func ObjectToSecret(runtimeObject runtime.Object) (*corev1.Secret, error) {
+	object, err := objectToUnstructured(runtimeObject)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"decoding runtime.Object data from watch: %w",
+			err)
+	}
+
+	var secret corev1.Secret
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &secret)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding Secret resource: %w", err)
+	}
+
+	return &secret, nil
+}
+
+// clusterToUnstructured encode a cluster object as an unstructured interface
+func clusterToUnstructured(cluster *apiv1.Cluster) (*unstructured.Unstructured, error) {
+	result, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cluster)
+	return &unstructured.Unstructured{Object: result}, err
+}
+
+// UpdateClusterStatusAndRetry apply the passed modifier to the passed cluster object and then try to
+// store the cluster using the API server. In case of a conflict error the cluster is refreshed from
+// the API server and the operation is retried until it will succeed.
+func UpdateClusterStatusAndRetry(
+	ctx context.Context,
+	client dynamic.Interface,
+	cluster *apiv1.Cluster,
+	tx ClusterModifier) (*apiv1.Cluster, error) {
+	if err := tx(cluster); err != nil {
+		return cluster, err
+	}
+
+	return cluster, retry.RetryOnConflict(RetrySettingPrimary, func() error {
+		updateError := UpdateClusterStatus(ctx, client, cluster)
+		if updateError == nil || !apierrors.IsConflict(updateError) {
+			return updateError
+		}
+
+		log.Log.Info(
+			"Conflict detected while changing cluster status, retrying",
+			"error", updateError.Error())
+
+		var err error
+		cluster, err = GetCluster(ctx, client, cluster.Namespace, cluster.Name)
+		if err != nil {
+			return err
+		}
+
+		err = tx(cluster)
+		if err != nil {
+			return err
+		}
+
+		return updateError
+	})
 }

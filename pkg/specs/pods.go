@@ -59,16 +59,6 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 			},
 		},
 		{
-			Name: "config",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: cluster.Name,
-					},
-				},
-			},
-		},
-		{
 			Name: "superuser-secret",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{

@@ -117,7 +117,7 @@ func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret
 		return nil, err
 	}
 
-	secret.Data["ca.crt"] = pair.Certificate
+	secret.Data[CACertKey] = pair.Certificate
 	updatedSecret, err := client.CoreV1().Secrets(secret.Namespace).Update(ctx, secret, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
@@ -155,7 +155,8 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 	ctx context.Context,
 	client kubernetes.Interface,
 	apiClient apiextensionsclientset.Interface,
-	caSecret *v1.Secret) error {
+	caSecret *v1.Secret,
+) error {
 	webhookSecret, err := pki.EnsureCertificate(ctx, client, caSecret)
 	if err != nil {
 		return err

@@ -175,6 +175,10 @@ const (
 
 	// PhaseHealthy for a cluster doing nothing
 	PhaseHealthy = "Cluster in healthy state"
+
+	// PhaseApplyingConfiguration is set by the instance manager when a configuration
+	// change is being detected
+	PhaseApplyingConfiguration = "Applying configuration"
 )
 
 // ClusterStatus defines the observed state of Cluster
