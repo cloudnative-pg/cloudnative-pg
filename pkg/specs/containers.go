@@ -17,7 +17,7 @@ import (
 func createBootstrapContainer(resources corev1.ResourceRequirements) corev1.Container {
 	return corev1.Container{
 		Name:  BootstrapControllerContainerName,
-		Image: configuration.GetOperatorImageName(),
+		Image: configuration.Current.OperatorImageName,
 		Command: []string{
 			"/manager",
 			"bootstrap",

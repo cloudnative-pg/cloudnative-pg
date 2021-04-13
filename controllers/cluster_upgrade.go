@@ -195,7 +195,7 @@ func (r *ClusterReconciler) isPodNeedingRestart(
 		return true, nil
 	}
 
-	if opCurrentImageName != configuration.GetOperatorImageName() {
+	if opCurrentImageName != configuration.Current.OperatorImageName {
 		// We need to apply a different version of the instance manager
 		return true, nil
 	}

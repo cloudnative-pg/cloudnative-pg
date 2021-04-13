@@ -599,7 +599,7 @@ func (cluster *Cluster) GetImageName() string {
 		return cluster.Spec.ImageName
 	}
 
-	return configuration.GetDefaultPostgresImageName()
+	return configuration.Current.PostgresImageName
 }
 
 // GetImagePullSecret get the name of the pull secret to use

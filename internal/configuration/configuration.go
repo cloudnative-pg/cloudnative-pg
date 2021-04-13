@@ -9,7 +9,9 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package configuration
 
 import (
-	"os"
+	"fmt"
+	"reflect"
+	"strings"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
@@ -17,88 +19,123 @@ import (
 // DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
 const DefaultOperatorPullSecretName = "postgresql-operator-pull-secret" // #nosec
 
-var (
-	// webhookCertDir is the directory where the certificates for the webhooks
+// Data is the struct containing the configuration of the operator.
+// Usually the operator code will used the "Current" configuration.
+type Data struct {
+	// WebhookCertDir is the directory where the certificates for the webhooks
 	// need to written. This is different between plain Kubernetes and OpenShift
-	webhookCertDir string
+	WebhookCertDir string `json:"webhookCertDir" env:"WEBHOOK_CERT_DIR"`
 
-	// watchNamespace is the namespace where the operator should watch and
+	// WatchNamespace is the namespace where the operator should watch and
 	// is configurable via environment variables of via the OpenShift console
-	watchNamespace string
+	WatchNamespace string `json:"watchNamespace" env:"WATCH_NAMESPACE"`
 
-	// operatorNamespace is the namespace where the operator is installed
-	operatorNamespace string
+	// OperatorNamespace is the namespace where the operator is installed
+	OperatorNamespace string `json:"operatorNamespace" env:"OPERATOR_NAMESPACE"`
 
-	// operatorPullSecretName is the pull secret used to download the
+	// OperatorPullSecretName is the pull secret used to download the
 	// pull secret name
-	operatorPullSecretName string
+	OperatorPullSecretName string `json:"operatorPullSecretName" env:"PULL_SECRET_NAME"`
 
-	// operatorImageName is the name of the image of the operator, that is
+	// OperatorImageName is the name of the image of the operator, that is
 	// used to bootstrap Pods
-	operatorImageName string
+	OperatorImageName string `json:"operatorImageName" env:"OPERATOR_IMAGE_NAME"`
 
-	// postgresImageName is the name of the image of PostgreSQL that is
+	// PostgresImageName is the name of the image of PostgreSQL that is
 	// used by default for new clusters
-	postgresImageName string
+	PostgresImageName string `json:"postgresImageName" env:"POSTGRES_IMAGE_NAME"`
+
+	// InheritedAnnotations are a list of annotations that are inherited from
+	// the Cluster specification to every resource owned by it
+	InheritedAnnotations []string `json:"inheritedAnnotations" env:"INHERITED_ANNOTATIONS"`
+}
+
+var (
+	// Current is the configuration used by the operator
+	Current = NewConfiguration()
 )
 
-func init() {
-	webhookCertDir = os.Getenv("WEBHOOK_CERT_DIR")
-	watchNamespace = os.Getenv("WATCH_NAMESPACE")
-	operatorNamespace = os.Getenv("OPERATOR_NAMESPACE")
-
-	operatorPullSecretName = os.Getenv("PULL_SECRET_NAME")
-	if operatorPullSecretName == "" {
-		operatorPullSecretName = DefaultOperatorPullSecretName
-	}
-
-	operatorImageName = os.Getenv("OPERATOR_IMAGE_NAME")
-	if operatorImageName == "" {
-		operatorImageName = versions.DefaultOperatorImageName
-	}
-
-	postgresImageName = os.Getenv("POSTGRES_IMAGE_NAME")
-	if postgresImageName == "" {
-		postgresImageName = versions.DefaultImageName
+// newDefaultConfig creates a configuration holding the defaults
+func newDefaultConfig() *Data {
+	return &Data{
+		OperatorPullSecretName: DefaultOperatorPullSecretName,
+		OperatorImageName:      versions.DefaultOperatorImageName,
+		PostgresImageName:      versions.DefaultImageName,
 	}
 }
 
-// GetDefaultPostgresImageName gets the default image that is used
-// for PostgreSQL in this operator
-func GetDefaultPostgresImageName() string {
-	return postgresImageName
+// NewConfiguration create a new CNP configuration by reading
+// the environment variables
+func NewConfiguration() *Data {
+	configuration := newDefaultConfig()
+	configuration.ReadConfigMap(nil)
+	return configuration
 }
 
-// GetOperatorImageName gets the operator image name that will be used
-func GetOperatorImageName() string {
-	return operatorImageName
+// ReadConfigMap reads the configuration from the environment and the passed in data map
+func (config *Data) ReadConfigMap(data map[string]string) {
+	config.readConfigMap(data, OsEnvironment{})
 }
 
-// GetOperatorNamespace gets the namespace under which the operator is deployed
-func GetOperatorNamespace() string {
-	return operatorNamespace
-}
+func (config *Data) readConfigMap(data map[string]string, env EnvironmentSource) {
+	defaults := newDefaultConfig()
+	count := reflect.TypeOf(Data{}).NumField()
+	for i := 0; i < count; i++ {
+		field := reflect.TypeOf(Data{}).Field(i)
+		envName := field.Tag.Get("env")
 
-// GetOperatorPullSecretName gets the pull secret that is being used to
-// download the operator image
-func GetOperatorPullSecretName() string {
-	return operatorPullSecretName
-}
+		// Fields without env tag are skipped.
+		if envName == "" {
+			continue
+		}
 
-// GetWebhookCertDir gets the directory where the webhooks certificate
-// need to be found
-func GetWebhookCertDir() string {
-	return webhookCertDir
-}
+		// Initialize value with default
+		value := reflect.ValueOf(defaults).Elem().FieldByName(field.Name).String()
+		// If the key is present in the environment, use its value
+		if envValue := env.Getenv(envName); envValue != "" {
+			value = envValue
+		}
+		// If the key is present in the passed data, use its value
+		if mapValue, ok := data[envName]; ok {
+			value = mapValue
+		}
 
-// GetWatchNamespace gets the namespace that will be watched by the operator
-func GetWatchNamespace() string {
-	return watchNamespace
-}
-
-// ReadConfigMap reads the configuration from the operator ConfigMap
-func ReadConfigMap(data map[string]string) {
-	if pullSecretName, ok := data["PULL_SECRET_NAME"]; ok {
-		operatorPullSecretName = pullSecretName
+		switch t := field.Type; t.Kind() {
+		case reflect.String:
+			reflect.ValueOf(config).Elem().FieldByName(field.Name).SetString(value)
+		case reflect.Slice:
+			reflect.ValueOf(config).Elem().FieldByName(field.Name).Set(reflect.ValueOf(splitAndTrim(value)))
+		default:
+			errMsg := fmt.Sprintf(
+				"field: %s, type: %s, kind: %s is not being handled",
+				field.Name, t.String(), t.Kind())
+			panic(errMsg)
+		}
 	}
+}
+
+// splitAndTrim slices a string into all substrings after each comma and
+// returns a slice of those space-trimmed substrings.
+func splitAndTrim(commaSeparatedList string) []string {
+	list := strings.Split(commaSeparatedList, ",")
+	for i := range list {
+		list[i] = strings.TrimSpace(list[i])
+	}
+	return list
+}
+
+// IsAnnotationInherited check if an annotation with a certain name should
+// be inherited from the Cluster specification to the generated objects
+func (config *Data) IsAnnotationInherited(name string) (result bool) {
+	for _, element := range config.InheritedAnnotations {
+		// TODO evaluate supporting glob-like patterns, such as 'ibm.com/*'
+		// the library https://github.com/gobwas/glob should be really useful
+		// for that, if we decide to support patterns
+		if name == element {
+			result = true
+			return
+		}
+	}
+
+	return
 }

@@ -118,7 +118,8 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&configMapName, "config-map-name", "", "The name of the ConfigMap")
+	flag.StringVar(&configMapName, "config-map-name", "", "The name of the ConfigMap containing "+
+		"the operator configuration")
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
@@ -126,7 +127,7 @@ func main() {
 
 	setupLog.Info("Starting Cloud Native PostgreSQL Operator", "version", versions.Version)
 
-	setupLog.Info("Listening for changes", "watchNamespace", configuration.GetWatchNamespace())
+	setupLog.Info("Listening for changes", "watchNamespace", configuration.Current.WatchNamespace)
 
 	managerOptions := ctrl.Options{
 		Scheme:             scheme,
@@ -134,13 +135,13 @@ func main() {
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "db9c8771.k8s.enterprisedb.io",
-		Namespace:          configuration.GetWatchNamespace(),
+		Namespace:          configuration.Current.WatchNamespace,
 		CertDir:            "/tmp",
 	}
-	if configuration.GetWebhookCertDir() != "" {
+	if configuration.Current.WebhookCertDir != "" {
 		// If OLM will generate certificates for us, let's just
 		// use those
-		managerOptions.CertDir = configuration.GetWebhookCertDir()
+		managerOptions.CertDir = configuration.Current.WebhookCertDir
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), managerOptions)
@@ -154,7 +155,7 @@ func main() {
 	mgr.GetWebhookServer().KeyName = "apiserver.key"
 
 	certificatesGenerationFolder := mgr.GetWebhookServer().CertDir
-	if configuration.GetWebhookCertDir() != "" {
+	if configuration.Current.WebhookCertDir != "" {
 		// OLM is generating certificates for us so we can avoid
 		// injecting/creating certificates
 		certificatesGenerationFolder = ""
@@ -167,13 +168,15 @@ func main() {
 	}
 
 	if configMapName != "" {
-		err := readConfigMap(ctx, configuration.GetOperatorNamespace(), configMapName)
+		err := readConfigMap(ctx, configuration.Current.OperatorNamespace, configMapName)
 		if err != nil {
 			setupLog.Error(err, "unable to read ConfigMap",
-				"namespace", configuration.GetOperatorNamespace(),
+				"namespace", configuration.Current.OperatorNamespace,
 				"name", configMapName)
 		}
 	}
+
+	setupLog.Info("Operator configuration loaded", "configuration", configuration.Current)
 
 	err = setupPKI(ctx, certificatesGenerationFolder)
 	if err != nil {
@@ -281,7 +284,7 @@ func setupPKI(ctx context.Context, certDir string) error {
 		CertDir:                            certDir,
 		SecretName:                         webhookSecretName,
 		ServiceName:                        webhookServiceName,
-		OperatorNamespace:                  configuration.GetOperatorNamespace(),
+		OperatorNamespace:                  configuration.Current.OperatorNamespace,
 		MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
 		CustomResourceDefinitionsName: []string{
@@ -325,7 +328,7 @@ func readConfigMap(ctx context.Context, namespace, name string) error {
 		return err
 	}
 
-	configuration.ReadConfigMap(configMap.Data)
+	configuration.Current.ReadConfigMap(configMap.Data)
 
 	return nil
 }
