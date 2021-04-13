@@ -11,7 +11,6 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -35,8 +34,13 @@ func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context) 
 		return err
 	}
 
-	return r.refreshCertificateFilesFromObject(
-		unstructuredObject,
+	secret, err := utils.ObjectToSecret(unstructuredObject)
+	if err != nil {
+		return err
+	}
+
+	return r.refreshCertificateFilesFromSecret(
+		secret,
 		postgresSpec.ServerCertificateLocation,
 		postgresSpec.ServerKeyLocation)
 }
@@ -55,8 +59,13 @@ func (r *InstanceReconciler) RefreshPostgresUserCertificate(ctx context.Context)
 		return err
 	}
 
-	return r.refreshCertificateFilesFromObject(
-		unstructuredObject,
+	secret, err := utils.ObjectToSecret(unstructuredObject)
+	if err != nil {
+		return err
+	}
+
+	return r.refreshCertificateFilesFromSecret(
+		secret,
 		postgresSpec.StreamingReplicaCertificateLocation,
 		postgresSpec.StreamingReplicaKeyLocation)
 }
@@ -75,7 +84,12 @@ func (r *InstanceReconciler) RefreshCA(ctx context.Context) error {
 		return err
 	}
 
-	return r.refreshCAFromObject(unstructuredObject)
+	secret, err := utils.ObjectToSecret(unstructuredObject)
+	if err != nil {
+		return err
+	}
+
+	return r.refreshCAFromSecret(secret)
 }
 
 // VerifyPgDataCoherence check if this cluster exist in k8s and panic if this
@@ -83,12 +97,9 @@ func (r *InstanceReconciler) RefreshCA(ctx context.Context) error {
 func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 	r.log.Info("Checking PGDATA coherence")
 
-	cluster, err := r.client.
-		Resource(apiv1.ClusterGVK).
-		Namespace(r.instance.Namespace).
-		Get(ctx, r.instance.ClusterName, metav1.GetOptions{})
+	cluster, err := utils.GetCluster(ctx, r.client, r.instance.Namespace, r.instance.ClusterName)
 	if err != nil {
-		return err
+		return fmt.Errorf("error while decoding runtime.Object data from watch: %w", err)
 	}
 
 	if err := fileutils.EnsurePgDataPerms(r.instance.PgData); err != nil {
@@ -113,19 +124,9 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 // one from the PGDATA viewpoint, but is not classified as the target nor the
 // current primary
 func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
-	ctx context.Context, cluster *unstructured.Unstructured) error {
-	targetPrimary, err := utils.GetTargetPrimary(cluster)
-	if err != nil {
-		return err
-	}
-
-	// When a new cluster has just started, we have still
-	// no current primary. It's not a real issue, we just need
-	// to put our name there
-	currentPrimary, err := utils.GetCurrentPrimary(cluster)
-	if err != nil && err != utils.ErrCurrentPrimaryNotFound {
-		return err
-	}
+	ctx context.Context, cluster *apiv1.Cluster) error {
+	targetPrimary := cluster.Status.TargetPrimary
+	currentPrimary := cluster.Status.CurrentPrimary
 
 	r.log.Info("Cluster status",
 		"currentPrimary", currentPrimary,
@@ -139,18 +140,14 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 			r.log.Info("First primary instance bootstrap, marking myself as primary",
 				"currentPrimary", currentPrimary,
 				"targetPrimary", targetPrimary)
-			err = utils.SetCurrentPrimary(cluster, r.instance.PodName)
-			if err != nil {
-				return err
-			}
 
-			_, err = r.client.
-				Resource(apiv1.ClusterGVK).
-				Namespace(r.instance.Namespace).
-				UpdateStatus(ctx, cluster, metav1.UpdateOptions{})
-			if err != nil {
-				return err
-			}
+			_, err := utils.UpdateClusterStatusAndRetry(
+				ctx, r.client, cluster, func(cluster *apiv1.Cluster) error {
+					cluster.Status.CurrentPrimary = r.instance.PodName
+					return nil
+				})
+
+			return err
 		}
 		return nil
 
@@ -164,7 +161,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 			"targetPrimary", targetPrimary)
 
 		// Wait for the switchover to be reflected in the cluster metadata
-		err = r.waitForSwitchoverToBeCompleted(ctx)
+		err := r.waitForSwitchoverToBeCompleted(ctx)
 		if err != nil {
 			return err
 		}
@@ -218,21 +215,13 @@ func (r *InstanceReconciler) waitForSwitchoverToBeCompleted(ctx context.Context)
 			return fmt.Errorf("watch expired while waiting for switchover to complete")
 		}
 
-		object, err := objectToUnstructured(event.Object)
+		cluster, err := utils.ObjectToCluster(event.Object)
 		if err != nil {
 			return fmt.Errorf("error while decoding runtime.Object data from watch: %w", err)
 		}
 
-		targetPrimary, err := utils.GetTargetPrimary(object)
-		if err != nil {
-			return fmt.Errorf("error while extracting the targetPrimary from the cluster status %v: %w",
-				object, err)
-		}
-		currentPrimary, err := utils.GetCurrentPrimary(object)
-		if err != nil {
-			return fmt.Errorf("error while extracting the currentPrimary from the cluster status %v: %w",
-				object, err)
-		}
+		targetPrimary := cluster.Status.TargetPrimary
+		currentPrimary := cluster.Status.CurrentPrimary
 
 		if targetPrimary == currentPrimary {
 			r.log.Info("Switchover completed",

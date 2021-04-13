@@ -122,7 +122,7 @@ func (r *ClusterReconciler) renewCASecret(ctx context.Context, secret *v1.Secret
 		return nil, err
 	}
 
-	secret.Data["ca.crt"] = pair.Certificate
+	secret.Data[certs.CACertKey] = pair.Certificate
 	err = r.Update(ctx, secret)
 	if err != nil {
 		return secret, nil

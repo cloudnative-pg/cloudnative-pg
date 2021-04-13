@@ -13,7 +13,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/cnp"
@@ -24,9 +23,7 @@ import (
 // Promote command implementation
 func Promote(ctx context.Context, clusterName string, serverName string) {
 	// Check cluster status
-	object, err := cnp.DynamicClient.Resource(apiv1.ClusterGVK).
-		Namespace(cnp.Namespace).
-		Get(ctx, clusterName, metav1.GetOptions{})
+	cluster, err := utils.GetCluster(ctx, cnp.DynamicClient, cnp.Namespace, clusterName)
 	if err != nil {
 		log.Log.Error(err, "Cannot find PostgreSQL cluster",
 			"namespace", cnp.Namespace,
@@ -48,35 +45,16 @@ func Promote(ctx context.Context, clusterName string, serverName string) {
 	}
 
 	// The Pod exists, let's do it!
-	err = utils.SetTargetPrimary(object, serverName)
-	if err != nil {
-		log.Log.Error(err, "Cannot find status field of cluster",
-			"object", object)
-		return
-	}
+	cluster.Status.TargetPrimary = serverName
+	cluster.Status.Phase = apiv1.PhaseSwitchover
+	cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
 
-	// Register the phase in the cluster
-	err = utils.SetPhase(object, apiv1.PhaseSwitchover,
-		fmt.Sprintf("Switching over to %v", serverName))
-	if err != nil {
-		log.Log.Error(err, "Cannot find status field of cluster",
-			"object", object)
-		return
-	}
-
-	// Update, considering possible conflicts
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, err = cnp.DynamicClient.
-			Resource(apiv1.ClusterGVK).
-			Namespace(cnp.Namespace).
-			UpdateStatus(ctx, object, metav1.UpdateOptions{})
-		return err
-	})
+	err = utils.UpdateClusterStatus(ctx, cnp.DynamicClient, cluster)
 	if err != nil {
 		log.Log.Error(err, "Cannot update PostgreSQL cluster status",
 			"namespace", cnp.Namespace,
 			"name", serverName,
-			"object", object)
+			"cluster", cluster)
 		return
 	}
 }

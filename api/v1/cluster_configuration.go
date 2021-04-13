@@ -4,42 +4,24 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package specs
+package v1
 
 import (
 	"sort"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
-const (
-	// PostgreSQLConfigurationKeyName is the name of the key
-	// inside the ConfigMap which is containing the PostgreSQL
-	// configuration
-	PostgreSQLConfigurationKeyName = "postgresConfiguration"
-
-	// PostgreSQLHBAKeyName is the name of the key
-	// inside the ConfigMap which is containing the PostgreSQL
-	// HBA rules
-	PostgreSQLHBAKeyName = "postgresHBA"
-)
-
-// CreatePostgresConfigMap create a configMap for this cluster
-func CreatePostgresConfigMap(cluster *apiv1.Cluster) (*corev1.ConfigMap, error) {
-	// put the user provided content between header and footer
-	hbaContent := postgres.CreateHBARules(cluster.Spec.PostgresConfiguration.PgHBA)
-
+// CreatePostgresqlConfiguration create the PostgreSQL configuration to be
+// used for this cluster
+func (cluster *Cluster) CreatePostgresqlConfiguration() (string, error) {
 	// Extract the PostgreSQL major version
 	imageName := cluster.GetImageName()
 	tag := utils.GetImageTag(imageName)
 	fromVersion, err := postgres.GetPostgresVersionFromTag(tag)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	info := postgres.ConfigurationInfo{
@@ -68,16 +50,10 @@ func CreatePostgresConfigMap(cluster *apiv1.Cluster) (*corev1.ConfigMap, error) 
 		info.SyncReplicas = int(cluster.Spec.MinSyncReplicas)
 	}
 
-	configFile := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
+	return postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info)), nil
+}
 
-	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
-		},
-		Data: map[string]string{
-			PostgreSQLConfigurationKeyName: configFile,
-			PostgreSQLHBAKeyName:           hbaContent,
-		},
-	}, nil
+// CreatePostgresqlHBA create the HBA rules for this cluster
+func (cluster *Cluster) CreatePostgresqlHBA() string {
+	return postgres.CreateHBARules(cluster.Spec.PostgresConfiguration.PgHBA)
 }

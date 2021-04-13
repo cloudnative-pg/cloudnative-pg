@@ -101,20 +101,6 @@ func (r *InstanceReconciler) watch(ctx context.Context) error {
 		return fmt.Errorf("error watching cluster: %w", err)
 	}
 
-	configMapWatch, err := r.client.
-		Resource(schema.GroupVersionResource{
-			Group:    "",
-			Version:  "v1",
-			Resource: "configmaps",
-		}).
-		Namespace(r.instance.Namespace).
-		Watch(ctx, metav1.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName).String(),
-		})
-	if err != nil {
-		return fmt.Errorf("error watching configmap: %w", err)
-	}
-
 	serverSecretWatch, err := r.client.
 		Resource(schema.GroupVersionResource{
 			Group:    "",
@@ -162,7 +148,6 @@ func (r *InstanceReconciler) watch(ctx context.Context) error {
 
 	r.watchCollection = NewWatchCollection(
 		clusterWatch,
-		configMapWatch,
 		serverSecretWatch,
 		caSecretWatch,
 		replicationSecretWatch,

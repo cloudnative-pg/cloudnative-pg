@@ -55,8 +55,8 @@ var _ = Describe("Keypair generation", func() {
 		secret := pair.GenerateCASecret("namespace", "name")
 		Expect(secret.Namespace).To(Equal("namespace"))
 		Expect(secret.Name).To(Equal("name"))
-		Expect(secret.Data["ca.crt"]).To(Equal(pair.Certificate))
-		Expect(secret.Data["ca.key"]).To(Equal(pair.Private))
+		Expect(secret.Data[CACertKey]).To(Equal(pair.Certificate))
+		Expect(secret.Data[CAPrivateKeyKey]).To(Equal(pair.Private))
 	})
 
 	It("should be able to renew an existing CA certificate", func() {

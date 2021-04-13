@@ -11,12 +11,10 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
@@ -69,20 +67,17 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 	return fileutils.WriteStringToFile(targetFile, contents)
 }
 
-// RefreshConfigurationFilesFromObject receive an unstructured object representing
-// a configmap and rewrite the file in the PGDATA. This function will return "true"
-// it the configuration has been really changed.
+// RefreshConfigurationFilesFromCluster receive a cluster object, generate the
+// PostgreSQL configuration and rewrite the file in the PGDATA if needed. This
+// function will return "true" if the configuration has been really changed.
 // Important: this won't send a SIGHUP to the server
-func (instance *Instance) RefreshConfigurationFilesFromObject(object *unstructured.Unstructured) (bool, error) {
-	postgresConfiguration, err := utils.GetPostgreSQLConfiguration(object)
+func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cluster) (bool, error) {
+	postgresConfiguration, err := cluster.CreatePostgresqlConfiguration()
 	if err != nil {
 		return false, err
 	}
 
-	postgresHBA, err := utils.GetPostgreSQLHBA(object)
-	if err != nil {
-		return false, err
-	}
+	postgresHBA := cluster.CreatePostgresqlHBA()
 
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
 		instance.PgData,
@@ -110,16 +105,10 @@ func (instance *Instance) RefreshConfigurationFilesFromObject(object *unstructur
 // RefreshConfigurationFiles get the latest version of the ConfigMap from the API
 // server and then write the configuration in PGDATA
 func (instance *Instance) RefreshConfigurationFiles(ctx context.Context, client dynamic.Interface) (bool, error) {
-	unstructuredObject, err := client.Resource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "configmaps",
-	}).
-		Namespace(instance.Namespace).
-		Get(ctx, instance.ClusterName, metav1.GetOptions{})
+	cluster, err := utils.GetCluster(ctx, client, instance.Namespace, instance.ClusterName)
 	if err != nil {
 		return false, err
 	}
 
-	return instance.RefreshConfigurationFilesFromObject(unstructuredObject)
+	return instance.RefreshConfigurationFilesFromCluster(cluster)
 }

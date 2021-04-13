@@ -36,6 +36,12 @@ const (
 
 	// Threshold to consider a certificate as expiring
 	expiringCheckThreshold = 7 * 24 * time.Hour
+
+	// CACertKey is the key for certificates in a CA secret
+	CACertKey = "ca.crt"
+
+	// CAPrivateKeyKey is the key for the private key field in a CA secret
+	CAPrivateKeyKey = "ca.key"
 )
 
 // CertType represent a certificate type
@@ -170,8 +176,8 @@ func (pair KeyPair) GenerateCASecret(namespace, name string) *v1.Secret {
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			"ca.key": pair.Private,
-			"ca.crt": pair.Certificate,
+			CAPrivateKeyKey: pair.Private,
+			CACertKey:       pair.Certificate,
 		},
 		Type: v1.SecretTypeOpaque,
 	}
@@ -280,14 +286,14 @@ func CreateRootCA(commonName string, organizationalUnit string) (*KeyPair, error
 
 // ParseCASecret parse a CA secret to a key pair
 func ParseCASecret(secret *v1.Secret) (*KeyPair, error) {
-	privateKey, ok := secret.Data["ca.key"]
+	privateKey, ok := secret.Data[CAPrivateKeyKey]
 	if !ok {
-		return nil, fmt.Errorf("missing ca.key secret data")
+		return nil, fmt.Errorf("missing %s secret data", CAPrivateKeyKey)
 	}
 
-	publicKey, ok := secret.Data["ca.crt"]
+	publicKey, ok := secret.Data[CACertKey]
 	if !ok {
-		return nil, fmt.Errorf("missing ca.crt secret data")
+		return nil, fmt.Errorf("missing %s secret data", CACertKey)
 	}
 
 	return &KeyPair{
