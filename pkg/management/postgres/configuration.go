@@ -57,14 +57,20 @@ func InstallPgHBAFile(pgdata, filename string) (bool, error) {
 // InstallPgDataFileContent install a file in PgData, returning true/false if
 // the file has been changed and an error state
 func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, error) {
-	log.Log.Info(
-		"Installing configuration file",
-		"pgdata", pgdata,
-		"filename", destinationFile,
-		"contents", contents)
-
 	targetFile := path.Join(pgdata, destinationFile)
-	return fileutils.WriteStringToFile(targetFile, contents)
+	result, err := fileutils.WriteStringToFile(targetFile, contents)
+	if err != nil {
+		return false, err
+	}
+
+	if result {
+		log.Log.Info(
+			"Installed configuration file",
+			"pgdata", pgdata,
+			"filename", destinationFile)
+	}
+
+	return result, nil
 }
 
 // RefreshConfigurationFilesFromCluster receive a cluster object, generate the

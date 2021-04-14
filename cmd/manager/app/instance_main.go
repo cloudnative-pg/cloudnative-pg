@@ -259,13 +259,13 @@ func joinSubCommand(ctx context.Context, info postgres.JoinInfo) {
 		os.Exit(1)
 	}
 
-	err = reconciler.RefreshPostgresUserCertificate(ctx)
+	_, err = reconciler.RefreshReplicationUserCertificate(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS server certificates")
 		os.Exit(1)
 	}
 
-	err = reconciler.RefreshCA(ctx)
+	_, err = reconciler.RefreshCA(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS CA certificates")
 		os.Exit(1)

@@ -21,8 +21,8 @@ import (
 )
 
 // RefreshServerCertificateFiles get the latest certificates from the
-// secrets
-func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context) error {
+// secrets. Returns true if configuration has been changed
+func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context) (bool, error) {
 	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
@@ -31,12 +31,12 @@ func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context) 
 		Namespace(r.instance.Namespace).
 		Get(ctx, r.instance.ClusterName+apiv1.ServerSecretSuffix, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	secret, err := utils.ObjectToSecret(unstructuredObject)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	return r.refreshCertificateFilesFromSecret(
@@ -45,9 +45,9 @@ func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context) 
 		postgresSpec.ServerKeyLocation)
 }
 
-// RefreshPostgresUserCertificate get the latest certificates from the
-// secrets
-func (r *InstanceReconciler) RefreshPostgresUserCertificate(ctx context.Context) error {
+// RefreshReplicationUserCertificate get the latest certificates from the
+// secrets. Returns true if configuration has been changed
+func (r *InstanceReconciler) RefreshReplicationUserCertificate(ctx context.Context) (bool, error) {
 	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
@@ -56,12 +56,12 @@ func (r *InstanceReconciler) RefreshPostgresUserCertificate(ctx context.Context)
 		Namespace(r.instance.Namespace).
 		Get(ctx, r.instance.ClusterName+apiv1.ReplicationSecretSuffix, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	secret, err := utils.ObjectToSecret(unstructuredObject)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	return r.refreshCertificateFilesFromSecret(
@@ -71,8 +71,8 @@ func (r *InstanceReconciler) RefreshPostgresUserCertificate(ctx context.Context)
 }
 
 // RefreshCA get the latest certificates from the
-// secrets
-func (r *InstanceReconciler) RefreshCA(ctx context.Context) error {
+// secrets. Returns true if configuration has been changed
+func (r *InstanceReconciler) RefreshCA(ctx context.Context) (bool, error) {
 	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
@@ -81,12 +81,12 @@ func (r *InstanceReconciler) RefreshCA(ctx context.Context) error {
 		Namespace(r.instance.Namespace).
 		Get(ctx, r.instance.ClusterName+apiv1.CaSecretSuffix, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	secret, err := utils.ObjectToSecret(unstructuredObject)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	return r.refreshCAFromSecret(secret)

@@ -226,6 +226,12 @@ type ClusterStatus struct {
 
 	// Reason for the current phase
 	PhaseReason string `json:"phaseReason,omitempty"`
+
+	// The list of resource versions of the secrets
+	// managed by the operator. Every change here is done in the
+	// interest of the instance manager, which will refresh the
+	// secret data
+	SecretsResourceVersion SecretsResourceVersion `json:"secretsResourceVersion,omitempty"`
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to
@@ -591,6 +597,25 @@ type ClusterList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of clusters
 	Items []Cluster `json:"items"`
+}
+
+// SecretsResourceVersion is the resource versions of the secrets
+// managed by the operator
+type SecretsResourceVersion struct {
+	// The resource version of the "postgres" user secret
+	SuperuserSecretVersion string `json:"superuserSecretVersion"`
+
+	// The resource version of the "streaming_replication" user secret
+	ReplicationSecretVersion string `json:"replicationSecretVersion"`
+
+	// The resource version of the "app" user secret
+	ApplicationSecretVersion string `json:"applicationSecretVersion"`
+
+	// The resource version of the "ca" secret version
+	CASecretVersion string `json:"caSecretVersion"`
+
+	// The resource version of the PostgreSQL server-side secret version
+	ServerSecretVersion string `json:"serverSecretVersion"`
 }
 
 // Hub marks this type as a conversion hub.

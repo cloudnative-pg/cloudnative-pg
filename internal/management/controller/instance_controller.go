@@ -10,19 +10,19 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
@@ -35,23 +35,6 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 		"eventType", event.Type,
 		"type", event.Object.GetObjectKind().GroupVersionKind())
 
-	kind := event.Object.GetObjectKind().GroupVersionKind().Kind
-	switch kind {
-	case "Cluster":
-		return r.reconcileCluster(ctx, event)
-	case "Secret":
-		return r.reconcileSecret(event)
-	default:
-		r.log.Info("unknown reconciliation target, skipped event",
-			"kind", kind)
-	}
-
-	return nil
-}
-
-// reconcileCluster is called when something is changed at the
-// cluster level
-func (r *InstanceReconciler) reconcileCluster(ctx context.Context, event *watch.Event) error {
 	cluster, err := utils.ObjectToCluster(event.Object)
 	if err != nil {
 		return fmt.Errorf("error decoding cluster resource: %w", err)
@@ -68,9 +51,13 @@ func (r *InstanceReconciler) reconcileCluster(ctx context.Context, event *watch.
 	}
 
 	// Reconcile PostgreSQL configuration
-	err = r.reconcileConfiguration(ctx, cluster)
-	if err != nil {
+	if err = r.reconcileConfiguration(ctx, cluster); err != nil {
 		return fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
+	}
+
+	// Reconcile secrets and cryptographic material
+	if err = r.reconcileSecrets(ctx); err != nil {
+		return err
 	}
 
 	return nil
@@ -176,53 +163,36 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 }
 
 // reconcileSecret is called when the PostgreSQL secrets are changes
-func (r *InstanceReconciler) reconcileSecret(event *watch.Event) error {
-	if event.Type == watch.Added {
-		// The bootstrap status has been already
-		// been applied when the instance started up.
-		// No need to reconcile here.
-		return nil
+func (r *InstanceReconciler) reconcileSecrets(ctx context.Context) error {
+	changed := false
+
+	serverSecretChanged, err := r.RefreshServerCertificateFiles(ctx)
+	if err == nil {
+		changed = changed || serverSecretChanged
+	} else if !apierrors.IsNotFound(err) {
+		r.log.Error(err, "Error while getting server secret")
 	}
 
-	secret, err := utils.ObjectToSecret(event.Object)
-	if err != nil {
-		return fmt.Errorf(
-			"decoding Secret resource from watch: %w",
-			err)
+	replicationSecretChanged, err := r.RefreshReplicationUserCertificate(ctx)
+	if err == nil {
+		changed = changed || replicationSecretChanged
+	} else if !apierrors.IsNotFound(err) {
+		r.log.Error(err, "Error while getting streaming replication secret")
 	}
 
-	name := secret.Name
-
-	switch {
-	case strings.HasSuffix(name, apiv1.ServerSecretSuffix):
-		err = r.refreshCertificateFilesFromSecret(
-			secret,
-			postgres.ServerCertificateLocation,
-			postgres.ServerKeyLocation)
-		if err != nil {
-			return err
-		}
-
-	case strings.HasSuffix(name, apiv1.ReplicationSecretSuffix):
-		err = r.refreshCertificateFilesFromSecret(
-			secret,
-			postgres.StreamingReplicaCertificateLocation,
-			postgres.StreamingReplicaKeyLocation)
-		if err != nil {
-			return err
-		}
-
-	case strings.HasSuffix(name, apiv1.CaSecretSuffix):
-		err = r.refreshCAFromSecret(secret)
-		if err != nil {
-			return err
-		}
+	caSecretChanged, err := r.RefreshCA(ctx)
+	if err == nil {
+		changed = changed || caSecretChanged
+	} else if !apierrors.IsNotFound(err) {
+		r.log.Error(err, "Error while getting cluster CA secret")
 	}
 
-	r.log.Info("reloading the TLS crypto material")
-	err = r.instance.Reload()
-	if err != nil {
-		return fmt.Errorf("while applying new certificates: %w", err)
+	if changed {
+		r.log.Info("reloading the TLS crypto material")
+		err = r.instance.Reload()
+		if err != nil {
+			return fmt.Errorf("while applying new certificates: %w", err)
+		}
 	}
 
 	return nil
@@ -237,7 +207,6 @@ func (r *InstanceReconciler) reconcileConfiguration(ctx context.Context, cluster
 	}
 
 	if !changed {
-		r.log.Info("PostgreSQL configuration has not been changed")
 		return nil
 	}
 
@@ -294,41 +263,56 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 	secret *corev1.Secret,
 	certificateLocation string,
 	privateKeyLocation string,
-) error {
+) (bool, error) {
 	certificate, ok := secret.Data[corev1.TLSCertKey]
 	if !ok {
-		return fmt.Errorf("missing %s field insecret", corev1.TLSCertKey)
+		return false, fmt.Errorf("missing %s field in Secret", corev1.TLSCertKey)
 	}
 
 	privateKey, ok := secret.Data[corev1.TLSPrivateKeyKey]
 	if !ok {
-		return fmt.Errorf("missing %s field insecret", corev1.TLSPrivateKeyKey)
+		return false, fmt.Errorf("missing %s field in Secret", corev1.TLSPrivateKeyKey)
 	}
 
-	if err := ioutil.WriteFile(certificateLocation, certificate, 0600); err != nil {
-		return fmt.Errorf("while writing server certificate: %w", err)
+	certificateIsChanged, err := fileutils.WriteFile(certificateLocation, certificate, 0600)
+	if err != nil {
+		return false, fmt.Errorf("while writing server certificate: %w", err)
 	}
 
-	if err := ioutil.WriteFile(privateKeyLocation, privateKey, 0600); err != nil {
-		return fmt.Errorf("while writing server private key: %w", err)
+	if certificateIsChanged {
+		r.log.Info("Refreshed configuration file", "filename", certificateLocation)
 	}
 
-	return nil
+	privateKeyIsChanged, err := fileutils.WriteFile(privateKeyLocation, privateKey, 0600)
+	if err != nil {
+		return false, fmt.Errorf("while writing server private key: %w", err)
+	}
+
+	if certificateIsChanged {
+		r.log.Info("Refreshed configuration file", "filename", privateKeyLocation)
+	}
+
+	return certificateIsChanged || privateKeyIsChanged, nil
 }
 
 // refreshConfigurationFilesFromObject receive an unstructured object representing
 // a secret and rewrite the file corresponding to the server certificate
-func (r *InstanceReconciler) refreshCAFromSecret(secret *corev1.Secret) error {
+func (r *InstanceReconciler) refreshCAFromSecret(secret *corev1.Secret) (bool, error) {
 	caCertificate, ok := secret.Data[certs.CACertKey]
 	if !ok {
-		return fmt.Errorf("missing %s entry in Secret", certs.CACertKey)
+		return false, fmt.Errorf("missing %s entry in Secret", certs.CACertKey)
 	}
 
-	if err := ioutil.WriteFile(postgres.CACertificateLocation, caCertificate, 0600); err != nil {
-		return fmt.Errorf("while writing server certificate: %w", err)
+	changed, err := fileutils.WriteFile(postgres.CACertificateLocation, caCertificate, 0600)
+	if err != nil {
+		return false, fmt.Errorf("while writing server certificate: %w", err)
 	}
 
-	return nil
+	if changed {
+		r.log.Info("Refreshed configuration file", "filename", postgres.CACertificateLocation)
+	}
+
+	return changed, nil
 }
 
 // Reconciler primary logic

@@ -155,6 +155,14 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 	dst.Status.ReadService = src.Status.ReadService
 	dst.Status.Phase = src.Status.Phase
 	dst.Status.PhaseReason = src.Status.PhaseReason
+	dst.Status.SecretsResourceVersion.SuperuserSecretVersion =
+		src.Status.SecretsResourceVersion.SuperuserSecretVersion
+	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =
+		src.Status.SecretsResourceVersion.ReplicationSecretVersion
+	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =
+		src.Status.SecretsResourceVersion.ReplicationSecretVersion
+	dst.Status.SecretsResourceVersion.CASecretVersion = src.Status.SecretsResourceVersion.CASecretVersion
+	dst.Status.SecretsResourceVersion.ServerSecretVersion = src.Status.SecretsResourceVersion.ServerSecretVersion
 
 	return nil
 }
@@ -295,6 +303,14 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:golint
 	dst.Status.ReadService = src.Status.ReadService
 	dst.Status.Phase = src.Status.Phase
 	dst.Status.PhaseReason = src.Status.PhaseReason
+	dst.Status.SecretsResourceVersion.SuperuserSecretVersion =
+		src.Status.SecretsResourceVersion.SuperuserSecretVersion
+	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =
+		src.Status.SecretsResourceVersion.ReplicationSecretVersion
+	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =
+		src.Status.SecretsResourceVersion.ReplicationSecretVersion
+	dst.Status.SecretsResourceVersion.CASecretVersion = src.Status.SecretsResourceVersion.CASecretVersion
+	dst.Status.SecretsResourceVersion.ServerSecretVersion = src.Status.SecretsResourceVersion.ServerSecretVersion
 
 	return nil
 }

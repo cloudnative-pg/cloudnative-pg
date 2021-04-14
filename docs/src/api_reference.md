@@ -42,6 +42,7 @@ Below you will find a description of the defined resources:
 - [ScheduledBackupList](#ScheduledBackupList)
 - [ScheduledBackupSpec](#ScheduledBackupSpec)
 - [ScheduledBackupStatus](#ScheduledBackupStatus)
+- [SecretsResourceVersion](#SecretsResourceVersion)
 - [StorageConfiguration](#StorageConfiguration)
 - [WalBackupConfiguration](#WalBackupConfiguration)
 
@@ -202,22 +203,23 @@ Name                  | Description                                             
 
 ClusterStatus defines the observed state of Cluster
 
-Name                | Description                                                                                        | Type                        
-------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------
-`instances          ` | Total number of instances in the cluster                                                           | int32                       
-`readyInstances     ` | Total number of ready instances in the cluster                                                     | int32                       
-`instancesStatus    ` | Instances status                                                                                   | map[utils.PodStatus][]string
-`latestGeneratedNode` | ID of the latest generated node (used to avoid node name clashing)                                 | int32                       
-`currentPrimary     ` | Current primary instance                                                                           | string                      
-`targetPrimary      ` | Target primary instance, this is different from the previous one during a switchover or a failover | string                      
-`pvcCount           ` | How many PVCs have been created by this cluster                                                    | int32                       
-`jobCount           ` | How many Jobs have been created by this cluster                                                    | int32                       
-`danglingPVC        ` | List of all the PVCs created by this cluster and still available which are not attached to a Pod   | []string                    
-`initializingPVC    ` | List of all the PVCs that are being initialized by this cluster                                    | []string                    
-`writeService       ` | Current write pod                                                                                  | string                      
-`readService        ` | Current list of read pods                                                                          | string                      
-`phase              ` | Current phase of the cluster                                                                       | string                      
-`phaseReason        ` | Reason for the current phase                                                                       | string                      
+Name                   | Description                                                                                                                                                                 | Type                                             
+---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------
+`instances             ` | Total number of instances in the cluster                                                                                                                                    | int32                                            
+`readyInstances        ` | Total number of ready instances in the cluster                                                                                                                              | int32                                            
+`instancesStatus       ` | Instances status                                                                                                                                                            | map[utils.PodStatus][]string                     
+`latestGeneratedNode   ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                          | int32                                            
+`currentPrimary        ` | Current primary instance                                                                                                                                                    | string                                           
+`targetPrimary         ` | Target primary instance, this is different from the previous one during a switchover or a failover                                                                          | string                                           
+`pvcCount              ` | How many PVCs have been created by this cluster                                                                                                                             | int32                                            
+`jobCount              ` | How many Jobs have been created by this cluster                                                                                                                             | int32                                            
+`danglingPVC           ` | List of all the PVCs created by this cluster and still available which are not attached to a Pod                                                                            | []string                                         
+`initializingPVC       ` | List of all the PVCs that are being initialized by this cluster                                                                                                             | []string                                         
+`writeService          ` | Current write pod                                                                                                                                                           | string                                           
+`readService           ` | Current list of read pods                                                                                                                                                   | string                                           
+`phase                 ` | Current phase of the cluster                                                                                                                                                | string                                           
+`phaseReason           ` | Reason for the current phase                                                                                                                                                | string                                           
+`secretsResourceVersion` | The list of resource versions of the secrets managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the secret data | [SecretsResourceVersion](#SecretsResourceVersion)
 
 ## <a id='DataBackupConfiguration'></a>`DataBackupConfiguration`
 
@@ -329,6 +331,18 @@ Name             | Description                                                  
 `lastCheckTime   ` | The latest time the schedule                                               | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#time-v1-meta)
 `lastScheduleTime` | Information when was the last time that backup was successfully scheduled. | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#time-v1-meta)
 `nextScheduleTime` | Next time we will run a backup                                             | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#time-v1-meta)
+
+## <a id='SecretsResourceVersion'></a>`SecretsResourceVersion`
+
+SecretsResourceVersion is the resource versions of the secrets managed by the operator
+
+Name                     | Description                                                       | Type  
+------------------------ | ----------------------------------------------------------------- | ------
+`superuserSecretVersion  ` | The resource version of the "postgres" user secret                - *mandatory*  | string
+`replicationSecretVersion` | The resource version of the "streaming_replication" user secret   - *mandatory*  | string
+`applicationSecretVersion` | The resource version of the "app" user secret                     - *mandatory*  | string
+`caSecretVersion         ` | The resource version of the "ca" secret version                   - *mandatory*  | string
+`serverSecretVersion     ` | The resource version of the PostgreSQL server-side secret version - *mandatory*  | string
 
 ## <a id='StorageConfiguration'></a>`StorageConfiguration`
 
