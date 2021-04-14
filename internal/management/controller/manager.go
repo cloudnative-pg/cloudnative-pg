@@ -16,7 +16,6 @@ import (
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -101,56 +100,8 @@ func (r *InstanceReconciler) watch(ctx context.Context) error {
 		return fmt.Errorf("error watching cluster: %w", err)
 	}
 
-	serverSecretWatch, err := r.client.
-		Resource(schema.GroupVersionResource{
-			Group:    "",
-			Version:  "v1",
-			Resource: "secrets",
-		}).
-		Namespace(r.instance.Namespace).
-		Watch(ctx, metav1.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(
-				"metadata.name", r.instance.ClusterName+apiv1.ServerSecretSuffix).String(),
-		})
-	if err != nil {
-		return fmt.Errorf("error watching certificate secret: %w", err)
-	}
-
-	caSecretWatch, err := r.client.
-		Resource(schema.GroupVersionResource{
-			Group:    "",
-			Version:  "v1",
-			Resource: "secrets",
-		}).
-		Namespace(r.instance.Namespace).
-		Watch(ctx, metav1.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(
-				"metadata.name", r.instance.ClusterName+apiv1.CaSecretSuffix).String(),
-		})
-	if err != nil {
-		return fmt.Errorf("error watching CA secret: %w", err)
-	}
-
-	replicationSecretWatch, err := r.client.
-		Resource(schema.GroupVersionResource{
-			Group:    "",
-			Version:  "v1",
-			Resource: "secrets",
-		}).
-		Namespace(r.instance.Namespace).
-		Watch(ctx, metav1.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(
-				"metadata.name", r.instance.ClusterName+apiv1.ReplicationSecretSuffix).String(),
-		})
-	if err != nil {
-		return fmt.Errorf("error watching 'postgres' user secret: %w", err)
-	}
-
 	r.watchCollection = NewWatchCollection(
 		clusterWatch,
-		serverSecretWatch,
-		caSecretWatch,
-		replicationSecretWatch,
 	)
 	defer r.Stop()
 

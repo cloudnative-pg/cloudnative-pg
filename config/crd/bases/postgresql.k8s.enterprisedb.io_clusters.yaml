@@ -665,6 +665,35 @@ spec:
                 description: Total number of ready instances in the cluster
                 format: int32
                 type: integer
+              secretsResourceVersion:
+                description: The list of resource versions of the secrets managed
+                  by the operator. Every change here is done in the interest of the
+                  instance manager, which will refresh the secret data
+                properties:
+                  applicationSecretVersion:
+                    description: The resource version of the "app" user secret
+                    type: string
+                  caSecretVersion:
+                    description: The resource version of the "ca" secret version
+                    type: string
+                  replicationSecretVersion:
+                    description: The resource version of the "streaming_replication"
+                      user secret
+                    type: string
+                  serverSecretVersion:
+                    description: The resource version of the PostgreSQL server-side
+                      secret version
+                    type: string
+                  superuserSecretVersion:
+                    description: The resource version of the "postgres" user secret
+                    type: string
+                required:
+                - applicationSecretVersion
+                - caSecretVersion
+                - replicationSecretVersion
+                - serverSecretVersion
+                - superuserSecretVersion
+                type: object
               targetPrimary:
                 description: Target primary instance, this is different from the previous
                   one during a switchover or a failover
@@ -1315,6 +1344,35 @@ spec:
                 description: Total number of ready instances in the cluster
                 format: int32
                 type: integer
+              secretsResourceVersion:
+                description: The list of resource versions of the secrets managed
+                  by the operator. Every change here is done in the interest of the
+                  instance manager, which will refresh the secret data
+                properties:
+                  applicationSecretVersion:
+                    description: The resource version of the "app" user secret
+                    type: string
+                  caSecretVersion:
+                    description: The resource version of the "ca" secret version
+                    type: string
+                  replicationSecretVersion:
+                    description: The resource version of the "streaming_replication"
+                      user secret
+                    type: string
+                  serverSecretVersion:
+                    description: The resource version of the PostgreSQL server-side
+                      secret version
+                    type: string
+                  superuserSecretVersion:
+                    description: The resource version of the "postgres" user secret
+                    type: string
+                required:
+                - applicationSecretVersion
+                - caSecretVersion
+                - replicationSecretVersion
+                - serverSecretVersion
+                - superuserSecretVersion
+                type: object
               targetPrimary:
                 description: Target primary instance, this is different from the previous
                   one during a switchover or a failover

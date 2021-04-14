@@ -16,6 +16,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
@@ -202,10 +203,69 @@ func (r *ClusterReconciler) updateResourceStatus(
 		}
 	}
 
+	if err := r.refreshSecretResourceVersions(ctx, cluster); err != nil {
+		return err
+	}
+
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
 	}
 	return nil
+}
+
+// refreshSecretResourceVersions set the resource version of the secrets
+func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, cluster *apiv1.Cluster) error {
+	version, err := r.getSecretResourceVersion(ctx, cluster, cluster.GetSuperuserSecretName())
+	if err != nil {
+		return err
+	}
+	cluster.Status.SecretsResourceVersion.SuperuserSecretVersion = version
+
+	version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetReplicationSecretName())
+	if err != nil {
+		return err
+	}
+	cluster.Status.SecretsResourceVersion.ReplicationSecretVersion = version
+
+	version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetApplicationSecretName())
+	if err != nil {
+		return err
+	}
+	cluster.Status.SecretsResourceVersion.ApplicationSecretVersion = version
+
+	version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetCASecretName())
+	if err != nil {
+		return err
+	}
+	cluster.Status.SecretsResourceVersion.CASecretVersion = version
+
+	version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetServerSecretName())
+	if err != nil {
+		return err
+	}
+	cluster.Status.SecretsResourceVersion.ServerSecretVersion = version
+
+	return nil
+}
+
+// getSecretResourceVersion retrieves the resource version of a secret
+func (r *ClusterReconciler) getSecretResourceVersion(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	name string,
+) (string, error) {
+	secret := corev1.Secret{}
+	err := r.Get(
+		ctx,
+		client.ObjectKey{Namespace: cluster.Namespace, Name: name},
+		&secret)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return secret.ResourceVersion, nil
 }
 
 func (r *ClusterReconciler) setPrimaryInstance(

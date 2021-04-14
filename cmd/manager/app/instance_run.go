@@ -38,19 +38,19 @@ func runSubCommand(ctx context.Context) {
 		os.Exit(1)
 	}
 
-	err = reconciler.RefreshServerCertificateFiles(ctx)
+	_, err = reconciler.RefreshServerCertificateFiles(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS server certificates")
 		os.Exit(1)
 	}
 
-	err = reconciler.RefreshPostgresUserCertificate(ctx)
+	_, err = reconciler.RefreshReplicationUserCertificate(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS server certificates")
 		os.Exit(1)
 	}
 
-	err = reconciler.RefreshCA(ctx)
+	_, err = reconciler.RefreshCA(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS CA certificates")
 		os.Exit(1)

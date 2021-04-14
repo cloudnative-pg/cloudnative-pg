@@ -7,6 +7,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,7 +33,21 @@ type JoinInfo struct {
 
 // Join create a new instance joined to an existing PostgreSQL cluster
 func (info JoinInfo) Join() error {
-	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName)
+	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
+
+	log.Log.Info("Waiting for primary to be available", "primaryConnInfo", primaryConnInfo)
+	db, err := sql.Open("postgres", primaryConnInfo)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	err = waitForConnectionAvailable(db)
+	if err != nil {
+		return fmt.Errorf("primary server not available: %v", primaryConnInfo)
+	}
 
 	options := []string{
 		"-D", info.PgData,
@@ -46,7 +61,7 @@ func (info JoinInfo) Join() error {
 	cmd.Stderr = os.Stderr
 
 	log.Log.Info("Starting pg_basebackup", "options", options)
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		return fmt.Errorf("error in pg_basebackup, %w", err)
 	}

@@ -9,6 +9,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package fileutils
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -97,6 +98,14 @@ func CopyFile(source, destination string) (err error) {
 // Returns an error status and a flag telling if the file has been
 // changed or not.
 func WriteStringToFile(fileName string, contents string) (changed bool, err error) {
+	return WriteFile(fileName, []byte(contents), 0666)
+}
+
+// WriteFile replace the contents of a certain file
+// with a string. If the file doesn't exist, it's created.
+// Returns an error status and a flag telling if the file has been
+// changed or not.
+func WriteFile(fileName string, contents []byte, perm os.FileMode) (changed bool, err error) {
 	var exist bool
 	exist, err = FileExists(fileName)
 	if err != nil {
@@ -111,7 +120,7 @@ func WriteStringToFile(fileName string, contents string) (changed bool, err erro
 		}
 
 		// If nothing changed return immediately
-		if string(previousContents) == contents {
+		if bytes.Equal(previousContents, contents) {
 			return changed, err
 		}
 	}
@@ -119,7 +128,7 @@ func WriteStringToFile(fileName string, contents string) (changed bool, err erro
 	changed = true
 
 	var out *os.File
-	out, err = os.Create(fileName)
+	out, err = os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm) // #nosec
 	if err != nil {
 		return changed, err
 	}
@@ -130,7 +139,7 @@ func WriteStringToFile(fileName string, contents string) (changed bool, err erro
 		}
 	}()
 
-	_, err = io.WriteString(out, contents)
+	_, err = out.Write(contents)
 	if err != nil {
 		return changed, err
 	}
