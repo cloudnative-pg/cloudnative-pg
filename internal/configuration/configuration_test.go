@@ -22,9 +22,11 @@ var _ = Describe("Data test suite", func() {
 		config.ReadConfigMap(map[string]string{
 			"WATCH_NAMESPACE":       "one-namespace",
 			"INHERITED_ANNOTATIONS": "one, two",
+			"INHERITED_LABELS":      "alpha, beta",
 		})
 		Expect(config.WatchNamespace).To(Equal("one-namespace"))
 		Expect(config.InheritedAnnotations).To(Equal([]string{"one", "two"}))
+		Expect(config.InheritedLabels).To(Equal([]string{"alpha", "beta"}))
 	})
 
 	It("loads values from environment", func() {
@@ -32,10 +34,12 @@ var _ = Describe("Data test suite", func() {
 		fakeEnv := NewFakeEnvironment(map[string]string{
 			"WATCH_NAMESPACE":       "one-namespace",
 			"INHERITED_ANNOTATIONS": "one, two",
+			"INHERITED_LABELS":      "alpha, beta",
 		})
 		config.readConfigMap(nil, fakeEnv)
 		Expect(config.WatchNamespace).To(Equal("one-namespace"))
 		Expect(config.InheritedAnnotations).To(Equal([]string{"one", "two"}))
+		Expect(config.InheritedLabels).To(Equal([]string{"alpha", "beta"}))
 	})
 
 	It("manages inherited annotations", func() {
@@ -46,6 +50,16 @@ var _ = Describe("Data test suite", func() {
 		Expect(config.IsAnnotationInherited("one")).To(BeTrue())
 		Expect(config.IsAnnotationInherited("two")).To(BeTrue())
 		Expect(config.IsAnnotationInherited("three")).To(BeFalse())
+	})
+
+	It("manages inherited labels", func() {
+		config := Data{
+			InheritedLabels: []string{"alpha", "beta"},
+		}
+
+		Expect(config.IsLabelInherited("alpha")).To(BeTrue())
+		Expect(config.IsLabelInherited("beta")).To(BeTrue())
+		Expect(config.IsLabelInherited("gamma")).To(BeFalse())
 	})
 })
 

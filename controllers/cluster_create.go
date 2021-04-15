@@ -94,6 +94,7 @@ func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *
 		utils.SetAsOwnedBy(&postgresSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 		utils.SetOperatorVersion(&postgresSecret.ObjectMeta, versions.Version)
 		utils.InheritAnnotations(&postgresSecret.ObjectMeta, cluster.Annotations, configuration.Current)
+		utils.InheritLabels(&postgresSecret.ObjectMeta, cluster.Labels, configuration.Current)
 		if err := r.Create(ctx, postgresSecret); err != nil {
 			if !apierrs.IsAlreadyExists(err) {
 				return err
@@ -119,6 +120,7 @@ func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *
 		utils.SetAsOwnedBy(&appSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 		utils.SetOperatorVersion(&appSecret.ObjectMeta, versions.Version)
 		utils.InheritAnnotations(&appSecret.ObjectMeta, cluster.Annotations, configuration.Current)
+		utils.InheritLabels(&appSecret.ObjectMeta, cluster.Labels, configuration.Current)
 		if err := r.Create(ctx, appSecret); err != nil {
 			if !apierrs.IsAlreadyExists(err) {
 				return err
@@ -134,6 +136,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	utils.SetAsOwnedBy(&anyService.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&anyService.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&anyService.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&anyService.ObjectMeta, cluster.Labels, configuration.Current)
 	if err := r.Create(ctx, anyService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
 			return err
@@ -144,6 +147,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	utils.SetAsOwnedBy(&readService.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&readService.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&readService.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&readService.ObjectMeta, cluster.Labels, configuration.Current)
 	if err := r.Create(ctx, readService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
 			return err
@@ -154,6 +158,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	utils.SetAsOwnedBy(&readOnlyService.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&readOnlyService.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&readOnlyService.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&readOnlyService.ObjectMeta, cluster.Labels, configuration.Current)
 	if err := r.Create(ctx, readOnlyService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
 			return err
@@ -164,6 +169,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	utils.SetAsOwnedBy(&readWriteService.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&readWriteService.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&readWriteService.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&readWriteService.ObjectMeta, cluster.Labels, configuration.Current)
 	if err := r.Create(ctx, readWriteService); err != nil {
 		if !apierrs.IsAlreadyExists(err) {
 			return err
@@ -181,6 +187,7 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 	utils.SetAsOwnedBy(&targetPdb.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&targetPdb.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&targetPdb.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&targetPdb.ObjectMeta, cluster.Labels, configuration.Current)
 
 	err := r.Create(ctx, &targetPdb)
 	if err != nil {
@@ -300,6 +307,7 @@ func (r *ClusterReconciler) generateServiceAccountForCluster(
 	utils.SetAsOwnedBy(&serviceAccount.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&serviceAccount.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&serviceAccount.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&serviceAccount.ObjectMeta, cluster.Labels, configuration.Current)
 
 	return serviceAccount, nil
 }
@@ -363,6 +371,7 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 	utils.SetAsOwnedBy(&secret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&secret.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&secret.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&secret.ObjectMeta, cluster.Labels, configuration.Current)
 
 	// Another sync loop may have already created the service. Let's check that
 	if err := r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
@@ -417,6 +426,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Clust
 	utils.SetAsOwnedBy(&role.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&role.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&role.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&role.ObjectMeta, cluster.Labels, configuration.Current)
 
 	err := r.Create(ctx, &role)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -435,6 +445,7 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv
 	utils.SetAsOwnedBy(&roleBinding.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&roleBinding.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&roleBinding.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&roleBinding.ObjectMeta, cluster.Labels, configuration.Current)
 
 	err := r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -538,6 +549,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&pvcSpec.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&pvcSpec.ObjectMeta, cluster.Labels, configuration.Current)
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
 		// We cannot observe a creation if it was not accepted by the server
 		r.pvcExpectations.CreationObserved(key)
@@ -580,6 +592,8 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	utils.SetOperatorVersion(&job.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations, configuration.Current)
 	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&job.ObjectMeta, cluster.Labels, configuration.Current)
+	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels, configuration.Current)
 
 	// We expect the creation of a Job
 	if err := r.jobExpectations.ExpectCreations(key, 1); err != nil {
@@ -635,6 +649,8 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	utils.SetOperatorVersion(&job.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations, configuration.Current)
 	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&job.ObjectMeta, cluster.Labels, configuration.Current)
+	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels, configuration.Current)
 
 	// Retrieve the cluster key
 	key := expectations.KeyFunc(cluster)
@@ -675,6 +691,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	utils.SetAsOwnedBy(&pvcSpec.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&pvcSpec.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&pvcSpec.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&pvcSpec.ObjectMeta, cluster.Labels, configuration.Current)
 
 	// We expect the creation of a PVC
 	if err := r.pvcExpectations.ExpectCreations(key, 1); err != nil {
@@ -737,6 +754,7 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 
 	utils.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&pod.ObjectMeta, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(&pod.ObjectMeta, cluster.Labels, configuration.Current)
 
 	// We expect the creation of a Pod
 	if err := r.podExpectations.ExpectCreations(expectations.KeyFunc(cluster), 1); err != nil {

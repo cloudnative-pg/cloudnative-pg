@@ -45,9 +45,13 @@ type Data struct {
 	// used by default for new clusters
 	PostgresImageName string `json:"postgresImageName" env:"POSTGRES_IMAGE_NAME"`
 
-	// InheritedAnnotations are a list of annotations that are inherited from
-	// the Cluster specification to every resource owned by it
+	// InheritedAnnotations is a list of annotations that every resource could inherit from
+	// the owning Cluster
 	InheritedAnnotations []string `json:"inheritedAnnotations" env:"INHERITED_ANNOTATIONS"`
+
+	// InheritedLabels is a list of labels that every resource could inherit from
+	// the owning Cluster
+	InheritedLabels []string `json:"inheritedLabels" env:"INHERITED_LABELS"`
 }
 
 var (
@@ -124,10 +128,26 @@ func splitAndTrim(commaSeparatedList string) []string {
 	return list
 }
 
-// IsAnnotationInherited check if an annotation with a certain name should
+// IsAnnotationInherited checks if an annotation with a certain name should
 // be inherited from the Cluster specification to the generated objects
 func (config *Data) IsAnnotationInherited(name string) (result bool) {
 	for _, element := range config.InheritedAnnotations {
+		// TODO evaluate supporting glob-like patterns, such as 'ibm.com/*'
+		// the library https://github.com/gobwas/glob should be really useful
+		// for that, if we decide to support patterns
+		if name == element {
+			result = true
+			return
+		}
+	}
+
+	return
+}
+
+// IsLabelInherited checks if a label with a certain name should
+// be inherited from the Cluster specification to the generated objects
+func (config *Data) IsLabelInherited(name string) (result bool) {
+	for _, element := range config.InheritedLabels {
 		// TODO evaluate supporting glob-like patterns, such as 'ibm.com/*'
 		// the library https://github.com/gobwas/glob should be really useful
 		// for that, if we decide to support patterns
