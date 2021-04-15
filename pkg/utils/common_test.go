@@ -48,3 +48,14 @@ var _ = Describe("Annotation management", func() {
 		Expect(pod.Annotations).To(Equal(map[string]string{"one": "1", "two": "2"}))
 	})
 })
+
+var _ = Describe("Label management", func() {
+	config := &configuration.Data{}
+	config.ReadConfigMap(map[string]string{"INHERITED_LABELS": "alpha,beta"})
+
+	It("must inherit labels to be inherited", func() {
+		pod := &corev1.Pod{}
+		InheritLabels(&pod.ObjectMeta, map[string]string{"alpha": "1", "beta": "2", "gamma": "3"}, config)
+		Expect(pod.Labels).To(Equal(map[string]string{"alpha": "1", "beta": "2"}))
+	})
+})

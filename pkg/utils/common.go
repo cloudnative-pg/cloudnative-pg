@@ -28,7 +28,7 @@ func SetOperatorVersion(object *metav1.ObjectMeta, version string) {
 	object.Annotations[OperatorVersionAnnotationName] = version
 }
 
-// InheritAnnotations put into the object metadata the passed annotations if
+// InheritAnnotations puts into the object metadata the passed annotations if
 // the annotations are supposed to be inherited. The passed configuration is
 // used to determine whenever a certain annotation is inherited or not
 func InheritAnnotations(object *metav1.ObjectMeta, annotations map[string]string, config *configuration.Data) {
@@ -39,6 +39,21 @@ func InheritAnnotations(object *metav1.ObjectMeta, annotations map[string]string
 	for key, value := range annotations {
 		if config.IsAnnotationInherited(key) {
 			object.Annotations[key] = value
+		}
+	}
+}
+
+// InheritLabels puts into the object metadata the passed labels if
+// the labels are supposed to be inherited. The passed configuration is
+// used to determine whenever a certain label is inherited or not
+func InheritLabels(object *metav1.ObjectMeta, labels map[string]string, config *configuration.Data) {
+	if object.Labels == nil {
+		object.Labels = make(map[string]string)
+	}
+
+	for key, value := range labels {
+		if config.IsLabelInherited(key) {
+			object.Labels[key] = value
 		}
 	}
 }
