@@ -173,7 +173,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 
 	// Disable SSL as we still don't have the required certificates
 	err = fileutils.AppendStringToFile(
-		path.Join(info.PgData, "custom.conf"),
+		path.Join(info.PgData, PostgresqlCustomConfigurationFile),
 		"ssl = 'off'\n"+
 			"archive_command = 'cd .'\n")
 	if err != nil {
@@ -184,7 +184,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		// Append restore_command to the end of the
 		// custom configs file
 		err = fileutils.AppendStringToFile(
-			path.Join(info.PgData, "custom.conf"),
+			path.Join(info.PgData, PostgresqlCustomConfigurationFile),
 			recoveryFileContents)
 		if err != nil {
 			return fmt.Errorf("cannot write recovery config: %w", err)
@@ -253,8 +253,8 @@ func (info InitInfo) writeInitialPostgresqlConf(ctx context.Context, client dyna
 	}
 
 	err = fileutils.CopyFile(
-		path.Join(temporaryInitInfo.PgData, "custom.conf"),
-		path.Join(info.PgData, "custom.conf"))
+		path.Join(temporaryInitInfo.PgData, PostgresqlCustomConfigurationFile),
+		path.Join(info.PgData, PostgresqlCustomConfigurationFile))
 	if err != nil {
 		return fmt.Errorf("while creating custom.conf: %w", err)
 	}
