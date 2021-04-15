@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/cheynewallace/tabby"
@@ -24,6 +25,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/cnp"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	management "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
@@ -37,6 +39,9 @@ type PostgresqlStatus struct {
 	// InstanceStatus is the status of each instance, extracted directly
 	// from the instance manager running into each Pod
 	InstanceStatus *postgres.PostgresqlStatusList `json:"instanceStatus"`
+
+	// PrimaryPod contains the primary Pod
+	PrimaryPod corev1.Pod
 }
 
 // Status implement the "status" subcommand
@@ -57,7 +62,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format cnp.Ou
 
 	status.printBasicInfo()
 	if verbose {
-		err = status.printPostgresConfiguration()
+		err = status.printPostgresConfiguration(ctx)
 		if err != nil {
 			log.Log.Error(err, "Cannot extract configuration from cluster!")
 		}
@@ -97,10 +102,14 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 	}
 
 	var managedPods []corev1.Pod
+	var primaryPod corev1.Pod
 	for idx := range pods.Items {
 		for _, owner := range pods.Items[idx].ObjectMeta.OwnerReferences {
 			if owner.Kind == apiv1.ClusterKind && owner.Name == clusterName {
 				managedPods = append(managedPods, pods.Items[idx])
+				if specs.IsPodPrimary(pods.Items[idx]) {
+					primaryPod = pods.Items[idx]
+				}
 			}
 		}
 	}
@@ -115,6 +124,7 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 	status := PostgresqlStatus{
 		Cluster:        &cluster,
 		InstanceStatus: &instancesStatus,
+		PrimaryPod:     primaryPod,
 	}
 	return &status, nil
 }
@@ -166,21 +176,38 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	fmt.Println()
 }
 
-func (fullStatus *PostgresqlStatus) printPostgresConfiguration() error {
-	// TODO this is not the real configuration. It must be removed or taken from the primary.
-	configuration, err := fullStatus.Cluster.CreatePostgresqlConfiguration()
+func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Context) error {
+	timeout := time.Second * 2
+	clientInterface := kubernetes.NewForConfigOrDie(cnp.Config)
+
+	// Read PostgreSQL configuration from custom.conf
+	customConf, _, err := utils.ExecCommand(ctx, clientInterface, cnp.Config, fullStatus.PrimaryPod,
+		specs.PostgresContainerName,
+		&timeout,
+		"cat",
+		path.Join(specs.PgDataPath, management.PostgresqlCustomConfigurationFile))
 	if err != nil {
+		log.Log.Error(err, "Cannot retrieve PostgreSQL configuration",
+			"namespace", cnp.Namespace, "PrimaryPod", fullStatus.PrimaryPod)
 		return err
 	}
 
-	hba := fullStatus.Cluster.CreatePostgresqlHBA()
+	// Read PostgreSQL HBA Rules from pg_hba.conf
+	pgHBAConf, _, err := utils.ExecCommand(ctx, clientInterface, cnp.Config, fullStatus.PrimaryPod,
+		specs.PostgresContainerName,
+		&timeout, "cat", path.Join(specs.PgDataPath, management.PostgresqlHBARulesFile))
+	if err != nil {
+		log.Log.Error(err, "Cannot retrieve PostgreSQL HBA Rules",
+			"namespace", cnp.Namespace, "PrimaryPod", fullStatus.PrimaryPod)
+		return err
+	}
 
 	fmt.Println(aurora.Green("PostgreSQL Configuration"))
-	fmt.Println(configuration)
+	fmt.Println(customConf)
 	fmt.Println()
 
 	fmt.Println(aurora.Green("PostgreSQL HBA Rules"))
-	fmt.Println(hba)
+	fmt.Println(pgHBAConf)
 	fmt.Println()
 
 	return nil

@@ -46,6 +46,9 @@ const (
 	// BootstrapControllerContainerName is the name of the container copying the bootstrap
 	// controller inside the Pod file system
 	BootstrapControllerContainerName = "bootstrap-controller"
+
+	// PgDataPath is the path to PGDATA variable
+	PgDataPath = "/var/lib/postgresql/data/pgdata"
 )
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
@@ -109,7 +112,7 @@ func createPostgresContainers(
 			Env: []corev1.EnvVar{
 				{
 					Name:  "PGDATA",
-					Value: "/var/lib/postgresql/data/pgdata",
+					Value: PgDataPath,
 				},
 				{
 					Name:  "POD_NAME",
