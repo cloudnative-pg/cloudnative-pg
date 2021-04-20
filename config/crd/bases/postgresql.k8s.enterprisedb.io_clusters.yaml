@@ -1051,9 +1051,6 @@ spec:
                       - key
                       type: object
                     type: array
-                required:
-                - customQueriesConfigMap
-                - customQueriesSecret
                 type: object
               nodeMaintenanceWindow:
                 description: Define a maintenance window for the Kubernetes nodes
