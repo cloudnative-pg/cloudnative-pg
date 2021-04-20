@@ -103,7 +103,8 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			r.log.Info("Unable to get configMap containing custom monitoring queries",
 				"reference", reference,
 				"clusterName", r.instance.ClusterName,
-				"namespace", r.instance.Namespace)
+				"namespace", r.instance.Namespace,
+				"error", err.Error())
 			continue
 		}
 
@@ -134,7 +135,8 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			r.log.Info("Unable to get secret containing custom monitoring queries",
 				"reference", reference,
 				"clusterName", r.instance.ClusterName,
-				"namespace", r.instance.Namespace)
+				"namespace", r.instance.Namespace,
+				"error", err.Error())
 			continue
 		}
 
