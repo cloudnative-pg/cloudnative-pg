@@ -15,6 +15,7 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
 )
 
@@ -98,14 +99,22 @@ func runSubCommand(ctx context.Context) {
 // startWebServer start the web server for handling probes given
 // a certain PostgreSQL instance
 func startWebServer() error {
-	if err := webserver.Setup(&instance); err != nil {
+	webserver.Setup(&instance)
+	if err := metricsserver.Setup(&instance); err != nil {
 		return err
 	}
 
 	go func() {
 		err := webserver.ListenAndServe()
 		if err != nil {
-			log.Log.Error(err, "Error while starting the web server")
+			log.Log.Error(err, "Error while starting the status web server")
+		}
+	}()
+
+	go func() {
+		err := metricsserver.ListenAndServe()
+		if err != nil {
+			log.Log.Error(err, "Error while starting the metrics server")
 		}
 	}()
 
@@ -133,6 +142,13 @@ func registerSignalHandler() {
 			log.Log.Error(err, "Error while shutting down the web server")
 		} else {
 			log.Log.Info("Web server shut down")
+		}
+
+		err = metricsserver.Shutdown()
+		if err != nil {
+			log.Log.Error(err, "Error while shutting down the metrics server")
+		} else {
+			log.Log.Info("Metrics server shut down")
 		}
 
 		log.Log.Info("Shutting down controller")

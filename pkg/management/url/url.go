@@ -12,8 +12,11 @@ import (
 )
 
 const (
-	// Port is the port for HTTP requests
-	Port int = 8000
+	// StatusPort is the port for status HTTP requests
+	StatusPort int = 8000
+
+	// MetricsPort is the port for HTTP requests
+	MetricsPort int = 9187
 
 	// PathHealth  is the URL path for Health State
 	PathHealth string = "/healthz"
@@ -31,16 +34,16 @@ const (
 	PathMetrics string = "/metrics"
 )
 
-// Local builds an url for the provided path on localhost
+// Local builds an url for the provided path on localhost, pointing to the status web server
 func Local(path string) string {
 	return Build("localhost", path)
 }
 
-// Build builds an url given the hostname and the path
+// Build builds an url given the hostname and the path, pointing to the status web server
 func Build(hostname, path string) string {
 	// If path already starts with '/' we remove it
 	if path[0] == '/' {
 		path = path[1:]
 	}
-	return fmt.Sprintf("http://%s:%d/%s", hostname, Port, path)
+	return fmt.Sprintf("http://%s:%d/%s", hostname, StatusPort, path)
 }

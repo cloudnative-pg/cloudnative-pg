@@ -24,7 +24,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
@@ -160,8 +160,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		}
 	}
 
-	exporter := webserver.GetExporter()
-	exporter.SetCustomQueries(queries)
+	metricsserver.GetExporter().SetCustomQueries(queries)
 }
 
 // reconcileSecret is called when the PostgreSQL secrets are changes

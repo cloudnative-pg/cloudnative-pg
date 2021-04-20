@@ -158,7 +158,7 @@ func createPostgresContainers(
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathReady,
-						Port: intstr.FromInt(url.Port),
+						Port: intstr.FromInt(url.StatusPort),
 					},
 				},
 			},
@@ -173,7 +173,7 @@ func createPostgresContainers(
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
-						Port: intstr.FromInt(url.Port),
+						Port: intstr.FromInt(url.StatusPort),
 					},
 				},
 			},
@@ -201,6 +201,10 @@ func createPostgresContainers(
 			Ports: []corev1.ContainerPort{
 				{
 					ContainerPort: 5432,
+					Protocol:      "TCP",
+				},
+				{
+					ContainerPort: int32(url.MetricsPort),
 					Protocol:      "TCP",
 				},
 			},
