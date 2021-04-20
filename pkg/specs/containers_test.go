@@ -17,7 +17,7 @@ import (
 var _ = Describe("Bootstrap Container creation", func() {
 	It("create a Bootstrap Container with resources with nil values into Limits and Requests fields", func() {
 		resources := corev1.ResourceRequirements{}
-		container := createBootstrapContainer(resources)
+		container := createBootstrapContainer(resources, 26, 26)
 		Expect(container.Resources.Limits).To(BeNil())
 		Expect(container.Resources.Requests).To(BeNil())
 	})
@@ -28,8 +28,22 @@ var _ = Describe("Bootstrap Container creation", func() {
 		requests := make(corev1.ResourceList)
 		requests["another_test_field"] = resource.Quantity{}
 		resources := corev1.ResourceRequirements{Limits: limits, Requests: requests}
-		container := createBootstrapContainer(resources)
+		container := createBootstrapContainer(resources, 26, 26)
 		Expect(container.Resources.Limits["a_test_field"]).ToNot(BeNil())
 		Expect(container.Resources.Requests["another_test_field"]).ToNot(BeNil())
+	})
+})
+
+var _ = Describe("Container Security Context creation", func() {
+	It("create a Security Context for the Container", func() {
+		postgresUID := int64(1001)
+		postgresGID := int64(26)
+		securityContext := CreateContainerSecurityContext(postgresUID, postgresGID)
+		Expect(*securityContext.RunAsUser).To(Equal(postgresUID))
+		Expect(*securityContext.RunAsGroup).To(Equal(postgresGID))
+		Expect(*securityContext.RunAsNonRoot).To(BeTrue())
+		Expect(*securityContext.AllowPrivilegeEscalation).To(BeFalse())
+		Expect(*securityContext.Privileged).To(BeFalse())
+		Expect(*securityContext.ReadOnlyRootFilesystem).To(BeFalse())
 	})
 })

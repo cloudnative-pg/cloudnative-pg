@@ -12,9 +12,13 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 )
 
-// createBootstrapContainer create the init container bootstrapping the operator
+// createBootstrapContainer creates the init container bootstrapping the operator
 // executable inside the generated Pods
-func createBootstrapContainer(resources corev1.ResourceRequirements) corev1.Container {
+func createBootstrapContainer(
+	resources corev1.ResourceRequirements,
+	postgresUser,
+	postgresGroup int64,
+) corev1.Container {
 	return corev1.Container{
 		Name:  BootstrapControllerContainerName,
 		Image: configuration.Current.OperatorImageName,
@@ -29,6 +33,31 @@ func createBootstrapContainer(resources corev1.ResourceRequirements) corev1.Cont
 				MountPath: "/controller",
 			},
 		},
-		Resources: resources,
+		Resources:       resources,
+		SecurityContext: CreateContainerSecurityContext(postgresUser, postgresGroup),
+	}
+}
+
+// CreateContainerSecurityContext initializes container security context
+func CreateContainerSecurityContext(postgresUser, postgresGroup int64) *corev1.SecurityContext {
+	trueValue := true
+	falseValue := false
+
+	return &corev1.SecurityContext{
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{
+				"ALL",
+			},
+		},
+		Privileged:               &falseValue,
+		SELinuxOptions:           nil,
+		WindowsOptions:           nil,
+		RunAsUser:                &postgresUser,
+		RunAsGroup:               &postgresGroup,
+		RunAsNonRoot:             &trueValue,
+		ReadOnlyRootFilesystem:   &falseValue, // TODO set to true in CNP-293
+		AllowPrivilegeEscalation: &falseValue,
+		ProcMount:                nil,
+		SeccompProfile:           nil,
 	}
 }

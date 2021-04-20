@@ -259,10 +259,12 @@ func CreateAffinitySection(clusterName string, config apiv1.AffinityConfiguratio
 // CreatePostgresSecurityContext defines the security context under which
 // the PostgreSQL containers are running
 func CreatePostgresSecurityContext(postgresUser, postgresGroup int64) *corev1.PodSecurityContext {
+	falseValue := false
 	return &corev1.PodSecurityContext{
-		RunAsUser:  &postgresUser,
-		RunAsGroup: &postgresGroup,
-		FSGroup:    &postgresGroup,
+		RunAsNonRoot: &falseValue,
+		RunAsUser:    &postgresUser,
+		RunAsGroup:   &postgresGroup,
+		FSGroup:      &postgresGroup,
 	}
 }
 
@@ -285,7 +287,10 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod
 			Hostname:  podName,
 			Subdomain: cluster.GetServiceAnyName(),
 			InitContainers: []corev1.Container{
-				createBootstrapContainer(cluster.Spec.Resources),
+				createBootstrapContainer(
+					cluster.Spec.Resources,
+					cluster.GetPostgresUID(),
+					cluster.GetPostgresGID()),
 			},
 			Containers:         createPostgresContainers(cluster, podName),
 			Volumes:            createPostgresVolumes(cluster, podName),

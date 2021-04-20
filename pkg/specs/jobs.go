@@ -79,7 +79,10 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
-						createBootstrapContainer(cluster.Spec.Resources),
+						createBootstrapContainer(
+							cluster.Spec.Resources,
+							cluster.GetPostgresUID(),
+							cluster.GetPostgresGID()),
 					},
 					Containers: []corev1.Container{
 						{
@@ -110,6 +113,9 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 							Command:      initCommand,
 							VolumeMounts: volumeMounts,
 							Resources:    cluster.Spec.Resources,
+							SecurityContext: CreateContainerSecurityContext(
+								cluster.GetPostgresUID(),
+								cluster.GetPostgresGID()),
 						},
 					},
 					Volumes:            createPostgresVolumes(cluster, podName),
@@ -157,7 +163,10 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 					Hostname:  jobName,
 					Subdomain: cluster.GetServiceAnyName(),
 					InitContainers: []corev1.Container{
-						createBootstrapContainer(cluster.Spec.Resources),
+						createBootstrapContainer(
+							cluster.Spec.Resources,
+							cluster.GetPostgresUID(),
+							cluster.GetPostgresGID()),
 					},
 					Containers: []corev1.Container{
 						{
@@ -217,6 +226,9 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 								},
 							},
 							Resources: cluster.Spec.Resources,
+							SecurityContext: CreateContainerSecurityContext(
+								cluster.GetPostgresUID(),
+								cluster.GetPostgresGID()),
 						},
 					},
 					Volumes:            createPostgresVolumes(cluster, podName),
@@ -249,7 +261,10 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 					Hostname:  jobName,
 					Subdomain: cluster.GetServiceAnyName(),
 					InitContainers: []corev1.Container{
-						createBootstrapContainer(cluster.Spec.Resources),
+						createBootstrapContainer(
+							cluster.Spec.Resources,
+							cluster.GetPostgresUID(),
+							cluster.GetPostgresGID()),
 					},
 					Containers: []corev1.Container{
 						{
@@ -298,6 +313,9 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 								},
 							},
 							Resources: cluster.Spec.Resources,
+							SecurityContext: CreateContainerSecurityContext(
+								cluster.GetPostgresUID(),
+								cluster.GetPostgresGID()),
 						},
 					},
 					Volumes:            createPostgresVolumes(cluster, podName),
