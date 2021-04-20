@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
@@ -125,6 +126,23 @@ func (env TestingEnvironment) ExecCommand(
 	timeout *time.Duration,
 	command ...string) (string, string, error) {
 	return utils.ExecCommand(ctx, env.Interface, env.RestClientConfig, pod, containerName, timeout, command...)
+}
+
+// GetOperatorNamespaceName returns the namespace the operator deployment is running in
+func (env TestingEnvironment) GetOperatorNamespaceName() (string, error) {
+	const operatorDeploymentName = "postgresql-operator-controller-manager"
+	deploymentList := &appsv1.DeploymentList{}
+	err := env.Client.List(
+		env.Ctx, deploymentList, client.MatchingFields{"metadata.name": operatorDeploymentName},
+	)
+	if err != nil {
+		return "", err
+	}
+	if len(deploymentList.Items) != 1 {
+		err = fmt.Errorf("number of %v deployments != 1", operatorDeploymentName)
+		return "", err
+	}
+	return deploymentList.Items[0].Namespace, nil
 }
 
 // GetClusterPodList gathers the current list of pods for a cluster in a namespace

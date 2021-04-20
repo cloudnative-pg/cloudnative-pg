@@ -16,6 +16,7 @@ fi
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 CONTROLLER_IMG=${CONTROLLER_IMG:-quay.io/enterprisedb/cloud-native-postgresql-testing:latest}
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
+TEST_OP_DISRUPTION=${TEST_OP_DISRUPTION:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 
 # Process the e2e templates
@@ -85,6 +86,10 @@ mkdir -p "${ROOT_DIR}/tests/e2e/out"
 # Create at most 4 testing nodes. Using -p instead of --nodes
 # would create CPUs-1 nodes and saturate the testing server
 ginkgo --nodes=4 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/e2e/..."
+
+mkdir -p "${ROOT_DIR}/tests/sequential/out"
+# These e2e tests need to be run sequentially since they may break concurrent test run
+ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/sequential/..."
 
 mkdir -p "${ROOT_DIR}/tests/performance/out"
 # Performance tests need to run on a single node to avoid concurrency
