@@ -93,8 +93,8 @@ switchover operations.
 
 The operator is designed to manage a PostgreSQL cluster with a single
 database. The operator transparently manages access to the database through
-two Kubernetes services automatically provisioned and managed for read-write
-and read-only workloads.
+three Kubernetes services automatically provisioned and managed for read-write,
+read, and read-only workloads.
 Using the convention over configuration approach, the operator creates a
 database called `app`, by default owned by a regular Postgres user with the
 same name. Both the database name and the user name can be specified if
@@ -109,6 +109,13 @@ For InfoSec requirements, the operator does not need privileged mode for the
 execution of containers and access to volumes both in the operator and in the
 operand.
 
+### Affinity
+
+The operator supports basic pod affinity/anti-affinity rules to deploy PostgreSQL
+pods on different nodes, based on the selected `topologyKey` (for example `node` or
+`zone`). Additionally, it supports node affinity through the `nodeSelector`
+configuration attribute, as [expected by Kubernetes](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/).
+
 ### Current status of the cluster
 
 The operator continuously updates the status section of the CR with the
@@ -119,7 +126,7 @@ controlled PostgreSQL instance to converge to the required status of
 the cluster (for example: if the cluster status reports that pod `-1` is the
 primary, pod `-1` needs to promote itself while the other pods need to follow
 pod `-1`). The same status is used by Kubernetes client applications to
-provide details, including the OpenShift dashboard.
+provide details, including the `cnp` plugin for `kubectl` and the OpenShift dashboard.
 
 ### Operator's certification authority
 
@@ -134,7 +141,8 @@ The operator automatically creates a certification authority for every PostgreSQ
 cluster, which is used to issue and renew TLS certificates for the authentication
 of streaming replication standby servers and applications (instead of passwords).
 The operator will use the Certification Authority to sign every cluster
-certification authority.
+certification authority. Certificates can be issued with the `cnp` plugin
+for `kubectl`.
 
 ### TLS connections
 
@@ -162,8 +170,9 @@ such as `max_connections` and `max_wal_senders`.
 
 The operator can be installed through a Kubernetes manifest via `kubectl
 apply`, to be used in a traditional Kubernetes installation in public
-and private cloud environments. Additionally, it can be deployed on OpenShift
-Container Platform via OperatorHub.
+and private cloud environments. Additionally, it can be deployed through
+the Operator Lifecycle Manager (OLM) from OperatorHub.io and the OpenShift
+Container Platform by RedHat.
 
 ### Convention over configuration
 
@@ -198,7 +207,8 @@ starting from the replicas by dropping the existing pod and creating a new
 one with the new requested operand image that reuses the underlying storage.
 Depending on the value of the `primaryUpdateStrategy`, the operator proceeds
 with a switchover before updating the former primary (`unsupervised`) or waits
-for the user to manually issue the switchover procedure (`supervised`).
+for the user to manually issue the switchover procedure (`supervised`) via the
+`cnp` plugin for `kubectl`.
 Which setting to use depends on the business requirements as the operation
 might generate some downtime for the applications, from a few seconds to
 minutes based on the actual database workload.
@@ -345,13 +355,15 @@ alerting, trending, log processing. This might involve the use of external tools
 such as Prometheus, Grafana, Fluent Bit, as well as extensions in the
 PostgreSQL engine for the output of error logs directly in JSON format.
 
-### Prometheus exporter infrastructure
+### Prometheus exporter with configurable queries
 
 The instance manager provides a pluggable framework and, via its own
 web server, exposes an endpoint to export metrics for the
 [Prometheus](https://prometheus.io/) monitoring and alerting tool.
-Currently, only basic metrics and the `pg_stat_archiver` system view
-for PostgreSQL have been implemented.
+The operator supports custom monitoring queries defined as `ConfigMap`
+and `Secret` objects using a syntax that is compatible with
+[`postgres_exporter` for Prometheus](https://github.com/prometheus-community/postgres_exporter).
+
 
 ### Kubernetes events
 
