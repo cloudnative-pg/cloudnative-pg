@@ -172,18 +172,30 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 			return err
 		}
 
-		// pg_rewind requires a clean shutdown of the old primary to work.
-		// The only way to do that is to start the server again
-		// and wait for it to be available again.
-		err = r.instance.CompleteCrashRecovery()
-		if err != nil {
-			return err
-		}
-
-		// Then let's go back to the point of the new primary
+		// pg_rewind could require a clean shutdown of the old primary to
+		// work. Unfortunately, if the old primary is already clean starting
+		// it up may make it advance in respect to the new one.
+		// The only way to check if we really need to start it up before
+		// invoking pg_rewind is to try using pg_rewind and, on failures,
+		// retrying after having started up the instance.
 		err = r.instance.Rewind()
 		if err != nil {
-			return err
+			r.log.Info(
+				"pg_rewind failed, starting the server to complete the crash recovery",
+				"err", err)
+
+			// pg_rewind requires a clean shutdown of the old primary to work.
+			// The only way to do that is to start the server again
+			// and wait for it to be available again.
+			err = r.instance.CompleteCrashRecovery()
+			if err != nil {
+				// Then let's go back to the point of the new primary
+				err = r.instance.Rewind()
+				if err != nil {
+					return err
+				}
+				return err
+			}
 		}
 
 		// Now I can demote myself
