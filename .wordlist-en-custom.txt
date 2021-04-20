@@ -81,6 +81,7 @@ Niccolò
 NodeMaintenanceWindow
 NodeSelector
 OCP
+OU
 ObjectMeta
 OpenShift
 Openshift
@@ -107,6 +108,7 @@ ResourceRequirements
 RoleBinding
 RollingUpdateStatus
 SDK
+SHA
 SSL
 ScheduledBackup
 ScheduledBackupList
@@ -172,6 +174,7 @@ bootstraprecovery
 br
 bs
 bzip
+ce
 cGFzc
 checksums
 cisecurity
@@ -198,6 +201,7 @@ crc
 creds
 cron
 crt
+cryptographic
 currentPrimary
 customQueriesConfigMap
 customQueriesSecret
@@ -214,6 +218,7 @@ dockle
 dod
 downtimes
 dvcmQ
+ecdsa
 edb
 eks
 enablePodAntiAffinity
@@ -223,6 +228,7 @@ executables
 failover
 fastpath
 ffd
+gcc
 gce
 github
 gmail
@@ -273,6 +279,7 @@ lifecycle
 linodeobjects
 linter
 linters
+linux
 listmeta
 liveness
 localobjectreference
@@ -309,6 +316,7 @@ openshift
 operatorframework
 operatorgroups
 operatorhub
+pc
 pdf
 persistentvolumeclaim
 persistentvolumeclaims
@@ -414,3 +422,21 @@ writeService
 www
 xact
 yaml
+CN
+dbname
+defaultMode
+env
+httpGet
+leonardoce
+matchLabels
+mountPath
+readinessProbe
+secretName
+sslcert
+sslkey
+sslrootcert
+tls
+volumeMounts
+webtest
+svc
+
