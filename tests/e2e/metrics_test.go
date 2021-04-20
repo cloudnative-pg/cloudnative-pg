@@ -89,7 +89,7 @@ var _ = Describe("Metrics", func() {
 						`cnp_pg_locks_blocked_queries 0|` +
 						`cnp_collector_last_collection_error 0)` +
 						`$)`)
-				metricsCmd := "sh -c 'curl -s 127.0.0.1:8000/metrics'"
+				metricsCmd := "sh -c 'curl -s 127.0.0.1:9187/metrics'"
 				out, _, err := tests.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,

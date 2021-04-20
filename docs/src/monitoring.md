@@ -1,7 +1,7 @@
 # Monitoring
 
 For each PostgreSQL instance, the operator provides an exporter of metrics for
-[Prometheus](https://prometheus.io/) via HTTP, on port 8000.
+[Prometheus](https://prometheus.io/) via HTTP, on port 9187.
 The operator comes with a predefined set of metrics, as well as a highly
 configurable and customizable system to define additional queries via one or
 more `ConfigMap` objects - and, future versions, `Secret` too.
@@ -9,7 +9,7 @@ more `ConfigMap` objects - and, future versions, `Secret` too.
 The exporter can be accessed as follows:
 
 ```shell
-curl http://<pod ip>:8000/metrics
+curl http://<pod ip>:9187/metrics
 ```
 
 All monitoring queries are:
