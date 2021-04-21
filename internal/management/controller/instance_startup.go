@@ -189,11 +189,12 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 			// and wait for it to be available again.
 			err = r.instance.CompleteCrashRecovery()
 			if err != nil {
-				// Then let's go back to the point of the new primary
-				err = r.instance.Rewind()
-				if err != nil {
-					return err
-				}
+				return err
+			}
+
+			// Then let's go back to the point of the new primary
+			err = r.instance.Rewind()
+			if err != nil {
 				return err
 			}
 		}
