@@ -14,7 +14,7 @@ in the `bootstrap` section).
 
 ## Issuing a new certificate
 
-!!! See also "About CNP plugin for kubectl".
+!!! See also "About CNP plugin for kubectl"
     Please refer to the ["Certificates" section in the "Cloud Native PostgreSQL Plugin"](cnp-plugin.md#certificates)
     page for details on how to use the plugin for `kubectl`.
 

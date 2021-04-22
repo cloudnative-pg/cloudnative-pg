@@ -108,7 +108,7 @@ kubectl create secret generic minio-creds \
   --from-literal=MINIO_SECRET_KEY=<minio secret key here>
 ```
 
-!!! NOTE "Note"
+!!! Note
     Cloud Object Storage credentials will be used only by MinIO Gateway in this case.
 
 !!! Important
