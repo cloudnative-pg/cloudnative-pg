@@ -255,7 +255,7 @@ func main() {
 }
 
 // readinessProbeHandler is used to implement the readiness probe handler
-func readinessProbeHandler(w http.ResponseWriter, _r *http.Request) {
+func readinessProbeHandler(w http.ResponseWriter, _ *http.Request) {
 	_, _ = fmt.Fprint(w, "OK")
 }
 
