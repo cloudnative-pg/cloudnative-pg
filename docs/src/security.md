@@ -1,7 +1,7 @@
 # Security
 
-This section contains information about security for Cloud Native PostgreSQL
-analyzed at 3 different layers: Code, Container and Cluster.
+This section contains information about security for Cloud Native PostgreSQL,
+that are analyzed at 3 different layers: Code, Container and Cluster.
 
 !!! Warning
     The information contained in this page must not exonerate you from
@@ -80,6 +80,18 @@ PostgreSQL servers run as `postgres` system user. No component whatsoever requir
 
 Likewise, Volumes access does not require *privileges* mode or `root` privileges either.
 Proper permissions must be properly assigned by the Kubernetes platform and/or administrators.
+
+The operator explicitly sets the required security contexts.
+
+On RedHat OpenShift, Cloud Native PostgreSQL runs in `restricted` security context constraint,
+the most restrictive one. The goal is to limit the execution of a  pod to a namespace allocated UID
+and SELinux context.
+
+!!! Seealso "Security Context Constraints in OpenShift"
+    For further information on Security Context Constraints (SCC) in
+    OpenShift, please refer to the
+    ["Managing SCC in OpenShift"](https://www.openshift.com/blog/managing-sccs-in-openshift)
+    article.
 
 ### Network Policies
 

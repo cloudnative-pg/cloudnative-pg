@@ -77,6 +77,10 @@ const (
 	// PostgresqlHBARulesFile is the name of the file which contains
 	// the host-based access rules
 	PostgresqlHBARulesFile = "pg_hba.conf"
+
+	// PostgresqlIdentFile is the name of the file which contains
+	// the user name maps
+	PostgresqlIdentFile = "pg_ident.conf"
 )
 
 // VerifyConfiguration verify if the passed configuration is OK and returns an error otherwise

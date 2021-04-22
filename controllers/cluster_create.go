@@ -384,11 +384,6 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 // createOrPatchRole ensure that the required role for the instance manager exists and
 // contains the right rules
 func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv1.Cluster) error {
-	openshift, err := utils.IsOpenShift()
-	if err != nil {
-		return fmt.Errorf("while creating cluster role: %w", err)
-	}
-
 	var role rbacv1.Role
 	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &role); err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -396,10 +391,10 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 		}
 
 		r.Recorder.Event(cluster, "Normal", "CreatingRole", "Creating Cluster Role")
-		return r.createRole(ctx, cluster, openshift)
+		return r.createRole(ctx, cluster)
 	}
 
-	generatedRole := specs.CreateRole(*cluster, openshift)
+	generatedRole := specs.CreateRole(*cluster)
 	if reflect.DeepEqual(generatedRole.Rules, role.Rules) {
 		// Everything fine, the two config maps are exactly the same
 		return nil
@@ -419,10 +414,10 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 }
 
 // createRole create the role
-func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster, openshift bool) error {
+func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
-	role := specs.CreateRole(*cluster, openshift)
+	role := specs.CreateRole(*cluster)
 	utils.SetAsOwnedBy(&role.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(&role.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&role.ObjectMeta, cluster.Annotations, configuration.Current)

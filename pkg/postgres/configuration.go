@@ -17,7 +17,7 @@ const (
 	// The content provided by the user is inserted after this text
 	hbaHeader = `
 # Grant local access
-local all all peer
+local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
 hostssl postgres streaming_replica all cert clientcert=1

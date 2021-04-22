@@ -198,7 +198,9 @@ func (instance *Instance) Backup(
 // barman-cloud-backup
 func (instance *Instance) getBarmanCloudBackupOptions(
 	configuration *apiv1.BarmanObjectStoreConfiguration, serverName string) []string {
-	var options []string
+	options := []string{
+		"-U", "postgres",
+	}
 	if configuration.Data != nil {
 		if len(configuration.Data.Compression) != 0 {
 			options = append(

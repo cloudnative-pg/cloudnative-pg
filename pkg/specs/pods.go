@@ -19,6 +19,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 const (
@@ -263,9 +264,14 @@ func CreateAffinitySection(clusterName string, config apiv1.AffinityConfiguratio
 // CreatePostgresSecurityContext defines the security context under which
 // the PostgreSQL containers are running
 func CreatePostgresSecurityContext(postgresUser, postgresGroup int64) *corev1.PodSecurityContext {
-	falseValue := false
+	// Under Openshift we inherit SecurityContext from the restricted security context constraint
+	if utils.HaveSecurityContextConstraints() {
+		return nil
+	}
+
+	trueValue := true
 	return &corev1.PodSecurityContext{
-		RunAsNonRoot: &falseValue,
+		RunAsNonRoot: &trueValue,
 		RunAsUser:    &postgresUser,
 		RunAsGroup:   &postgresGroup,
 		FSGroup:      &postgresGroup,

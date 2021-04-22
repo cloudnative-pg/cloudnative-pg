@@ -81,9 +81,9 @@ var _ = Describe("Configuration update", func() {
 				Eventually(func() (string, error) {
 					stdout, _, err = env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
 						"psql", "-U", "postgres", "-tAc",
-						"select auth_method from pg_hba_file_rules where auth_method = 'trust';")
+						"select count(*) from pg_hba_file_rules where type = 'host' and auth_method = 'trust'")
 					return strings.Trim(stdout, "\n"), err
-				}, timeout).Should(BeEquivalentTo("trust"))
+				}, timeout).Should(BeEquivalentTo("1"))
 			}
 			// The connection should work now
 			Eventually(func() (int, error, error) {

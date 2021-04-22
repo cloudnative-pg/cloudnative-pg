@@ -107,7 +107,9 @@ RedHat
 ResourceRequirements
 RoleBinding
 RollingUpdateStatus
+SCC
 SDK
+SELinux
 SHA
 SSL
 ScheduledBackup
@@ -360,6 +362,7 @@ sSfL
 sa
 scalability
 scalable
+sccs
 scheduledbackup
 scheduledbackuplist
 scheduledbackups

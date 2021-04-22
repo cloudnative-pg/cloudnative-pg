@@ -54,7 +54,6 @@ var _ = Describe("Connection via services", func() {
 				// Expect to be in a read-only transaction
 				_, _, err = env.ExecCommand(env.Ctx, *connectingPod, "postgres", &timeout,
 					"psql", dsn, "-tAc", "CREATE TABLE table1(var1 text);")
-				fmt.Printf("DSN: %v", dsn)
 				if isReplica {
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).Should(

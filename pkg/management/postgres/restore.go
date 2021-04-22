@@ -30,7 +30,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 var (
@@ -146,7 +146,7 @@ func (info InitInfo) loadBackup() (*apiv1.Backup, error) {
 func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 	// Ensure restore_command is used to correctly recover WALs
 	// from the object storage
-	major, err := postgres.GetMajorVersion(info.PgData)
+	major, err := postgresSpec.GetMajorVersion(info.PgData)
 	if err != nil {
 		return fmt.Errorf("cannot detect major version: %w", err)
 	}
@@ -274,11 +274,19 @@ func (info InitInfo) writeInitialPostgresqlConf(ctx context.Context, client dyna
 func (info InitInfo) writeRestoreHbaConf() error {
 	// We allow every access from localhost, and this is needed to correctly restore
 	// the database
-	temporaryHbaRules := "local all all peer"
-	return ioutil.WriteFile(
+	_, err := fileutils.WriteStringToFile(
 		path.Join(info.PgData, PostgresqlHBARulesFile),
-		[]byte(temporaryHbaRules),
-		0600)
+		"local all all peer map=local\n")
+	if err != nil {
+		return err
+	}
+
+	// Create the local map referred in the HBA configuration
+	if err = WritePostgresUserMaps(info.PgData); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // configureInstanceAfterRestore change the superuser password
@@ -293,7 +301,7 @@ func (info InitInfo) configureInstanceAfterRestore() error {
 
 	instance := info.GetInstance()
 
-	majorVersion, err := postgres.GetMajorVersion(info.PgData)
+	majorVersion, err := postgresSpec.GetMajorVersion(info.PgData)
 	if err != nil {
 		return fmt.Errorf("cannot detect major version: %w", err)
 	}
