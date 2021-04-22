@@ -21,7 +21,7 @@ to configure an Ingress object to expose the service via TCP.
 Cloud Native PostgreSQL works with PostgreSQL and is available under the
 [EnterpriseDB Limited Use License](https://www.enterprisedb.com/limited-use-license).
 
-!!! IMPORTANT
+!!! Important
     Currently, based on the [Operator Capability Levels model](operator_capability_levels.md),
     users can expect a **"Level III - Full Lifecycle"** set of capabilities from the
     Cloud Native PostgreSQL Operator.
