@@ -9,45 +9,62 @@ package utils
 import (
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
-
-	"strings"
 )
 
 var (
-	// This variable store the latest result of the openshift check, and is useful to avoid repeating
-	// the queries everytime
-	openshift *bool
+	// This variable store the result of the DetectSecurityContextConstraints check
+	haveSCC bool
 )
 
-// IsOpenShift connects to the discovery API and find out if
-// we're running under an OpenShift deployment
-func IsOpenShift() (bool, error) {
-	if openshift != nil {
-		return *openshift, nil
-	}
-
+// DetectSecurityContextConstraints connects to the discovery API and find out if
+// we're running under a system that implements OpenShift Security Context Constraints
+func DetectSecurityContextConstraints() error {
 	config, err := ctrl.GetConfig()
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	client, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
-		return false, err
+		return err
 	}
+
+	groupFound := false
+
 	apiGroupList, err := client.ServerGroups()
 	if err != nil {
-		return false, err
+		return err
 	}
 	for i := 0; i < len(apiGroupList.Groups); i++ {
-		if strings.HasSuffix(apiGroupList.Groups[i].Name, ".openshift.io") {
-			openshift = new(bool)
-			*openshift = true
-			return *openshift, nil
+		if apiGroupList.Groups[i].Name == "security.openshift.io" {
+			groupFound = true
+			break
 		}
 	}
 
-	openshift = new(bool)
-	*openshift = false
-	return *openshift, nil
+	if !groupFound {
+		haveSCC = false
+		return nil
+	}
+
+	apiResourceList, err := client.ServerResourcesForGroupVersion("security.openshift.io/v1")
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < len(apiResourceList.APIResources); i++ {
+		if apiResourceList.APIResources[i].Name == "securitycontextconstraints" {
+			haveSCC = true
+			break
+		}
+	}
+
+	return nil
+}
+
+// HaveSecurityContextConstraints returns true if we're running under a system that implements
+// OpenShift Security Context Constraints
+// It panics if called before DetectSecurityContextConstraints
+func HaveSecurityContextConstraints() bool {
+	return haveSCC
 }

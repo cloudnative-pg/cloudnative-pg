@@ -31,6 +31,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/controllers"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 	// +kubebuilder:scaffold:imports
 )
@@ -249,6 +250,12 @@ func main() {
 	mgr.GetWebhookServer().WebhookMux.HandleFunc("/readyz", readinessProbeHandler)
 
 	// +kubebuilder:scaffold:builder
+
+	// Detect if we are running under a system that implements OpenShift Security Context Constraints
+	if err := utils.DetectSecurityContextConstraints(); err != nil {
+		setupLog.Error(err, "unable to detect OpenShift Security Context Constraints presence")
+		os.Exit(1)
+	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

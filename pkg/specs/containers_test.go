@@ -39,8 +39,6 @@ var _ = Describe("Container Security Context creation", func() {
 		postgresUID := int64(1001)
 		postgresGID := int64(26)
 		securityContext := CreateContainerSecurityContext(postgresUID, postgresGID)
-		Expect(*securityContext.RunAsUser).To(Equal(postgresUID))
-		Expect(*securityContext.RunAsGroup).To(Equal(postgresGID))
 		Expect(*securityContext.RunAsNonRoot).To(BeTrue())
 		Expect(*securityContext.AllowPrivilegeEscalation).To(BeFalse())
 		Expect(*securityContext.Privileged).To(BeFalse())

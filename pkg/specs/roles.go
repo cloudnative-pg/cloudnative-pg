@@ -14,7 +14,7 @@ import (
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
-func CreateRole(cluster apiv1.Cluster, openshift bool) rbacv1.Role {
+func CreateRole(cluster apiv1.Cluster) rbacv1.Role {
 	involvedSecretNames := []string{
 		cluster.GetCASecretName(),
 		cluster.GetServerSecretName(),
@@ -140,16 +140,6 @@ func CreateRole(cluster apiv1.Cluster, openshift bool) rbacv1.Role {
 				"patch",
 			},
 		},
-	}
-
-	if openshift {
-		openshiftRules := rbacv1.PolicyRule{
-			APIGroups:     []string{"security.openshift.io"},
-			Resources:     []string{"securitycontextconstraints"},
-			Verbs:         []string{"use"},
-			ResourceNames: []string{"nonroot"},
-		}
-		rules = append(rules, openshiftRules)
 	}
 
 	return rbacv1.Role{

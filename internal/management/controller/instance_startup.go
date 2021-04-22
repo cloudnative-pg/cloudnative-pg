@@ -17,6 +17,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
@@ -103,6 +104,10 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 	}
 
 	if err := fileutils.EnsurePgDataPerms(r.instance.PgData); err != nil {
+		return err
+	}
+
+	if err := postgres.WritePostgresUserMaps(r.instance.PgData); err != nil {
 		return err
 	}
 

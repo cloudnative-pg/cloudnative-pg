@@ -146,8 +146,7 @@ var _ = Describe("Upgrade", func() {
 			// the apply
 			timeout := 60
 			Eventually(func() error {
-				stdout, stderr, err := tests.Run("kubectl apply -n " + namespace + " -f " + updateConfFile)
-				fmt.Printf("STDOUT: %v\nSTDERR: %v\n ERR: %v", stdout, stderr, err)
+				_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + updateConfFile)
 				return err
 			}, timeout).ShouldNot(HaveOccurred())
 

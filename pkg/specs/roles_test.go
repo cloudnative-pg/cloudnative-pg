@@ -24,15 +24,9 @@ var _ = Describe("Roles", func() {
 	}
 
 	It("are created with the cluster name for pure k8s", func() {
-		serviceAccount := CreateRole(cluster, false)
+		serviceAccount := CreateRole(cluster)
 		Expect(serviceAccount.Name).To(Equal(cluster.Name))
 		Expect(serviceAccount.Namespace).To(Equal(cluster.Namespace))
 		Expect(len(serviceAccount.Rules)).To(Equal(7))
-	})
-	It("are created with the cluster name for openshift", func() {
-		serviceAccount := CreateRole(cluster, true)
-		Expect(serviceAccount.Name).To(Equal(cluster.Name))
-		Expect(serviceAccount.Namespace).To(Equal(cluster.Namespace))
-		Expect(len(serviceAccount.Rules)).To(Equal(8))
 	})
 })

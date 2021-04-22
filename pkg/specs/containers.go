@@ -50,14 +50,8 @@ func CreateContainerSecurityContext(postgresUser, postgresGroup int64) *corev1.S
 			},
 		},
 		Privileged:               &falseValue,
-		SELinuxOptions:           nil,
-		WindowsOptions:           nil,
-		RunAsUser:                &postgresUser,
-		RunAsGroup:               &postgresGroup,
 		RunAsNonRoot:             &trueValue,
 		ReadOnlyRootFilesystem:   &falseValue, // TODO set to true in CNP-293
 		AllowPrivilegeEscalation: &falseValue,
-		ProcMount:                nil,
-		SeccompProfile:           nil,
 	}
 }
