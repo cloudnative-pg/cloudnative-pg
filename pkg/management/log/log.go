@@ -24,7 +24,7 @@ var Log logr.Logger
 var V4 = zapcore.Level(-4)
 
 func init() {
-	level := zap.NewAtomicLevelAt(zap.DebugLevel)
+	level := zap.NewAtomicLevelAt(zap.InfoLevel)
 
 	// To enable the debugging logging level you
 	// have to just set the "DEBUG" environment variable
