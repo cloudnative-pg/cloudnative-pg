@@ -156,8 +156,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Info("Waiting for the all WAL receivers to be down to elect a new primary")
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
-
-		return ctrl.Result{}, fmt.Errorf("cannot update target primary from pods: %w", err)
+		log.Info("Cannot update target primary: operation cannot be fulfilled. "+
+			"An immediate retry will be scheduled",
+			"cluster", cluster.Name)
+		return ctrl.Result{Requeue: true}, nil
 	}
 	if selectedPrimary != "" {
 		// If we selected a new primary, stop the reconciliation loop here
