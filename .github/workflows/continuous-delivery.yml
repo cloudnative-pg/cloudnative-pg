@@ -337,6 +337,11 @@ jobs:
       BUILD_IMAGE: "false"
       CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
       E2E_DEFAULT_STORAGE_CLASS: rook-ceph-block
+
+      # Disable upgrade test in AKS E2E
+      # CNP 0.7.0 is not compatible with the latest rook installation that is
+      # required for testing on AKS, hence we cannot test the upgrade there.
+      TEST_UPGRADE_TO_V1: "false"
     steps:
       -
         name: Checkout code
