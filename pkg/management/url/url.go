@@ -18,13 +18,13 @@ const (
 	// MetricsPort is the port for HTTP requests
 	MetricsPort int = 9187
 
-	// PathHealth  is the URL path for Health State
+	// PathHealth is the URL path for Health State
 	PathHealth string = "/healthz"
 
 	// PathReady is the URL oath for Ready State
 	PathReady string = "/readyz"
 
-	// PathPgStatus  is the URL path for PostgreSQL Status
+	// PathPgStatus is the URL path for PostgreSQL Status
 	PathPgStatus string = "/pg/status"
 
 	// PathPgBackup is the URL path for PostgreSQL Backup

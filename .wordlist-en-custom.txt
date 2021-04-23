@@ -35,6 +35,7 @@ Cron
 CronJobs
 CustomResourceDefinition
 CustomResourceDefinitions
+Customizations
 DISA
 DNS
 DataBackupConfiguration

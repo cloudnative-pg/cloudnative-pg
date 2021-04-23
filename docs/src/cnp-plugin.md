@@ -124,7 +124,7 @@ To get a certificate, you need to provide a name for the secret to store
 the credentials, the cluster name, and a user for this certificate
 
 ```shell
-kubectl cnp certificate cluster-cert --cnp-cluster cluster-example --cnp-user  appuser
+kubectl cnp certificate cluster-cert --cnp-cluster cluster-example --cnp-user appuser
 ```
 
 After the secrete it's created, you can get it using `kubectl`
