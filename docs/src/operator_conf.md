@@ -40,6 +40,9 @@ Name | Description
 
 By default, the above variables are not set.
 
+Values in `INHERITED_ANNOTATIONS` and `INHERITED_LABELS` support path-like wildcards. For example, the value `example.com/*` will match
+both the value `example.com/one` and `example.com/two`.
+
 ## Defining an operator config map
 
 The example below customizes the behavior of the operator, by defining

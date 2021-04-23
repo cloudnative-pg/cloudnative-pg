@@ -61,6 +61,35 @@ var _ = Describe("Data test suite", func() {
 		Expect(config.IsLabelInherited("beta")).To(BeTrue())
 		Expect(config.IsLabelInherited("gamma")).To(BeFalse())
 	})
+
+	It("manages inherited annotations containing glob patterns", func() {
+		config := Data{
+			InheritedAnnotations: []string{"qa.test.com/*", "prod.test.com/*"},
+		}
+
+		Expect(config.IsAnnotationInherited("qa.test.com/one")).To(BeTrue())
+		Expect(config.IsAnnotationInherited("prod.test.com/two")).To(BeTrue())
+		Expect(config.IsAnnotationInherited("testing.test.com/three")).To(BeFalse())
+	})
+
+	It("manages inherited labels containing glob patterns", func() {
+		config := Data{
+			InheritedLabels: []string{"qa.testing.com/*", "prod.testing.com/*"},
+		}
+
+		Expect(config.IsLabelInherited("qa.testing.com/one")).To(BeTrue())
+		Expect(config.IsLabelInherited("prod.testing.com/two")).To(BeTrue())
+		Expect(config.IsLabelInherited("testing.testing.com/three")).To(BeFalse())
+	})
+
+	It("skips invalid patterns during evaluation", func() {
+		config := Data{
+			InheritedLabels: []string{"[abc", "prod.testing.com/*"},
+		}
+
+		Expect(config.IsLabelInherited("prod.testing.com/two")).To(BeTrue())
+		Expect(config.IsLabelInherited("testing.testing.com/three")).To(BeFalse())
+	})
 })
 
 // FakeEnvironment is an EnvironmentSource that fetch data from an internal map.

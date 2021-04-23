@@ -10,11 +10,16 @@ package configuration
 
 import (
 	"fmt"
+	"path"
 	"reflect"
 	"strings"
 
+	ctrl "sigs.k8s.io/controller-runtime"
+
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
+
+var log = ctrl.Log.WithName("configuration")
 
 // DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
 const DefaultOperatorPullSecretName = "postgresql-operator-pull-secret" // #nosec
@@ -130,29 +135,28 @@ func splitAndTrim(commaSeparatedList string) []string {
 
 // IsAnnotationInherited checks if an annotation with a certain name should
 // be inherited from the Cluster specification to the generated objects
-func (config *Data) IsAnnotationInherited(name string) (result bool) {
-	for _, element := range config.InheritedAnnotations {
-		// TODO evaluate supporting glob-like patterns, such as 'ibm.com/*'
-		// the library https://github.com/gobwas/glob should be really useful
-		// for that, if we decide to support patterns
-		if name == element {
-			result = true
-			return
-		}
-	}
-
-	return
+func (config *Data) IsAnnotationInherited(name string) bool {
+	return evaluateGlobPatterns(config.InheritedAnnotations, name)
 }
 
 // IsLabelInherited checks if a label with a certain name should
 // be inherited from the Cluster specification to the generated objects
-func (config *Data) IsLabelInherited(name string) (result bool) {
-	for _, element := range config.InheritedLabels {
-		// TODO evaluate supporting glob-like patterns, such as 'ibm.com/*'
-		// the library https://github.com/gobwas/glob should be really useful
-		// for that, if we decide to support patterns
-		if name == element {
-			result = true
+func (config *Data) IsLabelInherited(name string) bool {
+	return evaluateGlobPatterns(config.InheritedLabels, name)
+}
+
+func evaluateGlobPatterns(patterns []string, value string) (result bool) {
+	var err error
+
+	for _, pattern := range patterns {
+		if result, err = path.Match(pattern, value); err != nil {
+			log.Info(
+				"Skipping invalid glob pattern during labels/annotations inheritance",
+				"pattern", pattern)
+			continue
+		}
+
+		if result {
 			return
 		}
 	}
