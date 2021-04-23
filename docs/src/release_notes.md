@@ -2,6 +2,30 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.3.0
+
+**Release date:** 23 Apr 2021
+
+Features:
+
+- Inheritance of labels and annotations
+- Set resource limits for every container
+
+Security Enhancements:
+
+- Support for restricted security context constraint on RedHat OpenShift to
+  limit pod execution to a namespace allocated UID and SELinux context
+- Pod security contexts explicitly defined by the operator to run as
+  non-root, non-privileged and without privilege escalation
+
+Changes:
+
+- Prometheus exporter endpoint listening on port 9187 (port 8000 is now
+  reserved to instance coordination with API server)
+- Documentation improvements
+- E2E tests enhancements, including GKE environment
+- Minor bug fixes
+
 ## Version 1.2.1
 
 **Release date:** 6 Apr 2021
