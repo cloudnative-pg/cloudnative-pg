@@ -39,6 +39,7 @@ Customizations
 DISA
 DNS
 DataBackupConfiguration
+DataBase
 DevOps
 DevSecOps
 DoD
@@ -76,6 +77,7 @@ MiB
 MinIO
 Minikube
 MonitoringConfiguration
+NFS
 NGINX
 Namespaces
 Nednur
@@ -134,7 +136,9 @@ TLS
 TOC
 TopologyKey
 UID
+VLDB
 VM
+VMs
 Valerio
 VirtualBox
 WAL
@@ -173,6 +177,7 @@ backupstatus
 balancer
 barmanObjectStore
 barmanobjectstoreconfiguration
+benchmarking
 bool
 bootstrapconfiguration
 bootstrapinitdb
@@ -237,6 +242,7 @@ executables
 failover
 fastpath
 ffd
+fio
 gcc
 gce
 github
@@ -335,6 +341,7 @@ persistentvolumeclaim
 persistentvolumeclaims
 pgBouncer
 pgbarman
+pgbench
 pgpass
 phaseReason
 pid
@@ -360,6 +367,7 @@ quickstart
 rbac
 readService
 readinessProbe
+readthedocs
 readyInstances
 recoveryTarget
 recoverytarget
@@ -388,6 +396,7 @@ securego
 serverName
 sig
 sigs
+specificities
 sql
 src
 sre
@@ -396,6 +405,7 @@ sslcert
 sslkey
 sslmode
 sslrootcert
+sso
 startDelay
 startedAt
 stopDelay
@@ -422,6 +432,7 @@ tls
 tmp
 tolerations
 topologyKey
+transactional
 transactionid
 tx
 ubi

@@ -25,6 +25,7 @@ nav:
   - postgresql_conf.md
   - operator_conf.md
   - storage.md
+  - labels_annotations.md
   - samples.md
   - monitoring.md
   - expose_pg_services.md
