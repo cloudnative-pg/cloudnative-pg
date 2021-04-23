@@ -349,7 +349,7 @@ jobs:
       -
         name:  Install ginkgo
         run: |
-          go install -mod=readonly github.com/onsi/ginkgo/ginkgo
+          go install github.com/onsi/ginkgo/ginkgo
       -
         name: Azure Login
         uses: azure/login@v1
@@ -479,7 +479,7 @@ jobs:
       -
         name:  Install ginkgo
         run: |
-          go install -mod=readonly github.com/onsi/ginkgo/ginkgo
+          go install github.com/onsi/ginkgo/ginkgo
       -
         name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -578,7 +578,7 @@ jobs:
       -
         name:  Install ginkgo
         run: |
-          go install -mod=readonly github.com/onsi/ginkgo/ginkgo
+          go install github.com/onsi/ginkgo/ginkgo
       -
         name: Set cluster name
         run: |
