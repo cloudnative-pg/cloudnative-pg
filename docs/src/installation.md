@@ -92,5 +92,5 @@ selected installation method.
 !!! Seealso "Operator configuration"
     You can change the default behavior of the operator by overriding
     some default options. For more information, please refer to the
-    ["Operator configuration"](operator_config.md) section.
+    ["Operator configuration"](operator_conf.md) section.
 
