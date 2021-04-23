@@ -88,3 +88,9 @@ the pod will be rescheduled on another node.
 
 As far as OpenShift is concerned, details might differ depending on the
 selected installation method.
+
+!!! Seealso "Operator configuration"
+    You can change the default behavior of the operator by overriding
+    some default options. For more information, please refer to the
+    ["Operator configuration"](operator_config.md) section.
+
