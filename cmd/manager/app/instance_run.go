@@ -15,6 +15,7 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
 )
@@ -60,6 +61,18 @@ func runSubCommand(ctx context.Context) {
 	err = reconciler.VerifyPgDataCoherence(ctx)
 	if err != nil {
 		log.Log.Error(err, "Error while checking Kubernetes cluster status")
+		os.Exit(1)
+	}
+
+	primary, err := instance.IsPrimary()
+	if err != nil {
+		log.Log.Error(err, "Error while getting the primary status")
+		os.Exit(1)
+	}
+
+	err = postgres.UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName, primary)
+	if err != nil {
+		log.Log.Error(err, "Error while create the postgresql.auto.conf configuration file")
 		os.Exit(1)
 	}
 

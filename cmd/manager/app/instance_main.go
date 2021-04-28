@@ -134,7 +134,7 @@ func InstanceManagerCommand(args []string) {
 			ClusterName:             clusterName,
 			Namespace:               namespace,
 			InitDBOptions:           initDBFlags,
-			CurrentNode:             podName,
+			PodName:                 podName,
 		}
 
 		initSubCommand(info)
@@ -150,9 +150,10 @@ func InstanceManagerCommand(args []string) {
 		instance.ClusterName = clusterName
 
 		info := postgres.JoinInfo{
-			PgData:     pgData,
-			ParentNode: parentNode,
-			PodName:    podName,
+			ClusterName: clusterName,
+			PgData:      pgData,
+			ParentNode:  parentNode,
+			PodName:     podName,
 		}
 
 		joinSubCommand(ctx, info)

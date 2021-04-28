@@ -14,7 +14,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"strings"
 )
 
 // AppendStringToFile append the content of the given string to the
@@ -148,10 +147,15 @@ func WriteFile(fileName string, contents []byte, perm os.FileMode) (changed bool
 	return changed, err
 }
 
-// ReadFile Read source file and output the content as string
+// ReadFile Read source file and output the content as string.
+// If the file does not exist, it returns an empty string with no error.
 func ReadFile(fileName string) (string, error) {
-	if _, err := FileExists(fileName); err != nil {
+	exists, err := FileExists(fileName)
+	if err != nil {
 		return "", err
+	}
+	if !exists {
+		return "", nil
 	}
 
 	content, err := ioutil.ReadFile(fileName) // #nosec
@@ -180,15 +184,4 @@ func CreateEmptyFile(fileName string) error {
 		return err
 	}
 	return file.Close()
-}
-
-// FindinFile search for a pattern in a file return true
-// if success
-func FindinFile(fileName string, pattern string) (bool, error) {
-	fileContent, err := ReadFile(fileName)
-	if err != nil {
-		return false, err
-	}
-
-	return strings.Contains(fileContent, pattern), nil
 }

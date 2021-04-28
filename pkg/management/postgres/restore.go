@@ -85,7 +85,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 
 // restoreDataDir restore PGDATA from an existing backup
 func (info InitInfo) restoreDataDir(backup *apiv1.Backup) error {
-	options := []string{}
+	var options []string
 	if backup.Status.EndpointURL != "" {
 		options = append(options, "--endpoint-url", backup.Status.EndpointURL)
 	}
@@ -140,7 +140,7 @@ func (info InitInfo) loadBackup() (*apiv1.Backup, error) {
 	return &backup, nil
 }
 
-// writeRestoreWalConfig write a `custom.config` allowing PostgreSQL
+// writeRestoreWalConfig write a `custom.conf` allowing PostgreSQL
 // to complete the WAL recovery from the object storage and then start
 // as a new primary
 func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
@@ -308,7 +308,7 @@ func (info InitInfo) configureInstanceAfterRestore() error {
 
 	// This will start the recovery of WALs taken during the backup
 	// and, after that, the server will start in a new timeline
-	return instance.WithActiveInstance(func() error {
+	if err = instance.WithActiveInstance(func() error {
 		db, err := instance.GetSuperUserDB()
 		if err != nil {
 			return err
@@ -327,12 +327,19 @@ func (info InitInfo) configureInstanceAfterRestore() error {
 			return fmt.Errorf("ALTER USER postgres error: %w", err)
 		}
 
-		if majorVersion >= 12 {
-			return info.ConfigureReplica(db)
-		}
-
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	if majorVersion >= 12 {
+		err = configurePostgresAutoConfFile(info.PgData, info.ClusterName, info.PodName)
+		if err != nil {
+			return fmt.Errorf("while configuring replica: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // waitUntilRecoveryFinishes periodically check the underlying

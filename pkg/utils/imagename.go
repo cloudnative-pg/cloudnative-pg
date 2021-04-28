@@ -11,13 +11,6 @@ import (
 	"strings"
 )
 
-// IsImageNameEqual compares two image names for equality. Two image names
-// could be equal even if their string name is not the same. I.e.
-// "myimage:2.3" is equal to "docker.io/library/myimage:2.3"
-func IsImageNameEqual(image1, image2 string) bool {
-	return NormaliseImageName(image1) == NormaliseImageName(image2)
-}
-
 // NormaliseImageName normalise an image name considering his docker.io prefix
 func NormaliseImageName(imageName string) string {
 	result := imageName

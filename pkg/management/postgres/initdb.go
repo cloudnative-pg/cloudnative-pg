@@ -45,7 +45,7 @@ type InitInfo struct {
 	ParentNode string
 
 	// The current node, used to fill application_name
-	CurrentNode string
+	PodName string
 
 	// The cluster name to assign to
 	ClusterName string
@@ -221,43 +221,6 @@ func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
 		}
 	}
 
-	_, err = db.Exec(fmt.Sprintf("ALTER SYSTEM SET cluster_name TO %v",
-		pq.QuoteIdentifier(info.ClusterName)))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// ConfigureReplica set the `primary_conninfo` field in the PostgreSQL system
-// This must be invoked only on PostgreSQL version >= 12
-func (info InitInfo) ConfigureReplica(db *sql.DB) error {
-	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.CurrentNode)
-
-	_, err := db.Exec(
-		fmt.Sprintf("ALTER SYSTEM SET primary_conninfo TO %v",
-			pq.QuoteLiteral(primaryConnInfo)))
-	if err != nil {
-		return err
-	}
-
-	// The following parameters will be used when this primary is being demoted.
-	// PostgreSQL <= 11 will have this parameter written to the
-	// 'recovery.conf' when needed.
-
-	_, err = db.Exec(
-		fmt.Sprintf("ALTER SYSTEM SET restore_command TO %v",
-			pq.QuoteLiteral("/controller/manager wal-restore %f %p")))
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec("ALTER SYSTEM SET recovery_target_timeline TO 'latest'")
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -275,6 +238,13 @@ func (info InitInfo) Bootstrap() error {
 		return fmt.Errorf("while reading major version: %w", err)
 	}
 
+	if majorVersion >= 12 {
+		err = configurePostgresAutoConfFile(info.PgData, info.ClusterName, info.PodName)
+		if err != nil {
+			return fmt.Errorf("while configuring replica: %w", err)
+		}
+	}
+
 	return instance.WithActiveInstance(func() error {
 		db, err := instance.GetSuperUserDB()
 		if err != nil {
@@ -284,13 +254,6 @@ func (info InitInfo) Bootstrap() error {
 		err = info.ConfigureNewInstance(db)
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
-		}
-
-		if majorVersion >= 12 {
-			err = info.ConfigureReplica(db)
-			if err != nil {
-				return fmt.Errorf("while configuring replica: %w", err)
-			}
 		}
 
 		return nil
