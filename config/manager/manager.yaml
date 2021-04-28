@@ -34,6 +34,7 @@ spec:
       - command:
         - /manager
         args:
+        - controller
         - --enable-leader-election
         - --config-map-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         image: controller:latest

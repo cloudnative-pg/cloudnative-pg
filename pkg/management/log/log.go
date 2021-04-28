@@ -8,31 +8,13 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package log
 
 import (
-	"os"
-	"strconv"
-
 	"github.com/go-logr/logr"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	crzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 // Log is the logger that will be used in this package
 var Log logr.Logger
 
-// V4 prints Log.V(4) logs
-var V4 = zapcore.Level(-4)
-
-func init() {
-	level := zap.NewAtomicLevelAt(zap.InfoLevel)
-
-	// To enable the debugging logging level you
-	// have to just set the "DEBUG" environment variable
-	// to "1" or something ParseBool-compatible
-	debugActive, err := strconv.ParseBool(os.Getenv("DEBUG"))
-	if debugActive && err != nil {
-		level = zap.NewAtomicLevelAt(V4)
-	}
-
-	Log = crzap.New(crzap.UseDevMode(true), crzap.Level(&level))
+// SetLogger will set the backing logr implementation for instance manager.
+func SetLogger(logr logr.Logger) {
+	Log = logr
 }

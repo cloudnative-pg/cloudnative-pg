@@ -26,8 +26,8 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 		"/controller/manager",
 		"instance",
 		"init",
-		"-pw-file", "/etc/superuser-secret/password",
-		"-parent-node", cluster.GetServiceReadWriteName(),
+		"--pw-file", "/etc/superuser-secret/password",
+		"--parent-node", cluster.GetServiceReadWriteName(),
 	}
 
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.InitDB != nil {
@@ -58,9 +58,9 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 
 	if cluster.ShouldCreateApplicationDatabase() {
 		initCommand = append(initCommand,
-			"-app-db-name", cluster.Spec.Bootstrap.InitDB.Database,
-			"-app-user", cluster.Spec.Bootstrap.InitDB.Owner,
-			"-app-pw-file", "/etc/app-secret/password")
+			"--app-db-name", cluster.Spec.Bootstrap.InitDB.Database,
+			"--app-user", cluster.Spec.Bootstrap.InitDB.Owner,
+			"--app-pw-file", "/etc/app-secret/password")
 
 		volumeMounts = append(volumeMounts,
 			corev1.VolumeMount{
@@ -129,6 +129,8 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 		},
 	}
 
+	addManagerLoggingOptions(job.Spec.Template.Spec.Containers[0])
+
 	return job
 }
 
@@ -141,14 +143,14 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 		"/controller/manager",
 		"instance",
 		"restore",
-		"-pw-file", "/etc/superuser-secret/password",
-		"-parent-node", cluster.GetServiceReadWriteName(),
-		"-backup-name", cluster.Spec.Bootstrap.Recovery.Backup.Name,
+		"--pw-file", "/etc/superuser-secret/password",
+		"--parent-node", cluster.GetServiceReadWriteName(),
+		"--backup-name", cluster.Spec.Bootstrap.Recovery.Backup.Name,
 	}
 
 	if cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
 		initCommand = append(initCommand,
-			"-target",
+			"--target",
 			cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
 	}
 
@@ -242,6 +244,8 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 		},
 	}
 
+	addManagerLoggingOptions(job.Spec.Template.Spec.Containers[0])
+
 	return job
 }
 
@@ -296,7 +300,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 								"/controller/manager",
 								"instance",
 								"join",
-								"-parent-node", cluster.GetServiceReadWriteName(),
+								"--parent-node", cluster.GetServiceReadWriteName(),
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -328,6 +332,8 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 			},
 		},
 	}
+
+	addManagerLoggingOptions(job.Spec.Template.Spec.Containers[0])
 
 	return job
 }

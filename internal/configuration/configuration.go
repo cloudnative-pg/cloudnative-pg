@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,6 +35,9 @@ type Data struct {
 	// WatchNamespace is the namespace where the operator should watch and
 	// is configurable via environment variables of via the OpenShift console
 	WatchNamespace string `json:"watchNamespace" env:"WATCH_NAMESPACE"`
+
+	// EnablePodDebugging enable debugging mode in new generated pods
+	EnablePodDebugging bool `json:"enablePodDebugging" env:"POD_DEBUG"`
 
 	// OperatorNamespace is the namespace where the operator is installed
 	OperatorNamespace string `json:"operatorNamespace" env:"OPERATOR_NAMESPACE"`
@@ -110,6 +114,15 @@ func (config *Data) readConfigMap(data map[string]string, env EnvironmentSource)
 		}
 
 		switch t := field.Type; t.Kind() {
+		case reflect.Bool:
+			boolValue, err := strconv.ParseBool(value)
+			if err != nil {
+				log.Info(
+					"Skipping invalid boolean value parsing configuration",
+					"field", field.Name, "value", value)
+				continue
+			}
+			reflect.ValueOf(config).Elem().FieldByName(field.Name).SetBool(boolValue)
 		case reflect.String:
 			reflect.ValueOf(config).Elem().FieldByName(field.Name).SetString(value)
 		case reflect.Slice:
