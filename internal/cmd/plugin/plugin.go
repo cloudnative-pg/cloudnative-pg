@@ -4,8 +4,8 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-// Package cnp contains the common behaviors of the kubectl-cnp subcommand
-package cnp
+// Package plugin contains the common behaviors of the kubectl-cnp subcommand
+package plugin
 
 import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"

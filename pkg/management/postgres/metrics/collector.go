@@ -46,7 +46,7 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 		return err
 	}
 
-	conn, err := q.instance.GetApplicationDB()
+	conn, err := q.instance.GetSuperUserDB()
 	if err != nil {
 		return err
 	}

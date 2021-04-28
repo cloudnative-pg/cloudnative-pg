@@ -1,1 +1,1 @@
-cmd/manager/main.go
+internal/cmd/manager/controller/controller.go

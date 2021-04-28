@@ -10,7 +10,6 @@ package specs
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -196,7 +195,7 @@ func createPostgresContainers(
 				"/controller/manager",
 				"instance",
 				"run",
-				"-pw-file", "/etc/superuser-secret/password",
+				"--pw-file", "/etc/superuser-secret/password",
 			},
 			Resources: cluster.Spec.Resources,
 			Ports: []corev1.ContainerPort{
@@ -212,13 +211,7 @@ func createPostgresContainers(
 		},
 	}
 
-	podDebugActive, err := strconv.ParseBool(os.Getenv("POD_DEBUG"))
-	if podDebugActive && err != nil {
-		containers[0].Env = append(containers[0].Env, corev1.EnvVar{
-			Name:  "DEBUG",
-			Value: "1",
-		})
-	}
+	addManagerLoggingOptions(containers[0])
 
 	return containers
 }

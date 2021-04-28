@@ -14,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/cnp"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 )
 
@@ -28,8 +28,8 @@ type Params struct {
 
 // Generate generate a Kubernetes secret suitable to allow certificate authentication
 // for a PostgreSQL user
-func Generate(ctx context.Context, params Params, dryRun bool, format cnp.OutputFormat) error {
-	secret, err := cnp.GoClient.CoreV1().Secrets(params.Namespace).Get(
+func Generate(ctx context.Context, params Params, dryRun bool, format plugin.OutputFormat) error {
+	secret, err := plugin.GoClient.CoreV1().Secrets(params.Namespace).Get(
 		ctx, params.ClusterName+apiv1.CaSecretSuffix, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func Generate(ctx context.Context, params Params, dryRun bool, format cnp.Output
 	}
 
 	userSecret := userPair.GenerateServerSecret(params.Namespace, params.Name)
-	err = cnp.Print(userSecret, format)
+	err = plugin.Print(userSecret, format)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func Generate(ctx context.Context, params Params, dryRun bool, format cnp.Output
 		return nil
 	}
 
-	_, err = cnp.GoClient.CoreV1().Secrets(params.Namespace).Create(ctx, userSecret, metav1.CreateOptions{})
+	_, err = plugin.GoClient.CoreV1().Secrets(params.Namespace).Create(ctx, userSecret, metav1.CreateOptions{})
 	if err == nil {
 		fmt.Printf("secret/%v created\n", userSecret.Name)
 	}

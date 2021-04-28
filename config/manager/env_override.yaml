@@ -16,6 +16,7 @@ spec:
           - name: POD_DEBUG
             value: "1"
         args:
+        - controller
         - --enable-leader-election
         - --config-map-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --zap-devel

@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/cnp"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
@@ -23,23 +23,23 @@ import (
 // Promote command implementation
 func Promote(ctx context.Context, clusterName string, serverName string) {
 	// Check cluster status
-	cluster, err := utils.GetCluster(ctx, cnp.DynamicClient, cnp.Namespace, clusterName)
+	cluster, err := utils.GetCluster(ctx, plugin.DynamicClient, plugin.Namespace, clusterName)
 	if err != nil {
 		log.Log.Error(err, "Cannot find PostgreSQL cluster",
-			"namespace", cnp.Namespace,
+			"namespace", plugin.Namespace,
 			"name", clusterName)
 		return
 	}
 
 	// Check if the Pod exist
-	_, err = cnp.DynamicClient.Resource(schema.GroupVersionResource{
+	_, err = plugin.DynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
 		Resource: "pods",
-	}).Namespace(cnp.Namespace).Get(ctx, serverName, metav1.GetOptions{})
+	}).Namespace(plugin.Namespace).Get(ctx, serverName, metav1.GetOptions{})
 	if err != nil {
 		log.Log.Error(err, "Cannot find PostgreSQL server",
-			"namespace", cnp.Namespace,
+			"namespace", plugin.Namespace,
 			"name", serverName)
 		return
 	}
@@ -49,10 +49,10 @@ func Promote(ctx context.Context, clusterName string, serverName string) {
 	cluster.Status.Phase = apiv1.PhaseSwitchover
 	cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
 
-	err = utils.UpdateClusterStatus(ctx, cnp.DynamicClient, cluster)
+	err = utils.UpdateClusterStatus(ctx, plugin.DynamicClient, cluster)
 	if err != nil {
 		log.Log.Error(err, "Cannot update PostgreSQL cluster status",
-			"namespace", cnp.Namespace,
+			"namespace", plugin.Namespace,
 			"name", serverName,
 			"cluster", cluster)
 		return

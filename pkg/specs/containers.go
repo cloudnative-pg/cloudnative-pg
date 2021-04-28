@@ -19,7 +19,7 @@ func createBootstrapContainer(
 	postgresUser,
 	postgresGroup int64,
 ) corev1.Container {
-	return corev1.Container{
+	container := corev1.Container{
 		Name:  BootstrapControllerContainerName,
 		Image: configuration.Current.OperatorImageName,
 		Command: []string{
@@ -35,6 +35,18 @@ func createBootstrapContainer(
 		},
 		Resources:       resources,
 		SecurityContext: CreateContainerSecurityContext(postgresUser, postgresGroup),
+	}
+
+	addManagerLoggingOptions(container)
+
+	return container
+}
+
+// addManagerLoggingOptions propagate the logging configuration
+// to the manager inside the generated pod.
+func addManagerLoggingOptions(container corev1.Container) {
+	if configuration.Current.EnablePodDebugging {
+		container.Command = append(container.Command, "--zap-devel", "--zap-log-level=4")
 	}
 }
 

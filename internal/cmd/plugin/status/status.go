@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/cnp"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	management "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
@@ -45,18 +45,18 @@ type PostgresqlStatus struct {
 }
 
 // Status implement the "status" subcommand
-func Status(ctx context.Context, clusterName string, verbose bool, format cnp.OutputFormat) error {
+func Status(ctx context.Context, clusterName string, verbose bool, format plugin.OutputFormat) error {
 	status, err := ExtractPostgresqlStatus(ctx, clusterName)
 	if err != nil {
 		return err
 	}
 
-	err = cnp.Print(status, format)
+	err = plugin.Print(status, format)
 	if err != nil {
 		return err
 	}
 
-	if format != cnp.OutputFormatText {
+	if format != plugin.OutputFormatText {
 		return nil
 	}
 
@@ -75,11 +75,11 @@ func Status(ctx context.Context, clusterName string, verbose bool, format cnp.Ou
 // ExtractPostgresqlStatus get the PostgreSQL status using the Kubernetes API
 func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*PostgresqlStatus, error) {
 	// Get the Cluster object
-	object, err := cnp.DynamicClient.Resource(apiv1.ClusterGVK).Namespace(
-		cnp.Namespace).Get(ctx, clusterName, metav1.GetOptions{})
+	object, err := plugin.DynamicClient.Resource(apiv1.ClusterGVK).Namespace(
+		plugin.Namespace).Get(ctx, clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Log.Error(err, "Cannot find PostgreSQL Cluster",
-			"namespace", cnp.Namespace,
+			"namespace", plugin.Namespace,
 			"name", clusterName)
 		return nil, err
 	}
@@ -93,10 +93,10 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 
 	// Get the list of Pods created by this Cluster
 	var instancesStatus postgres.PostgresqlStatusList
-	pods, err := cnp.GoClient.CoreV1().Pods(cnp.Namespace).List(ctx, metav1.ListOptions{})
+	pods, err := plugin.GoClient.CoreV1().Pods(plugin.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Log.Error(err, "Cannot find PostgreSQL Pods",
-			"namespace", cnp.Namespace,
+			"namespace", plugin.Namespace,
 			"name", clusterName)
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 
 	instancesStatus = extractInstancesStatus(
 		ctx,
-		cnp.Config,
+		plugin.Config,
 		managedPods,
 		specs.PostgresContainerName)
 
@@ -178,27 +178,27 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 
 func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Context) error {
 	timeout := time.Second * 2
-	clientInterface := kubernetes.NewForConfigOrDie(cnp.Config)
+	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
 
 	// Read PostgreSQL configuration from custom.conf
-	customConf, _, err := utils.ExecCommand(ctx, clientInterface, cnp.Config, fullStatus.PrimaryPod,
+	customConf, _, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
 		specs.PostgresContainerName,
 		&timeout,
 		"cat",
 		path.Join(specs.PgDataPath, management.PostgresqlCustomConfigurationFile))
 	if err != nil {
 		log.Log.Error(err, "Cannot retrieve PostgreSQL configuration",
-			"namespace", cnp.Namespace, "PrimaryPod", fullStatus.PrimaryPod)
+			"namespace", plugin.Namespace, "PrimaryPod", fullStatus.PrimaryPod)
 		return err
 	}
 
 	// Read PostgreSQL HBA Rules from pg_hba.conf
-	pgHBAConf, _, err := utils.ExecCommand(ctx, clientInterface, cnp.Config, fullStatus.PrimaryPod,
+	pgHBAConf, _, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
 		specs.PostgresContainerName,
 		&timeout, "cat", path.Join(specs.PgDataPath, management.PostgresqlHBARulesFile))
 	if err != nil {
 		log.Log.Error(err, "Cannot retrieve PostgreSQL HBA Rules",
-			"namespace", cnp.Namespace, "PrimaryPod", fullStatus.PrimaryPod)
+			"namespace", plugin.Namespace, "PrimaryPod", fullStatus.PrimaryPod)
 		return err
 	}
 
@@ -303,7 +303,6 @@ func getReplicaStatusFromPodViaExec(
 		postgresContainerName,
 		&timeout,
 		"/controller/manager", "instance", "status")
-
 	if err != nil {
 		result.PodName = pod.Name
 		result.ExecError = err
