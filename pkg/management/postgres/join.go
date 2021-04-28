@@ -11,16 +11,16 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // JoinInfo contains the information needed to bootstrap a new
 // PostgreSQL replica
 type JoinInfo struct {
+	// The cluster name to join
+	ClusterName string
+
 	// The generated node name
 	PodName string
 
@@ -52,7 +52,6 @@ func (info JoinInfo) Join() error {
 	options := []string{
 		"-D", info.PgData,
 		"-v",
-		"-R",
 		"-w",
 		"-d", primaryConnInfo,
 	}
@@ -66,25 +65,5 @@ func (info JoinInfo) Join() error {
 		return fmt.Errorf("error in pg_basebackup, %w", err)
 	}
 
-	// The generated recovery.conf / postgresql.auto.conf doesn't instruct
-	// the instance to follow the timeline changes of the primary, so we
-	// need to include another parameter in the configuration.
-	major, err := postgres.GetMajorVersion(info.PgData)
-	if err != nil {
-		return err
-	}
-
-	targetFile := "postgresql.auto.conf"
-	if major < 12 {
-		targetFile = "recovery.conf"
-	}
-	targetFile = path.Join(info.PgData, targetFile)
-
-	// Append the required configuration parameter
-	err = fileutils.AppendStringToFile(targetFile, "recovery_target_timeline = 'latest'\n")
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return UpdateReplicaConfiguration(info.PgData, info.ClusterName, info.PodName, false)
 }

@@ -16,13 +16,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/lib/pq"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // Instance represent a PostgreSQL instance to be executed
@@ -277,16 +275,7 @@ func (instance *Instance) Demote() error {
 	log.Log.Info("Demoting instance",
 		"pgpdata", instance.PgData)
 
-	major, err := postgres.GetMajorVersion(instance.PgData)
-	if err != nil {
-		return fmt.Errorf("cannot detect major version: %w", err)
-	}
-
-	if major < 12 {
-		return instance.createRecoveryConf()
-	}
-
-	return instance.createStandbySignal()
+	return UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName, false)
 }
 
 // WaitForPrimaryAvailable waits until we can connect to the primary
@@ -372,37 +361,4 @@ func (instance *Instance) Rewind() error {
 	}
 
 	return nil
-}
-
-// createRecoveryConf create a recovery.conf file for PostgreSQL 11 and earlier
-func (instance *Instance) createRecoveryConf() error {
-	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
-
-	f, err := os.Create(filepath.Join(instance.PgData, "recovery.conf"))
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		err = f.Close()
-	}()
-	_, err = f.WriteString("standby_mode = 'on'\n" +
-		"primary_conninfo = " + pq.QuoteLiteral(primaryConnInfo) + "\n" +
-		"recovery_target_timeline = 'latest'\n" +
-		"restore_command = '/controller/manager wal-restore %f %p'\n")
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// createStandbySignal creates a standby.signal file for PostgreSQL 12 and beyond
-func (instance *Instance) createStandbySignal() error {
-	emptyFile, err := os.Create(filepath.Join(instance.PgData, "standby.signal"))
-	if emptyFile != nil {
-		_ = emptyFile.Close()
-	}
-
-	return err
 }
