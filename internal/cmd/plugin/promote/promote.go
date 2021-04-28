@@ -31,6 +31,12 @@ func Promote(ctx context.Context, clusterName string, serverName string) {
 		return
 	}
 
+	// If server name is equal to target primary, there is no need to promote
+	// that instance
+	if cluster.Status.TargetPrimary == serverName {
+		return
+	}
+
 	// Check if the Pod exist
 	_, err = plugin.DynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "",
@@ -44,7 +50,7 @@ func Promote(ctx context.Context, clusterName string, serverName string) {
 		return
 	}
 
-	// The Pod exists, let's do it!
+	// The Pod exists, let's update status fields
 	cluster.Status.TargetPrimary = serverName
 	cluster.Status.Phase = apiv1.PhaseSwitchover
 	cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
