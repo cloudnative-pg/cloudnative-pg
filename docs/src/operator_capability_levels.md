@@ -56,6 +56,12 @@ primary/standby architecture directly by setting the `imageName`
 attribute in the CR. The operator also supports `imagePullSecretsNames`
 to access private container registries.
 
+### Labels and annotations
+
+The operator can be configured to support inheritance of labels and annotations
+that are defined in a cluster's metadata, with the goal to improve organizations
+of Cloud Native PostgreSQL deployment in your Kubernetes infrastructure.
+
 ### Self-contained instance manager
 
 Instead of relying on an external tool such as Patroni or Stolon to
@@ -107,7 +113,13 @@ Authentication rules in the `postgresql` section of the CR.
 
 For InfoSec requirements, the operator does not need privileged mode for the
 execution of containers and access to volumes both in the operator and in the
-operand.
+operand. It also explicitly sets the required security contexts.
+
+On RedHat OpenShift, Cloud Native PostgreSQL runs in [`restricted` security
+context constraint
+(SCC)](https://www.openshift.com/blog/managing-sccs-in-openshift), the most
+restrictive one - with the goal to limit the execution of a pod to a namespace
+allocated UID and SELinux context.
 
 ### Affinity
 
@@ -358,8 +370,8 @@ PostgreSQL engine for the output of error logs directly in JSON format.
 ### Prometheus exporter with configurable queries
 
 The instance manager provides a pluggable framework and, via its own
-web server, exposes an endpoint to export metrics for the
-[Prometheus](https://prometheus.io/) monitoring and alerting tool.
+web server listening on port 9187, exposes an endpoint to export metrics
+for the [Prometheus](https://prometheus.io/) monitoring and alerting tool.
 The operator supports custom monitoring queries defined as `ConfigMap`
 and `Secret` objects using a syntax that is compatible with
 [`postgres_exporter` for Prometheus](https://github.com/prometheus-community/postgres_exporter).
