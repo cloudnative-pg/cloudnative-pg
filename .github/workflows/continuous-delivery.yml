@@ -285,7 +285,7 @@ jobs:
 
   e2e-local:
     name: Run E2E on local executors
-    if: needs.generate-jobs.outputs.localEnabled == 'true' && ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+    if: ${{ needs.generate-jobs.outputs.localEnabled == 'true' && needs.duplicate_runs.outputs.should_skip != 'true' }}
     needs:
       - generate-jobs
       - duplicate_runs
@@ -346,7 +346,7 @@ jobs:
 
   e2e-aks:
     name: Run E2E on Microsoft AKS
-    if: needs.generate-jobs.outputs.aksEnabled == 'true' && ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+    if: ${{ needs.generate-jobs.outputs.aksEnabled == 'true' && needs.duplicate_runs.outputs.should_skip != 'true' }}
     needs:
       - generate-jobs
       - duplicate_runs
@@ -477,7 +477,7 @@ jobs:
 
   e2e-eks:
     name: Run E2E on Amazon EKS
-    if: needs.generate-jobs.outputs.eksEnabled == 'true' && ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+    if: ${{ needs.generate-jobs.outputs.eksEnabled == 'true' && needs.duplicate_runs.outputs.should_skip != 'true' }}
     needs:
       - generate-jobs
       - duplicate_runs
@@ -580,7 +580,7 @@ jobs:
 
   e2e-gke:
     name: Run E2E on Google GKE
-    if: needs.generate-jobs.outputs.gkeEnabled == 'true' && ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+    if: ${{ needs.generate-jobs.outputs.gkeEnabled == 'true' && needs.duplicate_runs.outputs.should_skip != 'true' }}
     needs:
       - generate-jobs
       - duplicate_runs
