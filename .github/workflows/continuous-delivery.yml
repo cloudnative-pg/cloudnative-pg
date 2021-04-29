@@ -27,8 +27,24 @@ defaults:
 
 jobs:
 
+  duplicate_runs:
+    runs-on: ubuntu-20.04
+    name: Skip duplicate runs
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v3.4.0
+        with:
+          concurrent_skipping: 'same_content'
+          skip_after_successful_duplicate: 'true'
+          paths_ignore: '["README.md", "docs/**"]'
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+
   golangci:
     name: Run linters
+    needs: duplicate_runs
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     runs-on: ubuntu-20.04
     steps:
       -
@@ -43,6 +59,8 @@ jobs:
 
   shellcheck:
     name: Run shellcheck linter
+    needs: duplicate_runs
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     runs-on: ubuntu-20.04
     env:
         SHELLCHECK_OPTS: -a -S style
@@ -55,6 +73,8 @@ jobs:
 
   tests:
     name: Run unit tests
+    needs: duplicate_runs
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     runs-on: ubuntu-20.04
     steps:
       -
@@ -79,6 +99,8 @@ jobs:
 
   apidoc:
     name: Verify API doc is up to date
+    needs: duplicate_runs
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout code
@@ -98,6 +120,8 @@ jobs:
 
   crd:
     name: Verify CRD is up to date
+    needs: duplicate_runs
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
@@ -123,6 +147,8 @@ jobs:
       - tests
       - apidoc
       - crd
+      - duplicate_runs
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     runs-on: ubuntu-20.04
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
@@ -207,6 +233,8 @@ jobs:
       - tests
       - apidoc
       - crd
+      - duplicate_runs
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     runs-on: ubuntu-20.04
     steps:
       - name: Repository Dispatch
@@ -221,6 +249,8 @@ jobs:
     name: Generate jobs for E2E tests
     needs:
       - buildx
+      - duplicate_runs
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     runs-on: ubuntu-20.04
     outputs:
       image: ${{ needs.buildx.outputs.image }}
@@ -255,9 +285,10 @@ jobs:
 
   e2e-local:
     name: Run E2E on local executors
-    if: needs.generate-jobs.outputs.localEnabled == 'true'
+    if: needs.generate-jobs.outputs.localEnabled == 'true' && ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     needs:
       - generate-jobs
+      - duplicate_runs
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
@@ -315,9 +346,10 @@ jobs:
 
   e2e-aks:
     name: Run E2E on Microsoft AKS
-    if: needs.generate-jobs.outputs.aksEnabled == 'true'
+    if: needs.generate-jobs.outputs.aksEnabled == 'true' && ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     needs:
       - generate-jobs
+      - duplicate_runs
     strategy:
       fail-fast: false
       max-parallel: 15
@@ -445,9 +477,10 @@ jobs:
 
   e2e-eks:
     name: Run E2E on Amazon EKS
-    if: needs.generate-jobs.outputs.eksEnabled == 'true'
+    if: needs.generate-jobs.outputs.eksEnabled == 'true' && ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     needs:
       - generate-jobs
+      - duplicate_runs
     strategy:
       fail-fast: false
       matrix:
@@ -547,9 +580,10 @@ jobs:
 
   e2e-gke:
     name: Run E2E on Google GKE
-    if: needs.generate-jobs.outputs.gkeEnabled == 'true'
+    if: needs.generate-jobs.outputs.gkeEnabled == 'true' && ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     needs:
       - generate-jobs
+      - duplicate_runs
     strategy:
       fail-fast: false
       max-parallel: 10
