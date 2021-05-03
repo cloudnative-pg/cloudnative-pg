@@ -18,12 +18,12 @@ func NewCmd() *cobra.Command {
 		Use:   "promote [cluster] [server]",
 		Short: "Promote a certain server as a primary",
 		Args:  cobra.ExactArgs(2),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 			clusterName := args[0]
 			serverName := args[1]
 
-			Promote(ctx, clusterName, serverName)
+			return Promote(ctx, clusterName, serverName)
 		},
 	}
 

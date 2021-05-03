@@ -18,13 +18,12 @@ import (
 	"github.com/logrusorgru/aurora/v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	mutils "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	management "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
@@ -61,33 +60,26 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	}
 
 	status.printBasicInfo()
+	var nonFatalError error
 	if verbose {
 		err = status.printPostgresConfiguration(ctx)
 		if err != nil {
-			log.Log.Error(err, "Cannot extract configuration from cluster!")
+			nonFatalError = err
 		}
 	}
 	status.printInstancesStatus()
 
+	if nonFatalError != nil {
+		return nonFatalError
+	}
 	return nil
 }
 
 // ExtractPostgresqlStatus get the PostgreSQL status using the Kubernetes API
 func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*PostgresqlStatus, error) {
 	// Get the Cluster object
-	object, err := plugin.DynamicClient.Resource(apiv1.ClusterGVK).Namespace(
-		plugin.Namespace).Get(ctx, clusterName, metav1.GetOptions{})
+	cluster, err := mutils.GetCluster(ctx, plugin.DynamicClient, plugin.Namespace, clusterName)
 	if err != nil {
-		log.Log.Error(err, "Cannot find PostgreSQL Cluster",
-			"namespace", plugin.Namespace,
-			"name", clusterName)
-		return nil, err
-	}
-
-	var cluster apiv1.Cluster
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &cluster)
-	if err != nil {
-		log.Log.Error(err, "Error decoding Cluster resource")
 		return nil, err
 	}
 
@@ -95,9 +87,6 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 	var instancesStatus postgres.PostgresqlStatusList
 	pods, err := plugin.GoClient.CoreV1().Pods(plugin.Namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		log.Log.Error(err, "Cannot find PostgreSQL Pods",
-			"namespace", plugin.Namespace,
-			"name", clusterName)
 		return nil, err
 	}
 
@@ -122,7 +111,7 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 
 	// Extract the status from the instances
 	status := PostgresqlStatus{
-		Cluster:        &cluster,
+		Cluster:        cluster,
 		InstanceStatus: &instancesStatus,
 		PrimaryPod:     primaryPod,
 	}
@@ -187,8 +176,6 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 		"cat",
 		path.Join(specs.PgDataPath, management.PostgresqlCustomConfigurationFile))
 	if err != nil {
-		log.Log.Error(err, "Cannot retrieve PostgreSQL configuration",
-			"namespace", plugin.Namespace, "PrimaryPod", fullStatus.PrimaryPod)
 		return err
 	}
 
@@ -197,8 +184,6 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 		specs.PostgresContainerName,
 		&timeout, "cat", path.Join(specs.PgDataPath, management.PostgresqlHBARulesFile))
 	if err != nil {
-		log.Log.Error(err, "Cannot retrieve PostgreSQL HBA Rules",
-			"namespace", plugin.Namespace, "PrimaryPod", fullStatus.PrimaryPod)
 		return err
 	}
 

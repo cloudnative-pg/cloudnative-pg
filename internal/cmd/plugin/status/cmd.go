@@ -8,7 +8,6 @@ package status
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -21,17 +20,14 @@ func NewCmd() *cobra.Command {
 		Use:   "status [cluster]",
 		Short: "Get the status of a PostgreSQL cluster",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 			clusterName := args[0]
 
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			output, _ := cmd.Flags().GetString("output")
 
-			err := Status(ctx, clusterName, verbose, plugin.OutputFormat(output))
-			if err != nil {
-				fmt.Printf("Error: %v\n", err)
-			}
+			return Status(ctx, clusterName, verbose, plugin.OutputFormat(output))
 		},
 	}
 

@@ -56,8 +56,10 @@ func Generate(ctx context.Context, params Params, dryRun bool, format plugin.Out
 	}
 
 	_, err = plugin.GoClient.CoreV1().Secrets(params.Namespace).Create(ctx, userSecret, metav1.CreateOptions{})
-	if err == nil {
-		fmt.Printf("secret/%v created\n", userSecret.Name)
+	if err != nil {
+		return err
 	}
-	return err
+
+	fmt.Printf("secret/%v created\n", userSecret.Name)
+	return nil
 }
