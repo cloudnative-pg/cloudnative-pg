@@ -12,42 +12,30 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
 // Promote command implementation
-func Promote(ctx context.Context, clusterName string, serverName string) {
-	// Check cluster status
+func Promote(ctx context.Context, clusterName string, serverName string) error {
+	// Get the Cluster object
 	cluster, err := utils.GetCluster(ctx, plugin.DynamicClient, plugin.Namespace, clusterName)
 	if err != nil {
-		log.Log.Error(err, "Cannot find PostgreSQL cluster",
-			"namespace", plugin.Namespace,
-			"name", clusterName)
-		return
+		return err
 	}
 
 	// If server name is equal to target primary, there is no need to promote
 	// that instance
 	if cluster.Status.TargetPrimary == serverName {
-		return
+		return nil
 	}
 
 	// Check if the Pod exist
-	_, err = plugin.DynamicClient.Resource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "pods",
-	}).Namespace(plugin.Namespace).Get(ctx, serverName, metav1.GetOptions{})
+	_, err = plugin.GoClient.CoreV1().Pods(plugin.Namespace).Get(ctx, serverName, metav1.GetOptions{})
 	if err != nil {
-		log.Log.Error(err, "Cannot find PostgreSQL server",
-			"namespace", plugin.Namespace,
-			"name", serverName)
-		return
+		return err
 	}
 
 	// The Pod exists, let's update status fields
@@ -57,10 +45,8 @@ func Promote(ctx context.Context, clusterName string, serverName string) {
 
 	err = utils.UpdateClusterStatus(ctx, plugin.DynamicClient, cluster)
 	if err != nil {
-		log.Log.Error(err, "Cannot update PostgreSQL cluster status",
-			"namespace", plugin.Namespace,
-			"name", serverName,
-			"cluster", cluster)
-		return
+		return err
 	}
+
+	return nil
 }
