@@ -14,13 +14,19 @@ import (
 
 	//+kubebuilder:scaffold:imports
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
+const (
+	operatorNamespace = "postgresql-operator-system"
+)
+
 var env *tests.TestingEnvironment
+var expectedOperatorPodName string
 
 var _ = BeforeSuite(func() {
 	var err error
@@ -31,6 +37,16 @@ var _ = BeforeSuite(func() {
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
 	//+kubebuilder:scaffold:scheme
+
+	// Check operator pod should be running
+	Eventually(func() int {
+		podList, _ := env.GetPodList(operatorNamespace)
+		return utils.CountReadyPods(podList.Items)
+	}, 120).Should(BeEquivalentTo(1), "Operator pod does not exist")
+
+	operatorPod, err := env.GetOperatorPod()
+	Expect(err).NotTo(HaveOccurred())
+	expectedOperatorPodName = operatorPod.GetName()
 })
 
 func TestE2ESuite(t *testing.T) {
@@ -38,3 +54,9 @@ func TestE2ESuite(t *testing.T) {
 	SetDefaultEventuallyPollingInterval(200 * time.Millisecond)
 	RunSpecs(t, "Cloud Native PostgreSQL Operator E2E")
 }
+
+// Before the end of the tests we should verify that the operator never restarted
+// and that the operator pod name didn't change
+var _ = AfterEach(func() {
+	AssertOperatorPodUnchanged(expectedOperatorPodName)
+})

@@ -128,21 +128,41 @@ func (env TestingEnvironment) ExecCommand(
 	return utils.ExecCommand(ctx, env.Interface, env.RestClientConfig, pod, containerName, timeout, command...)
 }
 
-// GetOperatorNamespaceName returns the namespace the operator deployment is running in
-func (env TestingEnvironment) GetOperatorNamespaceName() (string, error) {
+// GetOperatorDeployment returns the operator deployment if there is a single one running, error otherwise
+func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error) {
 	const operatorDeploymentName = "postgresql-operator-controller-manager"
 	deploymentList := &appsv1.DeploymentList{}
 	err := env.Client.List(
 		env.Ctx, deploymentList, client.MatchingFields{"metadata.name": operatorDeploymentName},
 	)
 	if err != nil {
-		return "", err
+		return appsv1.Deployment{}, err
 	}
 	if len(deploymentList.Items) != 1 {
 		err = fmt.Errorf("number of %v deployments != 1", operatorDeploymentName)
-		return "", err
+		return appsv1.Deployment{}, err
 	}
-	return deploymentList.Items[0].Namespace, nil
+	return deploymentList.Items[0], nil
+}
+
+// GetOperatorPod returns the operator pod if there is a single one running, error otherwise
+func (env TestingEnvironment) GetOperatorPod() (corev1.Pod, error) {
+	podList := &corev1.PodList{}
+	if err := env.Client.List(
+		env.Ctx, podList, client.MatchingLabels{"control-plane": "controller-manager"}); err != nil {
+		return corev1.Pod{}, err
+	}
+	if len(podList.Items) != 1 {
+		err := fmt.Errorf("number of running operator pods != 1: %v pods running", len(podList.Items))
+		return corev1.Pod{}, err
+	}
+	return podList.Items[0], nil
+}
+
+// GetOperatorNamespaceName returns the namespace the operator deployment is running in
+func (env TestingEnvironment) GetOperatorNamespaceName() (string, error) {
+	deployment, err := env.GetOperatorDeployment()
+	return deployment.GetNamespace(), err
 }
 
 // GetClusterPodList gathers the current list of pods for a cluster in a namespace

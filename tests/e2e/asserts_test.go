@@ -77,3 +77,18 @@ func AssertConnection(host string, user string, dbname string,
 		Expect(stderr).To(BeEmpty())
 	})
 }
+
+// AssertOperatorPodUnchanged verifies that the pod has an expected name and never restarted
+func AssertOperatorPodUnchanged(expectedOperatorPodName string) {
+	operatorPod, err := env.GetOperatorPod()
+	Expect(err).NotTo(HaveOccurred())
+	Expect(operatorPod.GetName()).Should(BeEquivalentTo(expectedOperatorPodName),
+		"Operator pod was recreated before the end of the test")
+	restartCount := -1
+	for _, containerStatus := range operatorPod.Status.ContainerStatuses {
+		if containerStatus.Name == "manager" {
+			restartCount = int(containerStatus.RestartCount)
+		}
+	}
+	Expect(restartCount).Should(BeEquivalentTo(0), fmt.Sprintf("Operator pod get restarted %v times ", restartCount))
+}
