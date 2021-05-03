@@ -243,7 +243,7 @@ jobs:
           token: ${{ secrets.REPO_GHA_PAT }}
           repository: enterprisedb/cloud-native-postgresql-ocp-certified
           event-type: cnp-trigger
-          client-payload: '{"upstream_commit": "${{ github.sha }}"}'
+          client-payload: '{"upstream_commit": "${{ github.event.pull_request.head.sha || github.sha }}"}'
 
   generate-jobs:
     name: Generate jobs for E2E tests
