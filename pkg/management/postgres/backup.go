@@ -23,6 +23,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
@@ -121,11 +123,18 @@ func (instance *Instance) Backup(
 
 		recorder.Event(backupObject, "Normal", "Starting", "Backup started")
 
+		if err := fileutils.EnsureDirectoryExist(postgres.BackupTemporaryDirectory); err != nil {
+			log.Error(err, "Cannot create backup temporary directory", "err", err)
+			return
+		}
+
 		cmd := exec.Command("barman-cloud-backup", options...) // #nosec G204
 		var stdoutBuffer bytes.Buffer
 		var stderrBuffer bytes.Buffer
 		cmd.Stdout = &stdoutBuffer
 		cmd.Stderr = &stderrBuffer
+		cmd.Env = os.Environ()
+		cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
 		err := cmd.Run()
 
 		log.Info("Backup completed", "err", err)

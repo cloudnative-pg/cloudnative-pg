@@ -157,6 +157,10 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 	apiClient apiextensionsclientset.Interface,
 	caSecret *v1.Secret,
 ) error {
+	if err := fileutils.EnsureDirectoryExist(pki.CertDir); err != nil {
+		return err
+	}
+
 	webhookSecret, err := pki.EnsureCertificate(ctx, client, caSecret)
 	if err != nil {
 		return err

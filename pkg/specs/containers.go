@@ -9,16 +9,13 @@ package specs
 import (
 	corev1 "k8s.io/api/core/v1"
 
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 )
 
 // createBootstrapContainer creates the init container bootstrapping the operator
 // executable inside the generated Pods
-func createBootstrapContainer(
-	resources corev1.ResourceRequirements,
-	postgresUser,
-	postgresGroup int64,
-) corev1.Container {
+func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 	container := corev1.Container{
 		Name:  BootstrapControllerContainerName,
 		Image: configuration.Current.OperatorImageName,
@@ -27,14 +24,9 @@ func createBootstrapContainer(
 			"bootstrap",
 			"/controller/manager",
 		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "controller",
-				MountPath: "/controller",
-			},
-		},
-		Resources:       resources,
-		SecurityContext: CreateContainerSecurityContext(postgresUser, postgresGroup),
+		VolumeMounts:    createPostgresVolumeMounts(cluster),
+		Resources:       cluster.Spec.Resources,
+		SecurityContext: CreateContainerSecurityContext(),
 	}
 
 	addManagerLoggingOptions(container)
@@ -51,7 +43,7 @@ func addManagerLoggingOptions(container corev1.Container) {
 }
 
 // CreateContainerSecurityContext initializes container security context
-func CreateContainerSecurityContext(postgresUser, postgresGroup int64) *corev1.SecurityContext {
+func CreateContainerSecurityContext() *corev1.SecurityContext {
 	trueValue := true
 	falseValue := false
 
@@ -63,7 +55,7 @@ func CreateContainerSecurityContext(postgresUser, postgresGroup int64) *corev1.S
 		},
 		Privileged:               &falseValue,
 		RunAsNonRoot:             &trueValue,
-		ReadOnlyRootFilesystem:   &falseValue, // TODO set to true in CNP-293
+		ReadOnlyRootFilesystem:   &trueValue,
 		AllowPrivilegeEscalation: &falseValue,
 	}
 }

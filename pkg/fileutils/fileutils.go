@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 )
 
 // AppendStringToFile append the content of the given string to the
@@ -22,7 +23,7 @@ func AppendStringToFile(targetFile string, content string) (err error) {
 	var stream *os.File
 	stream, err = os.OpenFile(
 		targetFile,
-		os.O_APPEND|os.O_WRONLY, 0600) // #nosec
+		os.O_APPEND|os.O_WRONLY, 0o600) // #nosec
 	if err != nil {
 		return err
 	}
@@ -60,6 +61,12 @@ func FileExists(fileName string) (bool, error) {
 
 // CopyFile copy a file from a location to another one
 func CopyFile(source, destination string) (err error) {
+	// Ensure that the directory really exist
+	if err := EnsureParentDirectoryExist(destination); err != nil {
+		return err
+	}
+
+	// Copy the file
 	var in *os.File
 	in, err = os.Open(source) // #nosec
 	if err != nil {
@@ -97,7 +104,7 @@ func CopyFile(source, destination string) (err error) {
 // Returns an error status and a flag telling if the file has been
 // changed or not.
 func WriteStringToFile(fileName string, contents string) (changed bool, err error) {
-	return WriteFile(fileName, []byte(contents), 0666)
+	return WriteFile(fileName, []byte(contents), 0o666)
 }
 
 // WriteFile replace the contents of a certain file
@@ -122,6 +129,11 @@ func WriteFile(fileName string, contents []byte, perm os.FileMode) (changed bool
 		if bytes.Equal(previousContents, contents) {
 			return changed, err
 		}
+	}
+
+	// Ensure that the directory really exist
+	if err := EnsureParentDirectoryExist(fileName); err != nil {
+		return false, err
 	}
 
 	changed = true
@@ -173,7 +185,7 @@ func EnsurePgDataPerms(pgData string) error {
 	if err != nil {
 		return err
 	}
-	return os.Chmod(pgData, 0700) // #nosec
+	return os.Chmod(pgData, 0o700) // #nosec
 }
 
 // CreateEmptyFile create an empty file or return an error if
@@ -184,4 +196,25 @@ func CreateEmptyFile(fileName string) error {
 		return err
 	}
 	return file.Close()
+}
+
+// EnsureParentDirectoryExist check if the directory containing a certain file
+// exist or not, and if is not existent will create the directory using
+// 0700 as permissions bits
+func EnsureParentDirectoryExist(fileName string) error {
+	destinationDir := filepath.Dir(fileName)
+	return EnsureDirectoryExist(destinationDir)
+}
+
+// EnsureDirectoryExist check if the passed directory exist or not, and if
+// it doesn't exist will create it using 0700 as permissions bits
+func EnsureDirectoryExist(destinationDir string) error {
+	if _, err := os.Stat(destinationDir); os.IsNotExist(err) {
+		err = os.Mkdir(destinationDir, 0o700)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -18,6 +18,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
@@ -50,54 +51,6 @@ const (
 	// PgDataPath is the path to PGDATA variable
 	PgDataPath = "/var/lib/postgresql/data/pgdata"
 )
-
-func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
-	result := []corev1.Volume{
-		{
-			Name: "pgdata",
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: podName,
-				},
-			},
-		},
-		{
-			Name: "superuser-secret",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: cluster.GetSuperuserSecretName(),
-				},
-			},
-		},
-		{
-			Name: "controller",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-		{
-			Name: "socket",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-	}
-
-	if cluster.ShouldCreateApplicationDatabase() {
-		result = append(result,
-			corev1.Volume{
-				Name: "app-secret",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cluster.GetApplicationSecretName(),
-					},
-				},
-			},
-		)
-	}
-
-	return result
-}
 
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
@@ -132,27 +85,10 @@ func createPostgresContainers(
 				},
 				{
 					Name:  "PGHOST",
-					Value: "/var/run/postgresql",
+					Value: postgres.SocketDirectory,
 				},
 			},
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      "pgdata",
-					MountPath: "/var/lib/postgresql/data",
-				},
-				{
-					Name:      "controller",
-					MountPath: "/controller",
-				},
-				{
-					Name:      "superuser-secret",
-					MountPath: "/etc/superuser-secret",
-				},
-				{
-					Name:      "socket",
-					MountPath: "/var/run/postgresql",
-				},
-			},
+			VolumeMounts: createPostgresVolumeMounts(cluster),
 			ReadinessProbe: &corev1.Probe{
 				TimeoutSeconds: 5,
 				Handler: corev1.Handler{
@@ -208,6 +144,7 @@ func createPostgresContainers(
 					Protocol:      "TCP",
 				},
 			},
+			SecurityContext: CreateContainerSecurityContext(),
 		},
 	}
 
@@ -290,10 +227,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod
 			Hostname:  podName,
 			Subdomain: cluster.GetServiceAnyName(),
 			InitContainers: []corev1.Container{
-				createBootstrapContainer(
-					cluster.Spec.Resources,
-					cluster.GetPostgresUID(),
-					cluster.GetPostgresGID()),
+				createBootstrapContainer(cluster),
 			},
 			Containers:         createPostgresContainers(cluster, podName),
 			Volumes:            createPostgresVolumes(cluster, podName),

@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // CreatePrimaryJobViaInitdb create a new primary instance in a Pod
@@ -37,37 +38,11 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 			shellquote.Join(cluster.Spec.Bootstrap.InitDB.Options...))
 	}
 
-	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      "pgdata",
-			MountPath: "/var/lib/postgresql/data",
-		},
-		{
-			Name:      "superuser-secret",
-			MountPath: "/etc/superuser-secret",
-		},
-		{
-			Name:      "controller",
-			MountPath: "/controller",
-		},
-		{
-			Name:      "socket",
-			MountPath: "/var/run/postgresql",
-		},
-	}
-
 	if cluster.ShouldCreateApplicationDatabase() {
 		initCommand = append(initCommand,
 			"--app-db-name", cluster.Spec.Bootstrap.InitDB.Database,
 			"--app-user", cluster.Spec.Bootstrap.InitDB.Owner,
 			"--app-pw-file", "/etc/app-secret/password")
-
-		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{
-				Name:      "app-secret",
-				MountPath: "/etc/app-secret",
-			},
-		)
 	}
 
 	job := &batchv1.Job{
@@ -79,10 +54,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
-						createBootstrapContainer(
-							cluster.Spec.Resources,
-							cluster.GetPostgresUID(),
-							cluster.GetPostgresGID()),
+						createBootstrapContainer(cluster),
 					},
 					Containers: []corev1.Container{
 						{
@@ -107,15 +79,13 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 								},
 								{
 									Name:  "PGHOST",
-									Value: "/var/run/postgresql",
+									Value: postgres.SocketDirectory,
 								},
 							},
-							Command:      initCommand,
-							VolumeMounts: volumeMounts,
-							Resources:    cluster.Spec.Resources,
-							SecurityContext: CreateContainerSecurityContext(
-								cluster.GetPostgresUID(),
-								cluster.GetPostgresGID()),
+							Command:         initCommand,
+							VolumeMounts:    createPostgresVolumeMounts(cluster),
+							Resources:       cluster.Spec.Resources,
+							SecurityContext: CreateContainerSecurityContext(),
 						},
 					},
 					Volumes:            createPostgresVolumes(cluster, podName),
@@ -165,10 +135,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 					Hostname:  jobName,
 					Subdomain: cluster.GetServiceAnyName(),
 					InitContainers: []corev1.Container{
-						createBootstrapContainer(
-							cluster.Spec.Resources,
-							cluster.GetPostgresUID(),
-							cluster.GetPostgresGID()),
+						createBootstrapContainer(cluster),
 					},
 					Containers: []corev1.Container{
 						{
@@ -205,32 +172,13 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 								},
 								{
 									Name:  "PGHOST",
-									Value: "/var/run/postgresql",
+									Value: postgres.SocketDirectory,
 								},
 							},
-							Command: initCommand,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "pgdata",
-									MountPath: "/var/lib/postgresql/data",
-								},
-								{
-									Name:      "superuser-secret",
-									MountPath: "/etc/superuser-secret",
-								},
-								{
-									Name:      "controller",
-									MountPath: "/controller",
-								},
-								{
-									Name:      "socket",
-									MountPath: "/var/run/postgresql",
-								},
-							},
-							Resources: cluster.Spec.Resources,
-							SecurityContext: CreateContainerSecurityContext(
-								cluster.GetPostgresUID(),
-								cluster.GetPostgresGID()),
+							Command:         initCommand,
+							VolumeMounts:    createPostgresVolumeMounts(cluster),
+							Resources:       cluster.Spec.Resources,
+							SecurityContext: CreateContainerSecurityContext(),
 						},
 					},
 					Volumes:            createPostgresVolumes(cluster, podName),
@@ -265,10 +213,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 					Hostname:  jobName,
 					Subdomain: cluster.GetServiceAnyName(),
 					InitContainers: []corev1.Container{
-						createBootstrapContainer(
-							cluster.Spec.Resources,
-							cluster.GetPostgresUID(),
-							cluster.GetPostgresGID()),
+						createBootstrapContainer(cluster),
 					},
 					Containers: []corev1.Container{
 						{
@@ -293,7 +238,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 								},
 								{
 									Name:  "PGHOST",
-									Value: "/var/run/postgresql",
+									Value: postgres.SocketDirectory,
 								},
 							},
 							Command: []string{
@@ -302,24 +247,9 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 								"join",
 								"--parent-node", cluster.GetServiceReadWriteName(),
 							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "pgdata",
-									MountPath: "/var/lib/postgresql/data",
-								},
-								{
-									Name:      "controller",
-									MountPath: "/controller",
-								},
-								{
-									Name:      "socket",
-									MountPath: "/var/run/postgresql",
-								},
-							},
-							Resources: cluster.Spec.Resources,
-							SecurityContext: CreateContainerSecurityContext(
-								cluster.GetPostgresUID(),
-								cluster.GetPostgresGID()),
+							VolumeMounts:    createPostgresVolumeMounts(cluster),
+							Resources:       cluster.Spec.Resources,
+							SecurityContext: CreateContainerSecurityContext(),
 						},
 					},
 					Volumes:            createPostgresVolumes(cluster, podName),

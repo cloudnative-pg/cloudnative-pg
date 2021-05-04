@@ -76,10 +76,11 @@ to run in a cluster.
 For InfoSec reasons, every Kubernetes platform should implement them.
 
 Cloud Native PostgreSQL does not require *privileged* mode for containers execution.
-PostgreSQL servers run as `postgres` system user. No component whatsoever requires to run as `root`.
+The PostgreSQL containers run as `postgres` system user. No component whatsoever requires running as `root`.
 
 Likewise, Volumes access does not require *privileges* mode or `root` privileges either.
 Proper permissions must be properly assigned by the Kubernetes platform and/or administrators.
+The PostgreSQL containers run with a read-only root filesystem (i.e. no writable layer).
 
 The operator explicitly sets the required security contexts.
 

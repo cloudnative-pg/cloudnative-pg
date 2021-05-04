@@ -59,6 +59,9 @@ const (
 
 	// This is the name of the validating webhook configuration
 	validatingWebhookConfigurationName = "postgresql-operator-validating-webhook-configuration"
+
+	// The name of the directory containing the TLS certificates
+	defaultWebhookCertDir = "/controller/certificates"
 )
 
 func init() {
@@ -88,7 +91,7 @@ func RunController(metricsAddr, configMapName string, enableLeaderElection bool)
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "db9c8771.k8s.enterprisedb.io",
 		Namespace:          configuration.Current.WatchNamespace,
-		CertDir:            "/tmp",
+		CertDir:            defaultWebhookCertDir,
 	}
 	if configuration.Current.WebhookCertDir != "" {
 		// If OLM will generate certificates for us, let's just
