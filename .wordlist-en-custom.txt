@@ -123,6 +123,7 @@ ScheduledBackupList
 ScheduledBackupSpec
 ScheduledBackupStatus
 ScheduledBackups
+Scorsolini
 SecretKeySelector
 SecretsResourceVersion
 Seealso
