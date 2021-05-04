@@ -40,25 +40,40 @@ host all all all md5
 	// operator to work correctly
 	blockedConfigurationParameter = "blocked"
 
+	// ServerCertificates location to store the certificates
+	ServerCertificates = "/controller/certificates/"
+
 	// ServerCertificateLocation is the location where the server certificate
 	// is stored
-	ServerCertificateLocation = "/tmp/server.crt"
+	ServerCertificateLocation = ServerCertificates + "server.crt"
 
 	// ServerKeyLocation is the location where the private key is stored
-	ServerKeyLocation = "/tmp/server.key"
+	ServerKeyLocation = ServerCertificates + "server.key"
 
 	// StreamingReplicaCertificateLocation is the location where the certificate
 	// of the "postgres" user is stored
-	StreamingReplicaCertificateLocation = "/tmp/streaming_replica.crt"
+	StreamingReplicaCertificateLocation = ServerCertificates + "streaming_replica.crt"
 
 	// StreamingReplicaKeyLocation is the location where the private key of
 	// the "postgres" user is stored
-	StreamingReplicaKeyLocation = "/tmp/streaming_replica.key"
+	StreamingReplicaKeyLocation = ServerCertificates + "streaming_replica.key"
 
 	// CACertificateLocation is the location where the CA certificate
 	// is stored, and this certificate will be use to authenticate
 	// client certificates
-	CACertificateLocation = "/tmp/ca.crt"
+	CACertificateLocation = ServerCertificates + "ca.crt"
+
+	// BackupTemporaryDirectory provides a path to backup temporary files
+	// needed in the recovery process
+	BackupTemporaryDirectory = "/controller/backup"
+
+	// RecoveryTemporaryDirectory provides a path to store temporary files
+	// needed in the recovery process
+	RecoveryTemporaryDirectory = "/controller/recovery"
+
+	// SocketDirectory provides a path to store the Unix socket to be
+	// used by the PostgreSQL server
+	SocketDirectory = "/controller/run"
 )
 
 // MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
@@ -213,7 +228,7 @@ var (
 		},
 		MandatorySettings: SettingsCollection{
 			"listen_addresses":        "*",
-			"unix_socket_directories": "/var/run/postgresql",
+			"unix_socket_directories": SocketDirectory,
 			"hot_standby":             "true",
 			"archive_mode":            "on",
 			"archive_command":         "/controller/manager wal-archive %p",

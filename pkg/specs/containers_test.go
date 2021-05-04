@@ -10,25 +10,34 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Bootstrap Container creation", func() {
 	It("create a Bootstrap Container with resources with nil values into Limits and Requests fields", func() {
-		resources := corev1.ResourceRequirements{}
-		container := createBootstrapContainer(resources, 26, 26)
+		cluster := apiv1.Cluster{}
+		container := createBootstrapContainer(cluster)
 		Expect(container.Resources.Limits).To(BeNil())
 		Expect(container.Resources.Requests).To(BeNil())
 	})
 
 	It("create a Bootstrap Container with resources with not nil values into Limits and Requests fields", func() {
-		limits := make(corev1.ResourceList)
-		limits["a_test_field"] = resource.Quantity{}
-		requests := make(corev1.ResourceList)
-		requests["another_test_field"] = resource.Quantity{}
-		resources := corev1.ResourceRequirements{Limits: limits, Requests: requests}
-		container := createBootstrapContainer(resources, 26, 26)
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Resources: corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						"a_test_field": resource.Quantity{},
+					},
+					Requests: corev1.ResourceList{
+						"another_test_field": resource.Quantity{},
+					},
+				},
+			},
+		}
+		container := createBootstrapContainer(cluster)
 		Expect(container.Resources.Limits["a_test_field"]).ToNot(BeNil())
 		Expect(container.Resources.Requests["another_test_field"]).ToNot(BeNil())
 	})
@@ -36,12 +45,10 @@ var _ = Describe("Bootstrap Container creation", func() {
 
 var _ = Describe("Container Security Context creation", func() {
 	It("create a Security Context for the Container", func() {
-		postgresUID := int64(1001)
-		postgresGID := int64(26)
-		securityContext := CreateContainerSecurityContext(postgresUID, postgresGID)
+		securityContext := CreateContainerSecurityContext()
 		Expect(*securityContext.RunAsNonRoot).To(BeTrue())
 		Expect(*securityContext.AllowPrivilegeEscalation).To(BeFalse())
 		Expect(*securityContext.Privileged).To(BeFalse())
-		Expect(*securityContext.ReadOnlyRootFilesystem).To(BeFalse())
+		Expect(*securityContext.ReadOnlyRootFilesystem).To(BeTrue())
 	})
 })

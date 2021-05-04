@@ -193,7 +193,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		err = ioutil.WriteFile(
 			path.Join(info.PgData, "postgresql.auto.conf"),
 			[]byte(""),
-			0600)
+			0o600)
 		if err != nil {
 			return fmt.Errorf("cannot erase auto config: %w", err)
 		}
@@ -202,19 +202,23 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		return ioutil.WriteFile(
 			path.Join(info.PgData, "recovery.signal"),
 			[]byte(""),
-			0600)
+			0o600)
 	}
 
 	// We need to generate a recovery.conf
 	return ioutil.WriteFile(
 		path.Join(info.PgData, "recovery.conf"),
 		[]byte(recoveryFileContents),
-		0600)
+		0o600)
 }
 
 // writeInitialPostgresqlConf reset the postgresql.conf that there is in the instance
 func (info InitInfo) writeInitialPostgresqlConf(ctx context.Context, client dynamic.Interface) error {
-	tempDataDir, err := ioutil.TempDir("/tmp", "datadir_")
+	if err := fileutils.EnsureDirectoryExist(postgresSpec.RecoveryTemporaryDirectory); err != nil {
+		return err
+	}
+
+	tempDataDir, err := ioutil.TempDir(postgresSpec.RecoveryTemporaryDirectory, "datadir_")
 	if err != nil {
 		return fmt.Errorf("while creating a temporary data directory: %w", err)
 	}

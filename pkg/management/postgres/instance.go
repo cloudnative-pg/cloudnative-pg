@@ -63,14 +63,31 @@ var (
 	}
 )
 
+// GetSocketDir get the name of the directory that will contain
+// the Unix socket for the PostgreSQL server. This is detected using
+// the PGHOST environment variable or using a default
+func (instance Instance) GetSocketDir() string {
+	socketDir := os.Getenv("PGHOST")
+	if socketDir == "" {
+		socketDir = "/var/run/postgresql"
+	}
+
+	return socketDir
+}
+
 // Startup starts up a PostgreSQL instance and wait for the instance to be
 // started
 func (instance Instance) Startup() error {
+	socketDir := instance.GetSocketDir()
+	if err := fileutils.EnsureDirectoryExist(socketDir); err != nil {
+		return fmt.Errorf("while creating socket directory: %w", err)
+	}
+
 	options := []string{
 		"start",
 		"-w",
 		"-D", instance.PgData,
-		"-o", "-c port=5432 -c unix_socket_directories=/var/run/postgresql",
+		"-o", "-c port=5432 -c unix_socket_directories=" + socketDir,
 	}
 
 	// Add postgres server command line options
@@ -158,6 +175,11 @@ func (instance *Instance) Reload() error {
 // Run this instance returning an exec.Cmd structure
 // to control the instance execution
 func (instance Instance) Run() (*exec.Cmd, error) {
+	socketDir := instance.GetSocketDir()
+	if err := fileutils.EnsureDirectoryExist(socketDir); err != nil {
+		return nil, fmt.Errorf("while creating socket directory: %w", err)
+	}
+
 	options := []string{
 		"-D", instance.PgData,
 	}
@@ -199,10 +221,7 @@ func (instance *Instance) GetApplicationDB() (*sql.DB, error) {
 		return instance.applicationDB, nil
 	}
 
-	socketDir := os.Getenv("PGHOST")
-	if socketDir == "" {
-		socketDir = "/var/run/postgresql"
-	}
+	socketDir := instance.GetSocketDir()
 
 	db, err := sql.Open(
 		"postgres",
@@ -226,11 +245,7 @@ func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 		return instance.superUserDB, nil
 	}
 
-	socketDir := os.Getenv("PGHOST")
-	if socketDir == "" {
-		socketDir = "/var/run/postgresql"
-	}
-
+	socketDir := instance.GetSocketDir()
 	dsn := fmt.Sprintf("host=%s port=5432 dbname=postgres user=postgres sslmode=disable", socketDir)
 	db, err := sql.Open(
 		"postgres",
