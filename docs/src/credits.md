@@ -14,6 +14,7 @@ developed, and tested by the EnterpriseDB Cloud Native team:
 - Anand Nednur
 - Marco Nenciarini
 - Gabriele Quaresima
+- Philippe Scorsolini
 - Jitendra Wadle
 - Adam Wright
 
