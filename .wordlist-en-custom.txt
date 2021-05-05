@@ -99,6 +99,7 @@ Patroni
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
 PodDisruptionBudget
+PodMonitor
 PodStatus
 Postgres
 PostgresConfiguration
@@ -207,6 +208,7 @@ config
 configmap
 configmapkeyselector
 containerPort
+coreos
 corev
 coverity
 cpu
@@ -350,6 +352,8 @@ pid
 pitr
 pluggable
 png
+podMetricsEndpoints
+podmonitor
 postgres
 postgresGID
 postgresUID

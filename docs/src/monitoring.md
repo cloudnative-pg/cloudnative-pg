@@ -1,7 +1,7 @@
 # Monitoring
 
 For each PostgreSQL instance, the operator provides an exporter of metrics for
-[Prometheus](https://prometheus.io/) via HTTP, on port 9187.
+[Prometheus](https://prometheus.io/) via HTTP, on port 9187, named `metrics`.
 The operator comes with a predefined set of metrics, as well as a highly
 configurable and customizable system to define additional queries via one or
 more `ConfigMap` objects - and, future versions, `Secret` too.
@@ -60,7 +60,6 @@ For example:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  namespace: default
   name: example-monitoring
 data:
   custom-queries: |
@@ -89,3 +88,24 @@ custom_pg_replication_lag 0
 
 This framework enables the definition of custom metrics to monitor the database
 or the application inside the PostgreSQL cluster.
+
+## Prometheus Operator example
+
+A specific cluster can be monitored using the
+[Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) by defining the following
+[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor) resource:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cluster-example
+spec:
+  selector:
+    matchLabels:
+      postgresql: cluster-example
+  podMetricsEndpoints:
+  - port: metrics
+```
+
+Take care to modify the example above with a unique name, the cluster's namespace and a set of labels as required before applying.

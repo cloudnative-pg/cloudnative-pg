@@ -140,6 +140,7 @@ func createPostgresContainers(
 					Protocol:      "TCP",
 				},
 				{
+					Name:          "metrics",
 					ContainerPort: int32(url.MetricsPort),
 					Protocol:      "TCP",
 				},
