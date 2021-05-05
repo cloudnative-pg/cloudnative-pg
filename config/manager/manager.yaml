@@ -66,6 +66,8 @@ spec:
         volumeMounts:
           - mountPath: /controller
             name: scratch-data
+        securityContext:
+          readOnlyRootFilesystem: true
       volumes:
         - name: scratch-data
           emptyDir: {}
