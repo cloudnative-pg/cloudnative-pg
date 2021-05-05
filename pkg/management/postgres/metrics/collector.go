@@ -277,7 +277,13 @@ func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
 		return nil, err
 	}
 
+	_, err = tx.Exec("SET application_name TO cnp_metrics_exporter")
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = tx.Exec("SET ROLE TO pg_monitor")
+
 	return tx, err
 }
 
