@@ -69,7 +69,6 @@ data:
               ELSE GREATEST (0,
                 EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())))
               END AS lag"
-      primary: true
       metrics:
         - lag:
             usage: "GAUGE"
@@ -77,8 +76,6 @@ data:
 ```
 
 The object must have a name and be in the same namespace as the `Cluster`.
-Note that the above query will be executed on the `primary` node, with the
-following output.
 
 ```text
 # HELP custom_pg_replication_lag Replication lag behind primary in seconds
