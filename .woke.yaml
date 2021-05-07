@@ -7,3 +7,5 @@ rules:
     alternatives:
       - leader
       - primary
+    options:
+      word_boundary: true

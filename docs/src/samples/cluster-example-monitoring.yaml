@@ -25,19 +25,18 @@ data:
   custom-queries: |
     pg_replication:
       query: "SELECT CASE WHEN NOT pg_is_in_recovery() THEN 0 ELSE GREATEST (0, EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))) END AS lag"
-      primary: true
       metrics:
         - lag:
             usage: "GAUGE"
             description: "Replication lag behind primary in seconds"
 
-    pg_postmaster:   # wokeignore:rule=master
-      query: "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()"   # wokeignore:rule=master
+    pg_postmaster:
+      query: "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()"
       primary: true
       metrics:
         - start_time_seconds:
             usage: "GAUGE"
-            description: "Time at which postmaster started"   # wokeignore:rule=master
+            description: "Time at which postgres started"
 
     pg_stat_user_tables:
       query: |
