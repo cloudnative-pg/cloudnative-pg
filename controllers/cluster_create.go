@@ -774,11 +774,13 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 	return nil
 }
 
-// electPvcToReattach will choose a PVC between the dangling ones that should be reattached to the cluster,
-// giving precedence to the target primary if between the set. If the target primary is fine, let's start
-// using the PVC we have initialized. After that we use the PVC that are dangling
+// electPvcToReattach chooses a PVC between the initializing and the dangling ones that should be reattached
+// to the cluster, giving precedence to the target primary if existing in the set. If the target primary is fine,
+// let's start using the PVC we have initialized. After that we use the PVC that are initializing or dangling
 func electPvcToReattach(cluster *apiv1.Cluster) string {
-	pvcs := append(cluster.Status.InitializingPVC, cluster.Status.DanglingPVC...)
+	pvcs := make([]string, 0, len(cluster.Status.InitializingPVC)+len(cluster.Status.DanglingPVC))
+	pvcs = append(pvcs, cluster.Status.InitializingPVC...)
+	pvcs = append(pvcs, cluster.Status.DanglingPVC...)
 	if len(pvcs) == 0 {
 		return ""
 	}
