@@ -43,7 +43,13 @@ operator by applying the following sections in this order:
 The **global default parameters** are:
 
 ```text
-logging_collector = 'off'
+logging_collector = 'on'
+log_destination = 'csvlog'
+log_directory = '/controller/log'
+log_filename = 'postgres'
+log_rotation_age = '0'
+log_rotation_size = '0'
+log_truncate_on_rotation = 'false'
 max_parallel_workers = '32'
 max_replication_slots = '32'
 max_worker_processes = '32'
@@ -80,7 +86,7 @@ wal_level = 'logical'
 wal_log_hints = 'on'
 ```
 
-Since the fixed parameters are added last, they can't be overridden by the
+Since the fixed parameters are added at the end, they can't be overridden by the
 user via the YAML configuration. Those parameters are required for correct WAL
 archiving and replication.
 
@@ -94,6 +100,15 @@ the cluster.
 primary_conninfo = 'host=cluster-example-rw user=postgres dbname=postgres'
 recovery_target_timeline = 'latest'
 ```
+
+### Log control settings
+
+The operator requires PostgreSQL to output its log in CSV format, and the
+instance manager automatically parses it and outputs it in JSON format.
+For this reason, all log settings in PostgreSQL are fixed and cannot be
+changed.
+
+For further information, please refer to the ["Logging" section](logging.md).
 
 ## The `pg_hba` section
 

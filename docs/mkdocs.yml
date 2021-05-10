@@ -28,6 +28,7 @@ nav:
   - labels_annotations.md
   - samples.md
   - monitoring.md
+  - logging.md
   - expose_pg_services.md
   - ssl_connections.md
   - kubernetes_upgrade.md

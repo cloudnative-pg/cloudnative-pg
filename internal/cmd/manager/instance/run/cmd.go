@@ -19,6 +19,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
 )
@@ -129,6 +130,11 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 
 	if err != nil {
 		log.Log.Error(err, "Error printing the control information of this PostgreSQL instance")
+		return err
+	}
+
+	if err = logpipe.Start(); err != nil {
+		log.Log.Error(err, "Error while starting the logging collector routine")
 		return err
 	}
 
