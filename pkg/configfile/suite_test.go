@@ -9,8 +9,6 @@ package configfile
 import (
 	"testing"
 
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -21,7 +19,5 @@ import (
 func TestConfigFile(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Configuration file parsing suite",
-		[]Reporter{printer.NewlineReporter{}})
+	RunSpecs(t, "Configuration File Parsing Suite")
 }

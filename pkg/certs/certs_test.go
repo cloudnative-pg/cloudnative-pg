@@ -8,22 +8,11 @@ package certs
 
 import (
 	"crypto/x509"
-	"testing"
 	"time"
-
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
-
-func TestCerts(t *testing.T) {
-	RegisterFailHandler(Fail)
-
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Certs Suite",
-		[]Reporter{printer.NewlineReporter{}})
-}
 
 var _ = Describe("Keypair generation", func() {
 	It("should generate a correct root CA", func() {

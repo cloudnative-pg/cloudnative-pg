@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package configuration
+package certs
 
 import (
 	"testing"
@@ -13,7 +13,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestConfiguration(t *testing.T) {
+func TestCerts(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Internal Configuration Test Suite")
+
+	RunSpecs(t, "Certs Suite")
 }
