@@ -1,6 +1,6 @@
 
 AES
-AKS
+AcolumnName
 AffinityConfiguration
 Anand
 BackupConfiguration
@@ -27,6 +27,7 @@ ClusterList
 ClusterSpec
 ClusterStatus
 CodeReady
+ColumnName
 CompressionType
 ConfigMap
 ConfigMapKeySelector
@@ -74,6 +75,10 @@ ListMeta
 Liveness
 LoadBalancer
 LocalObjectReference
+MAPPEDMETRIC
+MetricDescription
+MetricName
+MetricType
 MiB
 MinIO
 Minikube
@@ -119,6 +124,7 @@ SCC
 SDK
 SELinux
 SHA
+SQLQuery
 SSL
 ScheduledBackup
 ScheduledBackupList
@@ -201,6 +207,7 @@ clusterspec
 clusterstatus
 cnp
 codeready
+columnValue
 commandError
 commandOutput
 conf
@@ -289,6 +296,8 @@ kube
 kubectl
 kubelet
 kubernetes
+labelColumnName
+labelColumnValue
 lastCheckTime
 lastScheduleTime
 latestGeneratedNode
@@ -310,6 +319,8 @@ matchLabels
 maxSyncReplicas
 md
 metav
+metric's
+metricNameKS
 microsoft
 minSyncReplicas
 minikube
@@ -382,6 +393,7 @@ resizeInUseVolumes
 resourcerequirements
 reusePVC
 rollingupdatestatus
+runonserver
 runtime
 rw
 sSfL
