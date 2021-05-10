@@ -9,8 +9,6 @@ package controller
 import (
 	"testing"
 
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -18,7 +16,5 @@ import (
 func TestWatches(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Instance Manager Controller Suite",
-		[]Reporter{printer.NewlineReporter{}})
+	RunSpecs(t, "Internal Management Controller Test Suite")
 }
