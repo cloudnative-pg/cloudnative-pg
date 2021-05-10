@@ -4,7 +4,7 @@ For each PostgreSQL instance, the operator provides an exporter of metrics for
 [Prometheus](https://prometheus.io/) via HTTP, on port 9187, named `metrics`.
 The operator comes with a predefined set of metrics, as well as a highly
 configurable and customizable system to define additional queries via one or
-more `ConfigMap` objects - and, future versions, `Secret` too.
+more `ConfigMap` or `Secret` resources.
 
 The exporter can be accessed as follows:
 
@@ -16,81 +16,24 @@ All monitoring queries are:
 
 - transactionally atomic (one transaction per query)
 - executed with the `pg_monitor` role
+- executed with `application_name` set to `cnp_metrics_exporter`
 
-Please refer to the
-["Default roles" section in PostgreSQL documentation](https://www.postgresql.org/docs/current/default-roles.html)
+Please refer to the "Default roles" section in PostgreSQL
+[documentation](https://www.postgresql.org/docs/current/default-roles.html)
 for details on the `pg_monitor` role.
 
-## User defined metrics
+The exporter framework enables the definition of custom metrics to monitor the
+`postgres` database inside the pods of the PostgreSQL cluster.
 
-Users will be able to define metrics through the available interface
-that the operator provides. This interface is currently in *beta* state and
-only supports definition of custom queries as `ConfigMap` and `Secret` objects
-using a YAML file that is inspired by the [queries.yaml file](https://github.com/prometheus-community/postgres_exporter/blob/main/queries.yaml)
-of the PostgreSQL Prometheus Exporter.
-
-Queries must be defined in a `ConfigMap` to be referenced in the `monitoring`
-section of the `Cluster` definition, as in the following example:
-
-```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
-kind: Cluster
-metadata:
-  name: cluster-example
-spec:
-  instances: 3
-
-  storage:
-    size: 1Gi
-
-  monitoring:
-    customQueriesConfigMap:
-      - name: example-monitoring
-        key: custom-queries
-```
-
-Specifically, the `monitoring` section looks for an array with the name
-`customQueriesConfigMap`, which, as the name suggests, needs a list of
-`ConfigMap` key references to be used as the source of custom queries.
-
-For example:
-
-```yaml
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: example-monitoring
-data:
-  custom-queries: |
-    pg_replication:
-      query: "SELECT CASE WHEN NOT pg_is_in_recovery()
-              THEN 0
-              ELSE GREATEST (0,
-                EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())))
-              END AS lag"
-      metrics:
-        - lag:
-            usage: "GAUGE"
-            description: "Replication lag behind primary in seconds"
-```
-
-The object must have a name and be in the same namespace as the `Cluster`.
-
-```text
-# HELP custom_pg_replication_lag Replication lag behind primary in seconds
-# TYPE custom_pg_replication_lag gauge
-custom_pg_replication_lag 0
-```
-
-This framework enables the definition of custom metrics to monitor the database
-or the application inside the PostgreSQL cluster.
+!!! Note
+    Monitoring databases different from `postgres` will be available in a future version.
 
 ## Prometheus Operator example
 
 A specific cluster can be monitored using the
 [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) by defining the following
-[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor) resource:
+[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor)
+resource:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -105,4 +48,140 @@ spec:
   - port: metrics
 ```
 
-Take care to modify the example above with a unique name, the cluster's namespace and a set of labels as required before applying.
+!!! Important
+    Make sure you modify the example above with a unique name as well as the
+    correct cluster's namespace and labels.
+
+## User defined metrics
+
+This feature is currently in *beta* state and the format is inspired by the
+[queries.yaml file](https://github.com/prometheus-community/postgres_exporter/blob/master/queries.yaml) <!-- wokeignore:rule=master -->
+of the PostgreSQL Prometheus Exporter.
+
+Custom metrics can be defined by users by referring to the created `Configmap`/`Secret` in a `Cluster` definition
+under the `.spec.monitoring.customQueriesConfigMap` or `customQueriesSecret` section as in the following example:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+  namespace: test
+spec:
+  instances: 3
+
+  storage:
+    size: 1Gi
+
+  monitoring:
+    customQueriesConfigMap:
+      - name: example-monitoring
+        key: custom-queries
+```
+
+The `customQueriesConfigMap`/`customQueriesSecret` sections contain a list of
+`ConfigMap`/`Secret` references specifying the key in which the custom queries are defined.
+Take care that the referred resources have to be created **in the same namespace as the Cluster** resource.
+
+### Example of user defined metric
+
+Here you can see an example of a `ConfigMap` containing a single custom query,
+referenced by the `Cluster` example above:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-monitoring
+  namespace: test
+data:
+  custom-queries: |
+    pg_replication:
+      query: "SELECT CASE WHEN NOT pg_is_in_recovery()
+              THEN 0
+              ELSE GREATEST (0,
+                EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())))
+              END AS lag"
+      metrics:
+        - lag:
+            usage: "GAUGE"
+            description: "Replication lag behind primary in seconds"
+```
+
+A list of basic monitoring queries can be found in the [`cnp-basic-monitoring.yaml` file](
+./samples/cnp-basic-monitoring.yaml).
+
+### Structure of a user defined metric
+
+Every custom query has the following basic structure:
+
+```yaml
+<MetricName>:
+      query: "<SQLQuery>"
+      metrics:
+        - <ColumnName>:
+            usage: "<MetricType>"
+            description: "<MetricDescription>"
+```
+
+Here is a short description of all the available fields:
+
+- `<MetricName>`: the name of the Prometheus metric
+    - `query`: the SQL query to run on the target database to generate the metrics
+    - `primary`: whether to run the query only on the primary instance <!-- wokeignore:rule=master -->
+    - `master`: same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated) <!-- wokeignore:rule=master -->
+    - `metrics`: section containing a list of all exported columns, defined as follows:
+      - `<ColumnName>`: the name of the column returned by the query
+          - `usage`: one of the values described below
+          - `description`: the metric's description
+          - `metrics_mapping`: the optional column mapping when `usage` is set to `MAPPEDMETRIC`
+
+The possible values for `usage` are:
+
+| Column Usage Label  | Description                                              |
+|:--------------------|:---------------------------------------------------------|
+| `DISCARD`           | this column should be ignored                            |
+| `LABEL`             | use this column as a label                               |
+| `COUNTER`           | use this column as a counter                             |
+| `GAUGE`             | use this column as a gauge                               |
+| `MAPPEDMETRIC`      | use this column with the supplied mapping of text values |
+| `DURATION`          | use this column as a text duration (in milliseconds)     |
+| `HISTOGRAM`         | use this column as an histogram                          |
+
+
+Please visit the ["Metric Types" page](https://prometheus.io/docs/concepts/metric_types/)
+from the Prometheus documentation for more information.
+
+### Output of a user defined metric
+
+Custom defined metrics are returned by the Prometheus exporter endpoint (`:9187/metrics`)
+with the following format:
+
+```text
+cnp_<MetricName>_<ColumnName>{<LabelColumnName>=<LabelColumnValue> ... } <ColumnValue>
+```
+
+!!! Note
+    `LabelColumnName` are metrics with `usage` set to `LABEL` and their `Value`
+
+
+Considering the `pg_replication` example above, the exporter's endpoint would
+return the following output when invoked:
+
+```text
+# HELP cnp_pg_replication_lag Replication lag behind primary in seconds
+# TYPE cnp_pg_replication_lag gauge
+cnp_pg_replication_lag 0
+```
+
+### Differences with the Prometheus Postgres exporter
+
+Cloud Native PostgreSQL is inspired by the PostgreSQL Prometheus Exporter, but
+presents some differences. In particular, the following fields of a metric that
+are defined in the official Prometheus exporter are not implemented in Cloud
+Native PostgreSQL's exporter:
+
+- `cache_seconds`: number of seconds to cache the result of the query
+- `runonserver`: a semantic version range to limit the versions of PostgreSQL the query should run on (e.g. `">=10.0.0"`)
+
+Similarly, the `pg_version` field of a column definition is not implemented.
