@@ -1,0 +1,2 @@
+2021-05-10 06:25:24.239 UTC,,,9298,,601c20b5.2452,61853,,2021-02-04 16:28:37 UTC,,0,LOG,00000,"checkpoint starting: time",,,,,,,,,"",postmaster
+2021-05-10 06:25:30.200 UTC,,,9298,,601c20b5.2452,61854,,2021-02-04 16:28:37 UTC,,0,LOG,00000,"checkpoint complete: wrote 59 buffers (0.0%); 0 WAL file(s) added, 0 removed, 1 recycled; write=5.937 s, sync=0.004 s, total=5.961 s; sync files=7, longest=0.002 s, average=0.000 s; distance=16415 kB, estimate=16910 kB",,,,,,,,,"",postmaster

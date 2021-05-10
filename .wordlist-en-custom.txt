@@ -1,4 +1,3 @@
-
 AES
 AcolumnName
 AffinityConfiguration
@@ -20,6 +19,7 @@ CONFIG
 CR's
 CRC
 CRD
+CSV
 Canovai
 Cecchi
 ClusterIP
@@ -103,6 +103,7 @@ PVCs
 Patroni
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
+Philippe
 PodDisruptionBudget
 PodMonitor
 PodStatus
@@ -156,6 +157,7 @@ Wadle
 WalBackupConfiguration
 accessKeyId
 accessModes
+adc
 addons
 affinityconfiguration
 aks
@@ -327,6 +329,7 @@ minikube
 minio
 monitoringconfiguration
 mountPath
+msg
 myAKSCluster
 myResourceGroup
 namespace
@@ -338,6 +341,7 @@ nodeMaintenanceWindow
 nodeSelector
 nodemaintenancewindow
 ntt
+num
 objectmeta
 objid
 objsubid
@@ -365,6 +369,7 @@ pluggable
 png
 podMetricsEndpoints
 podmonitor
+pos
 postgres
 postgresGID
 postgresUID

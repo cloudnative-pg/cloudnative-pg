@@ -74,6 +74,14 @@ host all all all md5
 	// SocketDirectory provides a path to store the Unix socket to be
 	// used by the PostgreSQL server
 	SocketDirectory = "/controller/run"
+
+	// LogPath is the path of the folder used by the logging_collector
+	LogPath = "/controller/log"
+
+	// LogFileName is the name of the file produced by the logging_collector,
+	// excluding the extension. The logging collector process will append
+	// `.csv` and `.log` as needed.
+	LogFileName = "postgres"
 )
 
 // MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
@@ -213,10 +221,16 @@ var (
 	// default and the mandatory behavior of CNP
 	CnpConfigurationSettings = ConfigurationSettings{
 		GlobalDefaultSettings: SettingsCollection{
-			"max_parallel_workers":  "32",
-			"max_worker_processes":  "32",
-			"max_replication_slots": "32",
-			"logging_collector":     "off",
+			"max_parallel_workers":     "32",
+			"max_worker_processes":     "32",
+			"max_replication_slots":    "32",
+			"logging_collector":        "on",
+			"log_destination":          "csvlog",
+			"log_rotation_age":         "0",
+			"log_rotation_size":        "0",
+			"log_truncate_on_rotation": "false",
+			"log_directory":            LogPath,
+			"log_filename":             LogFileName,
 		},
 		DefaultSettings: map[MajorVersionRange]SettingsCollection{
 			{MajorVersionRangeUnlimited, 130000}: {
