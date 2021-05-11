@@ -25,7 +25,7 @@ jobs:
         name: Get updated EKS versions
         run: |
           DOC_URL="https://raw.githubusercontent.com/awsdocs/amazon-eks-user-guide/master/doc_source/kubernetes-versions.md" #wokeignore:rule=master
-          curl --silent "${DOC_URL}" | grep "+ 1" | sed -e 's/[\ +]//g; s/\.[1-9]\+$//' | grep -v "1.15" | \
+          curl --silent "${DOC_URL}" | grep "+ 1" | sed -e 's/[\ +]//g; s/\.[1-9]\+$//' | \
             jq -Rn '[inputs]' > .github/eks_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'eks'
       -
@@ -65,7 +65,6 @@ jobs:
           cut -d'.' -f '1-2' | \
           uniq | \
           sed 's/\([[:digit:]]\+\.[[:digit:]]\+\)/"\1"/' | \
-          grep -v "1.15" | \
           yq -j e - > .github/gke_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'gke'
       -
