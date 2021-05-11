@@ -452,14 +452,14 @@ func (r *InstanceReconciler) configureInstancePermissions() error {
 		return fmt.Errorf("while getting a connection to the instance: %w", err)
 	}
 
-	r.log.Info("Waiting for server to start")
+	r.log.Info("Verifying connection to DB")
 	err = r.instance.WaitForSuperuserConnectionAvailable()
 	if err != nil {
-		r.log.Error(err, "server did not start in time")
+		r.log.Error(err, "DB not available")
 		os.Exit(1)
 	}
 
-	r.log.Info("Configuring primary instance")
+	r.log.Info("Validating DB configuration")
 
 	// A transaction is required to temporarily disable synchronous replication
 	tx, err := db.Begin()

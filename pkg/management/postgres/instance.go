@@ -347,7 +347,7 @@ func waitForConnectionAvailable(db *sql.DB) error {
 	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
 		err := db.Ping()
 		if err != nil {
-			log.Log.Info("Primary server is still not available", "err", err)
+			log.Log.Info("DB not available, will retry", "err", err)
 		}
 		return err
 	})
