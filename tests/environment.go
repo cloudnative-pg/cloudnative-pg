@@ -132,14 +132,30 @@ func (env TestingEnvironment) ExecCommand(
 func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error) {
 	const operatorDeploymentName = "postgresql-operator-controller-manager"
 	deploymentList := &appsv1.DeploymentList{}
-	err := env.Client.List(
-		env.Ctx, deploymentList, client.MatchingFields{"metadata.name": operatorDeploymentName},
-	)
-	if err != nil {
+
+	if err := env.Client.List(
+		env.Ctx, deploymentList, client.MatchingLabels{"app.kubernetes.io/name": "cloud-native-postgresql"},
+	); err != nil {
 		return appsv1.Deployment{}, err
 	}
+	// We check if we have one or more deployments
+	switch {
+	case len(deploymentList.Items) > 1:
+		err := fmt.Errorf("number of operator deployments != 1")
+		return appsv1.Deployment{}, err
+	case len(deploymentList.Items) == 1:
+		return deploymentList.Items[0], nil
+	}
+
+	// This it's for older deployments and will not work on the new ones
+	if err := env.Client.List(
+		env.Ctx, deploymentList, client.MatchingFields{"metadata.name": operatorDeploymentName},
+	); err != nil {
+		return appsv1.Deployment{}, err
+	}
+
 	if len(deploymentList.Items) != 1 {
-		err = fmt.Errorf("number of %v deployments != 1", operatorDeploymentName)
+		err := fmt.Errorf("number of %v deployments != 1", operatorDeploymentName)
 		return appsv1.Deployment{}, err
 	}
 	return deploymentList.Items[0], nil
@@ -148,14 +164,33 @@ func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error)
 // GetOperatorPod returns the operator pod if there is a single one running, error otherwise
 func (env TestingEnvironment) GetOperatorPod() (corev1.Pod, error) {
 	podList := &corev1.PodList{}
+
+	// This will work for newer version of the operator, which are using
+	// our custom label
+	if err := env.Client.List(
+		env.Ctx, podList, client.MatchingLabels{"app.kubernetes.io/name": "cloud-native-postgresql"}); err != nil {
+		return corev1.Pod{}, err
+	}
+	switch {
+	case len(podList.Items) > 1:
+		err := fmt.Errorf("number of running operator pods greater than 1: %v pods running", len(podList.Items))
+		return corev1.Pod{}, err
+
+	case len(podList.Items) == 1:
+		return podList.Items[0], nil
+	}
+
+	// This will work for older version of the operator, which are using
+	// the default label from kube-builder
 	if err := env.Client.List(
 		env.Ctx, podList, client.MatchingLabels{"control-plane": "controller-manager"}); err != nil {
 		return corev1.Pod{}, err
 	}
 	if len(podList.Items) != 1 {
-		err := fmt.Errorf("number of running operator pods != 1: %v pods running", len(podList.Items))
+		err := fmt.Errorf("number of running operator different than 1: %v pods running", len(podList.Items))
 		return corev1.Pod{}, err
 	}
+
 	return podList.Items[0], nil
 }
 

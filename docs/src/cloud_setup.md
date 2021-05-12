@@ -16,7 +16,7 @@ Below you can find specific instructions for each of the above environments.
 Once the steps described on this page have been completed, and your `kubectl`
 can connect to the desired cluster, you can install the operator and start
 creating PostgreSQL `Clusters` by following the instructions you find in the
-["Installation"](installation.md) section.
+["Installation"](installation_upgrade.md) section.
 
 !!! Important
     `kubectl` is required to proceed with setup.

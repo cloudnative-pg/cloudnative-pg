@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   labels:
-    control-plane: controller-manager
+    app.kubernetes.io/name: cloud-native-postgresql
   name: system
 ---
 apiVersion: v1
@@ -16,16 +16,16 @@ metadata:
   name: controller-manager
   namespace: system
   labels:
-    control-plane: controller-manager
+    app.kubernetes.io/name: cloud-native-postgresql
 spec:
   selector:
     matchLabels:
-      control-plane: controller-manager
+      app.kubernetes.io/name: cloud-native-postgresql
   replicas: 1
   template:
     metadata:
       labels:
-        control-plane: controller-manager
+        app.kubernetes.io/name: cloud-native-postgresql
     spec:
       serviceAccountName: manager
       securityContext:

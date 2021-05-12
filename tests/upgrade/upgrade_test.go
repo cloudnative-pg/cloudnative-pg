@@ -417,20 +417,26 @@ var _ = Describe("Upgrade", func() {
 
 		By("upgrading the operator to a version with API v1", func() {
 			timeout := 120
-			_, _, err := tests.Run(fmt.Sprintf("kubectl apply -f %v", operatorUpgradeFile))
+			// Remove the old deployment. This is needed to correctly upgrade
+			// to a version of the operator which have different selector for
+			// the deployment of the controller.
+			_, _, err := tests.Run(
+				"kubectl delete deployments -n postgresql-operator-system " +
+					"-l control-plane=controller-manager")
+			Expect(err).NotTo(HaveOccurred())
+
+			_, _, err = tests.Run(
+				"kubectl delete deployments -n postgresql-operator-system " +
+					"-l app.kubernetes.io/name=cloud-native-postgresql")
+			Expect(err).NotTo(HaveOccurred())
+
+			// Upgrade to the new version
+			_, _, err = tests.Run(fmt.Sprintf("kubectl apply -f %v", operatorUpgradeFile))
 			Expect(err).NotTo(HaveOccurred())
 			namespacedName := types.NamespacedName{
 				Namespace: operatorNamespace,
 				Name:      operatorName,
 			}
-			// After deploying the new operator, Kubernetes should immediately
-			// increase the generation counter. We read it to verify that we
-			// have actually performed the deployment.
-			Eventually(func() (int64, error) {
-				deployment := &appsv1.Deployment{}
-				err := env.Client.Get(env.Ctx, namespacedName, deployment)
-				return deployment.Status.ObservedGeneration, err
-			}, timeout).Should(BeEquivalentTo(2))
 			// With the new deployment, a new pod should be started. When it's
 			// ready, the old one is removed. We wait for the number of replicas
 			// to decrease to 1.
