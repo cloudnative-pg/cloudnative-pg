@@ -94,6 +94,13 @@ and SELinux context.
     ["Managing SCC in OpenShift"](https://www.openshift.com/blog/managing-sccs-in-openshift)
     article.
 
+!!! Warning "Security Context Constraints and namespaces"
+    As stated by [Openshift documentation](https://docs.openshift.com/container-platform/latest/authentication/managing-security-context-constraints.html#role-based-access-to-ssc_configuring-internal-oauth)
+    SCCs are not applied in the default namespaces (`default`, `kube-system`,
+    `kube-public`, `openshift-node`, `openshift-infra`, `openshift`) and those
+    should not be used to run pods. CNP clusters deployed in those namespaces
+    will be unable to start due to missing SCCs.
+
 ### Network Policies
 
 The pods created by the `Cluster` resource can be controlled by Kubernetes
