@@ -53,7 +53,6 @@ EnterpriseDB
 EnterpriseDB's
 Fei
 Filesystem
-filesystem
 Francesco
 GCE
 GID
@@ -122,6 +121,7 @@ ResourceRequirements
 RoleBinding
 RollingUpdateStatus
 SCC
+SCCs
 SDK
 SELinux
 SHA
@@ -255,6 +255,7 @@ executables
 failover
 fastpath
 ffd
+filesystem
 fio
 gcc
 gce
@@ -342,6 +343,7 @@ nodeSelector
 nodemaintenancewindow
 ntt
 num
+oauth
 objectmeta
 objid
 objsubid
@@ -423,6 +425,7 @@ specificities
 sql
 src
 sre
+ssc
 ssl
 sslcert
 sslkey
