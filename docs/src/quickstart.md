@@ -98,7 +98,7 @@ and install `rancher/local-path-provisioner`.
 Now that you have a Kubernetes or OpenShift installation up and running
 on your laptop, you can proceed with Cloud Native PostgreSQL installation.
 
-Please refer to the ["Installation"](installation.md) section and then proceed
+Please refer to the ["Installation"](installation_upgrade.md) section and then proceed
 with the deployment of a PostgreSQL cluster.
 
 ## Part 3 - Deploy a PostgreSQL cluster

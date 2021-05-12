@@ -13,7 +13,7 @@ nav:
   - before_you_start.md
   - use_cases.md
   - architecture.md
-  - installation.md
+  - installation_upgrade.md
   - quickstart.md
   - cloud_setup.md
   - bootstrap.md

@@ -1,4 +1,4 @@
-# Installation
+# Installation and upgrades
 
 ## Installation on Kubernetes
 
@@ -94,3 +94,68 @@ selected installation method.
     some default options. For more information, please refer to the
     ["Operator configuration"](operator_conf.md) section.
 
+## Upgrades
+
+!!! Important
+    Please carefully read the [release notes](release_note.md)
+    before performing an upgrade as some versions might require
+    extraordinary measures.
+
+Upgrading Cloud Native PostgreSQL operator is a two-step process:
+
+1. upgrade the controller and the related Kubernetes resources
+2. upgrade the instance manager running in every PostgreSQL pod
+
+Unless differently stated in the release notes, the first step is normally done
+by applying the manifest of the newer version for plain Kubernetes
+installations, or using the native package manager of the used distribution
+(please follow the instructions in the above sections).
+
+The second step is automatically executed after having updated the controller,
+triggering a rolling update of every deployed PostgreSQL instance to use the
+new instance manager. If the `primaryUpdateStrategy` is set to `supervised`,
+users need to complete the rolling update by manually promoting a new instance
+through the `cnp` plugin for `kubectl`.
+
+!!! Seealso "Rolling updates"
+    This process is discussed in-depth in the [Rolling Updates](rolling_update.md) page.
+
+!!! Important
+    In case `primaryUpdateStrategy` is set to the default value of `unsupervised`,
+    an upgrade of the operator will trigger a switchover on your PostgreSQL cluster,
+    causing a (normally negligible) downtime.
+
+### Compatibility among versions
+
+We strive to maintain compatibility between different operator versions, but in
+some cases this might not be possible.
+Every version of the operator is compatible with the previous one, unless
+[release notes](release_notes.md) state the opposite.
+The release notes page indeed contains a detailed list of the changes introduced
+in every released version of the Cloud Native PostgreSQL Operator, and it must
+be read before upgrading to a newer version of the software.
+
+Most versions are directly upgradable and in that case applying the newer
+manifest for plain Kubernetes installations or using the native package
+manager of the chosen distribution is enough.
+
+When versions are not directly upgradable, the old version need to be
+removed before installing the new one. This won't affect user data but
+only the operator itself. Please consult the release notes for
+detailed information on how to upgrade to any released version.
+
+#### Upgrading to version 1.4.0
+
+When upgrading from version 1.3.0 to 1.4.0 you must run the following
+command before installing the new version of the operator:
+
+```bash
+kubectl delete deployments \
+  -n postgresql-operator-system \
+  -l control-plane=controller-manager
+```
+
+!!! Note
+    In case you deployed the operator in a different namespace than the default
+    (`postgresql-operator-system`), you need to use the correct namespace for
+    the `-n` option in the above command.

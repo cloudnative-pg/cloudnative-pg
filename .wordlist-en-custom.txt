@@ -465,6 +465,7 @@ ubi
 ul
 unencrypted
 unix
+upgradable
 usename
 usr
 utils
