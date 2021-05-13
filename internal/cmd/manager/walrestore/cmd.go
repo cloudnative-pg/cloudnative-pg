@@ -18,6 +18,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
@@ -124,12 +125,12 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
-			cmd := exec.Command("barman-cloud-wal-restore", options...) // #nosec G204
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			err = cmd.Run()
+			const barmanCloudWalRestoreName = "barman-cloud-wal-restore"
+			barmanCloudWalRestoreCmd := exec.Command(barmanCloudWalRestoreName, options...) // #nosec G204
+			err = execlog.RunStreaming(barmanCloudWalRestoreCmd, barmanCloudWalRestoreName)
 			if err != nil {
-				log.Log.Info("barman-cloud-wal-restore",
+				log.Log.Info("Error invoking "+barmanCloudWalRestoreName,
+					"error", err.Error(),
 					"walName", walName,
 					"pod", podName,
 					"cluster", clusterName,
@@ -137,9 +138,9 @@ func NewCmd() *cobra.Command {
 					"currentPrimary", cluster.Status.CurrentPrimary,
 					"targetPrimary", cluster.Status.TargetPrimary,
 					"options", options,
-					"exitCode", cmd.ProcessState.ExitCode(),
+					"exitCode", barmanCloudWalRestoreCmd.ProcessState.ExitCode(),
 				)
-				return err
+				return fmt.Errorf("unexpected failure invoking %s: %w", barmanCloudWalRestoreName, err)
 			}
 
 			return nil

@@ -20,8 +20,16 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/pool"
+)
+
+const (
+	postgresName     = "postgres"
+	pgCtlName        = "pg_ctl"
+	pgRewindName     = "pg_rewind"
+	pgBaseBackupName = "pg_basebackup"
 )
 
 // Instance represent a PostgreSQL instance to be executed
@@ -90,13 +98,10 @@ func (instance Instance) Startup() error {
 		options = append(options, "-o", "-c "+opt)
 	}
 
-	log.Log.Info("Starting up instance",
-		"pgdata", instance.PgData)
+	log.Log.Info("Starting up instance", "pgdata", instance.PgData)
 
-	cmd := exec.Command("pg_ctl", options...) // #nosec
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
+	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
+	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
 	if err != nil {
 		return fmt.Errorf("error starting PostgreSQL instance: %w", err)
 	}
@@ -129,10 +134,8 @@ func (instance *Instance) Shutdown() error {
 	log.Log.Info("Shutting down instance",
 		"pgdata", instance.PgData)
 
-	cmd := exec.Command("pg_ctl", options...) // #nosec
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
+	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
+	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
 	if err != nil {
 		return fmt.Errorf("error stopping PostgreSQL instance: %w", err)
 	}
@@ -151,10 +154,8 @@ func (instance *Instance) Reload() error {
 	log.Log.Info("Requesting configuration reload",
 		"pgdata", instance.PgData)
 
-	cmd := exec.Command("pg_ctl", options...) // #nosec
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
+	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
+	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
 	if err != nil {
 		return fmt.Errorf("error requesting configuration reload: %w", err)
 	}
@@ -174,18 +175,16 @@ func (instance Instance) Run() (*exec.Cmd, error) {
 		"-D", instance.PgData,
 	}
 
-	cmd := exec.Command("postgres", options...) // #nosec
-	cmd.SysProcAttr = &syscall.SysProcAttr{
+	postgresCmd := exec.Command(postgresName, options...) // #nosec
+	postgresCmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Start()
+	err := execlog.RunStreamingNoWait(postgresCmd, postgresName)
 	if err != nil {
 		return nil, err
 	}
 
-	return cmd, nil
+	return postgresCmd, nil
 }
 
 // WithActiveInstance execute the internal function while this
@@ -330,10 +329,8 @@ func (instance *Instance) Rewind() error {
 		"pgdata", instance.PgData,
 		"options", options)
 
-	cmd := exec.Command("pg_rewind", options...) // #nosec
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-	err := cmd.Run()
+	pgRewindCmd := exec.Command(pgRewindName, options...) // #nosec
+	err := execlog.RunStreaming(pgRewindCmd, pgRewindName)
 	if err != nil {
 		return fmt.Errorf("error executing pg_rewind: %w", err)
 	}

@@ -9,9 +9,9 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
-	"os"
 	"os/exec"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
@@ -55,12 +55,8 @@ func (info JoinInfo) Join() error {
 		"-w",
 		"-d", primaryConnInfo,
 	}
-	cmd := exec.Command("pg_basebackup", options...) // #nosec
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	log.Log.Info("Starting pg_basebackup", "options", options)
-	err = cmd.Run()
+	pgBaseBackupCmd := exec.Command(pgBaseBackupName, options...) // #nosec
+	err = execlog.RunStreaming(pgBaseBackupCmd, pgBaseBackupName)
 	if err != nil {
 		return fmt.Errorf("error in pg_basebackup, %w", err)
 	}

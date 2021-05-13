@@ -10,15 +10,16 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-// logMessage is the name of the logger that will export the PostgreSQL
-// logs in structured format
-const logMessage string = "postgres"
+const (
+	logRecordKey  = "record"
+	logRecordName = "postgres"
+)
 
 // LogRecordWriter implements the `RecordWriter` interface writing to the
 // instance manager logger
 type LogRecordWriter struct{}
 
-// Write write the PostgreSQL log record to the instance manager logger
+// Write writes the PostgreSQL log record to the instance manager logger
 func (writer *LogRecordWriter) Write(record *Record) {
-	log.Log.Info(logMessage, "record", record)
+	log.Log.WithName(logRecordName).Info(logRecordKey, logRecordKey, record)
 }
