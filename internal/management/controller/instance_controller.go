@@ -42,7 +42,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 
 	// Reconcile monitoring section
 	if cluster.Spec.Monitoring != nil {
-		r.reconcileMonitoringQueries(ctx, cluster.Spec.Monitoring)
+		r.reconcileMonitoringQueries(ctx, cluster)
 	}
 
 	// Reconcile replica role
@@ -90,11 +90,18 @@ func (r *InstanceReconciler) reconcileClusterRole(
 // web server
 func (r *InstanceReconciler) reconcileMonitoringQueries(
 	ctx context.Context,
-	configuration *apiv1.MonitoringConfiguration,
+	cluster *apiv1.Cluster,
 ) {
 	r.log.Info("Reconciling custom monitoring queries")
 
-	queries := metrics.NewQueriesCollector("cnp", r.instance)
+	configuration := cluster.Spec.Monitoring
+
+	dbname := "postgres"
+	if cluster.ShouldCreateApplicationDatabase() {
+		dbname = cluster.Spec.Bootstrap.InitDB.Database
+	}
+
+	queries := metrics.NewQueriesCollector("cnp", r.instance, dbname)
 
 	for _, reference := range configuration.CustomQueriesConfigMap {
 		configMap, err := r.GetStaticClient().CoreV1().ConfigMaps(r.instance.Namespace).Get(

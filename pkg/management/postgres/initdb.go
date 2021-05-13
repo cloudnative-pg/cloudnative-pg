@@ -177,9 +177,8 @@ func (info InitInfo) CreateDataDirectory() error {
 // GetInstance gets the PostgreSQL instance which correspond to these init information
 func (info InitInfo) GetInstance() Instance {
 	postgresInstance := Instance{
-		PgData:              info.PgData,
-		StartupOptions:      []string{"listen_addresses='127.0.0.1'"},
-		ApplicationDatabase: info.ApplicationDatabase,
+		PgData:         info.PgData,
+		StartupOptions: []string{"listen_addresses='127.0.0.1'"},
 	}
 	return postgresInstance
 }
