@@ -149,7 +149,7 @@ func createPostgresContainers(
 		},
 	}
 
-	addManagerLoggingOptions(containers[0])
+	addManagerLoggingOptions(&containers[0])
 
 	return containers
 }
