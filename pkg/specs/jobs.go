@@ -99,7 +99,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 		},
 	}
 
-	addManagerLoggingOptions(job.Spec.Template.Spec.Containers[0])
+	addManagerLoggingOptions(&job.Spec.Template.Spec.Containers[0])
 
 	return job
 }
@@ -192,7 +192,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 		},
 	}
 
-	addManagerLoggingOptions(job.Spec.Template.Spec.Containers[0])
+	addManagerLoggingOptions(&job.Spec.Template.Spec.Containers[0])
 
 	return job
 }
@@ -263,7 +263,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 		},
 	}
 
-	addManagerLoggingOptions(job.Spec.Template.Spec.Containers[0])
+	addManagerLoggingOptions(&job.Spec.Template.Spec.Containers[0])
 
 	return job
 }

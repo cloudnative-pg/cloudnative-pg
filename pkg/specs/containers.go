@@ -29,14 +29,14 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 		SecurityContext: CreateContainerSecurityContext(),
 	}
 
-	addManagerLoggingOptions(container)
+	addManagerLoggingOptions(&container)
 
 	return container
 }
 
 // addManagerLoggingOptions propagate the logging configuration
 // to the manager inside the generated pod.
-func addManagerLoggingOptions(container corev1.Container) {
+func addManagerLoggingOptions(container *corev1.Container) {
 	if configuration.Current.EnablePodDebugging {
 		container.Command = append(container.Command, "--zap-devel", "--zap-log-level=4")
 	}
