@@ -19,7 +19,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.3.4
       -
         # There is no command to get EKS k8s versions, we have to parse the documentation
         name: Get updated EKS versions
