@@ -1,3 +1,4 @@
+
 # Monitoring
 
 For each PostgreSQL instance, the operator provides an exporter of metrics for
@@ -17,17 +18,24 @@ All monitoring queries are:
 - transactionally atomic (one transaction per query)
 - executed with the `pg_monitor` role
 - executed with `application_name` set to `cnp_metrics_exporter`
+- executed as user `postgres`
 
 Please refer to the "Default roles" section in PostgreSQL
 [documentation](https://www.postgresql.org/docs/current/default-roles.html)
 for details on the `pg_monitor` role.
 
-The exporter framework enables the definition of custom metrics to monitor the
-`postgres` database inside the pods of the PostgreSQL cluster.
+Currently, metrics' queries can be run only against a single database, chosen
+depending on the specified `bootstrap` method in the `Cluster` resource,
+according to the following logic:
+
+- using `initdb`: queries will be run against the specified database, so the
+  value passed as `initdb.database` or defaulting to `app` if not specified.
+- not using `initdb`: queries will be run against the `postgres` database.
 
 !!! Note
-    Monitoring databases different from `postgres` will be available in a future version.
-
+    This behaviour will be improved starting from the next version of Cloud
+    Native PostgreSQL.
+  
 ## Prometheus Operator example
 
 A specific cluster can be monitored using the

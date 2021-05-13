@@ -21,6 +21,7 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/pool"
 )
 
 // Instance represent a PostgreSQL instance to be executed
@@ -29,18 +30,12 @@ type Instance struct {
 	// The data directory
 	PgData string
 
-	// Application database name
-	ApplicationDatabase string
-
 	// Command line options to pass to the postgres process, see the
 	// '-c' option of pg_ctl for an useful example
 	StartupOptions []string
 
-	// Connection pool pointing to the superuser database
-	superUserDB *sql.DB
-
-	// Connection pool pointing to the application database
-	applicationDB *sql.DB
+	// Pool of DB connections pointing to every used database
+	pool *pool.ConnectionPool
 
 	// The namespace of the k8s object representing this cluster
 	Namespace string
@@ -111,15 +106,10 @@ func (instance Instance) Startup() error {
 
 // ShutdownConnections tears down database connections
 func (instance *Instance) ShutdownConnections() {
-	if instance.applicationDB != nil {
-		_ = instance.applicationDB.Close()
-		instance.applicationDB = nil
+	if instance.pool == nil {
+		return
 	}
-
-	if instance.superUserDB != nil {
-		_ = instance.superUserDB.Close()
-		instance.superUserDB = nil
-	}
+	instance.pool.ShutdownConnections()
 }
 
 // Shutdown shuts down a PostgreSQL instance which was previously started
@@ -214,51 +204,24 @@ func (instance Instance) WithActiveInstance(inner func() error) error {
 	return inner()
 }
 
-// GetApplicationDB gets the connection pool pointing to this instance, possibly creating
-// it if needed.
-func (instance *Instance) GetApplicationDB() (*sql.DB, error) {
-	if instance.applicationDB != nil {
-		return instance.applicationDB, nil
-	}
-
-	socketDir := instance.GetSocketDir()
-
-	db, err := sql.Open(
-		"postgres",
-		fmt.Sprintf("host=%s port=5432 dbname=%v user=postgres sslmode=disable",
-			socketDir, instance.ApplicationDatabase))
-	if err != nil {
-		return nil, fmt.Errorf("cannot create connection pool: %w", err)
-	}
-
-	db.SetMaxOpenConns(2)
-	db.SetMaxIdleConns(0)
-
-	instance.applicationDB = db
-	return instance.applicationDB, nil
-}
-
-// GetSuperUserDB gets the connection pool pointing to this instance, possibly creating
+// GetSuperUserDB gets the connection connectionMap pointing to this instance, possibly creating
 // it if needed
 func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
-	if instance.superUserDB != nil {
-		return instance.superUserDB, nil
+	return instance.ConnectionPool().Connection("postgres")
+}
+
+// ConnectionPool gets or initializes the connection pool for this instance
+func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
+	if instance.pool == nil {
+		socketDir := instance.GetSocketDir()
+		dsn := fmt.Sprintf(
+			"host=%s port=5432 user=postgres sslmode=disable",
+			socketDir)
+
+		instance.pool = pool.NewConnectionPool(dsn)
 	}
 
-	socketDir := instance.GetSocketDir()
-	dsn := fmt.Sprintf("host=%s port=5432 dbname=postgres user=postgres sslmode=disable", socketDir)
-	db, err := sql.Open(
-		"postgres",
-		dsn)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create connection pool: %w", err)
-	}
-
-	db.SetMaxOpenConns(2)
-	db.SetMaxIdleConns(0)
-
-	instance.superUserDB = db
-	return instance.superUserDB, nil
+	return instance.pool
 }
 
 // IsPrimary check if the data directory belongs to a primary server or to a
@@ -338,7 +301,7 @@ func (instance *Instance) WaitForSuperuserConnectionAvailable() error {
 }
 
 // waitForConnectionAvailable waits until we can connect to the passed
-// connection pool
+// connection connectionMap
 func waitForConnectionAvailable(db *sql.DB) error {
 	errorIsRetryable := func(err error) bool {
 		return err != nil

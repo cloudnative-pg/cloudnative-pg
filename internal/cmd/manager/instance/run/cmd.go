@@ -27,7 +27,6 @@ import (
 // NewCmd creates the "instance run" subcommand
 func NewCmd() *cobra.Command {
 	var pwFile string
-	var appDBName string
 	var pgData string
 	var podName string
 	var clusterName string
@@ -40,7 +39,6 @@ func NewCmd() *cobra.Command {
 			var instance postgres.Instance
 
 			instance.PgData = pgData
-			instance.ApplicationDatabase = appDBName
 			instance.Namespace = namespace
 			instance.PodName = podName
 			instance.ClusterName = clusterName

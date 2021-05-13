@@ -24,6 +24,7 @@ import (
 // collection of custom queries supplied by the user
 type QueriesCollector struct {
 	instance      *postgres.Instance
+	defaultDBName string
 	collectorName string
 
 	userQueries    UserQueries
@@ -46,7 +47,7 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 		return err
 	}
 
-	conn, err := q.instance.GetSuperUserDB()
+	conn, err := q.instance.ConnectionPool().Connection(q.defaultDBName)
 	if err != nil {
 		return err
 	}
@@ -104,13 +105,14 @@ func (q QueriesCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // NewQueriesCollector create a new PgCollector working over a set of custom queries
 // supplied by the user
-func NewQueriesCollector(name string, instance *postgres.Instance) *QueriesCollector {
+func NewQueriesCollector(name string, instance *postgres.Instance, defaultDBName string) *QueriesCollector {
 	return &QueriesCollector{
 		collectorName:  name,
 		instance:       instance,
 		mappings:       make(map[string]MetricMapSet),
 		variableLabels: make(map[string]VariableSet),
 		userQueries:    make(UserQueries),
+		defaultDBName:  defaultDBName,
 		errorUserQueries: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: name,
 			Name:      "errors_total",
