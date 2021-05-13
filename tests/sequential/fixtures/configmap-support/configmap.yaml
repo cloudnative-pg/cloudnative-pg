@@ -1,0 +1,7 @@
+apiVersion: v1
+data:
+  INHERITED_ANNOTATIONS: categories, example.com/*
+  INHERITED_LABELS: environment, example.com/*
+kind: ConfigMap
+metadata:
+  name: postgresql-operator-controller-manager-config
