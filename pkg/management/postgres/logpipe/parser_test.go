@@ -52,12 +52,12 @@ var _ = Describe("CSV file reader", func() {
 		Expect(len(spy.records)).To(Equal(2))
 	})
 
-	It("correctly handles a record with an invalid number of fields", func() {
+	When("correctly handles a record with an invalid number of fields", func() {
 		inputBuffer, err := ioutil.ReadFile("testdata/one_line.csv")
 		Expect(err).ShouldNot(HaveOccurred())
 		input := strings.TrimRight(string(inputBuffer), " \n")
 
-		When("there are too many fields", func() {
+		It("there are too many fields", func() {
 			spy := SpyRecordWriter{}
 
 			longerInput := input + ",test"
@@ -71,7 +71,7 @@ var _ = Describe("CSV file reader", func() {
 			Expect(len(extendedError.Fields)).To(Equal(FieldsPerRecord13 + 1))
 		})
 
-		When("there are not enough fields", func() {
+		It("there are not enough fields", func() {
 			spy := SpyRecordWriter{}
 
 			shorterInput := "one,two,three"
@@ -85,7 +85,7 @@ var _ = Describe("CSV file reader", func() {
 			Expect(len(extendedError.Fields)).To(Equal(3))
 		})
 
-		When("there is a trailing comma", func() {
+		It("there is a trailing comma", func() {
 			spy := SpyRecordWriter{}
 
 			trailingCommaInput := input + ","
@@ -99,7 +99,7 @@ var _ = Describe("CSV file reader", func() {
 			Expect(len(extendedError.Fields)).To(Equal(FieldsPerRecord13 + 1))
 		})
 
-		When("there is a wrong number of fields on a line that is not the first", func() {
+		It("there is a wrong number of fields on a line that is not the first", func() {
 			spy := SpyRecordWriter{}
 
 			longerInput := input + "\none,two,three"

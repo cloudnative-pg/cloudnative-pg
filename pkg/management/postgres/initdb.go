@@ -12,13 +12,13 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
-	"os"
 	"os/exec"
 	"path"
 
 	"github.com/lib/pq"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
@@ -81,6 +81,8 @@ const (
 	// PostgresqlIdentFile is the name of the file which contains
 	// the user name maps
 	PostgresqlIdentFile = "pg_ident.conf"
+
+	initdbName = "initdb"
 )
 
 // VerifyConfiguration verify if the passed configuration is OK and returns an error otherwise
@@ -143,10 +145,8 @@ func (info InitInfo) CreateDataDirectory() error {
 		"pgdata", info.PgData,
 		"initDbOptions", options)
 
-	cmd := exec.Command("initdb", options...) // #nosec
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
+	initdbCmd := exec.Command(initdbName, options...) // #nosec
+	err := execlog.RunBuffering(initdbCmd, initdbName)
 	if err != nil {
 		return fmt.Errorf("error while creating the PostgreSQL instance: %w", err)
 	}

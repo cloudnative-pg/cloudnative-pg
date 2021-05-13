@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
@@ -119,13 +120,11 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	startReconciler(ctx, reconciler)
 
 	// Print the content of PostgreSQL control data, for debugging and tracing
-	pgControlData := exec.Command("pg_controldata")
-	pgControlData.Env = os.Environ()
-	pgControlData.Env = append(pgControlData.Env, "PGDATA="+instance.PgData)
-	pgControlData.Stdout = os.Stdout
-	pgControlData.Stderr = os.Stderr
-	err = pgControlData.Run()
-
+	const pgControlDataName = "pg_controldata"
+	pgControlDataCmd := exec.Command(pgControlDataName)
+	pgControlDataCmd.Env = os.Environ()
+	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+instance.PgData)
+	err = execlog.RunBuffering(pgControlDataCmd, pgControlDataName)
 	if err != nil {
 		log.Log.Error(err, "Error printing the control information of this PostgreSQL instance")
 		return err

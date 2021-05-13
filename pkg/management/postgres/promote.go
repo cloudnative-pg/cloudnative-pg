@@ -8,10 +8,10 @@ package postgres
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"time"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
@@ -28,10 +28,8 @@ func (instance *Instance) PromoteAndWait() error {
 
 	log.Log.Info("Promoting instance", "pgctl_options", options)
 
-	cmd := exec.Command("pg_ctl", options...) // #nosec
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
+	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
+	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
 	if err != nil {
 		return fmt.Errorf("error promoting the PostgreSQL instance: %w", err)
 	}
