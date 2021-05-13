@@ -43,8 +43,6 @@ We test the following:
 // refactored. It also contains duplicated code within itself.
 
 var _ = Describe("Upgrade", func() {
-	const operatorNamespace = "postgresql-operator-system"
-	const operatorName = "postgresql-operator-controller-manager"
 	const operatorUpgradeFile = "./fixtures/current-manifest.yaml"
 
 	const namespace = "operator-upgrade"
@@ -433,22 +431,16 @@ var _ = Describe("Upgrade", func() {
 			// Upgrade to the new version
 			_, _, err = tests.Run(fmt.Sprintf("kubectl apply -f %v", operatorUpgradeFile))
 			Expect(err).NotTo(HaveOccurred())
-			namespacedName := types.NamespacedName{
-				Namespace: operatorNamespace,
-				Name:      operatorName,
-			}
 			// With the new deployment, a new pod should be started. When it's
 			// ready, the old one is removed. We wait for the number of replicas
 			// to decrease to 1.
 			Eventually(func() (int32, error) {
-				deployment := &appsv1.Deployment{}
-				err := env.Client.Get(env.Ctx, namespacedName, deployment)
+				deployment, err := env.GetOperatorDeployment()
 				return deployment.Status.Replicas, err
 			}, timeout).Should(BeEquivalentTo(1))
 			// For a final check, we verify the pod is ready
 			Eventually(func() (int32, error) {
-				deployment := &appsv1.Deployment{}
-				err := env.Client.Get(env.Ctx, namespacedName, deployment)
+				deployment, err := env.GetOperatorDeployment()
 				return deployment.Status.ReadyReplicas, err
 			}, timeout).Should(BeEquivalentTo(1))
 		})

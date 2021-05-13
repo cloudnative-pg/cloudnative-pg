@@ -147,7 +147,21 @@ func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error)
 		return deploymentList.Items[0], nil
 	}
 
-	// This it's for older deployments and will not work on the new ones
+	if err := env.Client.List(
+		env.Ctx, deploymentList, client.MatchingLabels{"operators.coreos.com/cloud-native-postgresql": ""},
+	); err != nil {
+		return appsv1.Deployment{}, err
+	}
+	// We check if we have one or more deployments
+	switch {
+	case len(deploymentList.Items) > 1:
+		err := fmt.Errorf("number of operator deployments != 1")
+		return appsv1.Deployment{}, err
+	case len(deploymentList.Items) == 1:
+		return deploymentList.Items[0], nil
+	}
+
+	// This is for deployments created before 1.4.0
 	if err := env.Client.List(
 		env.Ctx, deploymentList, client.MatchingFields{"metadata.name": operatorDeploymentName},
 	); err != nil {
@@ -180,10 +194,17 @@ func (env TestingEnvironment) GetOperatorPod() (corev1.Pod, error) {
 		return podList.Items[0], nil
 	}
 
+	operatorNamespace, err := env.GetOperatorNamespaceName()
+	if err != nil {
+		return corev1.Pod{}, err
+	}
+
 	// This will work for older version of the operator, which are using
 	// the default label from kube-builder
 	if err := env.Client.List(
-		env.Ctx, podList, client.MatchingLabels{"control-plane": "controller-manager"}); err != nil {
+		env.Ctx, podList,
+		client.MatchingLabels{"control-plane": "controller-manager"},
+		client.InNamespace(operatorNamespace)); err != nil {
 		return corev1.Pod{}, err
 	}
 	if len(podList.Items) != 1 {
@@ -197,6 +218,9 @@ func (env TestingEnvironment) GetOperatorPod() (corev1.Pod, error) {
 // GetOperatorNamespaceName returns the namespace the operator deployment is running in
 func (env TestingEnvironment) GetOperatorNamespaceName() (string, error) {
 	deployment, err := env.GetOperatorDeployment()
+	if err != nil {
+		return "", err
+	}
 	return deployment.GetNamespace(), err
 }
 

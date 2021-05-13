@@ -28,7 +28,6 @@ import (
 var _ = Describe("Operator unavailable", func() {
 	const clusterName = "operator-unavailable"
 	const sampleFile = fixturesDir + "/operator-unavailable/operator-unavailable.yaml"
-	var operatorDeployment = "postgresql-operator-controller-manager"
 
 	Context("Scale down operator replicas to zero and delete primary", func() {
 		const namespace = "op-unavailable-e2e-zero-replicas"
@@ -56,10 +55,12 @@ var _ = Describe("Operator unavailable", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("scaling down operator replicas to zero", func() {
+				operatorDeployment, err := env.GetOperatorDeployment()
+				Expect(err).ToNot(HaveOccurred())
 				// Scale down operator deployment to zero replicas
 				cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=0 -n %v",
-					operatorDeployment, operatorNamespace)
-				_, _, err := tests.Run(cmd)
+					operatorDeployment.Name, operatorNamespace)
+				_, _, err = tests.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Verify the operator pod is not present anymore
@@ -106,9 +107,11 @@ var _ = Describe("Operator unavailable", func() {
 
 			By("scaling up the operator replicas to 1", func() {
 				// Scale up operator deployment to one replica
+				deployment, err := env.GetOperatorDeployment()
+				Expect(err).ToNot(HaveOccurred())
 				cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=1 -n %v",
-					operatorDeployment, operatorNamespace)
-				_, _, err := tests.Run(cmd)
+					deployment.Name, operatorNamespace)
+				_, _, err = tests.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 120
 				Eventually(func() (int, error) {
