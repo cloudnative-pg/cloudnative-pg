@@ -14,15 +14,10 @@ import (
 
 	//+kubebuilder:scaffold:imports
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-)
-
-const (
-	operatorNamespace = "postgresql-operator-system"
 )
 
 var env *tests.TestingEnvironment
@@ -32,17 +27,14 @@ var _ = BeforeSuite(func() {
 	var err error
 	env, err = tests.NewTestingEnvironment()
 	if err != nil {
-		Fail(err.Error())
+		panic(err)
 	}
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
 	//+kubebuilder:scaffold:scheme
 
 	// Check operator pod should be running
-	Eventually(func() int {
-		podList, _ := env.GetPodList(operatorNamespace)
-		return utils.CountReadyPods(podList.Items)
-	}, 120).Should(BeEquivalentTo(1), "Operator pod does not exist")
+	Eventually(env.GetOperatorPod, 120).ShouldNot(BeNil(), "Operator pod does not exist")
 
 	operatorPod, err := env.GetOperatorPod()
 	Expect(err).NotTo(HaveOccurred())
