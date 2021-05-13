@@ -97,7 +97,7 @@ selected installation method.
 ## Upgrades
 
 !!! Important
-    Please carefully read the [release notes](release_note.md)
+    Please carefully read the [release notes](release_notes.md)
     before performing an upgrade as some versions might require
     extraordinary measures.
 
