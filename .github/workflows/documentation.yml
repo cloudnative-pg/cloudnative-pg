@@ -142,7 +142,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Repository Dispatch
-        uses: peter-evans/repository-dispatch@v1
+        uses: peter-evans/repository-dispatch@v1.1.3
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           repository: enterprisedb/docs
