@@ -149,20 +149,33 @@ func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error)
 		return deploymentList.Items[0], nil
 	}
 
+	// Until we support 4.5 we cannot use the labels to find the operator deployment directly.
+	// When 4.5 will be out of games, we can switch to
+	//   HasLabels{"operators.coreos.com/cloud-native-postgresql.openshift-operators"}
 	if err := env.Client.List(
 		env.Ctx,
 		deploymentList,
-		client.MatchingLabels{"operators.coreos.com/cloud-native-postgresql.openshift-operators": ""},
+		client.MatchingLabels{"olm.owner.kind": "ClusterServiceVersion"},
 	); err != nil {
 		return appsv1.Deployment{}, err
 	}
+	var filteredDeploymentList []appsv1.Deployment
+	for _, deployment := range deploymentList.Items {
+		owner, ok := deployment.Labels["olm.owner"]
+		if !ok {
+			continue
+		}
+		if strings.HasPrefix(owner, "cloud-native-postgresql.") {
+			filteredDeploymentList = append(filteredDeploymentList, deployment)
+		}
+	}
 	// We check if we have one or more deployments
 	switch {
-	case len(deploymentList.Items) > 1:
+	case len(filteredDeploymentList) > 1:
 		err := fmt.Errorf("number of operator deployments != 1")
 		return appsv1.Deployment{}, err
-	case len(deploymentList.Items) == 1:
-		return deploymentList.Items[0], nil
+	case len(filteredDeploymentList) == 1:
+		return filteredDeploymentList[0], nil
 	}
 
 	// This is for deployments created before 1.4.0

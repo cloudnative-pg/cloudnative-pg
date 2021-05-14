@@ -11,14 +11,15 @@ import (
 	"strconv"
 	"strings"
 
-	clusterapiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	clusterapiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // Set of tests for config map for the operator. It is useful to configure the operator globally to survive
@@ -64,10 +65,10 @@ var _ = Describe("ConfigMap support", func() {
 
 		By("reload the configmap by restarting the operator deployment", func() {
 			operatorDeployment, err := env.GetOperatorDeployment()
+			Expect(err).ToNot(HaveOccurred())
+
 			operatorDeploymentName := operatorDeployment.GetName()
 			operatorNamespace = operatorDeployment.GetNamespace()
-
-			Expect(err).ToNot(HaveOccurred())
 
 			// Gather operator deployment status before restart
 			var deploymentRevisionNumber int
@@ -80,13 +81,21 @@ var _ = Describe("ConfigMap support", func() {
 			_, _, err = tests.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 
+			Eventually(func() (int, error) {
+				operatorDeployment, err := env.GetOperatorDeployment()
+				Expect(err).ToNot(HaveOccurred())
+
+				return strconv.Atoi(operatorDeployment.ObjectMeta.Annotations["deployment.kubernetes.io/revision"])
+			}, 60).Should(BeNumerically(">", deploymentRevisionNumber),
+				"operator deployment rollout is not started")
+
 			// verify that after restart the operator deployment
 			// rollout should be successful
-			cmd = fmt.Sprintf("kubectl rollout status deployment %v -n %v --revision=%v",
-				operatorDeploymentName, operatorNamespace, deploymentRevisionNumber+1)
-			Eventually(func() bool {
-				stdOut, _, _ := tests.Run(cmd)
-				return strings.Contains(stdOut, "successfully rolled out")
+			cmd = fmt.Sprintf("kubectl rollout status deployment %v -n %v",
+				operatorDeploymentName, operatorNamespace)
+			Eventually(func() (bool, error) {
+				stdOut, _, err := tests.Run(cmd)
+				return strings.Contains(stdOut, "successfully rolled out"), err
 			}, 60).Should(BeTrue(), "operator deployment rollout is not successful")
 
 			// verify new operator pod is up and running
