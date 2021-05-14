@@ -150,7 +150,9 @@ func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error)
 	}
 
 	if err := env.Client.List(
-		env.Ctx, deploymentList, client.MatchingLabels{"operators.coreos.com/cloud-native-postgresql": ""},
+		env.Ctx,
+		deploymentList,
+		client.MatchingLabels{"operators.coreos.com/cloud-native-postgresql.openshift-operators": ""},
 	); err != nil {
 		return appsv1.Deployment{}, err
 	}
