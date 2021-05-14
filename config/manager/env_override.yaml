@@ -19,5 +19,4 @@ spec:
         - controller
         - --enable-leader-election
         - --config-map-name=$(OPERATOR_DEPLOYMENT_NAME)-config
-        - --zap-devel
         - --zap-log-level=4
