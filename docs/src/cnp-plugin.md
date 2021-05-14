@@ -138,3 +138,16 @@ And the content of the same in plain text using the following commands:
 ```shell
 kubectl get secret cluster-cert -o json | jq -r '.data | map(@base64d) | .[]'
 ```
+
+### Restart
+
+The `kubectl cnp restart` command requests the operator to orchestrate
+a rollout restart for a certain cluster. This is useful to apply
+configuration changes to cluster dependent objects, such as ConfigMaps
+containing custom monitoring queries.
+
+The following command will restart a given cluster in a rollout fashion:
+
+```shell
+kubectl cnp restart [cluster_name]
+```

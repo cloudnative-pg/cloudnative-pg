@@ -27,6 +27,10 @@ const (
 	// serial number of the node
 	ClusterSerialAnnotationName = "k8s.enterprisedb.io/nodeSerial"
 
+	// ClusterRestartAnnotationName is the name of the annotation containing the
+	// lastest required restart time
+	ClusterRestartAnnotationName = "kubectl.kubernetes.io/restartedAt"
+
 	// ClusterRoleLabelName label is applied to Pods to mark primary ones
 	ClusterRoleLabelName = "role"
 

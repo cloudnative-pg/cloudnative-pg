@@ -738,6 +738,11 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 
 	pod := specs.PodWithExistingStorage(*cluster, int32(nodeSerial))
 
+	// If this cluster has been restarted, mark the Pod with the latest restart time
+	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
+		pod.Annotations[specs.ClusterRestartAnnotationName] = clusterRestart
+	}
+
 	log.Info("Creating new Pod to reattach a PVC",
 		"pod", pod.Name,
 		"pvc", pvc.Name)

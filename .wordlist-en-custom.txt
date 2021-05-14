@@ -30,6 +30,7 @@ CodeReady
 ColumnName
 CompressionType
 ConfigMap
+ConfigMaps
 ConfigMapKeySelector
 Coverity
 Cron

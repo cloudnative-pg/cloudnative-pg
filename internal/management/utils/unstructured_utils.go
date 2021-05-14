@@ -10,6 +10,7 @@ package utils
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"time"
@@ -19,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
@@ -38,12 +40,19 @@ var (
 	}
 )
 
+const (
+	// applyFieldManagerName is the name that will be used as
+	// the field manager for changes to the cluster applied
+	// using the patch request
+	applyFieldManagerName = "cloud-native-postgresql"
+)
+
 // ClusterModifier is a function that apply a change
 // to a cluster object. This encapsulation is useful to have
 // the operator retried when needed
 type ClusterModifier func(cluster *apiv1.Cluster) error
 
-// objectToUnstructured convert a runtime Object into an unstructured one
+// objectToUnstructured converts a runtime Object into an unstructured one
 func objectToUnstructured(object runtime.Object) (*unstructured.Unstructured, error) {
 	data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
 	if err != nil {
@@ -53,7 +62,7 @@ func objectToUnstructured(object runtime.Object) (*unstructured.Unstructured, er
 	return &unstructured.Unstructured{Object: data}, nil
 }
 
-// GetCluster get a Cluster resource from Kubernetes using a dynamic interface
+// GetCluster gets a Cluster resource from Kubernetes using a dynamic interface
 func GetCluster(ctx context.Context, client dynamic.Interface, namespace, name string) (*apiv1.Cluster, error) {
 	object, err := client.Resource(apiv1.ClusterGVK).
 		Namespace(namespace).
@@ -70,7 +79,7 @@ func GetCluster(ctx context.Context, client dynamic.Interface, namespace, name s
 	return cluster, nil
 }
 
-// UpdateClusterStatus store the Cluster status inside Kubernetes using a
+// UpdateClusterStatus stores the Cluster status inside Kubernetes using a
 // dynamic interface
 func UpdateClusterStatus(ctx context.Context, client dynamic.Interface, cluster *apiv1.Cluster) error {
 	object, err := clusterToUnstructured(cluster)
@@ -82,6 +91,29 @@ func UpdateClusterStatus(ctx context.Context, client dynamic.Interface, cluster 
 		Resource(apiv1.ClusterGVK).
 		Namespace(cluster.Namespace).
 		UpdateStatus(ctx, object, metav1.UpdateOptions{})
+	return err
+}
+
+// PatchCluster patches a cluster with the passed version
+func PatchCluster(ctx context.Context, client dynamic.Interface, cluster *apiv1.Cluster) error {
+	// Marshal the new object into JSON
+	object, err := clusterToUnstructured(cluster)
+	if err != nil {
+		return err
+	}
+
+	data, err := json.Marshal(object)
+	if err != nil {
+		return err
+	}
+
+	// We use our apply manager name
+	patchOptions := metav1.PatchOptions{FieldManager: applyFieldManagerName}
+
+	// Apply the latest status
+	_, err = client.Resource(apiv1.ClusterGVK).
+		Namespace(cluster.Namespace).
+		Patch(ctx, cluster.Name, types.ApplyPatchType, data, patchOptions)
 	return err
 }
 
