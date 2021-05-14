@@ -16,12 +16,8 @@ namespace as a Kubernetes `Deployment` called `postgresql-operator-controller-ma
     In the examples below we assume the default name and namespace for the operator deployment.
 
 The behavior of the operator can be customized through a `ConfigMap` that
-is located in the same namespace of the operator deployment and with the
-same name of the operator followed by the `-config` suffix.
-
-As a result, if you have installed the operator using the standard deployment
-manifest, the default `ConfigMap` is `postgresql-operator-controller-manager-config`
-in the `postgresql-operator-system` namespace.
+is located in the same namespace of the operator deployment and with
+`postgresql-operator-controller-manager-config` as the name.
 
 !!! Important
     Any change to the config map will not be automatically detected by the operator,

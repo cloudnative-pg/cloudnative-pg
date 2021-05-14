@@ -400,6 +400,7 @@ resizeInUseVolumes
 resourcerequirements
 reusePVC
 rollingupdatestatus
+rollout
 runonserver
 runtime
 rw
