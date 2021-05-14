@@ -146,14 +146,25 @@ detailed information on how to upgrade to any released version.
 
 #### Upgrading to version 1.4.0
 
-When upgrading from version 1.3.0 to 1.4.0 you must run the following
-command before installing the new version of the operator:
+If you have installed the operator on Kubernetes using the distributed YAML manifest
+you must delete the operator controller deployment before installing the
+1.4.0 manifest with the following command:
 
 ```bash
 kubectl delete deployments \
   -n postgresql-operator-system \
-  -l control-plane=controller-manager
+  postgresql-operator-controller-manager
 ```
+
+!!! Important
+    Removing the operator controller deployment will not delete or remove any
+    of your deployed PostgreSQL clusters.
+
+!!! Warning
+    Remember to install the new version of the operator after having performed
+    the above command. Otherwise, your PostgreSQL clusters will keep running 
+    without an operator and, as such, without any self-healing and high-availability
+    capabilities.
 
 !!! Note
     In case you deployed the operator in a different namespace than the default
