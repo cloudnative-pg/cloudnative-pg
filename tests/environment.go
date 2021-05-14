@@ -8,9 +8,11 @@ package tests
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -366,4 +368,27 @@ func (env TestingEnvironment) IsGKE() (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// GetPodLogs gathers pod logs
+func (env TestingEnvironment) GetPodLogs(namespace string, podName string) (string, error) {
+	req := env.Interface.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{})
+	podLogs, err := req.Stream(env.Ctx)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		innerErr := podLogs.Close()
+		if err == nil && innerErr != nil {
+			err = innerErr
+		}
+	}()
+
+	// Create a buffer to hold JSON data
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
