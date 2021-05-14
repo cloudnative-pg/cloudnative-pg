@@ -61,7 +61,10 @@ PostgreSQL 13, 12, 11 and 10 are currently supported.
 * Full recovery and Point-In-Time recovery from an S3 compatible object store backup
 * Support for Synchronous Replicas
 * Support for node affinity via `nodeSelector`
-* Standard output logging of PostgreSQL error messages
+* Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)
+* Standard output logging of PostgreSQL error messages in JSON format
+* Support for the `restricted` security context constraint (SCC) in Red Hat OpenShift
+* `cnp` plugin for `kubectl`
 
 ## About this guide
 

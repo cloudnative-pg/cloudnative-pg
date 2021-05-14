@@ -2,6 +2,40 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.4.0
+
+**Release date:** 17 May 2021
+
+Features:
+- Standard output logging of PostgreSQL error messages in JSON format
+- Provide a basic set of PostgreSQL metrics for the Prometheus exporter
+
+Security Enhancements:
+- Support `readOnlyRootFilesystem` security context for pods
+
+Changes:
+- **IMPORTANT change for Kubernetes users that have deployed the
+  operator using the YAML manifest.** Due to a change in labels and label
+  selectors directly managed by the operator, upgrading from a previous version
+  of the operator requires that you delete the existing operator deployment
+  before installing the new version. This critical change is required to avoid
+  any label conflicts with other K8s APIs.
+- Fix the labels that are automatically defined by the operator, renaming them
+  from `control-plane: controller-manager` to
+  `app.kubernetes.io/name: cloud-native-postgresql`
+- Assign the `metrics` name to the TCP port for the Prometheus exporter
+- Set `cnp_metrics_exporter` as the `application_name` to the metrics exporter
+  connection in PostgreSQL
+- When available, use the application database for monitoring queries of the
+  Prometheus exporter instead of the `postgres` database
+- Documentation improvements:
+    - Customization of monitoring queries
+    - Operator upgrade instructions
+- E2E tests enhancements
+- Minor bug fixes, including:
+    - Avoid using `-R` when calling `pg_basebackup`
+    - Remove stack trace from error log when getting the status
+
 ## Version 1.3.0
 
 **Release date:** 23 Apr 2021
