@@ -290,14 +290,14 @@ func getReplicaStatusFromPodViaExec(
 		"/controller/manager", "instance", "status")
 	if err != nil {
 		result.PodName = pod.Name
-		result.ExecError = err
+		result.ExecError = fmt.Errorf("pod not available")
 		return result
 	}
 
 	err = json.Unmarshal([]byte(stdout), &result)
 	if err != nil {
 		result.PodName = pod.Name
-		result.ExecError = err
+		result.ExecError = fmt.Errorf("can't parse pod output")
 		return result
 	}
 
