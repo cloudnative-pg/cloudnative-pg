@@ -16,6 +16,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/certificate"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/promote"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/restart"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/status"
 )
 
@@ -36,6 +37,7 @@ func main() {
 	rootCmd.AddCommand(status.NewCmd())
 	rootCmd.AddCommand(promote.NewCmd())
 	rootCmd.AddCommand(certificate.NewCmd())
+	rootCmd.AddCommand(restart.NewCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

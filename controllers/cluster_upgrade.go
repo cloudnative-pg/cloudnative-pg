@@ -57,7 +57,7 @@ func (r *ClusterReconciler) upgradeCluster(
 	primaryIdx := -1
 	standbyIdx := -1
 	for idx, pod := range sortedPodList {
-		podNeedsRestart, err := r.isPodNeedingRestart(cluster, clusterStatus, pod)
+		podNeedsRestart, err := isPodNeedingRestart(cluster, clusterStatus, pod)
 		if err != nil {
 			log.Error(err, "pod", pod.Name)
 			continue
@@ -174,7 +174,7 @@ func (r *ClusterReconciler) upgradePathAvailable(
 // isPodNeedingRestart return true if we need to restart the
 // Pod to apply a configuration change or a new version of
 // PostgreSQL
-func (r *ClusterReconciler) isPodNeedingRestart(
+func isPodNeedingRestart(
 	cluster *apiv1.Cluster,
 	clusterStatus postgres.PostgresqlStatusList,
 	pod v1.Pod) (bool, error) {
@@ -198,6 +198,16 @@ func (r *ClusterReconciler) isPodNeedingRestart(
 	if opCurrentImageName != configuration.Current.OperatorImageName {
 		// We need to apply a different version of the instance manager
 		return true, nil
+	}
+
+	// If the cluster has been restarted and we are working with a Pod
+	// which have not been restared yet, or restarted in a different
+	// time, let's restart it.
+	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
+		podRestart := pod.Annotations[specs.ClusterRestartAnnotationName]
+		if clusterRestart != podRestart {
+			return true, nil
+		}
 	}
 
 	for _, entry := range clusterStatus.Items {

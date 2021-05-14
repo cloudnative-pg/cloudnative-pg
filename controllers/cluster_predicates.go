@@ -7,6 +7,8 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package controllers
 
 import (
+	"reflect"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -104,8 +106,12 @@ func (ClusterPredicate) Update(e event.UpdateEvent) bool {
 
 	if isCluster(e.ObjectNew) {
 		// for update notifications, filter only the updates
-		// that result in a change for the cluster specification
-		return e.ObjectNew.GetGeneration() != e.ObjectOld.GetGeneration()
+		// that result in a change for the cluster specification or
+		// in the cluster annotations (needed to restart the Pods)
+		differentGenerations := e.ObjectNew.GetGeneration() != e.ObjectOld.GetGeneration()
+		differentAnnotations := !reflect.DeepEqual(e.ObjectNew.GetAnnotations(), e.ObjectOld.GetAnnotations())
+
+		return differentGenerations || differentAnnotations
 	}
 
 	return isControlledObject(e.ObjectNew)
