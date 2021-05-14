@@ -78,10 +78,10 @@ In Kubernetes, the operator is by default installed in the `postgresql-operator-
 kubectl describe deploy -n postgresql-operator-system postgresql-operator-controller-manager
 ```
 
-As any deployment, it sits on top of a replica set and supports rolling upgrades.
-By default, we currently support only 1 replica. In future versions we plan to
+As with any deployment, it sits on top of a replica set and supports rolling upgrades.
+By default, we currently support only 1 replica. In future versions, we plan to
 support multiple replicas and leader election, as well as taints and tolerations
-so to enable deployment on the Kubernetes control plane.
+to enable deployment on the Kubernetes control plane.
 
 In case the node where the pod is running is not reachable anymore,
 the pod will be rescheduled on another node.

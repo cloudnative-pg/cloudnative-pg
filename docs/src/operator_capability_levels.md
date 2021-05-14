@@ -369,13 +369,23 @@ PostgreSQL engine for the output of error logs directly in JSON format.
 
 ### Prometheus exporter with configurable queries
 
-The instance manager provides a pluggable framework and, via its own
-web server listening on port 9187, exposes an endpoint to export metrics
+The instance manager provides a pluggable framework and, via its own web server
+listening on the `metrics` port (9187), exposes an endpoint to export metrics
 for the [Prometheus](https://prometheus.io/) monitoring and alerting tool.
 The operator supports custom monitoring queries defined as `ConfigMap`
 and `Secret` objects using a syntax that is compatible with
 [`postgres_exporter` for Prometheus](https://github.com/prometheus-community/postgres_exporter).
+Cloud Native PostgreSQL provides a set of basic monitoring queries for
+PostgreSQL that can be integrated and adapted to your context.
 
+### Standard output logging of PostgreSQL error messages in JSON format
+
+Every log message is delivered to standard output in JSON format, with first level
+definition of the timestamp, the log level and the type of log entry, such as
+`postgres` for the canonical PostgreSQL error message channel.
+As a result, every Pod managed by Cloud Native PostgreSQL can be easily and directly
+integrated with any downstream log processing stack that supports JSON as source
+data type.
 
 ### Kubernetes events
 
