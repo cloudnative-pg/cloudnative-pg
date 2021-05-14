@@ -29,8 +29,21 @@ patchesStrategicMerge:
   # endpoint w/o any authn/z, please comment the following line.
 #- manager_auth_proxy_patch.yaml
 
-# [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in crd/kustomization.yaml
-- manager_webhook_patch.yaml
+patchesJson6902:
+  # add 9443 port to ports exposed by manager container
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: controller-manager
+      namespace: system
+    patch: |-
+      - op: add
+        path: "/spec/template/spec/containers/0/ports/-"
+        value:
+          containerPort: 9443
+          name: webhook-server
+          protocol: TCP
 
 # [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER'.
 # Uncomment 'CERTMANAGER' sections in crd/kustomization.yaml to enable the CA injection in the admission webhooks.

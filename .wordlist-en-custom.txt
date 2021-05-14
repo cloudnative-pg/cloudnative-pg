@@ -298,6 +298,7 @@ json
 jsonpath
 kms
 kube
+kubebuilder
 kubectl
 kubelet
 kubernetes
