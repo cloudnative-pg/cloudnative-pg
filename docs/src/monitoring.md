@@ -1,5 +1,5 @@
 
-# Monitoring
+# Monitoring Instances
 
 For each PostgreSQL instance, the operator provides an exporter of metrics for
 [Prometheus](https://prometheus.io/) via HTTP, on port 9187, named `metrics`.
@@ -7,10 +7,10 @@ The operator comes with a predefined set of metrics, as well as a highly
 configurable and customizable system to define additional queries via one or
 more `ConfigMap` or `Secret` resources.
 
-The exporter can be accessed as follows:
+Metrics can be accessed as follows:
 
 ```shell
-curl http://<pod ip>:9187/metrics
+curl http://<pod_ip>:9187/metrics
 ```
 
 All monitoring queries are:
@@ -193,3 +193,36 @@ Native PostgreSQL's exporter:
 - `runonserver`: a semantic version range to limit the versions of PostgreSQL the query should run on (e.g. `">=10.0.0"`)
 
 Similarly, the `pg_version` field of a column definition is not implemented.
+
+# Monitoring the operator
+
+The operator exposes [Prometheus](https://prometheus.io/) metrics via HTTP on port 8080, named `metrics`.
+
+Metrics can be accessed as follows:
+
+```shell
+curl http://<pod_ip>:8080/metrics
+```
+
+Currently, the operator exposes default `kubebuilder` metrics, see
+[kubebuilder documentation](https://book.kubebuilder.io/reference/metrics.html) for more details.
+
+## Prometheus Operator example
+
+The deployment operator can be monitored using the
+[Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) by defining the following
+[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor)
+resource:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgresql-operator-controller-manager
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cloud-native-postgresql
+  podMetricsEndpoints:
+    - port: metrics
+```

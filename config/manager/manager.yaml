@@ -39,6 +39,10 @@ spec:
         - --config-map-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         image: controller:latest
         name: manager
+        ports:
+          - containerPort: 8080
+            name: metrics
+            protocol: TCP
         env:
         - name: OPERATOR_IMAGE_NAME
           value: $(OPERATOR_IMAGE_NAME)

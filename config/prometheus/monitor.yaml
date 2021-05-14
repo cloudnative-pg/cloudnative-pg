@@ -1,16 +1,15 @@
 
-# Prometheus Monitor Service (Metrics)
+# Prometheus Pod Monitor (Metrics)
 apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
+kind: PodMonitor
 metadata:
   labels:
     app.kubernetes.io/name: cloud-native-postgresql
   name: controller-manager-metrics-monitor
   namespace: system
 spec:
-  endpoints:
-    - path: /metrics
-      port: https
   selector:
     matchLabels:
       app.kubernetes.io/name: cloud-native-postgresql
+  podMetricsEndpoints:
+    - port: metrics
