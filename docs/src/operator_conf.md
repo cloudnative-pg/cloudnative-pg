@@ -56,12 +56,23 @@ data:
   INHERITED_LABELS: environment, workload, app
 ```
 
-For the change to be effective, you need to reload the config map by issuing:
+For the change to be effective, you need to recreate the operator pods to
+reload the config map. If you have installed the operator on Kubernetes
+using the manifest you can do that by issuing:
 
 ```shell
 kubectl rollout restart deployment \
     -n postgresql-operator-system \
     postgresql-operator-controller-manager
+```
+
+Otherwise, If you have installed the operator using OLM, or you are running on
+Openshift, run the following command specifying the namespace the operator is
+installed in:
+
+```shell
+kubectl delete pods -n [NAMESPACE_NAME_HERE] \
+  -l app.kubernetes.io/name=cloud-native-postgresql
 ```
 
 !!! Warning
