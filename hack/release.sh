@@ -78,7 +78,7 @@ sed -i -e "s/version=\".*\"/version=\"${release_version}\"/" \
     Dockerfile
 
 sed -i "s/postgresql-operator-[0-9.]*.yaml/postgresql-operator-${release_version}.yaml/g" \
-    docs/src/installation.md
+    docs/src/installation_upgrade.md
 
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
@@ -94,7 +94,7 @@ git checkout -b "release/v${release_version}"
 git add \
     pkg/versions/versions.go \
     Dockerfile \
-    docs/src/installation.md \
+    docs/src/installation_upgrade.md \
     "${release_manifest}"
 git commit -sm "Version tag to ${release_version}"
 
