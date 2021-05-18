@@ -111,9 +111,10 @@ Authentication rules in the `postgresql` section of the CR.
 
 ### Pod Security Policies
 
-For InfoSec requirements, the operator does not need privileged mode for the
-execution of containers and access to volumes both in the operator and in the
-operand. It also explicitly sets the required security contexts.
+For InfoSec requirements, the operator does not require privileged mode for 
+any container and enforces read only root filesystem to guarantee containers
+immutability for both the operator and the operand pods. It also explicitly
+sets the required security contexts.
 
 On RedHat OpenShift, Cloud Native PostgreSQL runs in [`restricted` security
 context constraint
