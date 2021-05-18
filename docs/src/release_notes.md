@@ -23,7 +23,7 @@ Changes:
   operator using the YAML manifest, you must delete the existing operator
   deployment before installing the new version. This is required to avoid
   conflicts with other Kubernetes API's due to a change in labels
-  and label selectors being directly managed by the  operator. Please refer to
+  and label selectors being directly managed by the operator. Please refer to
   the Cloud Native PostgreSQL documentation for additional detail on upgrading
   to 1.4.0
 - Fix the labels that are automatically defined by the operator, renaming them
