@@ -11,17 +11,19 @@ import (
 	"context"
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 )
 
 // Promote command implementation
 func Promote(ctx context.Context, clusterName string, serverName string) error {
+	var cluster apiv1.Cluster
+
 	// Get the Cluster object
-	cluster, err := utils.GetCluster(ctx, plugin.DynamicClient, plugin.Namespace, clusterName)
+	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
 	if err != nil {
 		return err
 	}
@@ -33,7 +35,8 @@ func Promote(ctx context.Context, clusterName string, serverName string) error {
 	}
 
 	// Check if the Pod exist
-	_, err = plugin.GoClient.CoreV1().Pods(plugin.Namespace).Get(ctx, serverName, metav1.GetOptions{})
+	var pod v1.Pod
+	err = plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: serverName}, &pod)
 	if err != nil {
 		return err
 	}
@@ -43,7 +46,7 @@ func Promote(ctx context.Context, clusterName string, serverName string) error {
 	cluster.Status.Phase = apiv1.PhaseSwitchover
 	cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
 
-	err = utils.UpdateClusterStatus(ctx, plugin.DynamicClient, cluster)
+	err = plugin.Client.Status().Update(ctx, &cluster)
 	if err != nil {
 		return err
 	}

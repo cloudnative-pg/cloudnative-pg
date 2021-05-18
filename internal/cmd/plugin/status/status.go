@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-// Package status implement the kubectl-cnp status command
+// Package status implements the kubectl-cnp status command
 package status
 
 import (
@@ -17,13 +17,12 @@ import (
 	"github.com/cheynewallace/tabby"
 	"github.com/logrusorgru/aurora/v3"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
-	mutils "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	management "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
@@ -43,7 +42,7 @@ type PostgresqlStatus struct {
 	PrimaryPod corev1.Pod
 }
 
-// Status implement the "status" subcommand
+// Status implements the "status" subcommand
 func Status(ctx context.Context, clusterName string, verbose bool, format plugin.OutputFormat) error {
 	status, err := ExtractPostgresqlStatus(ctx, clusterName)
 	if err != nil {
@@ -75,17 +74,20 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	return nil
 }
 
-// ExtractPostgresqlStatus get the PostgreSQL status using the Kubernetes API
+// ExtractPostgresqlStatus gets the PostgreSQL status using the Kubernetes API
 func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*PostgresqlStatus, error) {
+	var cluster apiv1.Cluster
+
 	// Get the Cluster object
-	cluster, err := mutils.GetCluster(ctx, plugin.DynamicClient, plugin.Namespace, clusterName)
+	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get the list of Pods created by this Cluster
 	var instancesStatus postgres.PostgresqlStatusList
-	pods, err := plugin.GoClient.CoreV1().Pods(plugin.Namespace).List(ctx, metav1.ListOptions{})
+	var pods corev1.PodList
+	err = plugin.Client.List(ctx, &pods, client.InNamespace(plugin.Namespace))
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +113,7 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 
 	// Extract the status from the instances
 	status := PostgresqlStatus{
-		Cluster:        cluster,
+		Cluster:        &cluster,
 		InstanceStatus: &instancesStatus,
 		PrimaryPod:     primaryPod,
 	}

@@ -10,7 +10,6 @@ package utils
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"time"
@@ -20,7 +19,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
@@ -38,13 +36,6 @@ var (
 		// to int32 to support ARM-based 32 bit architectures
 		Steps: math.MaxInt32,
 	}
-)
-
-const (
-	// applyFieldManagerName is the name that will be used as
-	// the field manager for changes to the cluster applied
-	// using the patch request
-	applyFieldManagerName = "cloud-native-postgresql"
 )
 
 // ClusterModifier is a function that apply a change
@@ -91,29 +82,6 @@ func UpdateClusterStatus(ctx context.Context, client dynamic.Interface, cluster 
 		Resource(apiv1.ClusterGVK).
 		Namespace(cluster.Namespace).
 		UpdateStatus(ctx, object, metav1.UpdateOptions{})
-	return err
-}
-
-// PatchCluster patches a cluster with the passed version
-func PatchCluster(ctx context.Context, client dynamic.Interface, cluster *apiv1.Cluster) error {
-	// Marshal the new object into JSON
-	object, err := clusterToUnstructured(cluster)
-	if err != nil {
-		return err
-	}
-
-	data, err := json.Marshal(object)
-	if err != nil {
-		return err
-	}
-
-	// We use our apply manager name
-	patchOptions := metav1.PatchOptions{FieldManager: applyFieldManagerName}
-
-	// Apply the latest status
-	_, err = client.Resource(apiv1.ClusterGVK).
-		Namespace(cluster.Namespace).
-		Patch(ctx, cluster.Name, types.ApplyPatchType, data, patchOptions)
 	return err
 }
 
