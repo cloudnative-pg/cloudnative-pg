@@ -35,40 +35,22 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 	// spec.bootstrap
 	if src.Spec.Bootstrap != nil {
 		dst.Spec.Bootstrap = &v1.BootstrapConfiguration{}
-
-		// spec.bootstrap.initdb
-		if src.Spec.Bootstrap.InitDB != nil {
-			srcInitDB := src.Spec.Bootstrap.InitDB
-
-			dst.Spec.Bootstrap.InitDB = &v1.BootstrapInitDB{}
-			dst.Spec.Bootstrap.InitDB.Database = srcInitDB.Database
-			dst.Spec.Bootstrap.InitDB.Owner = srcInitDB.Owner
-			dst.Spec.Bootstrap.InitDB.Secret = srcInitDB.Secret
-			dst.Spec.Bootstrap.InitDB.Options = srcInitDB.Options
-		}
-
-		// spec.bootstrap.recovery
-		if src.Spec.Bootstrap.Recovery != nil {
-			dst.Spec.Bootstrap.Recovery = &v1.BootstrapRecovery{}
-			dst.Spec.Bootstrap.Recovery.Backup = src.Spec.Bootstrap.Recovery.Backup
-
-			if src.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
-				srcRecoveryTarget := src.Spec.Bootstrap.Recovery.RecoveryTarget
-
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget = &v1.RecoveryTarget{}
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTLI = srcRecoveryTarget.TargetTLI
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetXID = srcRecoveryTarget.TargetXID
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetName = srcRecoveryTarget.TargetName
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetLSN = srcRecoveryTarget.TargetLSN
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTime = srcRecoveryTarget.TargetTime
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetImmediate = srcRecoveryTarget.TargetImmediate
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.Exclusive = srcRecoveryTarget.Exclusive
-			}
-		}
+		src.Spec.Bootstrap.ConvertTo(dst.Spec.Bootstrap)
 	}
 
-	dst.Spec.SuperuserSecret = src.Spec.SuperuserSecret
-	dst.Spec.ImagePullSecrets = src.Spec.ImagePullSecrets
+	// src.spec.superuserSecret
+	if src.Spec.SuperuserSecret != nil {
+		dst.Spec.SuperuserSecret = &v1.LocalObjectReference{}
+		dst.Spec.SuperuserSecret.Name = src.Spec.SuperuserSecret.Name
+	}
+
+	// src.spec.imagePullSecrets
+	if src.Spec.ImagePullSecrets != nil {
+		dst.Spec.ImagePullSecrets = make([]v1.LocalObjectReference, len(src.Spec.ImagePullSecrets))
+		for idx := range src.Spec.ImagePullSecrets {
+			dst.Spec.ImagePullSecrets[idx].Name = src.Spec.ImagePullSecrets[idx].Name
+		}
+	}
 
 	// spec.storage
 	srcStorageConf := src.Spec.StorageConfiguration
@@ -96,8 +78,14 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 		if src.Spec.Backup.BarmanObjectStore != nil {
 			s3Credentials := src.Spec.Backup.BarmanObjectStore.S3Credentials
 			dst.Spec.Backup.BarmanObjectStore = &v1.BarmanObjectStoreConfiguration{}
-			dst.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference = s3Credentials.AccessKeyIDReference
-			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference = s3Credentials.SecretAccessKeyReference
+			dst.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Key =
+				s3Credentials.AccessKeyIDReference.Key
+			dst.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Name =
+				s3Credentials.AccessKeyIDReference.Name
+			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Key =
+				s3Credentials.SecretAccessKeyReference.Key
+			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Key =
+				s3Credentials.SecretAccessKeyReference.Name
 		}
 
 		dst.Spec.Backup.BarmanObjectStore.EndpointURL = src.Spec.Backup.BarmanObjectStore.EndpointURL
@@ -137,8 +125,25 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 	// spec.monitoring
 	if src.Spec.Monitoring != nil {
 		dst.Spec.Monitoring = &v1.MonitoringConfiguration{}
-		dst.Spec.Monitoring.CustomQueriesConfigMap = src.Spec.Monitoring.CustomQueriesConfigMap
-		dst.Spec.Monitoring.CustomQueriesSecret = src.Spec.Monitoring.CustomQueriesSecret
+		if src.Spec.Monitoring.CustomQueriesConfigMap != nil {
+			dst.Spec.Monitoring.CustomQueriesConfigMap = make(
+				[]v1.ConfigMapKeySelector,
+				len(src.Spec.Monitoring.CustomQueriesConfigMap))
+			for idx := range src.Spec.Monitoring.CustomQueriesConfigMap {
+				dst.Spec.Monitoring.CustomQueriesConfigMap[idx].Key = src.Spec.Monitoring.CustomQueriesConfigMap[idx].Key
+				dst.Spec.Monitoring.CustomQueriesConfigMap[idx].Name = src.Spec.Monitoring.CustomQueriesConfigMap[idx].Name
+			}
+		}
+
+		if src.Spec.Monitoring.CustomQueriesSecret != nil {
+			dst.Spec.Monitoring.CustomQueriesSecret = make(
+				[]v1.SecretKeySelector,
+				len(src.Spec.Monitoring.CustomQueriesSecret))
+			for idx := range src.Spec.Monitoring.CustomQueriesSecret {
+				dst.Spec.Monitoring.CustomQueriesSecret[idx].Key = src.Spec.Monitoring.CustomQueriesSecret[idx].Key
+				dst.Spec.Monitoring.CustomQueriesSecret[idx].Name = src.Spec.Monitoring.CustomQueriesSecret[idx].Name
+			}
+		}
 	}
 
 	// status
@@ -165,6 +170,45 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 	dst.Status.SecretsResourceVersion.ServerSecretVersion = src.Status.SecretsResourceVersion.ServerSecretVersion
 
 	return nil
+}
+
+// ConvertTo converts this specification to the relative Hub version (v1)
+func (src *BootstrapConfiguration) ConvertTo(dstSpec *v1.BootstrapConfiguration) {
+	// spec.bootstrap.initdb
+	if src.InitDB != nil {
+		srcInitDB := src.InitDB
+
+		dstSpec.InitDB = &v1.BootstrapInitDB{}
+		dstSpec.InitDB.Database = srcInitDB.Database
+		dstSpec.InitDB.Owner = srcInitDB.Owner
+		dstSpec.InitDB.Options = srcInitDB.Options
+	}
+
+	// spec.bootstrap.initdb.secret
+	if src.InitDB != nil && src.InitDB.Secret != nil {
+		dstSpec.InitDB.Secret = &v1.LocalObjectReference{}
+		dstSpec.InitDB.Secret.Name = src.InitDB.Secret.Name
+	}
+
+	// spec.bootstrap.recovery
+	if src.Recovery != nil {
+		dstSpec.Recovery = &v1.BootstrapRecovery{}
+		dstSpec.Recovery.Backup.Name = src.Recovery.Backup.Name
+	}
+
+	// spec.bootstrap.recovery.recoveryTarget
+	if src.Recovery != nil && src.Recovery.RecoveryTarget != nil {
+		srcRecoveryTarget := src.Recovery.RecoveryTarget
+
+		dstSpec.Recovery.RecoveryTarget = &v1.RecoveryTarget{}
+		dstSpec.Recovery.RecoveryTarget.TargetTLI = srcRecoveryTarget.TargetTLI
+		dstSpec.Recovery.RecoveryTarget.TargetXID = srcRecoveryTarget.TargetXID
+		dstSpec.Recovery.RecoveryTarget.TargetName = srcRecoveryTarget.TargetName
+		dstSpec.Recovery.RecoveryTarget.TargetLSN = srcRecoveryTarget.TargetLSN
+		dstSpec.Recovery.RecoveryTarget.TargetTime = srcRecoveryTarget.TargetTime
+		dstSpec.Recovery.RecoveryTarget.TargetImmediate = srcRecoveryTarget.TargetImmediate
+		dstSpec.Recovery.RecoveryTarget.Exclusive = srcRecoveryTarget.Exclusive
+	}
 }
 
 // ConvertFrom converts from the Hub version (v1) to this version.
@@ -198,32 +242,49 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:golint
 			dst.Spec.Bootstrap.InitDB = &BootstrapInitDB{}
 			dst.Spec.Bootstrap.InitDB.Database = srcInitDB.Database
 			dst.Spec.Bootstrap.InitDB.Owner = srcInitDB.Owner
-			dst.Spec.Bootstrap.InitDB.Secret = srcInitDB.Secret
 			dst.Spec.Bootstrap.InitDB.Options = srcInitDB.Options
+		}
+
+		// spec.bootstrap.initdb.secret
+		if src.Spec.Bootstrap.InitDB != nil && src.Spec.Bootstrap.InitDB.Secret != nil {
+			srcInitDB := src.Spec.Bootstrap.InitDB
+
+			dst.Spec.Bootstrap.InitDB.Secret = &LocalObjectReference{}
+			dst.Spec.Bootstrap.InitDB.Secret.Name = srcInitDB.Secret.Name
 		}
 
 		// spec.bootstrap.recovery
 		if src.Spec.Bootstrap.Recovery != nil {
 			dst.Spec.Bootstrap.Recovery = &BootstrapRecovery{}
-			dst.Spec.Bootstrap.Recovery.Backup = src.Spec.Bootstrap.Recovery.Backup
+			dst.Spec.Bootstrap.Recovery.Backup.Name = src.Spec.Bootstrap.Recovery.Backup.Name
+		}
 
-			if src.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
-				srcRecoveryTarget := src.Spec.Bootstrap.Recovery.RecoveryTarget
+		// spec.bootstrap.recovery.recoveryTarget
+		if src.Spec.Bootstrap.Recovery != nil && src.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
+			srcRecoveryTarget := src.Spec.Bootstrap.Recovery.RecoveryTarget
 
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget = &RecoveryTarget{}
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTLI = srcRecoveryTarget.TargetTLI
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetXID = srcRecoveryTarget.TargetXID
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetName = srcRecoveryTarget.TargetName
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetLSN = srcRecoveryTarget.TargetLSN
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTime = srcRecoveryTarget.TargetTime
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetImmediate = srcRecoveryTarget.TargetImmediate
-				dst.Spec.Bootstrap.Recovery.RecoveryTarget.Exclusive = srcRecoveryTarget.Exclusive
-			}
+			dst.Spec.Bootstrap.Recovery.RecoveryTarget = &RecoveryTarget{}
+			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTLI = srcRecoveryTarget.TargetTLI
+			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetXID = srcRecoveryTarget.TargetXID
+			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetName = srcRecoveryTarget.TargetName
+			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetLSN = srcRecoveryTarget.TargetLSN
+			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTime = srcRecoveryTarget.TargetTime
+			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetImmediate = srcRecoveryTarget.TargetImmediate
+			dst.Spec.Bootstrap.Recovery.RecoveryTarget.Exclusive = srcRecoveryTarget.Exclusive
 		}
 	}
 
-	dst.Spec.SuperuserSecret = src.Spec.SuperuserSecret
-	dst.Spec.ImagePullSecrets = src.Spec.ImagePullSecrets
+	if src.Spec.SuperuserSecret != nil {
+		dst.Spec.SuperuserSecret = &LocalObjectReference{}
+		dst.Spec.SuperuserSecret.Name = src.Spec.SuperuserSecret.Name
+	}
+
+	if src.Spec.ImagePullSecrets != nil {
+		dst.Spec.ImagePullSecrets = make([]LocalObjectReference, len(src.Spec.ImagePullSecrets))
+		for idx := range src.Spec.ImagePullSecrets {
+			dst.Spec.ImagePullSecrets[idx].Name = src.Spec.ImagePullSecrets[idx].Name
+		}
+	}
 
 	// spec.storage
 	srcStorageConf := src.Spec.StorageConfiguration
@@ -251,8 +312,12 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:golint
 		if src.Spec.Backup.BarmanObjectStore != nil {
 			s3Credentials := src.Spec.Backup.BarmanObjectStore.S3Credentials
 			dst.Spec.Backup.BarmanObjectStore = &BarmanObjectStoreConfiguration{}
-			dst.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference = s3Credentials.AccessKeyIDReference
-			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference = s3Credentials.SecretAccessKeyReference
+			dst.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Key = s3Credentials.AccessKeyIDReference.Key
+			dst.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Name = s3Credentials.AccessKeyIDReference.Name
+			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Key =
+				s3Credentials.SecretAccessKeyReference.Key
+			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Name =
+				s3Credentials.SecretAccessKeyReference.Name
 		}
 
 		dst.Spec.Backup.BarmanObjectStore.EndpointURL = src.Spec.Backup.BarmanObjectStore.EndpointURL

@@ -20,7 +20,7 @@ func (src *Backup) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 	dst.ObjectMeta = src.ObjectMeta
 
 	// spec
-	dst.Spec.Cluster = src.Spec.Cluster
+	dst.Spec.Cluster.Name = src.Spec.Cluster.Name
 
 	// status
 	dst.Status.EndpointURL = src.Status.EndpointURL
@@ -36,8 +36,12 @@ func (src *Backup) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 	dst.Status.CommandError = src.Status.CommandError
 
 	// status.s3Credentials
-	dst.Status.S3Credentials.AccessKeyIDReference = src.Status.S3Credentials.AccessKeyIDReference
-	dst.Status.S3Credentials.SecretAccessKeyReference = src.Status.S3Credentials.SecretAccessKeyReference
+	dst.Status.S3Credentials.AccessKeyIDReference.Key = src.Status.S3Credentials.AccessKeyIDReference.Key
+	dst.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name =
+		src.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name
+	dst.Status.S3Credentials.SecretAccessKeyReference.Key = src.Status.S3Credentials.SecretAccessKeyReference.Key
+	dst.Status.S3Credentials.SecretAccessKeyReference.LocalObjectReference.Name =
+		src.Status.S3Credentials.SecretAccessKeyReference.Name
 
 	return nil
 }
@@ -50,7 +54,7 @@ func (dst *Backup) ConvertFrom(srcRaw conversion.Hub) error { //nolint:golint
 	dst.ObjectMeta = src.ObjectMeta
 
 	// spec
-	dst.Spec.Cluster = src.Spec.Cluster
+	dst.Spec.Cluster.Name = src.Spec.Cluster.Name
 
 	// status
 	dst.Status.EndpointURL = src.Status.EndpointURL
@@ -66,8 +70,12 @@ func (dst *Backup) ConvertFrom(srcRaw conversion.Hub) error { //nolint:golint
 	dst.Status.CommandError = src.Status.CommandError
 
 	// status.s3Credentials
-	dst.Status.S3Credentials.AccessKeyIDReference = src.Status.S3Credentials.AccessKeyIDReference
-	dst.Status.S3Credentials.SecretAccessKeyReference = src.Status.S3Credentials.SecretAccessKeyReference
+	dst.Status.S3Credentials.AccessKeyIDReference.Key = src.Status.S3Credentials.AccessKeyIDReference.Key
+	dst.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name =
+		src.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name
+	dst.Status.S3Credentials.SecretAccessKeyReference.Key = src.Status.S3Credentials.SecretAccessKeyReference.Key
+	dst.Status.S3Credentials.SecretAccessKeyReference.LocalObjectReference.Name =
+		src.Status.S3Credentials.SecretAccessKeyReference.LocalObjectReference.Name
 
 	return nil
 }

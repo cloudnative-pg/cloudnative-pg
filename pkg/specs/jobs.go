@@ -161,13 +161,13 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 								{
 									Name: "AWS_ACCESS_KEY_ID",
 									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &backup.Status.S3Credentials.AccessKeyIDReference,
+										SecretKeyRef: apiv1.SecretKeySelectorToCore(&backup.Status.S3Credentials.AccessKeyIDReference),
 									},
 								},
 								{
 									Name: "AWS_SECRET_ACCESS_KEY",
 									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &backup.Status.S3Credentials.SecretAccessKeyReference,
+										SecretKeyRef: apiv1.SecretKeySelectorToCore(&backup.Status.S3Credentials.SecretAccessKeyReference),
 									},
 								},
 								{

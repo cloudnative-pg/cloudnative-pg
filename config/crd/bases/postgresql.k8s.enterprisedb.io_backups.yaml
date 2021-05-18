@@ -54,9 +54,10 @@ spec:
                 description: The cluster to backup
                 properties:
                   name:
-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    description: Name of the referent.
                     type: string
+                required:
+                - name
                 type: object
             type: object
           status:
@@ -97,37 +98,27 @@ spec:
                     description: The reference to the access key id
                     properties:
                       key:
-                        description: The key of the secret to select from.  Must be
-                          a valid secret key.
+                        description: The key to select
                         type: string
                       name:
-                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          TODO: Add other useful fields. apiVersion, kind, uid?'
+                        description: Name of the referent.
                         type: string
-                      optional:
-                        description: Specify whether the Secret or its key must be
-                          defined
-                        type: boolean
                     required:
                     - key
+                    - name
                     type: object
                   secretAccessKey:
                     description: The reference to the secret access key
                     properties:
                       key:
-                        description: The key of the secret to select from.  Must be
-                          a valid secret key.
+                        description: The key to select
                         type: string
                       name:
-                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          TODO: Add other useful fields. apiVersion, kind, uid?'
+                        description: Name of the referent.
                         type: string
-                      optional:
-                        description: Specify whether the Secret or its key must be
-                          defined
-                        type: boolean
                     required:
                     - key
+                    - name
                     type: object
                 required:
                 - accessKeyId
@@ -192,9 +183,10 @@ spec:
                 description: The cluster to backup
                 properties:
                   name:
-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    description: Name of the referent.
                     type: string
+                required:
+                - name
                 type: object
             type: object
           status:
@@ -235,37 +227,27 @@ spec:
                     description: The reference to the access key id
                     properties:
                       key:
-                        description: The key of the secret to select from.  Must be
-                          a valid secret key.
+                        description: The key to select
                         type: string
                       name:
-                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          TODO: Add other useful fields. apiVersion, kind, uid?'
+                        description: Name of the referent.
                         type: string
-                      optional:
-                        description: Specify whether the Secret or its key must be
-                          defined
-                        type: boolean
                     required:
                     - key
+                    - name
                     type: object
                   secretAccessKey:
                     description: The reference to the secret access key
                     properties:
                       key:
-                        description: The key of the secret to select from.  Must be
-                          a valid secret key.
+                        description: The key to select
                         type: string
                       name:
-                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                          TODO: Add other useful fields. apiVersion, kind, uid?'
+                        description: Name of the referent.
                         type: string
-                      optional:
-                        description: Specify whether the Secret or its key must be
-                          defined
-                        type: boolean
                     required:
                     - key
+                    - name
                     type: object
                 required:
                 - accessKeyId

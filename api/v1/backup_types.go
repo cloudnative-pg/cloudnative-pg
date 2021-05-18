@@ -7,7 +7,6 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -32,7 +31,7 @@ const (
 // BackupSpec defines the desired state of Backup
 type BackupSpec struct {
 	// The cluster to backup
-	Cluster v1.LocalObjectReference `json:"cluster,omitempty"`
+	Cluster LocalObjectReference `json:"cluster,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup
