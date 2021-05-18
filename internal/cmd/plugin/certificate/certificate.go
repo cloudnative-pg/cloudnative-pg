@@ -11,7 +11,8 @@ import (
 	"context"
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
@@ -26,16 +27,20 @@ type Params struct {
 	ClusterName string
 }
 
-// Generate generate a Kubernetes secret suitable to allow certificate authentication
+// Generate generates a Kubernetes secret suitable to allow certificate authentication
 // for a PostgreSQL user
 func Generate(ctx context.Context, params Params, dryRun bool, format plugin.OutputFormat) error {
-	secret, err := plugin.GoClient.CoreV1().Secrets(params.Namespace).Get(
-		ctx, params.ClusterName+apiv1.CaSecretSuffix, metav1.GetOptions{})
+	var secret corev1.Secret
+
+	err := plugin.Client.Get(
+		ctx,
+		client.ObjectKey{Namespace: params.Namespace, Name: params.ClusterName + apiv1.CaSecretSuffix},
+		&secret)
 	if err != nil {
 		return err
 	}
 
-	caPair, err := certs.ParseCASecret(secret)
+	caPair, err := certs.ParseCASecret(&secret)
 	if err != nil {
 		return err
 	}
@@ -55,7 +60,7 @@ func Generate(ctx context.Context, params Params, dryRun bool, format plugin.Out
 		return nil
 	}
 
-	_, err = plugin.GoClient.CoreV1().Secrets(params.Namespace).Create(ctx, userSecret, metav1.CreateOptions{})
+	err = plugin.Client.Create(ctx, userSecret)
 	if err != nil {
 		return err
 	}
