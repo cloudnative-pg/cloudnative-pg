@@ -7,7 +7,6 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
@@ -127,7 +126,7 @@ var _ = Describe("initdb options validation", func() {
 	It("complains if superuser secret name it's empty", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
-				SuperuserSecret: &corev1.LocalObjectReference{
+				SuperuserSecret: &LocalObjectReference{
 					Name: "",
 				},
 			},

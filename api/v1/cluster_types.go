@@ -109,10 +109,10 @@ type ClusterSpec struct {
 	// The secret containing the superuser password. If not defined a new
 	// secret will be created with a randomly generated password
 	// +optional
-	SuperuserSecret *corev1.LocalObjectReference `json:"superuserSecret,omitempty"`
+	SuperuserSecret *LocalObjectReference `json:"superuserSecret,omitempty"`
 
 	// The list of pull secrets to be used to pull the images
-	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
 	// Configuration of the storage of the instances
 	// +optional
@@ -323,7 +323,7 @@ type BootstrapInitDB struct {
 	// owner of the user database. If empty a new secret will be
 	// created from scratch
 	// +optional
-	Secret *corev1.LocalObjectReference `json:"secret,omitempty"`
+	Secret *LocalObjectReference `json:"secret,omitempty"`
 
 	// The list of options that must be passed to initdb
 	// when creating the cluster
@@ -337,7 +337,7 @@ type BootstrapInitDB struct {
 // Refer to the Bootstrap page of the documentation for more information.
 type BootstrapRecovery struct {
 	// The backup we need to restore
-	Backup corev1.LocalObjectReference `json:"backup"`
+	Backup LocalObjectReference `json:"backup"`
 
 	// By default the recovery will end as soon as a consistent state is
 	// reached: in this case that means at the end of a backup.
@@ -547,20 +547,20 @@ type DataBackupConfiguration struct {
 // files to S3
 type S3Credentials struct {
 	// The reference to the access key id
-	AccessKeyIDReference corev1.SecretKeySelector `json:"accessKeyId"`
+	AccessKeyIDReference SecretKeySelector `json:"accessKeyId"`
 
 	// The reference to the secret access key
-	SecretAccessKeyReference corev1.SecretKeySelector `json:"secretAccessKey"`
+	SecretAccessKeyReference SecretKeySelector `json:"secretAccessKey"`
 }
 
 // MonitoringConfiguration is the type containing all the monitoring
 // configuration for a certain cluster
 type MonitoringConfiguration struct {
 	// The list of config maps containing the custom queries
-	CustomQueriesConfigMap []corev1.ConfigMapKeySelector `json:"customQueriesConfigMap,omitempty"`
+	CustomQueriesConfigMap []ConfigMapKeySelector `json:"customQueriesConfigMap,omitempty"`
 
 	// The list of secrets containing the custom queries
-	CustomQueriesSecret []corev1.SecretKeySelector `json:"customQueriesSecret,omitempty"`
+	CustomQueriesSecret []SecretKeySelector `json:"customQueriesSecret,omitempty"`
 }
 
 // +kubebuilder:object:root=true

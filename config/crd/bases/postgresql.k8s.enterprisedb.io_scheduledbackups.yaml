@@ -51,9 +51,10 @@ spec:
                 description: The cluster to backup
                 properties:
                   name:
-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    description: Name of the referent.
                     type: string
+                required:
+                - name
                 type: object
               schedule:
                 description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
@@ -123,9 +124,10 @@ spec:
                 description: The cluster to backup
                 properties:
                   name:
-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    description: Name of the referent.
                     type: string
+                required:
+                - name
                 type: object
               schedule:
                 description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.

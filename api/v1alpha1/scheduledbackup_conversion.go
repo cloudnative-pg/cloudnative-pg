@@ -20,7 +20,7 @@ func (src *ScheduledBackup) ConvertTo(dstRaw conversion.Hub) error { //nolint:go
 	dst.ObjectMeta = src.ObjectMeta
 
 	// spec
-	dst.Spec.Cluster = src.Spec.Cluster
+	dst.Spec.Cluster.Name = src.Spec.Cluster.Name
 	dst.Spec.Schedule = src.Spec.Schedule
 	dst.Spec.Suspend = src.Spec.Suspend
 
@@ -40,7 +40,7 @@ func (dst *ScheduledBackup) ConvertFrom(srcRaw conversion.Hub) error { //nolint:
 	dst.ObjectMeta = src.ObjectMeta
 
 	// spec
-	dst.Spec.Cluster = src.Spec.Cluster
+	dst.Spec.Cluster.Name = src.Spec.Cluster.Name
 	dst.Spec.Schedule = src.Spec.Schedule
 	dst.Spec.Suspend = src.Spec.Suspend
 

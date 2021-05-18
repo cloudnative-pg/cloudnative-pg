@@ -137,39 +137,27 @@ spec:
                             description: The reference to the access key id
                             properties:
                               key:
-                                description: The key of the secret to select from.  Must
-                                  be a valid secret key.
+                                description: The key to select
                                 type: string
                               name:
-                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind,
-                                  uid?'
+                                description: Name of the referent.
                                 type: string
-                              optional:
-                                description: Specify whether the Secret or its key
-                                  must be defined
-                                type: boolean
                             required:
                             - key
+                            - name
                             type: object
                           secretAccessKey:
                             description: The reference to the secret access key
                             properties:
                               key:
-                                description: The key of the secret to select from.  Must
-                                  be a valid secret key.
+                                description: The key to select
                                 type: string
                               name:
-                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind,
-                                  uid?'
+                                description: Name of the referent.
                                 type: string
-                              optional:
-                                description: Specify whether the Secret or its key
-                                  must be defined
-                                type: boolean
                             required:
                             - key
+                            - name
                             type: object
                         required:
                         - accessKeyId
@@ -235,9 +223,10 @@ spec:
                           will be created from scratch
                         properties:
                           name:
-                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            description: Name of the referent.
                             type: string
+                        required:
+                        - name
                         type: object
                     type: object
                   recovery:
@@ -247,9 +236,10 @@ spec:
                         description: The backup we need to restore
                         properties:
                           name:
-                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            description: Name of the referent.
                             type: string
+                        required:
+                        - name
                         type: object
                       recoveryTarget:
                         description: 'By default the recovery will end as soon as
@@ -299,12 +289,14 @@ spec:
                 description: The list of pull secrets to be used to pull the images
                 items:
                   description: LocalObjectReference contains enough information to
-                    let you locate the referenced object inside the same namespace.
+                    let you locate a local object with a known type inside the same
+                    namespace
                   properties:
                     name:
-                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                        TODO: Add other useful fields. apiVersion, kind, uid?'
+                      description: Name of the referent.
                       type: string
+                  required:
+                  - name
                   type: object
                 type: array
               instances:
@@ -331,42 +323,35 @@ spec:
                   customQueriesConfigMap:
                     description: The list of config maps containing the custom queries
                     items:
-                      description: Selects a key from a ConfigMap.
+                      description: ConfigMapKeySelector contains enough information
+                        to let you locate the key of a ConfigMap
                       properties:
                         key:
-                          description: The key to select.
+                          description: The key to select
                           type: string
                         name:
-                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          description: Name of the referent.
                           type: string
-                        optional:
-                          description: Specify whether the ConfigMap or its key must
-                            be defined
-                          type: boolean
                       required:
                       - key
+                      - name
                       type: object
                     type: array
                   customQueriesSecret:
                     description: The list of secrets containing the custom queries
                     items:
-                      description: SecretKeySelector selects a key of a Secret.
+                      description: SecretKeySelector contains enough information to
+                        let you locate the key of a Secret
                       properties:
                         key:
-                          description: The key of the secret to select from.  Must
-                            be a valid secret key.
+                          description: The key to select
                           type: string
                         name:
-                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          description: Name of the referent.
                           type: string
-                        optional:
-                          description: Specify whether the Secret or its key must
-                            be defined
-                          type: boolean
                       required:
                       - key
+                      - name
                       type: object
                     type: array
                 type: object
@@ -601,9 +586,10 @@ spec:
                   defined a new secret will be created with a randomly generated password
                 properties:
                   name:
-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    description: Name of the referent.
                     type: string
+                required:
+                - name
                 type: object
             required:
             - instances
@@ -825,39 +811,27 @@ spec:
                             description: The reference to the access key id
                             properties:
                               key:
-                                description: The key of the secret to select from.  Must
-                                  be a valid secret key.
+                                description: The key to select
                                 type: string
                               name:
-                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind,
-                                  uid?'
+                                description: Name of the referent.
                                 type: string
-                              optional:
-                                description: Specify whether the Secret or its key
-                                  must be defined
-                                type: boolean
                             required:
                             - key
+                            - name
                             type: object
                           secretAccessKey:
                             description: The reference to the secret access key
                             properties:
                               key:
-                                description: The key of the secret to select from.  Must
-                                  be a valid secret key.
+                                description: The key to select
                                 type: string
                               name:
-                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Add other useful fields. apiVersion, kind,
-                                  uid?'
+                                description: Name of the referent.
                                 type: string
-                              optional:
-                                description: Specify whether the Secret or its key
-                                  must be defined
-                                type: boolean
                             required:
                             - key
+                            - name
                             type: object
                         required:
                         - accessKeyId
@@ -917,9 +891,10 @@ spec:
                           will be created from scratch
                         properties:
                           name:
-                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            description: Name of the referent.
                             type: string
+                        required:
+                        - name
                         type: object
                     type: object
                   recovery:
@@ -929,15 +904,16 @@ spec:
                         description: The backup we need to restore
                         properties:
                           name:
-                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            description: Name of the referent.
                             type: string
+                        required:
+                        - name
                         type: object
                       recoveryTarget:
-                        description: 'By default the recovery will end as soon as
-                          a consistent state is reached: in this case that means at
-                          the end of a backup. This option allows to fine tune the
-                          recovery process'
+                        description: 'By default, the recovery will end as soon as
+                          a consistent state is reached: in this case, that means
+                          at the end of a backup. This option allows to fine tune
+                          the recovery process'
                         properties:
                           exclusive:
                             description: Set the target to be exclusive (defaults
@@ -981,12 +957,14 @@ spec:
                 description: The list of pull secrets to be used to pull the images
                 items:
                   description: LocalObjectReference contains enough information to
-                    let you locate the referenced object inside the same namespace.
+                    let you locate a local object with a known type inside the same
+                    namespace
                   properties:
                     name:
-                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                        TODO: Add other useful fields. apiVersion, kind, uid?'
+                      description: Name of the referent.
                       type: string
+                  required:
+                  - name
                   type: object
                 type: array
               instances:
@@ -1013,42 +991,35 @@ spec:
                   customQueriesConfigMap:
                     description: The list of config maps containing the custom queries
                     items:
-                      description: Selects a key from a ConfigMap.
+                      description: ConfigMapKeySelector contains enough information
+                        to let you locate key of a ConfigMap
                       properties:
                         key:
-                          description: The key to select.
+                          description: The key to select
                           type: string
                         name:
-                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          description: Name of the referent.
                           type: string
-                        optional:
-                          description: Specify whether the ConfigMap or its key must
-                            be defined
-                          type: boolean
                       required:
                       - key
+                      - name
                       type: object
                     type: array
                   customQueriesSecret:
                     description: The list of secrets containing the custom queries
                     items:
-                      description: SecretKeySelector selects a key of a Secret.
+                      description: SecretKeySelector contains enough information to
+                        let you locate key of a Secret
                       properties:
                         key:
-                          description: The key of the secret to select from.  Must
-                            be a valid secret key.
+                          description: The key to select
                           type: string
                         name:
-                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          description: Name of the referent.
                           type: string
-                        optional:
-                          description: Specify whether the Secret or its key must
-                            be defined
-                          type: boolean
                       required:
                       - key
+                      - name
                       type: object
                     type: array
                 type: object
@@ -1280,12 +1251,14 @@ spec:
                 type: object
               superuserSecret:
                 description: The secret containing the superuser password. If not
-                  defined a new secret will be created with a randomly generated password
+                  defined, a new secret will be created with a randomly generated
+                  password
                 properties:
                   name:
-                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    description: Name of the referent.
                     type: string
+                required:
+                - name
                 type: object
             required:
             - instances
