@@ -10,7 +10,7 @@ package versions
 
 const (
 	// Version is the version of the operator
-	Version = "1.3.0"
+	Version = "1.4.0"
 
 	// DefaultImageName is the image used by default by the operator to create
 	// pods.
@@ -18,5 +18,5 @@ const (
 
 	// DefaultOperatorImageName used to bootstrap the controller in the Pods running
 	// PostgreSQL
-	DefaultOperatorImageName = "quay.io/enterprisedb/cloud-native-postgresql:1.3.0"
+	DefaultOperatorImageName = "quay.io/enterprisedb/cloud-native-postgresql:1.4.0"
 )
