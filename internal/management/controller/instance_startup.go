@@ -10,9 +10,10 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
@@ -21,84 +22,68 @@ import (
 	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
-// RefreshServerCertificateFiles get the latest certificates from the
+// RefreshServerCertificateFiles gets the latest server certificates files from the
 // secrets. Returns true if configuration has been changed
 func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context) (bool, error) {
-	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "secrets",
-	}).
-		Namespace(r.instance.Namespace).
-		Get(ctx, r.instance.ClusterName+apiv1.ServerSecretSuffix, metav1.GetOptions{})
-	if err != nil {
-		return false, err
-	}
+	var secret corev1.Secret
 
-	secret, err := utils.ObjectToSecret(unstructuredObject)
+	err := r.GetClient().Get(
+		ctx,
+		client.ObjectKey{Namespace: r.instance.Namespace, Name: r.instance.ClusterName + apiv1.ServerSecretSuffix},
+		&secret)
 	if err != nil {
 		return false, err
 	}
 
 	return r.refreshCertificateFilesFromSecret(
-		secret,
+		&secret,
 		postgresSpec.ServerCertificateLocation,
 		postgresSpec.ServerKeyLocation)
 }
 
-// RefreshReplicationUserCertificate get the latest certificates from the
+// RefreshReplicationUserCertificate gets the latest replication certificates from the
 // secrets. Returns true if configuration has been changed
 func (r *InstanceReconciler) RefreshReplicationUserCertificate(ctx context.Context) (bool, error) {
-	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "secrets",
-	}).
-		Namespace(r.instance.Namespace).
-		Get(ctx, r.instance.ClusterName+apiv1.ReplicationSecretSuffix, metav1.GetOptions{})
-	if err != nil {
-		return false, err
-	}
-
-	secret, err := utils.ObjectToSecret(unstructuredObject)
+	var secret corev1.Secret
+	err := r.GetClient().Get(
+		ctx,
+		client.ObjectKey{Namespace: r.instance.Namespace, Name: r.instance.ClusterName + apiv1.ReplicationSecretSuffix},
+		&secret)
 	if err != nil {
 		return false, err
 	}
 
 	return r.refreshCertificateFilesFromSecret(
-		secret,
+		&secret,
 		postgresSpec.StreamingReplicaCertificateLocation,
 		postgresSpec.StreamingReplicaKeyLocation)
 }
 
-// RefreshCA get the latest certificates from the
+// RefreshCA gets the latest CA certificates from the
 // secrets. Returns true if configuration has been changed
 func (r *InstanceReconciler) RefreshCA(ctx context.Context) (bool, error) {
-	unstructuredObject, err := r.client.Resource(schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "secrets",
-	}).
-		Namespace(r.instance.Namespace).
-		Get(ctx, r.instance.ClusterName+apiv1.CaSecretSuffix, metav1.GetOptions{})
+	var secret corev1.Secret
+	err := r.GetClient().Get(
+		ctx,
+		client.ObjectKey{Namespace: r.instance.Namespace, Name: r.instance.ClusterName + apiv1.CaSecretSuffix},
+		&secret)
 	if err != nil {
 		return false, err
 	}
 
-	secret, err := utils.ObjectToSecret(unstructuredObject)
-	if err != nil {
-		return false, err
-	}
-
-	return r.refreshCAFromSecret(secret)
+	return r.refreshCAFromSecret(&secret)
 }
 
-// VerifyPgDataCoherence check if this cluster exist in k8s and panic if this
+// VerifyPgDataCoherence checks if this cluster exists in K8s. It panics if this
 // pod belongs to a primary but the cluster status is not coherent with that
 func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 	r.log.Info("Checking PGDATA coherence")
 
-	cluster, err := utils.GetCluster(ctx, r.client, r.instance.Namespace, r.instance.ClusterName)
+	var cluster apiv1.Cluster
+	err := r.GetClient().Get(
+		ctx,
+		client.ObjectKey{Namespace: r.instance.Namespace, Name: r.instance.ClusterName},
+		&cluster)
 	if err != nil {
 		return fmt.Errorf("error while decoding runtime.Object data from watch: %w", err)
 	}
@@ -119,7 +104,7 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 	r.log.Info("Instance type", "isPrimary", isPrimary)
 
 	if isPrimary {
-		return r.verifyPgDataCoherenceForPrimary(ctx, cluster)
+		return r.verifyPgDataCoherenceForPrimary(ctx, &cluster)
 	}
 
 	return nil
@@ -214,7 +199,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 // progress. The function will create a watch on the cluster resource and wait
 // until the switchover is completed
 func (r *InstanceReconciler) waitForSwitchoverToBeCompleted(ctx context.Context) error {
-	switchoverWatch, err := r.client.
+	switchoverWatch, err := r.dynamicClient.
 		Resource(apiv1.ClusterGVK).
 		Namespace(r.instance.Namespace).
 		Watch(ctx, metav1.ListOptions{

@@ -21,8 +21,6 @@ import (
 
 	"github.com/lib/pq"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -49,12 +47,7 @@ var (
 
 // Restore restore a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore(ctx context.Context) error {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return err
-	}
-
-	dynamicClient, err := dynamic.NewForConfig(config)
+	client, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return err
 	}
@@ -68,7 +61,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.writeInitialPostgresqlConf(ctx, dynamicClient); err != nil {
+	if err := info.writeInitialPostgresqlConf(ctx, client); err != nil {
 		return err
 	}
 
@@ -213,7 +206,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 }
 
 // writeInitialPostgresqlConf reset the postgresql.conf that there is in the instance
-func (info InitInfo) writeInitialPostgresqlConf(ctx context.Context, client dynamic.Interface) error {
+func (info InitInfo) writeInitialPostgresqlConf(ctx context.Context, client client.Client) error {
 	if err := fileutils.EnsureDirectoryExist(postgresSpec.RecoveryTemporaryDirectory); err != nil {
 		return err
 	}
