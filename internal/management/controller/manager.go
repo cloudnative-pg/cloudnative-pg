@@ -18,11 +18,11 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
@@ -31,42 +31,41 @@ import (
 // the one of this PostgreSQL instance. Also the configuration in the
 // ConfigMap is applied when needed
 type InstanceReconciler struct {
-	client          dynamic.Interface
-	staticClient    kubernetes.Interface
+	client          ctrl.Client
+	dynamicClient   dynamic.Interface
 	instance        *postgres.Instance
 	log             logr.Logger
 	watchCollection *WatchCollection
 }
 
-// NewInstanceReconciler create a new instance reconciler
+// NewInstanceReconciler creates a new instance reconciler
 func NewInstanceReconciler(instance *postgres.Instance) (*InstanceReconciler, error) {
-	config, err := rest.InClusterConfig()
+	client, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := dynamic.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
+	// Unfortunately we need a dynamic client to watch over Clusters, because
+	// `controller-runtime` 0.8.0 don't have that feature. `0.9.0` will have
+	// a generic interface over watches, so let's wait for it.
 
-	staticClient, err := kubernetes.NewForConfig(config)
+	dynamicClient, err := management.NewDynamicClient()
 	if err != nil {
 		return nil, err
 	}
 
 	return &InstanceReconciler{
-		instance:     instance,
-		log:          log.Log,
-		client:       client,
-		staticClient: staticClient,
+		instance:      instance,
+		log:           log.Log,
+		client:        client,
+		dynamicClient: dynamicClient,
 	}, nil
 }
 
 // Run runs the reconciliation loop for this resource
 func (r *InstanceReconciler) Run(ctx context.Context) {
 	for {
-		// Retry with exponential back-off unless it is a connection refused error
+		// Retry with exponential back-off, unless it is a connection refused error
 		err := retry.OnError(retry.DefaultBackoff, func(err error) bool {
 			r.log.Error(err, "Error calling Watch", "cluster", r.instance.ClusterName)
 			return !utilnet.IsConnectionRefused(err)
@@ -74,7 +73,7 @@ func (r *InstanceReconciler) Run(ctx context.Context) {
 			return r.watch(ctx)
 		})
 		if err != nil {
-			// If this is "connection refused" error, it means that most likely apiserver is not responsive.
+			// If this is "connection refused" error, it means that apiserver is probably not responsive.
 			// If that's the case wait and resend watch request.
 			time.Sleep(time.Second)
 		}
@@ -90,7 +89,7 @@ func (r *InstanceReconciler) watch(ctx context.Context) error {
 
 	// This is an example of how to watch a certain object
 	// https://github.com/kubernetes/kubernetes/issues/43299
-	clusterWatch, err := r.client.
+	clusterWatch, err := r.dynamicClient.
 		Resource(apiv1.ClusterGVK).
 		Namespace(r.instance.Namespace).
 		Watch(ctx, metav1.ListOptions{
@@ -126,11 +125,6 @@ func (r *InstanceReconciler) Stop() {
 }
 
 // GetClient returns the dynamic client that is being used for a certain reconciler
-func (r *InstanceReconciler) GetClient() dynamic.Interface {
+func (r *InstanceReconciler) GetClient() ctrl.Client {
 	return r.client
-}
-
-// GetStaticClient returns the static client that is being used for a certain reconciler
-func (r *InstanceReconciler) GetStaticClient() kubernetes.Interface {
-	return r.staticClient
 }

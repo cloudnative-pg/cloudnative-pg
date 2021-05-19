@@ -16,8 +16,8 @@ import (
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
@@ -104,8 +104,11 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	queries := metrics.NewQueriesCollector("cnp", r.instance, dbname)
 
 	for _, reference := range configuration.CustomQueriesConfigMap {
-		configMap, err := r.GetStaticClient().CoreV1().ConfigMaps(r.instance.Namespace).Get(
-			ctx, reference.Name, metav1.GetOptions{})
+		var configMap corev1.ConfigMap
+		err := r.GetClient().Get(
+			ctx,
+			client.ObjectKey{Namespace: r.instance.Namespace, Name: reference.Name},
+			&configMap)
 		if err != nil {
 			r.log.Info("Unable to get configMap containing custom monitoring queries",
 				"reference", reference,
@@ -136,8 +139,8 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	}
 
 	for _, reference := range configuration.CustomQueriesSecret {
-		secret, err := r.GetStaticClient().CoreV1().Secrets(r.instance.Namespace).Get(
-			ctx, reference.Name, metav1.GetOptions{})
+		var secret corev1.Secret
+		err := r.GetClient().Get(ctx, client.ObjectKey{Namespace: r.instance.Namespace, Name: reference.Name}, &secret)
 		if err != nil {
 			r.log.Info("Unable to get secret containing custom monitoring queries",
 				"reference", reference,

@@ -11,6 +11,7 @@ package management
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -31,7 +32,7 @@ func init() {
 	_ = apiv1.AddToScheme(Scheme)
 }
 
-// NewControllerRuntimeClient create a new typed K8s client where
+// NewControllerRuntimeClient creates a new typed K8s client where
 // the PostgreSQL CRD has already been registered
 func NewControllerRuntimeClient() (client.Client, error) {
 	config, err := rest.InClusterConfig()
@@ -45,8 +46,9 @@ func NewControllerRuntimeClient() (client.Client, error) {
 	})
 }
 
-// NewClientGoClient create a new client-go kubernetes interface
-func NewClientGoClient() (kubernetes.Interface, error) {
+// newClientGoClient creates a new client-go kubernetes interface.
+// It is used only to create event recorders, as controller-runtime do.
+func newClientGoClient() (kubernetes.Interface, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
@@ -55,9 +57,19 @@ func NewClientGoClient() (kubernetes.Interface, error) {
 	return kubernetes.NewForConfig(config)
 }
 
-// NewEventRecorder create a new event recorder
+// NewDynamicClient creates a new dynamic kubernetes interface
+func NewDynamicClient() (dynamic.Interface, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamic.NewForConfig(config)
+}
+
+// NewEventRecorder creates a new event recorder
 func NewEventRecorder() (record.EventRecorder, error) {
-	kubeClient, err := NewClientGoClient()
+	kubeClient, err := newClientGoClient()
 	if err != nil {
 		return nil, err
 	}
