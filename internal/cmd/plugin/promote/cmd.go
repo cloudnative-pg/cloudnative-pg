@@ -8,6 +8,8 @@ package promote
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 )
@@ -15,15 +17,17 @@ import (
 // NewCmd create the new "promote" subcommand
 func NewCmd() *cobra.Command {
 	promoteCmd := &cobra.Command{
-		Use:   "promote [cluster] [server]",
-		Short: "Promote a certain server as a primary",
+		Use:   "promote [cluster] [node]",
+		Short: "Promote the pod named [cluster]-[node] or [node] to primary",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 			clusterName := args[0]
-			serverName := args[1]
-
-			return Promote(ctx, clusterName, serverName)
+			node := args[1]
+			if _, err := strconv.Atoi(args[1]); err == nil {
+				node = fmt.Sprintf("%s-%s", clusterName, node)
+			}
+			return Promote(ctx, clusterName, node)
 		},
 	}
 

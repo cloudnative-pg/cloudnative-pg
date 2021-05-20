@@ -114,6 +114,10 @@ can start with maintenance work or test a switch-over situation in your cluster
 ```shell
 kubectl cnp promote cluster-example cluster-example-2
 ```
+Or you can use the instance node number to promote
+```shell
+kubectl cnp promote cluster-example 2
+```
 
 ### Certificates
 
