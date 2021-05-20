@@ -19,18 +19,20 @@ Below you will find a description of the defined resources:
 
 {{ range $ -}}
 - [{{ .Name -}}](#{{ .Name -}})
-{{end}}
+{{ end }}
 
 {{ range $ -}}
-## {{ .NameWithAnchor }}
+{{ .Anchor }}
+## {{ .Name }}
 
 {{ .Doc -}}
-{{if .Items }}
+{{ if .Items }}
 
 {{ .TableFieldName }} | {{ .TableFieldDoc }} | {{ .TableFieldRawType }}
 {{ .TableFieldNameDashSize }} | {{ .TableFieldDocDashSize }} | {{ .TableFieldRawTypeDashSize }}
-{{end}}
+{{ end }}
 {{- range .Items -}}
-`{{ .Name }}` | {{ .Doc }}{{if .Mandatory }} - *mandatory* {{ end }} | {{ .RawType }}
+`{{ .Name }}` | {{ .Doc }}{{ if .Mandatory }} - *mandatory* {{ end }} | {{ .RawType }}
 {{ end }}
 {{ end -}}
+
