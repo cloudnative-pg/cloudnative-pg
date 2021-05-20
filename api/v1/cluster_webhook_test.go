@@ -7,12 +7,13 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 )
 
 var _ = Describe("bootstrap methods validation", func() {
@@ -732,5 +733,32 @@ var _ = Describe("Cluster name validation", func() {
 			},
 		}
 		Expect(cluster.validateName()).To(BeEmpty())
+	})
+
+	It("should return errors when the name is not DNS-1035 compliant", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "4b96d026-a956-47eb-bae8-a99b840805c3",
+			},
+		}
+		Expect(cluster.validateName()).NotTo(BeEmpty())
+	})
+
+	It("should return errors when the name length is greater than 50", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: strings.Repeat("toomuchlong", 4) + "-" + "after4times",
+			},
+		}
+		Expect(cluster.validateName()).NotTo(BeEmpty())
+	})
+
+	It("should return errors when having a name with dots", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "wrong.name",
+			},
+		}
+		Expect(cluster.validateName()).NotTo(BeEmpty())
 	})
 })

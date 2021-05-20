@@ -9,13 +9,13 @@ package v1
 import (
 	"fmt"
 	"reflect"
-	"regexp"
 	"strconv"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -28,8 +28,6 @@ import (
 
 // clusterLog is for logging in this package.
 var clusterLog = logf.Log.WithName("cluster-resource").WithValues("version", "v1")
-
-var dnsLabelNamesRegexp = regexp.MustCompile("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 
 // SetupWebhookWithManager setup the webhook inside the controller manager
 func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -559,7 +557,7 @@ func (r *Cluster) validateStorageSizeChange(old *Cluster) field.ErrorList {
 func (r *Cluster) validateName() field.ErrorList {
 	var result field.ErrorList
 
-	if !dnsLabelNamesRegexp.Match([]byte(r.Name)) {
+	if errs := validationutil.IsDNS1035Label(r.Name); len(errs) > 0 {
 		result = append(result, field.Invalid(
 			field.NewPath("metadata", "name"),
 			r.Name,
