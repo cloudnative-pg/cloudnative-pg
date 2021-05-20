@@ -50,7 +50,8 @@ Below you will find a description of the defined resources:
 - [WalBackupConfiguration](#WalBackupConfiguration)
 
 
-## <a id='AffinityConfiguration'></a>`AffinityConfiguration`
+<a id='AffinityConfiguration'></a>
+## AffinityConfiguration
 
 AffinityConfiguration contains the info we need to create the affinity rules for Pods
 
@@ -60,7 +61,8 @@ Name                  | Description                                             
 `topologyKey          ` | TopologyKey to use for anti-affinity configuration. See k8s documentation for more info on that                                                                          - *mandatory*  | string           
 `nodeSelector         ` | NodeSelector is map of key-value pairs used to define the nodes on which the pods can run. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/ | map[string]string
 
-## <a id='Backup'></a>`Backup`
+<a id='Backup'></a>
+## Backup
 
 Backup is the Schema for the backups API
 
@@ -70,7 +72,8 @@ Name     | Description                                                          
 `spec    ` | Specification of the desired behavior of the backup. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status                                                              | [BackupSpec](#BackupSpec)                                                                                   
 `status  ` | Most recently observed status of the backup. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [BackupStatus](#BackupStatus)                                                                               
 
-## <a id='BackupConfiguration'></a>`BackupConfiguration`
+<a id='BackupConfiguration'></a>
+## BackupConfiguration
 
 BackupConfiguration defines how the backup of the cluster are taken. Currently the only supported backup method is barmanObjectStore. For details and examples refer to the Backup and Recovery section of the documentation
 
@@ -78,7 +81,8 @@ Name              | Description                                       | Type
 ----------------- | ------------------------------------------------- | ------------------------------------------------------------------
 `barmanObjectStore` | The configuration for the barman-cloud tool suite | [*BarmanObjectStoreConfiguration](#BarmanObjectStoreConfiguration)
 
-## <a id='BackupList'></a>`BackupList`
+<a id='BackupList'></a>
+## BackupList
 
 BackupList contains a list of Backup
 
@@ -87,7 +91,8 @@ Name     | Description                                                          
 `metadata` | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#listmeta-v1-meta)
 `items   ` | List of backups                                                                                                                    - *mandatory*  | [[]Backup](#Backup)                                                                                     
 
-## <a id='BackupSpec'></a>`BackupSpec`
+<a id='BackupSpec'></a>
+## BackupSpec
 
 BackupSpec defines the desired state of Backup
 
@@ -95,7 +100,8 @@ Name    | Description           | Type
 ------- | --------------------- | ---------------------------------------------
 `cluster` | The cluster to backup | [LocalObjectReference](#LocalObjectReference)
 
-## <a id='BackupStatus'></a>`BackupStatus`
+<a id='BackupStatus'></a>
+## BackupStatus
 
 BackupStatus defines the observed state of Backup
 
@@ -114,7 +120,8 @@ Name            | Description                                                   
 `commandOutput  ` | The backup command output                                                                                                                              | string                                                                                           
 `commandError   ` | The backup command output                                                                                                                              | string                                                                                           
 
-## <a id='BarmanObjectStoreConfiguration'></a>`BarmanObjectStoreConfiguration`
+<a id='BarmanObjectStoreConfiguration'></a>
+## BarmanObjectStoreConfiguration
 
 BarmanObjectStoreConfiguration contains the backup configuration using Barman against an S3-compatible object storage
 
@@ -127,7 +134,8 @@ Name            | Description                                                   
 `wal            ` | The configuration for the backup of the WAL stream. When not defined, WAL files will be stored uncompressed and may be unencrypted in the object store, according to the bucket default policy.            | [*WalBackupConfiguration](#WalBackupConfiguration)  
 `data           ` | The configuration to be used to backup the data files When not defined, base backups files will be stored uncompressed and may be unencrypted in the object store, according to the bucket default policy. | [*DataBackupConfiguration](#DataBackupConfiguration)
 
-## <a id='BootstrapConfiguration'></a>`BootstrapConfiguration`
+<a id='BootstrapConfiguration'></a>
+## BootstrapConfiguration
 
 BootstrapConfiguration contains information about how to create the PostgreSQL cluster. Only a single bootstrap method can be defined among the supported ones. `initdb` will be used as the bootstrap method if left unspecified. Refer to the Bootstrap page of the documentation for more information.
 
@@ -136,7 +144,8 @@ Name     | Description                         | Type
 `initdb  ` | Bootstrap the cluster via initdb    | [*BootstrapInitDB](#BootstrapInitDB)    
 `recovery` | Bootstrap the cluster from a backup | [*BootstrapRecovery](#BootstrapRecovery)
 
-## <a id='BootstrapInitDB'></a>`BootstrapInitDB`
+<a id='BootstrapInitDB'></a>
+## BootstrapInitDB
 
 BootstrapInitDB is the configuration of the bootstrap process when initdb is used Refer to the Bootstrap page of the documentation for more information.
 
@@ -147,7 +156,8 @@ Name     | Description                                                          
 `secret  ` | Name of the secret containing the initial credentials for the owner of the user database. If empty a new secret will be created from scratch | [*LocalObjectReference](#LocalObjectReference)
 `options ` | The list of options that must be passed to initdb when creating the cluster                                                                  | []string                                      
 
-## <a id='BootstrapRecovery'></a>`BootstrapRecovery`
+<a id='BootstrapRecovery'></a>
+## BootstrapRecovery
 
 BootstrapRecovery contains the configuration required to restore the backup with the specified name and, after having changed the password with the one chosen for the superuser, will use it to bootstrap a full cluster cloning all the instances from the restored primary. Refer to the Bootstrap page of the documentation for more information.
 
@@ -156,7 +166,8 @@ Name           | Description                                                    
 `backup        ` | The backup we need to restore                                                                                                                                                   - *mandatory*  | [LocalObjectReference](#LocalObjectReference)
 `recoveryTarget` | By default the recovery will end as soon as a consistent state is reached: in this case that means at the end of a backup. This option allows to fine tune the recovery process | [*RecoveryTarget](#RecoveryTarget)           
 
-## <a id='Cluster'></a>`Cluster`
+<a id='Cluster'></a>
+## Cluster
 
 Cluster is the Schema for the PostgreSQL API
 
@@ -166,7 +177,8 @@ Name     | Description                                                          
 `spec    ` | Specification of the desired behavior of the cluster. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status                                                              | [ClusterSpec](#ClusterSpec)                                                                                 
 `status  ` | Most recently observed status of the cluster. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [ClusterStatus](#ClusterStatus)                                                                             
 
-## <a id='ClusterList'></a>`ClusterList`
+<a id='ClusterList'></a>
+## ClusterList
 
 ClusterList contains a list of Cluster
 
@@ -175,7 +187,8 @@ Name     | Description                                                          
 `metadata` | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#listmeta-v1-meta)
 `items   ` | List of clusters                                                                                                                   - *mandatory*  | [[]Cluster](#Cluster)                                                                                   
 
-## <a id='ClusterSpec'></a>`ClusterSpec`
+<a id='ClusterSpec'></a>
+## ClusterSpec
 
 ClusterSpec defines the desired state of Cluster
 
@@ -202,7 +215,8 @@ Name                  | Description                                             
 `nodeMaintenanceWindow` | Define a maintenance window for the Kubernetes nodes                                                                                                                                                           | [*NodeMaintenanceWindow](#NodeMaintenanceWindow)                                                                                
 `monitoring           ` | The configuration of the monitoring infrastructure of this cluster                                                                                                                                             | [*MonitoringConfiguration](#MonitoringConfiguration)                                                                            
 
-## <a id='ClusterStatus'></a>`ClusterStatus`
+<a id='ClusterStatus'></a>
+## ClusterStatus
 
 ClusterStatus defines the observed state of Cluster
 
@@ -224,7 +238,8 @@ Name                   | Description                                            
 `phaseReason           ` | Reason for the current phase                                                                                                                                                | string                                           
 `secretsResourceVersion` | The list of resource versions of the secrets managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the secret data | [SecretsResourceVersion](#SecretsResourceVersion)
 
-## <a id='ConfigMapKeySelector'></a>`ConfigMapKeySelector`
+<a id='ConfigMapKeySelector'></a>
+## ConfigMapKeySelector
 
 ConfigMapKeySelector contains enough information to let you locate the key of a ConfigMap
 
@@ -232,7 +247,8 @@ Name  | Description       | Type
 --- | ----------------- | ------
 `key` | The key to select - *mandatory*  | string
 
-## <a id='DataBackupConfiguration'></a>`DataBackupConfiguration`
+<a id='DataBackupConfiguration'></a>
+## DataBackupConfiguration
 
 DataBackupConfiguration is the configuration of the backup of the data directory
 
@@ -243,7 +259,8 @@ Name                | Description                                               
 `immediateCheckpoint` | Control whether the I/O workload for the backup initial checkpoint will be limited, according to the `checkpoint_completion_target` setting on the PostgreSQL server. If set to true, an immediate checkpoint will be used, meaning PostgreSQL will complete the checkpoint as soon as possible. `false` by default. | bool           
 `jobs               ` | The number of parallel jobs to be used to upload the backup, defaults to 2                                                                                                                                                                                                                                           | *int32         
 
-## <a id='LocalObjectReference'></a>`LocalObjectReference`
+<a id='LocalObjectReference'></a>
+## LocalObjectReference
 
 LocalObjectReference contains enough information to let you locate a local object with a known type inside the same namespace
 
@@ -251,7 +268,8 @@ Name | Description           | Type
 ---- | --------------------- | ------
 `name` | Name of the referent. - *mandatory*  | string
 
-## <a id='MonitoringConfiguration'></a>`MonitoringConfiguration`
+<a id='MonitoringConfiguration'></a>
+## MonitoringConfiguration
 
 MonitoringConfiguration is the type containing all the monitoring configuration for a certain cluster
 
@@ -260,7 +278,8 @@ Name                   | Description                                           |
 `customQueriesConfigMap` | The list of config maps containing the custom queries | [[]ConfigMapKeySelector](#ConfigMapKeySelector)
 `customQueriesSecret   ` | The list of secrets containing the custom queries     | [[]SecretKeySelector](#SecretKeySelector)      
 
-## <a id='NodeMaintenanceWindow'></a>`NodeMaintenanceWindow`
+<a id='NodeMaintenanceWindow'></a>
+## NodeMaintenanceWindow
 
 NodeMaintenanceWindow contains information that the operator will use while upgrading the underlying node.
 
@@ -271,7 +290,8 @@ Name       | Description                                                        
 `inProgress` | Is there a node maintenance activity in progress?                                          - *mandatory*  | bool 
 `reusePVC  ` | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere) - *mandatory*  | *bool
 
-## <a id='PostgresConfiguration'></a>`PostgresConfiguration`
+<a id='PostgresConfiguration'></a>
+## PostgresConfiguration
 
 PostgresConfiguration defines the PostgreSQL configuration
 
@@ -280,7 +300,8 @@ Name       | Description                                                        
 `parameters` | PostgreSQL configuration options (postgresql.conf)                                        | map[string]string
 `pg_hba    ` | PostgreSQL Host Based Authentication rules (lines to be appended to the pg_hba.conf file) | []string         
 
-## <a id='RecoveryTarget'></a>`RecoveryTarget`
+<a id='RecoveryTarget'></a>
+## RecoveryTarget
 
 RecoveryTarget allows to configure the moment where the recovery process will stop. All the target options except TargetTLI are mutually exclusive.
 
@@ -294,7 +315,8 @@ Name            | Description                                                   
 `targetImmediate` | End recovery as soon as a consistent state is reached                     | *bool 
 `exclusive      ` | Set the target to be exclusive (defaults to true)                         | *bool 
 
-## <a id='RollingUpdateStatus'></a>`RollingUpdateStatus`
+<a id='RollingUpdateStatus'></a>
+## RollingUpdateStatus
 
 RollingUpdateStatus contains the information about an instance which is being updated
 
@@ -303,7 +325,8 @@ Name      | Description                         | Type
 `imageName` | The image which we put into the Pod - *mandatory*  | string                                                                                          
 `startedAt` | When the update has been started    | [metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#time-v1-meta)
 
-## <a id='S3Credentials'></a>`S3Credentials`
+<a id='S3Credentials'></a>
+## S3Credentials
 
 S3Credentials is the type for the credentials to be used to upload files to S3
 
@@ -312,7 +335,8 @@ Name            | Description                            | Type
 `accessKeyId    ` | The reference to the access key id     - *mandatory*  | [SecretKeySelector](#SecretKeySelector)
 `secretAccessKey` | The reference to the secret access key - *mandatory*  | [SecretKeySelector](#SecretKeySelector)
 
-## <a id='ScheduledBackup'></a>`ScheduledBackup`
+<a id='ScheduledBackup'></a>
+## ScheduledBackup
 
 ScheduledBackup is the Schema for the scheduledbackups API
 
@@ -322,7 +346,8 @@ Name     | Description                                                          
 `spec    ` | Specification of the desired behavior of the ScheduledBackup. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status                                                              | [ScheduledBackupSpec](#ScheduledBackupSpec)                                                                 
 `status  ` | Most recently observed status of the ScheduledBackup. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [ScheduledBackupStatus](#ScheduledBackupStatus)                                                             
 
-## <a id='ScheduledBackupList'></a>`ScheduledBackupList`
+<a id='ScheduledBackupList'></a>
+## ScheduledBackupList
 
 ScheduledBackupList contains a list of ScheduledBackup
 
@@ -331,7 +356,8 @@ Name     | Description                                                          
 `metadata` | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#listmeta-v1-meta)
 `items   ` | List of clusters                                                                                                                   - *mandatory*  | [[]ScheduledBackup](#ScheduledBackup)                                                                   
 
-## <a id='ScheduledBackupSpec'></a>`ScheduledBackupSpec`
+<a id='ScheduledBackupSpec'></a>
+## ScheduledBackupSpec
 
 ScheduledBackupSpec defines the desired state of ScheduledBackup
 
@@ -341,7 +367,8 @@ Name     | Description                                                          
 `schedule` | The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron. - *mandatory*  | string                                       
 `cluster ` | The cluster to backup                                                | [LocalObjectReference](#LocalObjectReference)
 
-## <a id='ScheduledBackupStatus'></a>`ScheduledBackupStatus`
+<a id='ScheduledBackupStatus'></a>
+## ScheduledBackupStatus
 
 ScheduledBackupStatus defines the observed state of ScheduledBackup
 
@@ -351,7 +378,8 @@ Name             | Description                                                  
 `lastScheduleTime` | Information when was the last time that backup was successfully scheduled. | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#time-v1-meta)
 `nextScheduleTime` | Next time we will run a backup                                             | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#time-v1-meta)
 
-## <a id='SecretKeySelector'></a>`SecretKeySelector`
+<a id='SecretKeySelector'></a>
+## SecretKeySelector
 
 SecretKeySelector contains enough information to let you locate the key of a Secret
 
@@ -359,7 +387,8 @@ Name  | Description       | Type
 --- | ----------------- | ------
 `key` | The key to select - *mandatory*  | string
 
-## <a id='SecretsResourceVersion'></a>`SecretsResourceVersion`
+<a id='SecretsResourceVersion'></a>
+## SecretsResourceVersion
 
 SecretsResourceVersion is the resource versions of the secrets managed by the operator
 
@@ -371,7 +400,8 @@ Name                     | Description                                          
 `caSecretVersion         ` | The resource version of the "ca" secret version                   - *mandatory*  | string
 `serverSecretVersion     ` | The resource version of the PostgreSQL server-side secret version - *mandatory*  | string
 
-## <a id='StorageConfiguration'></a>`StorageConfiguration`
+<a id='StorageConfiguration'></a>
+## StorageConfiguration
 
 StorageConfiguration is the configuration of the storage of the PostgreSQL instances
 
@@ -382,7 +412,8 @@ Name               | Description                                                
 `resizeInUseVolumes` | Resize existent PVCs, defaults to true                                                                                                                                                     | *bool                                                                                                                                  
 `pvcTemplate       ` | Template to be used to generate the Persistent Volume Claim                                                                                                                                | [*corev1.PersistentVolumeClaimSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#persistentvolumeclaim-v1-core)
 
-## <a id='WalBackupConfiguration'></a>`WalBackupConfiguration`
+<a id='WalBackupConfiguration'></a>
+## WalBackupConfiguration
 
 WalBackupConfiguration is the configuration of the backup of the WAL stream
 
