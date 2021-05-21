@@ -34,7 +34,8 @@ var _ = BeforeSuite(func() {
 	//+kubebuilder:scaffold:scheme
 
 	// Check operator pod should be running
-	Eventually(env.GetOperatorPod, 120).ShouldNot(BeNil(), "Operator pod does not exist")
+	// TODO write as an assert
+	Eventually(env.IsOperatorReady, 120).Should(BeTrue(), "Operator pod is not ready")
 
 	operatorPod, err := env.GetOperatorPod()
 	Expect(err).NotTo(HaveOccurred())

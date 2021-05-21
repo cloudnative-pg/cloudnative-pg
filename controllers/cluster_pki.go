@@ -19,11 +19,6 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
-const (
-	// CaSecretName is the name of the secret which is hosting the Operator CA
-	CaSecretName = "postgresql-operator-ca-secret" // #nosec
-)
-
 // createPostgresPKI create all the PKI infrastructure that PostgreSQL need to work
 // if using ssl=on
 func (r *ClusterReconciler) createPostgresPKI(ctx context.Context, cluster *apiv1.Cluster) error {
@@ -94,12 +89,12 @@ func (r *ClusterReconciler) ensureCASecret(ctx context.Context, cluster *apiv1.C
 		return nil, err
 	}
 
-	derivedCaPair, err := certs.CreateRootCA(cluster.Name, cluster.Namespace)
+	caPair, err := certs.CreateRootCA(cluster.Name, cluster.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("while creating the CA of the cluster: %w", err)
 	}
 
-	derivedCaSecret := derivedCaPair.GenerateCASecret(cluster.Namespace, cluster.GetCASecretName())
+	derivedCaSecret := caPair.GenerateCASecret(cluster.Namespace, cluster.GetCASecretName())
 	utils.SetAsOwnedBy(&derivedCaSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 	err = r.Create(ctx, derivedCaSecret)
 	return derivedCaSecret, err
