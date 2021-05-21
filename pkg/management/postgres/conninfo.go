@@ -22,6 +22,6 @@ func buildPrimaryConnInfo(primaryHostname, applicationName string) string {
 		fmt.Sprintf("sslcert=%v ", postgres.StreamingReplicaCertificateLocation) +
 		fmt.Sprintf("sslrootcert=%v ", postgres.CACertificateLocation) +
 		fmt.Sprintf("application_name=%v ", applicationName) +
-		"sslmode=require"
+		"sslmode=verify-ca"
 	return primaryConnInfo
 }
