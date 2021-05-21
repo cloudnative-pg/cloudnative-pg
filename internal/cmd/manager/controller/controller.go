@@ -46,22 +46,25 @@ var (
 )
 
 const (
-	// This is the name of the secret where the certificates
+	// WebhookSecretName is the name of the secret where the certificates
 	// for the webhook server are stored
-	webhookSecretName = "postgresql-operator-webhook-cert" // #nosec
+	WebhookSecretName = "postgresql-operator-webhook-cert" // #nosec
 
-	// This is the name of the service where the webhook server
+	// WebhookServiceName is the name of the service where the webhook server
 	// is reachable
-	webhookServiceName = "postgresql-operator-webhook-service" // #nosec
+	WebhookServiceName = "postgresql-operator-webhook-service" // #nosec
 
-	// This is the name of the mutating webhook configuration
-	mutatingWebhookConfigurationName = "postgresql-operator-mutating-webhook-configuration"
+	// MutatingWebhookConfigurationName is the name of the mutating webhook configuration
+	MutatingWebhookConfigurationName = "postgresql-operator-mutating-webhook-configuration"
 
-	// This is the name of the validating webhook configuration
-	validatingWebhookConfigurationName = "postgresql-operator-validating-webhook-configuration"
+	// ValidatingWebhookConfigurationName is the name of the validating webhook configuration
+	ValidatingWebhookConfigurationName = "postgresql-operator-validating-webhook-configuration"
 
 	// The name of the directory containing the TLS certificates
 	defaultWebhookCertDir = "/controller/certificates"
+
+	// CaSecretName is the name of the secret which is hosting the Operator CA
+	CaSecretName = "postgresql-operator-ca-secret" // #nosec
 )
 
 func init() {
@@ -197,7 +200,17 @@ func RunController(metricsAddr, configMapName string, enableLeaderElection bool)
 		return err
 	}
 
-	// Setup the handler used by the readiness and liveliness probe
+	// Setup the handler used by the readiness and liveliness probe.
+	//
+	// Unfortunately the readiness of the probe is not sufficient for the operator to be
+	// working correctly. The probe may be positive even when:
+	//
+	// 1. the CA is not yet updated inside the CRD and/or in the validating/mutating
+	//    webhook configuration. In that case we have a timeout error after trying
+	//    to send a POST message and getting no response message.
+	//
+	// 2. the webhook service and/or the CNI are being updated, e.g. when a POD is
+	//    deleted. In that case we could get a "Connection refused" error message.
 	mgr.GetWebhookServer().WebhookMux.HandleFunc("/readyz", readinessProbeHandler)
 
 	// +kubebuilder:scaffold:builder
@@ -243,13 +256,13 @@ func createKubernetesClient(config *rest.Config) error {
 // the operator and the clusters working
 func setupPKI(ctx context.Context, certDir string) error {
 	pkiConfig := certs.PublicKeyInfrastructure{
-		CaSecretName:                       controllers.CaSecretName,
+		CaSecretName:                       CaSecretName,
 		CertDir:                            certDir,
-		SecretName:                         webhookSecretName,
-		ServiceName:                        webhookServiceName,
+		SecretName:                         WebhookSecretName,
+		ServiceName:                        WebhookServiceName,
 		OperatorNamespace:                  configuration.Current.OperatorNamespace,
-		MutatingWebhookConfigurationName:   mutatingWebhookConfigurationName,
-		ValidatingWebhookConfigurationName: validatingWebhookConfigurationName,
+		MutatingWebhookConfigurationName:   MutatingWebhookConfigurationName,
+		ValidatingWebhookConfigurationName: ValidatingWebhookConfigurationName,
 		CustomResourceDefinitionsName: []string{
 			"backups.postgresql.k8s.enterprisedb.io",
 			"clusters.postgresql.k8s.enterprisedb.io",

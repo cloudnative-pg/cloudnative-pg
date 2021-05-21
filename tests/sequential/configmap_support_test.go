@@ -14,7 +14,6 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterapiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -43,10 +42,8 @@ var _ = Describe("ConfigMap support", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// verify new operator pod is up and running
-			Eventually(func() (bool, error) {
-				newOperatorPod, err := env.GetOperatorPod()
-				return err == nil && newOperatorPod.Name != operatorPod.Name && utils.IsPodReady(newOperatorPod), err
-			}, 120).Should(BeTrue())
+			// TODO write as an assert
+			Eventually(env.IsOperatorReady, 120).Should(BeTrue(), "Operator pod is not ready")
 		})
 	}
 

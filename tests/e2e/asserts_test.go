@@ -92,3 +92,8 @@ func AssertOperatorPodUnchanged(expectedOperatorPodName string) {
 	}
 	Expect(restartCount).Should(BeEquivalentTo(0), fmt.Sprintf("Operator pod get restarted %v times ", restartCount))
 }
+
+// AssertOperatorIsReady verifies that the operator is ready
+func AssertOperatorIsReady() {
+	Eventually(env.IsOperatorReady, 120).Should(BeTrue(), "Operator pod is not ready")
+}

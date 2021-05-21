@@ -23,6 +23,9 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/controller"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
@@ -44,6 +48,7 @@ type TestingEnvironment struct {
 	RestClientConfig   *rest.Config
 	Client             client.Client
 	Interface          kubernetes.Interface
+	APIExtensionClient apiextensionsclientset.Interface
 	Ctx                context.Context
 	Scheme             *runtime.Scheme
 	PreserveNamespaces []string
@@ -55,6 +60,7 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	var env TestingEnvironment
 	env.RestClientConfig = ctrl.GetConfigOrDie()
 	env.Interface = kubernetes.NewForConfigOrDie(env.RestClientConfig)
+	env.APIExtensionClient = apiextensionsclientset.NewForConfigOrDie(env.RestClientConfig)
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
 	env.Log = ctrl.Log.WithName("e2e")
@@ -406,4 +412,101 @@ func (env TestingEnvironment) GetPodLogs(namespace string, podName string) (stri
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// IsOperatorReady ensures that the operator will be ready.
+func (env TestingEnvironment) IsOperatorReady() (bool, error) {
+	pod, err := env.GetOperatorPod()
+	if err != nil {
+		return false, err
+	}
+
+	isPodReady := utils.IsPodReady(pod)
+	if !isPodReady {
+		return false, err
+	}
+
+	namespace := pod.Namespace
+
+	// Check CA
+	secret := &corev1.Secret{}
+	secretNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      controller.WebhookSecretName,
+	}
+	err = env.Client.Get(env.Ctx, secretNamespacedName, secret)
+
+	if err != nil {
+		return false, err
+	}
+
+	ca := secret.Data["tls.crt"]
+
+	ctx := context.Background()
+	mutatingWebhookConfig, err := env.Interface.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
+		ctx, controller.MutatingWebhookConfigurationName, metav1.GetOptions{})
+
+	if err != nil {
+		return false, err
+	}
+
+	for _, webhook := range mutatingWebhookConfig.Webhooks {
+		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
+			return false, fmt.Errorf("secret %+v not match with ca bundle in %v: %v is not equal to %v",
+				controller.MutatingWebhookConfigurationName, secret, string(ca), string(webhook.ClientConfig.CABundle))
+		}
+	}
+
+	validatingWebhookConfig, err := env.Interface.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
+		ctx, controller.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+
+	if err != nil {
+		return false, err
+	}
+
+	for _, webhook := range validatingWebhookConfig.Webhooks {
+		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
+			return false, fmt.Errorf("secret not match with ca bundle in %v",
+				controller.ValidatingWebhookConfigurationName)
+		}
+	}
+
+	customResourceDefinitionsName := []string{
+		"backups.postgresql.k8s.enterprisedb.io",
+		"clusters.postgresql.k8s.enterprisedb.io",
+		"scheduledbackups.postgresql.k8s.enterprisedb.io"}
+
+	for _, c := range customResourceDefinitionsName {
+		crd, err := env.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
+			ctx, c, metav1.GetOptions{})
+
+		if err != nil {
+			return false, err
+		}
+
+		if crd.Spec.Conversion == nil {
+			continue
+		}
+
+		if crd.Spec.Conversion.Strategy == v1.NoneConverter {
+			continue
+		}
+
+		if crd.Spec.Conversion.Webhook != nil && crd.Spec.Conversion.Webhook.ClientConfig != nil &&
+			!bytes.Equal(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, ca) {
+			return false, fmt.Errorf("secret not match with ca bundle in %v; %v not equal to %v", c,
+				string(crd.Spec.Conversion.Webhook.ClientConfig.CABundle), string(ca))
+		}
+	}
+
+	// Here the webhook service should be up and running. If it's not, it
+	// means that the service is still not updated with the right
+	// endpoints, or that kube-proxy has not reloaded the right network
+	// rules.
+	//
+	// If we also want to check this behavior we need to create a Job
+	// executing a request for the webhook API and verify if the Job
+	// correctly finish or not.
+
+	return true, err
 }
