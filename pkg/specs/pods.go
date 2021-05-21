@@ -140,12 +140,18 @@ func createPostgresContainers(
 			Resources: cluster.Spec.Resources,
 			Ports: []corev1.ContainerPort{
 				{
+					Name:          "postgresql",
 					ContainerPort: 5432,
 					Protocol:      "TCP",
 				},
 				{
 					Name:          "metrics",
 					ContainerPort: int32(url.MetricsPort),
+					Protocol:      "TCP",
+				},
+				{
+					Name:          "status",
+					ContainerPort: int32(url.StatusPort),
 					Protocol:      "TCP",
 				},
 			},

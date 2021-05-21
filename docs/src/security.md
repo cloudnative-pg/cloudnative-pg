@@ -109,12 +109,27 @@ to enable/disable inbound and outbound network access at IP and TCP level.
 
 !!! Important
     The operator needs to communicate to each instance on TCP port 8000
-    to get information about the status of the PostgreSQL server. Make sure
-    you keep this in mind in case you add any network policy.
+    to get information about the status of the PostgreSQL server. Please
+    make sure you keep this in mind in case you add any network policy,
+    and refer to the "Exposed Ports" section below for a list of ports used by
+    Cloud Native PostgreSQL for finer control.
 
 Network policies are beyond the scope of this document.
 Please refer to the ["Network policies"](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 section of the Kubernetes documentation for further information.
+
+#### Exposed Ports
+
+Cloud Native PostgreSQL exposes ports at operator, instance manager and operand
+levels, as listed in the table below:
+
+System           | Port number  | Exposing            |  Name               |  Certificates  |  Authentication
+:--------------- | :----------- | :------------------ | :------------------ | :------------  | :--------------
+operator         | 9443         | webhook server      | `webhook-server`    |  TLS           | Yes
+operator         | 8080         | metrics             | `metrics`           |  no TLS        | No
+instance manager | 9187         | metrics             | `metrics`           |  no TLS        | No
+instance manager | 8000         | status              | `status`            |  no TLS        | No
+operand          | 5432         | PostgreSQL instance | `postgresql`        |  optional TLS  | Yes
 
 ### PostgreSQL
 
