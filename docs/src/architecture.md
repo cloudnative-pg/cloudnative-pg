@@ -120,3 +120,4 @@ The `-app` credentials are the ones that should be used by applications
 connecting to the PostgreSQL cluster.
 
 The `-superuser` ones are supposed to be used only for administrative purposes.
+
