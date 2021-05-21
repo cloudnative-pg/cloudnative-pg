@@ -188,7 +188,7 @@ var _ = Describe("Webhook certificate validation", func() {
 
 		notAfter := time.Now().Add(-10 * time.Hour)
 		notBefore := notAfter.Add(-365 * 24 * time.Hour)
-		server, _ := ca.createAndSignPairWithValidity("this.server.com", notBefore, notAfter, CertTypeServer)
+		server, _ := ca.createAndSignPairWithValidity("this.server.com", notBefore, notAfter, CertTypeServer, nil)
 		serverSecret := server.GenerateServerSecret("operator-namespace", "pki-secret-name")
 
 		clientSet := fake.NewSimpleClientset(caSecret, serverSecret)
@@ -240,7 +240,7 @@ var _ = Describe("TLS certificates injection", func() {
 	// Create a CA and the pki secret
 	ca, _ := CreateRootCA("ca-secret-name", "operator-namespace")
 	caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
-	webhookPair, _ := ca.CreateAndSignPair("pki-service.operator-namespace.svc", CertTypeServer)
+	webhookPair, _ := ca.CreateAndSignPair("pki-service.operator-namespace.svc", CertTypeServer, nil)
 	webhookSecret := webhookPair.GenerateServerSecret(pki.OperatorNamespace, pki.SecretName)
 
 	It("inject the pki certificate in the mutating pki", func() {

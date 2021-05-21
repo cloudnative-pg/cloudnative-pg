@@ -34,18 +34,25 @@ func (r *ClusterReconciler) createPostgresPKI(ctx context.Context, cluster *apiv
 	}
 
 	// This is the certificate for the server
-	serverCommonName := fmt.Sprintf(
-		"%v.%v.svc",
-		cluster.GetServiceReadWriteName(),
-		cluster.Namespace)
 	serverCertificateName := client.ObjectKey{Namespace: cluster.GetNamespace(), Name: cluster.GetServerSecretName()}
 	err = r.ensureLeafCertificate(
 		ctx,
 		cluster,
 		serverCertificateName,
-		serverCommonName,
+		cluster.GetServiceReadWriteName(),
 		caSecret,
-		certs.CertTypeServer)
+		certs.CertTypeServer,
+		[]string{
+			cluster.GetServiceReadWriteName(),
+			fmt.Sprintf("%v.%v", cluster.GetServiceReadWriteName(), cluster.Namespace),
+			fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadWriteName(), cluster.Namespace),
+			cluster.GetServiceReadName(),
+			fmt.Sprintf("%v.%v", cluster.GetServiceReadName(), cluster.Namespace),
+			fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadName(), cluster.Namespace),
+			cluster.GetServiceReadOnlyName(),
+			fmt.Sprintf("%v.%v", cluster.GetServiceReadOnlyName(), cluster.Namespace),
+			fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadOnlyName(), cluster.Namespace),
+		})
 	if err != nil {
 		return fmt.Errorf("generating server certificate: %w", err)
 	}
@@ -61,7 +68,8 @@ func (r *ClusterReconciler) createPostgresPKI(ctx context.Context, cluster *apiv
 		replicationSecretName,
 		apiv1.StreamingReplicationUser,
 		caSecret,
-		certs.CertTypeClient)
+		certs.CertTypeClient,
+		nil)
 	if err != nil {
 		return fmt.Errorf("generating server certificate: %w", err)
 	}
@@ -139,6 +147,7 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 	commonName string,
 	caSecret *v1.Secret,
 	usage certs.CertType,
+	altDNSNames []string,
 ) error {
 	// TODO: refactor and extract this to power kubectl-cnp
 	var secret v1.Secret
@@ -152,7 +161,7 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 		return err
 	}
 
-	serverPair, err := caPair.CreateAndSignPair(commonName, usage)
+	serverPair, err := caPair.CreateAndSignPair(commonName, usage, altDNSNames)
 	if err != nil {
 		return err
 	}
