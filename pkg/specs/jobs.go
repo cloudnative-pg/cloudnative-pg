@@ -114,7 +114,6 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 		"instance",
 		"restore",
 		"--pw-file", "/etc/superuser-secret/password",
-		"--parent-node", cluster.GetServiceReadWriteName(),
 		"--backup-name", cluster.Spec.Bootstrap.Recovery.Backup.Name,
 	}
 
@@ -193,6 +192,76 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 	}
 
 	addManagerLoggingOptions(&job.Spec.Template.Spec.Containers[0])
+
+	return job
+}
+
+// CreatePrimaryJobViaPgBaseBackup create a new primary instance in a Pod
+func CreatePrimaryJobViaPgBaseBackup(
+	cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
+	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	jobName := fmt.Sprintf("%s-%v-pgbasebackup", cluster.Name, nodeSerial)
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: cluster.Namespace,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Hostname:  jobName,
+					Subdomain: cluster.GetServiceAnyName(),
+					InitContainers: []corev1.Container{
+						createBootstrapContainer(cluster),
+					},
+					Containers: []corev1.Container{
+						{
+							Name:  "bootstrap-pgbasebackup",
+							Image: cluster.GetImageName(),
+							Env: []corev1.EnvVar{
+								{
+									Name:  "PGDATA",
+									Value: "/var/lib/postgresql/data/pgdata",
+								},
+								{
+									Name:  "POD_NAME",
+									Value: podName,
+								},
+								{
+									Name:  "CLUSTER_NAME",
+									Value: cluster.Name,
+								},
+								{
+									Name:  "NAMESPACE",
+									Value: cluster.Namespace,
+								},
+								{
+									Name:  "PGHOST",
+									Value: "/var/run/postgresql",
+								},
+							},
+							Command: []string{
+								"/controller/manager",
+								"instance",
+								"pgbasebackup",
+								"--pw-file", "/etc/superuser-secret/password",
+							},
+							VolumeMounts:    createPostgresVolumeMounts(cluster),
+							Resources:       cluster.Spec.Resources,
+							SecurityContext: CreateContainerSecurityContext(),
+						},
+					},
+					Volumes:            createPostgresVolumes(cluster, podName),
+					SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
+					Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
+					ServiceAccountName: cluster.Name,
+					RestartPolicy:      corev1.RestartPolicyNever,
+					NodeSelector:       cluster.Spec.Affinity.NodeSelector,
+				},
+			},
+		},
+	}
 
 	return job
 }

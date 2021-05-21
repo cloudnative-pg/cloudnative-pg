@@ -61,11 +61,11 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.writeInitialPostgresqlConf(ctx, client); err != nil {
+	if err := info.WriteInitialPostgresqlConf(ctx, client); err != nil {
 		return err
 	}
 
-	if err := info.writeRestoreHbaConf(); err != nil {
+	if err := info.WriteRestoreHbaConf(); err != nil {
 		return err
 	}
 
@@ -73,7 +73,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	return info.configureInstanceAfterRestore()
+	return info.ConfigureInstanceAfterRestore()
 }
 
 // restoreDataDir restore PGDATA from an existing backup
@@ -164,11 +164,10 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 
 	log.Log.Info("Generated recovery configuration", "configuration", recoveryFileContents)
 
-	// Disable SSL as we still don't have the required certificates
+	// Disable archiving
 	err = fileutils.AppendStringToFile(
 		path.Join(info.PgData, PostgresqlCustomConfigurationFile),
-		"ssl = 'off'\n"+
-			"archive_command = 'cd .'\n")
+		"archive_command = 'cd .'\n")
 	if err != nil {
 		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
@@ -205,8 +204,9 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		0o600)
 }
 
-// writeInitialPostgresqlConf reset the postgresql.conf that there is in the instance
-func (info InitInfo) writeInitialPostgresqlConf(ctx context.Context, client client.Client) error {
+// WriteInitialPostgresqlConf reset the postgresql.conf that there is in the instance using
+// a new bootstrapped instance as reference
+func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, client client.Client) error {
 	if err := fileutils.EnsureDirectoryExist(postgresSpec.RecoveryTemporaryDirectory); err != nil {
 		return err
 	}
@@ -263,12 +263,20 @@ func (info InitInfo) writeInitialPostgresqlConf(ctx context.Context, client clie
 		return fmt.Errorf("while creating postgresql.auto.conf: %w", err)
 	}
 
+	// Disable SSL as we still don't have the required certificates
+	err = fileutils.AppendStringToFile(
+		path.Join(info.PgData, PostgresqlCustomConfigurationFile),
+		"ssl = 'off'\n")
+	if err != nil {
+		return fmt.Errorf("cannot write recovery config: %w", err)
+	}
+
 	return err
 }
 
-// writeRestoreHbaConf write a pg_hba.conf allowing access without password from localhost.
+// WriteRestoreHbaConf write a pg_hba.conf allowing access without password from localhost.
 // this is needed to set the PostgreSQL password after the postgres server is started and active
-func (info InitInfo) writeRestoreHbaConf() error {
+func (info InitInfo) WriteRestoreHbaConf() error {
 	// We allow every access from localhost, and this is needed to correctly restore
 	// the database
 	_, err := fileutils.WriteStringToFile(
@@ -286,11 +294,11 @@ func (info InitInfo) writeRestoreHbaConf() error {
 	return nil
 }
 
-// configureInstanceAfterRestore change the superuser password
+// ConfigureInstanceAfterRestore change the superuser password
 // of the instance to be coherent with the one specified in the
 // cluster. This function also ensure that we can really connect
 // to this cluster using the password in the secrets
-func (info InitInfo) configureInstanceAfterRestore() error {
+func (info InitInfo) ConfigureInstanceAfterRestore() error {
 	superUserPassword, err := fileutils.ReadFile(info.PasswordFile)
 	if err != nil {
 		return fmt.Errorf("cannot read superUserPassword file: %w", err)

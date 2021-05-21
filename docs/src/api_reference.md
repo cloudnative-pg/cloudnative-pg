@@ -26,6 +26,7 @@ Below you will find a description of the defined resources:
 - [BarmanObjectStoreConfiguration](#BarmanObjectStoreConfiguration)
 - [BootstrapConfiguration](#BootstrapConfiguration)
 - [BootstrapInitDB](#BootstrapInitDB)
+- [BootstrapPgBaseBackup](#BootstrapPgBaseBackup)
 - [BootstrapRecovery](#BootstrapRecovery)
 - [Cluster](#Cluster)
 - [ClusterList](#ClusterList)
@@ -33,6 +34,7 @@ Below you will find a description of the defined resources:
 - [ClusterStatus](#ClusterStatus)
 - [ConfigMapKeySelector](#ConfigMapKeySelector)
 - [DataBackupConfiguration](#DataBackupConfiguration)
+- [ExternalCluster](#ExternalCluster)
 - [LocalObjectReference](#LocalObjectReference)
 - [MonitoringConfiguration](#MonitoringConfiguration)
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
@@ -139,10 +141,11 @@ Name            | Description                                                   
 
 BootstrapConfiguration contains information about how to create the PostgreSQL cluster. Only a single bootstrap method can be defined among the supported ones. `initdb` will be used as the bootstrap method if left unspecified. Refer to the Bootstrap page of the documentation for more information.
 
-Name     | Description                         | Type                                    
--------- | ----------------------------------- | ----------------------------------------
-`initdb  ` | Bootstrap the cluster via initdb    | [*BootstrapInitDB](#BootstrapInitDB)    
-`recovery` | Bootstrap the cluster from a backup | [*BootstrapRecovery](#BootstrapRecovery)
+Name          | Description                                                                              | Type                                            
+------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------
+`initdb       ` | Bootstrap the cluster via initdb                                                         | [*BootstrapInitDB](#BootstrapInitDB)            
+`recovery     ` | Bootstrap the cluster from a backup                                                      | [*BootstrapRecovery](#BootstrapRecovery)        
+`pg_basebackup` | Bootstrap the cluster taking a physical backup of another compatible PostgreSQL instance | [*BootstrapPgBaseBackup](#BootstrapPgBaseBackup)
 
 <a id='BootstrapInitDB'></a>
 ## BootstrapInitDB
@@ -155,6 +158,15 @@ Name     | Description                                                          
 `owner   ` | Name of the owner of the database in the instance to be used by applications. Defaults to the value of the `database` key.                   - *mandatory*  | string                                        
 `secret  ` | Name of the secret containing the initial credentials for the owner of the user database. If empty a new secret will be created from scratch | [*LocalObjectReference](#LocalObjectReference)
 `options ` | The list of options that must be passed to initdb when creating the cluster                                                                  | []string                                      
+
+<a id='BootstrapPgBaseBackup'></a>
+## BootstrapPgBaseBackup
+
+BootstrapPgBaseBackup contains the configuration required to take a physical backup of an existing PostgreSQL cluster
+
+Name   | Description                                                       | Type  
+------ | ----------------------------------------------------------------- | ------
+`source` | The name of the server of which we need to take a physical backup - *mandatory*  | string
 
 <a id='BootstrapRecovery'></a>
 ## BootstrapRecovery
@@ -214,6 +226,7 @@ Name                  | Description                                             
 `backup               ` | The configuration to be used for backups                                                                                                                                                                       | [*BackupConfiguration](#BackupConfiguration)                                                                                    
 `nodeMaintenanceWindow` | Define a maintenance window for the Kubernetes nodes                                                                                                                                                           | [*NodeMaintenanceWindow](#NodeMaintenanceWindow)                                                                                
 `monitoring           ` | The configuration of the monitoring infrastructure of this cluster                                                                                                                                             | [*MonitoringConfiguration](#MonitoringConfiguration)                                                                            
+`externalClusters     ` | The list of external clusters which are used in the configuration                                                                                                                                              | [[]ExternalCluster](#ExternalCluster)                                                                                           
 
 <a id='ClusterStatus'></a>
 ## ClusterStatus
@@ -258,6 +271,20 @@ Name                | Description                                               
 `encryption         ` | Whenever to force the encryption of files (if the bucket is not already configured for that). Allowed options are empty string (use the bucket policy, default), `AES256` and `aws:kms`                                                                                                                              | EncryptionType 
 `immediateCheckpoint` | Control whether the I/O workload for the backup initial checkpoint will be limited, according to the `checkpoint_completion_target` setting on the PostgreSQL server. If set to true, an immediate checkpoint will be used, meaning PostgreSQL will complete the checkpoint as soon as possible. `false` by default. | bool           
 `jobs               ` | The number of parallel jobs to be used to upload the backup, defaults to 2                                                                                                                                                                                                                                           | *int32         
+
+<a id='ExternalCluster'></a>
+## ExternalCluster
+
+ExternalCluster represents the connection parameters of an external server which is used in the cluster configuration
+
+Name                 | Description                                                                  | Type                                                                                                                       
+-------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------
+`name                ` | The server name, required                                                    - *mandatory*  | string                                                                                                                     
+`connectionParameters` | The list of connection parameters, such as dbname, host, username, etc       | map[string]string                                                                                                          
+`sslCert             ` | The reference to an SSL certificate to be used to connect to this instance   | [*corev1.SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#secretkeyselector-v1-core)
+`sslKey              ` | The reference to an SSL private key to be used to connect to this instance   | [*corev1.SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#secretkeyselector-v1-core)
+`sslRootCert         ` | The reference to an SSL CA public key to be used to connect to this instance | [*corev1.SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#secretkeyselector-v1-core)
+`password            ` | The reference to the password to be used to connect to the server            | [*corev1.SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#secretkeyselector-v1-core)
 
 <a id='LocalObjectReference'></a>
 ## LocalObjectReference

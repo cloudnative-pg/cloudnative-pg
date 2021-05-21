@@ -171,3 +171,28 @@ var _ = Describe("resize in use volumes", func() {
 		Expect(cluster.ShouldResizeInUseVolumes()).To(BeFalse())
 	})
 })
+
+var _ = Describe("external server list", func() {
+	cluster := Cluster{
+		Spec: ClusterSpec{
+			ExternalClusters: []ExternalCluster{
+				{
+					Name: "testServer",
+					ConnectionParameters: map[string]string{
+						"dbname": "test",
+					},
+				},
+			},
+		},
+	}
+	It("can be looked up by name", func() {
+		server, ok := cluster.ExternalServer("testServer")
+		Expect(ok).To(BeTrue())
+		Expect(server.Name).To(Equal("testServer"))
+		Expect(server.ConnectionParameters["dbname"]).To(Equal("test"))
+	})
+	It("fails for non existent replicas", func() {
+		_, ok := cluster.ExternalServer("nonExistentServer")
+		Expect(ok).To(BeFalse())
+	})
+})

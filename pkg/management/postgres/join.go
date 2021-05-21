@@ -31,12 +31,11 @@ type JoinInfo struct {
 	ParentNode string
 }
 
-// Join create a new instance joined to an existing PostgreSQL cluster
-func (info JoinInfo) Join() error {
-	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
-
-	log.Log.Info("Waiting for primary to be available", "primaryConnInfo", primaryConnInfo)
-	db, err := sql.Open("postgres", primaryConnInfo)
+// ClonePgData clones an existing server, given its connection string,
+// to a certain data directory
+func ClonePgData(connectionString, targetPgData string) error {
+	log.Log.Info("Waiting for server to be available", "connectionString", connectionString)
+	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
 		return err
 	}
@@ -46,19 +45,31 @@ func (info JoinInfo) Join() error {
 
 	err = waitForConnectionAvailable(db)
 	if err != nil {
-		return fmt.Errorf("primary server not available: %v", primaryConnInfo)
+		return fmt.Errorf("primary server not available: %v", connectionString)
 	}
 
 	options := []string{
-		"-D", info.PgData,
+		"-D", targetPgData,
 		"-v",
 		"-w",
-		"-d", primaryConnInfo,
+		"-d", connectionString,
 	}
 	pgBaseBackupCmd := exec.Command(pgBaseBackupName, options...) // #nosec
 	err = execlog.RunStreaming(pgBaseBackupCmd, pgBaseBackupName)
 	if err != nil {
 		return fmt.Errorf("error in pg_basebackup, %w", err)
+	}
+
+	return nil
+}
+
+// Join create a new instance joined to an existing PostgreSQL cluster
+func (info JoinInfo) Join() error {
+	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
+
+	err := ClonePgData(primaryConnInfo, info.PgData)
+	if err != nil {
+		return err
 	}
 
 	return UpdateReplicaConfiguration(info.PgData, info.ClusterName, info.PodName, false)

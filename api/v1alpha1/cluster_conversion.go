@@ -146,6 +146,19 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 		}
 	}
 
+	// spec.externalServers
+	if src.Spec.ExternalClusters != nil {
+		dst.Spec.ExternalClusters = make([]v1.ExternalCluster, len(src.Spec.ExternalClusters))
+		for idx, entry := range src.Spec.ExternalClusters {
+			dst.Spec.ExternalClusters[idx].Name = entry.Name
+			dst.Spec.ExternalClusters[idx].ConnectionParameters = entry.ConnectionParameters
+			dst.Spec.ExternalClusters[idx].SSLCert = entry.SSLCert
+			dst.Spec.ExternalClusters[idx].SSLKey = entry.SSLKey
+			dst.Spec.ExternalClusters[idx].SSLRootCert = entry.SSLRootCert
+			dst.Spec.ExternalClusters[idx].Password = entry.Password
+		}
+	}
+
 	// status
 	dst.Status.Instances = src.Status.Instances
 	dst.Status.ReadyInstances = src.Status.ReadyInstances
@@ -209,6 +222,12 @@ func (src *BootstrapConfiguration) ConvertTo(dstSpec *v1.BootstrapConfiguration)
 		dstSpec.Recovery.RecoveryTarget.TargetImmediate = srcRecoveryTarget.TargetImmediate
 		dstSpec.Recovery.RecoveryTarget.Exclusive = srcRecoveryTarget.Exclusive
 	}
+
+	// spec.bootstrap.pg_basebackup
+	if src != nil && src.PgBaseBackup != nil {
+		dstSpec.PgBaseBackup = &v1.BootstrapPgBaseBackup{}
+		dstSpec.PgBaseBackup.Source = src.PgBaseBackup.Source
+	}
 }
 
 // ConvertFrom converts from the Hub version (v1) to this version.
@@ -234,44 +253,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:golint
 	// spec.bootstrap
 	if src.Spec.Bootstrap != nil {
 		dst.Spec.Bootstrap = &BootstrapConfiguration{}
-
-		// spec.bootstrap.initdb
-		if src.Spec.Bootstrap.InitDB != nil {
-			srcInitDB := src.Spec.Bootstrap.InitDB
-
-			dst.Spec.Bootstrap.InitDB = &BootstrapInitDB{}
-			dst.Spec.Bootstrap.InitDB.Database = srcInitDB.Database
-			dst.Spec.Bootstrap.InitDB.Owner = srcInitDB.Owner
-			dst.Spec.Bootstrap.InitDB.Options = srcInitDB.Options
-		}
-
-		// spec.bootstrap.initdb.secret
-		if src.Spec.Bootstrap.InitDB != nil && src.Spec.Bootstrap.InitDB.Secret != nil {
-			srcInitDB := src.Spec.Bootstrap.InitDB
-
-			dst.Spec.Bootstrap.InitDB.Secret = &LocalObjectReference{}
-			dst.Spec.Bootstrap.InitDB.Secret.Name = srcInitDB.Secret.Name
-		}
-
-		// spec.bootstrap.recovery
-		if src.Spec.Bootstrap.Recovery != nil {
-			dst.Spec.Bootstrap.Recovery = &BootstrapRecovery{}
-			dst.Spec.Bootstrap.Recovery.Backup.Name = src.Spec.Bootstrap.Recovery.Backup.Name
-		}
-
-		// spec.bootstrap.recovery.recoveryTarget
-		if src.Spec.Bootstrap.Recovery != nil && src.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
-			srcRecoveryTarget := src.Spec.Bootstrap.Recovery.RecoveryTarget
-
-			dst.Spec.Bootstrap.Recovery.RecoveryTarget = &RecoveryTarget{}
-			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTLI = srcRecoveryTarget.TargetTLI
-			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetXID = srcRecoveryTarget.TargetXID
-			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetName = srcRecoveryTarget.TargetName
-			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetLSN = srcRecoveryTarget.TargetLSN
-			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTime = srcRecoveryTarget.TargetTime
-			dst.Spec.Bootstrap.Recovery.RecoveryTarget.TargetImmediate = srcRecoveryTarget.TargetImmediate
-			dst.Spec.Bootstrap.Recovery.RecoveryTarget.Exclusive = srcRecoveryTarget.Exclusive
-		}
+		dst.Spec.Bootstrap.ConvertFrom(src.Spec.Bootstrap)
 	}
 
 	if src.Spec.SuperuserSecret != nil {
@@ -378,4 +360,51 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:golint
 	dst.Status.SecretsResourceVersion.ServerSecretVersion = src.Status.SecretsResourceVersion.ServerSecretVersion
 
 	return nil
+}
+
+// ConvertFrom converts from the Hub version (v1) to this version.
+func (dst *BootstrapConfiguration) ConvertFrom(srcSpec *v1.BootstrapConfiguration) { //nolint:golint
+	// spec.bootstrap.initdb
+	if srcSpec.InitDB != nil {
+		srcInitDB := srcSpec.InitDB
+
+		dst.InitDB = &BootstrapInitDB{}
+		dst.InitDB.Database = srcInitDB.Database
+		dst.InitDB.Owner = srcInitDB.Owner
+		dst.InitDB.Options = srcInitDB.Options
+	}
+
+	// spec.bootstrap.initdb.secret
+	if srcSpec.InitDB != nil && srcSpec.InitDB.Secret != nil {
+		srcInitDB := srcSpec.InitDB
+
+		dst.InitDB.Secret = &LocalObjectReference{}
+		dst.InitDB.Secret.Name = srcInitDB.Secret.Name
+	}
+
+	// spec.bootstrap.recovery
+	if srcSpec.Recovery != nil {
+		dst.Recovery = &BootstrapRecovery{}
+		dst.Recovery.Backup.Name = srcSpec.Recovery.Backup.Name
+	}
+
+	// spec.bootstrap.recovery.recoveryTarget
+	if srcSpec.Recovery != nil && srcSpec.Recovery.RecoveryTarget != nil {
+		srcRecoveryTarget := srcSpec.Recovery.RecoveryTarget
+
+		dst.Recovery.RecoveryTarget = &RecoveryTarget{}
+		dst.Recovery.RecoveryTarget.TargetTLI = srcRecoveryTarget.TargetTLI
+		dst.Recovery.RecoveryTarget.TargetXID = srcRecoveryTarget.TargetXID
+		dst.Recovery.RecoveryTarget.TargetName = srcRecoveryTarget.TargetName
+		dst.Recovery.RecoveryTarget.TargetLSN = srcRecoveryTarget.TargetLSN
+		dst.Recovery.RecoveryTarget.TargetTime = srcRecoveryTarget.TargetTime
+		dst.Recovery.RecoveryTarget.TargetImmediate = srcRecoveryTarget.TargetImmediate
+		dst.Recovery.RecoveryTarget.Exclusive = srcRecoveryTarget.Exclusive
+	}
+
+	// spec.bootstrap.pg_basebackup
+	if srcSpec != nil && srcSpec.PgBaseBackup != nil {
+		dst.PgBaseBackup = &BootstrapPgBaseBackup{}
+		dst.PgBaseBackup.Source = srcSpec.PgBaseBackup.Source
+	}
 }

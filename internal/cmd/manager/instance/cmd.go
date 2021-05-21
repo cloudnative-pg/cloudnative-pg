@@ -14,6 +14,7 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/initdb"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/join"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/pgbasebackup"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/restore"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/run"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/status"
@@ -33,6 +34,7 @@ func NewCmd() *cobra.Command {
 	cmd.AddCommand(join.NewCmd())
 	cmd.AddCommand(run.NewCmd())
 	cmd.AddCommand(status.NewCmd())
+	cmd.AddCommand(pgbasebackup.NewCmd())
 	cmd.AddCommand(restore.NewCmd())
 
 	return cmd
