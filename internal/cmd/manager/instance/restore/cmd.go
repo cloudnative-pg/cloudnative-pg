@@ -23,7 +23,6 @@ import (
 func NewCmd() *cobra.Command {
 	var pwFile string
 	var pgData string
-	var parentNode string
 	var clusterName string
 	var backupName string
 	var namespace string
@@ -40,7 +39,6 @@ func NewCmd() *cobra.Command {
 				ClusterName:    clusterName,
 				Namespace:      namespace,
 				BackupName:     backupName,
-				ParentNode:     parentNode,
 				RecoveryTarget: recoveryTarget,
 			}
 
@@ -50,7 +48,6 @@ func NewCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&pwFile, "pw-file", "",
 		"The file containing the PostgreSQL superuser password to use during the init phase")
-	cmd.Flags().StringVar(&parentNode, "parent-node", "", "The origin node")
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
 	cmd.Flags().StringVar(&backupName, "backup-name", "", "The name of the backup that should be restored")
 	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+

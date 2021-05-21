@@ -19,7 +19,6 @@ type ClusterSpec struct {
 	Description string `json:"description,omitempty"`
 
 	// Name of the container image
-	// +kubebuilder:validation:MinLength=0
 	ImageName string `json:"imageName,omitempty"`
 
 	// The UID of the `postgres` user inside the image, defaults to `26`
@@ -93,6 +92,9 @@ type ClusterSpec struct {
 
 	// The configuration of the monitoring infrastructure of this cluster
 	Monitoring *MonitoringConfiguration `json:"monitoring,omitempty"`
+
+	// The list of external server which are used in the cluster configuration
+	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -167,6 +169,10 @@ type BootstrapConfiguration struct {
 
 	// Bootstrap the cluster from a backup
 	Recovery *BootstrapRecovery `json:"recovery,omitempty"`
+
+	// Bootstrap the cluster taking a physical backup of another compatible
+	// PostgreSQL instance
+	PgBaseBackup *BootstrapPgBaseBackup `json:"pg_basebackup,omitempty"`
 }
 
 // BootstrapRecovery contains the configuration required to restore
@@ -207,6 +213,14 @@ type BootstrapInitDB struct {
 	// The list of options that must be passed to initdb
 	// when creating the cluster
 	Options []string `json:"options,omitempty"`
+}
+
+// BootstrapPgBaseBackup represent the configuration needed to bootstrap
+// a new cluster from an existing PostgreSQL database
+type BootstrapPgBaseBackup struct {
+	// The name of the server of which we need to take a physical backup
+	// +kubebuilder:validation:MinLength=1
+	Source string `json:"source"`
 }
 
 // StorageConfiguration is the configuration of the storage of the PostgreSQL instances
@@ -290,7 +304,7 @@ type BarmanObjectStoreConfiguration struct {
 	// The path where to store the backup (i.e. s3://bucket/path/to/folder)
 	// this path, with different destination folders, will be used for WALs
 	// and for data
-	//+kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MinLength=1
 	DestinationPath string `json:"destinationPath"`
 
 	// The server name on S3, the cluster name is used if this
@@ -495,6 +509,31 @@ type SecretsResourceVersion struct {
 
 	// The resource version of the PostgreSQL server-side secret version
 	ServerSecretVersion string `json:"serverSecretVersion"`
+}
+
+// ExternalCluster represent the connection parameters to an
+// external server which is used in the cluster configuration
+type ExternalCluster struct {
+	// The server name, required
+	Name string `json:"name"`
+
+	// The list of connection parameters, such as dbname, host, username, etc
+	ConnectionParameters map[string]string `json:"connectionParameters,omitempty"`
+
+	// The reference to an SSL certificate to be used to connect to this
+	// instance
+	SSLCert *corev1.SecretKeySelector `json:"sslCert,omitempty"`
+
+	// The reference to an SSL private key to be used to connect to this
+	// instance
+	SSLKey *corev1.SecretKeySelector `json:"sslKey,omitempty"`
+
+	// The reference to an SSL CA public key to be used to connect to this
+	// instance
+	SSLRootCert *corev1.SecretKeySelector `json:"sslRootCert,omitempty"`
+
+	// The reference to the password to be used to connect to the server
+	Password *corev1.SecretKeySelector `json:"password,omitempty"`
 }
 
 func init() {

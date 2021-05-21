@@ -762,3 +762,68 @@ var _ = Describe("Cluster name validation", func() {
 		Expect(cluster.validateName()).NotTo(BeEmpty())
 	})
 })
+
+var _ = Describe("validation of the list of external servers", func() {
+	It("is correct when it's empty", func() {
+		cluster := Cluster{}
+		Expect(cluster.validateExternalServers()).To(BeEmpty())
+	})
+
+	It("complains when the list of servers contains duplicates", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "one",
+					},
+					{
+						Name: "one",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateExternalServers()).ToNot(BeEmpty())
+	})
+
+	It("should not raise errors is the server name is unique", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "one",
+					},
+					{
+						Name: "two",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateExternalServers()).To(BeEmpty())
+	})
+})
+
+var _ = Describe("bootstrap base backup validation", func() {
+	It("doesn't complain if we are not bootstrapping using pg_basebackup", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{},
+			},
+		}
+		result := recoveryCluster.validateBootstrapPgBaseBackupSource()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("complain when the source cluster doesn't exist", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Source: "test",
+					},
+				},
+			},
+		}
+		result := recoveryCluster.validateBootstrapPgBaseBackupSource()
+		Expect(result).ToNot(BeEmpty())
+	})
+})

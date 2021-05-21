@@ -30,7 +30,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
-// createPostgresClusterObjects ensure that we have the required global objects
+// createPostgresClusterObjects ensures that we have the required global objects
 func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cluster *apiv1.Cluster) error {
 	err := r.createPostgresPKI(ctx, cluster)
 	if err != nil {
@@ -179,7 +179,7 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	return nil
 }
 
-// createOrUpdatePodDisruptionBudget ensure that we have a PDB requiring to remove one node at a time
+// createOrUpdatePodDisruptionBudget ensures that we have a PDB requiring to remove one node at a time
 func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -202,7 +202,7 @@ func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, clust
 	return nil
 }
 
-// deletePodDisruptionBudget ensure that we delete the PDB requiring to remove one node at a time
+// deletePodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
 func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -230,7 +230,7 @@ func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, clust
 	return nil
 }
 
-// createOrPatchServiceAccount create or synchronize the ServiceAccount used by the
+// createOrPatchServiceAccount creates or synchronizes the ServiceAccount used by the
 // cluster with the latest cluster specification
 func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
@@ -277,7 +277,7 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 	return nil
 }
 
-// createServiceAccount create the service account for this PostgreSQL cluster
+// createServiceAccount creates the service account for this PostgreSQL cluster
 func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
 	generatedPullSecretNames, err := r.generateServiceAccountPullSecretsNames(ctx, cluster)
 	if err != nil {
@@ -297,7 +297,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 	return nil
 }
 
-// generateServiceAccountForCluster create a serviceAccount entity for the cluster
+// generateServiceAccountForCluster creates a serviceAccount entity for the cluster
 func (r *ClusterReconciler) generateServiceAccountForCluster(
 	cluster *apiv1.Cluster, pullSecretNames []string) (*corev1.ServiceAccount, error) {
 	serviceAccount, err := specs.CreateServiceAccount(cluster.ObjectMeta, pullSecretNames)
@@ -312,7 +312,7 @@ func (r *ClusterReconciler) generateServiceAccountForCluster(
 	return serviceAccount, nil
 }
 
-// generateServiceAccountPullSecretsNames extract the list of pull secret names given
+// generateServiceAccountPullSecretsNames extracts the list of pull secret names given
 // the cluster configuration
 func (r *ClusterReconciler) generateServiceAccountPullSecretsNames(
 	ctx context.Context, cluster *apiv1.Cluster) ([]string, error) {
@@ -381,7 +381,7 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 	return true, nil
 }
 
-// createOrPatchRole ensure that the required role for the instance manager exists and
+// createOrPatchRole ensures that the required role for the instance manager exists and
 // contains the right rules
 func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv1.Cluster) error {
 	var role rbacv1.Role
@@ -413,7 +413,7 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 	return nil
 }
 
-// createRole create the role
+// createRole creates the role
 func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -432,7 +432,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Clust
 	return nil
 }
 
-// createRoleBinding create the role binding
+// createRoleBinding creates the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -451,7 +451,7 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv
 	return nil
 }
 
-// generateNodeSerial extract the first free node serial in this pods
+// generateNodeSerial extracts the first free node serial in this pods
 func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *apiv1.Cluster) (int32, error) {
 	cluster.Status.LatestGeneratedNode++
 	if err := r.Status().Update(ctx, cluster); err != nil {
@@ -485,32 +485,6 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		log.Info("refusing to create the primary instance while the latest generated serial is not zero",
 			"latestGeneratedNode", cluster.Status.LatestGeneratedNode)
 		return ctrl.Result{}, nil
-	}
-
-	var backup apiv1.Backup
-	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil {
-		backupObjectKey := client.ObjectKey{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Spec.Bootstrap.Recovery.Backup.Name,
-		}
-		err := r.Get(ctx, backupObjectKey, &backup)
-		if err != nil {
-			if apierrs.IsNotFound(err) {
-				r.Recorder.Eventf(cluster, "Warning", "ErrorNoBackup",
-					"Backup object \"%v/%v\" is missing",
-					backupObjectKey.Namespace, backupObjectKey.Name)
-
-				// Missing backup
-				log.Info("Missing backup object, can't continue full recovery",
-					"backup", cluster.Spec.Bootstrap.Recovery.Backup)
-				return ctrl.Result{
-					Requeue:      true,
-					RequeueAfter: time.Minute,
-				}, nil
-			}
-
-			return ctrl.Result{}, fmt.Errorf("cannot get the backup object: %w", err)
-		}
 	}
 
 	// Generate a new node serial
@@ -556,10 +530,27 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	// We are bootstrapping a cluster and in need to create the first node
 	var job *batchv1.Job
 
-	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil {
+	switch {
+	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil:
+		backup, err := r.getOriginBackup(ctx, cluster)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if backup == nil {
+			log.Info("Missing backup object, can't continue full recovery",
+				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
+			return ctrl.Result{
+				Requeue:      true,
+				RequeueAfter: time.Minute,
+			}, nil
+		}
+
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
-		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, &backup)
-	} else {
+		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup)
+	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil:
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
+		job = specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial)
+	default:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
 		job = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial)
 	}
@@ -609,6 +600,33 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// getOriginBackup gets the backup that is used to bootstrap a new PostgreSQL cluster
+func (r *ClusterReconciler) getOriginBackup(ctx context.Context, cluster *apiv1.Cluster) (*apiv1.Backup, error) {
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil {
+		return nil, nil
+	}
+
+	var backup apiv1.Backup
+	backupObjectKey := client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      cluster.Spec.Bootstrap.Recovery.Backup.Name,
+	}
+	err := r.Get(ctx, backupObjectKey, &backup)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			r.Recorder.Eventf(cluster, "Warning", "ErrorNoBackup",
+				"Backup object \"%v/%v\" is missing",
+				backupObjectKey.Namespace, backupObjectKey.Name)
+
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("cannot get the backup object: %w", err)
+	}
+
+	return &backup, nil
 }
 
 func (r *ClusterReconciler) joinReplicaInstance(
@@ -704,7 +722,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	return ctrl.Result{}, nil
 }
 
-// reconcilePVCs reattach a dangling PVC
+// reconcilePVCs reattaches a dangling PVC
 func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 

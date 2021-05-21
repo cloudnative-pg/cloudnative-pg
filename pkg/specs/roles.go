@@ -45,6 +45,26 @@ func CreateRole(cluster apiv1.Cluster) rbacv1.Role {
 			cluster.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Name)
 	}
 
+	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil {
+		server, _ := cluster.ExternalServer(cluster.Spec.Bootstrap.PgBaseBackup.Source)
+		if server.SSLCert != nil {
+			involvedSecretNames = append(involvedSecretNames,
+				server.SSLCert.Name)
+		}
+		if server.SSLRootCert != nil {
+			involvedSecretNames = append(involvedSecretNames,
+				server.SSLRootCert.Name)
+		}
+		if server.SSLKey != nil {
+			involvedSecretNames = append(involvedSecretNames,
+				server.SSLKey.Name)
+		}
+		if server.Password != nil {
+			involvedSecretNames = append(involvedSecretNames,
+				server.Password.Name)
+		}
+	}
+
 	rules := []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{

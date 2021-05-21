@@ -1,0 +1,30 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-clone-tls
+spec:
+  instances: 3
+
+  bootstrap:
+    pg_basebackup:
+      source: cluster-example
+
+  storage:
+    size: 1Gi
+
+  externalClusters:
+  - name: cluster-example
+    connectionParameters:
+      host: cluster-example-rw.default.svc
+      user: streaming_replica
+      sslmode: verify-full
+      dbname: postgres
+    sslKey:
+      name: cluster-example-replication
+      key: tls.key
+    sslCert:
+      name: cluster-example-replication
+      key: tls.crt
+    sslRootCert:
+      name: cluster-example-ca
+      key: ca.crt

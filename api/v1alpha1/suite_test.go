@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"testing"
@@ -15,5 +15,5 @@ import (
 
 func TestApi(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "API properties")
+	RunSpecs(t, "v1alpha1 API tests")
 }

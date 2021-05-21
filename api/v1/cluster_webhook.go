@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configfile"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -54,7 +55,7 @@ func (r *Cluster) Default() {
 		r.Spec.Bootstrap = &BootstrapConfiguration{}
 	}
 
-	if r.Spec.Bootstrap.InitDB == nil && r.Spec.Bootstrap.Recovery == nil {
+	if r.Spec.Bootstrap.InitDB == nil && r.Spec.Bootstrap.Recovery == nil && r.Spec.Bootstrap.PgBaseBackup == nil {
 		r.Spec.Bootstrap.InitDB = &BootstrapInitDB{
 			Database: "app",
 			Owner:    "app",
@@ -102,6 +103,8 @@ func (r *Cluster) ValidateCreate() error {
 	allErrs = append(allErrs, r.validateMaxSyncReplicas()...)
 	allErrs = append(allErrs, r.validateStorageSize()...)
 	allErrs = append(allErrs, r.validateName()...)
+	allErrs = append(allErrs, r.validateBootstrapPgBaseBackupSource()...)
+	allErrs = append(allErrs, r.validateExternalServers()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -127,6 +130,8 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validateMaxSyncReplicas()...)
 	allErrs = append(allErrs, r.validateStorageSize()...)
 	allErrs = append(allErrs, r.validateName()...)
+	allErrs = append(allErrs, r.validateBootstrapPgBaseBackupSource()...)
+	allErrs = append(allErrs, r.validateExternalServers()...)
 
 	oldObject := old.(*Cluster)
 	if oldObject == nil {
@@ -232,6 +237,9 @@ func (r *Cluster) validateBootstrapMethod() field.ErrorList {
 	if r.Spec.Bootstrap.Recovery != nil {
 		bootstrapMethods++
 	}
+	if r.Spec.Bootstrap.PgBaseBackup != nil {
+		bootstrapMethods++
+	}
 
 	if bootstrapMethods > 1 {
 		result = append(
@@ -240,6 +248,30 @@ func (r *Cluster) validateBootstrapMethod() field.ErrorList {
 				field.NewPath("spec", "bootstrap"),
 				"",
 				"Too many bootstrap types specified"))
+	}
+
+	return result
+}
+
+// validateBootstrapPgBaseBackupSource is used to ensure that the source
+// server is correctly defined
+func (r *Cluster) validateBootstrapPgBaseBackupSource() field.ErrorList {
+	var result field.ErrorList
+
+	// This validation is only applicable for physical backup
+	// based bootstrap
+	if r.Spec.Bootstrap.PgBaseBackup == nil {
+		return result
+	}
+
+	_, found := r.ExternalServer(r.Spec.Bootstrap.PgBaseBackup.Source)
+	if !found {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec.bootstrap.physicalBackup.serverName"),
+				r.Spec.Bootstrap.PgBaseBackup.Source,
+				fmt.Sprintf("External server %v not found", r.Spec.Bootstrap.PgBaseBackup.Source)))
 	}
 
 	return result
@@ -569,6 +601,25 @@ func (r *Cluster) validateName() field.ErrorList {
 			field.NewPath("metadata", "name"),
 			r.Name,
 			"the maximum length of a cluster name is 50 characters"))
+	}
+
+	return result
+}
+
+// Check if the external servers list contains two servers with the same name
+func (r *Cluster) validateExternalServers() field.ErrorList {
+	var result field.ErrorList
+	stringSet := configfile.NewStringSet()
+
+	for _, server := range r.Spec.ExternalClusters {
+		stringSet.Put(server.Name)
+	}
+
+	if stringSet.Len() != len(r.Spec.ExternalClusters) {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "externalServers"),
+			r.Spec.ExternalClusters,
+			"the list of external servers contains duplicate values"))
 	}
 
 	return result

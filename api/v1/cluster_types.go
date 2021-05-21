@@ -75,7 +75,6 @@ type ClusterSpec struct {
 	Description string `json:"description,omitempty"`
 
 	// Name of the container image
-	// +kubebuilder:validation:MinLength=0
 	ImageName string `json:"imageName,omitempty"`
 
 	// The UID of the `postgres` user inside the image, defaults to `26`
@@ -149,6 +148,9 @@ type ClusterSpec struct {
 
 	// The configuration of the monitoring infrastructure of this cluster
 	Monitoring *MonitoringConfiguration `json:"monitoring,omitempty"`
+
+	// The list of external clusters which are used in the configuration
+	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
 }
 
 const (
@@ -304,6 +306,10 @@ type BootstrapConfiguration struct {
 
 	// Bootstrap the cluster from a backup
 	Recovery *BootstrapRecovery `json:"recovery,omitempty"`
+
+	// Bootstrap the cluster taking a physical backup of another compatible
+	// PostgreSQL instance
+	PgBaseBackup *BootstrapPgBaseBackup `json:"pg_basebackup,omitempty"`
 }
 
 // BootstrapInitDB is the configuration of the bootstrap process when
@@ -344,6 +350,14 @@ type BootstrapRecovery struct {
 	// This option allows to fine tune the recovery process
 	// +optional
 	RecoveryTarget *RecoveryTarget `json:"recoveryTarget,omitempty"`
+}
+
+// BootstrapPgBaseBackup contains the configuration required to take
+// a physical backup of an existing PostgreSQL cluster
+type BootstrapPgBaseBackup struct {
+	// The name of the server of which we need to take a physical backup
+	// +kubebuilder:validation:MinLength=1
+	Source string `json:"source"`
 }
 
 // RecoveryTarget allows to configure the moment where the recovery process
@@ -471,7 +485,7 @@ type BarmanObjectStoreConfiguration struct {
 	// The path where to store the backup (i.e. s3://bucket/path/to/folder)
 	// this path, with different destination folders, will be used for WALs
 	// and for data
-	//+kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MinLength=1
 	DestinationPath string `json:"destinationPath"`
 
 	// The server name on S3, the cluster name is used if this
@@ -561,6 +575,31 @@ type MonitoringConfiguration struct {
 
 	// The list of secrets containing the custom queries
 	CustomQueriesSecret []SecretKeySelector `json:"customQueriesSecret,omitempty"`
+}
+
+// ExternalCluster represents the connection parameters of an
+// external server which is used in the cluster configuration
+type ExternalCluster struct {
+	// The server name, required
+	Name string `json:"name"`
+
+	// The list of connection parameters, such as dbname, host, username, etc
+	ConnectionParameters map[string]string `json:"connectionParameters,omitempty"`
+
+	// The reference to an SSL certificate to be used to connect to this
+	// instance
+	SSLCert *corev1.SecretKeySelector `json:"sslCert,omitempty"`
+
+	// The reference to an SSL private key to be used to connect to this
+	// instance
+	SSLKey *corev1.SecretKeySelector `json:"sslKey,omitempty"`
+
+	// The reference to an SSL CA public key to be used to connect to this
+	// instance
+	SSLRootCert *corev1.SecretKeySelector `json:"sslRootCert,omitempty"`
+
+	// The reference to the password to be used to connect to the server
+	Password *corev1.SecretKeySelector `json:"password,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -801,6 +840,18 @@ func (cluster Cluster) GetPostgresGID() int64 {
 		return defaultPostgresGID
 	}
 	return cluster.Spec.PostgresGID
+}
+
+// ExternalServer gets the external server with a known name, returning
+// true if the server was found and false otherwise
+func (cluster Cluster) ExternalServer(name string) (ExternalCluster, bool) {
+	for _, server := range cluster.Spec.ExternalClusters {
+		if server.Name == name {
+			return server, true
+		}
+	}
+
+	return ExternalCluster{}, false
 }
 
 // BuildPostgresOptions create the list of options that

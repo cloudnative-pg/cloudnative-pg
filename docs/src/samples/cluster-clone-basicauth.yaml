@@ -1,0 +1,29 @@
+# IMPORTANT: this configuration requires an appropriate line
+# in the host-based access rules allowing replication connections
+# to the postgres user.
+#
+# The following line met the requisites
+# - "host replication postgres all md5"
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-clone-basicauth
+spec:
+  instances: 3
+
+  bootstrap:
+    pg_basebackup:
+      source: cluster-example
+
+  storage:
+    size: 1Gi
+
+  externalClusters:
+  - name: cluster-example
+    connectionParameters:
+      host: cluster-example-rw.default.svc
+      user: postgres
+      dbname: postgres
+    password:
+      name: cluster-example-superuser
+      key: password

@@ -229,6 +229,18 @@ spec:
                         - name
                         type: object
                     type: object
+                  pg_basebackup:
+                    description: Bootstrap the cluster taking a physical backup of
+                      another compatible PostgreSQL instance
+                    properties:
+                      source:
+                        description: The name of the server of which we need to take
+                          a physical backup
+                        minLength: 1
+                        type: string
+                    required:
+                    - source
+                    type: object
                   recovery:
                     description: Bootstrap the cluster from a backup
                     properties:
@@ -281,9 +293,103 @@ spec:
               description:
                 description: Description of this PostgreSQL cluster
                 type: string
+              externalClusters:
+                description: The list of external clusters which are used in the configuration
+                items:
+                  description: ExternalCluster represents the connection parameters
+                    of an external server which is used in the cluster configuration
+                  properties:
+                    connectionParameters:
+                      additionalProperties:
+                        type: string
+                      description: The list of connection parameters, such as dbname,
+                        host, username, etc
+                      type: object
+                    name:
+                      description: The server name, required
+                      type: string
+                    password:
+                      description: The reference to the password to be used to connect
+                        to the server
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                    sslCert:
+                      description: The reference to an SSL certificate to be used
+                        to connect to this instance
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                    sslKey:
+                      description: The reference to an SSL private key to be used
+                        to connect to this instance
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                    sslRootCert:
+                      description: The reference to an SSL CA public key to be used
+                        to connect to this instance
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
               imageName:
                 description: Name of the container image
-                minLength: 0
                 type: string
               imagePullSecrets:
                 description: The list of pull secrets to be used to pull the images
@@ -897,6 +1003,18 @@ spec:
                         - name
                         type: object
                     type: object
+                  pg_basebackup:
+                    description: Bootstrap the cluster taking a physical backup of
+                      another compatible PostgreSQL instance
+                    properties:
+                      source:
+                        description: The name of the server of which we need to take
+                          a physical backup
+                        minLength: 1
+                        type: string
+                    required:
+                    - source
+                    type: object
                   recovery:
                     description: Bootstrap the cluster from a backup
                     properties:
@@ -949,9 +1067,104 @@ spec:
               description:
                 description: Description of this PostgreSQL cluster
                 type: string
+              externalClusters:
+                description: The list of external server which are used in the cluster
+                  configuration
+                items:
+                  description: ExternalCluster represent the connection parameters
+                    to an external server which is used in the cluster configuration
+                  properties:
+                    connectionParameters:
+                      additionalProperties:
+                        type: string
+                      description: The list of connection parameters, such as dbname,
+                        host, username, etc
+                      type: object
+                    name:
+                      description: The server name, required
+                      type: string
+                    password:
+                      description: The reference to the password to be used to connect
+                        to the server
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                    sslCert:
+                      description: The reference to an SSL certificate to be used
+                        to connect to this instance
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                    sslKey:
+                      description: The reference to an SSL private key to be used
+                        to connect to this instance
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                    sslRootCert:
+                      description: The reference to an SSL CA public key to be used
+                        to connect to this instance
+                      properties:
+                        key:
+                          description: The key of the secret to select from.  Must
+                            be a valid secret key.
+                          type: string
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                        optional:
+                          description: Specify whether the Secret or its key must
+                            be defined
+                          type: boolean
+                      required:
+                      - key
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
               imageName:
                 description: Name of the container image
-                minLength: 0
                 type: string
               imagePullSecrets:
                 description: The list of pull secrets to be used to pull the images

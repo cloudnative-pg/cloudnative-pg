@@ -1,9 +1,9 @@
 AES
+API's
+APIs
 AcolumnName
 AffinityConfiguration
 Anand
-APIs
-API's
 BackupConfiguration
 BackupList
 BackupPhase
@@ -14,6 +14,7 @@ Bartolini
 Battiato
 BootstrapConfiguration
 BootstrapInitDB
+BootstrapPgBaseBackup
 BootstrapRecovery
 CIS
 CN
@@ -32,8 +33,8 @@ CodeReady
 ColumnName
 CompressionType
 ConfigMap
-ConfigMaps
 ConfigMapKeySelector
+ConfigMaps
 Coverity
 Cron
 CronJobs
@@ -54,6 +55,7 @@ EKS
 EncryptionType
 EnterpriseDB
 EnterpriseDB's
+ExternalCluster
 Fei
 Filesystem
 Francesco
