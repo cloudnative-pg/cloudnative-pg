@@ -45,7 +45,7 @@ func Generate(ctx context.Context, params Params, dryRun bool, format plugin.Out
 		return err
 	}
 
-	userPair, err := caPair.CreateAndSignPair(params.User, certs.CertTypeClient)
+	userPair, err := caPair.CreateAndSignPair(params.User, certs.CertTypeClient, nil)
 	if err != nil {
 		return err
 	}

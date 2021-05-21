@@ -99,7 +99,7 @@ var _ = Describe("Keypair generation", func() {
 			rootCA, err := CreateRootCA("test", "namespace")
 			Expect(err).To(BeNil())
 
-			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer)
+			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil)
 			Expect(err).To(BeNil())
 
 			cert, err := pair.ParseCertificate()
@@ -128,7 +128,7 @@ var _ = Describe("Keypair generation", func() {
 			rootCA, err := CreateRootCA("test", "namespace")
 			Expect(err).To(BeNil())
 
-			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer)
+			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil)
 			Expect(err).To(BeNil())
 
 			secret := pair.GenerateServerSecret("namespace", "name")
@@ -151,7 +151,7 @@ var _ = Describe("Keypair generation", func() {
 			caCert, err := ca.ParseCertificate()
 			Expect(err).To(BeNil())
 
-			pair, err := ca.createAndSignPairWithValidity("this.host.name.com", notBefore, notAfter, CertTypeClient)
+			pair, err := ca.createAndSignPairWithValidity("this.host.name.com", notBefore, notAfter, CertTypeClient, nil)
 			Expect(err).To(BeNil())
 
 			oldCert, err := pair.ParseCertificate()

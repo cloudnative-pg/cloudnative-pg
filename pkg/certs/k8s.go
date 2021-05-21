@@ -251,7 +251,7 @@ func (pki PublicKeyInfrastructure) EnsureCertificate(
 		"%v.%v.svc",
 		pki.ServiceName,
 		pki.OperatorNamespace)
-	webhookPair, err := caPair.CreateAndSignPair(webhookHostname, CertTypeServer)
+	webhookPair, err := caPair.CreateAndSignPair(webhookHostname, CertTypeServer, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -86,10 +86,10 @@ func (pair KeyPair) ParseCertificate() (*x509.Certificate, error) {
 }
 
 // CreateAndSignPair given a CA keypair, generate and sign a leaf keypair
-func (pair KeyPair) CreateAndSignPair(host string, usage CertType) (*KeyPair, error) {
+func (pair KeyPair) CreateAndSignPair(host string, usage CertType, altDNSNames []string) (*KeyPair, error) {
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
-	return pair.createAndSignPairWithValidity(host, notBefore, notAfter, usage)
+	return pair.createAndSignPairWithValidity(host, notBefore, notAfter, usage, altDNSNames)
 }
 
 func (pair KeyPair) createAndSignPairWithValidity(
@@ -97,6 +97,7 @@ func (pair KeyPair) createAndSignPairWithValidity(
 	notBefore,
 	notAfter time.Time,
 	usage CertType,
+	altDNSNames []string,
 ) (*KeyPair, error) {
 	caCertificate, err := pair.ParseCertificate()
 	if err != nil {
@@ -130,6 +131,7 @@ func (pair KeyPair) createAndSignPairWithValidity(
 		Subject: pkix.Name{
 			CommonName: host,
 		},
+		DNSNames: altDNSNames,
 	}
 
 	leafTemplate.KeyUsage = x509.KeyUsageDigitalSignature | x509.KeyUsageKeyAgreement
