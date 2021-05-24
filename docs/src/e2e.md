@@ -45,6 +45,7 @@ and the following suite of E2E tests are performed on that cluster:
 * Operator configuration via ConfigMap;
 * Operator pod eviction;
 * Operator upgrade;
+* Node drain;
 * Primary endpoint switch in case of failover in less than 10 seconds;
 * Primary endpoint switch in case of switchover in less than 20 seconds;
 * Recover from a degraded state in less than 60 seconds.

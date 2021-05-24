@@ -101,21 +101,7 @@ func AssertNewPrimary(namespace string, clusterName string, oldprimary string) {
 	})
 	By("verifying write operation on the new primary pod", func() {
 		commandTimeout := time.Second * 5
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		cluster := &apiv1.Cluster{}
-		err := env.Client.Get(env.Ctx, namespacedName, cluster)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Set currentPrimary
-		namespacedName = types.NamespacedName{
-			Namespace: namespace,
-			Name:      cluster.Status.CurrentPrimary,
-		}
-		pod := &corev1.Pod{}
-		err = env.Client.Get(env.Ctx, namespacedName, pod)
+		pod, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		// Expect write operation to succeed
 		query := "create table test(var1 text)"
@@ -142,7 +128,7 @@ func AssertTestDataCreation(namespace string, clusterName string) {
 	})
 }
 
-func AssertTestData(namespace string, clusterName string) {
+func AssertTestDataExistence(namespace string, clusterName string) {
 	By("verifying test data", func() {
 		testData := "test data"
 		tableName := "testTable"
@@ -158,4 +144,15 @@ func AssertTestData(namespace string, clusterName string) {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(strings.TrimSpace(stdout)).Should(BeEquivalentTo(testData))
 	})
+}
+
+func UncordonAllNodes() {
+	nodeList, err := env.GetNodeList()
+	Expect(err).ToNot(HaveOccurred())
+	// uncordoning all nodes
+	for _, node := range nodeList.Items {
+		command := fmt.Sprintf("kubectl uncordon %v", node.Name)
+		_, _, err := tests.Run(command)
+		Expect(err).ToNot(HaveOccurred())
+	}
 }
