@@ -190,9 +190,8 @@ jobs:
           images: ${{ steps.build-meta.outputs.images }}
           tags: |
             type=ref,event=branch
-            type=ref,event=tag
             type=ref,event=pr
-            type=semver,pattern={{version}}
+            type=match,pattern=v(\d.\d.\d),group=1,priority=1000
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v1
