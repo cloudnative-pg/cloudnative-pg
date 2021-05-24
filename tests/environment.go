@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -499,14 +500,23 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 		}
 	}
 
-	// Here the webhook service should be up and running. If it's not, it
-	// means that the service is still not updated with the right
-	// endpoints, or that kube-proxy has not reloaded the right network
-	// rules.
-	//
-	// If we also want to check this behavior we need to create a Job
-	// executing a request for the webhook API and verify if the Job
-	// correctly finish or not.
+	// Dry run object creation to check that webhook service is correctly running
+	testCluster := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "readiness-check-" + rand.String(5),
+			Namespace: "default",
+		},
+		Spec: apiv1.ClusterSpec{
+			Instances: 3,
+			StorageConfiguration: apiv1.StorageConfiguration{
+				Size: "1Gi",
+			},
+		},
+	}
+	err = env.Client.Create(env.Ctx, testCluster, &client.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		return false, err
+	}
 
 	return true, err
 }
