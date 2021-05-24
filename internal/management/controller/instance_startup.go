@@ -92,6 +92,11 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 		return err
 	}
 
+	// Delete any stale Postgres PID file
+	if err := r.instance.CleanupStalePidFile(); err != nil {
+		return err
+	}
+
 	if err := postgres.WritePostgresUserMaps(r.instance.PgData); err != nil {
 		return err
 	}

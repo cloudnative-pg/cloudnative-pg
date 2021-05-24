@@ -9,10 +9,12 @@ package log
 
 import (
 	"github.com/go-logr/logr"
+
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 // Log is the logger that will be used in this package
-var Log logr.Logger
+var Log logr.Logger = ctrl.Log
 
 // SetLogger will set the backing logr implementation for instance manager.
 func SetLogger(logr logr.Logger) {
