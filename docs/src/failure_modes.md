@@ -107,7 +107,7 @@ new pod will be created on a different worker node from a physical backup of the
 is set to `off` (default: `on` during maintenance windows, `off` otherwise).
 
 The `PodDisruptionBudget` may prevent the pod from being evicted if there
-is at least one node that is not ready.
+is at least another pod that is not ready.
 
 Self-healing will happen as soon as the *apiserver* is notified.
 

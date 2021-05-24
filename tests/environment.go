@@ -265,7 +265,14 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 		env.Ctx, podList, client.InNamespace(namespace),
 		client.MatchingLabels{"postgresql": clusterName, "role": "primary"},
 	)
-	return &(podList.Items[0]), err
+	if err != nil {
+		return &corev1.Pod{}, err
+	}
+	if len(podList.Items) > 0 {
+		return &(podList.Items[0]), nil
+	}
+	err = fmt.Errorf("no primary found")
+	return &corev1.Pod{}, err
 }
 
 // GetPodList gathers the current list of pods in a namespace
@@ -385,6 +392,22 @@ func (env TestingEnvironment) IsGKE() (bool, error) {
 	}
 	for _, node := range nodeList.Items {
 		re := regexp.MustCompile("^gke-")
+		if len(re.FindAllString(node.Name, -1)) == 0 {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// IsAKS returns true if we run on Azure Kubernetes Service. We check that
+// by verifying if all the node names start with "aks-"
+func (env TestingEnvironment) IsAKS() (bool, error) {
+	nodeList := &corev1.NodeList{}
+	if err := env.Client.List(env.Ctx, nodeList, client.InNamespace("")); err != nil {
+		return false, err
+	}
+	for _, node := range nodeList.Items {
+		re := regexp.MustCompile("^aks-")
 		if len(re.FindAllString(node.Name, -1)) == 0 {
 			return false, nil
 		}

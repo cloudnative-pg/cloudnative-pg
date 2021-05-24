@@ -137,7 +137,7 @@ var _ = Describe("Operator unavailable", func() {
 				}, timeout).Should(BeTrue())
 			})
 			// Expect the test data previously created to be available
-			AssertTestData(namespace, clusterName)
+			AssertTestDataExistence(namespace, clusterName)
 		})
 	})
 
@@ -235,7 +235,7 @@ var _ = Describe("Operator unavailable", func() {
 				}, timeout).Should(BeTrue())
 			})
 			// Expect the test data previously created to be available
-			AssertTestData(namespace, clusterName)
+			AssertTestDataExistence(namespace, clusterName)
 		})
 	})
 })

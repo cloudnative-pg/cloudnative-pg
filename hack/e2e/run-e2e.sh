@@ -16,7 +16,6 @@ fi
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 CONTROLLER_IMG=${CONTROLLER_IMG:-quay.io/enterprisedb/cloud-native-postgresql-testing:latest}
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
-TEST_OP_DISRUPTION=${TEST_OP_DISRUPTION:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 
 # Process the e2e templates
