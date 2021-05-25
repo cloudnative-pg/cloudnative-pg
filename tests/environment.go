@@ -452,74 +452,19 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 
 	namespace := pod.Namespace
 
-	// Check CA
-	secret := &corev1.Secret{}
-	secretNamespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      controller.WebhookSecretName,
-	}
-	err = env.Client.Get(env.Ctx, secretNamespacedName, secret)
-
-	if err != nil {
-		return false, err
-	}
-
-	ca := secret.Data["tls.crt"]
-
-	ctx := context.Background()
-	mutatingWebhookConfig, err := env.Interface.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
-		ctx, controller.MutatingWebhookConfigurationName, metav1.GetOptions{})
-
-	if err != nil {
-		return false, err
-	}
-
-	for _, webhook := range mutatingWebhookConfig.Webhooks {
-		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
-			return false, fmt.Errorf("secret %+v not match with ca bundle in %v: %v is not equal to %v",
-				controller.MutatingWebhookConfigurationName, secret, string(ca), string(webhook.ClientConfig.CABundle))
+	// Detect if we are running under OLM
+	var webhookManagedByOLM bool
+	for _, envVar := range pod.Spec.Containers[0].Env {
+		if envVar.Name == "WEBHOOK_CERT_DIR" {
+			webhookManagedByOLM = true
 		}
 	}
 
-	validatingWebhookConfig, err := env.Interface.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
-		ctx, controller.ValidatingWebhookConfigurationName, metav1.GetOptions{})
-
-	if err != nil {
-		return false, err
-	}
-
-	for _, webhook := range validatingWebhookConfig.Webhooks {
-		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
-			return false, fmt.Errorf("secret not match with ca bundle in %v",
-				controller.ValidatingWebhookConfigurationName)
-		}
-	}
-
-	customResourceDefinitionsName := []string{
-		"backups.postgresql.k8s.enterprisedb.io",
-		"clusters.postgresql.k8s.enterprisedb.io",
-		"scheduledbackups.postgresql.k8s.enterprisedb.io"}
-
-	for _, c := range customResourceDefinitionsName {
-		crd, err := env.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
-			ctx, c, metav1.GetOptions{})
-
+	// If the operator is managing certificates for webhooks, check that the setup is completed
+	if !webhookManagedByOLM {
+		err = env.checkWebhookReady(namespace)
 		if err != nil {
 			return false, err
-		}
-
-		if crd.Spec.Conversion == nil {
-			continue
-		}
-
-		if crd.Spec.Conversion.Strategy == v1.NoneConverter {
-			continue
-		}
-
-		if crd.Spec.Conversion.Webhook != nil && crd.Spec.Conversion.Webhook.ClientConfig != nil &&
-			!bytes.Equal(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, ca) {
-			return false, fmt.Errorf("secret not match with ca bundle in %v; %v not equal to %v", c,
-				string(crd.Spec.Conversion.Webhook.ClientConfig.CABundle), string(ca))
 		}
 	}
 
@@ -542,4 +487,75 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 	}
 
 	return true, err
+}
+
+// checkWebhookReady ensures that the operator has finished the webhook setup.
+func (env TestingEnvironment) checkWebhookReady(namespace string) error {
+	// Check CA
+	secret := &corev1.Secret{}
+	secretNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      controller.WebhookSecretName,
+	}
+	err := env.Client.Get(env.Ctx, secretNamespacedName, secret)
+	if err != nil {
+		return err
+	}
+
+	ca := secret.Data["tls.crt"]
+
+	ctx := context.Background()
+	mutatingWebhookConfig, err := env.Interface.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
+		ctx, controller.MutatingWebhookConfigurationName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, webhook := range mutatingWebhookConfig.Webhooks {
+		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
+			return fmt.Errorf("secret %+v not match with ca bundle in %v: %v is not equal to %v",
+				controller.MutatingWebhookConfigurationName, secret, string(ca), string(webhook.ClientConfig.CABundle))
+		}
+	}
+
+	validatingWebhookConfig, err := env.Interface.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
+		ctx, controller.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, webhook := range validatingWebhookConfig.Webhooks {
+		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
+			return fmt.Errorf("secret not match with ca bundle in %v",
+				controller.ValidatingWebhookConfigurationName)
+		}
+	}
+
+	customResourceDefinitionsName := []string{
+		"backups.postgresql.k8s.enterprisedb.io",
+		"clusters.postgresql.k8s.enterprisedb.io",
+		"scheduledbackups.postgresql.k8s.enterprisedb.io"}
+
+	for _, c := range customResourceDefinitionsName {
+		crd, err := env.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
+			ctx, c, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if crd.Spec.Conversion == nil {
+			continue
+		}
+
+		if crd.Spec.Conversion.Strategy == v1.NoneConverter {
+			continue
+		}
+
+		if crd.Spec.Conversion.Webhook != nil && crd.Spec.Conversion.Webhook.ClientConfig != nil &&
+			!bytes.Equal(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, ca) {
+			return fmt.Errorf("secret not match with ca bundle in %v; %v not equal to %v", c,
+				string(crd.Spec.Conversion.Webhook.ClientConfig.CABundle), string(ca))
+		}
+	}
+	return nil
 }
