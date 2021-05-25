@@ -18,6 +18,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walarchive"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walrestore"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/versions"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
@@ -41,6 +42,7 @@ func main() {
 	cmd.AddCommand(instance.NewCmd())
 	cmd.AddCommand(walarchive.NewCmd())
 	cmd.AddCommand(walrestore.NewCmd())
+	cmd.AddCommand(versions.NewCmd())
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)

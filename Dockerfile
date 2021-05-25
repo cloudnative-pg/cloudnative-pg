@@ -1,5 +1,8 @@
 # Build the manager binary
 FROM registry.access.redhat.com/ubi8/go-toolset:1.14.7-15 as builder
+ARG VERSION="dev"
+ARG COMMIT="none"
+ARG DATE="unknown"
 
 # We do not use root
 USER 1001
@@ -19,10 +22,16 @@ RUN go mod download
 COPY --chown=1001 . /workspace
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager ./cmd/manager
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager -ldflags \
+    "-s -w \
+    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion=\"$VERSION\" \
+    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit=\"$COMMIT\" \
+    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate=\"$DATE\"" \
+    ./cmd/manager
 
 # Use UBI Minimal image as base https://developers.redhat.com/products/rhel/ubi
 FROM registry.access.redhat.com/ubi8/ubi-minimal
+ARG VERSION="dev"
 
 ENV SUMMARY="Cloud Native PostgreSQL Operator Container Image." \
     DESCRIPTION="This Docker image contains Cloud Native PostgreSQL Operator \
@@ -40,7 +49,7 @@ LABEL summary="$SUMMARY" \
       name="Cloud Native PostgreSQL Operator" \
       vendor="EnterpriseDB Corporation" \
       url="https://www.enterprisedb.com/" \
-      version="1.4.0" \
+      version="$VERSION" \
       release="1"
 
 COPY licenses /licenses

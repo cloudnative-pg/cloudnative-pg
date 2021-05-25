@@ -95,12 +95,12 @@ install_kind() {
 }
 
 build_and_load_operator_k3d() {
-    docker build -t "${CONTROLLER_IMG}" "${ROOT_DIR}"
+    make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" docker-build
     k3d image import "${CONTROLLER_IMG}" -c "${CLUSTER_NAME}"
 }
 
 build_and_load_operator_kind() {
-    docker build -t "${CONTROLLER_IMG}" "${ROOT_DIR}"
+    make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" docker-build
     kind load -v 1 docker-image --name "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
 }
 

@@ -13,6 +13,13 @@ CONTROLLER_IMG = quay.io/enterprisedb/cloud-native-postgresql-testing:${IMAGE_TA
 endif
 endif
 
+COMMIT := $(shell git rev-parse --short HEAD || echo unknown)
+DATE := $(shell git log -1 --pretty=format:'%ad' --date short)
+VERSION := $(shell git describe --tags --match 'v*' | sed -e 's/^v//; s/-g[0-9a-f]\+$$//; s/-\([0-9]\+\)$$/+dev\1/')
+LDFLAGS= "-X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion=${VERSION} $\
+-X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit=${COMMIT} $\
+-X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate=${DATE}"
+
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/enterprisedb/postgresql:13
 KUSTOMIZE_VERSION ?= v3.5.4
@@ -48,8 +55,8 @@ e2e-test-k3d:
 
 # Build binaries
 build: generate fmt vet
-	go build -o bin/manager ./cmd/manager
-	go build -o bin/kubectl-cnp ./cmd/kubectl-cnp
+	go build -o bin/manager -ldflags ${LDFLAGS} ./cmd/manager
+	go build -o bin/kubectl-cnp -ldflags ${LDFLAGS} ./cmd/kubectl-cnp
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
@@ -101,8 +108,9 @@ generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 # Build the docker image
-docker-build: test
-	docker build . -t ${CONTROLLER_IMG}
+docker-build: #test
+	docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION} --build-arg COMMIT=${COMMIT} \
+					--build-arg DATE=${DATE}
 
 # Push the docker image
 docker-push:

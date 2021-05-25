@@ -74,9 +74,6 @@ sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
     -e "/DefaultOperatorImageName *= *.*/Is/\"\(.*\):.*\"/\"\1:${release_version}\"/" \
     pkg/versions/versions.go
 
-sed -i -e "s/version=\".*\"/version=\"${release_version}\"/" \
-    Dockerfile
-
 sed -i "s/postgresql-operator-[0-9.]*.yaml/postgresql-operator-${release_version}.yaml/g" \
     docs/src/installation_upgrade.md
 
@@ -93,7 +90,6 @@ rm -fr "${CONFIG_TMP_DIR}"
 git checkout -b "release/v${release_version}"
 git add \
     pkg/versions/versions.go \
-    Dockerfile \
     docs/src/installation_upgrade.md \
     "${release_manifest}"
 git commit -sm "Version tag to ${release_version}"
