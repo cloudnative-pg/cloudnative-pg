@@ -88,7 +88,7 @@ spec:
         effect: NoSchedule
       containers:
       - name: fluentd
-        image: fluent/fluentd-kubernetes-daemonset:v1-debian-forward
+        image: registry.dev:5000/fluentd-kubernetes-daemonset:local
         env:
           - name:  FLUENTD_CONF
             value: "custom/fluentd.conf"

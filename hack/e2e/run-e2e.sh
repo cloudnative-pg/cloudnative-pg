@@ -14,9 +14,31 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
-CONTROLLER_IMG=${CONTROLLER_IMG:-quay.io/enterprisedb/cloud-native-postgresql-testing:latest}
+CONTROLLER_IMG=${CONTROLLER_IMG:-$("${ROOT_DIR}/hack/setup-cluster.sh" print-image)}
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
+
+install_go_module() {
+  local module=$1
+  local GO_TMP_DIR
+  GO_TMP_DIR=$(mktemp -d)
+  cd "$GO_TMP_DIR"
+  go mod init tmp
+  go get -u "${module}"
+  rm -rf "$GO_TMP_DIR"
+  cd -
+}
+
+notinpath () {
+    case "$PATH" in
+        *:$1:* | *:$1 | $1:*)
+            return 1
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
 
 # Process the e2e templates
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
@@ -34,6 +56,15 @@ if [ -n "${DOCKER_SERVER-}" ] && [ -n "${DOCKER_USERNAME-}" ] && [ -n "${DOCKER_
     --docker-server="${DOCKER_SERVER}" \
     --docker-username="${DOCKER_USERNAME}" \
     --docker-password="${DOCKER_PASSWORD}"
+fi
+
+go_bin="$(go env GOPATH)/bin"
+if notinpath "${go_bin}"; then
+  export PATH="${go_bin}:${PATH}"
+fi
+
+if ! which ginkgo &>/dev/null; then
+  install_go_module "github.com/onsi/ginkgo/ginkgo"
 fi
 
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
