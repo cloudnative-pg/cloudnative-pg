@@ -191,11 +191,18 @@ func (r *InstanceReconciler) reconcileSecrets(ctx context.Context) error {
 		r.log.Error(err, "Error while getting streaming replication secret")
 	}
 
-	caSecretChanged, err := r.RefreshCA(ctx)
+	clientCaSecretChanged, err := r.RefreshClientCA(ctx)
 	if err == nil {
-		changed = changed || caSecretChanged
+		changed = changed || clientCaSecretChanged
 	} else if !apierrors.IsNotFound(err) {
-		r.log.Error(err, "Error while getting cluster CA secret")
+		r.log.Error(err, "Error while getting cluster CA Client secret")
+	}
+
+	serverCaSecretChanged, err := r.RefreshServerCA(ctx)
+	if err == nil {
+		changed = changed || serverCaSecretChanged
+	} else if !apierrors.IsNotFound(err) {
+		r.log.Error(err, "Error while getting cluster CA Server secret")
 	}
 
 	if changed {
@@ -285,7 +292,7 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 		return false, fmt.Errorf("missing %s field in Secret", corev1.TLSPrivateKeyKey)
 	}
 
-	certificateIsChanged, err := fileutils.WriteFile(certificateLocation, certificate, 0600)
+	certificateIsChanged, err := fileutils.WriteFile(certificateLocation, certificate, 0o600)
 	if err != nil {
 		return false, fmt.Errorf("while writing server certificate: %w", err)
 	}
@@ -294,7 +301,7 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 		r.log.Info("Refreshed configuration file", "filename", certificateLocation)
 	}
 
-	privateKeyIsChanged, err := fileutils.WriteFile(privateKeyLocation, privateKey, 0600)
+	privateKeyIsChanged, err := fileutils.WriteFile(privateKeyLocation, privateKey, 0o600)
 	if err != nil {
 		return false, fmt.Errorf("while writing server private key: %w", err)
 	}
@@ -308,19 +315,19 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 
 // refreshConfigurationFilesFromObject receive an unstructured object representing
 // a secret and rewrite the file corresponding to the server certificate
-func (r *InstanceReconciler) refreshCAFromSecret(secret *corev1.Secret) (bool, error) {
+func (r *InstanceReconciler) refreshCAFromSecret(secret *corev1.Secret, destLocation string) (bool, error) {
 	caCertificate, ok := secret.Data[certs.CACertKey]
 	if !ok {
 		return false, fmt.Errorf("missing %s entry in Secret", certs.CACertKey)
 	}
 
-	changed, err := fileutils.WriteFile(postgres.CACertificateLocation, caCertificate, 0600)
+	changed, err := fileutils.WriteFile(destLocation, caCertificate, 0o600)
 	if err != nil {
 		return false, fmt.Errorf("while writing server certificate: %w", err)
 	}
 
 	if changed {
-		r.log.Info("Refreshed configuration file", "filename", postgres.CACertificateLocation)
+		r.log.Info("Refreshed configuration file", "filename", destLocation)
 	}
 
 	return changed, nil
