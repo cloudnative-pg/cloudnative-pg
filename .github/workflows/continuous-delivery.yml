@@ -156,6 +156,9 @@ jobs:
       -
         name: Checkout
         uses: actions/checkout@v2.3.4
+        with:
+          # To identify the commit we need the history and all teh tags.
+          fetch-depth: 0
       -
         name: Build meta
         id: build-meta
@@ -179,9 +182,17 @@ jobs:
           else
             labels='quay.expires-after=7d'
           fi
+          commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
+          commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
+          # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
+          commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
+          commit_short=$(git rev-parse --short "${commit_sha}")
           echo "::set-output name=images::${images}"
           echo "::set-output name=tags::${tags}"
           echo "::set-output name=labels::${labels}"
+          echo "::set-output name=date::${commit_date}"
+          echo "::set-output name=version::${commit_version}"
+          echo "::set-output name=commit::${commit_short}"
       -
         name: Docker meta
         id: docker-meta
@@ -219,6 +230,10 @@ jobs:
           # Available architecture on UBI8 are: linux/amd64, linux/arm64, linux/ppc64le
           platforms: linux/amd64
           push: true
+          build-args: |
+            DATE=${{ steps.build-meta.outputs.date }}
+            COMMIT=${{ steps.build-meta.outputs.commit }}
+            VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
           labels: ${{ steps.build-meta.outputs.labels }}
       -

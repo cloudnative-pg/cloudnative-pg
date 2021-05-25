@@ -17,6 +17,12 @@ builds:
 - id: kubectl-cnp
   binary: kubectl-cnp
   main: cmd/kubectl-cnp/main.go
+  ldflags:
+  - -s
+  - -w
+  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion={{.Version}}
+  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit={{.ShortCommit}}
+  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate={{.CommitDate}}
   goos:
   - darwin
   - linux

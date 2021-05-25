@@ -23,6 +23,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 // NewCmd creates the "instance run" subcommand
@@ -63,6 +64,10 @@ func NewCmd() *cobra.Command {
 
 func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	var err error
+
+	log.Log.Info("Starting Cloud Native PostgreSQL Instance Manager",
+		"version", versions.Version,
+		"build", versions.Info)
 
 	reconciler, err := controller.NewInstanceReconciler(instance)
 	if err != nil {

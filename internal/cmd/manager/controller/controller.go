@@ -84,7 +84,9 @@ func init() {
 func RunController(metricsAddr, configMapName string, enableLeaderElection bool) error {
 	ctx := context.Background()
 
-	setupLog.Info("Starting Cloud Native PostgreSQL Operator", "version", versions.Version)
+	setupLog.Info("Starting Cloud Native PostgreSQL Operator",
+		"version", versions.Version,
+		"build", versions.Info)
 	setupLog.Info("Listening for changes", "watchNamespace", configuration.Current.WatchNamespace)
 
 	managerOptions := ctrl.Options{

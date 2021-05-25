@@ -14,6 +14,7 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 // NewCmd create a new cobra command
@@ -24,7 +25,10 @@ func NewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dest := args[0]
 
-			log.Log.Info("Installing the manager executable", "destination", dest)
+			log.Log.Info("Installing the manager executable",
+				"destination", dest,
+				"version", versions.Version,
+				"build", versions.Info)
 			err := fileutils.CopyFile(cmd.Root().Name(), dest)
 			if err != nil {
 				panic(err)
