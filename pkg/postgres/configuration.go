@@ -40,28 +40,33 @@ host all all all md5
 	// operator to work correctly
 	blockedConfigurationParameter = "blocked"
 
-	// ServerCertificates location to store the certificates
-	ServerCertificates = "/controller/certificates/"
+	// CertificatesDir location to store the certificates
+	CertificatesDir = "/controller/certificates/"
 
 	// ServerCertificateLocation is the location where the server certificate
 	// is stored
-	ServerCertificateLocation = ServerCertificates + "server.crt"
+	ServerCertificateLocation = CertificatesDir + "server.crt"
 
 	// ServerKeyLocation is the location where the private key is stored
-	ServerKeyLocation = ServerCertificates + "server.key"
+	ServerKeyLocation = CertificatesDir + "server.key"
 
 	// StreamingReplicaCertificateLocation is the location where the certificate
 	// of the "postgres" user is stored
-	StreamingReplicaCertificateLocation = ServerCertificates + "streaming_replica.crt"
+	StreamingReplicaCertificateLocation = CertificatesDir + "streaming_replica.crt"
 
 	// StreamingReplicaKeyLocation is the location where the private key of
 	// the "postgres" user is stored
-	StreamingReplicaKeyLocation = ServerCertificates + "streaming_replica.key"
+	StreamingReplicaKeyLocation = CertificatesDir + "streaming_replica.key"
 
-	// CACertificateLocation is the location where the CA certificate
+	// ClientCACertificateLocation is the location where the CA certificate
 	// is stored, and this certificate will be use to authenticate
 	// client certificates
-	CACertificateLocation = ServerCertificates + "ca.crt"
+	ClientCACertificateLocation = CertificatesDir + "client-ca.crt"
+
+	// ServerCACertificateLocation is the location where the CA certificate
+	// is stored, and this certificate will be use to authenticate
+	// server certificates
+	ServerCACertificateLocation = CertificatesDir + "server-ca.crt"
 
 	// BackupTemporaryDirectory provides a path to backup temporary files
 	// needed in the recovery process
@@ -254,7 +259,7 @@ var (
 			"ssl":                     "on",
 			"ssl_cert_file":           ServerCertificateLocation,
 			"ssl_key_file":            ServerKeyLocation,
-			"ssl_ca_file":             CACertificateLocation,
+			"ssl_ca_file":             ClientCACertificateLocation,
 		},
 	}
 )

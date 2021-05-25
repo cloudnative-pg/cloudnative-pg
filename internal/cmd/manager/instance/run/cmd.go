@@ -88,9 +88,15 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	_, err = reconciler.RefreshCA(ctx)
+	_, err = reconciler.RefreshClientCA(ctx)
 	if err != nil {
-		log.Log.Error(err, "Error while writing the TLS CA certificates")
+		log.Log.Error(err, "Error while writing the TLS CA Client certificates")
+		return err
+	}
+
+	_, err = reconciler.RefreshServerCA(ctx)
+	if err != nil {
+		log.Log.Error(err, "Error while writing the TLS CA Server certificates")
 		return err
 	}
 

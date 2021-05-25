@@ -59,9 +59,9 @@ func (r *InstanceReconciler) RefreshReplicationUserCertificate(ctx context.Conte
 		postgresSpec.StreamingReplicaKeyLocation)
 }
 
-// RefreshCA gets the latest CA certificates from the
-// secrets. Returns true if configuration has been changed
-func (r *InstanceReconciler) RefreshCA(ctx context.Context) (bool, error) {
+// RefreshClientCA gets the latest client CA certificates from the secrets.
+// It returns true if configuration has been changed
+func (r *InstanceReconciler) RefreshClientCA(ctx context.Context) (bool, error) {
 	var secret corev1.Secret
 	err := r.GetClient().Get(
 		ctx,
@@ -71,7 +71,22 @@ func (r *InstanceReconciler) RefreshCA(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	return r.refreshCAFromSecret(&secret)
+	return r.refreshCAFromSecret(&secret, postgresSpec.ClientCACertificateLocation)
+}
+
+// RefreshServerCA gets the latest server CA certificates from the secrets.
+// It returns true if configuration has been changed
+func (r *InstanceReconciler) RefreshServerCA(ctx context.Context) (bool, error) {
+	var secret corev1.Secret
+	err := r.GetClient().Get(
+		ctx,
+		client.ObjectKey{Namespace: r.instance.Namespace, Name: r.instance.ClusterName + apiv1.CaSecretSuffix},
+		&secret)
+	if err != nil {
+		return false, err
+	}
+
+	return r.refreshCAFromSecret(&secret, postgresSpec.ServerCACertificateLocation)
 }
 
 // VerifyPgDataCoherence checks if this cluster exists in K8s. It panics if this
