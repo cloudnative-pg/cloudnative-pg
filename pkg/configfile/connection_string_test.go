@@ -47,6 +47,10 @@ var _ = Describe("Connection string generator", func() {
 			map[string]string{
 				"one": "1",
 				"two": "2",
-			})).To(Equal("one='1' two='2'"))
+			})).To(
+			Or(
+				Equal("one='1' two='2'"),
+				Equal("two='2' one='1'"),
+			))
 	})
 })
