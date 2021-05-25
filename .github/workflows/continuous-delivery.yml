@@ -346,6 +346,12 @@ jobs:
         run:
           docker system prune -a -f
       -
+        name: Prepare the environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gettext-base
+          sudo hack/setup-cluster.sh prepare /usr/local/bin
+      -
         name: Run Kind End-to-End tests
         run:
           make e2e-test-kind
