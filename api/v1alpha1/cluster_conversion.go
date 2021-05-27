@@ -84,7 +84,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
 				s3Credentials.AccessKeyIDReference.Name
 			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Key =
 				s3Credentials.SecretAccessKeyReference.Key
-			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Key =
+			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Name =
 				s3Credentials.SecretAccessKeyReference.Name
 		}
 
