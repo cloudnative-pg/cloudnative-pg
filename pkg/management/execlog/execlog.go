@@ -114,10 +114,8 @@ func RunBuffering(cmd *exec.Cmd, cmdName string) (err error) {
 	cmd.Stdout = &stdoutBuffer
 	cmd.Stderr = &stderrBuffer
 	err = cmd.Run()
-	if err != nil {
-		return err
-	}
 
+	// Log stdout/stderr regardless of error status
 	if s := stdoutBuffer.String(); len(s) > 0 {
 		logger.WithValues(pipeKey, stdout).Info(s)
 	}
@@ -126,5 +124,5 @@ func RunBuffering(cmd *exec.Cmd, cmdName string) (err error) {
 		logger.WithValues(pipeKey, stderr).Info(s)
 	}
 
-	return nil
+	return err
 }
