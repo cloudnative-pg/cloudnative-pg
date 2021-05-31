@@ -300,7 +300,7 @@ func (instance *Instance) WaitForSuperuserConnectionAvailable() error {
 }
 
 // waitForConnectionAvailable waits until we can connect to the passed
-// connection connectionMap
+// sql.DB connection
 func waitForConnectionAvailable(db *sql.DB) error {
 	errorIsRetryable := func(err error) bool {
 		return err != nil
@@ -312,6 +312,24 @@ func waitForConnectionAvailable(db *sql.DB) error {
 			log.Log.Info("DB not available, will retry", "err", err)
 		}
 		return err
+	})
+}
+
+// waitForStreamingConnectionAvailable waits until we can connect to the passed
+// sql.DB connection using streaming protocol
+func waitForStreamingConnectionAvailable(db *sql.DB) error {
+	errorIsRetryable := func(err error) bool {
+		return err != nil
+	}
+
+	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
+		result, err := db.Query("IDENTIFY_SYSTEM")
+		if err != nil || result.Err() != nil {
+			log.Log.Info("DB not available, will retry", "err", err)
+			return err
+		}
+		_ = result.Close()
+		return nil
 	})
 }
 
