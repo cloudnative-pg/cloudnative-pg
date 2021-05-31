@@ -24,7 +24,7 @@ BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/enterprisedb/postgresql:13
 KUSTOMIZE_VERSION ?= v3.5.4
 KIND_CLUSTER_NAME ?= pg
-KIND_CLUSTER_VERSION ?= v1.20.0
+KIND_CLUSTER_VERSION ?= v1.21.1
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
@@ -224,9 +224,9 @@ dev-init:
 	  --docker-password="${QUAY_PASSWORD}" \
 	  --docker-server="quay.io/enterprisedb"
 	echo
-	while [[ $$( kubectl get pods -n postgresql-operator-system -l control-plane=controller-manager -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' ) != "True" ]]; do \
+	while [[ $$( kubectl get pods -n postgresql-operator-system -l app.kubernetes.io/name=cloud-native-postgresql -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' ) != "True" ]]; do \
 	    printf '\033[0K\r'; \
-	    kubectl get pods -n postgresql-operator-system -l control-plane=controller-manager \
+	    kubectl get pods -n postgresql-operator-system -l app.kubernetes.io/name=cloud-native-postgresql \
 	        -o 'jsonpath=Waiting for pod: {..status.phase} {..status.containerStatuses[*].state.waiting.reason}' ; \
 	    sleep 2 ; \
 	done

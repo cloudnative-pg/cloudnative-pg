@@ -13,7 +13,7 @@ environment variable:
 
 - Go 1.14+ compiler
 - GNU Make
-- [Kind](https://kind.sigs.k8s.io/) v0.9.x or greater
+- [Kind](https://kind.sigs.k8s.io/) v0.11.x or greater
 - [golangci-lint](https://github.com/golangci/golangci-lint)
 
 On Mac OS X, you can install the above components through `brew`:
@@ -21,7 +21,7 @@ On Mac OS X, you can install the above components through `brew`:
     brew install go kind golangci/tap/golangci-lint
 
 **⚠️ Note:**
-Kind version 0.9.x is required at the time of this writing.  If you already
+Kind version 0.11.x is required at the time of this writing.  If you already
 have kind, run `brew upgrade kind` to update to the latest version.
 
 You can invoke the compilation procedure with:
