@@ -140,7 +140,7 @@ var _ = Describe("Backup and restore", func() {
 				findCmd := fmt.Sprintf(
 					"sh -c 'mc find minio --name %v.gz | wc -l'",
 					latestWAL)
-				out, _, err := tests.Run(fmt.Sprintf(
+				out, _, err := tests.RunUnchecked(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					mcName,
@@ -177,7 +177,7 @@ var _ = Describe("Backup and restore", func() {
 			timeout = 30
 			Eventually(func() (int, error, error) {
 				findCmd := "sh -c 'mc find minio --name data.tar | wc -l'"
-				out, _, err := tests.Run(fmt.Sprintf(
+				out, _, err := tests.RunUnchecked(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					mcName,
@@ -277,7 +277,7 @@ var _ = Describe("Backup and restore", func() {
 			timeout = 30
 			Eventually(func() (int, error) {
 				findCmd := "sh -c 'mc find minio --name data.tar | wc -l'"
-				out, _, err := tests.Run(fmt.Sprintf(
+				out, _, err := tests.RunUnchecked(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					mcName,

@@ -10,9 +10,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

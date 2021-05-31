@@ -113,7 +113,7 @@ var _ = Describe("Upgrade", func() {
 			currentBackups, err := strconv.Atoi(strings.Trim(out, "\n"))
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int, error) {
-				out, _, err := tests.Run(fmt.Sprintf(
+				out, _, err := tests.RunUnchecked(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					minioClientName,
@@ -144,7 +144,7 @@ var _ = Describe("Upgrade", func() {
 			// the apply
 			timeout := 60
 			Eventually(func() error {
-				_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + updateConfFile)
+				_, _, err := tests.RunUnchecked("kubectl apply -n " + namespace + " -f " + updateConfFile)
 				return err
 			}, timeout).ShouldNot(HaveOccurred())
 
@@ -360,7 +360,7 @@ var _ = Describe("Upgrade", func() {
 				findCmd := fmt.Sprintf(
 					"sh -c 'mc find minio --name %v.gz | wc -l'",
 					latestWAL)
-				out, _, err := tests.Run(fmt.Sprintf(
+				out, _, err := tests.RunUnchecked(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					mcName,
@@ -394,7 +394,7 @@ var _ = Describe("Upgrade", func() {
 			// A file called data.tar.gz should be available on minio
 			timeout = 30
 			Eventually(func() (int, error, error) {
-				out, _, err := tests.Run(fmt.Sprintf(
+				out, _, err := tests.RunUnchecked(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					minioClientName,
