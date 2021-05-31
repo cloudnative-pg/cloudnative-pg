@@ -34,6 +34,13 @@ type JoinInfo struct {
 // ClonePgData clones an existing server, given its connection string,
 // to a certain data directory
 func ClonePgData(connectionString, targetPgData string) error {
+	// To initiate streaming replication, the frontend sends the replication parameter
+	// in the startup message. A Boolean value of true (or on, yes, 1) tells the backend
+	// to go into physical replication walsender mode, wherein a small set of replication
+	// commands, shown below, can be issued instead of SQL statements.
+	// https://www.postgresql.org/docs/current/protocol-replication.html
+	connectionString += " replication=1"
+
 	log.Log.Info("Waiting for server to be available", "connectionString", connectionString)
 	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
@@ -43,9 +50,9 @@ func ClonePgData(connectionString, targetPgData string) error {
 		_ = db.Close()
 	}()
 
-	err = waitForConnectionAvailable(db)
+	err = waitForStreamingConnectionAvailable(db)
 	if err != nil {
-		return fmt.Errorf("primary server not available: %v", connectionString)
+		return fmt.Errorf("source server not available: %v", connectionString)
 	}
 
 	options := []string{
