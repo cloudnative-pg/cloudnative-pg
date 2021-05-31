@@ -1,6 +1,6 @@
 # E2E testing
 
-E2E testing is performing running the `run-e2e.sh` script after setting
+E2E testing is performed by running the `run-e2e.sh` script after setting
 up a Kubernetes cluster and configuring `kubectl` to use it.
 
 The script can be configured through the following environment variables:
@@ -58,7 +58,7 @@ the following ones can be defined:
     Default: `false`.
 * `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
   the tests. Only useful if specified with `PRESERVE_CLUSTER=true`.
-* `K8S_VERSION`: the version of K8S to run. Default: `v1.20.0`.
+* `K8S_VERSION`: the version of K8S to run. Default: `v1.21.1`.
 * `KIND_VERSION`: the version of Kind. Defaults to the latest release.
 * `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
     false to get the image from a registry. Default: `false`.
