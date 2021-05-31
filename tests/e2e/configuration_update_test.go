@@ -172,7 +172,7 @@ var _ = Describe("Configuration update", func() {
 		By("Erroring out when a fixedConfigurationParameter is modified", func() {
 			sample := fixturesDir + "/config_update/05-fixed-params.yaml"
 			// Update the configuration
-			_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+			_, _, err := tests.RunUnchecked("kubectl apply -n " + namespace + " -f " + sample)
 			// Expecting an error when a fixedConfigurationParameter is modified
 			Expect(err).To(HaveOccurred())
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -193,7 +193,7 @@ var _ = Describe("Configuration update", func() {
 		By("Erroring out when a blockedConfigurationParameter is modified", func() {
 			sample := fixturesDir + "/config_update/06-blocked-params.yaml"
 			// Update the configuration
-			_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+			_, _, err := tests.RunUnchecked("kubectl apply -n " + namespace + " -f " + sample)
 			// Expecting an error when a blockedConfigurationParameter is modified
 			Expect(err).To(HaveOccurred())
 			podList, err := env.GetClusterPodList(namespace, clusterName)

@@ -306,7 +306,7 @@ func drainPrimaryNode(namespace string, clusterName string) []string {
 		cmd := fmt.Sprintf("kubectl drain %v --ignore-daemonsets --delete-local-data --force", primaryNode)
 		timeout := 900
 		Eventually(func() error {
-			_, _, err := tests.Run(cmd)
+			_, _, err := tests.RunUnchecked(cmd)
 			return err
 		}, timeout).ShouldNot(HaveOccurred())
 	})
