@@ -29,7 +29,6 @@ spec:
         host: pg-basebackup-src-rw
         user: postgres
         port: "5432"
-        dbname: app
       password:
         name: pg-basebackup-src-superuser
         key: password

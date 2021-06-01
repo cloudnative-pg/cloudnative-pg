@@ -18,7 +18,6 @@ spec:
       host: cluster-example-rw.default.svc
       user: streaming_replica
       sslmode: verify-full
-      dbname: postgres
     sslKey:
       name: cluster-example-replication
       key: tls.key

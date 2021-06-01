@@ -193,6 +193,7 @@ backupstatus
 balancer
 barmanObjectStore
 barmanobjectstoreconfiguration
+basebackup
 benchmarking
 bool
 bootstrapconfiguration
@@ -221,12 +222,14 @@ conf
 config
 configmap
 configmapkeyselector
+connectionParameters
 containerPort
 coreos
 corev
 coverity
 cpu
 crc
+createuser
 creds
 cron
 crt
@@ -257,6 +260,7 @@ endpointURL
 enterprisedb
 env
 executables
+externalClusters
 failover
 fastpath
 ffd
@@ -368,6 +372,7 @@ persistentvolumeclaim
 persistentvolumeclaims
 pgBouncer
 pgbarman
+pgbasebackup
 pgbench
 pgpass
 phaseReason
@@ -434,6 +439,9 @@ src
 sre
 ssc
 ssl
+sslCert
+sslKey
+sslRootCert
 sslcert
 sslkey
 sslmode
@@ -474,6 +482,7 @@ unencrypted
 unix
 upgradable
 usename
+usernamepassword
 usr
 utils
 virtualized
@@ -483,6 +492,7 @@ volumeMounts
 wal
 walbackupconfiguration
 walkthrough
+walsender
 webhook
 webtest
 wikipedia
