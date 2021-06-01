@@ -692,7 +692,6 @@ var _ = Describe("storage size validation", func() {
 		}
 
 		Expect(clusterNew.validateStorageSizeChange(&clusterOld)).To(BeEmpty())
-
 	})
 })
 

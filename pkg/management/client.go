@@ -22,10 +22,8 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
-var (
-	// Scheme used for the instance manager
-	Scheme = runtime.NewScheme()
-)
+// Scheme used for the instance manager
+var Scheme = runtime.NewScheme()
 
 func init() {
 	_ = clientgoscheme.AddToScheme(Scheme)
@@ -77,10 +75,12 @@ func NewEventRecorder() (record.EventRecorder, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(
 		&typedcorev1.EventSinkImpl{
-			Interface: kubeClient.CoreV1().Events("")})
+			Interface: kubeClient.CoreV1().Events(""),
+		})
 	recorder := eventBroadcaster.NewRecorder(
 		Scheme,
-		v1.EventSource{Component: "instance-manager"})
+		v1.EventSource{Component: "instance-manager"},
+	)
 
 	return recorder, nil
 }

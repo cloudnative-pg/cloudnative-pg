@@ -25,16 +25,14 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-var (
-	// RetrySettingPrimary is the default retry configuration that is used
-	// for promotions
-	RetrySettingPrimary = wait.Backoff{
-		Duration: 1 * time.Second,
-		// Steps is declared as an "int", so we are capping
-		// to int32 to support ARM-based 32 bit architectures
-		Steps: math.MaxInt32,
-	}
-)
+// RetrySettingPrimary is the default retry configuration that is used
+// for promotions
+var RetrySettingPrimary = wait.Backoff{
+	Duration: 1 * time.Second,
+	// Steps is declared as an "int", so we are capping
+	// to int32 to support ARM-based 32 bit architectures
+	Steps: math.MaxInt32,
+}
 
 // ClusterModifier is a function that apply a change
 // to a cluster object. This encapsulation is useful to have

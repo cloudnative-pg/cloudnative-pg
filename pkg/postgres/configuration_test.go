@@ -7,10 +7,10 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
+	"strings"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"strings"
 )
 
 var _ = Describe("PostgreSQL configuration creation", func() {

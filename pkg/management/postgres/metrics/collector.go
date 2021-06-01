@@ -122,7 +122,8 @@ func NewQueriesCollector(name string, instance *postgres.Instance, defaultDBName
 			Namespace: name,
 			Name:      "last_error",
 			Help:      "1 if the last collection ended with error, 0 otherwise.",
-		})}
+		}),
+	}
 }
 
 // ParseQueries parse a YAML file containing custom queries and add it

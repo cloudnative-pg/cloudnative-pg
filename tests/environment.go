@@ -534,7 +534,8 @@ func (env TestingEnvironment) checkWebhookReady(namespace string) error {
 	customResourceDefinitionsName := []string{
 		"backups.postgresql.k8s.enterprisedb.io",
 		"clusters.postgresql.k8s.enterprisedb.io",
-		"scheduledbackups.postgresql.k8s.enterprisedb.io"}
+		"scheduledbackups.postgresql.k8s.enterprisedb.io",
+	}
 
 	for _, c := range customResourceDefinitionsName {
 		crd, err := env.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(

@@ -7,11 +7,13 @@ linters:
   # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
   disable-all: true
   enable:
+    - asciicheck
     - bodyclose
     - deadcode
     - depguard
     - dogsled
     - dupl
+    - durationcheck
     - errcheck
     - exportloopref
     - gocognit
@@ -19,32 +21,61 @@ linters:
     - gocritic
     - gocyclo
     - gofmt
+    - gofumpt
+    - goheader
     - goimports
-    - golint
+    - gomoddirectives
     - gomodguard
     - goprintffuncname
     - gosec
     - gosimple
     - govet
+    - importas
     - ineffassign
     - lll
+    - makezero
     - misspell
     - nakedret
     - nestif
     - prealloc
+    - predeclared
+    - revive
     - rowserrcheck
+    - sqlclosecheck
     - staticcheck
     - structcheck
     - stylecheck
+    - thelper
+    - tparallel
     - typecheck
     - unconvert
     - unparam
     - unused
     - varcheck
+    - wastedassign
     - whitespace
 
+  # to be checked:
+  # - errorlint
+  # - forbidigo
+  # - forcetypeassert
+  # - goerr113
+  # - ifshort
+  # - nilerr
+  # - nlreturn
+  # - noctx
+  # - nolintlint
+  # - paralleltest
+  # - promlinter
+  # - tagliatelle
+  # - wrapcheck
+
   # don't enable:
+  # - cyclop
+  # - exhaustive
+  # - exhaustivestruct
   # - funlen
+  # - gci
   # - gochecknoglobals
   # - gochecknoinits
   # - godot
@@ -52,6 +83,12 @@ linters:
   # - gomnd
   # - testpackage
   # - wsl
+
+  # deprecated:
+  # - golint
+  # - interfacer
+  # - maligned
+  # - scopelint
 
 run:
   skip-files: "zz_generated.*"

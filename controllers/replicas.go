@@ -20,11 +20,9 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
-var (
-	// ErrWalReceiversRunning is raised when a new primary server can't be elected
-	// because there is a WAL receiver running in our Pod list
-	ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
-)
+// ErrWalReceiversRunning is raised when a new primary server can't be elected
+// because there is a WAL receiver running in our Pod list
+var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
 
 // updateTargetPrimaryFromPods set the name of the target primary from the Pods status if needed
 // this function will returns the name of the new primary selected for promotion
@@ -161,9 +159,8 @@ func getSacrificialPod(podList []corev1.Pod) *corev1.Pod {
 			continue
 		}
 
+		// If we cannot get the node serial this is not one of our Pods
 		podSerial, err := specs.GetNodeSerial(pod.ObjectMeta)
-
-		// This isn't one of our Pods, since I can't get the node serial
 		if err != nil {
 			continue
 		}

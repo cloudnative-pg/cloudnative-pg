@@ -20,13 +20,13 @@ import (
 var _ = Describe("update Postgres configuration files", func() {
 	var tmpDir string
 
-	var _ = BeforeEach(func() {
+	_ = BeforeEach(func() {
 		var err error
 		tmpDir, err = ioutil.TempDir("", "configuration-test-")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	var _ = AfterEach(func() {
+	_ = AfterEach(func() {
 		Expect(os.RemoveAll(tmpDir)).To(Succeed())
 	})
 

@@ -63,10 +63,8 @@ type Data struct {
 	InheritedLabels []string `json:"inheritedLabels" env:"INHERITED_LABELS"`
 }
 
-var (
-	// Current is the configuration used by the operator
-	Current = NewConfiguration()
-)
+// Current is the configuration used by the operator
+var Current = NewConfiguration()
 
 // newDefaultConfig creates a configuration holding the defaults
 func newDefaultConfig() *Data {

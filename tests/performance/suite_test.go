@@ -20,8 +20,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var env *tests.TestingEnvironment
-var expectedOperatorPodName string
+var (
+	env                     *tests.TestingEnvironment
+	expectedOperatorPodName string
+)
 
 var _ = BeforeSuite(func() {
 	var err error

@@ -212,5 +212,4 @@ var _ = Describe("Configuration update", func() {
 			}
 		})
 	})
-
 })

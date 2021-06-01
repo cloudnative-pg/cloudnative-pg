@@ -76,6 +76,5 @@ var _ = Describe("Expectation controller", func() {
 
 		Expect(expectations.SatisfiedExpectations(key)).To(BeTrue())
 		Expect(expectations.SatisfiedExpectations(anotherKey)).NotTo(BeTrue())
-
 	})
 })
