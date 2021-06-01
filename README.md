@@ -11,7 +11,7 @@ To develop the operator, you will need a UNIX based operating system that
 support the following software, which must be available in the `PATH`
 environment variable:
 
-- Go 1.14+ compiler
+- Go 1.15+ compiler
 - GNU Make
 - [Kind](https://kind.sigs.k8s.io/) v0.11.x or greater
 - [golangci-lint](https://github.com/golangci/golangci-lint)
