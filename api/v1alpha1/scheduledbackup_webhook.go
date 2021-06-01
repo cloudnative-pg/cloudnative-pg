@@ -71,11 +71,7 @@ func (r *ScheduledBackup) ValidateCreate() error {
 	// This code is not useful because the ValidateCreate function
 	// is not supposed to change the object. However this call helps to catch
 	// issues in the conversion code
-	if err := r.ConvertFrom(&v1ScheduledBackup); err != nil {
-		return err
-	}
-
-	return nil
+	return r.ConvertFrom(&v1ScheduledBackup)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
@@ -100,11 +96,7 @@ func (r *ScheduledBackup) ValidateUpdate(old runtime.Object) error {
 	// This code is not useful because the ValidateUpdate function
 	// is not supposed to change the object. However this call helps to catch
 	// issues in the conversion code
-	if err := r.ConvertFrom(&v1alphaScheduledBackup); err != nil {
-		return err
-	}
-
-	return nil
+	return r.ConvertFrom(&v1alphaScheduledBackup)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -124,9 +116,5 @@ func (r *ScheduledBackup) ValidateDelete() error {
 	// This code is not useful because the ValidateDelete function
 	// is not supposed to change the object. However this call helps to catch
 	// issues in the conversion code
-	if err := r.ConvertFrom(&v1ScheduledBackup); err != nil {
-		return err
-	}
-
-	return nil
+	return r.ConvertFrom(&v1ScheduledBackup)
 }

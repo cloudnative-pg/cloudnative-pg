@@ -11,9 +11,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-var (
-	log = ctrl.Log.WithName("utils")
-)
+var log = ctrl.Log.WithName("utils")
 
 // PodStatus represent the possible status of pods
 type PodStatus string
@@ -77,7 +75,7 @@ func CountReadyPods(podList []corev1.Pod) int {
 
 // ListStatusPods return a list of active Pods
 func ListStatusPods(podList []corev1.Pod) map[PodStatus][]string {
-	var podsNames = make(map[PodStatus][]string)
+	podsNames := make(map[PodStatus][]string)
 
 	for _, pod := range podList {
 		switch {

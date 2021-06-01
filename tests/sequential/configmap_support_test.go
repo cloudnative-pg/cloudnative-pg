@@ -72,7 +72,6 @@ var _ = Describe("ConfigMap support", func() {
 	})
 
 	It("verify label's and annotation's inheritance support", func() {
-
 		By("creating configmap", func() {
 			// create a config map where operator is deployed
 			cmd := fmt.Sprintf("kubectl apply -n %v -f %v", operatorNamespace, configMapFile)

@@ -210,7 +210,6 @@ var _ = Describe("Upgrade", func() {
 	}
 
 	It("works after an upgrade to v1", func() {
-
 		// Create a namespace for all the resources
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())

@@ -11,10 +11,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-var (
-	// This variable store the result of the DetectSecurityContextConstraints check
-	haveSCC bool
-)
+// This variable store the result of the DetectSecurityContextConstraints check
+var haveSCC bool
 
 // DetectSecurityContextConstraints connects to the discovery API and find out if
 // we're running under a system that implements OpenShift Security Context Constraints

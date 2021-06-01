@@ -24,11 +24,9 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-var (
-	// ErrorContainerNotFound is raised when an Exec call is invoked against
-	// a non existing container
-	ErrorContainerNotFound = fmt.Errorf("container not found")
-)
+// ErrorContainerNotFound is raised when an Exec call is invoked against
+// a non existing container
+var ErrorContainerNotFound = fmt.Errorf("container not found")
 
 // ExecCommand executes arbitrary command inside the pod, and returns his result
 func ExecCommand(

@@ -12,7 +12,6 @@ import (
 )
 
 var _ = Describe("create client", func() {
-
 	It("with given configuration", func() {
 		err := createClient(cfg)
 		Expect(err).NotTo(HaveOccurred())

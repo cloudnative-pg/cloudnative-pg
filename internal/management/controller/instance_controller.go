@@ -56,11 +56,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 	}
 
 	// Reconcile secrets and cryptographic material
-	if err = r.reconcileSecrets(ctx); err != nil {
-		return err
-	}
-
-	return nil
+	return r.reconcileSecrets(ctx)
 }
 
 // reconcileClusterRole applies the role written in the cluster status to this instance

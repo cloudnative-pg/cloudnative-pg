@@ -25,7 +25,6 @@ import (
 // Set of tests in which we check that operator is able to failover primary and bring back
 // replica's when we drain node
 var _ = Describe("E2E Drain Node", func() {
-
 	var nodesWithLabels []string
 
 	BeforeEach(func() {
@@ -198,7 +197,6 @@ var _ = Describe("E2E Drain Node", func() {
 		// on different nodes. We expect to see the cluster pods having
 		// all different names from the initial ones after the drain.
 		It("drains the primary pod's node, when all the pods are on a single node", func() {
-
 			// We leave a single node uncordoned, so all the pods we create
 			// will go there
 			By("leaving a single uncordoned", func() {

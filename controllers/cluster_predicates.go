@@ -18,16 +18,13 @@ import (
 	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 )
 
-var (
-	log = ctrl.Log.WithName("cluster_predicates")
-)
+var log = ctrl.Log.WithName("cluster_predicates")
 
 // ClusterPredicate filter events that invoke a Reconciliation loop
 // by listening to changes in the Cluster objects which create a new
 // generation (the Spec field has been updated) all the events related
 // to all Pods that belong to a cluster
-type ClusterPredicate struct {
-}
+type ClusterPredicate struct{}
 
 // isControlledObject checks if a certain object is controlled
 // by a PostgreSQL cluster

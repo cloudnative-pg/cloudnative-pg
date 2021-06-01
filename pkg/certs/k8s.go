@@ -24,9 +24,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 )
 
-var (
-	log = ctrl.Log.WithName("pki")
-)
+var log = ctrl.Log.WithName("pki")
 
 // PublicKeyInfrastructure represent the PKI under which the operator and the WebHook server
 // will work
@@ -366,12 +364,12 @@ func DumpSecretToDir(secret *v1.Secret, certDir string, basename string) error {
 	for name, content := range secret.Data {
 		extension := filepath.Ext(name)
 		fileName := path.Join(certDir, basename+extension)
-		if err := ioutil.WriteFile(fileName, content, 0600); err != nil {
+		if err := ioutil.WriteFile(fileName, content, 0o600); err != nil {
 			return err
 		}
 	}
 
-	err = ioutil.WriteFile(resourceFileName, []byte(secret.ResourceVersion), 0600)
+	err = ioutil.WriteFile(resourceFileName, []byte(secret.ResourceVersion), 0o600)
 	if err != nil {
 		return err
 	}

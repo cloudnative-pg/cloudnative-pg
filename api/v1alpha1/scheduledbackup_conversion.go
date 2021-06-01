@@ -13,7 +13,7 @@ import (
 )
 
 // ConvertTo converts this Cluster to the Hub version (v1).
-func (src *ScheduledBackup) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
+func (src *ScheduledBackup) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 	dst := dstRaw.(*v1.ScheduledBackup)
 
 	// objectmeta
@@ -33,7 +33,7 @@ func (src *ScheduledBackup) ConvertTo(dstRaw conversion.Hub) error { //nolint:go
 }
 
 // ConvertFrom converts from the Hub version (v1) to this version.
-func (dst *ScheduledBackup) ConvertFrom(srcRaw conversion.Hub) error { //nolint:golint
+func (dst *ScheduledBackup) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	src := srcRaw.(*v1.ScheduledBackup)
 
 	// objectmeta

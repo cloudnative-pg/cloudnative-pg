@@ -76,6 +76,5 @@ var _ = Describe("Certificate for tls authentication", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(stdout, err).To(Equal("1\n"))
 		})
-
 	})
 })

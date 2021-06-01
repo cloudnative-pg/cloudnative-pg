@@ -38,7 +38,6 @@ func (f *fakeWatch) fireEvent() {
 }
 
 var _ = Describe("how WatchCollection fan-in works", func() {
-
 	It("closes the channel when it watches no channels", func() {
 		wc := NewWatchCollection()
 		Eventually(wc.ResultChan()).Should(BeClosed())

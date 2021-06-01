@@ -13,7 +13,7 @@ import (
 )
 
 // ConvertTo converts this Cluster to the Hub version (v1).
-func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:golint
+func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 	dst := dstRaw.(*v1.Cluster)
 
 	// objectmeta
@@ -231,7 +231,7 @@ func (src *BootstrapConfiguration) ConvertTo(dstSpec *v1.BootstrapConfiguration)
 }
 
 // ConvertFrom converts from the Hub version (v1) to this version.
-func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:golint
+func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	src := srcRaw.(*v1.Cluster)
 
 	// objectmeta
@@ -363,7 +363,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:golint
 }
 
 // ConvertFrom converts from the Hub version (v1) to this version.
-func (dst *BootstrapConfiguration) ConvertFrom(srcSpec *v1.BootstrapConfiguration) { //nolint:golint
+func (dst *BootstrapConfiguration) ConvertFrom(srcSpec *v1.BootstrapConfiguration) { //nolint:revive
 	// spec.bootstrap.initdb
 	if srcSpec.InitDB != nil {
 		srcInitDB := srcSpec.InitDB

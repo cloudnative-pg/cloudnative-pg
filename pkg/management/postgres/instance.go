@@ -55,16 +55,14 @@ type Instance struct {
 	ClusterName string
 }
 
-var (
-	// RetryUntilServerAvailable is the default retry configuration that is used
-	// to wait for a successful connection to a certain server
-	RetryUntilServerAvailable = wait.Backoff{
-		Duration: 5 * time.Second,
-		// Steps is declared as an "int", so we are capping
-		// to int32 to support ARM-based 32 bit architectures
-		Steps: math.MaxInt32,
-	}
-)
+// RetryUntilServerAvailable is the default retry configuration that is used
+// to wait for a successful connection to a certain server
+var RetryUntilServerAvailable = wait.Backoff{
+	Duration: 5 * time.Second,
+	// Steps is declared as an "int", so we are capping
+	// to int32 to support ARM-based 32 bit architectures
+	Steps: math.MaxInt32,
+}
 
 // GetSocketDir get the name of the directory that will contain
 // the Unix socket for the PostgreSQL server. This is detected using
@@ -328,8 +326,13 @@ func waitForStreamingConnectionAvailable(db *sql.DB) error {
 			log.Log.Info("DB not available, will retry", "err", err)
 			return err
 		}
-		_ = result.Close()
-		return nil
+		defer func() {
+			innerErr := result.Close()
+			if err == nil && innerErr != nil {
+				err = innerErr
+			}
+		}()
+		return err
 	})
 }
 

@@ -17,7 +17,7 @@ import (
 var _ = Describe("Pod conditions test suite", func() {
 	Describe("Must check for Running PODs", func() {
 		It("Detect PODs without conditions are not running", func() {
-			var pod = corev1.Pod{
+			pod := corev1.Pod{
 				Status: corev1.PodStatus{
 					Conditions: []corev1.PodCondition{},
 				},
@@ -26,7 +26,7 @@ var _ = Describe("Pod conditions test suite", func() {
 		})
 
 		It("Detects Ready PODs as running", func() {
-			var pod = corev1.Pod{
+			pod := corev1.Pod{
 				Status: corev1.PodStatus{
 					Conditions: []corev1.PodCondition{
 						{
@@ -40,7 +40,7 @@ var _ = Describe("Pod conditions test suite", func() {
 		})
 
 		It("Detects not ready PODs are not running", func() {
-			var pod = corev1.Pod{
+			pod := corev1.Pod{
 				Status: corev1.PodStatus{
 					Conditions: []corev1.PodCondition{
 						{

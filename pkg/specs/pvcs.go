@@ -19,11 +19,9 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
-var (
-	// ErrorInvalidSize is raised when the size specified by the
-	// user is not valid and can't be specified in a PVC declaration
-	ErrorInvalidSize = fmt.Errorf("invalid storage size")
-)
+// ErrorInvalidSize is raised when the size specified by the
+// user is not valid and can't be specified in a PVC declaration
+var ErrorInvalidSize = fmt.Errorf("invalid storage size")
 
 // PVCUsageStatus is the status of the PVC we generated
 type PVCUsageStatus struct {

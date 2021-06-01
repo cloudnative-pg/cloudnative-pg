@@ -26,7 +26,6 @@ import (
 )
 
 var _ = Describe("Backup and restore", func() {
-
 	const namespace = "cluster-backup"
 	const sampleFile = fixturesDir + "/backup/cluster-with-backup.yaml"
 	const clusterName = "pg-backup"

@@ -22,11 +22,9 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
-var (
-	// ErrorInconsistentClusterStatus is raised when the current cluster has no primary nor
-	// the sufficient number of nodes to issue a switchover
-	ErrorInconsistentClusterStatus = errors.New("inconsistent cluster status")
-)
+// ErrorInconsistentClusterStatus is raised when the current cluster has no primary nor
+// the sufficient number of nodes to issue a switchover
+var ErrorInconsistentClusterStatus = errors.New("inconsistent cluster status")
 
 // updateCluster update a Cluster to a new image, if needed
 func (r *ClusterReconciler) upgradeCluster(

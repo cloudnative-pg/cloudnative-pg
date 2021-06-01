@@ -25,7 +25,6 @@ import (
 )
 
 var _ = Describe("Rolling updates", func() {
-
 	// gatherClusterInfo returns the current lists of pods, pod UIDs and pvc UIDs in a given cluster
 	gatherClusterInfo := func(namespace string, clusterName string) ([]string, []types.UID, []types.UID, error) {
 		var podNames []string

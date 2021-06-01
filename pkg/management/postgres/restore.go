@@ -287,11 +287,7 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 	}
 
 	// Create the local map referred in the HBA configuration
-	if err = WritePostgresUserMaps(info.PgData); err != nil {
-		return err
-	}
-
-	return nil
+	return WritePostgresUserMaps(info.PgData)
 }
 
 // ConfigureInstanceAfterRestore change the superuser password

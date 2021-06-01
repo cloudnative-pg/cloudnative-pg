@@ -16,12 +16,14 @@ var _ = Describe("Job conditions", func() {
 	nonCompleteJob := batchv1.Job{
 		Status: batchv1.JobStatus{
 			Succeeded: 0,
-		}}
+		},
+	}
 
 	completeJob := batchv1.Job{
 		Status: batchv1.JobStatus{
 			Succeeded: 1,
-		}}
+		},
+	}
 
 	It("detects if a certain job is completed", func() {
 		Expect(IsJobComplete(nonCompleteJob)).To(BeFalse())

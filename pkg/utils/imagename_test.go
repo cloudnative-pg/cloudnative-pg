@@ -13,7 +13,6 @@ import (
 
 var _ = Describe("image name management", func() {
 	It("should normalize image names", func() {
-
 		Expect(NormaliseImageName("postgres")).To(
 			Equal("docker.io/library/postgres:latest"))
 		Expect(NormaliseImageName("quay.io/test/postgres:34")).To(

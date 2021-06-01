@@ -18,13 +18,13 @@ import (
 var _ = Describe("the cleanup of a stale PostgreSQL pid file", func() {
 	var tmpDir string
 
-	var _ = BeforeEach(func() {
+	_ = BeforeEach(func() {
 		var err error
 		tmpDir, err = ioutil.TempDir("", "cleanup-stale-pid-file-")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	var _ = AfterEach(func() {
+	_ = AfterEach(func() {
 		Expect(os.RemoveAll(tmpDir)).To(Succeed())
 	})
 
