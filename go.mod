@@ -10,7 +10,7 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/lib/pq v1.10.2
 	github.com/logrusorgru/aurora/v3 v3.0.0
-	github.com/onsi/ginkgo v1.16.2
+	github.com/onsi/ginkgo v1.16.3
 	github.com/onsi/gomega v1.13.0
 	github.com/prometheus/client_golang v1.10.0
 	github.com/robfig/cron v1.2.0
