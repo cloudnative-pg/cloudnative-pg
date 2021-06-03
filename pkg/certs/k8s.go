@@ -97,7 +97,7 @@ func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret
 		return nil, err
 	}
 
-	expiring, err := pair.IsExpiring()
+	expiring, _, err := pair.IsExpiring()
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +254,7 @@ func (pki PublicKeyInfrastructure) EnsureCertificate(
 		return nil, err
 	}
 
-	secret = webhookPair.GenerateServerSecret(pki.OperatorNamespace, pki.SecretName)
+	secret = webhookPair.GenerateCertificateSecret(pki.OperatorNamespace, pki.SecretName)
 	createdSecret, err := client.CoreV1().Secrets(
 		pki.OperatorNamespace).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
@@ -273,7 +273,7 @@ func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) 
 		return false, err
 	}
 
-	expiring, err := pair.IsExpiring()
+	expiring, _, err := pair.IsExpiring()
 	if err != nil {
 		return false, err
 	}

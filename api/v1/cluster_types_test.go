@@ -29,11 +29,11 @@ var _ = Describe("PostgreSQL cluster type", func() {
 	})
 
 	It("correctly set the name of the secret containing the CA of the cluster", func() {
-		Expect(postgresql.GetCASecretName()).To(Equal("clustername-ca"))
+		Expect(postgresql.GetServerCASecretName()).To(Equal("clustername-ca"))
 	})
 
 	It("correctly set the name of the secret containing the certificate for PostgreSQL", func() {
-		Expect(postgresql.GetServerSecretName()).To(Equal("clustername-server"))
+		Expect(postgresql.GetServerTLSSecretName()).To(Equal("clustername-server"))
 	})
 })
 
@@ -194,5 +194,28 @@ var _ = Describe("external server list", func() {
 	It("fails for non existent replicas", func() {
 		_, ok := cluster.ExternalServer("nonExistentServer")
 		Expect(ok).To(BeFalse())
+	})
+})
+
+var _ = Describe("look up for secrets", func() {
+	cluster := Cluster{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "clustername",
+		},
+	}
+	It("retrieves client CA secret name", func() {
+		Expect(cluster.GetClientCASecretName()).To(Equal("clustername-ca"))
+	})
+	It("retrieves server CA secret name", func() {
+		Expect(cluster.GetServerCASecretName()).To(Equal("clustername-ca"))
+	})
+	It("retrieves replication secret name", func() {
+		Expect(cluster.GetReplicationSecretName()).To(Equal("clustername-replication"))
+	})
+	It("retrieves replication secret name", func() {
+		Expect(cluster.GetReplicationSecretName()).To(Equal("clustername-replication"))
+	})
+	It("retrieves all names needed to build a server CA certificate are 9", func() {
+		Expect(len(cluster.GetClusterAltDNSNames())).To(Equal(9))
 	})
 })

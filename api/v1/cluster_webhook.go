@@ -94,6 +94,7 @@ func (r *Cluster) ValidateCreate() error {
 
 	allErrs = append(allErrs, r.validateInitDB()...)
 	allErrs = append(allErrs, r.validateSuperuserSecret()...)
+	allErrs = append(allErrs, r.validateCerts()...)
 	allErrs = append(allErrs, r.validateBootstrapMethod()...)
 	allErrs = append(allErrs, r.validateStorageConfiguration()...)
 	allErrs = append(allErrs, r.validateImageName()...)
@@ -121,6 +122,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 
 	allErrs = append(allErrs, r.validateInitDB()...)
 	allErrs = append(allErrs, r.validateSuperuserSecret()...)
+	allErrs = append(allErrs, r.validateCerts()...)
 	allErrs = append(allErrs, r.validateBootstrapMethod()...)
 	allErrs = append(allErrs, r.validateStorageConfiguration()...)
 	allErrs = append(allErrs, r.validateImageName()...)
@@ -195,6 +197,40 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 				"You need to specify the database name"))
 	}
 
+	return result
+}
+
+// validateCerts validate all the provided certs
+func (r *Cluster) validateCerts() field.ErrorList {
+	var result field.ErrorList
+	certificates := r.Spec.Certificates
+
+	if certificates == nil {
+		return result
+	}
+
+	if certificates.ServerTLSSecret == "" {
+		return result
+	}
+
+	// Currently names are not validated, maybe add this check in future
+	if len(certificates.ServerAltDNSNames) != 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "certificates", "serveraltdnsnames"),
+				fmt.Sprintf("%v", certificates.ServerAltDNSNames),
+				"Server alternative DNS names can't be defined when server TLS secret is provided"))
+	}
+
+	if certificates.ServerCASecret == "" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "certificates", "servercasecret"),
+				"",
+				"Server CA secret can't be empty when server TLS secret is provided"))
+	}
 	return result
 }
 

@@ -16,9 +16,10 @@ import (
 // CreateRole create a role with the permissions needed by the instance manager
 func CreateRole(cluster apiv1.Cluster) rbacv1.Role {
 	involvedSecretNames := []string{
-		cluster.GetCASecretName(),
-		cluster.GetServerSecretName(),
 		cluster.GetReplicationSecretName(),
+		cluster.GetClientCASecretName(),
+		cluster.GetServerCASecretName(),
+		cluster.GetServerTLSSecretName(),
 	}
 
 	involvedConfigMapNames := []string{

@@ -25,6 +25,8 @@ CRD
 CSV
 Canovai
 Cecchi
+CertificatesConfiguration
+CertificatesStatus
 ClusterIP
 ClusterList
 ClusterSpec
@@ -141,6 +143,8 @@ Scorsolini
 SecretKeySelector
 SecretsResourceVersion
 Seealso
+ServerCASecret
+ServerTLSSecret
 ServiceAccount
 StorageClass
 StorageConfiguration

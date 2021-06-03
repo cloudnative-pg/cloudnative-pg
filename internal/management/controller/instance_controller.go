@@ -56,7 +56,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 	}
 
 	// Reconcile secrets and cryptographic material
-	return r.reconcileSecrets(ctx)
+	return r.reconcileSecrets(ctx, cluster)
 }
 
 // reconcileClusterRole applies the role written in the cluster status to this instance
@@ -170,31 +170,34 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 }
 
 // reconcileSecret is called when the PostgreSQL secrets are changes
-func (r *InstanceReconciler) reconcileSecrets(ctx context.Context) error {
+func (r *InstanceReconciler) reconcileSecrets(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
 	changed := false
 
-	serverSecretChanged, err := r.RefreshServerCertificateFiles(ctx)
+	serverSecretChanged, err := r.RefreshServerCertificateFiles(ctx, cluster)
 	if err == nil {
 		changed = changed || serverSecretChanged
 	} else if !apierrors.IsNotFound(err) {
 		r.log.Error(err, "Error while getting server secret")
 	}
 
-	replicationSecretChanged, err := r.RefreshReplicationUserCertificate(ctx)
+	replicationSecretChanged, err := r.RefreshReplicationUserCertificate(ctx, cluster)
 	if err == nil {
 		changed = changed || replicationSecretChanged
 	} else if !apierrors.IsNotFound(err) {
 		r.log.Error(err, "Error while getting streaming replication secret")
 	}
 
-	clientCaSecretChanged, err := r.RefreshClientCA(ctx)
+	clientCaSecretChanged, err := r.RefreshClientCA(ctx, cluster)
 	if err == nil {
 		changed = changed || clientCaSecretChanged
 	} else if !apierrors.IsNotFound(err) {
 		r.log.Error(err, "Error while getting cluster CA Client secret")
 	}
 
-	serverCaSecretChanged, err := r.RefreshServerCA(ctx)
+	serverCaSecretChanged, err := r.RefreshServerCA(ctx, cluster)
 	if err == nil {
 		changed = changed || serverCaSecretChanged
 	} else if !apierrors.IsNotFound(err) {
@@ -294,7 +297,9 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 	}
 
 	if certificateIsChanged {
-		r.log.Info("Refreshed configuration file", "filename", certificateLocation)
+		r.log.Info("Refreshed configuration file",
+			"filename", certificateLocation,
+			"secret", secret.Name)
 	}
 
 	privateKeyIsChanged, err := fileutils.WriteFile(privateKeyLocation, privateKey, 0o600)
@@ -303,7 +308,9 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 	}
 
 	if certificateIsChanged {
-		r.log.Info("Refreshed configuration file", "filename", privateKeyLocation)
+		r.log.Info("Refreshed configuration file",
+			"filename", privateKeyLocation,
+			"secret", secret.Name)
 	}
 
 	return certificateIsChanged || privateKeyIsChanged, nil
@@ -323,7 +330,9 @@ func (r *InstanceReconciler) refreshCAFromSecret(secret *corev1.Secret, destLoca
 	}
 
 	if changed {
-		r.log.Info("Refreshed configuration file", "filename", destLocation)
+		r.log.Info("Refreshed configuration file",
+			"filename", destLocation,
+			"secret", secret.Name)
 	}
 
 	return changed, nil

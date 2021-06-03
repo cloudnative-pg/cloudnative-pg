@@ -34,5 +34,16 @@ var _ = Describe("Cluster conversion from v1 cluster", func() {
 			Expect(err).To(BeNil())
 			Expect(dst).ToNot(BeNil())
 		})
+		When("source cluster specifies the certificates", func() {
+			src := v1.Cluster{Spec: v1.ClusterSpec{
+				Certificates: &v1.CertificatesConfiguration{
+					ServerCASecret:  "test-server-ca",
+					ServerTLSSecret: "test-server-tls",
+				},
+			}}
+			dst := Cluster{}
+			err := dst.ConvertFrom(&src)
+			Expect(err).To(BeNil())
+		})
 	})
 })

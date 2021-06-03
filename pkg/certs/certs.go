@@ -11,6 +11,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -42,6 +43,12 @@ const (
 
 	// CAPrivateKeyKey is the key for the private key field in a CA secret
 	CAPrivateKeyKey = "ca.key"
+
+	// TLSCertKey is the key for certificates in a CA secret
+	TLSCertKey = "tls.crt"
+
+	// TLSPrivateKeyKey is the key for the private key field in a CA secret
+	TLSPrivateKeyKey = "tls.key"
 )
 
 // CertType represent a certificate type
@@ -83,6 +90,44 @@ func (pair KeyPair) ParseCertificate() (*x509.Certificate, error) {
 	}
 
 	return x509.ParseCertificate(block.Bytes)
+}
+
+// IsValid checks if given CA and verify options match the server
+func (pair KeyPair) IsValid(caPair *KeyPair, opts *x509.VerifyOptions) error {
+	blockCa, _ := pem.Decode(caPair.Certificate)
+	if blockCa == nil || blockCa.Type != certificatePEMBlockType {
+		return fmt.Errorf("invalid public key PEM block type")
+	}
+
+	blockServer, _ := pem.Decode(pair.Certificate)
+	if blockServer == nil || blockServer.Type != certificatePEMBlockType {
+		return fmt.Errorf("invalid public key PEM block type")
+	}
+
+	caCert, err := x509.ParseCertificate(blockCa.Bytes)
+	if err != nil {
+		return err
+	}
+
+	serverCert, err := x509.ParseCertificate(blockServer.Bytes)
+	if err != nil {
+		return err
+	}
+
+	roots := x509.NewCertPool()
+	roots.AddCert(caCert)
+
+	// init opts if nil
+	if opts == nil {
+		opts = &x509.VerifyOptions{}
+	}
+
+	opts.Roots = roots
+
+	if _, err = serverCert.Verify(*opts); err != nil {
+		return fmt.Errorf("failed to verify certificate: %s", err)
+	}
+	return nil
 }
 
 // CreateAndSignPair given a CA keypair, generate and sign a leaf keypair
@@ -185,16 +230,16 @@ func (pair KeyPair) GenerateCASecret(namespace, name string) *v1.Secret {
 	}
 }
 
-// GenerateServerSecret create a k8s server secret from a key pair
-func (pair KeyPair) GenerateServerSecret(namespace, name string) *v1.Secret {
+// GenerateCertificateSecret creates a k8s server secret from a key pair
+func (pair KeyPair) GenerateCertificateSecret(namespace, name string) *v1.Secret {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			"tls.key": pair.Private,
-			"tls.crt": pair.Certificate,
+			TLSPrivateKeyKey: pair.Private,
+			TLSCertKey:       pair.Certificate,
 		},
 		Type: v1.SecretTypeTLS,
 	}
@@ -244,20 +289,20 @@ func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey, parentCert
 }
 
 // IsExpiring check if the certificate will expire in the configured duration
-func (pair *KeyPair) IsExpiring() (bool, error) {
+func (pair *KeyPair) IsExpiring() (bool, *time.Time, error) {
 	cert, err := pair.ParseCertificate()
 	if err != nil {
-		return true, err
+		return true, nil, err
 	}
 
 	if time.Now().Before(cert.NotBefore) {
-		return true, nil
+		return true, &cert.NotAfter, nil
 	}
 	if time.Now().Add(expiringCheckThreshold).After(cert.NotAfter) {
-		return true, nil
+		return true, &cert.NotAfter, nil
 	}
 
-	return false, nil
+	return false, &cert.NotAfter, nil
 }
 
 // CreateDerivedCA create a new CA derived from the certificate in the
@@ -298,6 +343,12 @@ func ParseCASecret(secret *v1.Secret) (*KeyPair, error) {
 		return nil, fmt.Errorf("missing %s secret data", CACertKey)
 	}
 
+	// Verify the key matches the certificate
+	_, err := tls.X509KeyPair(publicKey, privateKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &KeyPair{
 		Private:     privateKey,
 		Certificate: publicKey,
@@ -306,14 +357,20 @@ func ParseCASecret(secret *v1.Secret) (*KeyPair, error) {
 
 // ParseServerSecret parse a secret for a server to a key pair
 func ParseServerSecret(secret *v1.Secret) (*KeyPair, error) {
-	privateKey, ok := secret.Data["tls.key"]
+	privateKey, ok := secret.Data[TLSPrivateKeyKey]
 	if !ok {
-		return nil, fmt.Errorf("missing tls.key secret data")
+		return nil, fmt.Errorf("missing %v secret data", TLSPrivateKeyKey)
 	}
 
-	publicKey, ok := secret.Data["tls.crt"]
+	publicKey, ok := secret.Data[TLSCertKey]
 	if !ok {
-		return nil, fmt.Errorf("missing tls.crt secret data")
+		return nil, fmt.Errorf("missing %s secret data", TLSCertKey)
+	}
+
+	// Verify the key matches the certificate
+	_, err := tls.X509KeyPair(publicKey, privateKey)
+	if err != nil {
+		return nil, err
 	}
 
 	return &KeyPair{

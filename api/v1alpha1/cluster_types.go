@@ -54,6 +54,10 @@ type ClusterSpec struct {
 	// +optional
 	SuperuserSecret *LocalObjectReference `json:"superuserSecret,omitempty"`
 
+	// The configuration for the CA and related certificates
+	// +optional
+	Certificates *CertificatesConfiguration `json:"certificates,omitempty"`
+
 	// The list of pull secrets to be used to pull the images
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
@@ -145,6 +149,9 @@ type ClusterStatus struct {
 	// interest of the instance manager, which will refresh the
 	// secret data
 	SecretsResourceVersion SecretsResourceVersion `json:"secretsResourceVersion,omitempty"`
+
+	// The configuration for the CA and related certificates, initialized with defaults.
+	Certificates CertificatesStatus `json:"certificates,omitempty"`
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration
@@ -175,6 +182,29 @@ type BootstrapConfiguration struct {
 	PgBaseBackup *BootstrapPgBaseBackup `json:"pg_basebackup,omitempty"`
 }
 
+// CertificatesConfiguration contains the needed configurations to handle server certificates.
+type CertificatesConfiguration struct {
+	// The secret containing the Server CA certificate. If not defined, a new secret will be created
+	// with a self-signed CA and will be used to generate the TLS certificate ServerTLSSecret.
+	//
+	// Contains:
+	//
+	// - `ca.crt`: CA that should be used to validate the server certificate,
+	//   used as `sslrootcert` in client connection strings.
+	// - `ca.key`: key used to generate Server SSL certs, if ServerTLSSecret is provided,
+	//   this can be omitted.
+	ServerCASecret string `json:"serverCASecret,omitempty"`
+
+	// The secret of type kubernetes.io/tls containing the server TLS certificate and key that will be set as
+	// `ssl_cert_file` and `ssl_key_file` so that clients can connect to postgres securely.
+	// If not defined, ServerCASecret must provide also `ca.key` and a new secret will be
+	// created using the provided CA.
+	ServerTLSSecret string `json:"serverTLSSecret,omitempty"`
+
+	// The list of the server alternative DNS names to be added to the generated server TLS certificates, when required.
+	ServerAltDNSNames []string `json:"serverAltDNSNames,omitempty"`
+}
+
 // BootstrapRecovery contains the configuration required to restore
 // the backup with the specified name and, after having changed the password
 // with the one chosen for the superuser, will use it to bootstrap a full
@@ -189,6 +219,28 @@ type BootstrapRecovery struct {
 	// This option allows to fine tune the recovery process
 	// +optional
 	RecoveryTarget *RecoveryTarget `json:"recoveryTarget,omitempty"`
+}
+
+// CertificatesStatus contains configuration certificates and related expiration dates.
+type CertificatesStatus struct {
+	// Needed configurations to handle server certificates, initialized with default values, if needed.
+	CertificatesConfiguration `json:",inline"`
+
+	// The secret containing the Client CA certificate. This secret contains a self-signed CA and is used to sign
+	// TLS certificates used for client authentication.
+	//
+	// Contains:
+	//
+	// - `ca.crt`: CA that should be used to validate the client certificate, used as `ssl_ca_file`.
+	// - `ca.key`: key used to sign client SSL certs.
+	ClientCASecret string `json:"clientCASecret,omitempty"`
+
+	// The secret of type kubernetes.io/tls containing the TLS client certificate to authenticate
+	// as `streaming_replica` user.
+	ReplicationTLSSecret string `json:"replicationTLSSecret,omitempty"`
+
+	// Expiration dates for all certificates.
+	Expirations map[string]string `json:"expirations,omitempty"`
 }
 
 // BootstrapInitDB is the configuration of the bootstrap process when
@@ -504,8 +556,14 @@ type SecretsResourceVersion struct {
 	// The resource version of the "app" user secret
 	ApplicationSecretVersion string `json:"applicationSecretVersion"`
 
-	// The resource version of the "ca" secret version
-	CASecretVersion string `json:"caSecretVersion"`
+	// Unused. Retained for compatibility with old versions.
+	CASecretVersion string `json:"caSecretVersion,omitempty"`
+
+	// The resource version of the PostgreSQL client-side CA secret version
+	ClientCASecretVersion string `json:"clientCaSecretVersion"`
+
+	// The resource version of the PostgreSQL server-side CA secret version
+	ServerCASecretVersion string `json:"serverCaSecretVersion"`
 
 	// The resource version of the PostgreSQL server-side secret version
 	ServerSecretVersion string `json:"serverSecretVersion"`

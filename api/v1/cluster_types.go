@@ -29,9 +29,13 @@ const (
 	// get the name of the application user secret
 	ApplicationUserSecretSuffix = "-app"
 
-	// CaSecretSuffix is the suffix appended to the secret containing
+	// DefaultServerCaSecretSuffix is the suffix appended to the secret containing
 	// the generated CA for the cluster
-	CaSecretSuffix = "-ca"
+	DefaultServerCaSecretSuffix = "-ca"
+
+	// ClientCaSecretSuffix is the suffix appended to the secret containing
+	// the generated CA for the client certificates
+	ClientCaSecretSuffix = "-ca"
 
 	// ServerSecretSuffix is the suffix appended to the secret containing
 	// the generated server secret for PostgreSQL
@@ -109,6 +113,10 @@ type ClusterSpec struct {
 	// secret will be created with a randomly generated password
 	// +optional
 	SuperuserSecret *LocalObjectReference `json:"superuserSecret,omitempty"`
+
+	// The configuration for the CA and related certificates
+	// +optional
+	Certificates *CertificatesConfiguration `json:"certificates,omitempty"`
 
 	// The list of pull secrets to be used to pull the images
 	ImagePullSecrets []LocalObjectReference `json:"imagePullSecrets,omitempty"`
@@ -234,6 +242,9 @@ type ClusterStatus struct {
 	// interest of the instance manager, which will refresh the
 	// secret data
 	SecretsResourceVersion SecretsResourceVersion `json:"secretsResourceVersion,omitempty"`
+
+	// The configuration for the CA and related certificates, initialized with defaults.
+	Certificates CertificatesStatus `json:"certificates,omitempty"`
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to
@@ -310,6 +321,51 @@ type BootstrapConfiguration struct {
 	// Bootstrap the cluster taking a physical backup of another compatible
 	// PostgreSQL instance
 	PgBaseBackup *BootstrapPgBaseBackup `json:"pg_basebackup,omitempty"`
+}
+
+// CertificatesConfiguration contains the needed configurations to handle server certificates.
+type CertificatesConfiguration struct {
+	// The secret containing the Server CA certificate. If not defined, a new secret will be created
+	// with a self-signed CA and will be used to generate the TLS certificate ServerTLSSecret.
+	//
+	// Contains:
+	//
+	// - `ca.crt`: CA that should be used to validate the server certificate,
+	//    used as `sslrootcert` in client connection strings.
+	// - `ca.key`: key used to generate Server SSL certs, if ServerTLSSecret is provided,
+	//    this can be omitted.
+	ServerCASecret string `json:"serverCASecret,omitempty"`
+
+	// The secret of type kubernetes.io/tls containing the server TLS certificate and key that will be set as
+	// `ssl_cert_file` and `ssl_key_file` so that clients can connect to postgres securely.
+	// If not defined, ServerCASecret must provide also `ca.key` and a new secret will be
+	// created using the provided CA.
+	ServerTLSSecret string `json:"serverTLSSecret,omitempty"`
+
+	// The list of the server alternative DNS names to be added to the generated server TLS certificates, when required.
+	ServerAltDNSNames []string `json:"serverAltDNSNames,omitempty"`
+}
+
+// CertificatesStatus contains configuration certificates and related expiration dates.
+type CertificatesStatus struct {
+	// Needed configurations to handle server certificates, initialized with default values, if needed.
+	CertificatesConfiguration `json:",inline"`
+
+	// The secret containing the Client CA certificate. This secret contains a self-signed CA and is used to sign
+	// TLS certificates used for client authentication.
+	//
+	// Contains:
+	//
+	// - `ca.crt`: CA that should be used to validate the client certificate, used as `ssl_ca_file`.
+	// - `ca.key`: key used to sign client SSL certs.
+	ClientCASecret string `json:"clientCASecret,omitempty"`
+
+	// The secret of type kubernetes.io/tls containing the TLS client certificate to authenticate
+	// as `streaming_replica` user.
+	ReplicationTLSSecret string `json:"replicationTLSSecret,omitempty"`
+
+	// Expiration dates for all certificates.
+	Expirations map[string]string `json:"expirations,omitempty"`
 }
 
 // BootstrapInitDB is the configuration of the bootstrap process when
@@ -650,8 +706,14 @@ type SecretsResourceVersion struct {
 	// The resource version of the "app" user secret
 	ApplicationSecretVersion string `json:"applicationSecretVersion"`
 
-	// The resource version of the "ca" secret version
-	CASecretVersion string `json:"caSecretVersion"`
+	// Unused. Retained for compatibility with old versions.
+	CASecretVersion string `json:"caSecretVersion,omitempty"`
+
+	// The resource version of the PostgreSQL client-side CA secret version
+	ClientCASecretVersion string `json:"clientCaSecretVersion"`
+
+	// The resource version of the PostgreSQL server-side CA secret version
+	ServerCASecretVersion string `json:"serverCaSecretVersion"`
 
 	// The resource version of the PostgreSQL server-side secret version
 	ServerSecretVersion string `json:"serverSecretVersion"`
@@ -686,11 +748,6 @@ func (cluster *Cluster) GetSuperuserSecretName() string {
 	return fmt.Sprintf("%v%v", cluster.Name, SuperUserSecretSuffix)
 }
 
-// GetReplicationSecretName get the name of the secret for the replication user
-func (cluster *Cluster) GetReplicationSecretName() string {
-	return fmt.Sprintf("%v%v", cluster.Name, ReplicationSecretSuffix)
-}
-
 // GetApplicationSecretName get the name of the secret of the application
 func (cluster *Cluster) GetApplicationSecretName() string {
 	if cluster.Spec.Bootstrap != nil &&
@@ -703,16 +760,33 @@ func (cluster *Cluster) GetApplicationSecretName() string {
 	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
 }
 
-// GetCASecretName get the name of the secret containing the CA
+// GetServerCASecretName get the name of the secret containing the CA
 // of the cluster
-func (cluster *Cluster) GetCASecretName() string {
-	return fmt.Sprintf("%v%v", cluster.Name, CaSecretSuffix)
+func (cluster *Cluster) GetServerCASecretName() string {
+	if cluster.Spec.Certificates != nil && cluster.Spec.Certificates.ServerCASecret != "" {
+		return cluster.Spec.Certificates.ServerCASecret
+	}
+	return fmt.Sprintf("%v%v", cluster.Name, DefaultServerCaSecretSuffix)
 }
 
-// GetServerSecretName get the name of the secret containing the
+// GetServerTLSSecretName get the name of the secret containing the
 // certificate that is used for the PostgreSQL servers
-func (cluster *Cluster) GetServerSecretName() string {
+func (cluster *Cluster) GetServerTLSSecretName() string {
+	if cluster.Spec.Certificates != nil && cluster.Spec.Certificates.ServerTLSSecret != "" {
+		return cluster.Spec.Certificates.ServerTLSSecret
+	}
 	return fmt.Sprintf("%v%v", cluster.Name, ServerSecretSuffix)
+}
+
+// GetClientCASecretName get the name of the secret containing the CA
+// of the cluster
+func (cluster *Cluster) GetClientCASecretName() string {
+	return fmt.Sprintf("%v%v", cluster.Name, ClientCaSecretSuffix)
+}
+
+// GetReplicationSecretName get the name of the secret for the replication user
+func (cluster *Cluster) GetReplicationSecretName() string {
+	return fmt.Sprintf("%v%v", cluster.Name, ReplicationSecretSuffix)
 }
 
 // GetServiceAnyName return the name of the service that is used as DNS
@@ -852,6 +926,27 @@ func (cluster Cluster) ExternalServer(name string) (ExternalCluster, bool) {
 	}
 
 	return ExternalCluster{}, false
+}
+
+// GetClusterAltDNSNames returns all the names needed to build a valid Server Certificate
+func (cluster *Cluster) GetClusterAltDNSNames() []string {
+	defaultAltDNSNames := []string{
+		cluster.GetServiceReadWriteName(),
+		fmt.Sprintf("%v.%v", cluster.GetServiceReadWriteName(), cluster.Namespace),
+		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadWriteName(), cluster.Namespace),
+		cluster.GetServiceReadName(),
+		fmt.Sprintf("%v.%v", cluster.GetServiceReadName(), cluster.Namespace),
+		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadName(), cluster.Namespace),
+		cluster.GetServiceReadOnlyName(),
+		fmt.Sprintf("%v.%v", cluster.GetServiceReadOnlyName(), cluster.Namespace),
+		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadOnlyName(), cluster.Namespace),
+	}
+
+	if cluster.Spec.Certificates == nil {
+		return defaultAltDNSNames
+	}
+
+	return append(defaultAltDNSNames, cluster.Spec.Certificates.ServerAltDNSNames...)
 }
 
 // BuildPostgresOptions create the list of options that
