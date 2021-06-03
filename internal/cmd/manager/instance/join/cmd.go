@@ -13,7 +13,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
@@ -82,19 +84,28 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		return err
 	}
 
-	_, err = reconciler.RefreshReplicationUserCertificate(ctx)
+	var cluster apiv1.Cluster
+	err = reconciler.GetClient().Get(ctx,
+		ctrl.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName},
+		&cluster)
+	if err != nil {
+		log.Log.Error(err, "Error while getting cluster")
+		return err
+	}
+
+	_, err = reconciler.RefreshReplicationUserCertificate(ctx, &cluster)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS server certificates")
 		return err
 	}
 
-	_, err = reconciler.RefreshClientCA(ctx)
+	_, err = reconciler.RefreshClientCA(ctx, &cluster)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS Client CA certificates")
 		return err
 	}
 
-	_, err = reconciler.RefreshServerCA(ctx)
+	_, err = reconciler.RefreshServerCA(ctx, &cluster)
 	if err != nil {
 		log.Log.Error(err, "Error while writing the TLS Server CA certificates")
 		return err

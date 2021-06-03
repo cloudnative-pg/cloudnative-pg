@@ -28,6 +28,8 @@ Below you will find a description of the defined resources:
 - [BootstrapInitDB](#BootstrapInitDB)
 - [BootstrapPgBaseBackup](#BootstrapPgBaseBackup)
 - [BootstrapRecovery](#BootstrapRecovery)
+- [CertificatesConfiguration](#CertificatesConfiguration)
+- [CertificatesStatus](#CertificatesStatus)
 - [Cluster](#Cluster)
 - [ClusterList](#ClusterList)
 - [ClusterSpec](#ClusterSpec)
@@ -178,6 +180,39 @@ Name           | Description                                                    
 `backup        ` | The backup we need to restore                                                                                                                                                   - *mandatory*  | [LocalObjectReference](#LocalObjectReference)
 `recoveryTarget` | By default the recovery will end as soon as a consistent state is reached: in this case that means at the end of a backup. This option allows to fine tune the recovery process | [*RecoveryTarget](#RecoveryTarget)           
 
+<a id='CertificatesConfiguration'></a>
+## CertificatesConfiguration
+
+CertificatesConfiguration contains the needed configurations to handle server certificates.
+
+Name              | Description                                                                                                                                                                                                                                                                                                                                                                                                                                | Type    
+----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------
+`serverCASecret   ` | The secret containing the Server CA certificate. If not defined, a new secret will be created with a self-signed CA and will be used to generate the TLS certificate ServerTLSSecret.
+
+Contains:
+
+- `ca.crt`: CA that should be used to validate the server certificate,
+   used as `sslrootcert` in client connection strings.
+- `ca.key`: key used to generate Server SSL certs, if ServerTLSSecret is provided,
+   this can be omitted. | string  
+`serverTLSSecret  ` | The secret of type kubernetes.io/tls containing the server TLS certificate and key that will be set as `ssl_cert_file` and `ssl_key_file` so that clients can connect to postgres securely. If not defined, ServerCASecret must provide also `ca.key` and a new secret will be created using the provided CA.                                                                                                                              | string  
+`serverAltDNSNames` | The list of the server alternative DNS names to be added to the generated server TLS certificates, when required.                                                                                                                                                                                                                                                                                                                          | []string
+
+<a id='CertificatesStatus'></a>
+## CertificatesStatus
+
+CertificatesStatus contains configuration certificates and related expiration dates.
+
+Name                 | Description                                                                                                                                                                                                                                                                                                          | Type             
+-------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------
+`clientCASecret      ` | The secret containing the Client CA certificate. This secret contains a self-signed CA and is used to sign TLS certificates used for client authentication.
+
+Contains:
+
+- `ca.crt`: CA that should be used to validate the client certificate, used as `ssl_ca_file`. - `ca.key`: key used to sign client SSL certs. | string           
+`replicationTLSSecret` | The secret of type kubernetes.io/tls containing the TLS client certificate to authenticate as `streaming_replica` user.                                                                                                                                                                                              | string           
+`expirations         ` | Expiration dates for all certificates.                                                                                                                                                                                                                                                                               | map[string]string
+
 <a id='Cluster'></a>
 ## Cluster
 
@@ -216,6 +251,7 @@ Name                  | Description                                             
 `postgresql           ` | Configuration of the PostgreSQL server                                                                                                                                                                         | [PostgresConfiguration](#PostgresConfiguration)                                                                                 
 `bootstrap            ` | Instructions to bootstrap this cluster                                                                                                                                                                         | [*BootstrapConfiguration](#BootstrapConfiguration)                                                                              
 `superuserSecret      ` | The secret containing the superuser password. If not defined a new secret will be created with a randomly generated password                                                                                   | [*LocalObjectReference](#LocalObjectReference)                                                                                  
+`certificates         ` | The configuration for the CA and related certificates                                                                                                                                                          | [*CertificatesConfiguration](#CertificatesConfiguration)                                                                        
 `imagePullSecrets     ` | The list of pull secrets to be used to pull the images                                                                                                                                                         | [[]LocalObjectReference](#LocalObjectReference)                                                                                 
 `storage              ` | Configuration of the storage of the instances                                                                                                                                                                  | [StorageConfiguration](#StorageConfiguration)                                                                                   
 `startDelay           ` | The time in seconds that is allowed for a PostgreSQL instance to successfully start up (default 30)                                                                                                            | int32                                                                                                                           
@@ -250,6 +286,7 @@ Name                   | Description                                            
 `phase                 ` | Current phase of the cluster                                                                                                                                                | string                                           
 `phaseReason           ` | Reason for the current phase                                                                                                                                                | string                                           
 `secretsResourceVersion` | The list of resource versions of the secrets managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the secret data | [SecretsResourceVersion](#SecretsResourceVersion)
+`certificates          ` | The configuration for the CA and related certificates, initialized with defaults.                                                                                           | [CertificatesStatus](#CertificatesStatus)        
 
 <a id='ConfigMapKeySelector'></a>
 ## ConfigMapKeySelector
@@ -419,13 +456,15 @@ Name  | Description       | Type
 
 SecretsResourceVersion is the resource versions of the secrets managed by the operator
 
-Name                     | Description                                                       | Type  
------------------------- | ----------------------------------------------------------------- | ------
-`superuserSecretVersion  ` | The resource version of the "postgres" user secret                - *mandatory*  | string
-`replicationSecretVersion` | The resource version of the "streaming_replication" user secret   - *mandatory*  | string
-`applicationSecretVersion` | The resource version of the "app" user secret                     - *mandatory*  | string
-`caSecretVersion         ` | The resource version of the "ca" secret version                   - *mandatory*  | string
-`serverSecretVersion     ` | The resource version of the PostgreSQL server-side secret version - *mandatory*  | string
+Name                     | Description                                                          | Type  
+------------------------ | -------------------------------------------------------------------- | ------
+`superuserSecretVersion  ` | The resource version of the "postgres" user secret                   - *mandatory*  | string
+`replicationSecretVersion` | The resource version of the "streaming_replication" user secret      - *mandatory*  | string
+`applicationSecretVersion` | The resource version of the "app" user secret                        - *mandatory*  | string
+`caSecretVersion         ` | Unused. Retained for compatibility with old versions.                | string
+`clientCaSecretVersion   ` | The resource version of the PostgreSQL client-side CA secret version - *mandatory*  | string
+`serverCaSecretVersion   ` | The resource version of the PostgreSQL server-side CA secret version - *mandatory*  | string
+`serverSecretVersion     ` | The resource version of the PostgreSQL server-side secret version    - *mandatory*  | string
 
 <a id='StorageConfiguration'></a>
 ## StorageConfiguration

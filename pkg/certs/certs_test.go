@@ -84,13 +84,15 @@ var _ = Describe("Keypair generation", func() {
 			notBefore := notAfter.Add(-365 * 24 * time.Hour)
 			ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", "namespace")
 			Expect(err).To(BeNil())
-			Expect(ca.IsExpiring()).To(BeTrue())
+			isExpiring, _, err := ca.IsExpiring()
+			Expect(isExpiring, err).To(BeTrue())
 		})
 
 		When("it's not expiring", func() {
 			ca, err := CreateRootCA("test", "namespace")
 			Expect(err).To(BeNil())
-			Expect(ca.IsExpiring()).To(BeFalse())
+			isExpiring, _, err := ca.IsExpiring()
+			Expect(isExpiring, err).To(BeFalse())
 		})
 	})
 
@@ -131,7 +133,7 @@ var _ = Describe("Keypair generation", func() {
 			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil)
 			Expect(err).To(BeNil())
 
-			secret := pair.GenerateServerSecret("namespace", "name")
+			secret := pair.GenerateCertificateSecret("namespace", "name")
 			Expect(secret.Namespace).To(Equal("namespace"))
 			Expect(secret.Name).To(Equal("name"))
 			Expect(secret.Data["tls.crt"]).To(Equal(pair.Certificate))
@@ -174,6 +176,28 @@ var _ = Describe("Keypair generation", func() {
 			Expect(newCert.IsCA).To(Equal(oldCert.IsCA))
 			Expect(newCert.KeyUsage).To(Equal(oldCert.KeyUsage))
 			Expect(newCert.ExtKeyUsage).To(Equal(oldCert.ExtKeyUsage))
+		})
+
+		It("should be validated against the right server", func() {
+			rootCA, err := CreateRootCA("test", "namespace")
+			Expect(err).To(BeNil())
+
+			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil)
+			Expect(err).To(BeNil())
+
+			err = pair.IsValid(rootCA, nil)
+			Expect(err).To(BeNil())
+
+			opts := x509.VerifyOptions{KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+
+			err = pair.IsValid(rootCA, &opts)
+			Expect(err).To(BeNil())
+
+			otherRootCA, err := CreateRootCA("test", "namespace")
+			Expect(err).To(BeNil())
+
+			err = pair.IsValid(otherRootCA, nil)
+			Expect(err).ToNot(BeNil())
 		})
 	})
 })

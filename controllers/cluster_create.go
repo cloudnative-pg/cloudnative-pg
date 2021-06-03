@@ -32,7 +32,7 @@ import (
 
 // createPostgresClusterObjects ensures that we have the required global objects
 func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cluster *apiv1.Cluster) error {
-	err := r.createPostgresPKI(ctx, cluster)
+	err := r.setupPostgresPKI(ctx, cluster)
 	if err != nil {
 		return err
 	}

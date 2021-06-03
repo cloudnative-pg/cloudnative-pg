@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
@@ -24,13 +25,22 @@ import (
 
 // RefreshServerCertificateFiles gets the latest server certificates files from the
 // secrets. Returns true if configuration has been changed
-func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context) (bool, error) {
+func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
 	var secret corev1.Secret
 
-	err := r.GetClient().Get(
-		ctx,
-		client.ObjectKey{Namespace: r.instance.Namespace, Name: r.instance.ClusterName + apiv1.ServerSecretSuffix},
-		&secret)
+	err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true },
+		func() error {
+			err := r.GetClient().Get(
+				ctx,
+				client.ObjectKey{Namespace: r.instance.Namespace, Name: cluster.Status.Certificates.ServerTLSSecret},
+				&secret)
+			if err != nil {
+				r.log.Info("Error accessing server TLS Certificate. Retrying with exponential backoff.",
+					"secret", cluster.Status.Certificates.ServerTLSSecret)
+				return err
+			}
+			return nil
+		})
 	if err != nil {
 		return false, err
 	}
@@ -43,11 +53,12 @@ func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context) 
 
 // RefreshReplicationUserCertificate gets the latest replication certificates from the
 // secrets. Returns true if configuration has been changed
-func (r *InstanceReconciler) RefreshReplicationUserCertificate(ctx context.Context) (bool, error) {
+func (r *InstanceReconciler) RefreshReplicationUserCertificate(ctx context.Context,
+	cluster *apiv1.Cluster) (bool, error) {
 	var secret corev1.Secret
 	err := r.GetClient().Get(
 		ctx,
-		client.ObjectKey{Namespace: r.instance.Namespace, Name: r.instance.ClusterName + apiv1.ReplicationSecretSuffix},
+		client.ObjectKey{Namespace: r.instance.Namespace, Name: cluster.Status.Certificates.ReplicationTLSSecret},
 		&secret)
 	if err != nil {
 		return false, err
@@ -61,11 +72,11 @@ func (r *InstanceReconciler) RefreshReplicationUserCertificate(ctx context.Conte
 
 // RefreshClientCA gets the latest client CA certificates from the secrets.
 // It returns true if configuration has been changed
-func (r *InstanceReconciler) RefreshClientCA(ctx context.Context) (bool, error) {
+func (r *InstanceReconciler) RefreshClientCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
 	var secret corev1.Secret
 	err := r.GetClient().Get(
 		ctx,
-		client.ObjectKey{Namespace: r.instance.Namespace, Name: r.instance.ClusterName + apiv1.CaSecretSuffix},
+		client.ObjectKey{Namespace: r.instance.Namespace, Name: cluster.Status.Certificates.ClientCASecret},
 		&secret)
 	if err != nil {
 		return false, err
@@ -76,11 +87,11 @@ func (r *InstanceReconciler) RefreshClientCA(ctx context.Context) (bool, error) 
 
 // RefreshServerCA gets the latest server CA certificates from the secrets.
 // It returns true if configuration has been changed
-func (r *InstanceReconciler) RefreshServerCA(ctx context.Context) (bool, error) {
+func (r *InstanceReconciler) RefreshServerCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
 	var secret corev1.Secret
 	err := r.GetClient().Get(
 		ctx,
-		client.ObjectKey{Namespace: r.instance.Namespace, Name: r.instance.ClusterName + apiv1.CaSecretSuffix},
+		client.ObjectKey{Namespace: r.instance.Namespace, Name: cluster.Status.Certificates.ServerCASecret},
 		&secret)
 	if err != nil {
 		return false, err

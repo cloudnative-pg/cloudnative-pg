@@ -61,6 +61,50 @@ var _ = Describe("bootstrap methods validation", func() {
 	})
 })
 
+var _ = Describe("certificates options validation", func() {
+	It("doesn't complain if there isn't a configuration", func() {
+		emptyCluster := &Cluster{}
+		result := emptyCluster.validateCerts()
+		Expect(result).To(BeEmpty())
+	})
+	It("doesn't complain if you specify some valid secret names", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Certificates: &CertificatesConfiguration{
+					ServerCASecret:  "test-server-ca",
+					ServerTLSSecret: "test-server-tls",
+				},
+			},
+		}
+		result := cluster.validateCerts()
+		Expect(result).To(BeEmpty())
+	})
+	It("does complain if you specify the TLS secret and not the CA", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Certificates: &CertificatesConfiguration{
+					ServerTLSSecret: "test-server-tls",
+				},
+			},
+		}
+		result := cluster.validateCerts()
+		Expect(len(result)).To(Equal(1))
+	})
+	It("does complain if you specify the TLS secret and AltDNSNames is not empty", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Certificates: &CertificatesConfiguration{
+					ServerCASecret:    "test-server-ca",
+					ServerTLSSecret:   "test-server-tls",
+					ServerAltDNSNames: []string{"dns-name"},
+				},
+			},
+		}
+		result := cluster.validateCerts()
+		Expect(len(result)).To(Equal(1))
+	})
+})
+
 var _ = Describe("initdb options validation", func() {
 	It("doesn't complain if there isn't a configuration", func() {
 		emptyCluster := &Cluster{}

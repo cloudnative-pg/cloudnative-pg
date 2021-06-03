@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cert-test
+spec:
+  containers:
+    - image: leonardoce/webtest
+      name: cert-test
+      lifecycle:
+        postStart:
+          exec:
+            command: ["/bin/sh", "-c", "mkdir ~/.postgresql/;cp /etc/secrets/ca/ca.crt ~/.postgresql/root.crt;cp /etc/secrets/tls/tls.crt ~/.postgresql/postgresql.crt;cp /etc/secrets/tls/tls.key ~/.postgresql/postgresql.key;chmod 0600 -R  ~/.postgresql/"]
+      volumeMounts:
+        - name: secret-volume-root-ca
+          mountPath: /etc/secrets/ca
+        - name: secret-volume-tls
+          mountPath: /etc/secrets/tls
+      ports:
+        - containerPort: 8080
+  volumes:
+    - name: secret-volume-root-ca
+      secret:
+        secretName: my-postgresql-server-ca
+    - name: secret-volume-tls
+      secret:
+        secretName: cluster-cert

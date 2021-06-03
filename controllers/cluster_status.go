@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
@@ -203,6 +204,18 @@ func (r *ClusterReconciler) updateResourceStatus(
 		}
 	}
 
+	// set server CA secret,TLS secret and alternative DNS names with default values
+	cluster.Status.Certificates.ServerCASecret = cluster.GetServerCASecretName()
+	cluster.Status.Certificates.ServerTLSSecret = cluster.GetServerTLSSecretName()
+	cluster.Status.Certificates.ClientCASecret = cluster.GetClientCASecretName()
+	cluster.Status.Certificates.ReplicationTLSSecret = cluster.GetReplicationSecretName()
+	cluster.Status.Certificates.ServerAltDNSNames = cluster.GetClusterAltDNSNames()
+
+	// refresh expiration dates of certifications
+	if err := r.refreshCertsExpirations(ctx, cluster); err != nil {
+		return err
+	}
+
 	if err := r.refreshSecretResourceVersions(ctx, cluster); err != nil {
 		return err
 	}
@@ -210,6 +223,67 @@ func (r *ClusterReconciler) updateResourceStatus(
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
 	}
+	return nil
+}
+
+// refreshCertExpiration check the expiration date of all the certificates used by the cluster
+func (r *ClusterReconciler) refreshCertsExpirations(ctx context.Context, cluster *apiv1.Cluster) error {
+	namespace := cluster.GetNamespace()
+
+	cluster.Status.Certificates.Expirations = make(map[string]string, 4)
+	certificates := cluster.Status.Certificates
+
+	err := r.setCertExpiration(ctx, cluster, certificates.ServerCASecret, namespace, certs.CACertKey)
+	if err != nil {
+		return err
+	}
+
+	err = r.setCertExpiration(ctx, cluster, certificates.ServerTLSSecret, namespace, certs.TLSCertKey)
+	if err != nil {
+		return err
+	}
+
+	err = r.setCertExpiration(ctx, cluster, certificates.ClientCASecret, namespace, certs.CACertKey)
+	if err != nil {
+		return err
+	}
+
+	err = r.setCertExpiration(ctx, cluster, certificates.ReplicationTLSSecret, namespace, certs.TLSCertKey)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// setCertExpiration check the expiration date of a certificates used by the cluster
+func (r *ClusterReconciler) setCertExpiration(ctx context.Context, cluster *apiv1.Cluster, secretName string,
+	namespace string, certKey string) error {
+	var secret corev1.Secret
+	err := r.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      secretName,
+	}, &secret)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	cert, ok := secret.Data[certKey]
+
+	if !ok {
+		return err
+	}
+
+	keyPair := certs.KeyPair{Certificate: cert}
+	_, expDate, err := keyPair.IsExpiring()
+	if err != nil {
+		return err
+	}
+
+	cluster.Status.Certificates.Expirations[secretName] = expDate.String()
+
 	return nil
 }
 
@@ -221,25 +295,36 @@ func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, c
 	}
 	cluster.Status.SecretsResourceVersion.SuperuserSecretVersion = version
 
-	version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetReplicationSecretName())
-	if err != nil {
-		return err
-	}
-	cluster.Status.SecretsResourceVersion.ReplicationSecretVersion = version
-
 	version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetApplicationSecretName())
 	if err != nil {
 		return err
 	}
 	cluster.Status.SecretsResourceVersion.ApplicationSecretVersion = version
 
-	version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetCASecretName())
+	certificates := cluster.Status.Certificates
+
+	// Reset the content of the unused CASecretVersion field
+	cluster.Status.SecretsResourceVersion.CASecretVersion = ""
+
+	version, err = r.getSecretResourceVersion(ctx, cluster, certificates.ClientCASecret)
 	if err != nil {
 		return err
 	}
-	cluster.Status.SecretsResourceVersion.CASecretVersion = version
+	cluster.Status.SecretsResourceVersion.ClientCASecretVersion = version
 
-	version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetServerSecretName())
+	version, err = r.getSecretResourceVersion(ctx, cluster, certificates.ReplicationTLSSecret)
+	if err != nil {
+		return err
+	}
+	cluster.Status.SecretsResourceVersion.ReplicationSecretVersion = version
+
+	version, err = r.getSecretResourceVersion(ctx, cluster, certificates.ServerCASecret)
+	if err != nil {
+		return err
+	}
+	cluster.Status.SecretsResourceVersion.ServerCASecretVersion = version
+
+	version, err = r.getSecretResourceVersion(ctx, cluster, certificates.ServerTLSSecret)
 	if err != nil {
 		return err
 	}

@@ -38,6 +38,14 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 		src.Spec.Bootstrap.ConvertTo(dst.Spec.Bootstrap)
 	}
 
+	// spec.certificates
+	if src.Spec.Certificates != nil {
+		dst.Spec.Certificates = &v1.CertificatesConfiguration{}
+		dst.Spec.Certificates.ServerTLSSecret = src.Spec.Certificates.ServerTLSSecret
+		dst.Spec.Certificates.ServerCASecret = src.Spec.Certificates.ServerCASecret
+		dst.Spec.Certificates.ServerAltDNSNames = src.Spec.Certificates.ServerAltDNSNames
+	}
+
 	// src.spec.superuserSecret
 	if src.Spec.SuperuserSecret != nil {
 		dst.Spec.SuperuserSecret = &v1.LocalObjectReference{}
@@ -177,10 +185,18 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 		src.Status.SecretsResourceVersion.SuperuserSecretVersion
 	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =
 		src.Status.SecretsResourceVersion.ReplicationSecretVersion
-	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =
-		src.Status.SecretsResourceVersion.ReplicationSecretVersion
+	dst.Status.SecretsResourceVersion.ApplicationSecretVersion =
+		src.Status.SecretsResourceVersion.ApplicationSecretVersion
 	dst.Status.SecretsResourceVersion.CASecretVersion = src.Status.SecretsResourceVersion.CASecretVersion
+	dst.Status.SecretsResourceVersion.ClientCASecretVersion = src.Status.SecretsResourceVersion.ClientCASecretVersion
+	dst.Status.SecretsResourceVersion.ServerCASecretVersion = src.Status.SecretsResourceVersion.ServerCASecretVersion
 	dst.Status.SecretsResourceVersion.ServerSecretVersion = src.Status.SecretsResourceVersion.ServerSecretVersion
+	dst.Status.Certificates.ServerTLSSecret = src.Status.Certificates.ServerTLSSecret
+	dst.Status.Certificates.ServerCASecret = src.Status.Certificates.ServerCASecret
+	dst.Status.Certificates.ClientCASecret = src.Status.Certificates.ClientCASecret
+	dst.Status.Certificates.ReplicationTLSSecret = src.Status.Certificates.ReplicationTLSSecret
+	dst.Status.Certificates.ServerAltDNSNames = src.Status.Certificates.ServerAltDNSNames
+	dst.Status.Certificates.Expirations = src.Status.Certificates.Expirations
 
 	return nil
 }
@@ -286,6 +302,14 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Spec.Resources = src.Spec.Resources
 	dst.Spec.PrimaryUpdateStrategy = PrimaryUpdateStrategy(src.Spec.PrimaryUpdateStrategy)
 
+	// spec.certificates
+	if src.Spec.Certificates != nil {
+		dst.Spec.Certificates = &CertificatesConfiguration{}
+		dst.Spec.Certificates.ServerTLSSecret = src.Spec.Certificates.ServerTLSSecret
+		dst.Spec.Certificates.ServerCASecret = src.Spec.Certificates.ServerCASecret
+		dst.Spec.Certificates.ServerAltDNSNames = src.Spec.Certificates.ServerAltDNSNames
+	}
+
 	// spec.backup
 	if src.Spec.Backup != nil {
 		dst.Spec.Backup = &BackupConfiguration{}
@@ -354,10 +378,18 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 		src.Status.SecretsResourceVersion.SuperuserSecretVersion
 	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =
 		src.Status.SecretsResourceVersion.ReplicationSecretVersion
-	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =
-		src.Status.SecretsResourceVersion.ReplicationSecretVersion
+	dst.Status.SecretsResourceVersion.ApplicationSecretVersion =
+		src.Status.SecretsResourceVersion.ApplicationSecretVersion
 	dst.Status.SecretsResourceVersion.CASecretVersion = src.Status.SecretsResourceVersion.CASecretVersion
+	dst.Status.SecretsResourceVersion.ClientCASecretVersion = src.Status.SecretsResourceVersion.ClientCASecretVersion
+	dst.Status.SecretsResourceVersion.ServerCASecretVersion = src.Status.SecretsResourceVersion.ServerCASecretVersion
 	dst.Status.SecretsResourceVersion.ServerSecretVersion = src.Status.SecretsResourceVersion.ServerSecretVersion
+	dst.Status.Certificates.ServerTLSSecret = src.Status.Certificates.ServerTLSSecret
+	dst.Status.Certificates.ServerCASecret = src.Status.Certificates.ServerCASecret
+	dst.Status.Certificates.ClientCASecret = src.Status.Certificates.ClientCASecret
+	dst.Status.Certificates.ReplicationTLSSecret = src.Status.Certificates.ReplicationTLSSecret
+	dst.Status.Certificates.ServerAltDNSNames = src.Status.Certificates.ServerAltDNSNames
+	dst.Status.Certificates.Expirations = src.Status.Certificates.Expirations
 
 	return nil
 }

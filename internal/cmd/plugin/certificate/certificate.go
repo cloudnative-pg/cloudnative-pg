@@ -32,9 +32,17 @@ type Params struct {
 func Generate(ctx context.Context, params Params, dryRun bool, format plugin.OutputFormat) error {
 	var secret corev1.Secret
 
-	err := plugin.Client.Get(
+	var cluster apiv1.Cluster
+	err := plugin.Client.Get(ctx,
+		client.ObjectKey{Namespace: params.Namespace, Name: params.ClusterName},
+		&cluster)
+	if err != nil {
+		return err
+	}
+
+	err = plugin.Client.Get(
 		ctx,
-		client.ObjectKey{Namespace: params.Namespace, Name: params.ClusterName + apiv1.CaSecretSuffix},
+		client.ObjectKey{Namespace: params.Namespace, Name: cluster.GetClientCASecretName()},
 		&secret)
 	if err != nil {
 		return err
@@ -50,7 +58,7 @@ func Generate(ctx context.Context, params Params, dryRun bool, format plugin.Out
 		return err
 	}
 
-	userSecret := userPair.GenerateServerSecret(params.Namespace, params.Name)
+	userSecret := userPair.GenerateCertificateSecret(params.Namespace, params.Name)
 	err = plugin.Print(userSecret, format)
 	if err != nil {
 		return err
