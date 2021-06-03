@@ -85,7 +85,7 @@ GKE_K8S = VersionList(gke_versions)
 # MAJOR: [VERSION, PRE_ROLLING_UPDATE_VERSION],
 POSTGRES = MajorVersionList(
     {
-        "13": ["13.2", "13.1"],
+        "13": ["13.3", "13.2"],
         "12": ["12.6", "12.5"],
         "11": ["11.11", "11.10"],
         "10": ["10.16", "10.15"],
