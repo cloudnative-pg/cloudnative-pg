@@ -159,7 +159,7 @@ Output :
                                         version
 --------------------------------------------------------------------------------------
 ------------------
-PostgreSQL 13.2 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 8.3.1 20191121 (Red Hat
+PostgreSQL 13.3 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 8.3.1 20191121 (Red Hat
 8.3.1-5), 64-bit
 (1 row)
 ```
