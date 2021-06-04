@@ -31,10 +31,36 @@ guarantees higher and more predictable performance.
 
 !!! Warning
     Before you deploy a PostgreSQL cluster with Cloud Native PostgreSQL,
-    make sure that the storage you are using is recommended for database
+    ensure that the storage you are using is recommended for database
     workloads. Our advice is to clearly set performance expectations by
     first benchmarking the storage using tools such as [fio](https://fio.readthedocs.io/en/latest/fio_doc.html),
     and then the database using [pgbench](https://www.postgresql.org/docs/current/pgbench.html).
+
+## Benchmarking Cloud Native PostgreSQL
+
+EDB maintains [cnp-bench](https://github.com/EnterpriseDB/cnp-bench),
+an open source set of guidelines and Helm charts for benchmarking Cloud Native PostgreSQL
+in a controlled Kubernetes environment, before deploying the database in production.
+
+Briefly, `cnp-bench` is designed to operate at two levels:
+
+- measuring the performance of the underlying storage using `fio`, with relevant
+  metrics for database workloads such as throughput for sequential reads, sequential
+  writes, random reads and random writes
+- measuring the performance of the database using the default benchmarking tool
+  distributed along with PostgreSQL: `pgbench`
+
+!!! Important
+    Measuring both the storage and database performance is an activity that
+    must be done **before the database goes in production**. However, such results
+    are extremely valuable not only in the planning phase (e.g., capacity planning),
+    but also in the production lifecycle, especially in emergency situations
+    (when we don't have the luxury anymore to run this kind of tests). Databases indeed
+    change and evolve over time, so does the distribution of data, potentially affecting
+    performance: knowing the theoretical maximum throughput of sequential reads or
+    writes will turn out to be extremely useful in those situations. Especially in 
+    shared-nothing contexts, where results do not vary due to the influence of external workloads.
+    **Know your system, benchmark it.**
 
 ## Persistent Volume Claim
 
@@ -72,6 +98,11 @@ spec:
     storageClass: standard
     size: 1Gi
 ```
+
+!!! Important
+    Cloud Native PostgreSQL has been designed to be storage class agnostic.
+    As usual, our recommendation is to properly benchmark the storage class
+    in a controlled environment, before hitting production.
 
 ## Configuration via a PVC template
 
