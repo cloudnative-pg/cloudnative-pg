@@ -54,6 +54,7 @@ Dockle
 EBS
 EDB
 EKS
+EOF
 EncryptionType
 EnterpriseDB
 EnterpriseDB's
@@ -184,6 +185,7 @@ async
 auth
 authn
 authz
+autovacuum
 aws
 az
 ba
@@ -209,6 +211,7 @@ bzip
 cGFzc
 ce
 checksums
+chmod
 cisecurity
 clair
 classid
@@ -231,6 +234,7 @@ containerPort
 coreos
 corev
 coverity
+cp
 cpu
 crc
 createuser
@@ -246,6 +250,7 @@ cyber
 danglingPVC
 databackupconfiguration
 dbname
+ddl
 declaratively
 defaultMode
 destinationPath
@@ -282,6 +287,7 @@ hba
 healthz
 horikyota
 hostPort
+hostaddr
 hostssl
 href
 html
@@ -335,6 +341,7 @@ lt
 matchLabels
 maxSyncReplicas
 md
+mem
 metav
 metric's
 metricNameKS
@@ -434,7 +441,9 @@ secretAccessKey
 secretName
 secretkeyselector
 securego
+serverCASecret
 serverName
+serverTLSSecret
 sig
 sigs
 specificities
@@ -463,6 +472,7 @@ subresource
 sudo
 superuserSecret
 svc
+tAc
 tablespace
 targetImmediate
 targetLSN
