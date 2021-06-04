@@ -30,6 +30,7 @@ nav:
   - monitoring.md
   - logging.md
   - expose_pg_services.md
+  - certificates.md
   - ssl_connections.md
   - kubernetes_upgrade.md
   - e2e.md
