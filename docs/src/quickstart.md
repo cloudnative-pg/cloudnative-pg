@@ -169,3 +169,5 @@ spec:
     Never use tags like `latest` or `13` in a production environment
     as it might lead to unpredictable scenarios in terms of update
     policies and version consistency in the cluster.
+    For strict deterministic and repeatable deployments, you can add the digests
+    to the image name, through the `<image>:<tag>@sha256:<digestValue>` format.

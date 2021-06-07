@@ -54,7 +54,8 @@ Community and published on Quay.io by EnterpriseDB.
 You can use any compatible image of PostgreSQL supporting the
 primary/standby architecture directly by setting the `imageName`
 attribute in the CR. The operator also supports `imagePullSecretsNames`
-to access private container registries.
+to access private container registries, as well as digests in addition to
+tags for finer control of container image immutability.
 
 ### Labels and annotations
 
