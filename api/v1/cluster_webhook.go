@@ -11,8 +11,10 @@ import (
 	"reflect"
 	"strconv"
 
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
@@ -106,6 +108,7 @@ func (r *Cluster) ValidateCreate() error {
 	allErrs = append(allErrs, r.validateName()...)
 	allErrs = append(allErrs, r.validateBootstrapPgBaseBackupSource()...)
 	allErrs = append(allErrs, r.validateExternalServers()...)
+	allErrs = append(allErrs, r.validateTolerations()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -134,6 +137,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validateName()...)
 	allErrs = append(allErrs, r.validateBootstrapPgBaseBackupSource()...)
 	allErrs = append(allErrs, r.validateExternalServers()...)
+	allErrs = append(allErrs, r.validateTolerations()...)
 
 	oldObject := old.(*Cluster)
 	if oldObject == nil {
@@ -659,4 +663,89 @@ func (r *Cluster) validateExternalServers() field.ErrorList {
 	}
 
 	return result
+}
+
+// validateTolerations check and validate the tolerations field
+// This code is almost a verbatim copy of
+// https://github.com/kubernetes/kubernetes/blob/4d38d21/pkg/apis/core/validation/validation.go#L3147
+func (r *Cluster) validateTolerations() field.ErrorList {
+	path := field.NewPath("spec", "affinity", "toleration")
+	allErrors := field.ErrorList{}
+	for i, toleration := range r.Spec.Affinity.Tolerations {
+		idxPath := path.Index(i)
+		// validate the toleration key
+		if len(toleration.Key) > 0 {
+			allErrors = append(allErrors, validation.ValidateLabelName(toleration.Key, idxPath.Child("key"))...)
+		}
+
+		// empty toleration key with Exists operator and empty value means match all taints
+		if len(toleration.Key) == 0 && toleration.Operator != v1.TolerationOpExists {
+			allErrors = append(allErrors,
+				field.Invalid(idxPath.Child("operator"),
+					toleration.Operator,
+					"operator must be Exists when `key` is empty, which means \"match all values and all keys\""))
+		}
+
+		if toleration.TolerationSeconds != nil && toleration.Effect != v1.TaintEffectNoExecute {
+			allErrors = append(allErrors,
+				field.Invalid(idxPath.Child("effect"),
+					toleration.Effect,
+					"effect must be 'NoExecute' when `tolerationSeconds` is set"))
+		}
+
+		// validate toleration operator and value
+		switch toleration.Operator {
+		// empty operator means Equal
+		case v1.TolerationOpEqual, "":
+			if errs := validationutil.IsValidLabelValue(toleration.Value); len(errs) != 0 {
+				allErrors = append(allErrors,
+					field.Invalid(idxPath.Child("operator"),
+						toleration.Value, strings.Join(errs, ";")))
+			}
+		case v1.TolerationOpExists:
+			if len(toleration.Value) > 0 {
+				allErrors = append(allErrors,
+					field.Invalid(idxPath.Child("operator"),
+						toleration, "value must be empty when `operator` is 'Exists'"))
+			}
+		default:
+			validValues := []string{string(v1.TolerationOpEqual), string(v1.TolerationOpExists)}
+			allErrors = append(allErrors,
+				field.NotSupported(idxPath.Child("operator"),
+					toleration.Operator, validValues))
+		}
+
+		// validate toleration effect, empty toleration effect means match all taint effects
+		if len(toleration.Effect) > 0 {
+			allErrors = append(allErrors, validateTaintEffect(&toleration.Effect, true, idxPath.Child("effect"))...)
+		}
+	}
+
+	return allErrors
+}
+
+// validateTaintEffect is used from validateTollerations and is a verbatim copy of the code
+// at https://github.com/kubernetes/kubernetes/blob/4d38d21/pkg/apis/core/validation/validation.go#L3087
+func validateTaintEffect(effect *v1.TaintEffect, allowEmpty bool, fldPath *field.Path) field.ErrorList {
+	if !allowEmpty && len(*effect) == 0 {
+		return field.ErrorList{field.Required(fldPath, "")}
+	}
+
+	allErrors := field.ErrorList{}
+	switch *effect {
+	// TODO: Replace next line with subsequent commented-out line when implement TaintEffectNoScheduleNoAdmit.
+	case v1.TaintEffectNoSchedule, v1.TaintEffectPreferNoSchedule, v1.TaintEffectNoExecute:
+		// case core.TaintEffectNoSchedule, core.TaintEffectPreferNoSchedule, core.TaintEffectNoScheduleNoAdmit,
+		//     core.TaintEffectNoExecute:
+	default:
+		validValues := []string{
+			string(v1.TaintEffectNoSchedule),
+			string(v1.TaintEffectPreferNoSchedule),
+			string(v1.TaintEffectNoExecute),
+			// TODO: Uncomment this block when implement TaintEffectNoScheduleNoAdmit.
+			// string(core.TaintEffectNoScheduleNoAdmit),
+		}
+		allErrors = append(allErrors, field.NotSupported(fldPath, *effect, validValues))
+	}
+	return allErrors
 }

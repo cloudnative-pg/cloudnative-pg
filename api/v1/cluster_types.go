@@ -488,6 +488,12 @@ type AffinityConfiguration struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Tolerations is a list of Tolerations that should be set for all the pods, in order to allow them to run
+	// on tainted nodes.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // RollingUpdateStatus contains the information about an instance which is

@@ -9,11 +9,13 @@ package v1
 import (
 	"strings"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("bootstrap methods validation", func() {
@@ -867,6 +869,44 @@ var _ = Describe("bootstrap base backup validation", func() {
 			},
 		}
 		result := recoveryCluster.validateBootstrapPgBaseBackupSource()
+		Expect(result).ToNot(BeEmpty())
+	})
+})
+
+var _ = Describe("toleration validation", func() {
+	It("doesn't complain if we provide a proper toleration", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Affinity: AffinityConfiguration{
+					Tolerations: []v1.Toleration{
+						{
+							Key:      "test",
+							Operator: "Exists",
+							Effect:   "NoSchedule",
+						},
+					},
+				},
+			},
+		}
+		result := recoveryCluster.validateTolerations()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("complain when the toleration ", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Affinity: AffinityConfiguration{
+					Tolerations: []v1.Toleration{
+						{
+							Key:      "",
+							Operator: "Equal",
+							Effect:   "NoSchedule",
+						},
+					},
+				},
+			},
+		}
+		result := recoveryCluster.validateTolerations()
 		Expect(result).ToNot(BeEmpty())
 	})
 })

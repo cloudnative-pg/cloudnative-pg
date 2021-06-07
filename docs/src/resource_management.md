@@ -50,7 +50,8 @@ while creating a cluster:
 -  Specify your required PostgreSQL memory parameters consistently with the pod resources (as you would do
    in a VM or physical machine scenario - see below).
 -  Set up database server pods on a dedicated node using nodeSelector.
-   See the ["nodeSelector field of the affinityconfiguration resource on the API reference page"](api_reference.md#affinityconfiguration).
+   See the "nodeSelector" and "tolerations" fields of the
+   [“affinityconfiguration"](api_reference.md#affinityconfiguration) resource on the API reference page.
 
 You can refer to the following example manifest:
 

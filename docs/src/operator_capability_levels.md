@@ -126,8 +126,11 @@ allocated UID and SELinux context.
 
 The operator supports basic pod affinity/anti-affinity rules to deploy PostgreSQL
 pods on different nodes, based on the selected `topologyKey` (for example `node` or
-`zone`). Additionally, it supports node affinity through the `nodeSelector`
-configuration attribute, as [expected by Kubernetes](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/).
+`zone`). it supports node affinity/anti-affinity through the `nodeSelector`
+configuration attribute, to be specified as [expected by Kubernetes](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/)
+and tolerations through the `tolerations` configuration attribute, which will be added for all the pods created by the
+operator related to a specific Cluster, using kubernetes [standard syntax](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/).
+
 
 ### Current status of the cluster
 

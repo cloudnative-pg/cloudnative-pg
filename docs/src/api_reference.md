@@ -59,11 +59,12 @@ Below you will find a description of the defined resources:
 
 AffinityConfiguration contains the info we need to create the affinity rules for Pods
 
-Name                  | Description                                                                                                                                                              | Type             
---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -----------------
-`enablePodAntiAffinity` | Activates anti-affinity for the pods. The operator will define pods anti-affinity unless this field is explicitly set to false                                           | *bool            
-`topologyKey          ` | TopologyKey to use for anti-affinity configuration. See k8s documentation for more info on that                                                                          - *mandatory*  | string           
-`nodeSelector         ` | NodeSelector is map of key-value pairs used to define the nodes on which the pods can run. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/ | map[string]string
+Name                  | Description                                                                                                                                                                                                        | Type               
+--------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------
+`enablePodAntiAffinity` | Activates anti-affinity for the pods. The operator will define pods anti-affinity unless this field is explicitly set to false                                                                                     | *bool              
+`topologyKey          ` | TopologyKey to use for anti-affinity configuration. See k8s documentation for more info on that                                                                                                                    - *mandatory*  | string             
+`nodeSelector         ` | NodeSelector is map of key-value pairs used to define the nodes on which the pods can run. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/                                           | map[string]string  
+`tolerations          ` | Tolerations is a list of Tolerations that should be set for all the pods, in order to allow them to run on tainted nodes. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/ | []corev1.Toleration
 
 <a id='Backup'></a>
 ## Backup
