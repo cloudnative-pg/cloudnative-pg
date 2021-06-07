@@ -458,7 +458,8 @@ spec:
                   type: object
                 type: array
               imageName:
-                description: Name of the container image
+                description: Name of the container image, supporting both tags (`<image>:<tag>`)
+                  and digests for deterministic and repeatable deployments (`<image>:<tag>@sha256:<digestValue>`)
                 type: string
               imagePullSecrets:
                 description: The list of pull secrets to be used to pull the images

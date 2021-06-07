@@ -78,7 +78,9 @@ type ClusterSpec struct {
 	// Description of this PostgreSQL cluster
 	Description string `json:"description,omitempty"`
 
-	// Name of the container image
+	// Name of the container image, supporting both tags (`<image>:<tag>`)
+	// and digests for deterministic and repeatable deployments
+	// (`<image>:<tag>@sha256:<digestValue>`)
 	ImageName string `json:"imageName,omitempty"`
 
 	// The UID of the `postgres` user inside the image, defaults to `26`
