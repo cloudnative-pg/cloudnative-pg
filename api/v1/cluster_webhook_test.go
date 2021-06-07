@@ -308,10 +308,19 @@ var _ = Describe("Image name validation", func() {
 		Expect(cluster.validateImageName()).To(BeEmpty())
 	})
 
-	It("complain when the 'latest' tag is detected", func() {
+	It("complains when the 'latest' tag is detected", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				ImageName: "postgres:latest",
+			},
+		}
+		Expect(len(cluster.validateImageName())).To(Equal(1))
+	})
+
+	It("complains when only the sha is passed", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres@sha256:cff94de382ca538861622bbe84cfe03f44f307a9846a5c5eda672cf4dc692866",
 			},
 		}
 		Expect(len(cluster.validateImageName())).To(Equal(1))
@@ -321,6 +330,15 @@ var _ = Describe("Image name validation", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				ImageName: "postgres:10.4",
+			},
+		}
+		Expect(cluster.validateImageName()).To(BeEmpty())
+	})
+
+	It("doesn't complain if the tag is valid and has sha", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:10.4@sha256:cff94de382ca538861622bbe84cfe03f44f307a9846a5c5eda672cf4dc692866",
 			},
 		}
 		Expect(cluster.validateImageName()).To(BeEmpty())

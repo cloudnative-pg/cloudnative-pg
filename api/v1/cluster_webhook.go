@@ -344,14 +344,22 @@ func (r *Cluster) validateImageName() field.ErrorList {
 	}
 
 	tag := utils.GetImageTag(r.Spec.ImageName)
-	if tag == "latest" {
+	switch tag {
+	case "latest":
 		result = append(
 			result,
 			field.Invalid(
 				field.NewPath("spec", "imageName"),
 				r.Spec.ImageName,
 				"Can't use 'latest' as image tag as we can't detect upgrades"))
-	} else {
+	case "":
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "imageName"),
+				r.Spec.ImageName,
+				"Can't use just the image sha as we can't detect upgrades"))
+	default:
 		_, err := postgres.GetPostgresVersionFromTag(tag)
 		if err != nil {
 			result = append(
