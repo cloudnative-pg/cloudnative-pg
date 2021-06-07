@@ -63,8 +63,12 @@ const (
 	// The name of the directory containing the TLS certificates
 	defaultWebhookCertDir = "/controller/certificates"
 
+	// LeaderElectionID The operator Leader Election ID
+	LeaderElectionID = "db9c8771.k8s.enterprisedb.io"
+
 	// CaSecretName is the name of the secret which is hosting the Operator CA
 	CaSecretName = "postgresql-operator-ca-secret" // #nosec
+
 )
 
 func init() {
@@ -94,7 +98,7 @@ func RunController(metricsAddr, configMapName string, enableLeaderElection bool)
 		MetricsBindAddress: metricsAddr,
 		Port:               9443,
 		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "db9c8771.k8s.enterprisedb.io",
+		LeaderElectionID:   LeaderElectionID,
 		Namespace:          configuration.Current.WatchNamespace,
 		CertDir:            defaultWebhookCertDir,
 	}
