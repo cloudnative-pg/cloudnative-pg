@@ -316,6 +316,11 @@ type AffinityConfiguration struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// Tolerations is a list of Tolerations that should be set to all the pods for this cluster.
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // PrimaryUpdateStrategy contains the strategy to follow when upgrading
