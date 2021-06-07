@@ -1,5 +1,7 @@
 
-# Monitoring Instances
+# Monitoring
+
+## Monitoring Instances
 
 For each PostgreSQL instance, the operator provides an exporter of metrics for
 [Prometheus](https://prometheus.io/) via HTTP, on port 9187, named `metrics`.
@@ -36,9 +38,9 @@ according to the following logic:
     This behaviour will be improved starting from the next version of Cloud
     Native PostgreSQL.
   
-## Prometheus Operator example
+### Prometheus Operator example
 
-A specific cluster can be monitored using the
+A specific PostgreSQL cluster can be monitored using the
 [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) by defining the following
 [PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor)
 resource:
@@ -58,9 +60,9 @@ spec:
 
 !!! Important
     Make sure you modify the example above with a unique name as well as the
-    correct cluster's namespace and labels.
+    correct cluster's namespace and labels (we are using `cluster-example`).
 
-## User defined metrics
+### User defined metrics
 
 This feature is currently in *beta* state and the format is inspired by the
 [queries.yaml file](https://github.com/prometheus-community/postgres_exporter/blob/master/queries.yaml) <!-- wokeignore:rule=master -->
@@ -194,9 +196,10 @@ Native PostgreSQL's exporter:
 
 Similarly, the `pg_version` field of a column definition is not implemented.
 
-# Monitoring the operator
+## Monitoring the operator
 
-The operator exposes [Prometheus](https://prometheus.io/) metrics via HTTP on port 8080, named `metrics`.
+The operator internally exposes [Prometheus](https://prometheus.io/) metrics
+via HTTP on port 8080, named `metrics`.
 
 Metrics can be accessed as follows:
 
@@ -207,9 +210,9 @@ curl http://<pod_ip>:8080/metrics
 Currently, the operator exposes default `kubebuilder` metrics, see
 [kubebuilder documentation](https://book.kubebuilder.io/reference/metrics.html) for more details.
 
-## Prometheus Operator example
+### Prometheus Operator example
 
-The deployment operator can be monitored using the
+The operator deployment can be monitored using the
 [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) by defining the following
 [PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor)
 resource:
