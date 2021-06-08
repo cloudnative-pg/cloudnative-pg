@@ -403,10 +403,12 @@ type BootstrapRecovery struct {
 	// The backup we need to restore
 	Backup LocalObjectReference `json:"backup"`
 
-	// By default the recovery will end as soon as a consistent state is
-	// reached: in this case that means at the end of a backup.
-	// This option allows to fine tune the recovery process
-	// +optional
+	// By default, the recovery process applies all the available
+	// WAL files in the archive (full recovery). However, you can also
+	// end the recovery as soon as a consistent state is reached or
+	// recover to a point-in-time (PITR) by specifying a `RecoveryTarget` object,
+	// as expected by PostgreSQL (i.e., timestamp, transaction Id, LSN, ...).
+	// More info: https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET
 	RecoveryTarget *RecoveryTarget `json:"recoveryTarget,omitempty"`
 }
 
@@ -422,20 +424,16 @@ type BootstrapPgBaseBackup struct {
 // will stop. All the target options except TargetTLI are mutually exclusive.
 type RecoveryTarget struct {
 	// The target timeline ("latest", "current" or a positive integer)
-	// +optional
 	TargetTLI string `json:"targetTLI,omitempty"`
 
 	// The target transaction ID
-	// +optional
 	TargetXID string `json:"targetXID,omitempty"`
 
 	// The target name (to be previously created
 	// with `pg_create_restore_point`)
-	// +optional
 	TargetName string `json:"targetName,omitempty"`
 
 	// The target LSN (Log Sequence Number)
-	// +optional
 	TargetLSN string `json:"targetLSN,omitempty"`
 
 	// The target time, in any unambiguous representation
