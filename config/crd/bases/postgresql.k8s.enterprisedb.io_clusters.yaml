@@ -297,10 +297,13 @@ spec:
                         - name
                         type: object
                       recoveryTarget:
-                        description: 'By default the recovery will end as soon as
-                          a consistent state is reached: in this case that means at
-                          the end of a backup. This option allows to fine tune the
-                          recovery process'
+                        description: 'By default, the recovery process applies all
+                          the available WAL files in the archive (full recovery).
+                          However, you can also end the recovery as soon as a consistent
+                          state is reached or recover to a point-in-time (PITR) by
+                          specifying a `RecoveryTarget` object, as expected by PostgreSQL
+                          (i.e., timestamp, transaction Id, LSN, ...). More info:
+                          https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET'
                         properties:
                           exclusive:
                             description: Set the target to be exclusive (defaults
