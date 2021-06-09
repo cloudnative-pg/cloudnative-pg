@@ -461,6 +461,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		Owns(&corev1.Pod{}).
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.Secret{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		WithEventFilter(&ClusterPredicate{}).
 		Complete(r)
 }
