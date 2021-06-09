@@ -42,6 +42,11 @@ cleanup() {
 }
 
 main() {
+  # Call to setup-cluster.sh script
+  "${HACK_DIR}/setup-cluster.sh" create
+
+  trap cleanup EXIT
+
   # In case image building is forced it will use a default
   # controller image name: cloud-native-postgresql:e2e.
   # Otherwise it will download the image from docker
@@ -61,14 +66,8 @@ main() {
     fi
   else
     unset CONTROLLER_IMG
+    "${HACK_DIR}/setup-cluster.sh" load
   fi
-
-  # Call to setup-cluster.sh script
-  "${HACK_DIR}/setup-cluster.sh" create
-
-  trap cleanup EXIT
-
-  "${HACK_DIR}/setup-cluster.sh" load
 
   RC=0
 

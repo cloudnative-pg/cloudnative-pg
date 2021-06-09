@@ -16,12 +16,12 @@ fi
 # Defaults
 K8S_VERSION=${K8S_VERSION:-v1.21.1}
 KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
-CLUSTER_NAME=${CLUSTER_NAME:-pg-operator-e2e-${K8S_VERSION//./-}}
-ENGINE="${CLUSTER_ENGINE:-kind}"
-ENABLE_REGISTRY="${ENABLE_REGISTRY:-}"
+ENGINE=${CLUSTER_ENGINE:-kind}
+ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
+NODES=${NODES:-3}
 
 # Define the directories used by the script
-ROOT_DIR=$(realpath "$(dirname "$0")/../")
+ROOT_DIR=$(cd "$(dirname "$0")/../"; pwd)
 HACK_DIR="${ROOT_DIR}/hack"
 E2E_DIR="${HACK_DIR}/e2e"
 TEMP_DIR="$(mktemp -d)"
@@ -63,7 +63,32 @@ create_cluster_kind() {
 
   # Create kind config
   config_file="${TEMP_DIR}/kind-config.yaml"
-  cp "${E2E_DIR}/kind-config.yaml" "${config_file}"
+  cat >"${config_file}" <<-EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  apiServerAddress: "0.0.0.0"
+  kubeProxyMode: "ipvs"
+
+# add to the apiServer certSANs the name of the docker (dind) service in order to be able to reach the cluster through it
+kubeadmConfigPatchesJSON6902:
+  - group: kubeadm.k8s.io
+    version: v1beta2
+    kind: ClusterConfiguration
+    patch: |
+      - op: add
+        path: /apiServer/certSANs/-
+        value: docker
+nodes:
+- role: control-plane
+EOF
+
+  if [ "$NODES" -gt 1 ]; then
+    for ((i = 0; i < NODES; i++)); do
+      echo '- role: worker' >>"${config_file}"
+    done
+  fi
+
   if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ] || [ -n "${ENABLE_REGISTRY:-}" ]; then
     # Add containerdConfigPatches section
     cat >>"${config_file}" <<-EOF
@@ -102,7 +127,13 @@ export_logs_kind() {
 
 destroy_kind() {
   local cluster_name=$1
+  docker network disconnect "kind" "${registry_name}" &>/dev/null || true
   kind delete cluster --name "${cluster_name}" || true
+  docker network rm "kind" &>/dev/null || true
+}
+
+check_registry_kind() {
+  [ -n "$(check_registry "kind")" ]
 }
 
 ##
@@ -149,8 +180,18 @@ EOF
     volumes=(--volume "${config_file}:/etc/rancher/k3s/registries.yaml")
   fi
 
-  k3d cluster create "${volumes[@]}" -a 3 -i "rancher/k3s:${latest_k3s_tag}" \
-    --k3s-server-arg '--disable=traefik' --k3s-server-arg '--disable=metrics-server' --no-lb "${cluster_name}"
+  local agents=()
+  if [ "$NODES" -gt 1 ]; then
+    agents=(-a "${NODES}")
+  fi
+
+  disable="disable"
+  if [[ $k8s_version =~ ^v1\.1[0-6]\. ]]; then
+    disable="no-deploy"
+  fi
+
+  k3d cluster create "${volumes[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" \
+    --k3s-server-arg "--${disable}=traefik" --k3s-server-arg "--${disable}=metrics-server" --no-lb "${cluster_name}"
 
   if [ -n "${ENABLE_REGISTRY:-}" ]; then
     docker network connect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
@@ -166,17 +207,23 @@ load_image_k3d() {
 export_logs_k3d() {
   local cluster_name=$1
   while IFS= read -r line; do
-      NODES_LIST+=("$line")
+    NODES_LIST+=("$line")
   done < <(k3d node list | awk "/${cluster_name}/{print \$1}")
   for i in "${NODES_LIST[@]}"; do
-      mkdir -p "${LOG_DIR}/${i}"
-      docker cp -L "${i}:/var/log/." "${LOG_DIR}/${i}"
+    mkdir -p "${LOG_DIR}/${i}"
+    docker cp -L "${i}:/var/log/." "${LOG_DIR}/${i}"
   done
 }
 
 destroy_k3d() {
   local cluster_name=$1
+  docker network disconnect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
   k3d cluster delete "${cluster_name}" || true
+  docker network rm "k3d-${cluster_name}" &>/dev/null || true
+}
+
+check_registry_k3d() {
+  [ -n "$(check_registry "k3d-${cluster_name}")" ]
 }
 
 ##
@@ -209,6 +256,12 @@ ensure_registry() {
   if ! docker inspect "${registry_name}" &>/dev/null; then
     docker container run -d --name "${registry_name}" -v "${registry_volume}:/var/lib/registry" --restart always -p 5000:5000 registry:2
   fi
+}
+
+check_registry() {
+  local network=$1
+  docker network inspect "${network}" | \
+    jq -r ".[].Containers | .[] | select(.Name==\"${registry_name}\") | .Name"
 }
 
 deploy_fluentd() {
@@ -264,7 +317,6 @@ deploy_operator() {
   make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
 }
 
-
 usage() {
   cat >&2 <<EOF
 Usage: $0 [-e {kind|k3d}] [-k <version>] [-r] <command>
@@ -282,15 +334,23 @@ Commands:
 
 Options:
     -e|--engine
-        <CLUSTE_ENGINE>   Use the provided ENGINE to run the cluster.
+        <CLUSTER_ENGINE>  Use the provided ENGINE to run the cluster.
                           Available options are 'kind' and 'k3d'. Default 'kind'.
-                          Env: CLUSTE_ENGINE
+                          Env: CLUSTER_ENGINE
 
     -k|--k8s-version
         <K8S_VERSION>     Use the specified kubernetes full version number
                           (e.g., v1.21.1). Env: K8S_VERSION
 
+    -n|--nodes
+        <NODES>           Create a cluster with the required number of nodes.
+                          Used only during "create" command. Default: 3
+                          Env: NODES
+
     -r|--registry         Enable local registry. Env: ENABLE_REGISTRY
+
+To use long options you need to have GNU enhanced getopt available, otherwise
+you can only use the short version of the options.
 EOF
   exit 1
 }
@@ -318,18 +378,30 @@ create() {
 }
 
 load() {
-  CONTROLLER_IMG="$(print_image)"
+  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_${ENGINE}"; then
+    ENABLE_REGISTRY=true
+  fi
+
+  CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
   make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" docker-build
   load_image "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
 }
 
 deploy() {
-  CONTROLLER_IMG="$(print_image)"
+  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_${ENGINE}"; then
+    ENABLE_REGISTRY=true
+  fi
+
+  CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
   deploy_operator
 }
 
 print_image() {
-  echo "${registry_name}:5000/cloud-native-postgresql:latest"
+  local tag=devel
+  if [ -n "${ENABLE_REGISTRY:-}" ]; then
+    tag=latest
+  fi
+  echo "${registry_name}:5000/cloud-native-postgresql:${tag}"
 }
 
 export_logs() {
@@ -345,7 +417,13 @@ destroy() {
 ##
 
 main() {
-  parsed_opts=$(getopt -o e:k:r -l "engine:,k8s-version:,registry" -- "$@") || usage
+  if ! getopt -T > /dev/null; then
+    # GNU enhanced getopt is available
+    parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry" -- "$@") || usage
+  else
+    # Original getopt is available
+    parsed_opts=$(getopt e:k:n:r -- "$@") || usage
+  fi
   eval "set -- $parsed_opts"
   for o; do
     case "${o}" in
@@ -369,6 +447,16 @@ main() {
         usage
       fi
       ;;
+    -n | --nodes)
+      shift
+      NODES="${1}"
+      shift
+      if ! [[ $NODES =~ ^[1-9][0-9]*$ ]]; then
+        echo "ERROR: $NODES is not a positive integer!" >&2
+        echo >&2
+        usage
+      fi
+      ;;
     -r | --registry)
       shift
       ENABLE_REGISTRY=true
@@ -386,30 +474,39 @@ main() {
     echo >&2
     usage
   fi
-  command=$1
-  shift
 
-  # Invoke the command
-  case "$command" in
-  prepare)
-    if [ "$#" -eq 0 ]; then
-      echo "ERROR: prepare requires a destination directory" >&2
+  # Only here the K8S_VERSION veriable contains its final value
+  # so we can set the default cluster name
+  CLUSTER_NAME=${CLUSTER_NAME:-pg-operator-e2e-${K8S_VERSION//./-}}
+
+  while [ "$#" -gt 0 ]; do
+    command=$1
+    shift
+
+    # Invoke the command
+    case "$command" in
+    prepare)
+      if [ "$#" -eq 0 ]; then
+        echo "ERROR: prepare requires a destination directory" >&2
+        echo >&2
+        usage
+      fi
+      dest_dir=$1
+      shift
+      prepare "${dest_dir}"
+      ;;
+
+    create | load | deploy | print-image | export-logs | destroy)
+      ensure_registry
+      "${command//-/_}"
+      ;;
+    *)
+      echo "ERROR: unknown command ${command}" >&2
       echo >&2
       usage
-    fi
-    prepare "$1"
-    ;;
-
-  create | load | deploy | print-image | export-logs | destroy)
-    ensure_registry
-    "${command//-/_}"
-    ;;
-  *)
-    echo "ERROR: unknown command ${command}" >&2
-    echo >&2
-    usage
-    ;;
-  esac
+      ;;
+    esac
+  done
 }
 
 main "$@"
