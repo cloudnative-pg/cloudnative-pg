@@ -80,7 +80,7 @@ spec:
         app: webtest
     spec:
       containers:
-        - image: leonardoce/webtest:1.0.0
+        - image: quay.io/leonardoce/webtest:1.3.0
           name: cert-test
           volumeMounts:
             - name: secret-volume-root-ca
