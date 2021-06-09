@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -208,31 +209,49 @@ func (instance *Instance) Backup(
 func (instance *Instance) getBarmanCloudBackupOptions(
 	configuration *apiv1.BarmanObjectStoreConfiguration, serverName string) []string {
 	options := []string{
-		"-U", "postgres",
+		"--user", "postgres",
 	}
+
 	if configuration.Data != nil {
 		if len(configuration.Data.Compression) != 0 {
 			options = append(
 				options,
 				fmt.Sprintf("--%v", configuration.Data.Compression))
 		}
+
 		if len(configuration.Data.Encryption) != 0 {
 			options = append(
 				options,
-				"-e",
+				"--encrypt",
 				string(configuration.Data.Encryption))
 		}
+
+		if configuration.Data.ImmediateCheckpoint {
+			options = append(
+				options,
+				"--immediate-checkpoint")
+		}
+
+		if configuration.Data.Jobs != nil {
+			options = append(
+				options,
+				"--jobs",
+				strconv.Itoa(int(*configuration.Data.Jobs)))
+		}
 	}
+
 	if len(configuration.EndpointURL) > 0 {
 		options = append(
 			options,
 			"--endpoint-url",
 			configuration.EndpointURL)
 	}
+
 	options = append(
 		options,
 		configuration.DestinationPath,
 		serverName)
+
 	return options
 }
 

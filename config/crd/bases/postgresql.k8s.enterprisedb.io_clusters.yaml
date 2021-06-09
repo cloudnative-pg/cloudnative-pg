@@ -150,6 +150,7 @@ spec:
                             - aws:kms
                             type: string
                           immediateCheckpoint:
+                            default: false
                             description: Control whether the I/O workload for the
                               backup initial checkpoint will be limited, according
                               to the `checkpoint_completion_target` setting on the
@@ -161,6 +162,7 @@ spec:
                             description: The number of parallel jobs to be used to
                               upload the backup, defaults to 2
                             format: int32
+                            minimum: 1
                             type: integer
                         type: object
                       destinationPath:
