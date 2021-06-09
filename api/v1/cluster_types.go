@@ -612,10 +612,12 @@ type DataBackupConfiguration struct {
 	// the PostgreSQL server. If set to true, an immediate checkpoint will be
 	// used, meaning PostgreSQL will complete the checkpoint as soon as
 	// possible. `false` by default.
+	// +kubebuilder:default:boolean=false
 	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
 
 	// The number of parallel jobs to be used to upload the backup, defaults
 	// to 2
+	// +kubebuilder:validation:Minimum=1
 	Jobs *int32 `json:"jobs,omitempty"`
 }
 
