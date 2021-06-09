@@ -12,7 +12,7 @@ require (
 	github.com/logrusorgru/aurora/v3 v3.0.0
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.13.0
-	github.com/prometheus/client_golang v1.10.0
+	github.com/prometheus/client_golang v1.11.0
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.2.0
 	github.com/spf13/cobra v1.1.3
