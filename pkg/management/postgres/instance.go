@@ -30,6 +30,7 @@ const (
 	pgCtlName        = "pg_ctl"
 	pgRewindName     = "pg_rewind"
 	pgBaseBackupName = "pg_basebackup"
+	pgCtlTimeout     = "40000000" // greater than one year in seconds, big enough to simulate an infinite timeout
 )
 
 // Instance represent a PostgreSQL instance to be executed
@@ -89,6 +90,7 @@ func (instance Instance) Startup() error {
 		"-w",
 		"-D", instance.PgData,
 		"-o", "-c port=5432 -c unix_socket_directories=" + socketDir,
+		"-t " + pgCtlTimeout,
 	}
 
 	// Add postgres server command line options

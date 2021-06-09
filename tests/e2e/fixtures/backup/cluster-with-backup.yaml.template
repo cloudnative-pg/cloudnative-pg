@@ -45,3 +45,5 @@ spec:
             key: ACCESS_SECRET_KEY
         wal:
           compression: gzip
+        data:
+          immediateCheckpoint: true
