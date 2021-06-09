@@ -13,6 +13,7 @@ import (
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
@@ -46,7 +47,7 @@ func Setup(serverInstance *postgres.Instance) error {
 	if err := registry.Register(exporter); err != nil {
 		return fmt.Errorf("while registering PostgreSQL exporters: %w", err)
 	}
-	if err := registry.Register(prometheus.NewGoCollector()); err != nil {
+	if err := registry.Register(collectors.NewGoCollector()); err != nil {
 		return fmt.Errorf("while registering Go exporters: %w", err)
 	}
 
