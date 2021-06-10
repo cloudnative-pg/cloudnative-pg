@@ -7,9 +7,11 @@ Each log entry has the following fields:
 
 - `level`: log level (`info`, `notice`, ...)
 - `ts`: the timestamp (epoch with microseconds)
-- `msg`: the type of the record (e.g. `postgres` or `pg_controldata`)
+- `logger`: the type of the record (e.g. `postgres` or `pg_controldata`)
+- `msg`: the actual message or the keyword `record` in case the message is
+  parsed in JSON format
 - `record`: the actual record (with structure that varies depending on the
-  `msg` type)
+  `logger` type)
 
 ## PostgreSQL log
 

@@ -41,11 +41,12 @@ and the following suite of E2E tests are performed on that cluster:
 * Restore from backup;
 * Pod affinity using `NodeSelector`;
 * Metrics collection;
-* Operator pod deletion;
 * JSON log format;
 * Operator configuration via ConfigMap;
+* Operator pod deletion;
 * Operator pod eviction;
 * Operator upgrade;
+* Operator High Availability;
 * Node drain;
 * Primary endpoint switch in case of failover in less than 10 seconds;
 * Primary endpoint switch in case of switchover in less than 20 seconds;
