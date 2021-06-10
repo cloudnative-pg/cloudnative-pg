@@ -29,7 +29,8 @@ func NewCmd() *cobra.Command {
 	var recoveryTarget string
 
 	cmd := &cobra.Command{
-		Use: "restore [flags]",
+		Use:           "restore [flags]",
+		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 

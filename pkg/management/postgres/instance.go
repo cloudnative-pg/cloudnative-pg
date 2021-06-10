@@ -128,6 +128,11 @@ func (instance *Instance) ShutdownConnections() {
 func (instance *Instance) Shutdown() error {
 	instance.ShutdownConnections()
 
+	// check instance status
+	if !instance.isStatusRunning() {
+		return fmt.Errorf("instance is not running")
+	}
+
 	options := []string{
 		"-D",
 		instance.PgData,
@@ -147,6 +152,19 @@ func (instance *Instance) Shutdown() error {
 	}
 
 	return nil
+}
+
+// isStatusRunning checks the status of a running server using pg_ctl status
+func (instance *Instance) isStatusRunning() bool {
+	options := []string{
+		"-D",
+		instance.PgData,
+		"status",
+	}
+
+	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
+	err := execlog.RunBuffering(pgCtlCmd, pgCtlName)
+	return err == nil
 }
 
 // Reload makes a certain active instance reload the configuration
@@ -202,7 +220,7 @@ func (instance Instance) WithActiveInstance(inner func() error) error {
 	}
 	defer func() {
 		if err := instance.Shutdown(); err != nil {
-			log.Log.Error(err, "Error while deactivating instance")
+			log.Log.Info("Error while deactivating instance", "err", err)
 		}
 	}()
 
