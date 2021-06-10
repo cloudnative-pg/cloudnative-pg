@@ -242,6 +242,7 @@ creds
 cron
 crt
 cryptographic
+ctl
 currentPrimary
 customQueriesConfigMap
 customQueriesSecret
@@ -468,6 +469,7 @@ storageClass
 storageClassName
 storageclass
 storageconfiguration
+subcommand
 subresource
 sudo
 superuserSecret

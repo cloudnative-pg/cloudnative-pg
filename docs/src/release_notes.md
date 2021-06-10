@@ -2,6 +2,53 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.5.0
+
+**Release date:** 10 June 2021
+
+Features:
+
+- Introduce the `pg_basebackup` bootstrap method to create a new PostgreSQL
+  cluster as a copy of an existing PostgreSQL instance of the same major
+  version, even outside Kubernetes
+- Add support for Kubernetes’ tolerations in the `Affinity` section of the
+  `Cluster` resource, allowing users to distribute PostgreSQL instances on
+  Kubernetes nodes with the required taint
+- Enable specification of a digest to an image name, through the
+  `<image>:<tag>@sha256:<digestValue>` format, for more deterministic and
+  repeatable deployments
+
+Security Enhancements:
+
+- Customize TLS certificates to authenticate the PostgreSQL server by defining
+  secrets for the server certificate and the related Certification Authority
+  that signed it
+- Raise the `sslmode` for the WAL receiver process of internal and
+  automatically managed streaming replicas from `require` to `verify-ca`
+
+Changes:
+
+- Enhance the `promote` subcommand of the `cnp` plugin for `kubectl` to accept
+  just the node number rather than the whole name of the pod
+- Adopt DNS-1035 validation scheme for cluster names (from which service names
+  are inherited)
+- Enforce streaming replication connection when cloning a standby instance or
+  when bootstrapping using the `pg_basebackup` method
+- Documentation improvements:
+    - Provide a list of ports exposed by the operator and the operand container
+    - Introduce the `cnp-bench` helm charts and guidelines for benchmarking the
+      storage and PostgreSQL for database workloads
+- E2E tests enhancements:
+    - Test Kubernetes 1.21
+    - Add test for High Availability of the operator
+    - Add test for node draining
+- Minor bug fixes, including:
+    - Timeout to pg_ctl start during recovery operations too short
+    - Operator not watching over direct events on PVCs
+    - Fix handling of `immediateCheckpoint` and `jobs` parameter in
+      `barmanObjectStore` backups
+    - Empty logs when recovering from a backup
+
 ## Version 1.4.0
 
 **Release date:** 18 May 2021
@@ -134,4 +181,3 @@ Kubernetes with the following main capabilities:
 - Support for synchronous replicas
 - Support for node affinity via `nodeSelector` property
 - Standard output logging of PostgreSQL error messages
-
