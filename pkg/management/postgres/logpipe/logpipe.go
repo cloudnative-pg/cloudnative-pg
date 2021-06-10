@@ -12,12 +12,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
+
+var consumedLogFiles sync.Map
 
 // Start start a new goroutine running the logging collector core, reading
 // from the logging_collector process and translating its content to JSON
@@ -34,7 +37,11 @@ func Start() error {
 		}
 	}
 
-	go loggingCollector(csvPath)
+	_, loaded := consumedLogFiles.LoadOrStore(csvPath, true)
+
+	if !loaded {
+		go loggingCollector(csvPath)
+	}
 
 	return nil
 }
@@ -42,6 +49,7 @@ func Start() error {
 // loggingCollector will repeatedly try to open the FIFO file where PostgreSQL is writing
 // its logs, decode them, and printing using the instance manager logger infrastructure.
 func loggingCollector(csvPath string) {
+	defer consumedLogFiles.Delete(csvPath)
 	for {
 		if err := collectLogsFromFile(csvPath); err != nil {
 			log.Log.Error(err, "Error consuming log stream")
