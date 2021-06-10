@@ -67,6 +67,17 @@ The **default parameters for PostgreSQL 10 to 12** are:
 wal_keep_segments = '32'
 ```
 
+!!! Warning
+    It is your duty to plan for WAL segments retention in your PostgreSQL
+    cluster and properly configure either `wal_keep_segments` or `wal_keep_size`,
+    depending on the server version, based on the expected and observed workloads.
+    Until Cloud Native PostgreSQL supports replication slots, and if you don't have
+    continuous backup in place, this is the only way at the moment that protects
+    from the case of a standby falling out of sync and returning error messages like:
+    `"could not receive data from WAL stream: ERROR: requested WAL segment ************************ has already been removed"`.
+    This will require you to dedicate a part of your `PGDATA` to keep older
+    WAL segments for streaming replication purposes.
+
 The following parameters are **fixed** and exclusively controlled by the operator:
 
 ```text
