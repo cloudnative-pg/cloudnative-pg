@@ -93,12 +93,9 @@ git add \
     docs/src/installation_upgrade.md \
     "${release_manifest}"
 git commit -sm "Version tag to ${release_version}"
+git push origin -u "release/v${release_version}"
 
 cat <<EOF
 Generated release manifest ${release_manifest}
-Created branch release/v${release_version}
-
-Remember to push and then open a pull request:
-
-git push origin release/v${release_version}
+Created and pushed branch release/v${release_version}
 EOF

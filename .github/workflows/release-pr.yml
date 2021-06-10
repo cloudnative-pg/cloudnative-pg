@@ -1,0 +1,30 @@
+# Create a PR for a release when a commit is pushed on a release/v* branch
+
+name: release-pr
+
+on:
+  push:
+    branches:
+    - release/v*
+
+jobs:
+  pull-request:
+    runs-on: ubuntu-20.04
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2.3.4
+      -
+        name: Get tag
+        run: |
+          echo "TAG=${GITHUB_REF##*/}" >> $GITHUB_ENV
+      -
+        name: Pull Request
+        id: open-pr
+        uses: repo-sync/pull-request@v2.3.0
+        with:
+          destination_branch: "main"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pr_body: "Automated PR. Will trigger the ${{ env.TAG }} release when approved."
+          pr_label: release
+          pr_title: "Release ${{ env.TAG }}"

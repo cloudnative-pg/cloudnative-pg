@@ -1,0 +1,104 @@
+# When a release tag is pushed, create and publish operator images on Quay and
+# Docker. Then generate a release on GitHub.
+name: release-publish
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  buildx:
+    name: Build containers
+    runs-on: ubuntu-20.04
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2.3.4
+        with:
+          # To identify the commit we need the history and all the tags.
+          fetch-depth: 0
+      -
+        name: Build meta
+        id: build-meta
+        run: |
+          images='quay.io/enterprisedb/cloud-native-postgresql-testing,quay.io/enterprisedb/cloud-native-postgresql,enterprisedb/cloud-native-postgresql"
+          commit_sha=${{ github.sha }}
+          commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
+          # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
+          commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
+          commit_short=$(git rev-parse --short "${commit_sha}")
+          echo "::set-output name=images::${images}"
+          echo "::set-output name=date::${commit_date}"
+          echo "::set-output name=version::${commit_version}"
+          echo "::set-output name=commit::${commit_short}"
+      -
+        name: Docker meta
+        id: docker-meta
+        uses: docker/metadata-action@v3.3.0
+        with:
+          images: ${{ steps.build-meta.outputs.images }}
+          tags: |
+            type=semver,pattern={{version}}
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v1.2.0
+      -
+        name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1.3.0
+      -
+        name: Login to quay.io
+        uses: docker/login-action@v1.9.0
+        with:
+          registry: quay.io/enterprisedb
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+      -
+        name: Login to Docker Hub
+        uses: docker/login-action@v1.9.0
+        with:
+          username: ${{ secrets.DOCKER_HUB_USER }}
+          password: ${{ secrets.DOCKER_HUB_SECRET }}
+      -
+        name: Build and push
+        uses: docker/build-push-action@v2.4.0
+        with:
+          # Available architecture on UBI8 are: linux/amd64, linux/arm64, linux/ppc64le
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            DATE=${{ steps.build-meta.outputs.date }}
+            COMMIT=${{ steps.build-meta.outputs.commit }}
+            VERSION=${{ steps.build-meta.outputs.version }}
+          tags: ${{ steps.docker-meta.outputs.tags }}
+
+  release:
+    runs-on: ubuntu-20.04
+    needs:
+      - buildx
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2.3.4
+      -
+        name: Get tag
+        run: |
+          tag="${GITHUB_REF#refs/tags/v}"
+          echo "TAG=${tag}" >> $GITHUB_ENV
+      -
+        name: Generate release notes
+        run: |
+          docker run --rm -v $(pwd):/src mist/submark \
+            submark -O --h2 "Version ${{ env.TAG }}" \
+            --out-file /src/release_notes.md \
+            /src/docs/src/release_notes.md
+      -
+        name: Release
+        uses: softprops/action-gh-release@v0.1.5
+        with:
+          body_path: release_notes.md
+          draft: false
+          name: Release ${{ env.TAG }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
