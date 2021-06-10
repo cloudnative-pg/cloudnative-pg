@@ -10,12 +10,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -27,6 +29,15 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
+
+// RetryUntilWalReceiverDown is the default retry configuration that is used
+// to wait for the WAL receiver process to be down
+var RetryUntilWalReceiverDown = wait.Backoff{
+	Duration: 1 * time.Second,
+	// Steps is declared as an "int", so we are capping
+	// to int32 to support ARM-based 32 bit architectures
+	Steps: math.MaxInt32,
+}
 
 // Reconcile is the main reconciliation loop for the instance
 func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) error {
@@ -354,14 +365,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 			return err
 		}
 
-		r.log.Info("I'm the target primary, wait for every pending WAL record to be applied")
-
-		err = r.waitForApply()
-		if err != nil {
-			return err
-		}
-
-		r.log.Info("I'm the target primary, promoting my instance")
+		r.log.Info("I'm the target primary, applying WALs and promoting my instance")
 
 		// I must promote my instance here
 		err = r.instance.PromoteAndWait()
@@ -417,46 +421,24 @@ func (r *InstanceReconciler) reconcileReplica() error {
 	return r.instance.Shutdown()
 }
 
-// waitForApply wait for every transaction log to be applied
-func (r *InstanceReconciler) waitForApply() error {
-	// TODO: exponential backoff
-	for {
-		lag, err := r.instance.GetWALApplyLag()
-		if err != nil {
-			return err
-		}
-
-		if lag <= 0 {
-			break
-		}
-
-		r.log.Info("Still need to apply transaction log info, waiting for 1 second",
-			"lag", lag)
-		time.Sleep(time.Second * 1)
-	}
-
-	return nil
-}
-
 // waitForWalReceiverDown wait until the wal receiver is down, and it's used
 // to grab all the WAL files from a replica
 func (r *InstanceReconciler) waitForWalReceiverDown() error {
-	// TODO: exponential backoff
-	for {
+	// This is not really exponential backoff as RetryUntilWalReceiverDown
+	// doesn't contain any increment
+	return wait.ExponentialBackoff(RetryUntilWalReceiverDown, func() (done bool, err error) {
 		status, err := r.instance.IsWALReceiverActive()
 		if err != nil {
-			return err
+			return true, err
 		}
 
 		if !status {
-			break
+			return true, nil
 		}
 
-		r.log.Info("WAL receiver is still active, waiting for 2 seconds")
-		time.Sleep(time.Second * 1)
-	}
-
-	return nil
+		r.log.Info("WAL receiver is still active, waiting")
+		return false, nil
+	})
 }
 
 // configureInstancePermissions creates the expected users and databases in a new
