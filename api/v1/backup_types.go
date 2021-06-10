@@ -170,7 +170,10 @@ func (backup *Backup) GetKubernetesObject() client.Object {
 }
 
 // Hub marks this type as a conversion hub.
-func (*Backup) Hub() {}
+func (*Backup) Hub() {
+	// This function is empty because we only
+	// want to implement the conversion.Hub interface
+}
 
 func init() {
 	SchemeBuilder.Register(&Backup{}, &BackupList{})
