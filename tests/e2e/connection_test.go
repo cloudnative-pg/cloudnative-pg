@@ -163,8 +163,8 @@ var _ = Describe("Connection via services", func() {
 		// If we have specified secrets, we test that we're able to use them
 		// to connect
 		It("can connect with user-supplied passwords", func() {
-			const suppliedSuperuserPassword = "v3ry54f3"
-			const suppliedAppUserPassword = "4ls054f3"
+			const suppliedSuperuserPassword = "v3ry54f3" // NOSONAR
+			const suppliedAppUserPassword = "4ls054f3"   // NOSONAR
 
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
