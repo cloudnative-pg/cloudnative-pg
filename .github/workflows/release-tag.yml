@@ -1,0 +1,26 @@
+# Create a tag when a PR on a release/v* branch is merged
+name: release-tag
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+jobs:
+  tag:
+    runs-on: ubuntu-20.04
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2.3.4
+      -
+        name: Create tag
+        if: github.event.pull_request.merged == true && startsWith(${{ github.head_ref }}, "release/v")
+        uses: christophebedard/tag-version-commit@v1.6.0
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          version_regex: '^Version tag to ([0-9]+\.[0-9]+\.[0-9]+)'
+          version_tag_prefix: v
+          dry_run: false

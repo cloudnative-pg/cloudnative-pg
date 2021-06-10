@@ -2,6 +2,8 @@ name: continuous-delivery
 
 on:
   push:
+    branches:
+      - '**'
   pull_request:
   workflow_dispatch:
     inputs:
@@ -167,31 +169,15 @@ jobs:
         name: Checkout
         uses: actions/checkout@v2.3.4
         with:
-          # To identify the commit we need the history and all teh tags.
+          # To identify the commit we need the history and all the tags.
           fetch-depth: 0
       -
         name: Build meta
         id: build-meta
         run: |
-          # By default, set the "testing" target repository on Quay.io
-          # (every built container is pushed there)
           images='quay.io/enterprisedb/cloud-native-postgresql-testing'
           tags=''
-          labels=''
-          # In case we have a tag, add the main target repository
-          if [ "${GITHUB_REF#refs/tags/}" != "${GITHUB_REF}" ]
-          then
-            images="${images},quay.io/enterprisedb/cloud-native-postgresql,enterprisedb/cloud-native-postgresql"
-          fi
-          # In case of commit on the "main" branch or tag, set the "latest"
-          # label to the container image on the target repositories.
-          # Otherwise set expiration to 7 days.
-          if [ "${GITHUB_REF#refs/heads/}" == main ] || [ "${GITHUB_REF#refs/tags/}" != "${GITHUB_REF}" ]
-          then
-            tags='latest'
-          else
-            labels='quay.expires-after=7d'
-          fi
+          labels='quay.expires-after=7d'
           commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
@@ -212,7 +198,6 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=match,pattern=v(\d.\d.\d),group=1,priority=1000
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v1
