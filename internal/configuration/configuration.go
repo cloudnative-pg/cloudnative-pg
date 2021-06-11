@@ -101,7 +101,15 @@ func (config *Data) readConfigMap(data map[string]string, env EnvironmentSource)
 		}
 
 		// Initialize value with default
-		value := reflect.ValueOf(defaults).Elem().FieldByName(field.Name).String()
+		var value string
+		valueField := reflect.ValueOf(defaults).Elem().FieldByName(field.Name)
+		switch valueField.Kind() {
+		case reflect.Bool:
+			value = strconv.FormatBool(valueField.Bool())
+
+		default:
+			value = reflect.ValueOf(defaults).Elem().FieldByName(field.Name).String()
+		}
 		// If the key is present in the environment, use its value
 		if envValue := env.Getenv(envName); envValue != "" {
 			value = envValue
