@@ -4,7 +4,7 @@ History of user-visible changes for Cloud Native PostgreSQL.
 
 ## Version 1.5.0
 
-**Release date:** 10 June 2021
+**Release date:** 11 June 2021
 
 Features:
 
@@ -34,6 +34,8 @@ Changes:
   are inherited)
 - Enforce streaming replication connection when cloning a standby instance or
   when bootstrapping using the `pg_basebackup` method
+- Integrate the `Backup` resource with `beginWal`, `endWal`, `beginLSN`,
+  `endLSN`, `startedAt` and `stoppedAt` regarding the physical base backup
 - Documentation improvements:
     - Provide a list of ports exposed by the operator and the operand container
     - Introduce the `cnp-bench` helm charts and guidelines for benchmarking the
