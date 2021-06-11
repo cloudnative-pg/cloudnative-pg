@@ -10,13 +10,13 @@ package versions
 
 const (
 	// Version is the version of the operator
-	Version = "1.4.0"
+	Version = "1.5.0"
 
 	// DefaultImageName is the default image used by the operator to create pods
 	DefaultImageName = "quay.io/enterprisedb/postgresql:13.3"
 
 	// DefaultOperatorImageName is the default operator image used by the controller in the pods running PostgreSQL
-	DefaultOperatorImageName = "quay.io/enterprisedb/cloud-native-postgresql:1.4.0"
+	DefaultOperatorImageName = "quay.io/enterprisedb/cloud-native-postgresql:1.5.0"
 )
 
 // BuildInfo is a struct containing all the info about the build
@@ -26,7 +26,7 @@ type BuildInfo struct {
 
 var (
 	// buildVersion injected during the build
-	buildVersion = "dev"
+	buildVersion = "1.5.0"
 
 	// buildCommit injected during the build
 	buildCommit = "none"
