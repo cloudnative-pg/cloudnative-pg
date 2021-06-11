@@ -22,7 +22,7 @@ jobs:
         name: Build meta
         id: build-meta
         run: |
-          images='quay.io/enterprisedb/cloud-native-postgresql-testing,quay.io/enterprisedb/cloud-native-postgresql,enterprisedb/cloud-native-postgresql"
+          images='quay.io/enterprisedb/cloud-native-postgresql-testing,quay.io/enterprisedb/cloud-native-postgresql,enterprisedb/cloud-native-postgresql'
           commit_sha=${{ github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
