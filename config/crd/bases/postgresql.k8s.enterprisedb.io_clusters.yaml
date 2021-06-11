@@ -150,7 +150,6 @@ spec:
                             - aws:kms
                             type: string
                           immediateCheckpoint:
-                            default: false
                             description: Control whether the I/O workload for the
                               backup initial checkpoint will be limited, according
                               to the `checkpoint_completion_target` setting on the
