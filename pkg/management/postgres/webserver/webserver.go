@@ -117,13 +117,14 @@ func requestBackup(typedClient client.Client, recorder record.EventRecorder, w h
 		"backupName", backup.Name,
 		"backupNamespace", backup.Name)
 
-	err = instance.Backup(
-		ctx,
-		typedClient,
-		recorder,
+	backupCommand := postgres.NewBackupCommand(
 		&cluster,
 		&backup,
-		backupLog)
+		typedClient,
+		recorder,
+		backupLog,
+	)
+	err = backupCommand.Start(ctx)
 	if err != nil {
 		http.Error(
 			w,

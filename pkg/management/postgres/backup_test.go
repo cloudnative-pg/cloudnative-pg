@@ -81,6 +81,6 @@ var _ = Describe("barman-cloud-backup-list parsing", func() {
 	It("must extract the latest backup id", func() {
 		result, err := parseBarmanCloudBackupList(barmanCloudListOutput)
 		Expect(err).To(BeNil())
-		Expect(result.GetLatestBackupID()).To(Equal("20201020T115231"))
+		Expect(result.GetLatestBackup().ID).To(Equal("20201020T115231"))
 	})
 })

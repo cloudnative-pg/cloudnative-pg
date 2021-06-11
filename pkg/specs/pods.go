@@ -23,12 +23,15 @@ import (
 )
 
 const (
+	// AnnotationsURLPrefix is the annotation namespace used by the operator
+	AnnotationsURLPrefix = "k8s.enterprisedb.io"
+
 	// ClusterSerialAnnotationName is the name of the annotation containing the
 	// serial number of the node
-	ClusterSerialAnnotationName = "k8s.enterprisedb.io/nodeSerial"
+	ClusterSerialAnnotationName = AnnotationsURLPrefix + "/nodeSerial"
 
 	// ClusterRestartAnnotationName is the name of the annotation containing the
-	// lastest required restart time
+	// latest required restart time
 	ClusterRestartAnnotationName = "kubectl.kubernetes.io/restartedAt"
 
 	// ClusterRoleLabelName label is applied to Pods to mark primary ones

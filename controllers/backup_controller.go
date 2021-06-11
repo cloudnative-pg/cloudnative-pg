@@ -8,6 +8,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -65,7 +66,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Name:      clusterName,
 	}, &cluster); err != nil {
 		if apierrs.IsNotFound(err) {
-			backup.Status.SetAsFailed("Unknown cluster", "", err)
+			backup.Status.SetAsFailed(fmt.Errorf("unknown cluster: %w", err))
 			r.Recorder.Eventf(&backup, "Warning", "FindingCluster", "Unknown cluster %v", clusterName)
 			return ctrl.Result{}, r.Status().Update(ctx, &backup)
 		}
@@ -83,7 +84,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Name:      cluster.Status.TargetPrimary,
 	}, &pod)
 	if err != nil {
-		backup.Status.SetAsFailed("Unknown pod", "", err)
+		backup.Status.SetAsFailed(fmt.Errorf("unknown pod: %w", err))
 		r.Recorder.Event(&backup, "Warning", "FindingPod", "Couldn't found target pods")
 		return ctrl.Result{}, r.Status().Update(ctx, &backup)
 	}
@@ -113,7 +114,7 @@ func StartBackup(
 	// This backup has been started
 	backup.GetStatus().Phase = apiv1.BackupPhaseStarted
 	if err := utils.UpdateStatusAndRetry(ctx, client, backup.GetKubernetesObject()); err != nil {
-		backup.GetStatus().SetAsFailed("Can't update backup", "", err)
+		backup.GetStatus().SetAsFailed(fmt.Errorf("can't update backup: %w", err))
 		return err
 	}
 	config := ctrl.GetConfigOrDie()
@@ -130,7 +131,11 @@ func StartBackup(
 		"backup",
 		backup.GetName())
 	if err != nil {
-		backup.GetStatus().SetAsFailed(stdout, stderr, err)
+		log.Error(err, "executing backup", "stdout", stdout, "stderr", stderr)
+		status := backup.GetStatus()
+		status.SetAsFailed(fmt.Errorf("can't execute backup: %w", err))
+		status.CommandError = stderr
+		status.CommandError = stdout
 		return utils.UpdateStatusAndRetry(ctx, client, backup.GetKubernetesObject())
 	}
 

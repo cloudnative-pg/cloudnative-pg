@@ -67,11 +67,17 @@ spec:
               backupId:
                 description: The ID of the Barman backup
                 type: string
+              beginLSN:
+                description: The starting xlog
+                type: string
+              beginWal:
+                description: The starting WAL
+                type: string
               commandError:
-                description: The backup command output
+                description: The backup command output in case of error
                 type: string
               commandOutput:
-                description: The backup command output
+                description: Unused. Retained for compatibility with old versions.
                 type: string
               destinationPath:
                 description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
@@ -80,6 +86,12 @@ spec:
                 type: string
               encryption:
                 description: Encryption method required to S3 API
+                type: string
+              endLSN:
+                description: The ending xlog
+                type: string
+              endWal:
+                description: The ending WAL
                 type: string
               endpointURL:
                 description: Endpoint to be used to upload data to the cloud, overriding
@@ -196,11 +208,17 @@ spec:
               backupId:
                 description: The ID of the Barman backup
                 type: string
+              beginLSN:
+                description: The starting xlog
+                type: string
+              beginWal:
+                description: The starting WAL
+                type: string
               commandError:
-                description: The backup command output
+                description: The backup command output in case of error
                 type: string
               commandOutput:
-                description: The backup command output
+                description: Unused. Retained for compatibility with old versions.
                 type: string
               destinationPath:
                 description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
@@ -209,6 +227,12 @@ spec:
                 type: string
               encryption:
                 description: Encryption method required to S3 API
+                type: string
+              endLSN:
+                description: The ending xlog
+                type: string
+              endWal:
+                description: The ending WAL
                 type: string
               endpointURL:
                 description: Endpoint to be used to upload data to the cloud, overriding
