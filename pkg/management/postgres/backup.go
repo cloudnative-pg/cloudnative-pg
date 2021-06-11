@@ -19,12 +19,12 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -36,16 +36,17 @@ type BackupListResult struct {
 	List []BarmanBackup `json:"backups_list"`
 }
 
-// GetLatestBackupID gets the latest backup ID
-// between the ones available in the list
-func (backupList *BackupListResult) GetLatestBackupID() string {
+// GetLatestBackup gets the latest backup between the ones available in the list, scanning the IDs
+func (backupList *BackupListResult) GetLatestBackup() BarmanBackup {
 	id := ""
+	var latestBackup BarmanBackup
 	for _, backup := range backupList.List {
 		if backup.ID > id {
 			id = backup.ID
+			latestBackup = backup
 		}
 	}
-	return id
+	return latestBackup
 }
 
 // BarmanBackup represent a backup as created
@@ -60,153 +61,59 @@ type BarmanBackup struct {
 	// The moment where the backup ended
 	EndTime string `json:"end_time"`
 
+	// The WAL where the backup started
+	BeginWal string `json:"begin_wal"`
+
+	// The WAL where the backup ended
+	EndWal string `json:"end_wal"`
+
+	// The LSN where the backup started
+	BeginLSN string `json:"begin_xlog"`
+
+	// The LSN where the backup ended
+	EndLSN string `json:"end_xlog"`
+
 	// The systemID of the cluster
 	SystemID string `json:"systemid"`
 
 	// The ID of the backup
 	ID string `json:"backup_id"`
+
+	// The error output if present
+	Error string `json:"error"`
 }
 
-// Backup start a backup for this instance using
-// barman-cloud-backup
-func (instance *Instance) Backup(
-	ctx context.Context,
+// BackupCommand represent a backup command that is being executed
+type BackupCommand struct {
+	Cluster  *apiv1.Cluster
+	Backup   *apiv1.Backup
+	Client   client.Client
+	Recorder record.EventRecorder
+	Env      []string
+	Log      logr.Logger
+}
+
+// NewBackupCommand initializes a BackupCommand object
+func NewBackupCommand(
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
 	client client.Client,
 	recorder record.EventRecorder,
-	cluster *apiv1.Cluster,
-	backupObject runtime.Object,
 	log logr.Logger,
-) error {
-	configuration := cluster.Spec.Backup.BarmanObjectStore
-
-	serverName := instance.ClusterName
-	if len(configuration.ServerName) != 0 {
-		serverName = configuration.ServerName
+) *BackupCommand {
+	return &BackupCommand{
+		Cluster:  cluster,
+		Backup:   backup,
+		Client:   client,
+		Recorder: recorder,
+		Env:      os.Environ(),
+		Log:      log,
 	}
-
-	options := instance.getBarmanCloudBackupOptions(configuration, serverName)
-
-	// Mark the backup as running
-	backup := backupObject.(apiv1.BackupCommon)
-	if backup == nil {
-		return fmt.Errorf("backup object not recognized")
-	}
-
-	backup.GetStatus().S3Credentials = configuration.S3Credentials
-	backup.GetStatus().EndpointURL = configuration.EndpointURL
-	backup.GetStatus().DestinationPath = configuration.DestinationPath
-	backup.GetStatus().ServerName = instance.ClusterName
-	if configuration.Data != nil {
-		backup.GetStatus().Encryption = string(configuration.Data.Encryption)
-	}
-	if len(configuration.ServerName) != 0 {
-		backup.GetStatus().ServerName = configuration.ServerName
-	}
-	backup.GetStatus().Phase = apiv1.BackupPhaseRunning
-	backup.GetStatus().StartedAt = &metav1.Time{
-		Time: time.Now(),
-	}
-
-	if err := utils.UpdateStatusAndRetry(ctx, client, backup.GetKubernetesObject()); err != nil {
-		return fmt.Errorf("can't set backup as running: %v", err)
-	}
-
-	// Run the actual backup process
-	go func() {
-		log.Info("Backup started",
-			"options",
-			options)
-
-		if err := SetAWSCredentials(ctx, client, cluster); err != nil {
-			log.Error(err, "Cannot recover AWS credentials", "err", err)
-			return
-		}
-
-		recorder.Event(backupObject, "Normal", "Starting", "Backup started")
-
-		if err := fileutils.EnsureDirectoryExist(postgres.BackupTemporaryDirectory); err != nil {
-			log.Error(err, "Cannot create backup temporary directory", "err", err)
-			return
-		}
-
-		cmd := exec.Command("barman-cloud-backup", options...) // #nosec G204
-		var stdoutBuffer bytes.Buffer
-		var stderrBuffer bytes.Buffer
-		cmd.Stdout = &stdoutBuffer
-		cmd.Stderr = &stderrBuffer
-		cmd.Env = os.Environ()
-		cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
-		err := cmd.Run()
-
-		log.Info("Backup completed", "err", err)
-
-		if err != nil {
-			backup.GetStatus().SetAsFailed(stdoutBuffer.String(), stderrBuffer.String(), err)
-			recorder.Event(backupObject, "Normal", "Failed", "Backup failed")
-		} else {
-			backup.GetStatus().SetAsCompleted(stdoutBuffer.String(), stderrBuffer.String())
-			recorder.Event(backupObject, "Normal", "Completed", "Backup completed")
-		}
-		backup.GetStatus().StoppedAt = &metav1.Time{
-			Time: time.Now(),
-		}
-
-		if err := utils.UpdateStatusAndRetry(ctx, client, backup.GetKubernetesObject()); err != nil {
-			log.Error(err,
-				"Can't mark backup as done",
-				"stdout", stdoutBuffer.String(),
-				"stderr", stderrBuffer.String())
-		}
-
-		// Extracting backup ID using barman-cloud-backup-list
-		options := []string{"--format", "json"}
-		if configuration.EndpointURL != "" {
-			options = append(options, "--endpoint-url", configuration.EndpointURL)
-		}
-		if configuration.Data != nil && configuration.Data.Encryption != "" {
-			options = append(options, "-e", string(configuration.Data.Encryption))
-		}
-		options = append(options, configuration.DestinationPath, serverName)
-
-		cmd = exec.Command("barman-cloud-backup-list", options...) // #nosec G204
-		stderrBuffer.Reset()
-		stdoutBuffer.Reset()
-		cmd.Stdout = &stdoutBuffer
-		cmd.Stderr = &stderrBuffer
-		err = cmd.Run()
-
-		if err != nil {
-			log.Error(err,
-				"Can't extract backup id using barman-cloud-backup-list",
-				"options", options,
-				"stdout", stdoutBuffer.String(),
-				"stderr", stderrBuffer.String())
-			return
-		}
-
-		backupList, err := parseBarmanCloudBackupList(stdoutBuffer.String())
-		if err != nil {
-			log.Error(err,
-				"Error parsing barman-cloud-backup-list output",
-				"stdout", stdoutBuffer.String(),
-				"stderr", stderrBuffer.String())
-			return
-		}
-
-		backup.GetStatus().BackupID = backupList.GetLatestBackupID()
-		if err := utils.UpdateStatusAndRetry(ctx, client, backup.GetKubernetesObject()); err != nil {
-			log.Error(err,
-				"Can't mark backup with Barman ID",
-				"backupID", backup.GetStatus().BackupID)
-		}
-	}()
-
-	return nil
 }
 
 // getBarmanCloudBackupOptions extract the list of command line options to be used with
 // barman-cloud-backup
-func (instance *Instance) getBarmanCloudBackupOptions(
+func (b *BackupCommand) getBarmanCloudBackupOptions(
 	configuration *apiv1.BarmanObjectStoreConfiguration, serverName string) []string {
 	options := []string{
 		"--user", "postgres",
@@ -255,19 +162,140 @@ func (instance *Instance) getBarmanCloudBackupOptions(
 	return options
 }
 
-// parse the output of barman-cloud-backup-list
-func parseBarmanCloudBackupList(output string) (*BackupListResult, error) {
-	var result BackupListResult
-	err := json.Unmarshal([]byte(output), &result)
+// Start start a backup for this instance using
+// barman-cloud-backup
+func (b *BackupCommand) Start(ctx context.Context) error {
+	b.setupBackupStatus()
+
+	err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject())
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("can't set backup as running: %v", err)
 	}
-	return &result, nil
+
+	b.Env, err = EnvSetAWSCredentials(ctx, b.Client, b.Cluster, b.Env)
+	if err != nil {
+		return fmt.Errorf("cannot recover AWS credentials: %w", err)
+	}
+
+	// Run the actual backup process
+	go b.run(ctx)
+
+	return nil
 }
 
-// SetAWSCredentials set the AWS environment variables given the configuration
+// run executes the barman-cloud-backup command and updates the status
+// This method will take long time and is supposed to run inside a dedicated
+// goroutine.
+func (b *BackupCommand) run(ctx context.Context) {
+	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
+	backupStatus := b.Backup.GetStatus()
+	options := b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName)
+
+	b.Log.Info("Backup started", "options", options)
+
+	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
+
+	if err := fileutils.EnsureDirectoryExist(postgres.BackupTemporaryDirectory); err != nil {
+		b.Log.Error(err, "Cannot create backup temporary directory", "err", err)
+		return
+	}
+
+	const barmanCloudBackupName = "barman-cloud-backup"
+	cmd := exec.Command(barmanCloudBackupName, options...) // #nosec G204
+	cmd.Env = b.Env
+	cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
+	err := execlog.RunStreaming(cmd, barmanCloudBackupName)
+	if err != nil {
+		// Set the status to failed and exit
+		b.Log.Error(err, "Backup failed")
+		backupStatus.SetAsFailed(err)
+		b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
+		if err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject()); err != nil {
+			b.Log.Error(err, "Can't mark backup as failed")
+		}
+		return
+	}
+
+	// Set the status to completed
+	b.Log.Info("Backup completed")
+	backupStatus.SetAsCompleted()
+	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
+
+	// Update status
+	b.updateCompletedBackupStatus()
+	if err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject()); err != nil {
+		b.Log.Error(err, "Can't set backup status as completed")
+	}
+}
+
+// setupBackupStatus configures the backup's status from the provided configuration and instance
+func (b *BackupCommand) setupBackupStatus() {
+	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
+	backupStatus := b.Backup.GetStatus()
+
+	backupStatus.S3Credentials = barmanConfiguration.S3Credentials
+	backupStatus.EndpointURL = barmanConfiguration.EndpointURL
+	backupStatus.DestinationPath = barmanConfiguration.DestinationPath
+	if barmanConfiguration.Data != nil {
+		backupStatus.Encryption = string(barmanConfiguration.Data.Encryption)
+	}
+	// Set the barman server name as specified by the user.
+	// If not explicitly configured use the cluster name
+	backupStatus.ServerName = barmanConfiguration.ServerName
+	if backupStatus.ServerName == "" {
+		backupStatus.ServerName = b.Cluster.Name
+	}
+	backupStatus.Phase = apiv1.BackupPhaseRunning
+}
+
+// updateCompletedBackupStatus updates the backup calling barman-cloud-backup-list
+// to retrieve all the relevant data
+func (b *BackupCommand) updateCompletedBackupStatus() {
+	backupStatus := b.Backup.GetStatus()
+
+	// Extracting latest backup using barman-cloud-backup-list
+	backupList, err := b.getBackupList()
+	if err != nil {
+		// Proper logging already happened inside getBackupList
+		return
+	}
+
+	// Update the backup with the data from the backup list retrieved
+	// get latest backup and set BackupId, StartedAt, StoppedAt, BeginWal, EndWAL, BeginLSN, EndLSN
+	latestBackup := backupList.GetLatestBackup()
+	backupStatus.BackupID = latestBackup.ID
+	// date parsing layout
+	layout := "Mon Jan 2 15:04:05 2006"
+	started, err := time.Parse(layout, latestBackup.BeginTime)
+	if err != nil {
+		b.Log.Error(err, "Can't parse beginTime from latest backup")
+	} else {
+		startedAt := &metav1.Time{Time: started}
+		backupStatus.StartedAt = startedAt
+	}
+
+	stopped, err := time.Parse(layout, latestBackup.EndTime)
+	if err != nil {
+		b.Log.Error(err, "Can't parse endTime from latest backup")
+	} else {
+		stoppedAt := &metav1.Time{Time: stopped}
+		backupStatus.StoppedAt = stoppedAt
+	}
+
+	backupStatus.BeginWal = latestBackup.BeginWal
+	backupStatus.EndWal = latestBackup.EndWal
+	backupStatus.BeginLSN = latestBackup.BeginLSN
+	backupStatus.EndLSN = latestBackup.EndLSN
+}
+
+// EnvSetAWSCredentials sets the AWS environment variables given the configuration
 // inside the cluster
-func SetAWSCredentials(ctx context.Context, c client.Client, cluster *apiv1.Cluster) error {
+func EnvSetAWSCredentials(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	env []string,
+) ([]string, error) {
 	configuration := cluster.Spec.Backup.BarmanObjectStore
 	var accessKeyIDSecret corev1.Secret
 	var secretAccessKeySecret corev1.Secret
@@ -277,12 +305,12 @@ func SetAWSCredentials(ctx context.Context, c client.Client, cluster *apiv1.Clus
 	secretKey := configuration.S3Credentials.AccessKeyIDReference.Key
 	err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: secretName}, &accessKeyIDSecret)
 	if err != nil {
-		return fmt.Errorf("while getting access key ID secret: %w", err)
+		return nil, fmt.Errorf("while getting access key ID secret: %w", err)
 	}
 
 	accessKeyID, ok := accessKeyIDSecret.Data[secretKey]
 	if !ok {
-		return fmt.Errorf("missing key inside access key ID secret")
+		return nil, fmt.Errorf("missing key inside access key ID secret")
 	}
 
 	// Get secret access key
@@ -290,23 +318,65 @@ func SetAWSCredentials(ctx context.Context, c client.Client, cluster *apiv1.Clus
 	secretKey = configuration.S3Credentials.SecretAccessKeyReference.Key
 	err = c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: secretName}, &secretAccessKeySecret)
 	if err != nil {
-		return fmt.Errorf("while getting secret access key secret: %w", err)
+		return nil, fmt.Errorf("while getting secret access key secret: %w", err)
 	}
 
 	secretAccessKey, ok := secretAccessKeySecret.Data[secretKey]
 	if !ok {
-		return fmt.Errorf("missing key inside secret access key secret")
+		return nil, fmt.Errorf("missing key inside secret access key secret")
 	}
 
-	// Setting environment variables
-	err = os.Setenv("AWS_ACCESS_KEY_ID", string(accessKeyID))
-	if err != nil {
-		return err
+	env = append(env, fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", accessKeyID))
+	env = append(env, fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", secretAccessKey))
+
+	return env, nil
+}
+
+// getBackupList returns the backup list a
+func (b *BackupCommand) getBackupList() (*BackupListResult, error) {
+	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
+	backupStatus := b.Backup.GetStatus()
+
+	var stdoutBuffer bytes.Buffer
+	var stderrBuffer bytes.Buffer
+	options := []string{"--format", "json"}
+	if barmanConfiguration.EndpointURL != "" {
+		options = append(options, "--endpoint-url", barmanConfiguration.EndpointURL)
 	}
-	err = os.Setenv("AWS_SECRET_ACCESS_KEY", string(secretAccessKey))
+	if barmanConfiguration.Data != nil && barmanConfiguration.Data.Encryption != "" {
+		options = append(options, "-e", string(barmanConfiguration.Data.Encryption))
+	}
+	options = append(options, barmanConfiguration.DestinationPath, backupStatus.ServerName)
+
+	cmd := exec.Command("barman-cloud-backup-list", options...) // #nosec G204
+	cmd.Env = b.Env
+	cmd.Stdout = &stdoutBuffer
+	cmd.Stderr = &stderrBuffer
+	err := cmd.Run()
 	if err != nil {
-		return err
+		b.Log.Error(err,
+			"Can't extract backup id using barman-cloud-backup-list",
+			"options", options,
+			"stdout", stdoutBuffer.String(),
+			"stderr", stderrBuffer.String())
+		return nil, err
 	}
 
-	return nil
+	backupList, err := parseBarmanCloudBackupList(stdoutBuffer.String())
+	if err != nil {
+		b.Log.Error(err, "Can't parse barman-cloud-backup-list output")
+		return nil, err
+	}
+
+	return backupList, nil
+}
+
+// parseBarmanCloudBackupList parses the output of barman-cloud-backup-list
+func parseBarmanCloudBackupList(output string) (*BackupListResult, error) {
+	result := &BackupListResult{}
+	err := json.Unmarshal([]byte(output), result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

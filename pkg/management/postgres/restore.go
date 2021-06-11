@@ -7,7 +7,6 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -27,6 +26,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
@@ -93,22 +93,15 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup) error {
 	log.Log.Info("Starting barman-cloud-restore",
 		"options", options)
 
-	cmd := exec.Command("barman-cloud-restore", options...) // #nosec G204
-	var stdoutBuffer bytes.Buffer
-	var stderrBuffer bytes.Buffer
-	cmd.Stdout = &stdoutBuffer
-	cmd.Stderr = &stderrBuffer
-	err := cmd.Run()
-
+	const barmanCloudRestoreName = "barman-cloud-restore"
+	cmd := exec.Command(barmanCloudRestoreName, options...) // #nosec G204
+	err := execlog.RunStreaming(cmd, barmanCloudRestoreName)
 	if err != nil {
-		log.Log.Error(err, "Can't restore backup",
-			"stdOut", stdoutBuffer.String(),
-			"stdErr", stderrBuffer.String())
-	} else {
-		log.Log.Info("Restore completed", "output", err)
+		log.Log.Error(err, "Can't restore backup")
+		return err
 	}
-
-	return err
+	log.Log.Info("Restore completed")
+	return nil
 }
 
 // getBackupObjectKey construct the object key where the backup will be found

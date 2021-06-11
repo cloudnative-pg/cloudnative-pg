@@ -113,7 +113,8 @@ func NewCmd() *cobra.Command {
 				walName,
 				destinationPath)
 
-			if err = postgres.SetAWSCredentials(ctx, typedClient, &cluster); err != nil {
+			env, err := postgres.EnvSetAWSCredentials(ctx, typedClient, &cluster, os.Environ())
+			if err != nil {
 				log.Log.Error(err, "Error while settings AWS environment variables",
 					"walName", walName,
 					"pod", podName,
@@ -127,6 +128,7 @@ func NewCmd() *cobra.Command {
 
 			const barmanCloudWalRestoreName = "barman-cloud-wal-restore"
 			barmanCloudWalRestoreCmd := exec.Command(barmanCloudWalRestoreName, options...) // #nosec G204
+			barmanCloudWalRestoreCmd.Env = env
 			err = execlog.RunStreaming(barmanCloudWalRestoreCmd, barmanCloudWalRestoreName)
 			if err != nil {
 				log.Log.Info("Error invoking "+barmanCloudWalRestoreName,

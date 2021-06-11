@@ -165,11 +165,23 @@ var _ = Describe("Backup and restore", func() {
 				Namespace: namespace,
 				Name:      backupName,
 			}
+			backup := &apiv1.Backup{}
 			Eventually(func() (apiv1.BackupPhase, error) {
-				backup := &apiv1.Backup{}
 				err := env.Client.Get(env.Ctx, backupNamespacedName, backup)
 				return backup.Status.Phase, err
 			}, timeout).Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+			Eventually(func() (string, error) {
+				err := env.Client.Get(env.Ctx, backupNamespacedName, backup)
+				if err != nil {
+					return "", err
+				}
+				backupStatus := backup.GetStatus()
+				return backupStatus.BeginLSN, err
+			}, timeout).ShouldNot(BeEmpty())
+			backupStatus := backup.GetStatus()
+			Expect(backupStatus.BeginWal).NotTo(BeEmpty())
+			Expect(backupStatus.EndLSN).NotTo(BeEmpty())
+			Expect(backupStatus.EndWal).NotTo(BeEmpty())
 
 			// A file called data.tar should be available on minio
 			mcName := "mc"

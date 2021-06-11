@@ -34,6 +34,10 @@ func (src *Backup) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 	dst.Status.Error = src.Status.Error
 	dst.Status.CommandOutput = src.Status.CommandOutput
 	dst.Status.CommandError = src.Status.CommandError
+	dst.Status.BeginWal = src.Status.BeginWal
+	dst.Status.EndWal = src.Status.EndWal
+	dst.Status.BeginLSN = src.Status.BeginLSN
+	dst.Status.EndLSN = src.Status.EndLSN
 
 	// status.s3Credentials
 	dst.Status.S3Credentials.AccessKeyIDReference.Key = src.Status.S3Credentials.AccessKeyIDReference.Key
@@ -68,6 +72,10 @@ func (dst *Backup) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Status.Error = src.Status.Error
 	dst.Status.CommandOutput = src.Status.CommandOutput
 	dst.Status.CommandError = src.Status.CommandError
+	dst.Status.BeginWal = src.Status.BeginWal
+	dst.Status.EndWal = src.Status.EndWal
+	dst.Status.BeginLSN = src.Status.BeginLSN
+	dst.Status.EndLSN = src.Status.EndLSN
 
 	// status.s3Credentials
 	dst.Status.S3Credentials.AccessKeyIDReference.Key = src.Status.S3Credentials.AccessKeyIDReference.Key

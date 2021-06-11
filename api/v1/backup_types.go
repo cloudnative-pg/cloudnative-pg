@@ -67,13 +67,25 @@ type BackupStatus struct {
 	// When the backup was terminated
 	StoppedAt *metav1.Time `json:"stoppedAt,omitempty"`
 
+	// The starting WAL
+	BeginWal string `json:"beginWal,omitempty"`
+
+	// The ending WAL
+	EndWal string `json:"endWal,omitempty"`
+
+	// The starting xlog
+	BeginLSN string `json:"beginLSN,omitempty"`
+
+	// The ending xlog
+	EndLSN string `json:"endLSN,omitempty"`
+
 	// The detected error
 	Error string `json:"error,omitempty"`
 
-	// The backup command output
+	// Unused. Retained for compatibility with old versions.
 	CommandOutput string `json:"commandOutput,omitempty"`
 
-	// The backup command output
+	// The backup command output in case of error
 	CommandError string `json:"commandError,omitempty"`
 }
 
@@ -113,13 +125,9 @@ type BackupList struct {
 
 // SetAsFailed marks a certain backup as invalid
 func (backupStatus *BackupStatus) SetAsFailed(
-	stdout string,
-	stderr string,
 	err error,
 ) {
 	backupStatus.Phase = BackupPhaseFailed
-	backupStatus.CommandOutput = stdout
-	backupStatus.CommandError = stderr
 
 	if err != nil {
 		backupStatus.Error = err.Error()
@@ -129,13 +137,8 @@ func (backupStatus *BackupStatus) SetAsFailed(
 }
 
 // SetAsCompleted marks a certain backup as invalid
-func (backupStatus *BackupStatus) SetAsCompleted(
-	stdout string,
-	stderr string,
-) {
+func (backupStatus *BackupStatus) SetAsCompleted() {
 	backupStatus.Phase = BackupPhaseCompleted
-	backupStatus.CommandOutput = stdout
-	backupStatus.CommandError = stderr
 	backupStatus.Error = ""
 }
 
