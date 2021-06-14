@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM registry.access.redhat.com/ubi8/go-toolset:1.15.7-11 as builder
+FROM golang:1.16 as builder
 
 # We do not use root
 USER 1001
@@ -13,7 +13,7 @@ WORKDIR /workspace
 
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-RUN CGO_ENABLED=0 go mod download
+RUN go mod download
 
 # Copy the go source
 COPY --chown=1001 . /workspace
@@ -23,7 +23,7 @@ ARG COMMIT="none"
 ARG DATE="unknown"
 
 # Build
-RUN CGO_ENABLED=0 GO111MODULE=on go build -a -o manager -ldflags \
+RUN CGO_ENABLED=0 GOCACHE=/tmp/.gocache GO111MODULE=on go build -a -o manager -ldflags \
     "-s -w \
     -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion=\"$VERSION\" \
     -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit=\"$COMMIT\" \
