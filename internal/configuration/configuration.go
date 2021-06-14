@@ -9,14 +9,11 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package configuration
 
 import (
-	"fmt"
 	"path"
-	"reflect"
-	"strconv"
-	"strings"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configparser"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
@@ -85,71 +82,7 @@ func NewConfiguration() *Data {
 
 // ReadConfigMap reads the configuration from the environment and the passed in data map
 func (config *Data) ReadConfigMap(data map[string]string) {
-	config.readConfigMap(data, OsEnvironment{})
-}
-
-func (config *Data) readConfigMap(data map[string]string, env EnvironmentSource) {
-	defaults := newDefaultConfig()
-	count := reflect.TypeOf(Data{}).NumField()
-	for i := 0; i < count; i++ {
-		field := reflect.TypeOf(Data{}).Field(i)
-		envName := field.Tag.Get("env")
-
-		// Fields without env tag are skipped.
-		if envName == "" {
-			continue
-		}
-
-		// Initialize value with default
-		var value string
-		valueField := reflect.ValueOf(defaults).Elem().FieldByName(field.Name)
-		switch valueField.Kind() {
-		case reflect.Bool:
-			value = strconv.FormatBool(valueField.Bool())
-
-		default:
-			value = reflect.ValueOf(defaults).Elem().FieldByName(field.Name).String()
-		}
-		// If the key is present in the environment, use its value
-		if envValue := env.Getenv(envName); envValue != "" {
-			value = envValue
-		}
-		// If the key is present in the passed data, use its value
-		if mapValue, ok := data[envName]; ok {
-			value = mapValue
-		}
-
-		switch t := field.Type; t.Kind() {
-		case reflect.Bool:
-			boolValue, err := strconv.ParseBool(value)
-			if err != nil {
-				log.Info(
-					"Skipping invalid boolean value parsing configuration",
-					"field", field.Name, "value", value)
-				continue
-			}
-			reflect.ValueOf(config).Elem().FieldByName(field.Name).SetBool(boolValue)
-		case reflect.String:
-			reflect.ValueOf(config).Elem().FieldByName(field.Name).SetString(value)
-		case reflect.Slice:
-			reflect.ValueOf(config).Elem().FieldByName(field.Name).Set(reflect.ValueOf(splitAndTrim(value)))
-		default:
-			errMsg := fmt.Sprintf(
-				"field: %s, type: %s, kind: %s is not being handled",
-				field.Name, t.String(), t.Kind())
-			panic(errMsg)
-		}
-	}
-}
-
-// splitAndTrim slices a string into all substrings after each comma and
-// returns a slice of those space-trimmed substrings.
-func splitAndTrim(commaSeparatedList string) []string {
-	list := strings.Split(commaSeparatedList, ",")
-	for i := range list {
-		list[i] = strings.TrimSpace(list[i])
-	}
-	return list
+	configparser.ReadConfigMap(config, newDefaultConfig(), data, configparser.OsEnvironment{})
 }
 
 // IsAnnotationInherited checks if an annotation with a certain name should

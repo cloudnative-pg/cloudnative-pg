@@ -302,6 +302,15 @@ func (env TestingEnvironment) GetJobList(namespace string) (*batchv1.JobList, er
 	return jobList, err
 }
 
+// GetServiceAccountList gathers the current list of jobs in a namespace
+func (env TestingEnvironment) GetServiceAccountList(namespace string) (*corev1.ServiceAccountList, error) {
+	serviceAccountList := &corev1.ServiceAccountList{}
+	err := env.Client.List(
+		env.Ctx, serviceAccountList, client.InNamespace(namespace),
+	)
+	return serviceAccountList, err
+}
+
 // GetEventList gathers the current list of events in a namespace
 func (env TestingEnvironment) GetEventList(namespace string) (*eventsv1beta1.EventList, error) {
 	eventList := &eventsv1beta1.EventList{}
@@ -354,6 +363,13 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 	out, _ = json.MarshalIndent(eventList.Items, "", "    ")
 	fmt.Fprintf(w, "Dumping events for namespace %v\n", namespace)
 	fmt.Fprintln(w, string(out))
+
+	serviceAccountList, _ := env.GetServiceAccountList(namespace)
+	for _, sa := range serviceAccountList.Items {
+		out, _ := json.MarshalIndent(sa, "", "    ")
+		fmt.Fprintf(w, "Dumping %v/%v serviceaccount\n", namespace, sa.Name)
+		fmt.Fprintln(w, string(out))
+	}
 
 	suffixes := []string{"-r", "-rw", "-any"}
 	for _, suffix := range suffixes {
