@@ -65,13 +65,24 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 
 		// Initialize value with default
 		var value string
+		var sliceValue []string
+
 		valueField := reflect.ValueOf(defaults).Elem().FieldByName(field.Name)
 		switch valueField.Kind() {
 		case reflect.Bool:
 			value = strconv.FormatBool(valueField.Bool())
 
+		case reflect.Slice:
+			if valueField.Type().Elem().Kind() != reflect.String {
+				log.Info(
+					"Skipping invalid slice type while parsing default configuration",
+					"field", field.Name, "value", value)
+			} else {
+				sliceValue = valueField.Interface().([]string)
+			}
+
 		default:
-			value = reflect.ValueOf(defaults).Elem().FieldByName(field.Name).String()
+			value = valueField.String()
 		}
 		// If the key is present in the environment, use its value
 		if envValue := env.Getenv(envName); envValue != "" {
@@ -95,7 +106,14 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 		case reflect.String:
 			reflect.ValueOf(target).Elem().FieldByName(field.Name).SetString(value)
 		case reflect.Slice:
-			reflect.ValueOf(target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(splitAndTrim(value)))
+			var targetValue []string
+			if value != "" {
+				targetValue = splitAndTrim(value)
+			} else {
+				targetValue = sliceValue
+			}
+
+			reflect.ValueOf(target).Elem().FieldByName(field.Name).Set(reflect.ValueOf(targetValue))
 		default:
 			errMsg := fmt.Sprintf(
 				"field: %s, type: %s, kind: %s is not being handled",
