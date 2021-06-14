@@ -30,11 +30,17 @@ type FakeData struct {
 	EnablePodDebugging bool `json:"enablePodDebugging" env:"POD_DEBUG"`
 }
 
+var defaultInheritedAnnotations = []string{
+	"first",
+	"second",
+	"third",
+}
+
 const oneNamespace = "one-namespace"
 
 // readConfigMap reads the configuration from the environment and the passed in data map
 func (config *FakeData) readConfigMap(data map[string]string, env EnvironmentSource) {
-	ReadConfigMap(config, &FakeData{}, data, env)
+	ReadConfigMap(config, &FakeData{InheritedAnnotations: defaultInheritedAnnotations}, data, env)
 }
 
 var _ = Describe("Data test suite", func() {
@@ -66,6 +72,13 @@ var _ = Describe("Data test suite", func() {
 		Expect(config.WatchNamespace).To(Equal(oneNamespace))
 		Expect(config.InheritedAnnotations).To(Equal([]string{"one", "two"}))
 		Expect(config.InheritedLabels).To(Equal([]string{"alpha", "beta"}))
+	})
+
+	It("handles correctly default values of slices", func() {
+		config := &FakeData{}
+		config.readConfigMap(nil, NewFakeEnvironment(nil))
+		Expect(config.InheritedAnnotations).To(Equal(defaultInheritedAnnotations))
+		Expect(config.InheritedLabels).To(BeNil())
 	})
 })
 
