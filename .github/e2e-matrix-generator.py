@@ -260,6 +260,7 @@ if __name__ == "__main__":
                 sorted(ENGINE_MODES[engine][args.mode](), key=itemgetter("id"))
             )
         for job in include:
+            job['id'] = engine + "-" + job['id']
             print(f"Generating {engine}: {job['id']}", file=sys.stderr)
         print(f"::set-output name={engine}Matrix::" + json.dumps({"include": include}))
         print(f"::set-output name={engine}Enabled::" + str(len(include) > 0))
