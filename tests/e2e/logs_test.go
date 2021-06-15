@@ -24,82 +24,9 @@ import (
 )
 
 var _ = Describe("JSON log output", func() {
-	const namespace = "logs-e2e"
-	const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
-	const clusterName = "postgresql-storage-class"
-
-	AssertPodLogs := func(namespace string, podName string, testQuery string) {
-		isPgControlDataLoggerFound := false
-		isPostgresLoggerFound := false
-		isErrorMsgFoundInLoggingCollector := false
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      podName,
-		}
-		podObj := &corev1.Pod{}
-		err := env.Client.Get(env.Ctx, namespacedName, podObj)
-		Expect(err).ToNot(HaveOccurred())
-		commandTimeout := time.Second * 5
-		// Execute a wrong query and verify this error inside the instance logs
-		_, _, err = env.ExecCommand(env.Ctx, *podObj, "postgres",
-			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", testQuery)
-		Expect(err).To(HaveOccurred())
-		expectedResult := err.Error()
-		// Gather pod logs
-		podLogs, err := env.GetPodLogs(namespace, podName)
-		Expect(err).ToNot(HaveOccurred())
-		// In pod logs, each row is stored as JSON object. Split the JSON objects into JSON array
-		data := strings.Split(podLogs, "\n")
-		Expect(len(data) > 1).Should(BeTrue(), fmt.Sprintf("No logs found for pod %v", podName))
-		for index, item := range data {
-			// Store unmarshal items for further process
-			var unmarshalItem map[string]interface{}
-			if item != "" {
-				err := json.Unmarshal([]byte(item), &unmarshalItem)
-				// If unsupported format log line will be present in pod logs, then it will expect this error
-				Expect(err).ShouldNot(HaveOccurred(),
-					fmt.Sprintf("Unexpected log format found '%v' in pod %v logs on line number %v",
-						item, podName, index))
-				if value, ok := unmarshalItem["logger"]; ok {
-					switch {
-					case value == "pg_controldata":
-						isPgControlDataLoggerFound = true
-						// Verify that PG_CONTROLDATA logger exists in pod logs
-						// and the message value should not be empty
-						Expect(unmarshalItem["msg"]).Should(Not(BeEmpty()))
-					case value == "postgres":
-						isPostgresLoggerFound = true
-						// Verify that POSTGRES logger exists in pod logs
-						// and the message value should not be empty
-						Expect(unmarshalItem["msg"]).Should(Not(BeEmpty()))
-						recordField, recordOk := unmarshalItem["record"]
-						if recordOk {
-							// Record will be a JSON object, so we need to map keys and values as structured format
-							record := recordField.(map[string]interface{})
-							if strings.Contains(expectedResult, record["message"].(string)) {
-								isErrorMsgFoundInLoggingCollector = true
-								getExecutedQuery := record["query"]
-								Expect(getExecutedQuery).Should(Not(BeEmpty()),
-									fmt.Sprintf("Query record for pod '%v' is empty", podName))
-								Expect(getExecutedQuery).Should(BeEquivalentTo(testQuery))
-								Expect(record["user_name"]).Should(BeEquivalentTo("postgres"))
-								Expect(record["database_name"]).Should(BeEquivalentTo("app"))
-							}
-						}
-					}
-				}
-			}
-		}
-		// Verify all the expected loggers ie.'PG_CONTROLDATA','POSTGRES' and 'LOGGING_COLLECTOR' will be
-		// found into pod logs
-		Expect(isPgControlDataLoggerFound).Should(BeTrue(),
-			fmt.Sprintf("pg_controldata logger is not found in pod %v logs", podName))
-		Expect(isPostgresLoggerFound).Should(BeTrue(),
-			fmt.Sprintf("postgres logger is not found in pod %v logs", podName))
-		Expect(isErrorMsgFoundInLoggingCollector).Should(BeTrue(),
-			fmt.Sprintf("Error message in logging_collector logger is not found in pod %v log",
-				podName))
-	}
+	const namespace = "json-logs-e2e"
+	const sampleFile = fixturesDir + "/json_logs/cluster-json-logs.yaml"
+	const clusterName = "postgresql-json-logs"
 	JustAfterEach(func() {
 		if CurrentGinkgoTestDescription().Failed {
 			env.DumpClusterEnv(namespace, clusterName,
@@ -110,68 +37,175 @@ var _ = Describe("JSON log output", func() {
 		err := env.DeleteNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	It("can gather json logs from PostgreSQL instances", func() {
+
+	// parseJSONLogs returns the pod's logs of a given pod name,
+	// in the form of a list of JSON entries
+	parseJSONLogs := func(namespace string, podName string) []string {
+		// Gather pod logs
+		podLogs, err := env.GetPodLogs(namespace, podName)
+		Expect(err).ToNot(HaveOccurred())
+
+		// In pod logs, each row is stored as JSON object. Split the JSON objects into JSON array
+		logEntries := strings.Split(podLogs, "\n")
+		Expect(len(logEntries) > 1).Should(BeTrue(), fmt.Sprintf("No logs found for pod %v", podName))
+
+		return logEntries
+	}
+
+	// assertLoggerField verifies if a given value exists inside a list of JSON entries
+	assertLoggerField := func(logEntries []string, podName string, value string) bool {
+		var unmarshalItem map[string]interface{}
+		for i, logEntry := range logEntries {
+			if logEntry != "" {
+				err := json.Unmarshal([]byte(logEntry), &unmarshalItem)
+				Expect(err).ShouldNot(HaveOccurred(),
+					fmt.Sprintf("Unexpected log format found '%v' in pod %v logs on line number %v",
+						logEntry, podName, i))
+				if unmarshalItem["logger"] == value {
+					Expect(unmarshalItem["msg"]).To(Not(BeEmpty()))
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	// ensureLogIsWellFormed verifies if the message record field of the given map
+	// contains the expectedResult string. If the message field matches the expectedResult,
+	// then the related record is returned. Otherwise return nil.
+	ensureLogIsWellFormed := func(item map[string]interface{}, expectedResult string) map[string]interface{} {
+		if item["logger"] == "postgres" {
+			Expect(item["msg"]).To(Not(BeEmpty()))
+			// Filter out items with an empty record field
+			if recordField, recordOk := item["record"]; recordOk {
+				// The record will be a JSON object, so we need to map keys and values as a structured format
+				record := recordField.(map[string]interface{})
+				Expect(record["message"]).NotTo(BeNil())
+				if strings.Contains(expectedResult, record["message"].(string)) {
+					return record
+				}
+			}
+		}
+		return nil
+	}
+
+	// assertRecord applies some assertions related to the format of the JSON log fields keys and values
+	assertRecord := func(record map[string]interface{}, errorTestQuery string) bool {
+		// JSON entry assertions
+		Expect(record["user_name"]).To(BeEquivalentTo("postgres"))
+		Expect(record["database_name"]).To(BeEquivalentTo("app"))
+		Expect(record["query"]).To(BeEquivalentTo(errorTestQuery))
+
+		// Check the format of the log_time field
+		timeFormat := "2006-01-02 15:04:05.999 UTC"
+		_, err := time.Parse(timeFormat, record["log_time"].(string))
+		Expect(err).ToNot(HaveOccurred())
+
+		return true
+	}
+
+	// assertQueryRecord verifies if any of the message record field of each JSON row
+	// contains the expectedResult string, then applies the assertions related to the log format
+	assertQueryRecord := func(logEntries []string, errorTestQuery string, expectedResult string) bool {
+		for _, logEntry := range logEntries {
+			var unmarshalItem map[string]interface{}
+			if logEntry != "" {
+				err := json.Unmarshal([]byte(logEntry), &unmarshalItem)
+				Expect(err).ToNot(HaveOccurred())
+				record := ensureLogIsWellFormed(unmarshalItem, expectedResult)
+				if record != nil {
+					return assertRecord(record, errorTestQuery)
+				}
+			}
+		}
+		return false
+	}
+
+	It("correctly produces logs in JSON format", func() {
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
-		By("verifying each PostgreSQL instance logs correctly", func() {
-			errorTestQuery := "selecct 1\nwith newlines\n"
+		By("verifying the presence of possible logger values", func() {
 			podList, _ := env.GetClusterPodList(namespace, clusterName)
 			for _, pod := range podList.Items {
-				AssertPodLogs(namespace, pod.GetName(), errorTestQuery)
+				// Gather pod logs in the form of a Json Array
+				logEntries := parseJSONLogs(namespace, pod.GetName())
+
+				// Logger field Assertions
+				isPgControlDataLoggerFound := assertLoggerField(logEntries, pod.GetName(), "pg_controldata")
+				Expect(isPgControlDataLoggerFound).To(BeTrue(),
+					fmt.Sprintf("pg_controldata logger not found in pod %v logs", pod.GetName()))
+				isPostgresLoggerFound := assertLoggerField(logEntries, pod.GetName(), "postgres")
+				Expect(isPostgresLoggerFound).To(BeTrue(),
+					fmt.Sprintf("postgres logger not found in pod %v logs", pod.GetName()))
 			}
 		})
+
+		By("verifying the format of error queries being logged", func() {
+			errorTestQuery := "selecct 1\nwith newlines\n"
+			podList, _ := env.GetClusterPodList(namespace, clusterName)
+			timeout := 300
+
+			for _, pod := range podList.Items {
+				// Run a wrong query and save its result
+				commandTimeout := time.Second * 5
+				_, _, err = env.ExecCommand(env.Ctx, pod, "postgres",
+					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", errorTestQuery)
+				Expect(err).To(HaveOccurred())
+				expectedResult := err.Error()
+
+				// Eventually the error log line will be logged
+				Eventually(func() bool {
+					// Gather pod logs in the form of a Json Array
+					logEntries := parseJSONLogs(namespace, pod.GetName())
+
+					// Gather the record containing the wrong query result
+					return assertQueryRecord(logEntries, errorTestQuery, expectedResult)
+				}, timeout).Should(BeTrue())
+			}
+		})
+
 		By("verifying only the primary instance logs write queries", func() {
 			errorTestQuery := "ccreate table test(var text)"
 			primaryPod, _ := env.GetClusterPrimary(namespace, clusterName)
-			AssertPodLogs(namespace, primaryPod.GetName(), errorTestQuery)
-			// Verify 'test query text' exists or not, into standby instances logs
+			timeout := 300
+
+			// Run a wrong query on just the primary and save its result
+			commandTimeout := time.Second * 5
+			_, _, err = env.ExecCommand(env.Ctx, *primaryPod, "postgres",
+				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", errorTestQuery)
+			Expect(err).To(HaveOccurred())
+			expectedResult := err.Error()
+
+			// Expect the query to eventually be logged on the primary
+			Eventually(func() bool {
+				// Gather pod logs in the form of a Json Array
+				logEntries := parseJSONLogs(namespace, primaryPod.GetName())
+
+				// Gather the record containing the wrong query result
+				return assertQueryRecord(logEntries, errorTestQuery, expectedResult)
+			}, timeout).Should(BeTrue())
+
+			// Retrieve cluster replicas
 			podList := &corev1.PodList{}
 			err = env.Client.List(
 				env.Ctx, podList, client.InNamespace(namespace),
 				client.MatchingLabels{"postgresql": clusterName, "role": "replica"},
 			)
 			Expect(err).ToNot(HaveOccurred())
+
+			// Expect the query not to be logged on replicas
 			for _, pod := range podList.Items {
-				isQueryTextFoundInLoggingCollector := false
-				podName := pod.GetName()
-				podLogs, err := env.GetPodLogs(namespace, podName)
-				Expect(err).ToNot(HaveOccurred())
-				// In pod logs, each row is stored as JSON object. Split the JSON objects into JSON array
-				data := strings.Split(podLogs, "\n")
-				Expect(len(data) > 1).Should(BeTrue(), fmt.Sprintf("No logs found for pod %v", podName))
-				for index, item := range data {
-					// Store unmarshal items for further process
-					var unmarshalItem map[string]interface{}
-					if item != "" {
-						err := json.Unmarshal([]byte(item), &unmarshalItem)
-						// If unsupported format log line will be present in pod logs, then it will raise error
-						Expect(err).ShouldNot(HaveOccurred(),
-							fmt.Sprintf("Unexpected log format found '%v' in pod %v logs on line number %v",
-								item, podName, index))
-						if value, ok := unmarshalItem["logger"]; ok {
-							if value == "postgres" {
-								recordField, recordOk := unmarshalItem["record"]
-								if recordOk {
-									// Record will be a JSON object, so we need to map keys and values as structured format
-									record := recordField.(map[string]interface{})
-									getExecutedQuery := record["query"]
-									if getExecutedQuery == errorTestQuery {
-										// If the logging collector will be found inside a standby instance that logs
-										// query text, then we will set flag true
-										isQueryTextFoundInLoggingCollector = true
-									}
-								}
-							}
-						}
-					}
-				}
-				Expect(isQueryTextFoundInLoggingCollector).Should(BeFalse(),
-					fmt.Sprintf("Error logs of write queries have been also collected on replica %v", podName))
+				// Gather pod logs in the form of a Json Array
+				logEntries := parseJSONLogs(namespace, pod.GetName())
+
+				// No record should be returned in this case
+				Expect(assertQueryRecord(logEntries, expectedResult, errorTestQuery)).Should(BeFalse())
 			}
 		})
+
 		By("verifying pg_rewind logs after deleting the old primary pod", func() {
 			// Force-delete the primary
 			zero := int64(0)
@@ -181,6 +215,7 @@ var _ = Describe("JSON log output", func() {
 			}
 			err = env.DeletePod(namespace, currentPrimary.GetName(), forceDelete)
 			Expect(err).ToNot(HaveOccurred())
+
 			// Expect a new primary to be elected
 			timeout := 180
 			namespacedName := types.NamespacedName{
@@ -192,37 +227,21 @@ var _ = Describe("JSON log output", func() {
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.CurrentPrimary, err
 			}, timeout).ShouldNot(BeEquivalentTo(currentPrimary))
+
 			// Wait for the pods to be ready again
 			Eventually(func() (int, error) {
 				podList, err := env.GetClusterPodList(namespace, clusterName)
 				return utils.CountReadyPods(podList.Items), err
 			}, timeout).Should(BeEquivalentTo(3))
-			// Verify pg_rewind logging exists or not in previous primary instance logs
-			isPgRewindLoggerFound := false
-			oldPrimaryPod := currentPrimary.GetName()
-			podLogs, err := env.GetPodLogs(namespace, oldPrimaryPod)
-			Expect(err).ToNot(HaveOccurred())
-			// In pod logs, each row is stored as a JSON object. Split the JSON objects into JSON array
-			data := strings.Split(podLogs, "\n")
-			Expect(len(data) > 1).Should(BeTrue(), fmt.Sprintf("No logs found for pod %v", oldPrimaryPod))
-			for index, item := range data {
-				// Store unmarshal items for further process
-				var unmarshalItem map[string]interface{}
-				if item != "" {
-					err = json.Unmarshal([]byte(item), &unmarshalItem)
-					// If unsupported format log line will present in pod logs, then it will raise error
-					Expect(err).ShouldNot(HaveOccurred(),
-						fmt.Sprintf("Unexpected log format found '%v' in pod %v logs on line number %v",
-							item, oldPrimaryPod, index))
-					if value, ok := unmarshalItem["logger"]; ok {
-						if value == "pg_rewind" {
-							isPgRewindLoggerFound = true
-						}
-					}
-				}
-			}
-			Expect(isPgRewindLoggerFound).Should(BeTrue(),
-				fmt.Sprintf("pg_rewind logger hasn't been found in the oldprimary pod %v logs", oldPrimaryPod))
+
+			Eventually(func() bool {
+				// Gather pod logs in the form of a JSON slice
+				logEntries := parseJSONLogs(namespace, currentPrimary.GetName())
+
+				// Expect pg_rewind logger to eventually be present on the old primary logs
+				isPgRewindLoggerFound := assertLoggerField(logEntries, currentPrimary.GetName(), "pg_rewind")
+				return isPgRewindLoggerFound
+			}, timeout).Should(BeTrue())
 		})
 	})
 })
