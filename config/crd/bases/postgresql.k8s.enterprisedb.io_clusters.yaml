@@ -1724,6 +1724,12 @@ spec:
                 items:
                   type: string
                 type: array
+              initializingPVC:
+                description: List of all the PVCs that are being initialized by this
+                  cluster
+                items:
+                  type: string
+                type: array
               instances:
                 description: Total number of instances in the cluster
                 format: int32
@@ -1791,13 +1797,6 @@ spec:
                   superuserSecretVersion:
                     description: The resource version of the "postgres" user secret
                     type: string
-                required:
-                - applicationSecretVersion
-                - clientCaSecretVersion
-                - replicationSecretVersion
-                - serverCaSecretVersion
-                - serverSecretVersion
-                - superuserSecretVersion
                 type: object
               targetPrimary:
                 description: Target primary instance, this is different from the previous

@@ -178,6 +178,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 	dst.Status.PVCCount = src.Status.PVCCount
 	dst.Status.JobCount = src.Status.JobCount
 	dst.Status.DanglingPVC = src.Status.DanglingPVC
+	dst.Status.InitializingPVC = src.Status.InitializingPVC
 	dst.Status.WriteService = src.Status.WriteService
 	dst.Status.ReadService = src.Status.ReadService
 	dst.Status.Phase = src.Status.Phase
@@ -372,6 +373,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Status.PVCCount = src.Status.PVCCount
 	dst.Status.JobCount = src.Status.JobCount
 	dst.Status.DanglingPVC = src.Status.DanglingPVC
+	dst.Status.InitializingPVC = src.Status.InitializingPVC
 	dst.Status.WriteService = src.Status.WriteService
 	dst.Status.ReadService = src.Status.ReadService
 	dst.Status.Phase = src.Status.Phase
