@@ -705,25 +705,25 @@ type ClusterList struct {
 // managed by the operator
 type SecretsResourceVersion struct {
 	// The resource version of the "postgres" user secret
-	SuperuserSecretVersion string `json:"superuserSecretVersion"`
+	SuperuserSecretVersion string `json:"superuserSecretVersion,omitempty"`
 
 	// The resource version of the "streaming_replication" user secret
-	ReplicationSecretVersion string `json:"replicationSecretVersion"`
+	ReplicationSecretVersion string `json:"replicationSecretVersion,omitempty"`
 
 	// The resource version of the "app" user secret
-	ApplicationSecretVersion string `json:"applicationSecretVersion"`
+	ApplicationSecretVersion string `json:"applicationSecretVersion,omitempty"`
 
 	// Unused. Retained for compatibility with old versions.
 	CASecretVersion string `json:"caSecretVersion,omitempty"`
 
 	// The resource version of the PostgreSQL client-side CA secret version
-	ClientCASecretVersion string `json:"clientCaSecretVersion"`
+	ClientCASecretVersion string `json:"clientCaSecretVersion,omitempty"`
 
 	// The resource version of the PostgreSQL server-side CA secret version
-	ServerCASecretVersion string `json:"serverCaSecretVersion"`
+	ServerCASecretVersion string `json:"serverCaSecretVersion,omitempty"`
 
 	// The resource version of the PostgreSQL server-side secret version
-	ServerSecretVersion string `json:"serverSecretVersion"`
+	ServerSecretVersion string `json:"serverSecretVersion,omitempty"`
 }
 
 // Hub marks this type as a conversion hub.
