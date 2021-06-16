@@ -463,13 +463,13 @@ SecretsResourceVersion is the resource versions of the secrets managed by the op
 
 Name                     | Description                                                          | Type  
 ------------------------ | -------------------------------------------------------------------- | ------
-`superuserSecretVersion  ` | The resource version of the "postgres" user secret                   - *mandatory*  | string
-`replicationSecretVersion` | The resource version of the "streaming_replication" user secret      - *mandatory*  | string
-`applicationSecretVersion` | The resource version of the "app" user secret                        - *mandatory*  | string
+`superuserSecretVersion  ` | The resource version of the "postgres" user secret                   | string
+`replicationSecretVersion` | The resource version of the "streaming_replication" user secret      | string
+`applicationSecretVersion` | The resource version of the "app" user secret                        | string
 `caSecretVersion         ` | Unused. Retained for compatibility with old versions.                | string
-`clientCaSecretVersion   ` | The resource version of the PostgreSQL client-side CA secret version - *mandatory*  | string
-`serverCaSecretVersion   ` | The resource version of the PostgreSQL server-side CA secret version - *mandatory*  | string
-`serverSecretVersion     ` | The resource version of the PostgreSQL server-side secret version    - *mandatory*  | string
+`clientCaSecretVersion   ` | The resource version of the PostgreSQL client-side CA secret version | string
+`serverCaSecretVersion   ` | The resource version of the PostgreSQL server-side CA secret version | string
+`serverSecretVersion     ` | The resource version of the PostgreSQL server-side secret version    | string
 
 <a id='StorageConfiguration'></a>
 ## StorageConfiguration
