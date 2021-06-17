@@ -2,6 +2,15 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.5.1
+
+**Release date:** 17 June 2021
+
+Change: 
+
+- Fix a bug with CRD validation preventing auto-update with Operator Deployments on Red Hat OpenShift
+- Allow passing operator's configuration using a Secret.
+
 ## Version 1.5.0
 
 **Release date:** 11 June 2021

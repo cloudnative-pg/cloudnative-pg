@@ -86,6 +86,9 @@ workload requirements, based on what the underlying Kubernetes environment
 can offer. This implies choosing a particular storage class in
 a public cloud environment or fine-tuning the generated PVC through a
 PVC template in the CR's `storage` parameter.
+The [`cnp-bench`](https://github.com/EnterpriseDB/cnp-bench) open source
+project can be used to benchmark both the storage and the database prior to
+production.
 
 ### Replica configuration
 
@@ -155,17 +158,16 @@ Kubernetes API Server and the operator itself.
 ### Cluster's certification authority
 
 The operator automatically creates a certification authority for every PostgreSQL
-cluster, which is used to issue and renew TLS certificates for the authentication
-of streaming replication standby servers and applications (instead of passwords).
-The operator will use the Certification Authority to sign every cluster
-certification authority. Certificates can be issued with the `cnp` plugin
-for `kubectl`.
+cluster, which is used to issue and renew TLS certificates for clients' authentication,
+including streaming replication standby servers (instead of passwords).
+Certificates can be issued with the `cnp` plugin for `kubectl`.
 
 ### TLS connections
 
 The operator transparently and natively supports TLS/SSL connections
 to encrypt client/server communications for increased security using the
 cluster's certification authority.
+Support for custom server certificates is available through secrets.
 
 ### Certificate authentication for streaming replication
 
