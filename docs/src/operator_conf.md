@@ -15,14 +15,18 @@ namespace as a Kubernetes `Deployment` called `postgresql-operator-controller-ma
 !!! Note
     In the examples below we assume the default name and namespace for the operator deployment.
 
-The behavior of the operator can be customized through a `ConfigMap` that
+The behavior of the operator can be customized through a `ConfigMap`/`Secret` that
 is located in the same namespace of the operator deployment and with
 `postgresql-operator-controller-manager-config` as the name.
 
 !!! Important
-    Any change to the config map will not be automatically detected by the operator,
+    Any change to the config's `ConfigMap`/`Secret` will not be automatically detected by the operator,
     - and as such, it needs to be reloaded (see below). Moreover, changes only
     apply to the resources created after the configuration is reloaded.
+
+!!! Important
+    The operator first processes the ConfigMap values and then the Secret’s, in this order.
+    As a result, if a parameter is defined in both places, the one in the Secret will be used.
 
 ## Available options
 
@@ -55,6 +59,26 @@ data:
   INHERITED_ANNOTATIONS: categories
   INHERITED_LABELS: environment, workload, app
 ```
+
+## Defining an operator secret
+
+The example below customizes the behavior of the operator, by defining
+the label/annotation names to be inherited by the resources created by
+any `Cluster` object that is deployed at a later time.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-operator-controller-manager-config
+  namespace: postgresql-operator-system
+type: Opaque
+stringData:
+  INHERITED_ANNOTATIONS: categories
+  INHERITED_LABELS: environment, workload, app
+```
+
+## Restarting the operator to reload configs
 
 For the change to be effective, you need to recreate the operator pods to
 reload the config map. If you have installed the operator on Kubernetes
