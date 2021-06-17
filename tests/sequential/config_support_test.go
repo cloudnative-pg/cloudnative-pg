@@ -22,11 +22,12 @@ import (
 
 // Set of tests for config map for the operator. It is useful to configure the operator globally to survive
 // the upgrades (especially in OLM installation like OpenShift).
-var _ = Describe("ConfigMap support", func() {
+var _ = Describe("Config support", func() {
 	const clusterName = "configmap-support"
-	const sampleFile = fixturesDir + "/configmap-support/configmap-support.yaml"
+	const sampleFile = fixturesDir + "/configmap-support/config-support.yaml"
 	const configMapFile = fixturesDir + "/configmap-support/configmap.yaml"
-	const configMapName = "postgresql-operator-controller-manager-config"
+	const secretFile = fixturesDir + "/configmap-support/secret.yaml"
+	const configName = "postgresql-operator-controller-manager-config"
 	const namespace = "configmap-support-e2e"
 	var operatorNamespace string
 	var err error
@@ -68,6 +69,11 @@ var _ = Describe("ConfigMap support", func() {
 		_, _, err = tests.Run(cmd)
 		Expect(err).ToNot(HaveOccurred())
 
+		// Delete the secret and restore the previous behaviour
+		cmd = fmt.Sprintf("kubectl delete -n %v -f %v", operatorNamespace, secretFile)
+		_, _, err = tests.Run(cmd)
+		Expect(err).ToNot(HaveOccurred())
+
 		AssertReloadOperatorDeployment(operatorNamespace, env)
 	})
 
@@ -82,9 +88,25 @@ var _ = Describe("ConfigMap support", func() {
 				tempConfigMapList := &corev1.ConfigMapList{}
 				err := env.Client.List(
 					env.Ctx, tempConfigMapList, ctrlclient.InNamespace(operatorNamespace),
-					ctrlclient.MatchingFields{"metadata.name": configMapName},
+					ctrlclient.MatchingFields{"metadata.name": configName},
 				)
 				return tempConfigMapList.Items, err
+			}, 60).Should(HaveLen(1))
+		})
+
+		By("creating secret", func() {
+			// create a secret where operator is deployed
+			cmd := fmt.Sprintf("kubectl apply -n %v -f %v", operatorNamespace, secretFile)
+			_, _, err = tests.Run(cmd)
+			Expect(err).ToNot(HaveOccurred())
+			// Check if configmap is created
+			Eventually(func() ([]corev1.Secret, error) {
+				tempSecretList := &corev1.SecretList{}
+				err := env.Client.List(
+					env.Ctx, tempSecretList, ctrlclient.InNamespace(operatorNamespace),
+					ctrlclient.MatchingFields{"metadata.name": configName},
+				)
+				return tempSecretList.Items, err
 			}, 60).Should(HaveLen(1))
 		})
 

@@ -227,8 +227,10 @@ commandError
 commandOutput
 conf
 config
+config's
 configmap
 configmapkeyselector
+configs
 connectionParameters
 containerPort
 coreos

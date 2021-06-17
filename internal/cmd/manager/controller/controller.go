@@ -85,7 +85,7 @@ func init() {
 //
 // This code really belongs to app/controller_manager.go but we can't put
 // it here to respect the project layout created by kubebuilder.
-func RunController(metricsAddr, configMapName string, enableLeaderElection bool) error {
+func RunController(metricsAddr, configMapName, secretName string, enableLeaderElection bool) error {
 	ctx := context.Background()
 
 	setupLog.Info("Starting Cloud Native PostgreSQL Operator",
@@ -131,13 +131,37 @@ func RunController(metricsAddr, configMapName string, enableLeaderElection bool)
 		return err
 	}
 
+	// Read configurations
+	configData := make(map[string]string)
+	// First read the configmap if provided and store it in configData
 	if configMapName != "" {
-		err := readConfigMap(ctx, configuration.Current.OperatorNamespace, configMapName)
+		configMapData, err := readConfigMap(ctx, configuration.Current.OperatorNamespace, configMapName)
 		if err != nil {
 			setupLog.Error(err, "unable to read ConfigMap",
 				"namespace", configuration.Current.OperatorNamespace,
 				"name", configMapName)
 		}
+		for k, v := range configMapData {
+			configData[k] = v
+		}
+	}
+
+	// Then read the secret if provided and store it in configData, overwriting configmap's values
+	if secretName != "" {
+		secretData, err := readSecret(ctx, configuration.Current.OperatorNamespace, secretName)
+		if err != nil {
+			setupLog.Error(err, "unable to read Secret",
+				"namespace", configuration.Current.OperatorNamespace,
+				"name", secretName)
+		}
+		for k, v := range secretData {
+			configData[k] = v
+		}
+	}
+
+	// Finally read the config if it was provided
+	if len(configData) > 0 {
+		configuration.Current.ReadConfigMap(configData)
 	}
 
 	setupLog.Info("Operator configuration loaded", "configuration", configuration.Current)
@@ -288,14 +312,14 @@ func setupPKI(ctx context.Context, certDir string) error {
 	return nil
 }
 
-// readConfigMap reads the configMap
-func readConfigMap(ctx context.Context, namespace, name string) error {
+// readConfigMap reads the configMap and returns its content as map
+func readConfigMap(ctx context.Context, namespace, name string) (map[string]string, error) {
 	if name == "" {
-		return nil
+		return nil, nil
 	}
 
 	if namespace == "" {
-		return nil
+		return nil, nil
 	}
 
 	setupLog.Info("Loading configuration from ConfigMap",
@@ -304,13 +328,41 @@ func readConfigMap(ctx context.Context, namespace, name string) error {
 
 	configMap, err := clientSet.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 	if apierrs.IsNotFound(err) {
-		return nil
+		return nil, nil
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	configuration.Current.ReadConfigMap(configMap.Data)
+	return configMap.Data, nil
+}
 
-	return nil
+// readSecret reads the secret and returns its content as map
+func readSecret(ctx context.Context, namespace, name string) (map[string]string, error) {
+	if name == "" {
+		return nil, nil
+	}
+
+	if namespace == "" {
+		return nil, nil
+	}
+
+	setupLog.Info("Loading configuration from Secret",
+		"namespace", namespace,
+		"name", name)
+
+	secret, err := clientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if apierrs.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	data := make(map[string]string)
+	for k, v := range secret.Data {
+		data[k] = string(v)
+	}
+
+	return data, nil
 }
