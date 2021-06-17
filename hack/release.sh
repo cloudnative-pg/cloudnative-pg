@@ -57,15 +57,8 @@ else
     exit 1
 fi
 
-if [ -z "$(go env GOBIN)" ]
-then
-    GOBIN="$(go env GOPATH)/bin"
-else
-    GOBIN=$( go env GOBIN)
-fi
-
 make kustomize
-KUSTOMIZE=$(PATH="${GOBIN}:${PATH}" command -v kustomize)
+KUSTOMIZE="${REPO_ROOT}/bin/kustomize"
 
 mkdir -p releases/
 release_manifest="releases/postgresql-operator-${release_version}.yaml"

@@ -32,6 +32,14 @@ trap 'rm -fr ${TEMP_DIR}' EXIT
 registry_volume=registry_dev_data
 registry_name=registry.dev
 
+# Colors (only if using a terminal)
+bright=
+reset=
+if [ -t 1 ]; then
+  bright=$(tput bold 2>/dev/null || true)
+  reset=$(tput sgr0 2>/dev/null || true)
+fi
+
 ##
 ## KIND SUPPORT
 ##
@@ -313,7 +321,7 @@ load_image() {
 }
 
 deploy_operator() {
-  kubectl delete ns postgresql-operator-system || :
+  kubectl delete ns postgresql-operator-system 2> /dev/null || :
   make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
 }
 
@@ -361,12 +369,15 @@ EOF
 
 prepare() {
   local bindir=$1
-  echo "Installing cluster prerequisites in ${bindir}"
+  echo "${bright}Installing cluster prerequisites in ${bindir}${reset}"
   install_kubectl "${bindir}"
   "install_${ENGINE}" "${bindir}"
+  echo "${bright}Done installing cluster prerequisites in ${bindir}${reset}"
 }
 
 create() {
+  echo "${bright}Creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
+
   "create_cluster_${ENGINE}" "${K8S_VERSION}" "${CLUSTER_NAME}"
 
   # Support for docker:dind service
@@ -375,6 +386,8 @@ create() {
   fi
 
   deploy_fluentd
+
+  echo "${bright}Done creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 }
 
 load() {
@@ -382,9 +395,16 @@ load() {
     ENABLE_REGISTRY=true
   fi
 
+  echo "${bright}Building operator from current worktree${reset}"
+
   CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
   make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" docker-build
+
+  echo "${bright}Loading new operator image on cluster ${CLUSTER_NAME}${reset}"
+
   load_image "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
+
+  echo "${bright}Done loading new operator image on cluster ${CLUSTER_NAME}${reset}"
 }
 
 deploy() {
@@ -393,7 +413,12 @@ deploy() {
   fi
 
   CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
+
+  echo "${bright}Deploying manifests from current worktree on cluster ${CLUSTER_NAME}${reset}"
+
   deploy_operator
+
+  echo "${bright}Done deploying manifests from current worktree on cluster ${CLUSTER_NAME}${reset}"
 }
 
 print_image() {
@@ -405,11 +430,19 @@ print_image() {
 }
 
 export_logs() {
+  echo "${bright}Exporting logs from cluster ${CLUSTER_NAME} to ${LOG_DIR}${reset}"
+
   "export_logs_${ENGINE}" "${CLUSTER_NAME}"
+
+  echo "${bright}Done exporting logs from cluster ${CLUSTER_NAME} to ${LOG_DIR}${reset}"
 }
 
 destroy() {
+  echo "${bright}Destroying ${ENGINE} cluster ${CLUSTER_NAME}${reset}"
+
   "destroy_${ENGINE}" "${CLUSTER_NAME}"
+
+  echo "${bright}Done destroying ${ENGINE} cluster ${CLUSTER_NAME}${reset}"
 }
 
 ##

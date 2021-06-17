@@ -145,97 +145,32 @@ shellcheck:
 	find -name '*.sh' -exec shellcheck -a -S style {} + ;\
 	}
 
-# find or download controller-gen
-.PHONY: controller-gen
-controller-gen:
-# download controller-gen if necessary
-ifneq ($(shell controller-gen --version), Version: v0.4.1)
-	@{ \
-	set -e ;\
-	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$CONTROLLER_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.1 ;\
-	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
-	}
-CONTROLLER_GEN=$(GOBIN)/controller-gen
-else
-CONTROLLER_GEN=$(shell which controller-gen)
-endif
+CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
+controller-gen: ## Download controller-gen locally if necessary.
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.1)
 
-# find or download go-licenses
-.PHONY: go-licenses
-go-licenses:
-# download go-licenses if necessary
-ifeq (, $(shell which go-licenses))
-	@{ \
-	set -e ;\
-	GO_LICENSES_TMP_DIR=$$(mktemp -d) ;\
-	cd $$GO_LICENSES_TMP_DIR ;\
-	go mod init tmp ;\
-	go get github.com/google/go-licenses ;\
-	rm -rf $$GO_LICENSES_TMP_DIR ;\
-	}
-GO_LICENSES=$(GOBIN)/go-licenses
-else
-GO_LICENSES=$(shell which go-licenses)
-endif
+KUSTOMIZE = $(shell pwd)/bin/kustomize
+kustomize: ## Download kustomize locally if necessary.
+	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@$(KUSTOMIZE_VERSION))
 
-# find or download k8s-api-docgen
-.PHONY: k8s-api-docgen
-k8s-api-docgen:
-# download k8s-api-docgen if necessary
-ifeq (, $(shell which k8s-api-docgen))
-	@{ \
-	set -e ;\
-	K8S_API_DOCGEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$K8S_API_DOCGEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get github.com/EnterpriseDB/k8s-api-docgen/cmd/k8s-api-docgen ;\
-	rm -rf $$K8S_API_DOCGEN_TMP_DIR ;\
-	}
-K8S_API_DOCGEN=$(GOBIN)/k8s-api-docgen
-else
-K8S_API_DOCGEN=$(shell which k8s-api-docgen)
-endif
+K8S_API_DOCGEN = $(shell pwd)/bin/k8s-api-docgen
+k8s-api-docgen: ## Download k8s-api-docgen locally if necessary.
+	$(call go-get-tool,$(K8S_API_DOCGEN),github.com/EnterpriseDB/k8s-api-docgen/cmd/k8s-api-docgen)
 
-# find or download kustomize
-.PHONY: kustomize
-kustomize:
-ifneq ($(shell PATH="$(GOBIN):$${PATH}" kustomize version --short | awk -F '[/ ]' '{print $$2}'), $(KUSTOMIZE_VERSION))
-	@{ \
-	set -e ;\
-	curl -sSfL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_$$(uname | tr '[:upper:]' '[:lower:]')_amd64.tar.gz | \
-	tar -xz -C ${GOBIN} ;\
-	}
-KUSTOMIZE=$(GOBIN)/kustomize
-else
-KUSTOMIZE=$(shell PATH="$(GOBIN):$${PATH}" which kustomize)
-endif
+GO_LICENSES = $(shell pwd)/bin/go-licenses
+go-licenses: ## Download go-licenses locally if necessary.
+	$(call go-get-tool,$(GO_LICENSES),github.com/google/go-licenses)
 
-# initialize a local development cluster using kind
-dev-init:
-	kind create cluster --name=$(KIND_CLUSTER_NAME) --image kindest/node:$(KIND_CLUSTER_VERSION)
-	$(MAKE) deploy
-	kubectl create secret docker-registry \
-	  postgresql-operator-pull-secret \
-	  -n postgresql-operator-system \
-	  --docker-username="${QUAY_USERNAME}" \
-	  --docker-password="${QUAY_PASSWORD}" \
-	  --docker-server="quay.io/enterprisedb"
-	echo
-	while [[ $$( kubectl get pods -n postgresql-operator-system -l app.kubernetes.io/name=cloud-native-postgresql -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' ) != "True" ]]; do \
-	    printf '\033[0K\r'; \
-	    kubectl get pods -n postgresql-operator-system -l app.kubernetes.io/name=cloud-native-postgresql \
-	        -o 'jsonpath=Waiting for pod: {..status.phase} {..status.containerStatuses[*].state.waiting.reason}' ; \
-	    sleep 2 ; \
-	done
-	echo
-	kubectl apply -f docs/src/samples/cluster-example.yaml
-
-# clean up the kind cluster created by dev-init command
-dev-clean:
-	kind delete cluster --name=$(KIND_CLUSTER_NAME)
-
-# reinitialize the local kind cluster
-dev-reset: dev-clean dev-init
+# go-get-tool will 'go get' any package $2 and install it to $1.
+PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
+define go-get-tool
+@[ -f $(1) ] || { \
+set -e ;\
+TMP_DIR=$$(mktemp -d) ;\
+cd $$TMP_DIR ;\
+go mod init tmp 2>/dev/null;\
+echo "Downloading $(2)" ;\
+GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
+rm -rf $$TMP_DIR ;\
+}
+endef
