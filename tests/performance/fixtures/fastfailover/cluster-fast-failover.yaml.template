@@ -2,7 +2,7 @@
 apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
-  name: cluster-example
+  name: cluster-fast-failover
 spec:
   instances: 3
 

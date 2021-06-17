@@ -20,8 +20,8 @@ import (
 var _ = Describe("E2E Tolerations Node", func() {
 	var taintedNodes []string
 	namespace := "test-tolerations"
-	const sampleFile = fixturesDir + "/tolerations/cluster-example.yaml"
-	const clusterName = "cluster-example"
+	const sampleFile = fixturesDir + "/tolerations/cluster-tolerations.yaml"
+	const clusterName = "cluster-tolerations"
 	const tolerationKey = "test-tolerations"
 
 	JustAfterEach(func() {

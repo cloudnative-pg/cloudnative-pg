@@ -23,7 +23,7 @@ import (
 // from an application by using certificates created by kubectl-cnp
 var _ = Describe("Certificate for tls authentication", func() {
 	const namespace = "certificate-e2e"
-	const sampleFile = fixturesDir + "/cnp_certificate/cluster-example-ssl-enabled.yaml"
+	const sampleFile = fixturesDir + "/cnp_certificate/cluster-ssl-enabled.yaml"
 	const sampleAppFile = fixturesDir + "/cnp_certificate/app-pod.yaml"
 	const clusterName = "postgresql-cert"
 	JustAfterEach(func() {

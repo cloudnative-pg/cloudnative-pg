@@ -1,0 +1,31 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-tolerations
+spec:
+  instances: 3
+
+  affinity:
+      tolerations:
+        - key: "test-tolerations"
+          operator: "Exists"
+          effect: "NoSchedule"
+
+  postgresql:
+    parameters:
+      log_checkpoints: "on"
+      log_line_prefix: '%m [%p]: u=[%u] db=[%d] app=[%a] c=[%h] s=[%c:%l] tx=[%v:%x] '
+      log_lock_waits: "on"
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: appuser
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

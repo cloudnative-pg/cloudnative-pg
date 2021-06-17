@@ -24,8 +24,10 @@ import (
 
 var _ = Describe("Fast failover", func() {
 	const namespace = "primary-failover-time"
-	const sampleFile = "./fixtures/base/cluster-example.yaml"
-	const clusterName = "cluster-example"
+	const sampleFile = "./fixtures/fastfailover/cluster-fast-failover.yaml"
+	const webTestFile = "./fixtures/fastfailover/webtest.yaml"
+	const webTestJob = "./fixtures/fastfailover/hey-job-webtest.yaml"
+	const clusterName = "cluster-fast-failover"
 	JustAfterEach(func() {
 		if CurrentGinkgoTestDescription().Failed {
 			env.DumpClusterEnv(namespace, clusterName,
@@ -133,10 +135,10 @@ var _ = Describe("Fast failover", func() {
 			// step.
 
 			_, _, err := tests.Run("kubectl create -n " + namespace +
-				" -f ./fixtures/base/webtest.yaml")
+				" -f " + webTestFile)
 			Expect(err).ToNot(HaveOccurred())
 			_, _, err = tests.Run("kubectl create -n " + namespace +
-				" -f ./fixtures/base/hey-job-webtest.yaml")
+				" -f " + webTestJob)
 			Expect(err).ToNot(HaveOccurred())
 
 			commandTimeout := time.Second * 2

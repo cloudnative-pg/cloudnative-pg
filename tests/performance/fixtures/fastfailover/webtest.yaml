@@ -22,15 +22,15 @@ spec:
             - name: PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: cluster-example-superuser
+                  name: cluster-fast-failover-superuser
                   key: password
             - name: USER
               valueFrom:
                 secretKeyRef:
-                  name: cluster-example-superuser
+                  name: cluster-fast-failover-superuser
                   key: username
             - name: DATABASE_URL
-              value: "postgres://$(USER):$(PASSWORD)@cluster-example-rw/app?sslmode=require&connect_timeout=2"
+              value: "postgres://$(USER):$(PASSWORD)@cluster-fast-failover-rw/app?sslmode=require&connect_timeout=2"
             - name: SQL_QUERY
               value: "insert into tps.tl(source) values ('hey');"
           ports:
