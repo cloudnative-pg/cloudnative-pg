@@ -24,8 +24,10 @@ import (
 
 var _ = Describe("Fast switchover", func() {
 	const namespace = "primary-switchover-time"
-	const sampleFile = "./fixtures/base/cluster-example.yaml"
-	const clusterName = "cluster-example"
+	const sampleFile = "./fixtures/fastswitchover/cluster-fast-switchover.yaml"
+	const webTestFile = "./fixtures/fastswitchover/webtest.yaml"
+	const webTestJob = "./fixtures/fastswitchover/hey-job-webtest.yaml"
+	const clusterName = "cluster-fast-switchover"
 	JustAfterEach(func() {
 		if CurrentGinkgoTestDescription().Failed {
 			env.DumpClusterEnv(namespace, clusterName,
@@ -137,10 +139,10 @@ var _ = Describe("Fast switchover", func() {
 			// step.
 
 			_, _, err := tests.Run("kubectl create -n " + namespace +
-				" -f ./fixtures/base/webtest.yaml")
+				" -f " + webTestFile)
 			Expect(err).ToNot(HaveOccurred())
 			_, _, err = tests.Run("kubectl create -n " + namespace +
-				" -f ./fixtures/base/hey-job-webtest.yaml")
+				" -f " + webTestJob)
 			Expect(err).ToNot(HaveOccurred())
 
 			commandTimeout := time.Second * 2

@@ -58,8 +58,8 @@ var _ = Describe("E2E Drain Node", func() {
 	Context("Maintenance on, reuse pvc on", func() {
 		// Initialize empty global namespace variable
 		namespace := ""
-		const sampleFile = fixturesDir + "/drain-node/cluster-example.yaml"
-		const clusterName = "cluster-example"
+		const sampleFile = fixturesDir + "/drain-node/cluster-drain-node.yaml"
+		const clusterName = "cluster-drain-node"
 
 		JustAfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {
@@ -179,8 +179,8 @@ var _ = Describe("E2E Drain Node", func() {
 	Context("Maintenance on, reuse pvc off", func() {
 		// Set unique namespace
 		const namespace = "drain-node-e2e-pvc-off-single-node"
-		const sampleFile = fixturesDir + "/drain-node/cluster-example-pvc-off.yaml"
-		const clusterName = "cluster-example"
+		const sampleFile = fixturesDir + "/drain-node/cluster-drain-node-pvc-off.yaml"
+		const clusterName = "cluster-drain-node"
 
 		JustAfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed {

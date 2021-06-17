@@ -32,7 +32,7 @@ import (
 // and the operator is able to handle the provided server certificates
 var _ = Describe("TLS server certificate", func() {
 	const namespace = "server-certificate-e2e"
-	const sampleFile = fixturesDir + "/cnp_server_certificate/cluster-example-ssl-enabled.yaml"
+	const sampleFile = fixturesDir + "/cnp_server_certificate/cluster-ssl-enabled.yaml"
 	const sampleAppFile = fixturesDir + "/cnp_server_certificate/app-pod.yaml"
 	const caSecName = "my-postgresql-server-ca"
 	const tlsSecName = "my-postgresql-server"

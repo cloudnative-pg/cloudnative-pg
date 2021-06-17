@@ -1,2 +1,2 @@
-cluster-example.yaml
-cluster-example-pvc-off.yaml
+cluster-drain-node.yaml
+cluster-drain-node-pvc-off.yaml
