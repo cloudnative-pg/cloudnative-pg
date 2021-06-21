@@ -833,6 +833,11 @@ spec:
                 items:
                   type: string
                 type: array
+              healthyPVC:
+                description: List of all the PVCs not dangling nor initializing
+                items:
+                  type: string
+                type: array
               initializingPVC:
                 description: List of all the PVCs that are being initialized by this
                   cluster
@@ -1721,6 +1726,11 @@ spec:
               danglingPVC:
                 description: List of all the PVCs created by this cluster and still
                   available which are not attached to a Pod
+                items:
+                  type: string
+                type: array
+              healthyPVC:
+                description: List of all the PVCs not dangling nor initializing
                 items:
                   type: string
                 type: array

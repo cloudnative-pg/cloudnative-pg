@@ -105,11 +105,8 @@ var _ = Describe("PVC Deletion", func() {
 			Expect(err).ToNot(HaveOccurred())
 			originalPVCUID := pvc.GetUID()
 
-			// Delete the PVC, this will set the PVC as terminated
-			_, _, err = tests.Run(fmt.Sprintf("kubectl delete -n %v pvc/%v --wait=false", namespace, pvcName))
-			Expect(err).ToNot(HaveOccurred())
-			// Delete the pod
-			_, _, err = tests.Run(fmt.Sprintf("kubectl delete -n %v pod/%v", namespace, podName))
+			// Delete the PVC and the Pod
+			_, _, err = tests.Run(fmt.Sprintf("kubectl delete -n %v pvc/%v pod/%v", namespace, pvcName, podName))
 			Expect(err).ToNot(HaveOccurred())
 			// A new pod should be created
 			timeout := 300
