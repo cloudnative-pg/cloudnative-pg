@@ -477,6 +477,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.HealthyPVC != nil {
+		in, out := &in.HealthyPVC, &out.HealthyPVC
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	out.SecretsResourceVersion = in.SecretsResourceVersion
 	in.Certificates.DeepCopyInto(&out.Certificates)
 }

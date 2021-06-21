@@ -40,17 +40,14 @@ remove the PVC before deleting the Pod. For this purpose, you can use the
 following command:
 
 ```sh
-kubectl delete -n [namespace] pvc/[cluster-name]-[serial] --wait=false
-kubectl delete -n [namespace] pod/[cluster-name]-[serial]
+kubectl delete -n [namespace] pvc/[cluster-name]-[serial] pod/[cluster-name]-[serial]
 ```
 
 For example:
 
 ```sh
-$ kubectl delete -n default pvc/cluster-example-1 --wait=false
+$ kubectl delete -n default pvc/cluster-example-1 pod/cluster-example-1
 persistentvolumeclaim "cluster-example-1" deleted
-
-$ kubectl delete -n default pod/cluster-example-1
 pod "cluster-example-1" deleted
 ```
 

@@ -194,8 +194,7 @@ To recreate the cluster using different PVCs, you can edit the cluster definitio
 As an example, to recreate the storage for `cluster-example-3` you can:
 
 ```
-$ kubectl delete pvc cluster-example-3 --wait=false
-$ kubectl delete pod cluster-example-3 --wait=false
+$ kubectl delete pvc/cluster-example-3 pod/cluster-example-3
 ```
 
 Having done that, the operator will orchestrate the creation of another replica with a

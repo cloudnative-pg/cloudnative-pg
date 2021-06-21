@@ -17,15 +17,18 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 // managedResources contains the resources that are created a cluster
@@ -142,16 +145,18 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	existingClusterStatus := cluster.Status
 
-	// Fill the list of dangling PVCs
-	oldPVCCount := cluster.Status.PVCCount
+	// Update the pvcExpectations for the cluster
+	createdPVCs, deletedPVCs := countPVC(cluster, resources)
+	if createdPVCs > 0 || deletedPVCs > 0 {
+		r.pvcExpectations.LowerExpectations(key, createdPVCs, deletedPVCs)
+	}
+
 	newPVCCount := int32(len(resources.pvcs.Items))
 	cluster.Status.PVCCount = newPVCCount
 	pvcClassification := specs.DetectPVCs(resources.pods.Items, resources.jobs.Items, resources.pvcs.Items)
 	cluster.Status.DanglingPVC = pvcClassification.Dangling
 	cluster.Status.InitializingPVC = pvcClassification.Initializing
-
-	// Update the pvcExpectations for the cluster
-	r.pvcExpectations.LowerExpectationsDelta(key, int(newPVCCount-oldPVCCount))
+	cluster.Status.HealthyPVC = pvcClassification.Healthy
 
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones
@@ -224,6 +229,50 @@ func (r *ClusterReconciler) updateResourceStatus(
 		return r.Status().Update(ctx, cluster)
 	}
 	return nil
+}
+
+// SetClusterOwnerAnnotationsAndLabels sets the cluster as owner of the passed object and then
+// sets all the needed annotations and labels
+func SetClusterOwnerAnnotationsAndLabels(obj *v1.ObjectMeta, cluster *apiv1.Cluster) {
+	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
+	utils.SetOperatorVersion(obj, versions.Version)
+	utils.InheritAnnotations(obj, cluster.Annotations, configuration.Current)
+	utils.InheritLabels(obj, cluster.Labels, configuration.Current)
+}
+
+// countPVC returns the numbers of PVCs created and deleted
+// w.r.t. the previous state of the cluster
+func countPVC(
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) (created int, deleted int) {
+	// Fill the seen map with all the known PVCs
+	seen := map[string]bool{}
+	for _, pvc := range cluster.Status.DanglingPVC {
+		seen[pvc] = true
+	}
+	for _, pvc := range cluster.Status.InitializingPVC {
+		seen[pvc] = true
+	}
+	for _, pvc := range cluster.Status.HealthyPVC {
+		seen[pvc] = true
+	}
+
+	// If a PVC is not in the seen map it is new
+	for _, pvc := range resources.pvcs.Items {
+		if _, ok := seen[pvc.Name]; ok {
+			// We remove the PVC from the seen map once matched,
+			// to detect those that are remaining at the end.
+			delete(seen, pvc.Name)
+		} else {
+			created++
+		}
+	}
+
+	// If a PVC has not been matched it has been removed.
+	deleted = len(seen)
+
+	return created, deleted
 }
 
 // refreshCertExpiration check the expiration date of all the certificates used by the cluster

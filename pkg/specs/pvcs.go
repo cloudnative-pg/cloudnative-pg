@@ -25,11 +25,14 @@ var ErrorInvalidSize = fmt.Errorf("invalid storage size")
 
 // PVCUsageStatus is the status of the PVC we generated
 type PVCUsageStatus struct {
-	// List of PVC that are being initialized (they have a corresponding Job but not a corresponding Pod)
+	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
 	Initializing []string
 
-	// List of PVC that are dangling (they don't have a corresponding Job nor a corresponding Pod)
+	// List of PVCs that are dangling (they don't have a corresponding Job nor a corresponding Pod)
 	Dangling []string
+
+	// List of PVCs that are used (they have a corresponding Pod)
+	Healthy []string
 }
 
 // CreatePVC create spec of a PVC, given its name and the storage configuration
@@ -112,6 +115,7 @@ func DetectPVCs(
 		if podFound {
 			// We found a Pod using this PVC so this
 			// PVC is not dangling
+			result.Healthy = append(result.Healthy, pvc.Name)
 			continue
 		}
 

@@ -135,6 +135,9 @@ type ClusterStatus struct {
 	// List of all the PVCs that are being initialized by this cluster
 	InitializingPVC []string `json:"initializingPVC,omitempty"`
 
+	// List of all the PVCs not dangling nor initializing
+	HealthyPVC []string `json:"healthyPVC,omitempty"`
+
 	// Current write pod
 	WriteService string `json:"writeService,omitempty"`
 
