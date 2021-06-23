@@ -46,7 +46,7 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 // function will return "true" if the configuration has been really changed.
 // Important: this won't send a SIGHUP to the server
 func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cluster) (bool, error) {
-	postgresConfiguration, err := cluster.CreatePostgresqlConfiguration()
+	postgresConfiguration, sha256, err := cluster.CreatePostgresqlConfiguration()
 	if err != nil {
 		return false, err
 	}
@@ -71,6 +71,10 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cl
 		return postgresConfigurationChanged || postgresHBAChanged, fmt.Errorf(
 			"installing postgresql HBA rules: %w",
 			err)
+	}
+
+	if sha256 != "" && postgresConfigurationChanged {
+		instance.ConfigSha256 = sha256
 	}
 
 	return postgresConfigurationChanged || postgresHBAChanged, nil

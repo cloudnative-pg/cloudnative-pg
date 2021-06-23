@@ -13,15 +13,15 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
-// CreatePostgresqlConfiguration create the PostgreSQL configuration to be
-// used for this cluster
-func (cluster *Cluster) CreatePostgresqlConfiguration() (string, error) {
+// CreatePostgresqlConfiguration creates the PostgreSQL configuration to be
+// used for this cluster and return it and its sha256 checksum
+func (cluster *Cluster) CreatePostgresqlConfiguration() (string, string, error) {
 	// Extract the PostgreSQL major version
 	imageName := cluster.GetImageName()
 	tag := utils.GetImageTag(imageName)
 	fromVersion, err := postgres.GetPostgresVersionFromTag(tag)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	info := postgres.ConfigurationInfo{
@@ -50,7 +50,8 @@ func (cluster *Cluster) CreatePostgresqlConfiguration() (string, error) {
 		info.SyncReplicas = int(cluster.Spec.MinSyncReplicas)
 	}
 
-	return postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info)), nil
+	conf, sha256 := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
+	return conf, sha256, nil
 }
 
 // CreatePostgresqlHBA create the HBA rules for this cluster

@@ -7,6 +7,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"sort"
 	"strings"
@@ -87,6 +88,10 @@ host all all all md5
 	// excluding the extension. The logging collector process will append
 	// `.csv` and `.log` as needed.
 	LogFileName = "postgres"
+
+	// CNPConfigSha256 is the parameter to be used to inject the sha256 of the
+	// config in the custom.conf file
+	CNPConfigSha256 = "cnp.confixg_sha256"
 )
 
 // MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
@@ -346,7 +351,7 @@ func FillCNPConfiguration(
 }
 
 // CreatePostgresqlConfFile create the contents of the postgresql.conf file
-func CreatePostgresqlConfFile(configuration map[string]string) string {
+func CreatePostgresqlConfFile(configuration map[string]string) (string, string) {
 	// We need to be able to compare two configurations generated
 	// by operator to know if they are different or not. To do
 	// that we sort the configuration by parameter name as order
@@ -366,7 +371,12 @@ func CreatePostgresqlConfFile(configuration map[string]string) string {
 			parameter,
 			escapePostgresConfValue(configuration[parameter]))
 	}
-	return postgresConf
+
+	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(postgresConf)))
+	postgresConf += fmt.Sprintf("%v = %v", CNPConfigSha256,
+		escapePostgresConfValue(sha256sum))
+
+	return postgresConf, sha256sum
 }
 
 // escapePostgresConfValue escapes a value to make its representation

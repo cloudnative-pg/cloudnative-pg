@@ -24,6 +24,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/pool"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 const (
@@ -55,6 +56,10 @@ type Instance struct {
 
 	// The name of the cluster of which this Pod is belonging
 	ClusterName string
+
+	// The sha256 of the config. It is computed on the config string, before
+	// adding the PostgreSQL CNPConfigSha256 parameter
+	ConfigSha256 string
 }
 
 // RetryUntilServerAvailable is the default retry configuration that is used
@@ -336,6 +341,31 @@ func waitForConnectionAvailable(db *sql.DB) error {
 			log.Log.Info("DB not available, will retry", "err", err)
 		}
 		return err
+	})
+}
+
+// WaitForConfigReloaded waits until the config has been reloaded
+func (instance *Instance) WaitForConfigReloaded() error {
+	errorIsRetryable := func(err error) bool {
+		return err != nil
+	}
+	db, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+
+	return retry.OnError(retry.DefaultRetry, errorIsRetryable, func() error {
+		var sha string
+		row := db.QueryRow(
+			"SHOW %s", postgres.CNPConfigSha256)
+		err = row.Scan(&sha)
+		if err != nil {
+			return err
+		}
+		if sha != instance.ConfigSha256 {
+			return fmt.Errorf("configuration not yet updated: got %s, wanted %s", sha, instance.ConfigSha256)
+		}
+		return nil
 	})
 }
 
