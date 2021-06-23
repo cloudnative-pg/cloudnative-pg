@@ -252,12 +252,11 @@ func (r *InstanceReconciler) reconcileConfiguration(ctx context.Context, cluster
 		return fmt.Errorf("while applying new configuration: %w", err)
 	}
 
-	// TODO: we already sighup the postgres server and
-	// probably it has already reloaded the configuration
-	// anyway there's no guarantee here that the signal
-	// has been actually received and sent to the children.
-	// What shall we do? Wait for a bit of time? Or inject
-	// a configuration marker and wait for it to appear somewhere?
+	err = r.instance.WaitForConfigReloaded()
+	if err != nil {
+		return fmt.Errorf("while waiting for new configuration to be reloaded: %w", err)
+	}
+
 	status, err := r.instance.GetStatus()
 	if err != nil {
 		return fmt.Errorf("while applying new configuration: %w", err)

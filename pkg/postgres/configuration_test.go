@@ -56,7 +56,8 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			Replicas:           nil,
 			SyncReplicas:       0,
 		}
-		confFile := CreatePostgresqlConfFile(CreatePostgresqlConfiguration(info))
+		confFile, sha256 := CreatePostgresqlConfFile(CreatePostgresqlConfiguration(info))
+		Expect(sha256).NotTo(BeEmpty())
 		Expect(confFile).To(Not(BeEmpty()))
 		Expect(len(strings.Split(confFile, "\n"))).To(BeNumerically(">", 2))
 	})
@@ -66,8 +67,9 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			"shared_buffers":  "128KB",
 			"log_destination": "stderr",
 		}
-		confFile := CreatePostgresqlConfFile(settings)
-		Expect(confFile).To(Equal("log_destination = 'stderr'\nshared_buffers = '128KB'\n"))
+		confFile, sha256 := CreatePostgresqlConfFile(settings)
+		Expect(sha256).NotTo(BeEmpty())
+		Expect(confFile).To(ContainSubstring("log_destination = 'stderr'\nshared_buffers = '128KB'\n"))
 	})
 
 	When("version is 10", func() {
