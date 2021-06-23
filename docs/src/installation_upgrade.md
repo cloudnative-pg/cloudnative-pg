@@ -33,6 +33,14 @@ You can install Cloud Native PostgreSQL using the metadata available in the
 [Cloud Native PostgreSQL page](https://operatorhub.io/operator/cloud-native-postgresql)
 from the [OperatorHub.io website](https://operatorhub.io), following the installation steps listed on that page.
 
+### Using the Helm Chart
+
+The operator can be installed using the provided [Helm chart](https://github.com/EnterpriseDB/cloud-native-postgresql-helm).
+
+!!! Important
+  Helm does not allow to update CRDs, as discussed [here](https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations),
+  therefore take care to follow the instructions in the chart documentation in order to update them.
+
 ## Installation on Openshift
 
 ### Via the web interface
