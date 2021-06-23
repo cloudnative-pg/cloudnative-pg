@@ -37,7 +37,7 @@ jobs:
       -
         name: Get updated AKS versions
         run: |
-          az aks get-versions --location westeurope --query 'reverse(sort(orchestrators[].orchestratorVersion))' -o tsv | sort -urk 1,1.5 | \
+          az aks get-versions --location westeurope --query 'reverse(sort(orchestrators[? isPreview != `true`].orchestratorVersion))' -o tsv | sort -urk 1,1.5 | \
             jq -Rn '[inputs]' > .github/aks_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
       -
