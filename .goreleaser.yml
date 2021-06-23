@@ -17,6 +17,8 @@ builds:
 - id: kubectl-cnp
   binary: kubectl-cnp
   main: cmd/kubectl-cnp/main.go
+  gcflags:
+  - all=-trimpath={{.Env.GOPATH}};{{.Env.PWD}}
   ldflags:
   - -s
   - -w
