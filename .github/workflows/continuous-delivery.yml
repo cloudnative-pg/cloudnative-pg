@@ -410,7 +410,7 @@ jobs:
       -
         name:  Install ginkgo
         run: |
-          go install github.com/onsi/ginkgo/ginkgo
+          go install -mod=mod github.com/onsi/ginkgo/ginkgo
       -
         name: Azure Login
         uses: azure/login@v1.3.0
@@ -441,11 +441,7 @@ jobs:
         # It can still take a while to deploy rook.
         name: Set up Rook
         run: |
-          if [ "${K8S_VERSION}" \> "1.20.1" ]; then
-            STORAGECLASSNAME=default
-          else
-            STORAGECLASSNAME=managed-csi
-          fi
+          STORAGECLASSNAME=default
           GO111MODULE=on go get github.com/mikefarah/yq/v4
           ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/ceph #wokeignore:rule=master
           kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
@@ -541,7 +537,7 @@ jobs:
       -
         name:  Install ginkgo
         run: |
-          go install github.com/onsi/ginkgo/ginkgo
+          go install -mod=mod github.com/onsi/ginkgo/ginkgo
       -
         name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -641,7 +637,7 @@ jobs:
       -
         name:  Install ginkgo
         run: |
-          go install github.com/onsi/ginkgo/ginkgo
+          go install -mod=mod github.com/onsi/ginkgo/ginkgo
       -
         name: Set cluster name
         run: |
