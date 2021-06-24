@@ -30,6 +30,9 @@ func Restart(ctx context.Context, clusterName string) error {
 	}
 
 	clusterRestarted := cluster.DeepCopy()
+	if clusterRestarted.Annotations == nil {
+		clusterRestarted.Annotations = make(map[string]string)
+	}
 	clusterRestarted.Annotations[specs.ClusterRestartAnnotationName] = time.Now().Format(time.RFC3339)
 	clusterRestarted.ManagedFields = nil
 

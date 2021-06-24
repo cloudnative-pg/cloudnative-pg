@@ -726,6 +726,9 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 
 	// If this cluster has been restarted, mark the Pod with the latest restart time
 	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
+		if pod.Annotations == nil {
+			pod.Annotations = make(map[string]string)
+		}
 		pod.Annotations[specs.ClusterRestartAnnotationName] = clusterRestart
 	}
 

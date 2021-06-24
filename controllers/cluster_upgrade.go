@@ -199,7 +199,7 @@ func isPodNeedingRestart(
 	}
 
 	// If the cluster has been restarted and we are working with a Pod
-	// which have not been restared yet, or restarted in a different
+	// which have not been restarted yet, or restarted in a different
 	// time, let's restart it.
 	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
 		podRestart := pod.Annotations[specs.ClusterRestartAnnotationName]
