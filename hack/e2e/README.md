@@ -1,14 +1,53 @@
+# Setting up a local K8s cluster
+
+`hack/setup-cluster.sh` can be used to create a local K8s cluster for development
+purposes and deploy the current branch of this repo.
+
+Before moving forward, please follow the instructions found in the
+[prerequisites](../../DEV.md#setting-up-your-workstation-for-cnp-development) section. Below is the intended sequence
+of commands.
+
+Create the cluster:
+
+```console
+hack/setup-cluster.sh create
+```
+
+Build the operator image and load it in the local Kubernetes cluster:
+
+Load the operator image:
+
+```console
+hack/setup-cluster.sh load
+```
+
+Deploy the operator:
+
+```console
+hack/setup-cluster.sh deploy
+```
+
+Cleanup everything:
+
+```console
+hack/setup-cluster.sh destroy
+```
+
+> **NOTE:** if you want to use custom engine and registry settings, please make
+> sure that they are consistent through all invocations either via command line
+> options or by defining the respective environment variables
+
 # E2E testing
 
-E2E testing is performed by running the `run-e2e.sh` script after setting
+E2E testing is performed by running the `hack/run-e2e.sh` script after setting
 up a Kubernetes cluster and configuring `kubectl` to use it.
 
 The script can be configured through the following environment variables:
 
 * `CONTROLLER_IMG`: the controller image to deploy on K8s
-* `POSTGRES_IMG`: the postgresql image used by default in the clusters
+* `POSTGRES_IMG`: the PostgreSQL image used by default in the clusters
 * `E2E_PRE_ROLLING_UPDATE_IMG`: test a rolling upgrade from this version to the
-     latest minor
+  latest minor
 * `E2E_DEFAULT_STORAGE_CLASS`: default storage class, depending on the provider
 
 If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
@@ -18,14 +57,17 @@ the following variables to create a pull secret:
 * `DOCKER_USERNAME`: the registry username
 * `DOCKER_PASSWORD`: the registry password
 
-Additionally you can specify a DockerHub mirror to be used by
+Additionally, you can specify a DockerHub mirror to be used by
 specifying the following variable
 
 * `DOCKER_REGISTRY_MIRROR`: DockerHub mirror URL (i.e. https://mirror.gcr.io)
 
-## Local test
+# Setting up a local K8s cluster and running the tests
 
-### On kind
+The following scripts use the previous `hack/setup-cluster.sh` and `hack/run-e2e.sh`
+to create a K8s local cluster and running E2E tests on it.
+
+## On kind
 
 You can test the operator locally on kind running
 
@@ -35,7 +77,7 @@ run-e2e-kind.sh
 
 It will take care of creating a Kind cluster and run the tests on it.
 
-### On k3d
+## On k3d
 
 You can test the operator locally on k3d running
 
@@ -54,31 +96,18 @@ It will take care of creating a K3d cluster and run the tests on it.
 In addition to the environment variables for the script,
 the following ones can be defined:
 
-* `PRESERVE_CLUSTER`: true to prevent K8S from destroying the kind cluster.
-    Default: `false`.
+* `PRESERVE_CLUSTER`: true to prevent K8s from destroying the kind cluster.
+  Default: `false`.
 * `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
   the tests. Only useful if specified with `PRESERVE_CLUSTER=true`.
-* `K8S_VERSION`: the version of K8S to run. Default: `v1.21.1`.
+* `K8S_VERSION`: the version of K8s to run. Default: `v1.21.1`.
 * `KIND_VERSION`: the version of Kind. Defaults to the latest release.
 * `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
-    false to get the image from a registry. Default: `false`.
+  false to get the image from a registry. Default: `false`.
 * `LOG_DIR`: the directory where the container logs are exported. Default:
-    `_logs/` directory in the project root.
+  `_logs/` directory in the project root.
 
 `run-e2e-kind.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard` while `run-e2e-k3d.sh` forces `E2E_DEFAULT_STORAGE_CLASS=local-path`
 
-Both scripts use the `setup-cluster.sh` script to initialize the cluster
+Both scripts use the `setup-cluster.sh` script, in order to initialize the cluster
 choosing between Kind or K3d engine.
-
-## Local cluster
-
-`setup-cluster.sh` can be used to create a local cluster for developer
-purposes, specifying the environment variable `CLUSTER_ENGINE`, as
-follows:
-
-``` bash
-CLUSTER_ENGINE=k3d setup-cluster.sh
-```
-By default it will use Kind as engine.
-
-When running this script standalone, it can take the following set of variables: `BUILD_IMAGE`, `K8S_VERSION`, `CLUSTER_NAME`
