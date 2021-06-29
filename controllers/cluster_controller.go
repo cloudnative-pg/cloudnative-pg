@@ -284,7 +284,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 		log.V(2).Info("Waiting for jobs to finish",
 			"clusterName", cluster.Name,
 			"namespace", cluster.Namespace,
-			"jobs", resources.jobs.Items)
+			"jobs", len(resources.jobs.Items))
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 

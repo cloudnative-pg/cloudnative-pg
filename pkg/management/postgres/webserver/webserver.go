@@ -40,7 +40,7 @@ func isServerHealthy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Log.V(1).Info("Readiness probe succeeded")
+	log.Log.V(2).Info("Readiness probe succeeded")
 
 	_, _ = fmt.Fprint(w, "OK")
 }
@@ -56,7 +56,7 @@ func pgStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Log.V(1).Info("Cluster status extraction succeeded")
+	log.Log.V(2).Info("Cluster status extraction succeeded")
 
 	js, err := json.Marshal(status)
 	if err != nil {

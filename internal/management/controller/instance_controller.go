@@ -41,7 +41,7 @@ var RetryUntilWalReceiverDown = wait.Backoff{
 
 // Reconcile is the main reconciliation loop for the instance
 func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) error {
-	r.log.Info(
+	r.log.V(2).Info(
 		"Reconciliation loop",
 		"eventType", event.Type,
 		"type", event.Object.GetObjectKind().GroupVersionKind())
@@ -462,7 +462,7 @@ func (r *InstanceReconciler) configureInstancePermissions() error {
 		os.Exit(1)
 	}
 
-	r.log.Info("Validating DB configuration")
+	r.log.V(2).Info("Validating DB configuration")
 
 	// A transaction is required to temporarily disable synchronous replication
 	tx, err := db.Begin()
