@@ -113,6 +113,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
+	// Ensure we have the required global objects
+	if err := r.createPostgresClusterObjects(ctx, &cluster); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot create Cluster auxiliary objects: %w", err)
+	}
+
 	// Update the status of this resource
 	resources, err := r.getManagedResources(ctx, cluster)
 	if err != nil {
@@ -138,11 +143,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			"targetPrimary", cluster.Status.TargetPrimary)
 
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
-	}
-
-	// Ensure we have the required global objects
-	if err := r.createPostgresClusterObjects(ctx, &cluster); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot create Cluster auxiliary objects: %w", err)
 	}
 
 	// Get the replication status
