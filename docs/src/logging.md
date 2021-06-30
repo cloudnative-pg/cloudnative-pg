@@ -54,11 +54,13 @@ Each entry in the PostgreSQL log is a JSON object having the `logger` key set to
 
 Internally, the operator relies on the PostgreSQL CSV log format.
 Please refer to the PostgreSQL documentation for more information
-on the [CSV log format](https://www.postgresql.org/docs/current/runtime-config-logging.html).
+about the [CSV log format](https://www.postgresql.org/docs/current/runtime-config-logging.html).
 
 ## Other logs
-All logs produced by the operator and its instances are in JSON format, with `logger` set accordingly to the process 
-that produced them. So, all the possible `logger` values are the following ones:
+
+All logs that are produced by the operator and its instances are in JSON format, with `logger` set accordingly to the process
+that produced them. Therefore, all the possible `logger` values are the following ones:
+
 - `barman-cloud-wal-archive`
 - `barman-cloud-wal-restore`
 - `initdb`

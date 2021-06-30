@@ -356,8 +356,7 @@ func (instance *Instance) WaitForConfigReloaded() error {
 
 	return retry.OnError(retry.DefaultRetry, errorIsRetryable, func() error {
 		var sha string
-		row := db.QueryRow(
-			"SHOW %s", postgres.CNPConfigSha256)
+		row := db.QueryRow(fmt.Sprintf("SHOW %s", postgres.CNPConfigSha256))
 		err = row.Scan(&sha)
 		if err != nil {
 			return err
