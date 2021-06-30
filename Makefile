@@ -174,3 +174,11 @@ GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
 rm -rf $$TMP_DIR ;\
 }
 endef
+
+spellcheck:
+	docker run -v $(PWD):/tmp jonasbn/github-action-spellcheck:0.14.0
+
+woke:
+	docker run -v $(PWD):/src -w /src getwoke/woke:0.9 woke -c .woke.yaml
+
+checks: woke spellcheck fmt vet lint apidoc manifests
