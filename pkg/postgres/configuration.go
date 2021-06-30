@@ -33,7 +33,7 @@ host all all all md5
 `
 	// fixedConfigurationParameter are the configuration parameters
 	// whose value is managed by the operator and should not be changed
-	// be the user
+	// by the user
 	fixedConfigurationParameter = "fixed"
 
 	// blockedConfigurationParameter are the configuration parameters
@@ -91,7 +91,7 @@ host all all all md5
 
 	// CNPConfigSha256 is the parameter to be used to inject the sha256 of the
 	// config in the custom.conf file
-	CNPConfigSha256 = "cnp.confixg_sha256"
+	CNPConfigSha256 = "cnp.config_sha256"
 )
 
 // MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
@@ -289,7 +289,31 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) map[string]string {
 	// Start from scratch
 	configuration := make(map[string]string)
 
-	// start from the default settings
+	// Set all the default settings
+	setDefaultConfigurations(info, configuration)
+
+	// Apply all the values from the user, overriding defaults
+	for key, value := range info.UserSettings {
+		configuration[key] = value
+	}
+
+	// Apply all mandatory settings, on top of defaults and user settings
+	if info.IncludingMandatory {
+		for key, value := range info.Settings.MandatorySettings {
+			configuration[key] = value
+		}
+	}
+
+	// Apply the list of replicas
+	setReplicasListConfigurations(info, configuration)
+
+	return configuration
+}
+
+// setDefaultConfigurations sets all default configurations into the configuration map
+// from the provided info
+func setDefaultConfigurations(info ConfigurationInfo, configuration map[string]string) {
+	// start from the global default settings
 	for key, value := range info.Settings.GlobalDefaultSettings {
 		configuration[key] = value
 	}
@@ -304,20 +328,10 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) map[string]string {
 			}
 		}
 	}
+}
 
-	// apply the values from the user
-	for key, value := range info.UserSettings {
-		configuration[key] = value
-	}
-
-	// apply the mandatory settings
-	if info.IncludingMandatory {
-		for key, value := range info.Settings.MandatorySettings {
-			configuration[key] = value
-		}
-	}
-
-	// apply the list of replicas
+// setReplicasListConfigurations set the standby node list
+func setReplicasListConfigurations(info ConfigurationInfo, configuration map[string]string) {
 	if info.Replicas != nil && info.SyncReplicas > 0 {
 		escapedReplicas := make([]string, len(info.Replicas))
 		for idx, name := range info.Replicas {
@@ -328,24 +342,17 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) map[string]string {
 			info.SyncReplicas,
 			strings.Join(escapedReplicas, ","))
 	}
-
-	return configuration
 }
 
 // FillCNPConfiguration create the actual PostgreSQL configuration
 // for CNP given the user settings and the major version. This is
 // useful during the configuration validation
-func FillCNPConfiguration(
-	majorVersion int,
-	userSettings map[string]string,
-	includingMandatory bool,
-) map[string]string {
+func FillCNPConfiguration(majorVersion int, userSettings map[string]string) map[string]string {
 	info := ConfigurationInfo{
-		Settings:           CnpConfigurationSettings,
-		MajorVersion:       majorVersion,
-		UserSettings:       userSettings,
-		IncludingMandatory: includingMandatory,
-		Replicas:           nil,
+		Settings:     CnpConfigurationSettings,
+		MajorVersion: majorVersion,
+		UserSettings: userSettings,
+		Replicas:     nil,
 	}
 	return CreatePostgresqlConfiguration(info)
 }

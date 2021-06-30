@@ -9,65 +9,74 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package logpipe
 
 import (
-	"fmt"
+	"encoding/csv"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sync"
-	"syscall"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
+
+type logPipe struct {
+	fileName        string
+	sourceName      string
+	record          CSVRecordParser
+	fieldsValidator FieldsValidator
+}
 
 var consumedLogFiles sync.Map
 
-// Start start a new goroutine running the logging collector core, reading
-// from the logging_collector process and translating its content to JSON
-func Start() error {
-	if err := fileutils.EnsureDirectoryExist(postgres.LogPath); err != nil {
-		return err
-	}
+// FieldsValidator is a function validating the number of fields
+// for a specific log line to be parsed
+type FieldsValidator func(int) *ErrFieldCountExtended
 
-	csvPath := filepath.Join(postgres.LogPath, postgres.LogFileName+".csv")
-	if _, err := os.Stat(csvPath); err != nil {
-		errSysCall := syscall.Mkfifo(csvPath, 0o600)
-		if errSysCall != nil {
-			return fmt.Errorf("creating log FIFO: %w", errSysCall)
-		}
-	}
+// Starts a new goroutine running the logging collector core, reading
+// from a process logging in CSV to a file and redirecting its content to stdout in JSON format.
+// The goroutine is started just once for a given file.
+// All successive calls, that are referencing the same filename, will just check its existence
+func (p *logPipe) start() error {
+	_, alreadyStarted := consumedLogFiles.LoadOrStore(p.fileName, true)
 
-	_, loaded := consumedLogFiles.LoadOrStore(csvPath, true)
+	if !alreadyStarted {
+		go func() {
+			for {
+				// check if the directory exists
+				if err := fileutils.EnsureDirectoryExist(filepath.Dir(p.fileName)); err != nil {
+					log.Log.WithValues("fileName", p.fileName).Error(err,
+						"Error checking if the directory exists")
+					continue
+				}
 
-	if !loaded {
-		go loggingCollector(csvPath)
+				if err := fileutils.CreateFifo(p.fileName); err != nil {
+					log.Log.WithValues("fileName", p.fileName).Error(err, "Error creating log FIFO")
+					continue
+				}
+
+				if err := p.collectLogsFromFile(); err != nil {
+					log.Log.WithValues("fileName", p.fileName).Error(err, "Error consuming log stream")
+				}
+			}
+		}()
 	}
 
 	return nil
 }
 
-// loggingCollector will repeatedly try to open the FIFO file where PostgreSQL is writing
-// its logs, decode them, and printing using the instance manager logger infrastructure.
-func loggingCollector(csvPath string) {
-	defer consumedLogFiles.Delete(csvPath)
-	for {
-		if err := collectLogsFromFile(csvPath); err != nil {
-			log.Log.Error(err, "Error consuming log stream")
-		}
-	}
-}
-
 // collectLogsFromFile opens (blocking) the FIFO file, then starts reading the csv file line by line
 // until the end of the file or an error.
-func collectLogsFromFile(csvPath string) error {
+func (p *logPipe) collectLogsFromFile() error {
 	defer func() {
 		if condition := recover(); condition != nil {
 			log.Log.Info("Recover from panic condition while collecting PostgreSQL logs",
-				"condition", condition)
+				"condition", condition, "fileName", p.fileName, "stacktrace", debug.Stack())
 		}
 	}()
 
-	f, err := os.OpenFile(csvPath, os.O_RDONLY, 0o600) // #nosec
+	f, err := os.OpenFile(p.fileName, os.O_RDONLY, 0o600) // #nosec
 	if err != nil {
 		return err
 	}
@@ -79,5 +88,64 @@ func collectLogsFromFile(csvPath string) error {
 		}
 	}()
 
-	return streamLogFromCSVFile(f, &LogRecordWriter{})
+	return p.streamLogFromCSVFile(f, &LogRecordWriter{p.sourceName})
+}
+
+// streamLogFromCSVFile is a function reading csv lines from an io.Reader and
+// writing them to the passed RecordWriter. This function can return
+// ErrFieldCountExtended which enrich the csv.ErrFieldCount with the
+// decoded invalid line
+func (p *logPipe) streamLogFromCSVFile(inputFile io.Reader, writer RecordWriter) error {
+	var (
+		content []string
+		err     error
+	)
+
+	reader := csv.NewReader(inputFile)
+	reader.ReuseRecord = true
+
+	// Read the first line outside the loop to validate the number of fields
+	if content, err = reader.Read(); err != nil {
+		// If the stream is finished, we are done before starting
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+
+		return err
+	}
+
+	// If the number of records is among the expected values write the log and enter the loop
+	if err := p.fieldsValidator(reader.FieldsPerRecord); err != nil {
+		err.Fields = content
+		return err
+	}
+	p.record.FromCSV(content)
+	writer.Write(p.record)
+
+reader:
+	for {
+		if content, err = reader.Read(); err != nil {
+			switch {
+			// If we have an invalid number of fields we enrich the
+			// error structure with the parsed CSV line
+			case errors.Is(err, csv.ErrFieldCount):
+				return &ErrFieldCountExtended{
+					Fields:   content,
+					Expected: reader.FieldsPerRecord,
+					Err:      err,
+				}
+
+			// If the stream is finished, we are done
+			case errors.Is(err, io.EOF):
+				break reader
+			default:
+				return err
+			}
+		}
+
+		p.record.FromCSV(content)
+		writer.Write(p.record)
+	}
+
+	return nil
 }

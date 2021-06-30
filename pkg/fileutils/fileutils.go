@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 // AppendStringToFile append the content of the given string to the
@@ -216,5 +217,13 @@ func EnsureDirectoryExist(destinationDir string) error {
 		}
 	}
 
+	return nil
+}
+
+// CreateFifo invokes the Unix system call Mkfifo, if the given filename exists
+func CreateFifo(fileName string) error {
+	if _, err := os.Stat(fileName); err != nil {
+		return syscall.Mkfifo(fileName, 0o600)
+	}
 	return nil
 }

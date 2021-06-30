@@ -11,15 +11,21 @@ import (
 )
 
 const (
-	logRecordKey  = "record"
-	logRecordName = "postgres"
+	logRecordKey = "record"
 )
+
+// RecordWriter is the interface
+type RecordWriter interface {
+	Write(r CSVRecordParser)
+}
 
 // LogRecordWriter implements the `RecordWriter` interface writing to the
 // instance manager logger
-type LogRecordWriter struct{}
+type LogRecordWriter struct {
+	name string
+}
 
 // Write writes the PostgreSQL log record to the instance manager logger
-func (writer *LogRecordWriter) Write(record *Record) {
-	log.Log.WithName(logRecordName).Info(logRecordKey, logRecordKey, record)
+func (writer *LogRecordWriter) Write(record CSVRecordParser) {
+	log.Log.WithName(writer.name).Info(logRecordKey, logRecordKey, record)
 }

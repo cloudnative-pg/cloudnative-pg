@@ -81,7 +81,7 @@ func (r *Cluster) Default() {
 		// The validation error will be already raised by the
 		// validateImageName function
 		r.Spec.PostgresConfiguration.Parameters = postgres.FillCNPConfiguration(
-			psqlVersion, r.Spec.PostgresConfiguration.Parameters, false)
+			psqlVersion, r.Spec.PostgresConfiguration.Parameters)
 	}
 }
 
@@ -404,9 +404,9 @@ func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
 	}
 
 	r.Spec.PostgresConfiguration.Parameters = postgres.FillCNPConfiguration(
-		psqlVersion, r.Spec.PostgresConfiguration.Parameters, false)
+		psqlVersion, r.Spec.PostgresConfiguration.Parameters)
 	oldParameters := postgres.FillCNPConfiguration(
-		psqlVersion, old.Spec.PostgresConfiguration.Parameters, false)
+		psqlVersion, old.Spec.PostgresConfiguration.Parameters)
 
 	for key, value := range r.Spec.PostgresConfiguration.Parameters {
 		_, isFixed := postgres.FixedConfigurationParameters[key]
