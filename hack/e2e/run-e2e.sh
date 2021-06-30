@@ -67,6 +67,9 @@ if ! which ginkgo &>/dev/null; then
   install_go_module "github.com/onsi/ginkgo/ginkgo"
 fi
 
+# To run all ginkgo test suite, store return code for individual ginkgo suite and
+# after completion the run it will exit on any of the failure
+RC=0
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
   # Install a version of the operator using v1alpha1
   kubectl apply -f "${ROOT_DIR}/releases/postgresql-operator-0.7.0.yaml"
@@ -96,7 +99,7 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
   mkdir -p "${ROOT_DIR}/tests/upgrade/out"
   # Unset DEBUG to prevent k8s from spamming messages
   unset DEBUG
-  ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/upgrade/..."
+  ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/upgrade/..." || RC=$?
 fi
 
 CONTROLLER_IMG="${CONTROLLER_IMG}" \
@@ -116,12 +119,13 @@ export PATH=${ROOT_DIR}/bin/:${PATH}
 mkdir -p "${ROOT_DIR}/tests/e2e/out"
 # Create at most 4 testing nodes. Using -p instead of --nodes
 # would create CPUs-1 nodes and saturate the testing server
-ginkgo --nodes=4 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/e2e/..."
+ginkgo --nodes=4 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/e2e/..." || RC=$?
 
 mkdir -p "${ROOT_DIR}/tests/sequential/out"
 # These e2e tests need to be run sequentially since they may break concurrent test run
-ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/sequential/..."
+ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/sequential/..." || RC=$?
 
 mkdir -p "${ROOT_DIR}/tests/performance/out"
 # Performance tests need to run on a single node to avoid concurrency
-ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/performance/..."
+ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/performance/..." || RC=$?
+exit $RC
