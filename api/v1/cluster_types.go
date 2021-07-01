@@ -71,6 +71,12 @@ const (
 
 	// defaultPostgresGID is the default GID which is used by PostgreSQL
 	defaultPostgresGID = 26
+
+	// PodAntiAffinityTypeRequired is the label for required anti-affinity type
+	PodAntiAffinityTypeRequired = "required"
+
+	// PodAntiAffinityTypePreferred is the label for preferred anti-affinity type
+	PodAntiAffinityTypePreferred = "preferred"
 )
 
 // ClusterSpec defines the desired state of Cluster
@@ -497,6 +503,15 @@ type AffinityConfiguration struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// PodAntiAffinityType allows the user to decide whether pod anti-affinity between cluster instance has to be
+	// considered a strong requirement during scheduling or not. Allowed values are: "preferred" (default if empty) or
+	// "required". Setting it to "required", could lead to instances remaining pending until new kubernetes nodes are
+	// added if all the existing nodes don't match the required pod anti-affinity rule.
+	// More info:
+	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity
+	// +optional
+	PodAntiAffinityType string `json:"podAntiAffinityType,omitempty"`
 }
 
 // RollingUpdateStatus contains the information about an instance which is

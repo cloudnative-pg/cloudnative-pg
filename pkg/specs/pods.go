@@ -180,29 +180,44 @@ func CreateAffinitySection(clusterName string, config apiv1.AffinityConfiguratio
 		topologyKey = "kubernetes.io/hostname"
 	}
 
-	return &corev1.Affinity{
-		PodAntiAffinity: &corev1.PodAntiAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+	podAffinityTerm := corev1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
 				{
-					Weight: 100,
-					PodAffinityTerm: corev1.PodAffinityTerm{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
-								{
-									Key:      ClusterLabelName,
-									Operator: metav1.LabelSelectorOpIn,
-									Values: []string{
-										clusterName,
-									},
-								},
-							},
-						},
-						TopologyKey: topologyKey,
+					Key:      ClusterLabelName,
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						clusterName,
 					},
 				},
 			},
 		},
+		TopologyKey: topologyKey,
 	}
+
+	// Initialize affinity
+	affinity := corev1.Affinity{PodAntiAffinity: &corev1.PodAntiAffinity{}}
+
+	// Switch pod anti-affinity type:
+	// - if it is "required", 'RequiredDuringSchedulingIgnoredDuringExecution' will be properly set.
+	// - if it is "preferred",'PreferredDuringSchedulingIgnoredDuringExecution' will be properly set.
+	// - by default, return nil.
+	switch config.PodAntiAffinityType {
+	case apiv1.PodAntiAffinityTypeRequired:
+		affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution =
+			[]corev1.PodAffinityTerm{podAffinityTerm}
+	case apiv1.PodAntiAffinityTypePreferred:
+		affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []corev1.WeightedPodAffinityTerm{
+			{
+				Weight:          100,
+				PodAffinityTerm: podAffinityTerm,
+			},
+		}
+	default:
+		return nil
+	}
+
+	return &affinity
 }
 
 // CreatePostgresSecurityContext defines the security context under which

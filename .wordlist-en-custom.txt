@@ -112,6 +112,7 @@ Patroni
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
 Philippe
+PodAntiAffinityType
 PodDisruptionBudget
 PodMonitor
 PodStatus
