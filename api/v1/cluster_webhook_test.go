@@ -928,3 +928,84 @@ var _ = Describe("toleration validation", func() {
 		Expect(result).ToNot(BeEmpty())
 	})
 })
+
+var _ = Describe("validate anti-affinity", func() {
+	t := true
+	f := false
+	It("doesn't complain if we provide a proper PodAntiAffinity with anti-affinity enabled", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Affinity: AffinityConfiguration{
+					EnablePodAntiAffinity: &t,
+					PodAntiAffinityType:   "required",
+				},
+			},
+		}
+		result := cluster.validateAntiAffinity()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("doesn't complain if we provide a proper PodAntiAffinity with anti-affinity disabled", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Affinity: AffinityConfiguration{
+					EnablePodAntiAffinity: &f,
+					PodAntiAffinityType:   "required",
+				},
+			},
+		}
+		result := recoveryCluster.validateAntiAffinity()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("doesn't complain if we provide a proper PodAntiAffinity with anti-affinity enabled", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Affinity: AffinityConfiguration{
+					EnablePodAntiAffinity: &t,
+					PodAntiAffinityType:   "preferred",
+				},
+			},
+		}
+		result := recoveryCluster.validateAntiAffinity()
+		Expect(result).To(BeEmpty())
+	})
+	It("doesn't complain if we provide a proper PodAntiAffinity default with anti-affinity enabled", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Affinity: AffinityConfiguration{
+					EnablePodAntiAffinity: &t,
+					PodAntiAffinityType:   "",
+				},
+			},
+		}
+		result := recoveryCluster.validateAntiAffinity()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("complains if we provide a wrong PodAntiAffinity with anti-affinity disabled", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Affinity: AffinityConfiguration{
+					EnablePodAntiAffinity: &f,
+					PodAntiAffinityType:   "error",
+				},
+			},
+		}
+		result := recoveryCluster.validateAntiAffinity()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("complains if we provide a wrong PodAntiAffinity with anti-affinity enabled", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Affinity: AffinityConfiguration{
+					EnablePodAntiAffinity: &t,
+					PodAntiAffinityType:   "error",
+				},
+			},
+		}
+		result := recoveryCluster.validateAntiAffinity()
+		Expect(result).NotTo(BeEmpty())
+	})
+})

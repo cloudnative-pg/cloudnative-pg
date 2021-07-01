@@ -71,6 +71,15 @@ spec:
                     description: 'NodeSelector is map of key-value pairs used to define
                       the nodes on which the pods can run. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
                     type: object
+                  podAntiAffinityType:
+                    description: 'PodAntiAffinityType allows the user to decide whether
+                      pod anti-affinity between cluster instance has to be considered
+                      a strong requirement during scheduling or not. Allowed values
+                      are: "preferred" (default if empty) or "required". Setting it
+                      to "required", could lead to instances remaining pending until
+                      new kubernetes nodes are added if all the existing nodes don''t
+                      match the required pod anti-affinity rule. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity'
+                    type: string
                   tolerations:
                     description: 'Tolerations is a list of Tolerations that should
                       be set for all the pods, in order to allow them to run on tainted
@@ -983,6 +992,15 @@ spec:
                     description: 'NodeSelector is map of key-value pairs used to define
                       the nodes on which the pods can run. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
                     type: object
+                  podAntiAffinityType:
+                    description: 'PodAntiAffinityType allows the user to decide whether
+                      pod anti-affinity between cluster instance has to be considered
+                      a strong requirement during scheduling or not. Allowed values
+                      are: "preferred" (default if empty) or "required". Setting it
+                      to "required", could lead to instances remaining pending until
+                      new kubernetes nodes are added if all the existing nodes don''t
+                      match the required pod anti-affinity rule. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity'
+                    type: string
                   tolerations:
                     description: 'Tolerations is a list of Tolerations that should
                       be set to all the pods for this cluster. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/'

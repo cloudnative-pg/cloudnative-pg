@@ -74,6 +74,13 @@ func (r *Cluster) Default() {
 		}
 	}
 
+	// Defaulting the pod anti-affinity type if podAntiaAffinity is enabled and not specified
+	if r.Spec.Affinity.EnablePodAntiAffinity != nil &&
+		*r.Spec.Affinity.EnablePodAntiAffinity &&
+		r.Spec.Affinity.PodAntiAffinityType == "" {
+		r.Spec.Affinity.PodAntiAffinityType = PodAntiAffinityTypePreferred
+	}
+
 	imageName := r.GetImageName()
 	tag := utils.GetImageTag(imageName)
 	psqlVersion, err := postgres.GetPostgresVersionFromTag(tag)
@@ -110,6 +117,7 @@ func (r *Cluster) ValidateCreate() error {
 	allErrs = append(allErrs, r.validateBootstrapPgBaseBackupSource()...)
 	allErrs = append(allErrs, r.validateExternalServers()...)
 	allErrs = append(allErrs, r.validateTolerations()...)
+	allErrs = append(allErrs, r.validateAntiAffinity()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -139,6 +147,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validateBootstrapPgBaseBackupSource()...)
 	allErrs = append(allErrs, r.validateExternalServers()...)
 	allErrs = append(allErrs, r.validateTolerations()...)
+	allErrs = append(allErrs, r.validateAntiAffinity()...)
 
 	oldObject := old.(*Cluster)
 	if oldObject == nil {
@@ -755,6 +764,24 @@ func validateTaintEffect(effect *v1.TaintEffect, allowEmpty bool, fldPath *field
 			// string(core.TaintEffectNoScheduleNoAdmit),
 		}
 		allErrors = append(allErrors, field.NotSupported(fldPath, *effect, validValues))
+	}
+	return allErrors
+}
+
+// validateAntiAffinity checks and validates the anti-affinity fields.
+func (r *Cluster) validateAntiAffinity() field.ErrorList {
+	path := field.NewPath("spec", "affinity", "podAntiAffinityType")
+	allErrors := field.ErrorList{}
+
+	if r.Spec.Affinity.PodAntiAffinityType != PodAntiAffinityTypePreferred &&
+		r.Spec.Affinity.PodAntiAffinityType != PodAntiAffinityTypeRequired &&
+		r.Spec.Affinity.PodAntiAffinityType != "" {
+		allErrors = append(allErrors, field.Invalid(
+			path,
+			r.Spec.Affinity.PodAntiAffinityType,
+			fmt.Sprintf("pod anti-affinity type must be '%s' (default if empty) or '%s'",
+				PodAntiAffinityTypePreferred, PodAntiAffinityTypeRequired),
+		))
 	}
 	return allErrors
 }

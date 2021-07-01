@@ -75,6 +75,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 	dst.Spec.Affinity.TopologyKey = src.Spec.Affinity.TopologyKey
 	dst.Spec.Affinity.NodeSelector = src.Spec.Affinity.NodeSelector
 	dst.Spec.Affinity.Tolerations = src.Spec.Affinity.Tolerations
+	dst.Spec.Affinity.PodAntiAffinityType = src.Spec.Affinity.PodAntiAffinityType
 
 	dst.Spec.Resources = src.Spec.Resources
 	dst.Spec.PrimaryUpdateStrategy = v1.PrimaryUpdateStrategy(src.Spec.PrimaryUpdateStrategy)
@@ -302,6 +303,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Spec.Affinity.TopologyKey = src.Spec.Affinity.TopologyKey
 	dst.Spec.Affinity.NodeSelector = src.Spec.Affinity.NodeSelector
 	dst.Spec.Affinity.Tolerations = src.Spec.Affinity.Tolerations
+	dst.Spec.Affinity.PodAntiAffinityType = src.Spec.Affinity.PodAntiAffinityType
 
 	dst.Spec.Resources = src.Spec.Resources
 	dst.Spec.PrimaryUpdateStrategy = PrimaryUpdateStrategy(src.Spec.PrimaryUpdateStrategy)
