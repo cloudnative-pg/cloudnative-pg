@@ -14,6 +14,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"sync"
 
@@ -23,10 +24,11 @@ import (
 
 type logPipe struct {
 	fileName        string
-	sourceName      string
 	record          CSVRecordParser
 	fieldsValidator FieldsValidator
 }
+
+var tagRegex = regexp.MustCompile(`(?P<Tag>^[a-zA-Z]+): (?P<Record>.*)$`)
 
 var consumedLogFiles sync.Map
 
@@ -88,7 +90,7 @@ func (p *logPipe) collectLogsFromFile() error {
 		}
 	}()
 
-	return p.streamLogFromCSVFile(f, &LogRecordWriter{p.sourceName})
+	return p.streamLogFromCSVFile(f, &LogRecordWriter{})
 }
 
 // streamLogFromCSVFile is a function reading csv lines from an io.Reader and
@@ -119,8 +121,7 @@ func (p *logPipe) streamLogFromCSVFile(inputFile io.Reader, writer RecordWriter)
 		err.Fields = content
 		return err
 	}
-	p.record.FromCSV(content)
-	writer.Write(p.record)
+	writer.Write(p.record.FromCSV(content))
 
 reader:
 	for {
@@ -143,8 +144,7 @@ reader:
 			}
 		}
 
-		p.record.FromCSV(content)
-		writer.Write(p.record)
+		writer.Write(p.record.FromCSV(content))
 	}
 
 	return nil

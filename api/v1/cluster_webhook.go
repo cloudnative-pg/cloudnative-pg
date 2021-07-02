@@ -58,7 +58,9 @@ func (r *Cluster) Default() {
 		r.Spec.Bootstrap = &BootstrapConfiguration{}
 	}
 
-	if r.Spec.Bootstrap.InitDB == nil && r.Spec.Bootstrap.Recovery == nil && r.Spec.Bootstrap.PgBaseBackup == nil {
+	if r.Spec.Bootstrap.InitDB == nil &&
+		r.Spec.Bootstrap.Recovery == nil &&
+		r.Spec.Bootstrap.PgBaseBackup == nil {
 		r.Spec.Bootstrap.InitDB = &BootstrapInitDB{
 			Database: "app",
 			Owner:    "app",
@@ -88,7 +90,9 @@ func (r *Cluster) Default() {
 		// The validation error will be already raised by the
 		// validateImageName function
 		r.Spec.PostgresConfiguration.Parameters = postgres.FillCNPConfiguration(
-			psqlVersion, r.Spec.PostgresConfiguration.Parameters)
+			psqlVersion,
+			r.Spec.PostgresConfiguration.Parameters,
+			r.Spec.PostgresConfiguration.AdditionalLibraries)
 	}
 }
 
@@ -413,9 +417,13 @@ func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
 	}
 
 	r.Spec.PostgresConfiguration.Parameters = postgres.FillCNPConfiguration(
-		psqlVersion, r.Spec.PostgresConfiguration.Parameters)
+		psqlVersion,
+		r.Spec.PostgresConfiguration.Parameters,
+		r.Spec.PostgresConfiguration.AdditionalLibraries)
 	oldParameters := postgres.FillCNPConfiguration(
-		psqlVersion, old.Spec.PostgresConfiguration.Parameters)
+		psqlVersion,
+		old.Spec.PostgresConfiguration.Parameters,
+		old.Spec.PostgresConfiguration.AdditionalLibraries)
 
 	for key, value := range r.Spec.PostgresConfiguration.Parameters {
 		_, isFixed := postgres.FixedConfigurationParameters[key]

@@ -31,6 +31,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 	// spec.postgresql
 	dst.Spec.PostgresConfiguration.Parameters = src.Spec.PostgresConfiguration.Parameters
 	dst.Spec.PostgresConfiguration.PgHBA = src.Spec.PostgresConfiguration.PgHBA
+	dst.Spec.PostgresConfiguration.AdditionalLibraries = src.Spec.PostgresConfiguration.AdditionalLibraries
 
 	// spec.bootstrap
 	if src.Spec.Bootstrap != nil {
@@ -269,6 +270,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	// spec.postgresql
 	dst.Spec.PostgresConfiguration.Parameters = src.Spec.PostgresConfiguration.Parameters
 	dst.Spec.PostgresConfiguration.PgHBA = src.Spec.PostgresConfiguration.PgHBA
+	dst.Spec.PostgresConfiguration.AdditionalLibraries = src.Spec.PostgresConfiguration.AdditionalLibraries
 
 	// spec.bootstrap
 	if src.Spec.Bootstrap != nil {

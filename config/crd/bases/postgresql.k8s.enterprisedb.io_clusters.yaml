@@ -586,6 +586,12 @@ spec:
                       promoting an instance to primary
                     format: int32
                     type: integer
+                  shared_preload_libraries:
+                    description: Lists of shared preload libraries to add to the default
+                      ones
+                    items:
+                      type: string
+                    type: array
                 type: object
               primaryUpdateStrategy:
                 description: 'Strategy to follow to upgrade the primary server during
@@ -1495,6 +1501,12 @@ spec:
                       promoting an instance to primary
                     format: int32
                     type: integer
+                  shared_preload_libraries:
+                    description: Lists of shared preload libraries to add to the default
+                      ones
+                    items:
+                      type: string
+                    type: array
                 type: object
               primaryUpdateStrategy:
                 description: 'Strategy to follow to upgrade the primary server during

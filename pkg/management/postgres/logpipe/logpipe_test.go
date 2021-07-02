@@ -19,11 +19,11 @@ import (
 // SpyRecordWriter is an implementation of the RecordWriter interface
 // keeping track of the generated records
 type SpyRecordWriter struct {
-	records []CSVRecordParser
+	records []NamedRecord
 }
 
 // Write write the PostgreSQL log record to the instance manager logger
-func (writer *SpyRecordWriter) Write(record CSVRecordParser) {
+func (writer *SpyRecordWriter) Write(record NamedRecord) {
 	writer.records = append(writer.records, record)
 }
 
@@ -55,6 +55,22 @@ var _ = Describe("CSV file reader", func() {
 			spy := SpyRecordWriter{}
 			p := logPipe{
 				record:          &LoggingRecord{},
+				fieldsValidator: LogFieldValidator,
+			}
+			Expect(p.streamLogFromCSVFile(f, &spy)).To(Succeed())
+			Expect(len(spy.records)).To(Equal(2))
+		})
+
+		It("can read pgAudit CSV lines", func() {
+			f, err := os.Open("testdata/pgaudit.csv")
+			defer func() {
+				_ = f.Close()
+			}()
+			Expect(err).ToNot(HaveOccurred())
+
+			spy := SpyRecordWriter{}
+			p := logPipe{
+				record:          NewPgAuditLoggingDecorator(),
 				fieldsValidator: LogFieldValidator,
 			}
 			Expect(p.streamLogFromCSVFile(f, &spy)).To(Succeed())

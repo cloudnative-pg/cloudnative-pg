@@ -235,10 +235,14 @@ func (instance Instance) WithActiveInstance(inner func() error) error {
 	return inner()
 }
 
-// GetSuperUserDB gets the connection connectionMap pointing to this instance, possibly creating
-// it if needed
+// GetSuperUserDB gets a connection to the super user db "postgres" on this instance
 func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 	return instance.ConnectionPool().Connection("postgres")
+}
+
+// GetTemplateDB gets a connection to the template user db "template1" on this instance
+func (instance *Instance) GetTemplateDB() (*sql.DB, error) {
+	return instance.ConnectionPool().Connection("template1")
 }
 
 // ConnectionPool gets or initializes the connection pool for this instance

@@ -323,6 +323,10 @@ type PostgresConfiguration struct {
 	// Specifies the maximum number of seconds to wait when promoting an instance to primary
 	// +optional
 	PgCtlTimeoutForPromotion int32 `json:"promotionTimeout,omitempty"`
+
+	// Lists of shared preload libraries to add to the default ones
+	// +optional
+	AdditionalLibraries []string `json:"shared_preload_libraries,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL

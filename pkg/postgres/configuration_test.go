@@ -28,8 +28,8 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			SyncReplicas:       0,
 		}
 		config := CreatePostgresqlConfiguration(info)
-		Expect(len(config)).To(BeNumerically(">", 1))
-		Expect(config["hot_standby"]).To(Equal("true"))
+		Expect(len(config.configs)).To(BeNumerically(">", 1))
+		Expect(config.getConfig("hot_standby")).To(Equal("true"))
 	})
 
 	It("enforce the mandatory values", func() {
@@ -44,7 +44,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			SyncReplicas:       0,
 		}
 		config := CreatePostgresqlConfiguration(info)
-		Expect(config["hot_standby"]).To(Equal("true"))
+		Expect(config.getConfig("hot_standby")).To(Equal("true"))
 	})
 
 	It("generate a config file", func() {
@@ -56,7 +56,8 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			Replicas:           nil,
 			SyncReplicas:       0,
 		}
-		confFile, sha256 := CreatePostgresqlConfFile(CreatePostgresqlConfiguration(info))
+		conf := CreatePostgresqlConfiguration(info)
+		confFile, sha256 := CreatePostgresqlConfFile(conf)
 		Expect(sha256).NotTo(BeEmpty())
 		Expect(confFile).To(Not(BeEmpty()))
 		Expect(len(strings.Split(confFile, "\n"))).To(BeNumerically(">", 2))
@@ -67,7 +68,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			"shared_buffers":  "128KB",
 			"log_destination": "stderr",
 		}
-		confFile, sha256 := CreatePostgresqlConfFile(settings)
+		confFile, sha256 := CreatePostgresqlConfFile(&PgConfiguration{settings})
 		Expect(sha256).NotTo(BeEmpty())
 		Expect(confFile).To(ContainSubstring("log_destination = 'stderr'\nshared_buffers = '128KB'\n"))
 	})
@@ -83,7 +84,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 				SyncReplicas:       0,
 			}
 			config := CreatePostgresqlConfiguration(info)
-			Expect(config["wal_keep_segments"]).To(Equal("32"))
+			Expect(config.getConfig("wal_keep_segments")).To(Equal("32"))
 		})
 	})
 
@@ -98,7 +99,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 				SyncReplicas:       0,
 			}
 			config := CreatePostgresqlConfiguration(info)
-			Expect(config["wal_keep_size"]).To(Equal("512MB"))
+			Expect(config.getConfig("wal_keep_size")).To(Equal("512MB"))
 		})
 	})
 
@@ -117,7 +118,8 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 				SyncReplicas: 2,
 			}
 			config := CreatePostgresqlConfiguration(info)
-			Expect(config["synchronous_standby_names"]).To(Equal("ANY 2 (\"one\",\"two\",\"three\")"))
+			Expect(config.getConfig("synchronous_standby_names")).
+				To(Equal("ANY 2 (\"one\",\"two\",\"three\")"))
 		})
 	})
 })
@@ -131,5 +133,17 @@ var _ = Describe("pg_hba.conf generation", func() {
 	It("insert the spec configuration between an header and a footer", func() {
 		hbaContent := CreateHBARules(specRules)
 		Expect(hbaContent).To(ContainSubstring("two\n"))
+	})
+})
+
+var _ = Describe("pg_audit", func() {
+	It("is enabled", func() {
+		userConfigsWithPgAudit := make(map[string]string, 1)
+		userConfigsWithPgAudit["pgaudit."] = "test"
+		Expect(IsPgAuditEnabled(userConfigsWithPgAudit)).To(BeTrue())
+	})
+	It("is not enabled", func() {
+		userConfigsWithNoPgAudit := make(map[string]string, 1)
+		Expect(IsPgAuditEnabled(userConfigsWithNoPgAudit)).To(BeFalse())
 	})
 })
