@@ -581,6 +581,11 @@ spec:
                     items:
                       type: string
                     type: array
+                  promotionTimeout:
+                    description: Specifies the maximum number of seconds to wait when
+                      promoting an instance to primary
+                    format: int32
+                    type: integer
                 type: object
               primaryUpdateStrategy:
                 description: 'Strategy to follow to upgrade the primary server during
@@ -1485,6 +1490,11 @@ spec:
                     items:
                       type: string
                     type: array
+                  promotionTimeout:
+                    description: Specifies the maximum number of seconds to wait when
+                      promoting an instance to primary
+                    format: int32
+                    type: integer
                 type: object
               primaryUpdateStrategy:
                 description: 'Strategy to follow to upgrade the primary server during

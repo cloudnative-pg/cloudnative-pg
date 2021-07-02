@@ -9,13 +9,15 @@ package postgres
 import (
 	"fmt"
 	"os/exec"
+	"strconv"
 	"time"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-// PromoteAndWait promotes this instance, and wait 60 seconds for it to happen
+// PromoteAndWait promotes this instance, and wait DefaultPgCtlTimeoutForPromotion
+// seconds for it to happen
 func (instance *Instance) PromoteAndWait() error {
 	instance.ShutdownConnections()
 
@@ -24,6 +26,7 @@ func (instance *Instance) PromoteAndWait() error {
 		instance.PgData,
 		"-w",
 		"promote",
+		"-t " + strconv.Itoa(int(instance.PgCtlTimeoutForPromotion)),
 	}
 
 	log.Log.Info("Promoting instance", "pgctl_options", options)

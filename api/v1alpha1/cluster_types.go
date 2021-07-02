@@ -169,6 +169,10 @@ type PostgresConfiguration struct {
 	// to the pg_hba.conf file)
 	// +optional
 	PgHBA []string `json:"pg_hba,omitempty"`
+
+	// Specifies the maximum number of seconds to wait when promoting an instance to primary
+	// +optional
+	PgCtlTimeoutForPromotion int32 `json:"promotionTimeout,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL

@@ -366,10 +366,11 @@ Name       | Description                                                        
 
 PostgresConfiguration defines the PostgreSQL configuration
 
-Name       | Description                                                                               | Type             
----------- | ----------------------------------------------------------------------------------------- | -----------------
-`parameters` | PostgreSQL configuration options (postgresql.conf)                                        | map[string]string
-`pg_hba    ` | PostgreSQL Host Based Authentication rules (lines to be appended to the pg_hba.conf file) | []string         
+Name             | Description                                                                               | Type             
+---------------- | ----------------------------------------------------------------------------------------- | -----------------
+`parameters      ` | PostgreSQL configuration options (postgresql.conf)                                        | map[string]string
+`pg_hba          ` | PostgreSQL Host Based Authentication rules (lines to be appended to the pg_hba.conf file) | []string         
+`promotionTimeout` | Specifies the maximum number of seconds to wait when promoting an instance to primary     | int32            
 
 <a id='RecoveryTarget'></a>
 ## RecoveryTarget

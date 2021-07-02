@@ -60,6 +60,9 @@ type Instance struct {
 	// The sha256 of the config. It is computed on the config string, before
 	// adding the PostgreSQL CNPConfigSha256 parameter
 	ConfigSha256 string
+
+	// PgCtlTimeoutForPromotion specifies the maximum number of seconds to wait when waiting for promotion to complete
+	PgCtlTimeoutForPromotion int32
 }
 
 // RetryUntilServerAvailable is the default retry configuration that is used
