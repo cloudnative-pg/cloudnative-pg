@@ -70,5 +70,5 @@ that produced them. Therefore, all the possible `logger` values are the followin
 - `pg_rewind`
 - `postgres`
 
-Except for `postgres` that has the aforementioned structure, all other possible values just have `msg` set to the 
-escaped message that is logged.
+Except for `postgres` that has the aforementioned structures, all other possible values
+just have `msg` set to the escaped message that is logged.

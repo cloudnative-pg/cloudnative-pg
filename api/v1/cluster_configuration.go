@@ -25,10 +25,12 @@ func (cluster *Cluster) CreatePostgresqlConfiguration() (string, string, error) 
 	}
 
 	info := postgres.ConfigurationInfo{
-		Settings:           postgres.CnpConfigurationSettings,
-		MajorVersion:       fromVersion,
-		UserSettings:       cluster.Spec.PostgresConfiguration.Parameters,
-		IncludingMandatory: true,
+		Settings:                         postgres.CnpConfigurationSettings,
+		MajorVersion:                     fromVersion,
+		UserSettings:                     cluster.Spec.PostgresConfiguration.Parameters,
+		IncludingMandatory:               true,
+		PgAuditEnabled:                   postgres.IsPgAuditEnabled(cluster.Spec.PostgresConfiguration.Parameters),
+		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
 	}
 
 	// We need to include every replica inside the list of possible synchronous standbys

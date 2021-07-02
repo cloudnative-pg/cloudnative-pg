@@ -29,9 +29,8 @@ const LoggingCollectorRecordName = "postgres"
 func Start() error {
 	p := logPipe{
 		fileName:        filepath.Join(postgres.LogPath, postgres.LogFileName+".csv"),
-		record:          &LoggingRecord{},
+		record:          NewPgAuditLoggingDecorator(),
 		fieldsValidator: LogFieldValidator,
-		sourceName:      LoggingCollectorRecordName,
 	}
 	return p.start()
 }
@@ -49,30 +48,30 @@ func LogFieldValidator(fields int) *ErrFieldCountExtended {
 
 // LoggingRecord is used to store all the fields of the logging_collector CSV format
 type LoggingRecord struct {
-	LogTime              string `json:"log_time"`
-	Username             string `json:"user_name"`
-	DatabaseName         string `json:"database_name"`
-	ProcessID            string `json:"process_id"`
-	ConnectionFrom       string `json:"connection_from"`
-	SessionID            string `json:"session_id"`
-	SessionLineNum       string `json:"session_line_num"`
-	CommandTag           string `json:"command_tag"`
-	SessionStartTime     string `json:"session_start_time"`
-	VirtualTransactionID string `json:"virtual_transaction_id"`
-	TransactionID        string `json:"transaction_id"`
-	ErrorSeverity        string `json:"error_severity"`
-	SQLStateCode         string `json:"sql_state_code"`
-	Message              string `json:"message"`
-	Detail               string `json:"detail"`
-	Hint                 string `json:"hint"`
-	InternalQuery        string `json:"internal_query"`
-	InternalQueryPos     string `json:"internal_query_pos"`
-	Context              string `json:"context"`
-	Query                string `json:"query"`
-	QueryPos             string `json:"query_pos"`
-	Location             string `json:"location"`
-	ApplicationName      string `json:"application_name"`
-	BackendType          string `json:"backend_type"`
+	LogTime              string `json:"log_time,omitempty"`
+	Username             string `json:"user_name,omitempty"`
+	DatabaseName         string `json:"database_name,omitempty"`
+	ProcessID            string `json:"process_id,omitempty"`
+	ConnectionFrom       string `json:"connection_from,omitempty"`
+	SessionID            string `json:"session_id,omitempty"`
+	SessionLineNum       string `json:"session_line_num,omitempty"`
+	CommandTag           string `json:"command_tag,omitempty"`
+	SessionStartTime     string `json:"session_start_time,omitempty"`
+	VirtualTransactionID string `json:"virtual_transaction_id,omitempty"`
+	TransactionID        string `json:"transaction_id,omitempty"`
+	ErrorSeverity        string `json:"error_severity,omitempty"`
+	SQLStateCode         string `json:"sql_state_code,omitempty"`
+	Message              string `json:"message,omitempty"`
+	Detail               string `json:"detail,omitempty"`
+	Hint                 string `json:"hint,omitempty"`
+	InternalQuery        string `json:"internal_query,omitempty"`
+	InternalQueryPos     string `json:"internal_query_pos,omitempty"`
+	Context              string `json:"context,omitempty"`
+	Query                string `json:"query,omitempty"`
+	QueryPos             string `json:"query_pos,omitempty"`
+	Location             string `json:"location,omitempty"`
+	ApplicationName      string `json:"application_name,omitempty"`
+	BackendType          string `json:"backend_type,omitempty"`
 }
 
 // FromCSV store inside the record structure the relative fields
@@ -80,7 +79,7 @@ type LoggingRecord struct {
 //
 // See https://www.postgresql.org/docs/current/runtime-config-logging.html
 // section "19.8.4. Using CSV-Format Log Output".
-func (r *LoggingRecord) FromCSV(content []string) {
+func (r *LoggingRecord) FromCSV(content []string) NamedRecord {
 	r.LogTime = content[0]
 	r.Username = content[1]
 	r.DatabaseName = content[2]
@@ -109,4 +108,10 @@ func (r *LoggingRecord) FromCSV(content []string) {
 	if len(content) == FieldsPerRecord13 {
 		r.BackendType = content[23]
 	}
+	return r
+}
+
+// GetName implements the NamedRecord interface
+func (r *LoggingRecord) GetName() string {
+	return LoggingCollectorRecordName
 }

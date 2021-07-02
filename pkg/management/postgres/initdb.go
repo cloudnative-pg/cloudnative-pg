@@ -66,6 +66,9 @@ type InitInfo struct {
 
 	// Whether it is a temporary instance that will never contain real data.
 	Temporary bool
+
+	// Whether pgaudit is enabled or not
+	PgAuditEnabled bool
 }
 
 const (
@@ -151,13 +154,13 @@ func (info InitInfo) CreateDataDirectory() error {
 		return fmt.Errorf("error while creating the PostgreSQL instance: %w", err)
 	}
 
-	// Always read the custom configuration file
-	// created by the operator
+	// Always read the custom configuration file created by the operator
+	postgresConfTrailer := fmt.Sprintf("# load Cloud Native PostgreSQL custom configuration\n"+
+		"include '%v'\n",
+		PostgresqlCustomConfigurationFile)
 	err = fileutils.AppendStringToFile(
 		path.Join(info.PgData, "postgresql.conf"),
-		fmt.Sprintf(
-			"# load Cloud Native PostgreSQL custom configuration\ninclude '%v'\n",
-			PostgresqlCustomConfigurationFile),
+		postgresConfTrailer,
 	)
 	if err != nil {
 		return fmt.Errorf("appending to postgresql.conf file resulted in an error: %w", err)
@@ -223,6 +226,19 @@ func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
 	return nil
 }
 
+// ConfigureNewInstanceTemplate creates the expected users and databases in a new
+// PostgreSQL instance
+func (info InitInfo) ConfigureNewInstanceTemplate(db *sql.DB) error {
+	if info.PgAuditEnabled {
+		_, err := db.Exec("CREATE EXTENSION pgaudit")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Bootstrap create and configure this new PostgreSQL instance
 func (info InitInfo) Bootstrap() error {
 	err := info.CreateDataDirectory()
@@ -245,12 +261,22 @@ func (info InitInfo) Bootstrap() error {
 	}
 
 	return instance.WithActiveInstance(func() error {
-		db, err := instance.GetSuperUserDB()
+		superUserDB, err := instance.GetSuperUserDB()
 		if err != nil {
 			return fmt.Errorf("while creating superuser: %w", err)
 		}
 
-		err = info.ConfigureNewInstance(db)
+		err = info.ConfigureNewInstance(superUserDB)
+		if err != nil {
+			return fmt.Errorf("while configuring new instance: %w", err)
+		}
+
+		templateDB, err := instance.GetTemplateDB()
+		if err != nil {
+			return fmt.Errorf("while creating superuser: %w", err)
+		}
+
+		err = info.ConfigureNewInstanceTemplate(templateDB)
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
 		}

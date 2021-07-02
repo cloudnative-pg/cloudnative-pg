@@ -387,6 +387,7 @@ pdf
 persistentvolumeclaim
 persistentvolumeclaims
 pgBouncer
+pgaudit
 pgbarman
 pgbasebackup
 pgbench
@@ -405,6 +406,7 @@ postgresUID
 postgresconfiguration
 postgresql
 pre
+preload
 prepended
 primaryUpdateStrategy
 programmatically

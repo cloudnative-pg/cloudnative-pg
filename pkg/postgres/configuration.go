@@ -92,6 +92,9 @@ host all all all md5
 	// CNPConfigSha256 is the parameter to be used to inject the sha256 of the
 	// config in the custom.conf file
 	CNPConfigSha256 = "cnp.config_sha256"
+
+	// SharedPreloadLibraries shared preload libraries key in the config
+	SharedPreloadLibraries = "shared_preload_libraries"
 )
 
 // MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
@@ -124,6 +127,9 @@ type ConfigurationSettings struct {
 	// The following settings are applied to the final PostgreSQL configuration,
 	// even if the user specified something different
 	MandatorySettings SettingsCollection
+
+	// The following settings are applied if pgaudit is enabled
+	PgAuditSettings SettingsCollection
 }
 
 // ConfigurationInfo contains the required information to create a PostgreSQL
@@ -146,6 +152,12 @@ type ConfigurationInfo struct {
 
 	// The number of desired number of synchronous replicas
 	SyncReplicas int
+
+	// If pgaudit is enabled or not
+	PgAuditEnabled bool
+
+	// List of additional sharedPreloadLibraries to be loaded
+	AdditionalSharedPreloadLibraries []string
 }
 
 var (
@@ -183,6 +195,7 @@ var (
 		"recovery_target_timeline":   fixedConfigurationParameter,
 		"recovery_target_xid":        fixedConfigurationParameter,
 		"restore_command":            fixedConfigurationParameter,
+		"shared_preload_libraries":   fixedConfigurationParameter,
 		"shared_memory_type":         blockedConfigurationParameter,
 		"unix_socket_directories":    blockedConfigurationParameter,
 		"unix_socket_group":          blockedConfigurationParameter,
@@ -241,6 +254,7 @@ var (
 			"log_truncate_on_rotation": "false",
 			"log_directory":            LogPath,
 			"log_filename":             LogFileName,
+			SharedPreloadLibraries:     "",
 		},
 		DefaultSettings: map[MajorVersionRange]SettingsCollection{
 			{MajorVersionRangeUnlimited, 130000}: {
@@ -266,6 +280,9 @@ var (
 			"ssl_key_file":            ServerKeyLocation,
 			"ssl_ca_file":             ClientCACertificateLocation,
 		},
+		PgAuditSettings: SettingsCollection{
+			SharedPreloadLibraries: "pgaudit",
+		},
 	}
 )
 
@@ -283,39 +300,87 @@ func CreateHBARules(hba []string) string {
 	return strings.Join(hbaContent, "\n")
 }
 
-// CreatePostgresqlConfiguration create the configuration from the settings
+// PgConfiguration wraps configuration parameters with some checks
+type PgConfiguration struct {
+	configs map[string]string
+}
+
+func (p *PgConfiguration) overwriteConfig(key, value string) {
+	if p.configs == nil {
+		p.configs = make(map[string]string)
+	}
+
+	p.configs[key] = value
+}
+
+func (p *PgConfiguration) addSharedPreloadLibrary(newLibrary string) {
+	if len(newLibrary) == 0 {
+		return
+	}
+	if strings.Contains(p.configs[SharedPreloadLibraries], newLibrary) {
+		return
+	}
+	if libraries, ok := p.configs[SharedPreloadLibraries]; ok &&
+		libraries != "" {
+		p.configs[SharedPreloadLibraries] = strings.Join([]string{libraries, newLibrary}, ",")
+		return
+	}
+	p.configs[SharedPreloadLibraries] = newLibrary
+}
+
+func (p *PgConfiguration) getConfig(key string) string {
+	return p.configs[key]
+}
+
+func (p *PgConfiguration) getSortedList() []string {
+	parameters := make([]string, len(p.configs))
+	i := 0
+	for key := range p.configs {
+		parameters[i] = key
+		i++
+	}
+	sort.Strings(parameters)
+	return parameters
+}
+
+// CreatePostgresqlConfiguration creates the configuration from the settings
 // and the default values
-func CreatePostgresqlConfiguration(info ConfigurationInfo) map[string]string {
+func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	// Start from scratch
-	configuration := make(map[string]string)
+	configuration := &PgConfiguration{}
 
 	// Set all the default settings
 	setDefaultConfigurations(info, configuration)
 
 	// Apply all the values from the user, overriding defaults
 	for key, value := range info.UserSettings {
-		configuration[key] = value
+		configuration.overwriteConfig(key, value)
 	}
 
 	// Apply all mandatory settings, on top of defaults and user settings
 	if info.IncludingMandatory {
 		for key, value := range info.Settings.MandatorySettings {
-			configuration[key] = value
+			configuration.overwriteConfig(key, value)
 		}
 	}
+
+	// Set pgaudit specific configurations if needed
+	setPgAuditConfigurations(info, configuration)
 
 	// Apply the list of replicas
 	setReplicasListConfigurations(info, configuration)
 
+	setSharedPreloadLibraries(info, configuration)
+
 	return configuration
 }
 
-// setDefaultConfigurations sets all default configurations into the configuration map
+//  setDefaultConfigurations sets all default configurations into the configuration map
 // from the provided info
-func setDefaultConfigurations(info ConfigurationInfo, configuration map[string]string) {
+func setDefaultConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
 	// start from the global default settings
 	for key, value := range info.Settings.GlobalDefaultSettings {
-		configuration[key] = value
+		configuration.overwriteConfig(key, value)
 	}
 
 	// apply settings relative to a certain PostgreSQL version
@@ -323,60 +388,92 @@ func setDefaultConfigurations(info ConfigurationInfo, configuration map[string]s
 		if constraints.Min == MajorVersionRangeUnlimited || (constraints.Min <= info.MajorVersion) {
 			if constraints.Max == MajorVersionRangeUnlimited || (info.MajorVersion < constraints.Max) {
 				for key, value := range settings {
-					configuration[key] = value
+					configuration.overwriteConfig(key, value)
 				}
 			}
 		}
 	}
 }
 
-// setReplicasListConfigurations set the standby node list
-func setReplicasListConfigurations(info ConfigurationInfo, configuration map[string]string) {
+// setPgAuditConfigurations sets all pgaudit specific configurations, if needed
+func setPgAuditConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
+	if info.PgAuditEnabled {
+		for key, value := range info.Settings.PgAuditSettings {
+			if key == SharedPreloadLibraries {
+				configuration.addSharedPreloadLibrary(value)
+				continue
+			}
+			configuration.overwriteConfig(key, value)
+		}
+	}
+}
+
+// setSharedPreloadLibraries sets all additional preloaded libraries
+func setSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
+	oldLibraries := strings.Split(configuration.getConfig(SharedPreloadLibraries), ",")
+	dedupedLibraries := make(map[string]bool, len(oldLibraries)+len(info.AdditionalSharedPreloadLibraries))
+	for _, library := range append(oldLibraries, info.AdditionalSharedPreloadLibraries...) {
+		dedupedLibraries[library] = true
+	}
+	libraries := make([]string, len(dedupedLibraries))
+	i := 0
+	for library := range dedupedLibraries {
+		libraries[i] = library
+		i++
+	}
+	sort.Strings(libraries)
+	if len(dedupedLibraries) > 0 {
+		configuration.overwriteConfig(SharedPreloadLibraries, strings.Join(libraries, ","))
+	}
+}
+
+// setReplicasListConfigurations sets the standby node list
+func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
 	if info.Replicas != nil && info.SyncReplicas > 0 {
 		escapedReplicas := make([]string, len(info.Replicas))
 		for idx, name := range info.Replicas {
 			escapedReplicas[idx] = escapePostgresConfLiteral(name)
 		}
-		configuration["synchronous_standby_names"] = fmt.Sprintf(
+		configuration.overwriteConfig("synchronous_standby_names", fmt.Sprintf(
 			"ANY %v (%v)",
 			info.SyncReplicas,
-			strings.Join(escapedReplicas, ","))
+			strings.Join(escapedReplicas, ",")))
 	}
 }
 
-// FillCNPConfiguration create the actual PostgreSQL configuration
+// FillCNPConfiguration creates the actual PostgreSQL configuration
 // for CNP given the user settings and the major version. This is
 // useful during the configuration validation
-func FillCNPConfiguration(majorVersion int, userSettings map[string]string) map[string]string {
+func FillCNPConfiguration(
+	majorVersion int,
+	userSettings map[string]string,
+	additionalSharedPreloadLibraries []string,
+) map[string]string {
 	info := ConfigurationInfo{
-		Settings:     CnpConfigurationSettings,
-		MajorVersion: majorVersion,
-		UserSettings: userSettings,
-		Replicas:     nil,
+		Settings:                         CnpConfigurationSettings,
+		MajorVersion:                     majorVersion,
+		UserSettings:                     userSettings,
+		Replicas:                         nil,
+		PgAuditEnabled:                   IsPgAuditEnabled(userSettings),
+		AdditionalSharedPreloadLibraries: additionalSharedPreloadLibraries,
 	}
-	return CreatePostgresqlConfiguration(info)
+	pgConfig := CreatePostgresqlConfiguration(info)
+	return pgConfig.configs
 }
 
-// CreatePostgresqlConfFile create the contents of the postgresql.conf file
-func CreatePostgresqlConfFile(configuration map[string]string) (string, string) {
+// CreatePostgresqlConfFile creates the contents of the postgresql.conf file
+func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 	// We need to be able to compare two configurations generated
 	// by operator to know if they are different or not. To do
 	// that we sort the configuration by parameter name as order
 	// is really irrelevant for our purposes
-	parameters := make([]string, len(configuration))
-	i := 0
-	for key := range configuration {
-		parameters[i] = key
-		i++
-	}
-	sort.Strings(parameters)
-
+	parameters := configuration.getSortedList()
 	postgresConf := ""
 	for _, parameter := range parameters {
 		postgresConf += fmt.Sprintf(
 			"%v = %v\n",
 			parameter,
-			escapePostgresConfValue(configuration[parameter]))
+			escapePostgresConfValue(configuration.configs[parameter]))
 	}
 
 	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(postgresConf)))
@@ -396,4 +493,14 @@ func escapePostgresConfValue(value string) string {
 // similar to the literals in PostgreSQL
 func escapePostgresConfLiteral(value string) string {
 	return fmt.Sprintf("\"%v\"", strings.ReplaceAll(value, "\"", "\"\""))
+}
+
+// IsPgAuditEnabled checks if pgaudit is enabled or not
+func IsPgAuditEnabled(userConfigs map[string]string) bool {
+	for k := range userConfigs {
+		if strings.HasPrefix(k, "pgaudit.") {
+			return true
+		}
+	}
+	return false
 }
