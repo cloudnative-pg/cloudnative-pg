@@ -66,6 +66,9 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 		return fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
 	}
 
+	// Reconcile PostgreSQL instance parameters
+	r.reconcileInstance(cluster)
+
 	// Reconcile secrets and cryptographic material
 	return r.reconcileSecrets(ctx, cluster)
 }
@@ -224,6 +227,11 @@ func (r *InstanceReconciler) reconcileSecrets(
 	}
 
 	return nil
+}
+
+// reconcileInstance sets PostgreSQL instance parameters to current values
+func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
+	r.instance.PgCtlTimeoutForPromotion = cluster.GetPgCtlTimeoutForPromotion()
 }
 
 // reconcileConfiguration reconcile the PostgreSQL configuration from

@@ -304,6 +304,10 @@ const (
 	// to another updated replica and then automatically update the primary server
 	// (`unsupervised`, default)
 	PrimaryUpdateStrategyUnsupervised = "unsupervised"
+
+	// DefaultPgCtlTimeoutForPromotion is the default for the pg_ctl timeout to be provided when promotion is performed.
+	// It is greater than one year in seconds, big enough to simulate an infinite timeout
+	DefaultPgCtlTimeoutForPromotion = 40000000
 )
 
 // PostgresConfiguration defines the PostgreSQL configuration
@@ -315,6 +319,10 @@ type PostgresConfiguration struct {
 	// to the pg_hba.conf file)
 	// +optional
 	PgHBA []string `json:"pg_hba,omitempty"`
+
+	// Specifies the maximum number of seconds to wait when promoting an instance to primary
+	// +optional
+	PgCtlTimeoutForPromotion int32 `json:"promotionTimeout,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL
@@ -871,6 +879,16 @@ func (cluster *Cluster) GetPrimaryUpdateStrategy() PrimaryUpdateStrategy {
 // IsNodeMaintenanceWindowInProgress check if the upgrade mode is active or not
 func (cluster *Cluster) IsNodeMaintenanceWindowInProgress() bool {
 	return cluster.Spec.NodeMaintenanceWindow != nil && cluster.Spec.NodeMaintenanceWindow.InProgress
+}
+
+// GetPgCtlTimeoutForPromotion returns the timeout that should be waited for an instance to be promoted
+// to primary. As default, DefaultPgCtlTimeoutForPromotion is big enough to simulate an infinite timeout
+func (cluster *Cluster) GetPgCtlTimeoutForPromotion() int32 {
+	timeout := cluster.Spec.PostgresConfiguration.PgCtlTimeoutForPromotion
+	if timeout == 0 {
+		return DefaultPgCtlTimeoutForPromotion
+	}
+	return timeout
 }
 
 // IsNodeMaintenanceWindowReusePVC check if we are in a recovery window and
