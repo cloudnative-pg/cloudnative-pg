@@ -184,6 +184,17 @@ var _ = Describe("Fast failover", func() {
 			maxFailoverTime = 20
 		}
 
+		// Sometimes on AKS the promotion itself takes more than 10 seconds.
+		// Nothing to be done operator side, we raise the timeout to avoid
+		// failures in the test.
+		isAKS, err := env.IsAKS()
+		if err != nil {
+			fmt.Println("Couldn't verify if tests are running on AKS, assuming they aren't")
+		}
+		if isAKS {
+			maxFailoverTime = 30
+		}
+
 		AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
 
 		AssertWritesResumedBeforeTimeout(namespace, clusterName, maxFailoverTime)
