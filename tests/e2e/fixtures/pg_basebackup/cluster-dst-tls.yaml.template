@@ -30,6 +30,7 @@ spec:
         port: "5432"
         user: streaming_replica
         sslmode: verify-full
+        dbname: app
       sslKey:
         name: pg-basebackup-src-replication
         key: tls.key

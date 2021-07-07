@@ -70,7 +70,7 @@ func ClonePgData(connectionString, targetPgData string) error {
 	return nil
 }
 
-// Join create a new instance joined to an existing PostgreSQL cluster
+// Join creates a new instance joined to an existing PostgreSQL cluster
 func (info JoinInfo) Join() error {
 	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
 
@@ -79,5 +79,5 @@ func (info JoinInfo) Join() error {
 		return err
 	}
 
-	return UpdateReplicaConfiguration(info.PgData, info.ClusterName, info.PodName, false)
+	return UpdateReplicaConfiguration(info.PgData, info.ClusterName, info.PodName)
 }

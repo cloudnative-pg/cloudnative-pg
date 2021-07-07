@@ -49,6 +49,10 @@ type ClusterSpec struct {
 	// +optional
 	Bootstrap *BootstrapConfiguration `json:"bootstrap,omitempty"`
 
+	// Replica cluster configuration
+	// +optional
+	ReplicaCluster *ReplicaClusterConfiguration `json:"replica,omitempty"`
+
 	// The secret containing the superuser password. If not defined, a new
 	// secret will be created with a randomly generated password
 	// +optional
@@ -158,6 +162,20 @@ type ClusterStatus struct {
 
 	// The configuration for the CA and related certificates, initialized with defaults.
 	Certificates CertificatesStatus `json:"certificates,omitempty"`
+}
+
+// ReplicaClusterConfiguration encapsulates the configuration of a replica
+// cluster
+type ReplicaClusterConfiguration struct {
+	// If replica mode is enabled, this cluster will be a replica of an
+	// existing cluster. A cluster of such type can be created only
+	// using bootstrap via pg_basebackup
+	//+optional
+	Enabled bool `json:"enabled"`
+
+	// The name of the external server which is the replication origin
+	// +kubebuilder:validation:MinLength=1
+	Source string `json:"source"`
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration

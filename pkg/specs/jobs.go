@@ -18,7 +18,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
-// CreatePrimaryJobViaInitdb create a new primary instance in a Pod
+// CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
 func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 	jobName := fmt.Sprintf("%s-%v-initdb", cluster.Name, nodeSerial)
@@ -105,7 +105,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 	return job
 }
 
-// CreatePrimaryJobViaRecovery create a new primary instance in a Pod
+// CreatePrimaryJobViaRecovery creates a new primary instance in a Pod
 func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup *apiv1.Backup) *batchv1.Job {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 	jobName := fmt.Sprintf("%s-%v-full-recovery", cluster.Name, nodeSerial)
@@ -198,7 +198,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 	return job
 }
 
-// CreatePrimaryJobViaPgBaseBackup create a new primary instance in a Pod
+// CreatePrimaryJobViaPgBaseBackup creates a new primary instance in a Pod
 func CreatePrimaryJobViaPgBaseBackup(
 	cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)

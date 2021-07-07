@@ -1009,3 +1009,172 @@ var _ = Describe("validate anti-affinity", func() {
 		Expect(result).NotTo(BeEmpty())
 	})
 })
+
+var _ = Describe("validation of the list of external servers", func() {
+	It("is correct when it's empty", func() {
+		cluster := Cluster{}
+		Expect(cluster.validateExternalServers()).To(BeEmpty())
+	})
+
+	It("complains when the list of servers contains duplicates", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "one",
+					},
+					{
+						Name: "one",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateExternalServers()).ToNot(BeEmpty())
+	})
+
+	It("should not raise errors is the server name is unique", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "one",
+					},
+					{
+						Name: "two",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateExternalServers()).To(BeEmpty())
+	})
+})
+
+var _ = Describe("bootstrap base backup validation", func() {
+	It("doesn't complain if we are not bootstrapping using pg_basebackup", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{},
+			},
+		}
+		result := recoveryCluster.validateBootstrapPgBaseBackupSource()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("complain when the source cluster doesn't exist", func() {
+		bootstrap := BootstrapConfiguration{}
+		bpb := BootstrapPgBaseBackup{"test"}
+		bootstrap.PgBaseBackup = &bpb
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Source: "test",
+					},
+				},
+			},
+		}
+		result := recoveryCluster.validateBootstrapPgBaseBackupSource()
+		Expect(result).ToNot(BeEmpty())
+	})
+})
+
+var _ = Describe("replica mode validation", func() {
+	It("complain if pg_basebackup bootstrap option is not used", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+
+		cluster.Spec.Bootstrap.PgBaseBackup = nil
+		result = cluster.validateReplicaMode()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains when the external server doesn't exist", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{},
+			},
+		}
+
+		cluster.Spec.Bootstrap.PgBaseBackup = nil
+		result := cluster.validateReplicaMode()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains when enabled on an existing cluster with no replica mode configured", func() {
+		oldCluster := &Cluster{
+			Spec: ClusterSpec{},
+		}
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{Name: "test"},
+				},
+			},
+		}
+		Expect(cluster.validateReplicaMode()).To(BeEmpty())
+		Expect(cluster.validateReplicaModeChange(oldCluster)).ToNot(BeEmpty())
+	})
+
+	It("complains when enabled on an existing cluster with replica mode disabled", func() {
+		oldCluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: false,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{Name: "test"},
+				},
+			},
+		}
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{Name: "test"},
+				},
+			},
+		}
+		Expect(cluster.validateReplicaMode()).To(BeEmpty())
+		Expect(cluster.validateReplicaModeChange(oldCluster)).ToNot(BeEmpty())
+	})
+})

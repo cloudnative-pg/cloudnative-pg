@@ -16,6 +16,7 @@ BootstrapConfiguration
 BootstrapInitDB
 BootstrapPgBaseBackup
 BootstrapRecovery
+basebackup
 CIS
 CN
 CONFIG
@@ -127,6 +128,7 @@ RPO
 RUNTIME
 ReadWriteOnce
 RedHat
+ReplicaClusterConfiguration
 ResourceRequirements
 RoleBinding
 RollingUpdateStatus
@@ -417,6 +419,7 @@ pvc
 pvcCount
 pvcTemplate
 quickstart
+ReplicaClusterConfiguration
 rbac
 readService
 readinessProbe

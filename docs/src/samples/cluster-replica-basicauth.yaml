@@ -7,13 +7,17 @@
 apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
-  name: cluster-clone-basicauth
+  name: cluster-replica-basicauth
 spec:
   instances: 3
 
   bootstrap:
     pg_basebackup:
       source: cluster-example
+
+  replica:
+    enabled: true
+    source: cluster-example
 
   storage:
     size: 1Gi

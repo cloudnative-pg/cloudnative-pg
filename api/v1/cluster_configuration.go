@@ -52,11 +52,14 @@ func (cluster *Cluster) CreatePostgresqlConfiguration() (string, string, error) 
 		info.SyncReplicas = int(cluster.Spec.MinSyncReplicas)
 	}
 
+	// Set cluster name
+	info.ClusterName = cluster.Name
+
 	conf, sha256 := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
 	return conf, sha256, nil
 }
 
-// CreatePostgresqlHBA create the HBA rules for this cluster
+// CreatePostgresqlHBA creates the HBA rules for this cluster
 func (cluster *Cluster) CreatePostgresqlHBA() string {
 	return postgres.CreateHBARules(cluster.Spec.PostgresConfiguration.PgHBA)
 }

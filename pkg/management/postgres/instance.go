@@ -288,7 +288,7 @@ func (instance *Instance) Demote() error {
 	log.Log.Info("Demoting instance",
 		"pgpdata", instance.PgData)
 
-	return UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName, false)
+	return UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName)
 }
 
 // WaitForPrimaryAvailable waits until we can connect to the primary

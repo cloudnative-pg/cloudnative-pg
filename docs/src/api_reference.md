@@ -42,6 +42,7 @@ Below you will find a description of the defined resources:
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
 - [PostgresConfiguration](#PostgresConfiguration)
 - [RecoveryTarget](#RecoveryTarget)
+- [ReplicaClusterConfiguration](#ReplicaClusterConfiguration)
 - [RollingUpdateStatus](#RollingUpdateStatus)
 - [S3Credentials](#S3Credentials)
 - [ScheduledBackup](#ScheduledBackup)
@@ -256,6 +257,7 @@ Name                  | Description                                             
 `maxSyncReplicas      ` | The target value for the synchronous replication quorum, that can be decreased if the number of ready standbys is lower than this. Undefined or 0 disable synchronous replication.                             | int32                                                                                                                           
 `postgresql           ` | Configuration of the PostgreSQL server                                                                                                                                                                         | [PostgresConfiguration](#PostgresConfiguration)                                                                                 
 `bootstrap            ` | Instructions to bootstrap this cluster                                                                                                                                                                         | [*BootstrapConfiguration](#BootstrapConfiguration)                                                                              
+`replica              ` | Replica cluster configuration                                                                                                                                                                                  | [*ReplicaClusterConfiguration](#ReplicaClusterConfiguration)                                                                    
 `superuserSecret      ` | The secret containing the superuser password. If not defined a new secret will be created with a randomly generated password                                                                                   | [*LocalObjectReference](#LocalObjectReference)                                                                                  
 `certificates         ` | The configuration for the CA and related certificates                                                                                                                                                          | [*CertificatesConfiguration](#CertificatesConfiguration)                                                                        
 `imagePullSecrets     ` | The list of pull secrets to be used to pull the images                                                                                                                                                         | [[]LocalObjectReference](#LocalObjectReference)                                                                                 
@@ -387,6 +389,16 @@ Name            | Description                                                   
 `targetTime     ` | The target time, in any unambiguous representation allowed by PostgreSQL  | string
 `targetImmediate` | End recovery as soon as a consistent state is reached                     | *bool 
 `exclusive      ` | Set the target to be exclusive (defaults to true)                         | *bool 
+
+<a id='ReplicaClusterConfiguration'></a>
+## ReplicaClusterConfiguration
+
+ReplicaClusterConfiguration encapsulates the configuration of a replica cluster
+
+Name    | Description                                                                                                                                                     | Type  
+------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------
+`enabled` | If replica mode is enabled, this cluster will be a replica of an existing cluster. A cluster of such type can be created only using bootstrap via pg_basebackup - *mandatory*  | bool  
+`source ` | The name of the external server which is the replication origin                                                                                                 - *mandatory*  | string
 
 <a id='RollingUpdateStatus'></a>
 ## RollingUpdateStatus

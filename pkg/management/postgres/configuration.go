@@ -22,7 +22,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
-// InstallPgDataFileContent install a file in PgData, returning true/false if
+// InstallPgDataFileContent installs a file in PgData, returning true/false if
 // the file has been changed and an error state
 func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, error) {
 	targetFile := path.Join(pgdata, destinationFile)
@@ -41,10 +41,10 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 	return result, nil
 }
 
-// RefreshConfigurationFilesFromCluster receive a cluster object, generate the
-// PostgreSQL configuration and rewrite the file in the PGDATA if needed. This
+// RefreshConfigurationFilesFromCluster receives a cluster object, then generates the
+// PostgreSQL configuration and rewrites the file in the PGDATA if needed. This
 // function will return "true" if the configuration has been really changed.
-// Important: this won't send a SIGHUP to the server
+// Important: this will not send a SIGHUP to the server
 func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cluster) (bool, error) {
 	postgresConfiguration, sha256, err := cluster.CreatePostgresqlConfiguration()
 	if err != nil {
@@ -80,7 +80,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cl
 	return postgresConfigurationChanged || postgresHBAChanged, nil
 }
 
-// RefreshConfigurationFiles get the latest version of the ConfigMap from the API
+// RefreshConfigurationFiles gets the latest version of the ConfigMap from the API
 // server and then write the configuration in PGDATA
 func (instance *Instance) RefreshConfigurationFiles(ctx context.Context, client ctrl.Client) (bool, error) {
 	var cluster apiv1.Cluster
@@ -92,34 +92,36 @@ func (instance *Instance) RefreshConfigurationFiles(ctx context.Context, client 
 	return instance.RefreshConfigurationFilesFromCluster(&cluster)
 }
 
-// UpdateReplicaConfiguration update the postgresql.auto.conf or recovery.conf file for the proper version
+// UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL
-func UpdateReplicaConfiguration(pgData string, clusterName string, podName string, primary bool) error {
+func UpdateReplicaConfiguration(pgData string, clusterName string, podName string) error {
+	primaryConnInfo := buildPrimaryConnInfo(clusterName+"-rw", podName)
+	return UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo)
+}
+
+// UpdateReplicaConfigurationForPrimary updates the postgresql.auto.conf or recovery.conf file for the proper version
+// of PostgreSQL, using the specified connection string to connect to the primary server
+func UpdateReplicaConfigurationForPrimary(pgData string, primaryConnInfo string) error {
 	major, err := postgres.GetMajorVersion(pgData)
 	if err != nil {
 		return err
 	}
 
-	if primary {
-		return nil
-	}
-
 	if major < 12 {
-		return configureRecoveryConfFile(pgData, clusterName, podName)
+		return configureRecoveryConfFile(pgData, primaryConnInfo)
 	}
 
 	if err := createStandbySignal(pgData); err != nil {
 		return err
 	}
 
-	return configurePostgresAutoConfFile(pgData, clusterName, podName)
+	return configurePostgresAutoConfFile(pgData, primaryConnInfo)
 }
 
 // configureRecoveryConfFile configures replication in the recovery.conf file
 // for PostgreSQL 11 and earlier
-func configureRecoveryConfFile(pgData string, clusterName string, podName string) error {
+func configureRecoveryConfFile(pgData string, primaryConnInfo string) error {
 	log.Log.Info("Installing recovery.conf file")
-	primaryConnInfo := buildPrimaryConnInfo(clusterName+"-rw", podName)
 	targetFile := path.Join(pgData, "recovery.conf")
 
 	options := map[string]string{
@@ -139,13 +141,11 @@ func configureRecoveryConfFile(pgData string, clusterName string, podName string
 
 // configurePostgresAutoConfFile configures replication a in the postgresql.auto.conf file
 // for PostgreSQL 11 and earlier
-func configurePostgresAutoConfFile(pgData string, clusterName string, podName string) error {
+func configurePostgresAutoConfFile(pgData string, primaryConnInfo string) error {
 	log.Log.Info("Updating postgresql.auto.conf file")
-	primaryConnInfo := buildPrimaryConnInfo(clusterName+"-rw", podName)
 	targetFile := path.Join(pgData, "postgresql.auto.conf")
 
 	options := map[string]string{
-		"cluster_name":             clusterName,
 		"primary_conninfo":         primaryConnInfo,
 		"restore_command":          "/controller/manager wal-restore %f %p",
 		"recovery_target_timeline": "latest",
