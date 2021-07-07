@@ -135,6 +135,9 @@ type ConfigurationSettings struct {
 // ConfigurationInfo contains the required information to create a PostgreSQL
 // configuration
 type ConfigurationInfo struct {
+	// The name of this cluster
+	ClusterName string
+
 	// The database settings to be used
 	Settings ConfigurationSettings
 
@@ -439,6 +442,9 @@ func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConf
 			info.SyncReplicas,
 			strings.Join(escapedReplicas, ",")))
 	}
+
+	// Apply the cluster name
+	configuration.overwriteConfig("cluster_name", info.ClusterName)
 }
 
 // FillCNPConfiguration creates the actual PostgreSQL configuration

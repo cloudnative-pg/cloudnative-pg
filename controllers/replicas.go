@@ -24,7 +24,7 @@ import (
 // because there is a WAL receiver running in our Pod list
 var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
 
-// updateTargetPrimaryFromPods set the name of the target primary from the Pods status if needed
+// updateTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
 // this function will returns the name of the new primary selected for promotion
 func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	ctx context.Context,
@@ -32,15 +32,32 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	status postgres.PostgresqlStatusList,
 	resources *managedResources,
 ) (string, error) {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
-
 	if len(status.Items) == 0 {
 		// We have no status to check and we can't make a
 		// switchover under those conditions
 		return "", nil
 	}
+	if cluster.IsReplica() {
+		return r.updateTargetPrimaryFromPodsReplicaCluster(ctx, cluster, status, resources)
+	}
 
-	// Set targetPrimary to do a failover if needed
+	return r.updateTargetPrimaryFromPodsPrimaryCluster(ctx, cluster, status, resources)
+}
+
+// updateTargetPrimaryFromPodsPrimaryCluster sets the name of the target primary from the Pods status if needed
+// this function will returns the name of the new primary selected for promotion
+func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	status postgres.PostgresqlStatusList,
+	resources *managedResources,
+) (string, error) {
+	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
+	// When replica mode is not active, the first instance in the list is the primary one.
+	// This means we can just look at the first element of the list to check if the primary
+	// if available or not.
+
 	if !status.Items[0].IsPrimary && cluster.Status.TargetPrimary != status.Items[0].PodName {
 		if !status.AreWalReceiversDown() {
 			return "", ErrWalReceiversRunning
@@ -64,7 +81,48 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	return "", nil
 }
 
-// getStatusFromInstances get the replication status from the PostgreSQL instances,
+// updateTargetPrimaryFromPodsReplicaCluster sets the name of the target designated
+// primary from the Pods status if needed this function will returns the name of the
+// new primary selected for promotion
+func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	status postgres.PostgresqlStatusList,
+	resources *managedResources,
+) (string, error) {
+	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
+	// When replica mode is active, the designated primary may not be the first element
+	// in this list, since from the PostgreSQL point-of-view it's not the real primary.
+
+	for _, statusRecord := range status.Items {
+		if statusRecord.PodName == cluster.Status.TargetPrimary {
+			// Everything fine, the current designated primary is active
+			return "", nil
+		}
+	}
+
+	// The designated primary is not correctly working and we need to elect a new one
+	if !status.AreWalReceiversDown() {
+		return "", ErrWalReceiversRunning
+	}
+
+	log.Info("Current target primary isn't healthy, failing over",
+		"newPrimary", status.Items[0].PodName,
+		"clusterStatus", status)
+	log.V(1).Info("Cluster status before failover", "pods", resources.pods)
+	r.Recorder.Eventf(cluster, "Normal", "FailingOver",
+		"Current target primary isn't healthy, failing over from %v to %v",
+		cluster.Status.TargetPrimary, status.Items[0].PodName)
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
+		fmt.Sprintf("Failing over to %v", status.Items[0].PodName)); err != nil {
+		return "", err
+	}
+
+	return status.Items[0].PodName, r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
+}
+
+// getStatusFromInstances gets the replication status from the PostgreSQL instances,
 // the returned list is sorted in order to have the primary as the first element
 // and the other instances in their election order
 func (r *ClusterReconciler) getStatusFromInstances(

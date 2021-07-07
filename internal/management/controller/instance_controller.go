@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/lib/pq"
@@ -77,23 +78,27 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 func (r *InstanceReconciler) reconcileClusterRole(
 	ctx context.Context, event *watch.Event, cluster *apiv1.Cluster) error {
 	// Reconcile replica role
-	if cluster.Status.TargetPrimary == r.instance.PodName {
-		// This is a primary server
-		err := r.reconcilePrimary(ctx, cluster)
-		if err != nil {
-			return err
-		}
-
-		// Apply all the settings required by the operator if this is the first time we
-		// this instance.
-		if event.Type == watch.Added {
-			return r.configureInstancePermissions()
-		}
-
-		return nil
+	if cluster.Status.TargetPrimary != r.instance.PodName {
+		return r.reconcileReplica(ctx, cluster)
 	}
 
-	return r.reconcileReplica()
+	// Reconcile designated primary role
+	if cluster.IsReplica() {
+		return r.reconcileDesignatedPrimary(ctx, cluster)
+	}
+
+	// This is a primary server
+	err := r.reconcilePrimary(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
+	// Apply all the settings required by the operator
+	if event.Type == watch.Added {
+		return r.configureInstancePermissions()
+	}
+
+	return nil
 }
 
 // reconcileMonitoringQueries applies the custom monitoring queries to the
@@ -358,6 +363,7 @@ func (r *InstanceReconciler) refreshCAFromSecret(secret *corev1.Secret, destLoca
 
 // Reconciler primary logic
 func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) error {
+	oldCluster := cluster.DeepCopy()
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
 		return err
@@ -366,14 +372,15 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
 		r.log.Info("I'm the target primary, wait for the wal_receiver to be terminated")
-
-		err = r.waitForWalReceiverDown()
-		if err != nil {
-			return err
+		if exists, err := fileutils.FileExists(filepath.Join(r.instance.PgData, "standby.signal")); exists || err != nil {
+			// if the cluster is not replicating it means it's doing a failover and
+			// we have to wait for wal receivers to be down
+			err = r.waitForWalReceiverDown()
+			if err != nil {
+				return err
+			}
 		}
-
 		r.log.Info("I'm the target primary, applying WALs and promoting my instance")
-
 		// I must promote my instance here
 		err = r.instance.PromoteAndWait()
 		if err != nil {
@@ -381,31 +388,49 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		}
 	}
 
-	// If I'm already the current primary everything is ok.
+	// If it is already the current primary, everything is ok
+	if cluster.Status.CurrentPrimary != r.instance.PodName {
+		cluster.Status.CurrentPrimary = r.instance.PodName
+		r.log.Info("Setting myself as the current primary")
+		return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
+	}
+
+	return nil
+}
+
+// Reconciler designated primary logic for replica clusters
+func (r *InstanceReconciler) reconcileDesignatedPrimary(ctx context.Context, cluster *apiv1.Cluster) error {
+	// If I'm already the current designated primary everything is ok.
 	if cluster.Status.CurrentPrimary == r.instance.PodName {
 		return nil
 	}
 
+	// We need to ensure that this instance is replicating from the correct server
+	if err := r.refreshParentServer(ctx, cluster); err != nil {
+		return err
+	}
+
 	// I'm the primary, need to inform the operator
-	r.log.Info("Setting myself as the current primary")
-	_, err = utils.UpdateClusterStatusAndRetry(
+	r.log.Info("Setting myself as the current designated primary")
+
+	_, err := utils.UpdateClusterStatusAndRetry(
 		ctx, r.client, cluster, func(cluster *apiv1.Cluster) error {
 			cluster.Status.CurrentPrimary = r.instance.PodName
-			return err
+			return nil
 		})
 	return err
 }
 
 // Reconciler replica logic
-func (r *InstanceReconciler) reconcileReplica() error {
+func (r *InstanceReconciler) reconcileReplica(ctx context.Context, cluster *apiv1.Cluster) error {
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
 		return err
 	}
 
 	if !isPrimary {
-		// All right
-		return nil
+		// We need to ensure that this instance is replicating from the correct server
+		return r.refreshParentServer(ctx, cluster)
 	}
 
 	r.log.Info("This is an old primary node. Requesting a checkpoint before demotion")
@@ -426,6 +451,19 @@ func (r *InstanceReconciler) reconcileReplica() error {
 	// Here we need to invoke a fast shutdown on the instance, and wait the the pod
 	// restart to demote as a replica of the new primary
 	return r.instance.Shutdown()
+}
+
+// refreshParentServer will ensure that this replica instance is actually replicating from the correct
+// parent server, which is the external server for the designated primary and the designated primary
+// for the replicas
+func (r *InstanceReconciler) refreshParentServer(ctx context.Context, cluster *apiv1.Cluster) error {
+	// Let's update the replication configuration
+	if err := r.WriteReplicaConfiguration(ctx, cluster); err != nil {
+		return err
+	}
+
+	// Reload the replication configuration
+	return r.instance.Reload()
 }
 
 // waitForWalReceiverDown wait until the wal receiver is down, and it's used

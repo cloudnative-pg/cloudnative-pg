@@ -45,7 +45,7 @@ var (
 	}
 )
 
-// Restore restore a PostgreSQL cluster from a backup into the object storage
+// Restore restores a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore(ctx context.Context) error {
 	client, err := management.NewControllerRuntimeClient()
 	if err != nil {
@@ -76,7 +76,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	return info.ConfigureInstanceAfterRestore()
 }
 
-// restoreDataDir restore PGDATA from an existing backup
+// restoreDataDir restores PGDATA from an existing backup
 func (info InitInfo) restoreDataDir(backup *apiv1.Backup) error {
 	var options []string
 	if backup.Status.EndpointURL != "" {
@@ -104,7 +104,7 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup) error {
 	return nil
 }
 
-// getBackupObjectKey construct the object key where the backup will be found
+// getBackupObjectKey constructs the object key where the backup will be found
 func (info InitInfo) getBackupObjectKey() client.ObjectKey {
 	return client.ObjectKey{Namespace: info.Namespace, Name: info.BackupName}
 }
@@ -126,7 +126,7 @@ func (info InitInfo) loadBackup() (*apiv1.Backup, error) {
 	return &backup, nil
 }
 
-// writeRestoreWalConfig write a `custom.conf` allowing PostgreSQL
+// writeRestoreWalConfig writes a `custom.conf` allowing PostgreSQL
 // to complete the WAL recovery from the object storage and then start
 // as a new primary
 func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
@@ -197,7 +197,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		0o600)
 }
 
-// WriteInitialPostgresqlConf reset the postgresql.conf that there is in the instance using
+// WriteInitialPostgresqlConf resets the postgresql.conf that there is in the instance using
 // a new bootstrapped instance as reference
 func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, client client.Client) error {
 	if err := fileutils.EnsureDirectoryExist(postgresSpec.RecoveryTemporaryDirectory); err != nil {
@@ -267,7 +267,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, client clie
 	return err
 }
 
-// WriteRestoreHbaConf write a pg_hba.conf allowing access without password from localhost.
+// WriteRestoreHbaConf writes a pg_hba.conf allowing access without password from localhost.
 // this is needed to set the PostgreSQL password after the postgres server is started and active
 func (info InitInfo) WriteRestoreHbaConf() error {
 	// We allow every access from localhost, and this is needed to correctly restore
@@ -283,9 +283,9 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 	return WritePostgresUserMaps(info.PgData)
 }
 
-// ConfigureInstanceAfterRestore change the superuser password
+// ConfigureInstanceAfterRestore changes the superuser password
 // of the instance to be coherent with the one specified in the
-// cluster. This function also ensure that we can really connect
+// cluster. This function also ensures that we can really connect
 // to this cluster using the password in the secrets
 func (info InitInfo) ConfigureInstanceAfterRestore() error {
 	superUserPassword, err := fileutils.ReadFile(info.PasswordFile)
@@ -327,7 +327,8 @@ func (info InitInfo) ConfigureInstanceAfterRestore() error {
 	}
 
 	if majorVersion >= 12 {
-		err = configurePostgresAutoConfFile(info.PgData, info.ClusterName, info.PodName)
+		primaryConnInfo := buildPrimaryConnInfo(info.ClusterName, info.PodName)
+		err = configurePostgresAutoConfFile(info.PgData, primaryConnInfo)
 		if err != nil {
 			return fmt.Errorf("while configuring replica: %w", err)
 		}
@@ -336,7 +337,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore() error {
 	return nil
 }
 
-// waitUntilRecoveryFinishes periodically check the underlying
+// waitUntilRecoveryFinishes periodically checks the underlying
 // PostgreSQL connection and returns only when the recovery
 // mode is finished
 func waitUntilRecoveryFinishes(db *sql.DB) error {

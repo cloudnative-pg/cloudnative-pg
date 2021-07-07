@@ -128,10 +128,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		os.Exit(1)
 	}
 
-	err = postgres.UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName, primary)
-	if err != nil {
-		log.Log.Error(err, "Error while create the postgresql.auto.conf configuration file")
-		os.Exit(1)
+	if !primary {
+		err = reconciler.RefreshReplicaConfiguration(ctx)
+		if err != nil {
+			log.Log.Error(err, "Error while creating the replica configuration")
+			os.Exit(1)
+		}
 	}
 
 	if err = startWebServer(instance); err != nil {

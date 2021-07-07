@@ -170,6 +170,13 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 		}
 	}
 
+	// spec.replicaCluster
+	if src.Spec.ReplicaCluster != nil {
+		dst.Spec.ReplicaCluster = &v1.ReplicaClusterConfiguration{}
+		dst.Spec.ReplicaCluster.Enabled = src.Spec.ReplicaCluster.Enabled
+		dst.Spec.ReplicaCluster.Source = src.Spec.ReplicaCluster.Source
+	}
+
 	// status
 	dst.Status.Instances = src.Status.Instances
 	dst.Status.ReadyInstances = src.Status.ReadyInstances
@@ -366,6 +373,13 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 		dst.Spec.NodeMaintenanceWindow = &NodeMaintenanceWindow{}
 		dst.Spec.NodeMaintenanceWindow.InProgress = src.Spec.NodeMaintenanceWindow.InProgress
 		dst.Spec.NodeMaintenanceWindow.ReusePVC = src.Spec.NodeMaintenanceWindow.ReusePVC
+	}
+
+	// spec.replicaCluster
+	if src.Spec.ReplicaCluster != nil {
+		dst.Spec.ReplicaCluster = &ReplicaClusterConfiguration{}
+		dst.Spec.ReplicaCluster.Enabled = src.Spec.ReplicaCluster.Enabled
+		dst.Spec.ReplicaCluster.Source = src.Spec.ReplicaCluster.Source
 	}
 
 	// status

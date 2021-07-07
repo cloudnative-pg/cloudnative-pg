@@ -599,6 +599,22 @@ spec:
                   updated: it can be automated (`unsupervised` - default) or manual
                   (`supervised`)'
                 type: string
+              replica:
+                description: Replica cluster configuration
+                properties:
+                  enabled:
+                    description: If replica mode is enabled, this cluster will be
+                      a replica of an existing cluster. A cluster of such type can
+                      be created only using bootstrap via pg_basebackup
+                    type: boolean
+                  source:
+                    description: The name of the external server which is the replication
+                      origin
+                    minLength: 1
+                    type: string
+                required:
+                - source
+                type: object
               resources:
                 description: Resources requirements of every generated Pod. Please
                   refer to https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -1514,6 +1530,22 @@ spec:
                   updated: it can be automated (`unsupervised` - default) or manual
                   (`supervised`)'
                 type: string
+              replica:
+                description: Replica cluster configuration
+                properties:
+                  enabled:
+                    description: If replica mode is enabled, this cluster will be
+                      a replica of an existing cluster. A cluster of such type can
+                      be created only using bootstrap via pg_basebackup
+                    type: boolean
+                  source:
+                    description: The name of the external server which is the replication
+                      origin
+                    minLength: 1
+                    type: string
+                required:
+                - source
+                type: object
               resources:
                 description: Resources requirements of every generated Pod. Please
                   refer to https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/

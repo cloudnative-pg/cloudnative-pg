@@ -10,16 +10,14 @@ package pgbasebackup
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/spf13/cobra"
-	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configfile"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/external"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
@@ -89,16 +87,35 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 		return fmt.Errorf("missing external server")
 	}
 
-	connectionString, err := env.configureConnectionToExternalServer(ctx, &server)
+	connectionString, pgpass, err := external.ConfigureConnectionToServer(
+		ctx, env.client, env.info.Namespace, &server)
 	if err != nil {
 		return err
 	}
 
+	// Unfortunately lib/pq doesn't support the passfile
+	// connection option so we must rely on an environment
+	// variable.
+	if pgpass != "" {
+		if err = os.Setenv("PGPASSFILE", pgpass); err != nil {
+			return err
+		}
+	}
 	err = postgres.ClonePgData(connectionString, env.info.PgData)
 	if err != nil {
 		return err
 	}
 
+	if cluster.IsReplica() {
+		return postgres.UpdateReplicaConfigurationForPrimary(env.info.PgData, connectionString)
+	}
+
+	return env.configureInstanceAsNewPrimary(ctx)
+}
+
+// configureInstanceAsNewPrimary sets up this instance as a new primary server, using
+// the configuration created by the user and setting up the global object as needed
+func (env *CloneInfo) configureInstanceAsNewPrimary(ctx context.Context) error {
 	if err := env.info.WriteInitialPostgresqlConf(ctx, env.client); err != nil {
 		return err
 	}
@@ -108,139 +125,4 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 	}
 
 	return env.info.ConfigureInstanceAfterRestore()
-}
-
-// configureConnectionToExternalServer creates a connection string to the external
-// server, using the configuration inside the cluster and dumping the secret when
-// needed
-func (env *CloneInfo) configureConnectionToExternalServer(
-	ctx context.Context, server *apiv1.ExternalCluster) (string, error) {
-	connectionParameters := make(map[string]string, len(server.ConnectionParameters))
-	for key, value := range server.ConnectionParameters {
-		connectionParameters[key] = value
-	}
-
-	if server.SSLCert != nil {
-		name, err := env.dumpSecretKeyRefToFile(ctx, server.SSLCert)
-		if err != nil {
-			return "", err
-		}
-
-		connectionParameters["sslcert"] = name
-	}
-
-	if server.SSLKey != nil {
-		name, err := env.dumpSecretKeyRefToFile(ctx, server.SSLKey)
-		if err != nil {
-			return "", err
-		}
-
-		connectionParameters["sslkey"] = name
-	}
-
-	if server.SSLRootCert != nil {
-		name, err := env.dumpSecretKeyRefToFile(ctx, server.SSLRootCert)
-		if err != nil {
-			return "", err
-		}
-
-		connectionParameters["sslrootcert"] = name
-	}
-
-	if server.Password != nil {
-		password, err := env.readSecretKeyRef(ctx, server.Password)
-		if err != nil {
-			return "", err
-		}
-
-		passfile, err := createPgPassFile(password)
-		if err != nil {
-			return "", err
-		}
-
-		// Unfortunately we can't use the "passfile" option inside the PostgreSQL
-		// DSN, as the "github.com/lib/pq" doesn't support it (while libpq handles
-		// it correctly)
-		err = os.Setenv("PGPASSFILE", passfile)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	return configfile.CreateConnectionString(connectionParameters), nil
-}
-
-// dumpSecretKeyRefToFile dumps a certain secret to a file inside a temporary folder
-// using 0600 as permission bits
-func (env *CloneInfo) dumpSecretKeyRefToFile(
-	ctx context.Context, selector *corev1.SecretKeySelector) (string, error) {
-	var secret corev1.Secret
-	err := env.client.Get(ctx, ctrl.ObjectKey{Namespace: env.info.Namespace, Name: selector.Name}, &secret)
-	if err != nil {
-		return "", err
-	}
-
-	value, ok := secret.Data[selector.Key]
-	if !ok {
-		return "", fmt.Errorf("missing key %v in secret %v", selector.Key, selector.Name)
-	}
-
-	f, err := ioutil.TempFile("/controller", fmt.Sprintf("%v_%v", selector.Name, selector.Key))
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-
-	_, err = f.Write(value)
-	if err != nil {
-		return "", err
-	}
-
-	return f.Name(), nil
-}
-
-// readSecretKeyRef dumps a certain secret to a file inside a temporary folder
-// using 0600 as permission bits
-func (env *CloneInfo) readSecretKeyRef(
-	ctx context.Context, selector *corev1.SecretKeySelector) (string, error) {
-	var secret corev1.Secret
-	err := env.client.Get(ctx, ctrl.ObjectKey{Namespace: env.info.Namespace, Name: selector.Name}, &secret)
-	if err != nil {
-		return "", err
-	}
-
-	value, ok := secret.Data[selector.Key]
-	if !ok {
-		return "", fmt.Errorf("missing key %v in secret %v", selector.Key, selector.Name)
-	}
-
-	return string(value), err
-}
-
-// createPgPassFile creates a pgpass file inside the user home directory
-func createPgPassFile(password string) (string, error) {
-	pgpassContent := fmt.Sprintf(
-		"%v:%v:%v:%v:%v",
-		"*", // hostname
-		"*", // port
-		"*", // database
-		"*", // username
-		password)
-
-	f, err := ioutil.TempFile("/controller", "pgpass")
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-
-	_, err = f.WriteString(pgpassContent)
-	if err != nil {
-		return "", err
-	}
-
-	return f.Name(), nil
 }

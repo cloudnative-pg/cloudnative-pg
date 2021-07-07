@@ -122,6 +122,7 @@ func (r *Cluster) ValidateCreate() error {
 	allErrs = append(allErrs, r.validateExternalServers()...)
 	allErrs = append(allErrs, r.validateTolerations()...)
 	allErrs = append(allErrs, r.validateAntiAffinity()...)
+	allErrs = append(allErrs, r.validateReplicaMode()...)
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -152,6 +153,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validateExternalServers()...)
 	allErrs = append(allErrs, r.validateTolerations()...)
 	allErrs = append(allErrs, r.validateAntiAffinity()...)
+	allErrs = append(allErrs, r.validateReplicaMode()...)
 
 	oldObject := old.(*Cluster)
 	if oldObject == nil {
@@ -161,6 +163,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 		allErrs = append(allErrs, r.validateImageChange(oldObject.Spec.ImageName)...)
 		allErrs = append(allErrs, r.validateConfigurationChange(oldObject)...)
 		allErrs = append(allErrs, r.validateStorageSizeChange(oldObject)...)
+		allErrs = append(allErrs, r.validateReplicaModeChange(oldObject)...)
 	}
 
 	if len(allErrs) == 0 {
@@ -686,6 +689,54 @@ func (r *Cluster) validateExternalServers() field.ErrorList {
 			field.NewPath("spec", "externalServers"),
 			r.Spec.ExternalClusters,
 			"the list of external servers contains duplicate values"))
+	}
+
+	return result
+}
+
+// Check replica mode is enabled only at cluster creation time
+func (r *Cluster) validateReplicaModeChange(old *Cluster) field.ErrorList {
+	var result field.ErrorList
+	// if we are not specifying any replica cluster configuration or disabling it, nothing to do
+	if r.Spec.ReplicaCluster == nil || !r.Spec.ReplicaCluster.Enabled {
+		return result
+	}
+
+	// otherwise if it was not defined before or it was just not enabled, add an error
+	if old.Spec.ReplicaCluster == nil || !old.Spec.ReplicaCluster.Enabled {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "replicaCluster"),
+			r.Spec.ReplicaCluster,
+			"Can not enable replication on existing clusters"))
+	}
+
+	return result
+}
+
+// Check if the replica mode is used with an incompatible bootstrap
+// method
+func (r *Cluster) validateReplicaMode() field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.ReplicaCluster == nil {
+		return result
+	}
+
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.PgBaseBackup == nil {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "replicaCluster"),
+			r.Spec.ReplicaCluster,
+			"replica mode is compatible only with bootstrap using pg_basebackup"))
+	}
+
+	_, found := r.ExternalServer(r.Spec.ReplicaCluster.Source)
+	if !found {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "replicaCluster", "primaryServerName"),
+				r.Spec.ReplicaCluster.Source,
+				fmt.Sprintf("External cluster %v not found", r.Spec.ReplicaCluster.Source)))
 	}
 
 	return result
