@@ -26,7 +26,7 @@ func main() {
 
 	rootCmd := &cobra.Command{
 		Use:          "kubectl-cnp",
-		Short:        "An interface to manage your Cloud Native PostgreSQL clusters",
+		Short:        "A plugin to manage your Cloud Native PostgreSQL clusters",
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return plugin.CreateKubernetesClient(configFlags)

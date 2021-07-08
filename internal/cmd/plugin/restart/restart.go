@@ -41,6 +41,6 @@ func Restart(ctx context.Context, clusterName string) error {
 		return err
 	}
 
-	fmt.Printf("%s restarted", clusterRestarted.Name)
+	fmt.Printf("%s restarted\n", clusterRestarted.Name)
 	return nil
 }

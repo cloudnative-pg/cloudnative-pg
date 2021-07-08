@@ -21,7 +21,7 @@ func NewCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Prints version, commit sha and date of the build",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Build: %+v", versions.Info)
+			fmt.Printf("Build: %+v\n", versions.Info)
 		},
 	}
 }
