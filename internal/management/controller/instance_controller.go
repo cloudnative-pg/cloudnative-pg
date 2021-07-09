@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/lib/pq"
@@ -372,7 +371,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
 		r.log.Info("I'm the target primary, wait for the wal_receiver to be terminated")
-		if exists, err := fileutils.FileExists(filepath.Join(r.instance.PgData, "standby.signal")); exists || err != nil {
+		if r.instance.PodName != cluster.Status.CurrentPrimary {
 			// if the cluster is not replicating it means it's doing a failover and
 			// we have to wait for wal receivers to be down
 			err = r.waitForWalReceiverDown()
