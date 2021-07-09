@@ -28,6 +28,14 @@ var _ = Describe("The PostgreSQL security context", func() {
 var _ = Describe("Create affinity section", func() {
 	clusterName := "cluster-test"
 
+	It("enable preferred pod affinity everything default", func() {
+		config := v1.AffinityConfiguration{
+			PodAntiAffinityType: "preferred",
+		}
+		affinity := CreateAffinitySection(clusterName, config)
+		Expect(affinity).NotTo(BeNil())
+	})
+
 	It("can not set pod affinity if pod anti affinity is disabled", func() {
 		config := v1.AffinityConfiguration{
 			EnablePodAntiAffinity: pointerToBool(false),
