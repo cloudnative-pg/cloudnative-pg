@@ -19,15 +19,14 @@ import (
 
 // UpdatePostgresConfigurationFile search and replace options in a Postgres configuration file.
 // If the configuration file doesn't exist, it will be written.
-func UpdatePostgresConfigurationFile(fileName string, options map[string]string) error {
+func UpdatePostgresConfigurationFile(fileName string, options map[string]string) (changed bool, err error) {
 	currentContent, err := fileutils.ReadFile(fileName)
 	if err != nil {
-		return fmt.Errorf("error while reading content of %v: %w", fileName, err)
+		return false, fmt.Errorf("error while reading content of %v: %w", fileName, err)
 	}
 
 	updatedContent := UpdateConfigurationContents(currentContent, options)
-	_, err = fileutils.WriteStringToFile(fileName, updatedContent)
-	return err
+	return fileutils.WriteStringToFile(fileName, updatedContent)
 }
 
 // UpdateConfigurationContents search and replace options in a configuration file whose

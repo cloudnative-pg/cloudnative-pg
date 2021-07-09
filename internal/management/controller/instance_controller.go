@@ -457,12 +457,17 @@ func (r *InstanceReconciler) reconcileReplica(ctx context.Context, cluster *apiv
 // for the replicas
 func (r *InstanceReconciler) refreshParentServer(ctx context.Context, cluster *apiv1.Cluster) error {
 	// Let's update the replication configuration
-	if err := r.WriteReplicaConfiguration(ctx, cluster); err != nil {
+	changed, err := r.WriteReplicaConfiguration(ctx, cluster)
+	if err != nil {
 		return err
 	}
 
-	// Reload the replication configuration
-	return r.instance.Reload()
+	// Reload the replication configuration if configuration is changed
+	if changed {
+		return r.instance.Reload()
+	}
+
+	return nil
 }
 
 // waitForWalReceiverDown wait until the wal receiver is down, and it's used

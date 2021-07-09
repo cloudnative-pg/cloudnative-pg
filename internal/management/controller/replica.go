@@ -26,19 +26,23 @@ func (r *InstanceReconciler) RefreshReplicaConfiguration(ctx context.Context) er
 		return err
 	}
 
-	return r.WriteReplicaConfiguration(ctx, &cluster)
+	_, err = r.WriteReplicaConfiguration(ctx, &cluster)
+	return err
 }
 
 // WriteReplicaConfiguration writes the PostgreSQL replica configuration for connecting to the
 // right primary server, depending on the cluster replica mode
-func (r *InstanceReconciler) WriteReplicaConfiguration(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) WriteReplicaConfiguration(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (changed bool, err error) {
 	primary, err := r.instance.IsPrimary()
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if primary {
-		return nil
+		return false, nil
 	}
 
 	if cluster.IsReplica() && cluster.Status.TargetPrimary == r.instance.PodName {
@@ -48,21 +52,21 @@ func (r *InstanceReconciler) WriteReplicaConfiguration(ctx context.Context, clus
 	return r.writeReplicaConfigurationForReplica()
 }
 
-func (r *InstanceReconciler) writeReplicaConfigurationForReplica() error {
+func (r *InstanceReconciler) writeReplicaConfigurationForReplica() (changed bool, err error) {
 	return postgres.UpdateReplicaConfiguration(r.instance.PgData, r.instance.ClusterName, r.instance.PodName)
 }
 
 func (r *InstanceReconciler) writeReplicaConfigurationForDesignatedPrimary(
-	ctx context.Context, cluster *apiv1.Cluster) error {
+	ctx context.Context, cluster *apiv1.Cluster) (changed bool, err error) {
 	server, ok := cluster.ExternalServer(cluster.Spec.ReplicaCluster.Source)
 	if !ok {
-		return fmt.Errorf("missing external server")
+		return false, fmt.Errorf("missing external server")
 	}
 
 	connectionString, pgpassfile, err := external.ConfigureConnectionToServer(
 		ctx, r.client, r.instance.Namespace, &server)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if pgpassfile != "" {

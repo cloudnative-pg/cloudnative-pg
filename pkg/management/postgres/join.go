@@ -79,5 +79,6 @@ func (info JoinInfo) Join() error {
 		return err
 	}
 
-	return UpdateReplicaConfiguration(info.PgData, info.ClusterName, info.PodName)
+	_, err = UpdateReplicaConfiguration(info.PgData, info.ClusterName, info.PodName)
+	return err
 }

@@ -94,17 +94,17 @@ func (instance *Instance) RefreshConfigurationFiles(ctx context.Context, client 
 
 // UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL
-func UpdateReplicaConfiguration(pgData string, clusterName string, podName string) error {
+func UpdateReplicaConfiguration(pgData string, clusterName string, podName string) (changed bool, err error) {
 	primaryConnInfo := buildPrimaryConnInfo(clusterName+"-rw", podName)
 	return UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo)
 }
 
 // UpdateReplicaConfigurationForPrimary updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
-func UpdateReplicaConfigurationForPrimary(pgData string, primaryConnInfo string) error {
+func UpdateReplicaConfigurationForPrimary(pgData string, primaryConnInfo string) (changed bool, err error) {
 	major, err := postgres.GetMajorVersion(pgData)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if major < 12 {
@@ -112,7 +112,7 @@ func UpdateReplicaConfigurationForPrimary(pgData string, primaryConnInfo string)
 	}
 
 	if err := createStandbySignal(pgData); err != nil {
-		return err
+		return false, err
 	}
 
 	return configurePostgresAutoConfFile(pgData, primaryConnInfo)
@@ -120,8 +120,7 @@ func UpdateReplicaConfigurationForPrimary(pgData string, primaryConnInfo string)
 
 // configureRecoveryConfFile configures replication in the recovery.conf file
 // for PostgreSQL 11 and earlier
-func configureRecoveryConfFile(pgData string, primaryConnInfo string) error {
-	log.Log.Info("Installing recovery.conf file")
+func configureRecoveryConfFile(pgData string, primaryConnInfo string) (changed bool, err error) {
 	targetFile := path.Join(pgData, "recovery.conf")
 
 	options := map[string]string{
@@ -131,18 +130,20 @@ func configureRecoveryConfFile(pgData string, primaryConnInfo string) error {
 		"recovery_target_timeline": "latest",
 	}
 
-	err := configfile.UpdatePostgresConfigurationFile(targetFile, options)
+	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
 	if err != nil {
-		return err
+		return false, err
+	}
+	if changed {
+		log.Log.Info("Updated replication settings in recovery.conf file")
 	}
 
-	return nil
+	return changed, nil
 }
 
 // configurePostgresAutoConfFile configures replication a in the postgresql.auto.conf file
-// for PostgreSQL 11 and earlier
-func configurePostgresAutoConfFile(pgData string, primaryConnInfo string) error {
-	log.Log.Info("Updating postgresql.auto.conf file")
+// for PostgreSQL 12 and newer
+func configurePostgresAutoConfFile(pgData string, primaryConnInfo string) (changed bool, err error) {
 	targetFile := path.Join(pgData, "postgresql.auto.conf")
 
 	options := map[string]string{
@@ -151,12 +152,15 @@ func configurePostgresAutoConfFile(pgData string, primaryConnInfo string) error 
 		"recovery_target_timeline": "latest",
 	}
 
-	err := configfile.UpdatePostgresConfigurationFile(targetFile, options)
+	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
 	if err != nil {
-		return err
+		return false, err
+	}
+	if changed {
+		log.Log.Info("Updated replication settings in postgresql.auto.conf file")
 	}
 
-	return nil
+	return changed, nil
 }
 
 // createStandbySignal creates a standby.signal file for PostgreSQL 12 and beyond

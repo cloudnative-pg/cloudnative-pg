@@ -255,7 +255,7 @@ func (info InitInfo) Bootstrap() error {
 
 	if majorVersion >= 12 {
 		primaryConnInfo := buildPrimaryConnInfo(info.ClusterName, info.PodName)
-		err = configurePostgresAutoConfFile(info.PgData, primaryConnInfo)
+		_, err = configurePostgresAutoConfFile(info.PgData, primaryConnInfo)
 		if err != nil {
 			return fmt.Errorf("while configuring replica: %w", err)
 		}
