@@ -212,6 +212,17 @@ var _ = Describe("cluster configuration", func() {
 		cluster.Default()
 		Expect(len(cluster.Spec.PostgresConfiguration.Parameters)).To(BeNumerically(">", 0))
 	})
+
+	It("defaults the anti-affinity", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Affinity: AffinityConfiguration{},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.Spec.Affinity.PodAntiAffinityType).To(BeEquivalentTo(PodAntiAffinityTypePreferred))
+		Expect(cluster.Spec.Affinity.EnablePodAntiAffinity).To(BeNil())
+	})
 })
 
 var _ = Describe("Storage validation", func() {
@@ -932,6 +943,15 @@ var _ = Describe("toleration validation", func() {
 var _ = Describe("validate anti-affinity", func() {
 	t := true
 	f := false
+	It("doesn't complain if we provide an empty affinity section", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Affinity: AffinityConfiguration{},
+			},
+		}
+		result := cluster.validateAntiAffinity()
+		Expect(result).To(BeEmpty())
+	})
 	It("doesn't complain if we provide a proper PodAntiAffinity with anti-affinity enabled", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{

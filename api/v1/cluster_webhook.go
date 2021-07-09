@@ -76,9 +76,8 @@ func (r *Cluster) Default() {
 		}
 	}
 
-	// Defaulting the pod anti-affinity type if podAntiaAffinity is enabled and not specified
-	if r.Spec.Affinity.EnablePodAntiAffinity != nil &&
-		*r.Spec.Affinity.EnablePodAntiAffinity &&
+	// Defaulting the pod anti-affinity type if podAntiAffinity
+	if (r.Spec.Affinity.EnablePodAntiAffinity == nil || *r.Spec.Affinity.EnablePodAntiAffinity) &&
 		r.Spec.Affinity.PodAntiAffinityType == "" {
 		r.Spec.Affinity.PodAntiAffinityType = PodAntiAffinityTypePreferred
 	}
