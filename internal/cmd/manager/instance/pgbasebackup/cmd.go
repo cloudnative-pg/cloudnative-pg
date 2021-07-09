@@ -107,7 +107,8 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 	}
 
 	if cluster.IsReplica() {
-		return postgres.UpdateReplicaConfigurationForPrimary(env.info.PgData, connectionString)
+		_, err = postgres.UpdateReplicaConfigurationForPrimary(env.info.PgData, connectionString)
+		return err
 	}
 
 	return env.configureInstanceAsNewPrimary(ctx)
