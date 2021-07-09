@@ -2,6 +2,32 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.6.0
+
+**Release date:** 09 July 2021
+
+Features:
+
+- Replica mode (**EXPERIMENTAL**): allow a cluster to be created as a replica
+  of a source cluster. A replica cluster has a *designated primary* and any
+  number of standbys.
+- Add the `.spec.postgresql.promotionTimeout` parameter to specify the maximum amount of
+  seconds to wait when promoting an instance to primary, defaulting to 40000000 seconds.
+- Add the `.spec.affinity.podAntiAffinityType` parameter. It can be set to
+  `preferred` (default), resulting in
+  `preferredDuringSchedulingIgnoredDuringExecution` being used, or to
+  `required`,   resulting in `requiredDuringSchedulingIgnoredDuringExecution`.
+
+Changes:
+
+- Fixed a race condition when deleting a PVC and a pod which prevented the
+  operator from creating a new pod.
+- Fixed a race condition preventing the manager from detecting the need for
+  a PostgreSQL restart on a configuration change.
+- Fixed a panic in `kubectl-cnp` on clusters without annotations.
+- Lowered the level of some log messages to `debug`.
+- E2E tests for server CA and TLS injection.
+
 ## Version 1.5.1
 
 **Release date:** 17 June 2021
