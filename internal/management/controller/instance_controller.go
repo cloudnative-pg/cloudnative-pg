@@ -282,18 +282,17 @@ func (r *InstanceReconciler) reconcileConfiguration(ctx context.Context, cluster
 	// I'm not the first instance spotting the configuration
 	// change, everything if fine and there is no need to signal
 	// the operator again
-	if cluster.Status.Phase == apiv1.PhaseApplyingConfiguration {
+	if cluster.Status.Phase == apiv1.PhaseApplyingConfiguration ||
+		// don't trigger the reconciliation loop from the primary,
+		// let's wait for replicas to trigger it first
+		(status.IsPrimary && cluster.Spec.Instances > 1) {
 		return nil
 	}
 
-	_, err = utils.UpdateClusterStatusAndRetry(
-		ctx, r.client, cluster, func(cluster *apiv1.Cluster) error {
-			cluster.Status.Phase = apiv1.PhaseApplyingConfiguration
-			cluster.Status.PhaseReason = "PostgreSQL configuration changed"
-			return nil
-		})
-
-	return err
+	oldCluster := cluster.DeepCopy()
+	cluster.Status.Phase = apiv1.PhaseApplyingConfiguration
+	cluster.Status.PhaseReason = "PostgreSQL configuration changed"
+	return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 }
 
 // refreshCertificateFilesFromSecret receive a secret and rewrite the file
