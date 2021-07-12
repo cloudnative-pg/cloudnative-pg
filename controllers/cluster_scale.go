@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 )
 
 // scaleDownCluster handles the scaling down operations of a PostgreSQL cluster.
@@ -52,19 +51,10 @@ func (r *ClusterReconciler) scaleDownCluster(
 	r.Recorder.Eventf(cluster, "Normal", "ScaleDown",
 		"Scaling down: removing instance %v", sacrificialPod.Name)
 
-	// Retrieve the cluster key
-	key := expectations.KeyFunc(cluster)
-
-	// We expect the deletion of the selected Pod
-	if err := r.podExpectations.ExpectDeletions(key, 1); err != nil {
-		log.Error(err, "Unable to set podExpectations", "key", key, "dels", 1)
-	}
-
 	log.Info("Too many nodes for cluster, deleting an instance",
 		"pod", sacrificialPod.Name)
 	if err := r.Delete(ctx, sacrificialPod); err != nil {
 		// We cannot observe a deletion if it was not accepted by the server
-		r.podExpectations.DeletionObserved(key)
 
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
@@ -82,15 +72,9 @@ func (r *ClusterReconciler) scaleDownCluster(
 		},
 	}
 
-	// We expect the deletion of the selected PVC
-	if err := r.pvcExpectations.ExpectDeletions(key, 1); err != nil {
-		log.Error(err, "Unable to set pvcExpectations", "key", key, "dels", 1)
-	}
-
 	err := r.Delete(ctx, &pvc)
 	if err != nil {
 		// We cannot observe a deletion if it was not accepted by the server
-		r.pvcExpectations.DeletionObserved(key)
 
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
@@ -101,11 +85,6 @@ func (r *ClusterReconciler) scaleDownCluster(
 	// And now also the Job
 	for idx := range resources.jobs.Items {
 		if strings.HasPrefix(resources.jobs.Items[idx].Name, sacrificialPod.Name+"-") {
-			// We expect the deletion of the selected Job
-			if err := r.jobExpectations.ExpectDeletions(key, 1); err != nil {
-				log.Error(err, "Unable to set jobExpectations", "key", key, "dels", 1)
-			}
-
 			// This job was working against the PVC of this Pod,
 			// let's remove it
 			foreground := metav1.DeletePropagationForeground
@@ -117,9 +96,6 @@ func (r *ClusterReconciler) scaleDownCluster(
 				},
 			)
 			if err != nil {
-				// We cannot observe a deletion if it was not accepted by the server
-				r.jobExpectations.DeletionObserved(key)
-
 				// Ignore if NotFound, otherwise report the error
 				if !apierrs.IsNotFound(err) {
 					return fmt.Errorf("scaling down node (job) %v: %v", sacrificialPod.Name, err)

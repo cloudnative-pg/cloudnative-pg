@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
@@ -28,31 +27,18 @@ func (r *ClusterReconciler) cleanupCluster(
 	jobs batchv1.JobList) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
-	// Retrieve the cluster key
-	key := expectations.KeyFunc(cluster)
-
 	completeJobs := utils.FilterCompleteJobs(jobs.Items)
 	if len(completeJobs) == 0 {
 		return nil
 	}
 
-	if err := r.jobExpectations.ExpectDeletions(key, 0); err != nil {
-		log.Error(err, "Unable to initialize jobExpectations", "key", key, "dels", 0)
-	}
-
 	for idx := range completeJobs {
 		log.V(2).Info("Removing job", "job", jobs.Items[idx].Name)
-
-		// We expect the deletion of the selected Job
-		r.jobExpectations.RaiseExpectations(key, 0, 1)
 
 		foreground := metav1.DeletePropagationForeground
 		if err := r.Delete(ctx, &jobs.Items[idx], &client.DeleteOptions{
 			PropagationPolicy: &foreground,
 		}); err != nil {
-			// We cannot observe a deletion if it was not accepted by the server
-			r.jobExpectations.DeletionObserved(key)
-
 			return fmt.Errorf("cannot delete job: %w", err)
 		}
 	}

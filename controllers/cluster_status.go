@@ -23,7 +23,6 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
@@ -141,15 +140,8 @@ func (r *ClusterReconciler) updateResourceStatus(
 	resources *managedResources,
 ) error {
 	// Retrieve the cluster key
-	key := expectations.KeyFunc(cluster)
 
 	existingClusterStatus := cluster.Status
-
-	// Update the pvcExpectations for the cluster
-	createdPVCs, deletedPVCs := countPVC(cluster, resources)
-	if createdPVCs > 0 || deletedPVCs > 0 {
-		r.pvcExpectations.LowerExpectations(key, createdPVCs, deletedPVCs)
-	}
 
 	newPVCCount := int32(len(resources.pvcs.Items))
 	cluster.Status.PVCCount = newPVCCount
@@ -163,21 +155,13 @@ func (r *ClusterReconciler) updateResourceStatus(
 	filteredPods := utils.FilterActivePods(resources.pods.Items)
 
 	// Count pods
-	oldInstances := cluster.Status.Instances
 	newInstances := int32(len(filteredPods))
 	cluster.Status.Instances = newInstances
 	cluster.Status.ReadyInstances = int32(utils.CountReadyPods(filteredPods))
 
-	// Update the podExpectations for the cluster
-	r.podExpectations.LowerExpectationsDelta(key, int(newInstances-oldInstances))
-
 	// Count jobs
-	oldJobs := cluster.Status.JobCount
 	newJobs := int32(len(resources.jobs.Items))
 	cluster.Status.JobCount = newJobs
-
-	// Update the jobExpectations for the cluster
-	r.jobExpectations.LowerExpectationsDelta(key, int(newJobs-oldJobs))
 
 	// Instances status
 	cluster.Status.InstancesStatus = utils.ListStatusPods(resources.pods.Items)
@@ -238,41 +222,6 @@ func SetClusterOwnerAnnotationsAndLabels(obj *v1.ObjectMeta, cluster *apiv1.Clus
 	utils.SetOperatorVersion(obj, versions.Version)
 	utils.InheritAnnotations(obj, cluster.Annotations, configuration.Current)
 	utils.InheritLabels(obj, cluster.Labels, configuration.Current)
-}
-
-// countPVC returns the numbers of PVCs created and deleted
-// w.r.t. the previous state of the cluster
-func countPVC(
-	cluster *apiv1.Cluster,
-	resources *managedResources,
-) (created int, deleted int) {
-	// Fill the seen map with all the known PVCs
-	seen := map[string]bool{}
-	for _, pvc := range cluster.Status.DanglingPVC {
-		seen[pvc] = true
-	}
-	for _, pvc := range cluster.Status.InitializingPVC {
-		seen[pvc] = true
-	}
-	for _, pvc := range cluster.Status.HealthyPVC {
-		seen[pvc] = true
-	}
-
-	// If a PVC is not in the seen map it is new
-	for _, pvc := range resources.pvcs.Items {
-		if _, ok := seen[pvc.Name]; ok {
-			// We remove the PVC from the seen map once matched,
-			// to detect those that are remaining at the end.
-			delete(seen, pvc.Name)
-		} else {
-			created++
-		}
-	}
-
-	// If a PVC has not been matched it has been removed.
-	deleted = len(seen)
-
-	return created, deleted
 }
 
 // refreshCertExpiration check the expiration date of all the certificates used by the cluster
