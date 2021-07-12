@@ -14,12 +14,18 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
-// CreatePodDisruptionBudget create a pud disruption budget telling
-// k8s to avoid removing more than one node at a time
-func CreatePodDisruptionBudget(cluster apiv1.Cluster) policyv1beta1.PodDisruptionBudget {
-	one := intstr.FromInt(1)
+// BuildReplicasPodDisruptionBudget creates a pod disruption budget telling
+// K8s to avoid removing more than one replica at a time
+func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1beta1.PodDisruptionBudget {
+	// We should ensure that in a cluster of n instances,
+	// with n-1 replicas, at least n-2 are always available
+	if cluster == nil || cluster.Spec.Instances < 3 {
+		return nil
+	}
+	minAvailableReplicas := int(cluster.Spec.Instances) - 2
+	allReplicasButOne := intstr.FromInt(minAvailableReplicas)
 
-	return policyv1beta1.PodDisruptionBudget{
+	return &policyv1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
 			Namespace: cluster.Namespace,
@@ -27,10 +33,36 @@ func CreatePodDisruptionBudget(cluster apiv1.Cluster) policyv1beta1.PodDisruptio
 		Spec: policyv1beta1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"postgresql": cluster.Name,
+					ClusterLabelName:     cluster.Name,
+					ClusterRoleLabelName: ClusterRoleLabelReplica,
 				},
 			},
-			MaxUnavailable: &one,
+			MinAvailable: &allReplicasButOne,
+		},
+	}
+}
+
+// BuildPrimaryPodDisruptionBudget creates a pod disruption budget, telling
+// K8s to avoid removing more than one primary instance at a time
+func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1beta1.PodDisruptionBudget {
+	if cluster == nil {
+		return nil
+	}
+	one := intstr.FromInt(1)
+
+	return &policyv1beta1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cluster.Name + "-primary",
+			Namespace: cluster.Namespace,
+		},
+		Spec: policyv1beta1.PodDisruptionBudgetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					ClusterLabelName:     cluster.Name,
+					ClusterRoleLabelName: ClusterRoleLabelPrimary,
+				},
+			},
+			MinAvailable: &one,
 		},
 	}
 }

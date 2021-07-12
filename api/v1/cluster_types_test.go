@@ -82,7 +82,7 @@ var _ = Describe("Node maintenance window", func() {
 	It("default maintenance not in progress", func() {
 		cluster := Cluster{}
 		Expect(cluster.IsNodeMaintenanceWindowInProgress()).To(BeFalse())
-		Expect(cluster.IsNodeMaintenanceWindowReusePVC()).To(BeFalse())
+		Expect(cluster.IsReusePVCEnabled()).To(BeTrue())
 	})
 
 	It("is enabled when specified, and by default ReusePVC is enabled", func() {
@@ -94,7 +94,7 @@ var _ = Describe("Node maintenance window", func() {
 			},
 		}
 		Expect(cluster.IsNodeMaintenanceWindowInProgress()).To(BeTrue())
-		Expect(cluster.IsNodeMaintenanceWindowReusePVC()).To(BeTrue())
+		Expect(cluster.IsReusePVCEnabled()).To(BeTrue())
 	})
 
 	It("is enabled and you required to reuse PVC", func() {
@@ -109,7 +109,7 @@ var _ = Describe("Node maintenance window", func() {
 		}
 
 		Expect(cluster.IsNodeMaintenanceWindowInProgress()).To(BeTrue())
-		Expect(cluster.IsNodeMaintenanceWindowReusePVC()).To(BeFalse())
+		Expect(cluster.IsReusePVCEnabled()).To(BeFalse())
 	})
 })
 

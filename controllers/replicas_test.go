@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 
 	. "github.com/onsi/ginkgo"
@@ -111,5 +112,31 @@ var _ = Describe("Sacrificial Pod detection", func() {
 		result := getSacrificialPod(podList)
 		Expect(result).ToNot(BeNil())
 		Expect(result.Name).To(Equal("car-2"))
+	})
+})
+
+var _ = Describe("Check pods not on primary node", func() {
+	item1 := postgres.PostgresqlStatus{
+		IsPrimary: false,
+		Node:      "node-1",
+		PodName:   "pod-1",
+	}
+
+	item2 := postgres.PostgresqlStatus{
+		IsPrimary: false,
+		Node:      "node-2",
+		PodName:   "pod-2",
+	}
+	statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{item1, item2}}
+
+	It("if primary is nil", func() {
+		Expect(GetPodsNotOnPrimaryNode(statusList, nil).Items).To(BeEmpty())
+	})
+
+	item1.IsPrimary = true
+	statusList2 := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{item1, item2}}
+
+	It("first status element is primary", func() {
+		Expect(GetPodsNotOnPrimaryNode(statusList2, &statusList2.Items[0]).Items).ToNot(BeEmpty())
 	})
 })

@@ -17,6 +17,7 @@ type PostgresqlStatus struct {
 	ReplayPaused        bool   `json:"replayPaused"`
 	PendingRestart      bool   `json:"pendingRestart"`
 	IsWalReceiverActive bool   `json:"isWalReceiverActive"`
+	Node                string `json:"node"`
 
 	// This field is set when there is an error while extracting the
 	// status of a Pod

@@ -47,12 +47,24 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
+	// Create or patch the primary PDB
+	err = r.createOrPatchOwnedPodDisruptionBudget(ctx,
+		cluster,
+		specs.BuildPrimaryPodDisruptionBudget(cluster),
+	)
+	if err != nil {
+		return err
+	}
+
 	// The PDB should not be enforced if we are inside a maintenance
-	// windows and we chose to don't allocate more space
-	if cluster.IsNodeMaintenanceWindowReusePVC() {
-		err = r.deletePodDisruptionBudget(ctx, cluster)
+	// windows and we chose to don't allocate more space.
+	if cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled() {
+		err = r.deleteClusterPodDisruptionBudget(ctx, cluster)
 	} else {
-		err = r.createPodDisruptionBudget(ctx, cluster)
+		err = r.createOrPatchOwnedPodDisruptionBudget(ctx,
+			cluster,
+			specs.BuildReplicasPodDisruptionBudget(cluster),
+		)
 	}
 	if err != nil {
 		return err
@@ -167,28 +179,54 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 	return nil
 }
 
-// createOrUpdatePodDisruptionBudget ensures that we have a PDB requiring to remove one node at a time
-func (r *ClusterReconciler) createPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
+// createOrPatchOwnedPodDisruptionBudget ensures that we have a PDB requiring to remove one node at a time
+func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pdb *v1beta1.PodDisruptionBudget,
+) error {
+	if pdb == nil {
+		return nil
+	}
+
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	var oldPdb v1beta1.PodDisruptionBudget
 
-	targetPdb := specs.CreatePodDisruptionBudget(*cluster)
-	SetClusterOwnerAnnotationsAndLabels(&targetPdb.ObjectMeta, cluster)
-
-	err := r.Create(ctx, &targetPdb)
-	if err != nil {
-		if !apierrs.IsAlreadyExists(err) {
-			log.Error(err, "Unable to create PodDisruptionBudget", "object", targetPdb)
-			return err
+	if err := r.Get(ctx, client.ObjectKey{Name: pdb.Name, Namespace: pdb.Namespace}, &oldPdb); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while getting PodDisruptionBudget: %w", err)
 		}
-	} else {
-		r.Recorder.Event(cluster, "Normal", "CreatingPodDisruptionBudget", "Creating Pod Disruption Budget")
+		SetClusterOwnerAnnotationsAndLabels(&pdb.ObjectMeta, cluster)
+
+		r.Recorder.Event(cluster, "Normal", "CreatingPodDisruptionBudget",
+			fmt.Sprintf("Creating PodDisruptionBudget %s", pdb.Name))
+		if err = r.Create(ctx, pdb); err != nil {
+			log.Error(err, "Unable to create PodDisruptionBudget", "object", pdb)
+			return fmt.Errorf("while creating PodDisruptionBudget: %w", err)
+		}
+		return nil
+	}
+
+	if reflect.DeepEqual(pdb.Spec, oldPdb.Spec) {
+		// Everything fine, the two pdbs are the same for us
+		return nil
+	}
+
+	r.Recorder.Event(cluster, "Normal", "UpdatingPodDisruptionBudget",
+		fmt.Sprintf("Updating PodDisruptionBudget %s", pdb.Name))
+
+	patchedPdb := oldPdb
+	patchedPdb.Spec = pdb.Spec
+
+	if err := r.Patch(ctx, &patchedPdb, client.MergeFrom(&oldPdb)); err != nil {
+		return fmt.Errorf("while patching PodDisruptionBudget: %w", err)
 	}
 
 	return nil
 }
 
-// deletePodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
-func (r *ClusterReconciler) deletePodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
+// deleteClusterPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
+func (r *ClusterReconciler) deleteClusterPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
 	// If we have a PDB, we need to delete it
@@ -700,7 +738,8 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 	}
 
 	if len(cluster.Status.DanglingPVC) > 0 {
-		if cluster.IsNodeMaintenanceWindowNotReusePVC() || cluster.Spec.Instances <= cluster.Status.Instances {
+		if (cluster.IsNodeMaintenanceWindowInProgress() && !cluster.IsReusePVCEnabled()) ||
+			cluster.Spec.Instances <= cluster.Status.Instances {
 			log.Info(
 				"Detected unneeded PVCs, removing them",
 				"statusInstances", cluster.Status.Instances,

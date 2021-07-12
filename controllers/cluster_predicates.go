@@ -9,6 +9,7 @@ package controllers
 import (
 	"reflect"
 
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,6 +59,18 @@ func isCluster(object client.Object) bool {
 
 	_, okv1alpha1 := object.(*apiv1alpha1.Cluster)
 	return okv1alpha1
+}
+
+// isUsefulNodeEvent checks if a certain object is a node
+func isUsefulNodeEvent(oldObj client.Object, newObj client.Object) bool {
+	oldNode, oldOk := oldObj.(*corev1.Node)
+	newNode, newOk := newObj.(*corev1.Node)
+	return oldOk && newOk && nodeUschedulableChanged(oldNode, newNode)
+}
+
+// nodeUschedulableChanged checks if a node became unschedulable
+func nodeUschedulableChanged(oldNode *corev1.Node, newNode *corev1.Node) bool {
+	return oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable
 }
 
 // Create implements Predicate
@@ -111,5 +124,5 @@ func (ClusterPredicate) Update(e event.UpdateEvent) bool {
 		return differentGenerations || differentAnnotations
 	}
 
-	return isControlledObject(e.ObjectNew)
+	return isControlledObject(e.ObjectNew) || isUsefulNodeEvent(e.ObjectOld, e.ObjectNew)
 }

@@ -444,6 +444,7 @@ func ExtractInstancesStatus(
 	for idx := range filteredPods {
 		instanceStatus := getReplicaStatusFromPodViaHTTP(ctx, filteredPods[idx])
 		instanceStatus.IsReady = utils.IsPodReady(filteredPods[idx])
+		instanceStatus.Node = filteredPods[idx].Spec.NodeName
 		result.Items = append(result.Items, instanceStatus)
 	}
 	return result
