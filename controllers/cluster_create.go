@@ -24,7 +24,6 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
@@ -519,18 +518,11 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	// Retrieve the cluster key
-	key := expectations.KeyFunc(cluster)
-
-	// We expect the creation of a PVC
-	if err := r.pvcExpectations.ExpectCreations(key, 1); err != nil {
-		log.Error(err, "Unable to set pvcExpectations", "key", key, "adds", 1)
-	}
 
 	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, cluster)
 
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
 		// We cannot observe a creation if it was not accepted by the server
-		r.pvcExpectations.CreationObserved(key)
 
 		log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 		return ctrl.Result{}, err
@@ -590,15 +582,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	utils.InheritLabels(&job.ObjectMeta, cluster.Labels, configuration.Current)
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels, configuration.Current)
 
-	// We expect the creation of a Job
-	if err := r.jobExpectations.ExpectCreations(key, 1); err != nil {
-		log.Error(err, "Unable to set jobExpectations", "key", key, "adds", 1)
-	}
-
 	if err = r.Create(ctx, job); err != nil {
-		// We cannot observe a creation if it was not accepted by the server
-		r.jobExpectations.CreationObserved(key)
-
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			return ctrl.Result{}, nil
@@ -674,18 +658,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	utils.InheritLabels(&job.ObjectMeta, cluster.Labels, configuration.Current)
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels, configuration.Current)
 
-	// Retrieve the cluster key
-	key := expectations.KeyFunc(cluster)
-
-	// We expect the creation of a Job
-	if err := r.jobExpectations.ExpectCreations(key, 1); err != nil {
-		log.Error(err, "Unable to set jobExpectations", "key", key, "adds", 1)
-	}
-
 	if err = r.Create(ctx, job); err != nil {
-		// We cannot observe a creation if it was not accepted by the server
-		r.jobExpectations.CreationObserved(key)
-
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			log.Info("Job already exist, maybe the cache is stale", "pod", job.Name)
@@ -712,15 +685,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, cluster)
 
-	// We expect the creation of a PVC
-	if err := r.pvcExpectations.ExpectCreations(key, 1); err != nil {
-		log.Error(err, "Unable to set pvcExpectations", "key", key, "adds", 1)
-	}
-
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-		// We cannot observe a creation if it was not accepted by the server
-		r.pvcExpectations.CreationObserved(key)
-
 		log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 		return ctrl.Result{}, err
 	}
@@ -784,15 +749,7 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 	utils.InheritAnnotations(&pod.ObjectMeta, cluster.Annotations, configuration.Current)
 	utils.InheritLabels(&pod.ObjectMeta, cluster.Labels, configuration.Current)
 
-	// We expect the creation of a Pod
-	if err := r.podExpectations.ExpectCreations(expectations.KeyFunc(cluster), 1); err != nil {
-		log.Error(err, "Unable to set podExpectations", "key", expectations.KeyFunc(cluster), "adds", 1)
-	}
-
 	if err := r.Create(ctx, pod); err != nil {
-		// We cannot observe a creation if it was not accepted by the server
-		r.podExpectations.CreationObserved(expectations.KeyFunc(cluster))
-
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
@@ -841,16 +798,8 @@ func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *api
 			return fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
 		}
 
-		// We expect the deletion of a PVC
-		if err := r.pvcExpectations.ExpectDeletions(expectations.KeyFunc(cluster), 1); err != nil {
-			log.Error(err, "Unable to set podExpectations", "key", expectations.KeyFunc(cluster), "dels", 1)
-		}
-
 		err = r.Delete(ctx, &pvc)
 		if err != nil {
-			// We cannot observe a deletion if it was not accepted by the server
-			r.podExpectations.DeletionObserved(expectations.KeyFunc(cluster))
-
 			// Ignore if NotFound, otherwise report the error
 			if apierrs.IsNotFound(err) {
 				return nil

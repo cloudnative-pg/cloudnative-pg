@@ -30,7 +30,6 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
@@ -49,12 +48,9 @@ var (
 // ClusterReconciler reconciles a Cluster objects
 type ClusterReconciler struct {
 	client.Client
-	podExpectations *expectations.ControllerExpectations
-	jobExpectations *expectations.ControllerExpectations
-	pvcExpectations *expectations.ControllerExpectations
-	Log             logr.Logger
-	Scheme          *runtime.Scheme
-	Recorder        record.EventRecorder
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // Alphabetical order to not repeat or miss permissions
@@ -93,14 +89,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// to remove all the Pods of the cluster.
 		if apierrs.IsNotFound(err) {
 			log.Info("Resource has been deleted")
-
-			// Let's remove every expectation we have about this cluster
-			r.deleteExpectations(&apiv1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      req.Name,
-					Namespace: req.Namespace,
-				},
-			})
 
 			return ctrl.Result{}, nil
 		}
@@ -182,12 +170,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
-	if !r.satisfiedExpectations(&cluster) {
-		// If an expectation is not met, let's try invoking a reconciliation loop
-		// in one seconds, just to see if something has changed or not
+	if runningJobs := resources.countRunningJobs(); runningJobs > 0 {
+		log.V(2).Info("A job is currently running. Waiting", "count", runningJobs)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
-
 	if !resources.allPodsAreActive() {
 		log.V(2).Info("A managed resource is currently being created or deleted. Waiting")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
@@ -203,35 +189,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Reconcile Pods
 	return r.ReconcilePods(ctx, req, &cluster, resources, instancesStatus)
-}
-
-// satisfiedExpectations check if the expectations for a certain cluster are met
-func (r *ClusterReconciler) satisfiedExpectations(cluster *apiv1.Cluster) bool {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
-
-	key := expectations.KeyFunc(cluster)
-	if !r.podExpectations.SatisfiedExpectations(key) {
-		log.Info("Pod expectations are not met")
-		return false
-	}
-	if !r.jobExpectations.SatisfiedExpectations(key) {
-		log.Info("Job expectations are not met")
-		return false
-	}
-	if !r.pvcExpectations.SatisfiedExpectations(key) {
-		log.Info("PVC expectations are not met")
-		return false
-	}
-
-	return true
-}
-
-// deleteExpectations remove expectations we have about a certain cluster
-func (r *ClusterReconciler) deleteExpectations(cluster *apiv1.Cluster) {
-	key := expectations.KeyFunc(cluster)
-	r.podExpectations.DeleteExpectations(key)
-	r.jobExpectations.DeleteExpectations(key)
-	r.pvcExpectations.DeleteExpectations(key)
 }
 
 // ReconcilePVCs align the PVCs that are backing our cluster with the user specifications
@@ -385,10 +342,6 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 
 // SetupWithManager creates a ClusterReconciler
 func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
-	// Initialize expectations
-	r.podExpectations = expectations.NewControllerExpectations()
-	r.jobExpectations = expectations.NewControllerExpectations()
-	r.pvcExpectations = expectations.NewControllerExpectations()
 	err := r.createFieldIndexes(ctx, mgr)
 	if err != nil {
 		return err
