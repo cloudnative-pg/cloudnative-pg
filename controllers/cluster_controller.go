@@ -15,18 +15,24 @@ import (
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/expectations"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
 const (
@@ -43,30 +49,31 @@ var (
 // ClusterReconciler reconciles a Cluster objects
 type ClusterReconciler struct {
 	client.Client
-	Log             logr.Logger
-	Scheme          *runtime.Scheme
-	Recorder        record.EventRecorder
 	podExpectations *expectations.ControllerExpectations
 	jobExpectations *expectations.ControllerExpectations
 	pvcExpectations *expectations.ControllerExpectations
+	Log             logr.Logger
+	Scheme          *runtime.Scheme
+	Recorder        record.EventRecorder
 }
 
 // Alphabetical order to not repeat or miss permissions
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;update;list
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;update;list
-// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;create;update
-// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters/status,verbs=get;watch;update;patch
-// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters/finalizers,verbs=update
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;delete;patch;create;watch
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;create;update
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=create;delete;get;list;watch;update;patch
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters/finalizers,verbs=update
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=clusters/status,verbs=get;watch;update;patch
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=create;patch;update;get;list;watch
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=create;patch;update;get;list;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=configmaps/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
@@ -136,7 +143,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
 	}
 
-	if cluster.Status.CurrentPrimary != "" && cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+	if cluster.Status.CurrentPrimary != "" &&
+		cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
 		log.Info("There is a switchover or a failover "+
 			"in progress, waiting for the operation to complete",
 			"currentPrimary", cluster.Status.CurrentPrimary,
@@ -319,10 +327,9 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 		return r.createPrimaryInstance(ctx, cluster)
 	}
 
-	// Stop acting here if there are non-ready Pods and cluster
-	// is in maintenance mode reusing PVCs.
+	// Stop acting here if there are non-ready Pods unless in maintenance reusing PVCs.
 	// The user have choose to wait for the missing nodes to come up
-	if !cluster.IsNodeMaintenanceWindowReusePVC() &&
+	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
 		cluster.Status.ReadyInstances < cluster.Status.Instances {
 		log.V(2).Info("Waiting for Pods to be ready")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
@@ -382,7 +389,28 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 	r.podExpectations = expectations.NewControllerExpectations()
 	r.jobExpectations = expectations.NewControllerExpectations()
 	r.pvcExpectations = expectations.NewControllerExpectations()
+	err := r.createFieldIndexes(ctx, mgr)
+	if err != nil {
+		return err
+	}
 
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&apiv1.Cluster{}).
+		WithEventFilter(&ClusterPredicate{}).
+		Owns(&corev1.Pod{}).
+		Owns(&batchv1.Job{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&policyv1beta1.PodDisruptionBudget{}).
+		Watches(
+			&source.Kind{Type: &corev1.Node{}},
+			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters(ctx)),
+		).
+		Complete(r)
+}
+
+// createFieldIndexes creates the indexes needed by this controller
+func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by this controller
 	if err := mgr.GetFieldIndexer().IndexField(
@@ -390,20 +418,28 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		&corev1.Pod{},
 		podOwnerKey, func(rawObj client.Object) []string {
 			pod := rawObj.(*corev1.Pod)
-			owner := metav1.GetControllerOf(pod)
-			if owner == nil {
+
+			if ownerName, ok := isOwnedByCluster(pod); ok {
+				return []string{ownerName}
+			}
+
+			return nil
+		}); err != nil {
+		return err
+	}
+
+	// Create a new indexed field on Pods. This field will be used to easily
+	// find all the Pods created by node
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&corev1.Pod{},
+		".spec.nodeName", func(rawObj client.Object) []string {
+			pod := rawObj.(*corev1.Pod)
+			if pod.Spec.NodeName == "" {
 				return nil
 			}
 
-			if owner.Kind != apiv1.ClusterKind {
-				return nil
-			}
-
-			if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
-				return nil
-			}
-
-			return []string{owner.Name}
+			return []string{pod.Spec.NodeName}
 		}); err != nil {
 		return err
 	}
@@ -414,54 +450,83 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		&corev1.PersistentVolumeClaim{},
 		pvcOwnerKey, func(rawObj client.Object) []string {
 			persistentVolumeClaim := rawObj.(*corev1.PersistentVolumeClaim)
-			owner := metav1.GetControllerOf(persistentVolumeClaim)
-			if owner == nil {
-				return nil
+
+			if ownerName, ok := isOwnedByCluster(persistentVolumeClaim); ok {
+				return []string{ownerName}
 			}
 
-			if owner.Kind != apiv1.ClusterKind {
-				return nil
-			}
-
-			if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
-				return nil
-			}
-
-			return []string{owner.Name}
+			return nil
 		}); err != nil {
 		return err
 	}
 
 	// Create a new indexed field on Jobs.
-	if err := mgr.GetFieldIndexer().IndexField(
+	return mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&batchv1.Job{},
 		jobOwnerKey, func(rawObj client.Object) []string {
 			job := rawObj.(*batchv1.Job)
-			owner := metav1.GetControllerOf(job)
-			if owner == nil {
-				return nil
+
+			if ownerName, ok := isOwnedByCluster(job); ok {
+				return []string{ownerName}
 			}
 
-			if owner.Kind != apiv1.ClusterKind {
-				return nil
-			}
+			return nil
+		})
+}
 
-			if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
-				return nil
-			}
-
-			return []string{owner.Name}
-		}); err != nil {
-		return err
+// isOwnedByCluster checks that an object is owned by a Cluster and returns
+// the owner name
+func isOwnedByCluster(obj client.Object) (string, bool) {
+	owner := metav1.GetControllerOf(obj)
+	if owner == nil {
+		return "", false
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&apiv1.Cluster{}).
-		Owns(&corev1.Pod{}).
-		Owns(&batchv1.Job{}).
-		Owns(&corev1.Secret{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
-		WithEventFilter(&ClusterPredicate{}).
-		Complete(r)
+	if owner.Kind != apiv1.ClusterKind {
+		return "", false
+	}
+
+	if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
+		return "", false
+	}
+	return owner.Name, true
+}
+
+// mapNodeToClusters returns a function mapping cluster events watched to cluster reconcile requests
+func (r *ClusterReconciler) mapNodeToClusters(ctx context.Context) handler.MapFunc {
+	return func(obj client.Object) []reconcile.Request {
+		node := obj.(*corev1.Node)
+		// exit if the node is schedulable (e.g. not cordoned)
+		// could be expanded here with other conditions (e.g. pressure or issues)
+		if !node.Spec.Unschedulable {
+			return nil
+		}
+		var childPods corev1.PodList
+		// get all the pods handled by the operator on that node
+		err := r.List(ctx, &childPods,
+			client.MatchingFields{".spec.nodeName": node.Name},
+			client.MatchingLabels{specs.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary},
+			client.HasLabels{specs.ClusterLabelName},
+		)
+		if err != nil {
+			r.Log.Error(err, "while getting primary instances for node")
+			return nil
+		}
+		var requests []reconcile.Request
+		// build requests for nodes the pods are running on
+		for idx := range childPods.Items {
+			if cluster, ok := isOwnedByCluster(&childPods.Items[idx]); ok {
+				requests = append(requests,
+					reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      cluster,
+							Namespace: childPods.Items[idx].Namespace,
+						},
+					},
+				)
+			}
+		}
+		return requests
+	}
 }

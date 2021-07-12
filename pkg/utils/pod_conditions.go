@@ -41,6 +41,7 @@ func IsPodReady(pod corev1.Pod) bool {
 // IsPodActive check if a pod is active
 func IsPodActive(p corev1.Pod) bool {
 	return corev1.PodSucceeded != p.Status.Phase &&
+		corev1.PodPending != p.Status.Phase &&
 		corev1.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil
 }

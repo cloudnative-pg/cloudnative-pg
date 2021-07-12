@@ -16,21 +16,31 @@ import (
 )
 
 var _ = Describe("POD Disruption Budget specifications", func() {
-	cluster := apiv1.Cluster{
+	instancesNum := int32(3)
+	minAvailablePrimary := int32(1)
+	replicas := instancesNum - minAvailablePrimary
+	minAvailableReplicas := replicas - 1
+	cluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "thistest",
 			Namespace: "default",
 		},
+		Spec: apiv1.ClusterSpec{Instances: instancesNum},
 	}
 
 	It("have the same name as the PostgreSQL cluster", func() {
-		result := CreatePodDisruptionBudget(cluster)
+		result := BuildReplicasPodDisruptionBudget(cluster)
 		Expect(result.Name).To(Equal(cluster.Name))
 		Expect(result.Namespace).To(Equal(cluster.Namespace))
 	})
 
-	It("require a maximum of one unavailable instances", func() {
-		result := CreatePodDisruptionBudget(cluster)
-		Expect(result.Spec.MaxUnavailable.IntVal).To(Equal(int32(1)))
+	It("require not more than one unavailable replicas", func() {
+		result := BuildReplicasPodDisruptionBudget(cluster)
+		Expect(result.Spec.MinAvailable.IntVal).To(Equal(minAvailableReplicas))
+	})
+
+	It("require at least one primary instance to be available at all times", func() {
+		result := BuildPrimaryPodDisruptionBudget(cluster)
+		Expect(result.Spec.MinAvailable.IntVal).To(Equal(minAvailablePrimary))
 	})
 })

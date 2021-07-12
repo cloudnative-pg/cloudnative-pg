@@ -17,7 +17,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 )
@@ -57,7 +56,7 @@ var _ = Describe("E2E Drain Node", func() {
 
 	Context("Maintenance on, reuse pvc on", func() {
 		// Initialize empty global namespace variable
-		namespace := ""
+		const namespace = "drain-node-e2e-pvc-on-two-nodes"
 		const sampleFile = fixturesDir + "/drain-node/cluster-drain-node.yaml"
 		const clusterName = "cluster-drain-node"
 
@@ -87,9 +86,6 @@ var _ = Describe("E2E Drain Node", func() {
 		// is overloaded, since the anti-affinity should keep pods away from
 		// each other.
 		It("can drain the primary pod's node", func() {
-			// Set unique namespace
-			namespace = "drain-node-e2e-pvc-on-two-nodes"
-
 			By("leaving only two nodes uncordoned", func() {
 				// mark a node unschedulable so the pods will be distributed only on two nodes
 				for _, cordonNode := range nodesWithLabels[:len(nodesWithLabels)-2] {
@@ -134,23 +130,26 @@ var _ = Describe("E2E Drain Node", func() {
 				pvcUIDMap[pod.Name] = pvc.GetUID()
 			}
 
-			// Drain the node containing the primary pod
-			podNames := drainPrimaryNode(namespace, clusterName)
+			// Drain the node containing the primary pod and store the list of running pods
+			podsOnPrimaryNode := tryDrainingPrimaryNode(namespace, clusterName)
 
-			By("verifying failover after drain", func() {
-				timeout := 180
-				// Expect a failover to have happened
-				Eventually(func() (string, error) {
-					pod, err := env.GetClusterPrimary(namespace, clusterName)
-					return pod.Name, err
-				}, timeout).ShouldNot(BeEquivalentTo(oldPrimary))
-			})
+			if len(podsOnPrimaryNode) < len(podList.Items) {
+				By("verifying failover after drain", func() {
+					timeout := 180
+					// Expect a failover to have happened
+					Eventually(func() (string, error) {
+						pod, err := env.GetClusterPrimary(namespace, clusterName)
+						return pod.Name, err
+					}, timeout).ShouldNot(BeEquivalentTo(oldPrimary))
+				})
+			}
 
 			By("uncordon nodes and check new pods use old pvcs", func() {
 				UncordonAllNodes()
-				// ensure evicted pods have restarted and are running as replicas
+				// Ensure evicted pods have restarted and are running.
+				// one of them could have become the new primary.
 				timeout := 300
-				for _, podName := range podNames {
+				for _, podName := range podsOnPrimaryNode {
 					namespacedName := types.NamespacedName{
 						Namespace: namespace,
 						Name:      podName,
@@ -158,7 +157,7 @@ var _ = Describe("E2E Drain Node", func() {
 					Eventually(func() (bool, error) {
 						pod := corev1.Pod{}
 						err := env.Client.Get(env.Ctx, namespacedName, &pod)
-						return utils.IsPodActive(pod) && utils.IsPodReady(pod) && specs.IsPodStandby(pod), err
+						return utils.IsPodActive(pod) && utils.IsPodReady(pod), err
 					}, timeout).Should(BeTrue())
 
 					pod := corev1.Pod{}
@@ -170,7 +169,7 @@ var _ = Describe("E2E Drain Node", func() {
 				}
 			})
 
-			// Expect the test data previously created to be available
+			// Expect the (previously created) test data to be available
 			AssertTestDataExistence(namespace, clusterName)
 			assertClusterStandbysAreStreaming(namespace, clusterName)
 		})
@@ -253,12 +252,13 @@ var _ = Describe("E2E Drain Node", func() {
 			// Expect pods to be running on the uncordoned node and to have new names
 			By("verifying cluster pods changed names", func() {
 				timeout := 300
-				Eventually(func() (bool, error) {
-					matchingNames := int32(0)
-					isClusterReady := false
+				Eventually(func() bool {
+					matchingNames := 0
 					podList, err := env.GetClusterPodList(namespace, clusterName)
+					if err != nil {
+						return false
+					}
 					for _, pod := range podList.Items {
-						Expect(pod.Spec.NodeName).To(BeEquivalentTo(nodesWithLabels[0]))
 						// compare the old pod list with the current pod names
 						for _, oldName := range podsBeforeDrain {
 							if pod.GetName() == oldName {
@@ -266,14 +266,11 @@ var _ = Describe("E2E Drain Node", func() {
 							}
 						}
 					}
-					if len(podList.Items) == 3 && matchingNames == 0 {
-						isClusterReady = true
-					}
-					return isClusterReady, err
+					return len(podList.Items) == 3 && matchingNames == 0
 				}, timeout).Should(BeTrue())
 			})
 
-			// Expect the test data previously created to be available
+			// Expect the (previously created) test data to be available
 			AssertTestDataExistence(namespace, clusterName)
 			assertClusterStandbysAreStreaming(namespace, clusterName)
 			UncordonAllNodes()
@@ -301,14 +298,16 @@ func drainPrimaryNode(namespace string, clusterName string) []string {
 		}
 
 		// Draining the primary pod's node
-		cmd := fmt.Sprintf("kubectl drain %v --ignore-daemonsets --delete-local-data --force", primaryNode)
 		timeout := 900
+		// should set a timeout otherwise will hang forever
+		var stdout, stderr string
 		Eventually(func() error {
-			_, _, err := tests.RunUnchecked(cmd)
+			cmd := fmt.Sprintf("kubectl drain %v --ignore-daemonsets --delete-local-data --force --timeout=%ds",
+				primaryNode, timeout)
+			stdout, stderr, err = tests.RunUnchecked(cmd)
 			return err
-		}, timeout).ShouldNot(HaveOccurred())
+		}, timeout).ShouldNot(HaveOccurred(), fmt.Sprintf("stdout: %s, stderr: %s", stdout, stderr))
 	})
-
 	By("ensuring no cluster pod is still running on the drained node", func() {
 		timeout := 60
 		Eventually(func() ([]string, error) {
@@ -324,23 +323,71 @@ func drainPrimaryNode(namespace string, clusterName string) []string {
 	return podNames
 }
 
+// tryDrainingPrimaryNode drains the node containing the primary pod.
+// It returns the names of the pods that were running on that node
+func tryDrainingPrimaryNode(namespace string, clusterName string) []string {
+	var primaryNode string
+	var podNames []string
+	By("identifying primary node and try draining", func() {
+		pod, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		primaryNode = pod.Spec.NodeName
+
+		// Gather the pods running on this node
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		for _, pod := range podList.Items {
+			if pod.Spec.NodeName == primaryNode {
+				podNames = append(podNames, pod.Name)
+			}
+		}
+
+		timeout := 300
+		// should set a timeout otherwise will hang forever
+		cmd := fmt.Sprintf("kubectl drain %v --ignore-daemonsets --delete-local-data --force --timeout=%ds",
+			primaryNode, timeout)
+		_, _, _ = tests.RunUnchecked(cmd)
+	})
+
+	return podNames
+}
+
 // assertClusterStandbysAreStreaming verifies that all the standbys of a
 // cluster have a wal receiver running.
 func assertClusterStandbysAreStreaming(namespace string, clusterName string) {
-	podList, err := env.GetClusterPodList(namespace, clusterName)
-	Expect(err).NotTo(HaveOccurred())
-	primary, err := env.GetClusterPrimary(namespace, clusterName)
-	Expect(err).NotTo(HaveOccurred())
-	for _, pod := range podList.Items {
-		// Primary should be ignored
-		if pod.GetName() == primary.GetName() {
-			continue
+	Eventually(func() error {
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		if err != nil {
+			return err
 		}
-		timeout := time.Second
-		out, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &timeout,
-			"psql", "-U", "postgres", "-tAc", "SELECT count(*) FROM pg_stat_wal_receiver")
-		Expect(err).NotTo(HaveOccurred())
-		value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
-		Expect(value, atoiErr).To(BeEquivalentTo(1), "Pod %v not streaming", pod.Name)
-	}
+
+		primary, err := env.GetClusterPrimary(namespace, clusterName)
+		if err != nil {
+			return err
+		}
+
+		for _, pod := range podList.Items {
+			// Primary should be ignored
+			if pod.GetName() == primary.GetName() {
+				continue
+			}
+
+			timeout := time.Second
+			out, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &timeout,
+				"psql", "-U", "postgres", "-tAc", "SELECT count(*) FROM pg_stat_wal_receiver")
+			if err != nil {
+				return err
+			}
+
+			value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
+			if atoiErr != nil {
+				return atoiErr
+			}
+			if value != 1 {
+				return fmt.Errorf("pod %v not streaming", pod.Name)
+			}
+		}
+
+		return nil
+	}, 60).ShouldNot(HaveOccurred())
 }

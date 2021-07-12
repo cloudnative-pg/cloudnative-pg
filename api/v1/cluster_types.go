@@ -913,32 +913,13 @@ func (cluster *Cluster) GetPgCtlTimeoutForPromotion() int32 {
 	return timeout
 }
 
-// IsNodeMaintenanceWindowReusePVC check if we are in a recovery window and
-// we should reuse PVCs
-func (cluster *Cluster) IsNodeMaintenanceWindowReusePVC() bool {
-	if !cluster.IsNodeMaintenanceWindowInProgress() {
-		return false
-	}
-
+// IsReusePVCEnabled check if in a maintenance window we should reuse PVCs
+func (cluster *Cluster) IsReusePVCEnabled() bool {
 	reusePVC := true
-	if cluster.Spec.NodeMaintenanceWindow.ReusePVC != nil {
+	if cluster.Spec.NodeMaintenanceWindow != nil && cluster.Spec.NodeMaintenanceWindow.ReusePVC != nil {
 		reusePVC = *cluster.Spec.NodeMaintenanceWindow.ReusePVC
 	}
 	return reusePVC
-}
-
-// IsNodeMaintenanceWindowNotReusePVC check if we are in a recovery window and
-// should avoid reusing PVCs
-func (cluster *Cluster) IsNodeMaintenanceWindowNotReusePVC() bool {
-	if !cluster.IsNodeMaintenanceWindowInProgress() {
-		return false
-	}
-
-	reusePVC := true
-	if cluster.Spec.NodeMaintenanceWindow.ReusePVC != nil {
-		reusePVC = *cluster.Spec.NodeMaintenanceWindow.ReusePVC
-	}
-	return !reusePVC
 }
 
 // ShouldResizeInUseVolumes is true when we should resize PVC we already
