@@ -38,8 +38,8 @@ from the [OperatorHub.io website](https://operatorhub.io), following the install
 The operator can be installed using the provided [Helm chart](https://github.com/EnterpriseDB/cloud-native-postgresql-helm).
 
 !!! Important
-  Helm does not allow to update CRDs, as discussed [here](https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations),
-  therefore take care to follow the instructions in the chart documentation in order to update them.
+    Helm does not support the update of CRDs. For further information, please refer to the
+    [instructions in the Helm chart documentation](https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations).
 
 ## Installation on Openshift
 
