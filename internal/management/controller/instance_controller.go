@@ -411,12 +411,9 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(ctx context.Context, clu
 	// I'm the primary, need to inform the operator
 	r.log.Info("Setting myself as the current designated primary")
 
-	_, err := utils.UpdateClusterStatusAndRetry(
-		ctx, r.client, cluster, func(cluster *apiv1.Cluster) error {
-			cluster.Status.CurrentPrimary = r.instance.PodName
-			return nil
-		})
-	return err
+	oldCluster := cluster.DeepCopy()
+	cluster.Status.CurrentPrimary = r.instance.PodName
+	return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 }
 
 // Reconciler replica logic
