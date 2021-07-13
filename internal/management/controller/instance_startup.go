@@ -162,13 +162,9 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 				"currentPrimary", currentPrimary,
 				"targetPrimary", targetPrimary)
 
-			_, err := utils.UpdateClusterStatusAndRetry(
-				ctx, r.client, cluster, func(cluster *apiv1.Cluster) error {
-					cluster.Status.CurrentPrimary = r.instance.PodName
-					return nil
-				})
-
-			return err
+			oldCluster := cluster.DeepCopy()
+			cluster.Status.CurrentPrimary = r.instance.PodName
+			return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 		}
 		return nil
 
