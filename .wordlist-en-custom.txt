@@ -16,7 +16,6 @@ BootstrapConfiguration
 BootstrapInitDB
 BootstrapPgBaseBackup
 BootstrapRecovery
-basebackup
 CIS
 CN
 CONFIG
@@ -175,6 +174,7 @@ adc
 addons
 affinityconfiguration
 aks
+albert
 allowVolumeExpansion
 api
 apiVersion
@@ -204,6 +204,7 @@ balancer
 barmanObjectStore
 barmanobjectstoreconfiguration
 basebackup
+bb
 benchmarking
 bool
 bootstrapconfiguration
@@ -256,6 +257,7 @@ customizable
 cyber
 danglingPVC
 databackupconfiguration
+datname
 dbname
 ddl
 declaratively
@@ -282,6 +284,7 @@ fastpath
 ffd
 filesystem
 fio
+freddie
 gcc
 gce
 github
@@ -418,7 +421,6 @@ pvc
 pvcCount
 pvcTemplate
 quickstart
-ReplicaClusterConfiguration
 rbac
 readService
 readinessProbe

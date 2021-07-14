@@ -47,11 +47,6 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 		return err
 	}
 
-	conn, err := q.instance.ConnectionPool().Connection(q.defaultDBName)
-	if err != nil {
-		return err
-	}
-
 	// reset before collecting
 	q.errorUserQueries.Reset()
 
@@ -69,13 +64,23 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 			continue
 		}
 
-		err = collector.collect(conn, ch)
-
-		if err != nil {
-			log.Log.Error(err, "Error collecting user query", "query name", name)
-			// increment metrics counters.
-			q.errorUserQueries.WithLabelValues(name + ": " + err.Error()).Inc()
-			q.errorUserQueriesGauge.Set(1)
+		targetDatabases := userQuery.TargetDatabases
+		if len(targetDatabases) == 0 {
+			targetDatabases = append(targetDatabases, q.defaultDBName)
+		}
+		for _, targetDatabase := range targetDatabases {
+			conn, err := q.instance.ConnectionPool().Connection(targetDatabase)
+			if err != nil {
+				return err
+			}
+			err = collector.collect(conn, ch)
+			if err != nil {
+				log.Log.Error(err, "Error collecting user query", "query name", name,
+					"targetDatabase", targetDatabase)
+				// increment metrics counters.
+				q.errorUserQueries.WithLabelValues(name + ": " + err.Error()).Inc()
+				q.errorUserQueriesGauge.Set(1)
+			}
 		}
 	}
 

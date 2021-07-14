@@ -7,7 +7,8 @@ For each PostgreSQL instance, the operator provides an exporter of metrics for
 [Prometheus](https://prometheus.io/) via HTTP, on port 9187, named `metrics`.
 The operator comes with a predefined set of metrics, as well as a highly
 configurable and customizable system to define additional queries via one or
-more `ConfigMap` or `Secret` resources.
+more `ConfigMap` or `Secret` resources (see the
+["User defined metrics" section](#user-defined-metrics) below for details).
 
 Metrics can be accessed as follows:
 
@@ -26,18 +27,17 @@ Please refer to the "Default roles" section in PostgreSQL
 [documentation](https://www.postgresql.org/docs/current/default-roles.html)
 for details on the `pg_monitor` role.
 
-Currently, metrics' queries can be run only against a single database, chosen
-depending on the specified `bootstrap` method in the `Cluster` resource,
-according to the following logic:
+Queries, by default, are run against the *main database*, as defined by
+the specified `bootstrap` method of the `Cluster` resource, according
+to the following logic:
 
-- using `initdb`: queries will be run against the specified database, so the
+- using `initdb`: queries will be run against the specified database by default, so the
   value passed as `initdb.database` or defaulting to `app` if not specified.
-- not using `initdb`: queries will be run against the `postgres` database.
+- not using `initdb`: queries will run against the `postgres` database, by default.
 
-!!! Note
-    This behaviour will be improved starting from the next version of Cloud
-    Native PostgreSQL.
-  
+The default database can always be overridden for a given user-defined metric,
+by specifying a list of one or more databases in the `target_databases` option.
+
 ### Prometheus Operator example
 
 A specific PostgreSQL cluster can be monitored using the
@@ -93,7 +93,7 @@ The `customQueriesConfigMap`/`customQueriesSecret` sections contain a list of
 `ConfigMap`/`Secret` references specifying the key in which the custom queries are defined.
 Take care that the referred resources have to be created **in the same namespace as the Cluster** resource.
 
-### Example of user defined metric
+#### Example of a user defined metric
 
 Here you can see an example of a `ConfigMap` containing a single custom query,
 referenced by the `Cluster` example above:
@@ -121,6 +121,43 @@ data:
 A list of basic monitoring queries can be found in the [`cnp-basic-monitoring.yaml` file](
 ./samples/cnp-basic-monitoring.yaml).
 
+#### Example of a user defined metric running on multiple databases
+
+If the `target_databases` option lists more than one database
+the metric is collected from each of them.
+
+It is recommended that you always include the name of the database 
+in the returned labels, for example using the `current_database()` function
+as in the following example:
+
+```yaml
+some_query:
+  query: |
+    SELECT
+     current_database() as datname,
+     count(*) as rows
+    FROM some_table
+  metrics:
+    - datname:
+        usage: "LABEL"
+        description: "Name of current database"
+    - rows:
+        usage: "GAUGE"
+        description: "number of rows"
+  target_databases:
+    - albert
+    - bb
+    - freddie
+```
+
+This will produce in the following metric being exposed:
+
+```text
+cnp_some_query_rows{datname="albert"} 2
+cnp_some_query_rows{datname="bb"} 5
+cnp_some_query_rows{datname="freddie"} 10
+```
+
 ### Structure of a user defined metric
 
 Every custom query has the following basic structure:
@@ -140,6 +177,8 @@ Here is a short description of all the available fields:
     - `query`: the SQL query to run on the target database to generate the metrics
     - `primary`: whether to run the query only on the primary instance <!-- wokeignore:rule=master -->
     - `master`: same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated) <!-- wokeignore:rule=master -->
+    - `target_databases`: a list of databases to run the `query` against, overwrites the default database, take care 
+      to grant the `pg_monitor` role access to the required databases or tables
     - `metrics`: section containing a list of all exported columns, defined as follows:
       - `<ColumnName>`: the name of the column returned by the query
           - `usage`: one of the values described below
