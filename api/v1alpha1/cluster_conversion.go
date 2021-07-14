@@ -45,6 +45,8 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 		dst.Spec.Certificates.ServerTLSSecret = src.Spec.Certificates.ServerTLSSecret
 		dst.Spec.Certificates.ServerCASecret = src.Spec.Certificates.ServerCASecret
 		dst.Spec.Certificates.ServerAltDNSNames = src.Spec.Certificates.ServerAltDNSNames
+		dst.Spec.Certificates.ClientCASecret = src.Spec.Certificates.ClientCASecret
+		dst.Spec.Certificates.ReplicationTLSSecret = src.Spec.Certificates.ReplicationTLSSecret
 	}
 
 	// src.spec.superuserSecret
@@ -342,6 +344,8 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 		dst.Spec.Certificates.ServerTLSSecret = src.Spec.Certificates.ServerTLSSecret
 		dst.Spec.Certificates.ServerCASecret = src.Spec.Certificates.ServerCASecret
 		dst.Spec.Certificates.ServerAltDNSNames = src.Spec.Certificates.ServerAltDNSNames
+		dst.Spec.Certificates.ClientCASecret = src.Spec.Certificates.ClientCASecret
+		dst.Spec.Certificates.ReplicationTLSSecret = src.Spec.Certificates.ReplicationTLSSecret
 	}
 
 	// spec.backup

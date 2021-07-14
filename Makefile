@@ -181,4 +181,4 @@ spellcheck:
 woke:
 	docker run --rm -v $(PWD):/src -w /src getwoke/woke:0.9 woke -c .woke.yaml
 
-checks: woke spellcheck fmt vet lint apidoc manifests
+checks: woke spellcheck fmt vet lint apidoc manifests generate

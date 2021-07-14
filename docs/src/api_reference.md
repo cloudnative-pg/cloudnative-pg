@@ -196,33 +196,22 @@ Name           | Description                                                    
 
 CertificatesConfiguration contains the needed configurations to handle server certificates.
 
-Name              | Description                                                                                                                                                                                                                                                                                                                                                                                                                                | Type    
------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------
-`serverCASecret   ` | The secret containing the Server CA certificate. If not defined, a new secret will be created with a self-signed CA and will be used to generate the TLS certificate ServerTLSSecret.
-
-Contains:
-
-- `ca.crt`: CA that should be used to validate the server certificate,
-   used as `sslrootcert` in client connection strings.
-- `ca.key`: key used to generate Server SSL certs, if ServerTLSSecret is provided,
-   this can be omitted. | string  
-`serverTLSSecret  ` | The secret of type kubernetes.io/tls containing the server TLS certificate and key that will be set as `ssl_cert_file` and `ssl_key_file` so that clients can connect to postgres securely. If not defined, ServerCASecret must provide also `ca.key` and a new secret will be created using the provided CA.                                                                                                                              | string  
-`serverAltDNSNames` | The list of the server alternative DNS names to be added to the generated server TLS certificates, when required.                                                                                                                                                                                                                                                                                                                          | []string
+Name                 | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Type    
+-------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------
+`serverCASecret      ` | The secret containing the Server CA certificate. If not defined, a new secret will be created with a self-signed CA and will be used to generate the TLS certificate ServerTLSSecret.<br /> <br /> Contains:<br /> <br /> - `ca.crt`: CA that should be used to validate the server certificate, used as `sslrootcert` in client connection strings.<br /> - `ca.key`: key used to generate Server SSL certs, if ServerTLSSecret is provided, this can be omitted.<br /> | string  
+`serverTLSSecret     ` | The secret of type kubernetes.io/tls containing the server TLS certificate and key that will be set as `ssl_cert_file` and `ssl_key_file` so that clients can connect to postgres securely. If not defined, ServerCASecret must provide also `ca.key` and a new secret will be created using the provided CA.                                                                                                                                                            | string  
+`replicationTLSSecret` | The secret of type kubernetes.io/tls containing the client certificate to authenticate as the `streaming_replica` user. If not defined, ClientCASecret must provide also `ca.key`, and a new secret will be created using the provided CA.                                                                                                                                                                                                                               | string  
+`clientCASecret      ` | The secret containing the Client CA certificate. If not defined, a new secret will be created with a self-signed CA and will be used to generate all the client certificates.<br /> <br /> Contains:<br /> <br /> - `ca.crt`: CA that should be used to validate the client certificates, used as `ssl_ca_file` of all the instances.<br /> - `ca.key`: key used to generate client certificates, if ReplicationTLSSecret is provided, this can be omitted.<br />        | string  
+`serverAltDNSNames   ` | The list of the server alternative DNS names to be added to the generated server TLS certificates, when required.                                                                                                                                                                                                                                                                                                                                                        | []string
 
 <a id='CertificatesStatus'></a>
 ## CertificatesStatus
 
 CertificatesStatus contains configuration certificates and related expiration dates.
 
-Name                 | Description                                                                                                                                                                                                                                                                                                          | Type             
--------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------
-`clientCASecret      ` | The secret containing the Client CA certificate. This secret contains a self-signed CA and is used to sign TLS certificates used for client authentication.
-
-Contains:
-
-- `ca.crt`: CA that should be used to validate the client certificate, used as `ssl_ca_file`. - `ca.key`: key used to sign client SSL certs. | string           
-`replicationTLSSecret` | The secret of type kubernetes.io/tls containing the TLS client certificate to authenticate as `streaming_replica` user.                                                                                                                                                                                              | string           
-`expirations         ` | Expiration dates for all certificates.                                                                                                                                                                                                                                                                               | map[string]string
+Name        | Description                            | Type             
+----------- | -------------------------------------- | -----------------
+`expirations` | Expiration dates for all certificates. | map[string]string
 
 <a id='Cluster'></a>
 ## Cluster
@@ -494,7 +483,7 @@ SecretsResourceVersion is the resource versions of the secrets managed by the op
 Name                     | Description                                                                                                                 | Type             
 ------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -----------------
 `superuserSecretVersion  ` | The resource version of the "postgres" user secret                                                                          | string           
-`replicationSecretVersion` | The resource version of the "streaming_replication" user secret                                                             | string           
+`replicationSecretVersion` | The resource version of the "streaming_replica" user secret                                                                 | string           
 `applicationSecretVersion` | The resource version of the "app" user secret                                                                               | string           
 `caSecretVersion         ` | Unused. Retained for compatibility with old versions.                                                                       | string           
 `clientCaSecretVersion   ` | The resource version of the PostgreSQL client-side CA secret version                                                        | string           

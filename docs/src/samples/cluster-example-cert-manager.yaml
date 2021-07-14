@@ -1,0 +1,106 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: server-ca
+spec:
+  isCA: true
+  commonName: my-selfsigned-server-ca
+  secretName: server-ca-key-pair
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: server-ca-issuer
+spec:
+  ca:
+    secretName: server-ca-key-pair
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: my-postgres-server-cert
+spec:
+  secretName: my-postgres-server-cert
+  usages:
+    - server auth
+  dnsNames:
+    - cluster-example-lb.internal.mydomain.net
+    - cluster-example-rw
+    - cluster-example-rw.default
+    - cluster-example-rw.default.svc
+    - cluster-example-r
+    - cluster-example-r.default
+    - cluster-example-r.default.svc
+    - cluster-example-ro
+    - cluster-example-ro.default
+    - cluster-example-ro.default.svc
+  issuerRef:
+    name: server-ca-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: client-ca
+spec:
+  isCA: true
+  commonName: my-selfsigned-client-ca
+  secretName: client-ca-key-pair
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: client-ca-issuer
+spec:
+  ca:
+    secretName: client-ca-key-pair
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: my-postgres-client-cert
+spec:
+  secretName: my-postgres-client-cert
+  usages:
+    - client auth
+  commonName: streaming_replica
+  issuerRef:
+    name: client-ca-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  certificates:
+    serverTLSSecret: my-postgres-server-cert
+    serverCASecret: my-postgres-server-cert
+    clientCASecret: my-postgres-client-cert
+    replicationTLSSecret: my-postgres-client-cert
+  storage:
+    size: 1Gi

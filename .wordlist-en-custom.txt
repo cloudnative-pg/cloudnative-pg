@@ -30,6 +30,9 @@ Canovai
 Cecchi
 CertificatesConfiguration
 CertificatesStatus
+ClientCASecret
+ClientCertsCASecret
+ClientReplicationSecret
 ClusterIP
 ClusterList
 ClusterSpec
@@ -59,8 +62,8 @@ EBS
 EDB
 EKS
 EOF
-EndpointCA
 EncryptionType
+EndpointCA
 EnterpriseDB
 EnterpriseDB's
 ExternalCluster
@@ -134,6 +137,7 @@ RUNTIME
 ReadWriteOnce
 RedHat
 ReplicaClusterConfiguration
+ReplicationTLSSecret
 ResourceRequirements
 RoleBinding
 RollingUpdateStatus
@@ -228,6 +232,7 @@ cisecurity
 clair
 classid
 cli
+clientCASecret
 clientcert
 clusterlist
 clusterspec
@@ -305,9 +310,9 @@ gzip
 hba
 healthz
 horikyota
-hostname
 hostPort
 hostaddr
+hostname
 hostssl
 href
 html
@@ -318,7 +323,6 @@ imageName
 imagePullSecrets
 img
 immediateCheckpoint
-inProgress
 inProgress
 init
 initdb
@@ -441,6 +445,7 @@ readyInstances
 recoveryTarget
 recoverytarget
 redhat
+replicationTLSSecret
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resourcerequirements

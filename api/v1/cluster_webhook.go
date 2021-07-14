@@ -224,28 +224,38 @@ func (r *Cluster) validateCerts() field.ErrorList {
 		return result
 	}
 
-	if certificates.ServerTLSSecret == "" {
-		return result
+	if certificates.ServerTLSSecret != "" {
+		// Currently names are not validated, maybe add this check in future
+		if len(certificates.ServerAltDNSNames) != 0 {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "certificates", "serveraltdnsnames"),
+					fmt.Sprintf("%v", certificates.ServerAltDNSNames),
+					"Server alternative DNS names can't be defined when server TLS secret is provided"))
+		}
+
+		// With ServerTLSSecret not empty you must provide the ServerCASecret
+		if certificates.ServerCASecret == "" {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "certificates", "servercasecret"),
+					"",
+					"Server CA secret can't be empty when server TLS secret is provided"))
+		}
 	}
 
-	// Currently names are not validated, maybe add this check in future
-	if len(certificates.ServerAltDNSNames) != 0 {
+	// If you provide the ReplicationTLSSecret we must provide the ClientCaSecret
+	if certificates.ReplicationTLSSecret != "" && certificates.ClientCASecret == "" {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "certificates", "serveraltdnsnames"),
-				fmt.Sprintf("%v", certificates.ServerAltDNSNames),
-				"Server alternative DNS names can't be defined when server TLS secret is provided"))
-	}
-
-	if certificates.ServerCASecret == "" {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "certificates", "servercasecret"),
+				field.NewPath("spec", "certificates", "clientcasecret"),
 				"",
-				"Server CA secret can't be empty when server TLS secret is provided"))
+				"Client CA secret can't be empty when client replication secret is provided"))
 	}
+
 	return result
 }
 
