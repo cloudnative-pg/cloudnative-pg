@@ -10,7 +10,7 @@ with local Persistent Volumes (PV).
 - [Code of conduct](CODE-OF-CONDUCT.md)
 - [Contributing](CONTRIBUTING.md)
 - [License](LICENSE)
-- [Setting up your dev workstation](DEV.md)
+- [Setting up your dev workstation](DEVELOPERS.md)
 - [Setting up a local k8s cluster to test your code](hack/e2e/README.md#setting-up-a-local-k8s-cluster)
 - [E2E tests (how-to)](hack/e2e/README.md#e2e-testing)
 - [Release process (how-to)](RELEASE.md)
