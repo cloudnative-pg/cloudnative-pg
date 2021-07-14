@@ -82,7 +82,37 @@ func (r *ClusterReconciler) setupPostgresPKI(ctx context.Context, cluster *apiv1
 
 // ensureClientCASecret ensure that the cluster CA really exist and is valid
 func (r *ClusterReconciler) ensureClientCASecret(ctx context.Context, cluster *apiv1.Cluster) (*v1.Secret, error) {
-	return r.ensureCASecret(ctx, cluster, cluster.GetClientCASecretName())
+	if cluster.Spec.Certificates == nil || cluster.Spec.Certificates.ClientCASecret == "" {
+		return r.ensureCASecret(ctx, cluster, cluster.GetClientCASecretName())
+	}
+
+	var secret v1.Secret
+	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.GetNamespace(), Name: cluster.GetClientCASecretName()},
+		&secret)
+	// If specified and error, bubble up
+	if err != nil {
+		r.Recorder.Event(cluster, "Warning", "SecretNotFound",
+			"Getting secret "+cluster.GetClientCASecretName())
+		return nil, err
+	}
+
+	err = r.verifyCAValidity(secret, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate also ca.key if needed
+	if cluster.Spec.Certificates.ReplicationTLSSecret == "" {
+		_, err = certs.ParseCASecret(&secret)
+		if err != nil {
+			r.Recorder.Event(cluster, "Warning", "InvalidCASecret",
+				fmt.Sprintf("Parsing client secret %s: %s", secret.Name, err.Error()))
+			return nil, err
+		}
+	}
+
+	// If specified and found, go on
+	return &secret, nil
 }
 
 // ensureServerCASecret ensure that the cluster CA really exist and is valid
@@ -103,16 +133,26 @@ func (r *ClusterReconciler) ensureServerCASecret(ctx context.Context, cluster *a
 		return nil, err
 	}
 
-	err = r.verifyServerCAValidity(secret, cluster)
+	err = r.verifyCAValidity(secret, cluster)
 	if err != nil {
 		return nil, err
+	}
+
+	// validate also ca.key if needed
+	if cluster.Spec.Certificates.ServerTLSSecret == "" {
+		_, err = certs.ParseCASecret(&secret)
+		if err != nil {
+			r.Recorder.Event(cluster, "Warning", "InvalidCASecret",
+				fmt.Sprintf("Parsing server secret %s: %s", secret.Name, err.Error()))
+			return nil, err
+		}
 	}
 
 	// If specified and found, go on
 	return &secret, nil
 }
 
-func (r *ClusterReconciler) verifyServerCAValidity(secret v1.Secret, cluster *apiv1.Cluster) error {
+func (r *ClusterReconciler) verifyCAValidity(secret v1.Secret, cluster *apiv1.Cluster) error {
 	// Verify validity of the CA and expiration (only ca.crt)
 	publicKey, ok := secret.Data[certs.CACertKey]
 	if !ok {
@@ -132,15 +172,6 @@ func (r *ClusterReconciler) verifyServerCAValidity(secret v1.Secret, cluster *ap
 		log.Info("CA certificate is expiring or is already expired", "secret", secret.Name)
 	}
 
-	// validate also ca.key if needed
-	if cluster.Spec.Certificates.ServerTLSSecret == "" {
-		_, err = certs.ParseCASecret(&secret)
-		if err != nil {
-			r.Recorder.Event(cluster, "Warning", "InvalidCASecret",
-				fmt.Sprintf("Parsing server secret %s: %s", secret.Name, err.Error()))
-			return err
-		}
-	}
 	return nil
 }
 

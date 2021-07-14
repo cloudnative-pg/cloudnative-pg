@@ -373,14 +373,14 @@ type BootstrapConfiguration struct {
 // CertificatesConfiguration contains the needed configurations to handle server certificates.
 type CertificatesConfiguration struct {
 	// The secret containing the Server CA certificate. If not defined, a new secret will be created
-	// with a self-signed CA and will be used to generate the TLS certificate ServerTLSSecret.
-	//
-	// Contains:
-	//
+	// with a self-signed CA and will be used to generate the TLS certificate ServerTLSSecret.<br />
+	// <br />
+	// Contains:<br />
+	// <br />
 	// - `ca.crt`: CA that should be used to validate the server certificate,
-	//    used as `sslrootcert` in client connection strings.
+	// used as `sslrootcert` in client connection strings.<br />
 	// - `ca.key`: key used to generate Server SSL certs, if ServerTLSSecret is provided,
-	//    this can be omitted.
+	// this can be omitted.<br />
 	ServerCASecret string `json:"serverCASecret,omitempty"`
 
 	// The secret of type kubernetes.io/tls containing the server TLS certificate and key that will be set as
@@ -388,6 +388,23 @@ type CertificatesConfiguration struct {
 	// If not defined, ServerCASecret must provide also `ca.key` and a new secret will be
 	// created using the provided CA.
 	ServerTLSSecret string `json:"serverTLSSecret,omitempty"`
+
+	// The secret of type kubernetes.io/tls containing the client certificate to authenticate as
+	// the `streaming_replica` user.
+	// If not defined, ClientCASecret must provide also `ca.key`, and a new secret will be
+	// created using the provided CA.
+	ReplicationTLSSecret string `json:"replicationTLSSecret,omitempty"`
+
+	// The secret containing the Client CA certificate. If not defined, a new secret will be created
+	// with a self-signed CA and will be used to generate all the client certificates.<br />
+	// <br />
+	// Contains:<br />
+	// <br />
+	// - `ca.crt`: CA that should be used to validate the client certificates,
+	// used as `ssl_ca_file` of all the instances.<br />
+	// - `ca.key`: key used to generate client certificates, if ReplicationTLSSecret is provided,
+	// this can be omitted.<br />
+	ClientCASecret string `json:"clientCASecret,omitempty"`
 
 	// The list of the server alternative DNS names to be added to the generated server TLS certificates, when required.
 	ServerAltDNSNames []string `json:"serverAltDNSNames,omitempty"`
@@ -397,19 +414,6 @@ type CertificatesConfiguration struct {
 type CertificatesStatus struct {
 	// Needed configurations to handle server certificates, initialized with default values, if needed.
 	CertificatesConfiguration `json:",inline"`
-
-	// The secret containing the Client CA certificate. This secret contains a self-signed CA and is used to sign
-	// TLS certificates used for client authentication.
-	//
-	// Contains:
-	//
-	// - `ca.crt`: CA that should be used to validate the client certificate, used as `ssl_ca_file`.
-	// - `ca.key`: key used to sign client SSL certs.
-	ClientCASecret string `json:"clientCASecret,omitempty"`
-
-	// The secret of type kubernetes.io/tls containing the TLS client certificate to authenticate
-	// as `streaming_replica` user.
-	ReplicationTLSSecret string `json:"replicationTLSSecret,omitempty"`
 
 	// Expiration dates for all certificates.
 	Expirations map[string]string `json:"expirations,omitempty"`
@@ -775,7 +779,7 @@ type SecretsResourceVersion struct {
 	// The resource version of the "postgres" user secret
 	SuperuserSecretVersion string `json:"superuserSecretVersion,omitempty"`
 
-	// The resource version of the "streaming_replication" user secret
+	// The resource version of the "streaming_replica" user secret
 	ReplicationSecretVersion string `json:"replicationSecretVersion,omitempty"`
 
 	// The resource version of the "app" user secret
@@ -900,11 +904,17 @@ func (cluster *Cluster) GetServerTLSSecretName() string {
 // GetClientCASecretName get the name of the secret containing the CA
 // of the cluster
 func (cluster *Cluster) GetClientCASecretName() string {
+	if cluster.Spec.Certificates != nil && cluster.Spec.Certificates.ClientCASecret != "" {
+		return cluster.Spec.Certificates.ClientCASecret
+	}
 	return fmt.Sprintf("%v%v", cluster.Name, ClientCaSecretSuffix)
 }
 
 // GetReplicationSecretName get the name of the secret for the replication user
 func (cluster *Cluster) GetReplicationSecretName() string {
+	if cluster.Spec.Certificates != nil && cluster.Spec.Certificates.ReplicationTLSSecret != "" {
+		return cluster.Spec.Certificates.ReplicationTLSSecret
+	}
 	return fmt.Sprintf("%v%v", cluster.Name, ReplicationSecretSuffix)
 }
 
