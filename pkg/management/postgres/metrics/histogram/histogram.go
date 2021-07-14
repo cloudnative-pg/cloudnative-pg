@@ -45,8 +45,9 @@ func NewFromRawData(values []interface{}, columns []string, name string) (*Value
 		switch columnName {
 		case name:
 			err := pq.Array(&histogramValue.Keys).Scan(values[idx])
-			return nil, fmt.Errorf("cannot load histogram values: %w", err)
-
+			if err != nil {
+				return nil, fmt.Errorf("cannot load histogram values: %w", err)
+			}
 		case name + sumSuffix:
 			histogramValue.Sum, ok = postgres.DBToFloat64(values[idx])
 			if !ok {

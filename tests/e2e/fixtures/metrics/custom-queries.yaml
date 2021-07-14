@@ -62,17 +62,17 @@ stringData:
       query: "SELECT archived_count, failed_count FROM pg_stat_archiver"
       primary: false
       metrics:
-        - archived:
+        - archived_count:
             usage: "COUNTER"
             description: "Amount of WALs archived"
-        - failed:
+        - failed_count:
             usage: "COUNTER"
             description: "Amount of failures in archiving WALs"
 
   additional-queries: |
     pg_locks:
       query: |
-        SELECT count(*)
+        SELECT count(*) as blocked_queries
         FROM pg_catalog.pg_locks blocked_locks
         JOIN pg_catalog.pg_locks blocking_locks
           ON blocking_locks.locktype = blocked_locks.locktype
