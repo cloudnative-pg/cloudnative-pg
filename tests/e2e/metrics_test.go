@@ -22,7 +22,7 @@ import (
 var _ = Describe("Metrics", func() {
 	// Cluster identifiers
 	const namespace = "cluster-metrics-e2e"
-	const sampleFile = fixturesDir + "/metrics/cluster-metrics.yaml"
+	const clusterMetricsFile = fixturesDir + "/metrics/cluster-metrics.yaml"
 	const clusterName = "postgresql-metrics"
 	JustAfterEach(func() {
 		if CurrentGinkgoTestDescription().Failed {
@@ -68,7 +68,7 @@ var _ = Describe("Metrics", func() {
 		})
 
 		// Create the cluster
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		AssertCreateCluster(namespace, clusterName, clusterMetricsFile, env)
 
 		By("collecting metrics on each pod", func() {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -84,8 +84,8 @@ var _ = Describe("Metrics", func() {
 						`cnp_pg_wal_files_total \d+|` +
 						`cnp_pg_database_size_bytes{datname="app"} [0-9e\+\.]+|` +
 						`cnp_pg_replication_slots_inactive 0|` +
-						`cnp_pg_stat_archiver_archived \d+|` +
-						`cnp_pg_stat_archiver_failed \d+|` +
+						`cnp_pg_stat_archiver_archived_count \d+|` +
+						`cnp_pg_stat_archiver_failed_count \d+|` +
 						`cnp_pg_locks_blocked_queries 0|` +
 						`cnp_collector_last_collection_error 0)` +
 						`$)`)

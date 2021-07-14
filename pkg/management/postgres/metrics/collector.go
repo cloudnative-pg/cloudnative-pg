@@ -58,11 +58,12 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 			variableLabels: q.variableLabels[name],
 		}
 
-		log.Log.V(1).Info("Collecting query: ", "name", name)
-
 		if (userQuery.Primary || userQuery.Master) && !isPrimary { // wokeignore:rule=master
+			log.Log.V(1).Info("Skipping because runs only on primary", "query", name)
 			continue
 		}
+
+		log.Log.V(1).Info("Collecting data", "query", name)
 
 		targetDatabases := userQuery.TargetDatabases
 		if len(targetDatabases) == 0 {
@@ -211,7 +212,7 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 			return err
 		}
 
-		labels, done := c.collectLabels(columnData)
+		labels, done := c.collectLabels(columns, columnData)
 		if done {
 			c.collectColumns(columns, columnData, labels, ch)
 		}
@@ -221,10 +222,10 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 
 // Collect the list of labels from the database, and returns true if the
 // label extraction succeeded, false otherwise
-func (c QueryCollector) collectLabels(columnData []interface{}) ([]string, bool) {
+func (c QueryCollector) collectLabels(columns []string, columnData []interface{}) ([]string, bool) {
 	var labels []string
-	for idx, mapping := range c.columnMapping {
-		if mapping.Label {
+	for idx, columnName := range columns {
+		if mapping, ok := c.columnMapping[columnName]; ok && mapping.Label {
 			value, ok := postgres.DBToString(columnData[idx])
 			if !ok {
 				log.Log.Info("Label value cannot be converted to string",
@@ -243,7 +244,11 @@ func (c QueryCollector) collectLabels(columnData []interface{}) ([]string, bool)
 func (c QueryCollector) collectColumns(columns []string, columnData []interface{},
 	labels []string, ch chan<- prometheus.Metric) {
 	for idx, columnName := range columns {
-		mapping := c.columnMapping[idx]
+		mapping, ok := c.columnMapping[columnName]
+		if !ok {
+			log.Log.Info("Missing mapping for column", "column", columnName, "mapping", c.columnMapping)
+			continue
+		}
 
 		// There is a strong difference between histogram and non-histogram metrics in
 		// postgres_exporter. The first ones are looked up by column name and the second
@@ -260,6 +265,10 @@ func (c QueryCollector) collectColumns(columns []string, columnData []interface{
 			if err != nil {
 				log.Log.Error(err, "Cannot process histogram metric",
 					"columns", columns,
+					"columnName", columnName,
+					"mapping.Name", mapping.Name,
+					"mappings", c.columnMapping,
+					"mapping", mapping,
 					"columnData", columnData,
 					"labels", labels)
 			} else {
