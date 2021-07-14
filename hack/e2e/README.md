@@ -4,7 +4,7 @@
 purposes and deploy the current branch of this repo.
 
 Before moving forward, please follow the instructions found in the
-[prerequisites](../../DEV.md#setting-up-your-workstation-for-cnp-development) section. Below is the intended sequence
+[prerequisites](../../DEVELOPERS.md#setting-up-your-workstation-for-cnp-development) section. Below is the intended sequence
 of commands.
 
 Create the cluster:
@@ -39,7 +39,7 @@ hack/setup-cluster.sh destroy
 
 # E2E testing
 
-E2E testing is performed by running the `hack/run-e2e.sh` script after setting
+E2E testing is performed by running the `hack/e2e/run-e2e.sh` script after setting
 up a Kubernetes cluster and configuring `kubectl` to use it.
 
 The script can be configured through the following environment variables:
@@ -64,7 +64,7 @@ specifying the following variable
 
 # Setting up a local K8s cluster and running the tests
 
-The following scripts use the previous `hack/setup-cluster.sh` and `hack/run-e2e.sh`
+The following scripts use the previous `hack/setup-cluster.sh` and `hack/e2e/run-e2e.sh`
 to create a K8s local cluster and running E2E tests on it.
 
 ## On kind
@@ -93,10 +93,12 @@ Error response from daemon: manifest for rancher/k3s:v1.20.0-k3s5 not found: man
 
 It will take care of creating a K3d cluster and run the tests on it.
 
+## Environment variables
+
 In addition to the environment variables for the script,
 the following ones can be defined:
 
-* `PRESERVE_CLUSTER`: true to prevent K8s from destroying the kind cluster.
+* `PRESERVE_CLUSTER`: true to prevent the script from destroying the kind cluster.
   Default: `false`.
 * `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
   the tests. Only useful if specified with `PRESERVE_CLUSTER=true`.
