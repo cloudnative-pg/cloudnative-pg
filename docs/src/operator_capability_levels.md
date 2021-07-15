@@ -53,7 +53,7 @@ version of the latest stable major version supported by the PostgreSQL
 Community and published on Quay.io by EnterpriseDB.
 You can use any compatible image of PostgreSQL supporting the
 primary/standby architecture directly by setting the `imageName`
-attribute in the CR. The operator also supports `imagePullSecretsNames`
+attribute in the CR. The operator also supports `imagePullSecrets`
 to access private container registries, as well as digests in addition to
 tags for finer control of container image immutability.
 

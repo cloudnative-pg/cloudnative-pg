@@ -303,7 +303,6 @@ httpGet
 https
 imageName
 imagePullSecrets
-imagePullSecretsNames
 img
 immediateCheckpoint
 inProgress
