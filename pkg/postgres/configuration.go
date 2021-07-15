@@ -257,7 +257,6 @@ var (
 			"log_truncate_on_rotation": "false",
 			"log_directory":            LogPath,
 			"log_filename":             LogFileName,
-			SharedPreloadLibraries:     "",
 		},
 		DefaultSettings: map[MajorVersionRange]SettingsCollection{
 			{MajorVersionRangeUnlimited, 130000}: {
@@ -418,6 +417,8 @@ func setSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfigur
 	for _, library := range append(oldLibraries, info.AdditionalSharedPreloadLibraries...) {
 		dedupedLibraries[library] = true
 	}
+	// if any, delete empty string
+	delete(dedupedLibraries, "")
 	libraries := make([]string, len(dedupedLibraries))
 	i := 0
 	for library := range dedupedLibraries {
@@ -453,15 +454,13 @@ func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConf
 func FillCNPConfiguration(
 	majorVersion int,
 	userSettings map[string]string,
-	additionalSharedPreloadLibraries []string,
 ) map[string]string {
 	info := ConfigurationInfo{
-		Settings:                         CnpConfigurationSettings,
-		MajorVersion:                     majorVersion,
-		UserSettings:                     userSettings,
-		Replicas:                         nil,
-		PgAuditEnabled:                   IsPgAuditEnabled(userSettings),
-		AdditionalSharedPreloadLibraries: additionalSharedPreloadLibraries,
+		Settings:       CnpConfigurationSettings,
+		MajorVersion:   majorVersion,
+		UserSettings:   userSettings,
+		Replicas:       nil,
+		PgAuditEnabled: IsPgAuditEnabled(userSettings),
 	}
 	pgConfig := CreatePostgresqlConfiguration(info)
 	return pgConfig.configs
