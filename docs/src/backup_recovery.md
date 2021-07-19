@@ -13,6 +13,12 @@ You can use the image `quay.io/enterprisedb/postgresql` for this scope,
 as it is composed of a community PostgreSQL image and the latest
 `barman-cli-cloud` package.
 
+!!! Warning
+    Cloud Native PostgreSQL does not currently manage the deletion of backup files 
+    from the backup object store. The retention policy feature will be merged from 
+    Barman to Barman Cloud in the future. For the time being, it is your responsibility 
+    to configure retention policies directly on the object store. 
+
 ## Cloud credentials
 
 You can archive the backup files in any service whose API is compatible
