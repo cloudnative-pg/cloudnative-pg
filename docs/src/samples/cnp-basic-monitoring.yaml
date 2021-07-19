@@ -4,13 +4,13 @@ metadata:
   name: cnp-basic-monitoring
 data:
   custom-queries: |
-    backend_summary:
+    backends:
       query: |
        SELECT sa.datname
-           , states.state
            , sa.usename
            , sa.application_name
-           , COALESCE(sa.count, 0) AS backends
+           , states.state
+           , COALESCE(sa.count, 0) AS total
            , COALESCE(sa.max_tx_secs, 0) AS max_tx_duration_seconds
            FROM ( VALUES ('active')
                , ('idle')
@@ -24,7 +24,7 @@ data:
                    , state
                    , usename
                    , COALESCE(application_name, '') AS application_name
-                   , count(*)
+                   , COUNT(*)
                    , COALESCE(EXTRACT (EPOCH FROM (max(now() - xact_start))), 0) AS max_tx_secs
                FROM pg_stat_activity
                GROUP BY datname, state, usename, application_name
@@ -34,24 +34,51 @@ data:
         - datname:
             usage: "LABEL"
             description: "Name of the database"
-        - state:
-            usage: "LABEL"
-            description: "State of the backend"
         - usename:
             usage: "LABEL"
             description: "Name of the user"
         - application_name:
             usage: "LABEL"
             description: "Name of the application"
-        - backends:
+        - state:
+            usage: "LABEL"
+            description: "State of the backend"
+        - total:
             usage: "GAUGE"
             description: "Number of backends"
         - max_tx_duration_seconds:
             usage: "GAUGE"
             description: "Maximum duration of a transaction in seconds"
 
+    backends_waiting:
+      query: |
+       SELECT count(*) AS total
+       FROM pg_catalog.pg_locks         blocked_locks
+       JOIN pg_catalog.pg_locks         blocking_locks
+         ON blocking_locks.locktype = blocked_locks.locktype
+         AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database
+         AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation
+         AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page
+         AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple
+         AND blocking_locks.virtualxid IS NOT DISTINCT FROM blocked_locks.virtualxid
+         AND blocking_locks.transactionid IS NOT DISTINCT FROM blocked_locks.transactionid
+         AND blocking_locks.classid IS NOT DISTINCT FROM blocked_locks.classid
+         AND blocking_locks.objid IS NOT DISTINCT FROM blocked_locks.objid
+         AND blocking_locks.objsubid IS NOT DISTINCT FROM blocked_locks.objsubid
+         AND blocking_locks.pid != blocked_locks.pid
+       JOIN pg_catalog.pg_stat_activity blocking_activity ON blocking_activity.pid = blocking_locks.pid
+       WHERE NOT blocked_locks.granted
+      metrics:
+        - total:
+            usage: "GAUGE"
+            description: "Total number of backends that are currently waiting on other queries"
+
     pg_database:
-      query: "SELECT d.datname, pg_database_size(d.datname) as size_bytes FROM pg_database d"
+      query: |
+        SELECT datname
+          , pg_database_size(datname) AS size_bytes
+          , age(datfrozenxid) AS age
+        FROM pg_database
       metrics:
         - datname:
             usage: "LABEL"
@@ -59,13 +86,18 @@ data:
         - size_bytes:
             usage: "GAUGE"
             description: "Disk space used by the database"
+        - age:
+            usage: "GAUGE"
+            description: "Number of transactions from the frozen XID to the current one"
 
     pg_postmaster:
-      query: "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()"
+      query: |
+        SELECT EXTRACT(EPOCH FROM pg_postmaster_start_time) AS start_time
+        FROM pg_postmaster_start_time()
       metrics:
-        - start_time_seconds:
+        - start_time:
             usage: "GAUGE"
-            description: "Time at which postgres started"
+            description: "Time at which postgres started (based on epoch)"
 
     pg_replication:
       query: "SELECT CASE WHEN NOT pg_is_in_recovery() THEN 0 ELSE GREATEST (0, EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))) END AS lag"
@@ -91,7 +123,12 @@ data:
             description: "Replication lag in bytes"
 
     pg_stat_archiver:
-      query: "SELECT archived_count, failed_count, extract(epoch from now() - last_archived_time) AS last_archived_age FROM pg_stat_archiver"
+      query: |
+        SELECT archived_count
+          , failed_count
+          , COALESCE(EXTRACT(EPOCH FROM (now() - last_archived_time)), -1) AS seconds_since_last_archival
+          , COALESCE(EXTRACT(EPOCH FROM (now() - last_failed_time)), -1) AS seconds_since_last_failure
+        FROM pg_stat_archiver
       metrics:
         - archived_count:
             usage: "COUNTER"
@@ -99,12 +136,26 @@ data:
         - failed_count:
             usage: "COUNTER"
             description: "Number of failed attempts for archiving WAL files"
-        - last_archived_age:
+        - seconds_since_last_archival:
             usage: "GAUGE"
-            description: "Time in seconds since last WAL segment was successfully archived"
+            description: "Seconds since the last successful archival operation"
+        - seconds_since_last_failure:
+            usage: "GAUGE"
+            description: "Seconds since the last failed archival operation"
 
     pg_stat_bgwriter:
-      query: "SELECT checkpoints_timed, checkpoints_req, checkpoint_write_time, checkpoint_sync_time, buffers_checkpoint, buffers_clean, maxwritten_clean, buffers_backend, buffers_backend_fsync, buffers_alloc, stats_reset FROM pg_stat_bgwriter"
+      query: |
+        SELECT checkpoints_timed
+          , checkpoints_req
+          , checkpoint_write_time
+          , checkpoint_sync_time
+          , buffers_checkpoint
+          , buffers_clean
+          , maxwritten_clean
+          , buffers_backend
+          , buffers_backend_fsync
+          , buffers_alloc
+        FROM pg_stat_bgwriter
       metrics:
         - checkpoints_timed:
             usage: "COUNTER"
@@ -136,9 +187,75 @@ data:
         - buffers_alloc:
             usage: "COUNTER"
             description: "Number of buffers allocated"
-        - stats_reset:
+
+    pg_stat_database:
+      query: |
+        SELECT datname
+          , xact_commit
+          , xact_rollback
+          , blks_read
+          , blks_hit
+          , tup_returned
+          , tup_fetched
+          , tup_inserted
+          , tup_updated
+          , tup_deleted
+          , conflicts
+          , temp_files
+          , temp_bytes
+          , deadlocks
+          , blk_read_time
+          , blk_write_time
+        FROM pg_stat_database
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of this database"
+        - xact_commit:
             usage: "COUNTER"
-            description: "Time at which these statistics were last reset"
+            description: "Number of transactions in this database that have been committed"
+        - xact_rollback:
+            usage: "COUNTER"
+            description: "Number of transactions in this database that have been rolled back"
+        - blks_read:
+            usage: "COUNTER"
+            description: "Number of disk blocks read in this database"
+        - blks_hit:
+            usage: "COUNTER"
+            description: "Number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system's file system cache)"
+        - tup_returned:
+            usage: "COUNTER"
+            description: "Number of rows returned by queries in this database"
+        - tup_fetched:
+            usage: "COUNTER"
+            description: "Number of rows fetched by queries in this database"
+        - tup_inserted:
+            usage: "COUNTER"
+            description: "Number of rows inserted by queries in this database"
+        - tup_updated:
+            usage: "COUNTER"
+            description: "Number of rows updated by queries in this database"
+        - tup_deleted:
+            usage: "COUNTER"
+            description: "Number of rows deleted by queries in this database"
+        - conflicts:
+            usage: "COUNTER"
+            description: "Number of queries canceled due to conflicts with recovery in this database"
+        - temp_files:
+            usage: "COUNTER"
+            description: "Number of temporary files created by queries in this database"
+        - temp_bytes:
+            usage: "COUNTER"
+            description: "Total amount of data written to temporary files by queries in this database"
+        - deadlocks:
+            usage: "COUNTER"
+            description: "Number of deadlocks detected in this database"
+        - blk_read_time:
+            usage: "COUNTER"
+            description: "Time spent reading data file blocks by backends in this database, in milliseconds"
+        - blk_write_time:
+            usage: "COUNTER"
+            description: "Time spent writing data file blocks by backends in this database, in milliseconds"
 
     pg_stat_database_conflicts:
       query: "SELECT datname, confl_tablespace, confl_lock, confl_snapshot, confl_bufferpin, confl_deadlock FROM pg_stat_database_conflicts"
@@ -262,15 +379,17 @@ data:
     pg_stat_replication:
       query: |
        SELECT usename
-           , COALESCE(application_name, '') AS application_name
-           , COALESCE(client_addr::text, '') AS client_addr
-           , pg_wal_lsn_diff(pg_current_wal_lsn(), sent_lsn) AS sent_diff_bytes
-           , pg_wal_lsn_diff(pg_current_wal_lsn(), write_lsn) AS write_diff_bytes
-           , pg_wal_lsn_diff(pg_current_wal_lsn(), flush_lsn) AS flush_diff_bytes
-           , COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn),0) AS replay_diff_bytes
-           , COALESCE((EXTRACT(EPOCH FROM write_lag)),0)::float AS write_lag_seconds
-           , COALESCE((EXTRACT(EPOCH FROM flush_lag)),0)::float AS flush_lag_seconds
-           , COALESCE((EXTRACT(EPOCH FROM replay_lag)),0)::float AS replay_lag_seconds
+         , COALESCE(application_name, '') AS application_name
+         , COALESCE(client_addr::text, '') AS client_addr
+         , EXTRACT(EPOCH FROM backend_start) AS backend_start
+         , COALESCE(age(backend_xmin), 0) AS backend_xmin_age
+         , pg_wal_lsn_diff(pg_current_wal_lsn(), sent_lsn) AS sent_diff_bytes
+         , pg_wal_lsn_diff(pg_current_wal_lsn(), write_lsn) AS write_diff_bytes
+         , pg_wal_lsn_diff(pg_current_wal_lsn(), flush_lsn) AS flush_diff_bytes
+         , COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn),0) AS replay_diff_bytes
+         , COALESCE((EXTRACT(EPOCH FROM write_lag)),0)::float AS write_lag_seconds
+         , COALESCE((EXTRACT(EPOCH FROM flush_lag)),0)::float AS flush_lag_seconds
+         , COALESCE((EXTRACT(EPOCH FROM replay_lag)),0)::float AS replay_lag_seconds
        FROM pg_stat_replication
       metrics:
         - usename:
@@ -282,6 +401,12 @@ data:
         - client_addr:
             usage: "LABEL"
             description: "Client IP address"
+        - backend_start:
+            usage: "COUNTER"
+            description: "Time when this process was started"
+        - backend_xmin_age:
+            usage: "COUNTER"
+            description: "The age of this standby's xmin horizon"
         - sent_diff_bytes:
             usage: "GAUGE"
             description: "Difference in bytes from the last write-ahead log location sent on this connection"
@@ -343,25 +468,15 @@ data:
             usage: "COUNTER"
             description: "Number of buffer hits in this table's TOAST table indexes (if any)"
 
-    waiting_backends:
+    pg_settings:
       query: |
-       SELECT count(*) AS total
-       FROM pg_catalog.pg_locks         blocked_locks
-       JOIN pg_catalog.pg_locks         blocking_locks
-           ON blocking_locks.locktype = blocked_locks.locktype
-           AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database
-           AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation
-           AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page
-           AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple
-           AND blocking_locks.virtualxid IS NOT DISTINCT FROM blocked_locks.virtualxid
-           AND blocking_locks.transactionid IS NOT DISTINCT FROM blocked_locks.transactionid
-           AND blocking_locks.classid IS NOT DISTINCT FROM blocked_locks.classid
-           AND blocking_locks.objid IS NOT DISTINCT FROM blocked_locks.objid
-           AND blocking_locks.objsubid IS NOT DISTINCT FROM blocked_locks.objsubid
-           AND blocking_locks.pid != blocked_locks.pid
-       JOIN pg_catalog.pg_stat_activity blocking_activity ON blocking_activity.pid = blocking_locks.pid
-       WHERE NOT blocked_locks.granted
+        SELECT name, setting
+        FROM pg_settings
+        WHERE vartype NOT IN ('string', 'enum', 'bool')
       metrics:
-        - total:
+        - name:
+            usage: "LABEL"
+            description: "Name of the setting"
+        - setting:
             usage: "GAUGE"
-            description: "Total number of backends that are currently waiting on other queries"
+            description: "Setting value"
