@@ -43,12 +43,9 @@ func (r *ClusterReconciler) upgradeCluster(
 	})
 
 	// Ensure we really have an upgrade strategy between the involved versions
-	upgradePathAvailable, err := r.upgradePathAvailable(ctx, cluster, sortedPodList, targetImageName)
+	upgradeNeeded, err := r.checkUpgradePath(ctx, cluster, sortedPodList, targetImageName)
 	if err != nil {
 		return "", err
-	}
-	if !upgradePathAvailable {
-		return "", nil
 	}
 
 	primaryIdx := -1
@@ -78,9 +75,12 @@ func (r *ClusterReconciler) upgradeCluster(
 		return "", nil
 	}
 
-	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
-		fmt.Sprintf("Upgrading cluster to image: %v", targetImageName)); err != nil {
-		return "", err
+	// Switch phase only if there is some image to update in the standbys
+	if upgradeNeeded && cluster.Status.Phase != apiv1.PhaseWaitingForUser {
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
+			fmt.Sprintf("Upgrading cluster to image: %v", targetImageName)); err != nil {
+			return "", err
+		}
 	}
 
 	// Update the selected standby
@@ -125,13 +125,15 @@ func (r *ClusterReconciler) upgradeCluster(
 	return sortedPodList[0].Name, r.setPrimaryInstance(ctx, cluster, clusterStatus.Items[1].PodName)
 }
 
-// upgradePathAvailable check if we have an available upgrade path to the PostgreSQL version
-// whose name in in `targetImageName`
-func (r *ClusterReconciler) upgradePathAvailable(
+// checkUpgradePath check if we have an available upgrade path to the PostgreSQL version
+// whose name is in `targetImageName`. It returns false if there is nothing to upgrade.
+// It returns and error if the upgrade path is impossible to follow.
+func (r *ClusterReconciler) checkUpgradePath(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	podList []v1.Pod,
-	targetImageName string) (bool, error) {
+	targetImageName string) (canUpgrade bool, err error) {
+	var newImage bool
 	for _, pod := range podList {
 		usedImageName, err := specs.GetPostgresImageName(pod)
 		if err != nil {
@@ -142,8 +144,9 @@ func (r *ClusterReconciler) upgradePathAvailable(
 		if usedImageName == targetImageName {
 			continue
 		}
+		newImage = true
 
-		status, err := postgres.CanUpgrade(usedImageName, targetImageName)
+		canUpgrade, err = postgres.CanUpgrade(usedImageName, targetImageName)
 		if err != nil {
 			log.Error(
 				err, "Error checking image versions", "from", usedImageName, "to", targetImageName)
@@ -152,7 +155,7 @@ func (r *ClusterReconciler) upgradePathAvailable(
 			return false, err
 		}
 
-		if !status {
+		if !canUpgrade {
 			log.Info("Can't upgrade between these PostgreSQL versions",
 				"from", usedImageName,
 				"to", targetImageName,
@@ -165,7 +168,7 @@ func (r *ClusterReconciler) upgradePathAvailable(
 		}
 	}
 
-	return true, nil
+	return newImage, nil
 }
 
 // isPodNeedingRestart return true if we need to restart the

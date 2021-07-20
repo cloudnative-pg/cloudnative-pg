@@ -51,6 +51,8 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 		return fmt.Errorf("error decoding cluster resource: %w", err)
 	}
 
+	r.reconcileMetrics(cluster)
+
 	// Reconcile monitoring section
 	if cluster.Spec.Monitoring != nil {
 		r.reconcileMonitoringQueries(ctx, cluster)
@@ -98,6 +100,22 @@ func (r *InstanceReconciler) reconcileClusterRole(
 	}
 
 	return nil
+}
+
+// reconcileMetrics updates any required metrics
+func (r *InstanceReconciler) reconcileMetrics(
+	cluster *apiv1.Cluster,
+) {
+	exporter := metricsserver.GetExporter()
+	// We should never reset the SwitchoverRequired metrics as it needs the primary instance restarts,
+	// however, if the cluster is healthy we make sure it is set to 0.
+	if cluster.Status.CurrentPrimary == r.instance.PodName {
+		if cluster.Status.Phase == apiv1.PhaseWaitingForUser {
+			exporter.Metrics.SwitchoverRequired.Set(1)
+		} else {
+			exporter.Metrics.SwitchoverRequired.Set(0)
+		}
+	}
 }
 
 // reconcileMonitoringQueries applies the custom monitoring queries to the

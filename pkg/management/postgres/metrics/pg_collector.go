@@ -16,12 +16,14 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
 
-const namespace = "cnp"
+// PrometheusNamespace is the namespace to be used for all custom metrics exposed by instances
+// or the operator
+const PrometheusNamespace = "cnp"
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
 	instance *postgres.Instance
-	metrics  metrics
+	Metrics  *metrics
 	queries  *QueriesCollector
 }
 
@@ -33,100 +35,109 @@ type metrics struct {
 	Error              prometheus.Gauge
 	PostgreSQLUp       prometheus.Gauge
 	CollectionDuration *prometheus.GaugeVec
+	SwitchoverRequired prometheus.Gauge
 }
 
 // NewExporter creates an exporter
 func NewExporter(instance *postgres.Instance) *Exporter {
 	return &Exporter{
 		instance: instance,
-		metrics:  newMetrics(),
+		Metrics:  newMetrics(),
 	}
 }
 
 // newMetrics returns collector metrics
-func newMetrics() metrics {
+func newMetrics() *metrics {
 	subsystem := "collector"
-	return metrics{
+	return &metrics{
 		CollectionsTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
+			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "collections_total",
 			Help:      "Total number of times PostgreSQL was accessed for metrics.",
 		}),
 		PgCollectionErrors: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespace,
+			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "collection_errors_total",
 			Help:      "Total errors occurred accessing PostgreSQL for metrics.",
 		}, []string{"collector"}),
 		Error: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
+			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "last_collection_error",
 			Help:      "1 if the last collection ended with error, 0 otherwise.",
 		}),
 		PostgreSQLUp: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
+			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "up",
 			Help:      "1 if PostgreSQL is up, 0 otherwise.",
 		}),
 		CollectionDuration: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: namespace,
+			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "collection_duration_seconds",
 			Help:      "Collection time duration in seconds",
 		}, []string{"collector"}),
+		SwitchoverRequired: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "manual_switchover_required",
+			Help:      "1 if a manual switchover is required, 0 otherwise",
+		}),
 	}
 }
 
-// Describe implements prometheus.Collector, defining the metrics we return.
+// Describe implements prometheus.Collector, defining the Metrics we return.
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
-	ch <- e.metrics.CollectionsTotal.Desc()
-	ch <- e.metrics.Error.Desc()
-	e.metrics.PgCollectionErrors.Describe(ch)
-	ch <- e.metrics.PostgreSQLUp.Desc()
-	e.metrics.CollectionDuration.Describe(ch)
+	ch <- e.Metrics.CollectionsTotal.Desc()
+	ch <- e.Metrics.Error.Desc()
+	e.Metrics.PgCollectionErrors.Describe(ch)
+	ch <- e.Metrics.PostgreSQLUp.Desc()
+	ch <- e.Metrics.SwitchoverRequired.Desc()
+	e.Metrics.CollectionDuration.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
 	}
 }
 
-// Collect implements prometheus.Collector, collecting the metrics values to
+// Collect implements prometheus.Collector, collecting the Metrics values to
 // export.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.collectPgMetrics(ch)
 
-	ch <- e.metrics.CollectionsTotal
-	ch <- e.metrics.Error
-	e.metrics.PgCollectionErrors.Collect(ch)
-	ch <- e.metrics.PostgreSQLUp
-	e.metrics.CollectionDuration.Collect(ch)
+	ch <- e.Metrics.CollectionsTotal
+	ch <- e.Metrics.Error
+	e.Metrics.PgCollectionErrors.Collect(ch)
+	ch <- e.Metrics.PostgreSQLUp
+	ch <- e.Metrics.SwitchoverRequired
+	e.Metrics.CollectionDuration.Collect(ch)
 }
 
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
-	e.metrics.CollectionsTotal.Inc()
+	e.Metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
 	db, err := e.instance.GetSuperUserDB()
 	if err != nil {
 		log.Log.Error(err, "Error opening connection to PostgreSQL")
-		e.metrics.Error.Set(1)
+		e.Metrics.Error.Set(1)
 		return
 	}
 
 	// First, let's check the connection. No need to proceed if this fails.
 	if err := db.Ping(); err != nil {
 		log.Log.Error(err, "Error pinging PostgreSQL")
-		e.metrics.PostgreSQLUp.Set(0)
-		e.metrics.Error.Set(1)
-		e.metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
+		e.Metrics.PostgreSQLUp.Set(0)
+		e.Metrics.Error.Set(1)
+		e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 		return
 	}
 
-	e.metrics.PostgreSQLUp.Set(1)
-	e.metrics.Error.Set(0)
-	e.metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
+	e.Metrics.PostgreSQLUp.Set(1)
+	e.Metrics.Error.Set(0)
+	e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 
 	// Work on predefined metrics and custom queries
 	if e.queries != nil {
@@ -134,10 +145,10 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		collectionStart := time.Now()
 		if err := e.queries.Collect(ch); err != nil {
 			log.Log.Error(err, "Error during collection", "collector", e.queries.Name())
-			e.metrics.PgCollectionErrors.WithLabelValues(label).Inc()
-			e.metrics.Error.Set(1)
+			e.Metrics.PgCollectionErrors.WithLabelValues(label).Inc()
+			e.Metrics.Error.Set(1)
 		}
-		e.metrics.CollectionDuration.WithLabelValues(label).Set(time.Since(collectionStart).Seconds())
+		e.Metrics.CollectionDuration.WithLabelValues(label).Set(time.Since(collectionStart).Seconds())
 	}
 }
 
