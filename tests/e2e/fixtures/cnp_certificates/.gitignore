@@ -1,2 +1,4 @@
 cluster-ssl-enabled.yaml
 cluster-user-supplied-certificates.yaml
+cluster-user-supplied-client-certificates.yaml
+cluster-user-supplied-client-server-certificates.yaml
