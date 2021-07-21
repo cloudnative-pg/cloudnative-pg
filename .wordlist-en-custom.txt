@@ -504,6 +504,7 @@ transactionid
 tx
 ubi
 ul
+uncordon
 unencrypted
 unix
 upgradable
