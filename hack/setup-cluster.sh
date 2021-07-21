@@ -130,7 +130,7 @@ EOF
   # Workaround https://github.com/kubernetes-sigs/kind/issues/2326
   if [[ $k8s_version =~ ^v1\.2[1-9]\. ]]; then
     for node in $(kind get nodes --name "${cluster_name}"); do
-      docker exec -ti "$node" sysctl net.ipv4.conf.all.route_localnet=1
+      docker exec "$node" sysctl net.ipv4.conf.all.route_localnet=1
     done
   fi
 }
