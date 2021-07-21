@@ -34,6 +34,10 @@ const (
 	// latest required restart time
 	ClusterRestartAnnotationName = "kubectl.kubernetes.io/restartedAt"
 
+	// ClusterReloadAnnotationName is the name of the annotation containing the
+	// latest required restart time
+	ClusterReloadAnnotationName = AnnotationsURLPrefix + "/reloadedAt"
+
 	// ClusterRoleLabelName label is applied to Pods to mark primary ones
 	ClusterRoleLabelName = "role"
 
