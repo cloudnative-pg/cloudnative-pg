@@ -9,13 +9,12 @@ package v1
 import (
 	"strings"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("bootstrap methods validation", func() {
@@ -1196,5 +1195,13 @@ var _ = Describe("replica mode validation", func() {
 		}
 		Expect(cluster.validateReplicaMode()).To(BeEmpty())
 		Expect(cluster.validateReplicaModeChange(oldCluster)).ToNot(BeEmpty())
+	})
+})
+
+var _ = Describe("Validation changes", func() {
+	It("doesn't complain if given old cluster is nil", func() {
+		newCluster := &Cluster{}
+		err := newCluster.ValidateChanges(nil)
+		Expect(err).To(BeNil())
 	})
 })

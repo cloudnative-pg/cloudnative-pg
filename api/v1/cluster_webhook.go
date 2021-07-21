@@ -101,26 +101,8 @@ var _ webhook.Validator = &Cluster{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateCreate() error {
-	var allErrs field.ErrorList
 	clusterLog.Info("validate create", "name", r.Name)
-
-	allErrs = append(allErrs, r.validateInitDB()...)
-	allErrs = append(allErrs, r.validateSuperuserSecret()...)
-	allErrs = append(allErrs, r.validateCerts()...)
-	allErrs = append(allErrs, r.validateBootstrapMethod()...)
-	allErrs = append(allErrs, r.validateStorageConfiguration()...)
-	allErrs = append(allErrs, r.validateImageName()...)
-	allErrs = append(allErrs, r.validateRecoveryTarget()...)
-	allErrs = append(allErrs, r.validatePrimaryUpdateStrategy()...)
-	allErrs = append(allErrs, r.validateMinSyncReplicas()...)
-	allErrs = append(allErrs, r.validateMaxSyncReplicas()...)
-	allErrs = append(allErrs, r.validateStorageSize()...)
-	allErrs = append(allErrs, r.validateName()...)
-	allErrs = append(allErrs, r.validateBootstrapPgBaseBackupSource()...)
-	allErrs = append(allErrs, r.validateExternalServers()...)
-	allErrs = append(allErrs, r.validateTolerations()...)
-	allErrs = append(allErrs, r.validateAntiAffinity()...)
-	allErrs = append(allErrs, r.validateReplicaMode()...)
+	allErrs := r.Validate()
 	if len(allErrs) == 0 {
 		return nil
 	}
@@ -130,11 +112,8 @@ func (r *Cluster) ValidateCreate() error {
 		r.Name, allErrs)
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateUpdate(old runtime.Object) error {
-	var allErrs field.ErrorList
-	clusterLog.Info("validate update", "name", r.Name)
-
+// Validate groups the validation logic for clusters returning a list of all encountered errors
+func (r *Cluster) Validate() (allErrs field.ErrorList) {
 	allErrs = append(allErrs, r.validateInitDB()...)
 	allErrs = append(allErrs, r.validateSuperuserSecret()...)
 	allErrs = append(allErrs, r.validateCerts()...)
@@ -153,16 +132,18 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	allErrs = append(allErrs, r.validateAntiAffinity()...)
 	allErrs = append(allErrs, r.validateReplicaMode()...)
 
-	oldObject := old.(*Cluster)
-	if oldObject == nil {
-		clusterLog.Info("Received invalid old object, skipping old object validation",
-			"old", old)
-	} else {
-		allErrs = append(allErrs, r.validateImageChange(oldObject.Spec.ImageName)...)
-		allErrs = append(allErrs, r.validateConfigurationChange(oldObject)...)
-		allErrs = append(allErrs, r.validateStorageSizeChange(oldObject)...)
-		allErrs = append(allErrs, r.validateReplicaModeChange(oldObject)...)
-	}
+	return allErrs
+}
+
+// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
+func (r *Cluster) ValidateUpdate(old runtime.Object) error {
+	clusterLog.Info("validate update", "name", r.Name)
+	oldCluster := old.(*Cluster)
+
+	allErrs := append(
+		r.Validate(),
+		r.ValidateChanges(oldCluster)...,
+	)
 
 	if len(allErrs) == 0 {
 		return nil
@@ -171,6 +152,21 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	return apierrors.NewInvalid(
 		schema.GroupKind{Group: "cluster.k8s.enterprisedb.io", Kind: "Cluster"},
 		r.Name, allErrs)
+}
+
+// ValidateChanges groups the validation logic for cluster changes checking the differences between
+// the previous version and the new one of the cluster, returning a list of all encountered errors
+func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
+	if old == nil {
+		clusterLog.Info("Received invalid old object, skipping old object validation",
+			"old", old)
+		return nil
+	}
+	allErrs = append(allErrs, r.validateImageChange(old.Spec.ImageName)...)
+	allErrs = append(allErrs, r.validateConfigurationChange(old)...)
+	allErrs = append(allErrs, r.validateStorageSizeChange(old)...)
+	allErrs = append(allErrs, r.validateReplicaModeChange(old)...)
+	return allErrs
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
