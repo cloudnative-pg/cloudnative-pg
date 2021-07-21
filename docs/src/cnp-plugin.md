@@ -155,3 +155,15 @@ The following command will restart a given cluster in a rollout fashion:
 ```shell
 kubectl cnp restart [cluster_name]
 ```
+
+### Reload
+
+The `kubectl cnp reload` command requests the operator to trigger a reconciliation
+loop for a certain cluster. This is useful to apply configuration changes
+to cluster dependent objects, such as ConfigMaps containing custom monitoring queries.
+
+The following command will reload all configurations for a given cluster:
+
+```shell
+kubectl cnp reload [cluster_name]
+```
