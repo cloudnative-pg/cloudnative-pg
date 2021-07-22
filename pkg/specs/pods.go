@@ -66,6 +66,44 @@ const (
 	PgDataPath = "/var/lib/postgresql/data/pgdata"
 )
 
+func createEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []corev1.EnvVar {
+	envVar := []corev1.EnvVar{
+		{
+			Name:  "PGDATA",
+			Value: PgDataPath,
+		},
+		{
+			Name:  "POD_NAME",
+			Value: podName,
+		},
+		{
+			Name:  "NAMESPACE",
+			Value: cluster.Namespace,
+		},
+		{
+			Name:  "CLUSTER_NAME",
+			Value: cluster.Name,
+		},
+		{
+			Name:  "PGPORT",
+			Value: "5432",
+		},
+		{
+			Name:  "PGHOST",
+			Value: postgres.SocketDirectory,
+		},
+	}
+
+	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
+		envVar = append(envVar, corev1.EnvVar{
+			Name:  "AWS_CA_BUNDLE",
+			Value: postgres.BarmanEndpointCACertificateLocation,
+		})
+	}
+
+	return envVar
+}
+
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
 func createPostgresContainers(
@@ -74,34 +112,9 @@ func createPostgresContainers(
 ) []corev1.Container {
 	containers := []corev1.Container{
 		{
-			Name:  PostgresContainerName,
-			Image: cluster.GetImageName(),
-			Env: []corev1.EnvVar{
-				{
-					Name:  "PGDATA",
-					Value: PgDataPath,
-				},
-				{
-					Name:  "POD_NAME",
-					Value: podName,
-				},
-				{
-					Name:  "NAMESPACE",
-					Value: cluster.Namespace,
-				},
-				{
-					Name:  "CLUSTER_NAME",
-					Value: cluster.Name,
-				},
-				{
-					Name:  "PGPORT",
-					Value: "5432",
-				},
-				{
-					Name:  "PGHOST",
-					Value: postgres.SocketDirectory,
-				},
-			},
+			Name:         PostgresContainerName,
+			Image:        cluster.GetImageName(),
+			Env:          createEnvVarPostgresContainer(cluster, podName),
 			VolumeMounts: createPostgresVolumeMounts(cluster),
 			ReadinessProbe: &corev1.Probe{
 				TimeoutSeconds: 5,

@@ -100,6 +100,26 @@ func (r *InstanceReconciler) RefreshServerCA(ctx context.Context, cluster *apiv1
 	return r.refreshCAFromSecret(&secret, postgresSpec.ServerCACertificateLocation)
 }
 
+// RefreshBarmanEndpointCA gets the latest barman endpoint CA certificates from the secrets.
+// It returns true if configuration has been changed
+func (r *InstanceReconciler) RefreshBarmanEndpointCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
+	if !cluster.Spec.Backup.IsBarmanEndpointCASet() {
+		return false, nil
+	}
+
+	var secret corev1.Secret
+	endpointCA := cluster.Spec.Backup.BarmanObjectStore.EndpointCA
+	err := r.GetClient().Get(
+		ctx,
+		client.ObjectKey{Namespace: r.instance.Namespace, Name: endpointCA.Name},
+		&secret)
+	if err != nil {
+		return false, err
+	}
+
+	return r.refreshFileFromSecret(&secret, endpointCA.Key, postgresSpec.BarmanEndpointCACertificateLocation)
+}
+
 // VerifyPgDataCoherence checks if this cluster exists in K8s. It panics if this
 // pod belongs to a primary but the cluster status is not coherent with that
 func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {

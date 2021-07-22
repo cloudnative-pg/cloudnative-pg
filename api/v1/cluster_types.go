@@ -598,6 +598,11 @@ type BarmanObjectStoreConfiguration struct {
 	// overriding the automatic endpoint discovery
 	EndpointURL string `json:"endpointURL,omitempty"`
 
+	// EndpointCA store the CA bundle of the barman endpoint.
+	// Useful when using self-signed certificates to avoid
+	// errors with certificate issuer and barman-cloud-wal-archive
+	EndpointCA *SecretKeySelector `json:"endpointCA,omitempty"`
+
 	// The path where to store the backup (i.e. s3://bucket/path/to/folder)
 	// this path, with different destination folders, will be used for WALs
 	// and for data
@@ -778,6 +783,9 @@ type SecretsResourceVersion struct {
 
 	// The resource version of the PostgreSQL server-side secret version
 	ServerSecretVersion string `json:"serverSecretVersion,omitempty"`
+
+	// The resource version of the Barman Endpoint CA if provided
+	BarmanEndpointCA string `json:"barmanEndpointCA,omitempty"`
 
 	// A map with the versions of all the secrets used to pass metrics.
 	// Map keys are the secret names, map values are the versions
@@ -1045,6 +1053,16 @@ func (cluster *Cluster) GetClusterAltDNSNames() []string {
 	}
 
 	return append(defaultAltDNSNames, cluster.Spec.Certificates.ServerAltDNSNames...)
+}
+
+// IsBarmanEndpointCASet returns true if we have a CA bundle for the endpoint
+// false otherwise
+func (backupConfiguration *BackupConfiguration) IsBarmanEndpointCASet() bool {
+	return backupConfiguration != nil &&
+		backupConfiguration.BarmanObjectStore != nil &&
+		backupConfiguration.BarmanObjectStore.EndpointCA != nil &&
+		backupConfiguration.BarmanObjectStore.EndpointCA.Name != "" &&
+		backupConfiguration.BarmanObjectStore.EndpointCA.Key != ""
 }
 
 // BuildPostgresOptions create the list of options that

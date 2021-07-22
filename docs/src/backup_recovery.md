@@ -96,6 +96,11 @@ spec:
         [...]
 ```
 
+!!! Important
+    Suppose you configure an Object Storage provider which uses a certificated signed with a private CA,
+    like when using OpenShift or MinIO via HTTPS. In that case, you need to set the option `endpointCA`
+    referring to a secret containing the CA bundle so that Barman can verify the certificate correctly.
+
 ### MinIO Gateway
 
 Optionally, you can use MinIO Gateway as a common interface which

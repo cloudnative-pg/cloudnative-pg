@@ -18,7 +18,6 @@ spec:
       - host replication postgres all md5
       - hostssl app streaming_replica all cert clientcert=1
 
-
   storage:
     size: 1Gi
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
