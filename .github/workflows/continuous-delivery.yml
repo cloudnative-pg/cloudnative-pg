@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-20.04
     name: Skip duplicate runs
     outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@v3.4.0
