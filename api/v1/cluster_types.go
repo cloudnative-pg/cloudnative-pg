@@ -548,6 +548,15 @@ type AffinityConfiguration struct {
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity
 	// +optional
 	PodAntiAffinityType string `json:"podAntiAffinityType,omitempty"`
+
+	// AdditionalPodAntiAffinity allows to specify pod anti-affinity terms to be added to the ones generated
+	// by the operator if EnablePodAntiAffinity is set to true (default) or to be used exclusively if set to false.
+	// +optional
+	AdditionalPodAntiAffinity *corev1.PodAntiAffinity `json:"additionalPodAntiAffinity,omitempty"`
+
+	// AdditionalPodAffinity allows to specify pod affinity terms to be passed to all the cluster's pods.
+	// +optional
+	AdditionalPodAffinity *corev1.PodAffinity `json:"additionalPodAffinity,omitempty"`
 }
 
 // RollingUpdateStatus contains the information about an instance which is

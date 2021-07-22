@@ -9,6 +9,8 @@ package specs
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
@@ -16,6 +18,23 @@ import (
 func pointerToBool(b bool) *bool {
 	return &b
 }
+
+var (
+	testAffinityTerm = corev1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				{
+					Key:      "test",
+					Operator: metav1.LabelSelectorOpExists,
+				},
+			},
+		},
+	}
+	testWeightedAffinityTerm = corev1.WeightedPodAffinityTerm{
+		Weight:          100,
+		PodAffinityTerm: testAffinityTerm,
+	}
+)
 
 var _ = Describe("The PostgreSQL security context", func() {
 	securityContext := CreatePostgresSecurityContext(26, 26)
@@ -34,15 +53,12 @@ var _ = Describe("Create affinity section", func() {
 		}
 		affinity := CreateAffinitySection(clusterName, config)
 		Expect(affinity).NotTo(BeNil())
+		Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).NotTo(BeNil())
 	})
 
-	It("can not set pod affinity if pod anti affinity is disabled", func() {
+	It("can not set pod affinity if pod anti-affinity is disabled", func() {
 		config := v1.AffinityConfiguration{
 			EnablePodAntiAffinity: pointerToBool(false),
-			TopologyKey:           "",
-			NodeSelector:          nil,
-			Tolerations:           nil,
-			PodAntiAffinityType:   "preferred",
 		}
 		affinity := CreateAffinitySection(clusterName, config)
 		Expect(affinity).To(BeNil())
@@ -51,38 +67,172 @@ var _ = Describe("Create affinity section", func() {
 	It("can set pod anti affinity with 'preferred' pod anti-affinity type", func() {
 		config := v1.AffinityConfiguration{
 			EnablePodAntiAffinity: pointerToBool(true),
-			TopologyKey:           "",
-			NodeSelector:          nil,
-			Tolerations:           nil,
 			PodAntiAffinityType:   "preferred",
 		}
 		affinity := CreateAffinitySection(clusterName, config)
-		Expect(affinity.PodAntiAffinity).ToNot(BeNil())
-		Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).ToNot(BeNil())
+		Expect(affinity.PodAntiAffinity).NotTo(BeNil())
+		Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).NotTo(BeNil())
 	})
 
-	It("can set pod anti affinity with 'required' pod anti-affinity type", func() {
+	It("can set pod anti-affinity with 'required' pod anti-affinity type", func() {
 		config := v1.AffinityConfiguration{
 			EnablePodAntiAffinity: pointerToBool(true),
-			TopologyKey:           "",
-			NodeSelector:          nil,
-			Tolerations:           nil,
 			PodAntiAffinityType:   "required",
 		}
 		affinity := CreateAffinitySection(clusterName, config)
-		Expect(affinity.PodAntiAffinity).ToNot(BeNil())
-		Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).ToNot(BeNil())
+		Expect(affinity.PodAntiAffinity).NotTo(BeNil())
+		Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).NotTo(BeNil())
+		Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).To(BeNil())
 	})
-
-	It("can not set pod anti affinity with invalid pod anti-affinity type", func() {
+	It("does not set pod anti-affinity if provided an invalid type", func() {
 		config := v1.AffinityConfiguration{
-			EnablePodAntiAffinity: pointerToBool(false),
-			TopologyKey:           "",
-			NodeSelector:          nil,
-			Tolerations:           nil,
+			EnablePodAntiAffinity: pointerToBool(true),
 			PodAntiAffinityType:   "not-a-type",
 		}
 		affinity := CreateAffinitySection(clusterName, config)
 		Expect(affinity).To(BeNil())
+		config.EnablePodAntiAffinity = pointerToBool(false)
+		affinity = CreateAffinitySection(clusterName, config)
+		Expect(affinity).To(BeNil())
+	})
+
+	When("given additional affinity terms", func() {
+		When("generated pod anti-affinity is enabled", func() {
+			It("sets both pod affinity and anti-affinity correctly if passed and set to required", func() {
+				config := v1.AffinityConfiguration{
+					EnablePodAntiAffinity: pointerToBool(true),
+					PodAntiAffinityType:   "required",
+					AdditionalPodAffinity: &corev1.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm},
+						RequiredDuringSchedulingIgnoredDuringExecution:  []corev1.PodAffinityTerm{testAffinityTerm},
+					},
+					AdditionalPodAntiAffinity: &corev1.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm},
+						RequiredDuringSchedulingIgnoredDuringExecution:  []corev1.PodAffinityTerm{testAffinityTerm},
+					},
+				}
+				affinity := CreateAffinitySection(clusterName, config)
+				Expect(affinity).NotTo(BeNil())
+				Expect(affinity.PodAffinity).NotTo(BeNil())
+				Expect(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.PodAffinityTerm{testAffinityTerm}))
+				Expect(affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm}))
+				Expect(affinity.PodAntiAffinity).NotTo(BeNil())
+				Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).
+					To(ContainElement(testAffinityTerm))
+				Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm}))
+			})
+			It("sets pod both affinity and anti-affinity correctly if passed and set to preferred", func() {
+				config := v1.AffinityConfiguration{
+					EnablePodAntiAffinity: pointerToBool(true),
+					PodAntiAffinityType:   "preferred",
+					AdditionalPodAffinity: &corev1.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm},
+						RequiredDuringSchedulingIgnoredDuringExecution:  []corev1.PodAffinityTerm{testAffinityTerm},
+					},
+					AdditionalPodAntiAffinity: &corev1.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm},
+						RequiredDuringSchedulingIgnoredDuringExecution:  []corev1.PodAffinityTerm{testAffinityTerm},
+					},
+				}
+				affinity := CreateAffinitySection(clusterName, config)
+				Expect(affinity).NotTo(BeNil())
+				Expect(affinity.PodAffinity).NotTo(BeNil())
+				Expect(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.PodAffinityTerm{testAffinityTerm}))
+				Expect(affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm}))
+				Expect(affinity.PodAntiAffinity).NotTo(BeNil())
+				Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.PodAffinityTerm{testAffinityTerm}))
+				Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).
+					To(ContainElement(testWeightedAffinityTerm))
+			})
+		})
+		When("generated pod anti-affinity is disabled", func() {
+			It("sets pod required anti-affinity correctly if passed", func() {
+				config := v1.AffinityConfiguration{
+					EnablePodAntiAffinity: pointerToBool(false),
+					AdditionalPodAntiAffinity: &corev1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{testAffinityTerm},
+					},
+				}
+				affinity := CreateAffinitySection(clusterName, config)
+				Expect(affinity).NotTo(BeNil())
+				Expect(affinity.PodAntiAffinity).NotTo(BeNil())
+				Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.PodAffinityTerm{testAffinityTerm}))
+				Expect(affinity.PodAffinity).To(BeNil())
+			})
+			It("sets pod preferred anti-affinity correctly if passed", func() {
+				config := v1.AffinityConfiguration{
+					EnablePodAntiAffinity: pointerToBool(false),
+					AdditionalPodAntiAffinity: &corev1.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm},
+					},
+				}
+				affinity := CreateAffinitySection(clusterName, config)
+				Expect(affinity).NotTo(BeNil())
+				Expect(affinity.PodAntiAffinity).NotTo(BeNil())
+				Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm}))
+				Expect(affinity.PodAffinity).To(BeNil())
+			})
+			It("sets pod preferred affinity correctly if passed", func() {
+				config := v1.AffinityConfiguration{
+					EnablePodAntiAffinity: pointerToBool(false),
+					AdditionalPodAffinity: &corev1.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm},
+					},
+				}
+				affinity := CreateAffinitySection(clusterName, config)
+				Expect(affinity).NotTo(BeNil())
+				Expect(affinity.PodAffinity).NotTo(BeNil())
+				Expect(affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm}))
+				Expect(affinity.PodAntiAffinity).To(BeNil())
+			})
+			It("sets pod required affinity correctly if passed", func() {
+				config := v1.AffinityConfiguration{
+					EnablePodAntiAffinity: pointerToBool(false),
+					AdditionalPodAffinity: &corev1.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{testAffinityTerm},
+					},
+				}
+				affinity := CreateAffinitySection(clusterName, config)
+				Expect(affinity).NotTo(BeNil())
+				Expect(affinity.PodAffinity).NotTo(BeNil())
+				Expect(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.PodAffinityTerm{testAffinityTerm}))
+				Expect(affinity.PodAntiAffinity).To(BeNil())
+			})
+			It("sets pod both affinity and anti-affinity correctly if passed", func() {
+				config := v1.AffinityConfiguration{
+					EnablePodAntiAffinity: pointerToBool(false),
+					AdditionalPodAffinity: &corev1.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm},
+						RequiredDuringSchedulingIgnoredDuringExecution:  []corev1.PodAffinityTerm{testAffinityTerm},
+					},
+					AdditionalPodAntiAffinity: &corev1.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm},
+						RequiredDuringSchedulingIgnoredDuringExecution:  []corev1.PodAffinityTerm{testAffinityTerm},
+					},
+				}
+				affinity := CreateAffinitySection(clusterName, config)
+				Expect(affinity).NotTo(BeNil())
+				Expect(affinity.PodAffinity).NotTo(BeNil())
+				Expect(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.PodAffinityTerm{testAffinityTerm}))
+				Expect(affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm}))
+				Expect(affinity.PodAntiAffinity).NotTo(BeNil())
+				Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.PodAffinityTerm{testAffinityTerm}))
+				Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).
+					To(BeEquivalentTo([]corev1.WeightedPodAffinityTerm{testWeightedAffinityTerm}))
+			})
+		})
 	})
 })
