@@ -37,6 +37,7 @@ ColumnName
 CompressionType
 ConfigMap
 ConfigMapKeySelector
+ConfigMapResourceVersion
 ConfigMaps
 Coverity
 Cron
@@ -235,6 +236,7 @@ config
 config's
 configmap
 configmapkeyselector
+configmaps
 configs
 connectionParameters
 containerPort

@@ -23,12 +23,12 @@ import (
 )
 
 const (
-	// AnnotationsURLPrefix is the annotation namespace used by the operator
-	AnnotationsURLPrefix = "k8s.enterprisedb.io"
+	// MetadataNamespace is the annotation and label namespace used by the operator
+	MetadataNamespace = "k8s.enterprisedb.io"
 
 	// ClusterSerialAnnotationName is the name of the annotation containing the
 	// serial number of the node
-	ClusterSerialAnnotationName = AnnotationsURLPrefix + "/nodeSerial"
+	ClusterSerialAnnotationName = MetadataNamespace + "/nodeSerial"
 
 	// ClusterRestartAnnotationName is the name of the annotation containing the
 	// latest required restart time
@@ -36,7 +36,7 @@ const (
 
 	// ClusterReloadAnnotationName is the name of the annotation containing the
 	// latest required restart time
-	ClusterReloadAnnotationName = AnnotationsURLPrefix + "/reloadedAt"
+	ClusterReloadAnnotationName = MetadataNamespace + "/reloadedAt"
 
 	// ClusterRoleLabelName label is applied to Pods to mark primary ones
 	ClusterRoleLabelName = "role"
@@ -46,6 +46,9 @@ const (
 
 	// ClusterRoleLabelReplica is written in labels to represent replica servers
 	ClusterRoleLabelReplica = "replica"
+
+	// ConfigMapWatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded
+	ConfigMapWatchedLabelName = MetadataNamespace + "/reload"
 
 	// ClusterLabelName label is applied to Pods to link them to the owning
 	// cluster

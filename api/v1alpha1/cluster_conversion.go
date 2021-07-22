@@ -203,6 +203,8 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 	dst.Status.SecretsResourceVersion.ClientCASecretVersion = src.Status.SecretsResourceVersion.ClientCASecretVersion
 	dst.Status.SecretsResourceVersion.ServerCASecretVersion = src.Status.SecretsResourceVersion.ServerCASecretVersion
 	dst.Status.SecretsResourceVersion.ServerSecretVersion = src.Status.SecretsResourceVersion.ServerSecretVersion
+	dst.Status.SecretsResourceVersion.Metrics = src.Status.SecretsResourceVersion.Metrics
+	dst.Status.ConfigMapResourceVersion.Metrics = src.Status.ConfigMapResourceVersion.Metrics
 	dst.Status.Certificates.ServerTLSSecret = src.Status.Certificates.ServerTLSSecret
 	dst.Status.Certificates.ServerCASecret = src.Status.Certificates.ServerCASecret
 	dst.Status.Certificates.ClientCASecret = src.Status.Certificates.ClientCASecret
@@ -408,6 +410,8 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Status.SecretsResourceVersion.ClientCASecretVersion = src.Status.SecretsResourceVersion.ClientCASecretVersion
 	dst.Status.SecretsResourceVersion.ServerCASecretVersion = src.Status.SecretsResourceVersion.ServerCASecretVersion
 	dst.Status.SecretsResourceVersion.ServerSecretVersion = src.Status.SecretsResourceVersion.ServerSecretVersion
+	dst.Status.SecretsResourceVersion.Metrics = src.Status.SecretsResourceVersion.Metrics
+	dst.Status.ConfigMapResourceVersion.Metrics = src.Status.ConfigMapResourceVersion.Metrics
 	dst.Status.Certificates.ServerTLSSecret = src.Status.Certificates.ServerTLSSecret
 	dst.Status.Certificates.ServerCASecret = src.Status.Certificates.ServerCASecret
 	dst.Status.Certificates.ClientCASecret = src.Status.Certificates.ClientCASecret

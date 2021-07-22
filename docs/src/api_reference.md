@@ -35,6 +35,7 @@ Below you will find a description of the defined resources:
 - [ClusterSpec](#ClusterSpec)
 - [ClusterStatus](#ClusterStatus)
 - [ConfigMapKeySelector](#ConfigMapKeySelector)
+- [ConfigMapResourceVersion](#ConfigMapResourceVersion)
 - [DataBackupConfiguration](#DataBackupConfiguration)
 - [ExternalCluster](#ExternalCluster)
 - [LocalObjectReference](#LocalObjectReference)
@@ -277,25 +278,26 @@ Name                  | Description                                             
 
 ClusterStatus defines the observed state of Cluster
 
-Name                   | Description                                                                                                                                                                 | Type                                             
----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------
-`instances             ` | Total number of instances in the cluster                                                                                                                                    | int32                                            
-`readyInstances        ` | Total number of ready instances in the cluster                                                                                                                              | int32                                            
-`instancesStatus       ` | Instances status                                                                                                                                                            | map[utils.PodStatus][]string                     
-`latestGeneratedNode   ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                          | int32                                            
-`currentPrimary        ` | Current primary instance                                                                                                                                                    | string                                           
-`targetPrimary         ` | Target primary instance, this is different from the previous one during a switchover or a failover                                                                          | string                                           
-`pvcCount              ` | How many PVCs have been created by this cluster                                                                                                                             | int32                                            
-`jobCount              ` | How many Jobs have been created by this cluster                                                                                                                             | int32                                            
-`danglingPVC           ` | List of all the PVCs created by this cluster and still available which are not attached to a Pod                                                                            | []string                                         
-`initializingPVC       ` | List of all the PVCs that are being initialized by this cluster                                                                                                             | []string                                         
-`healthyPVC            ` | List of all the PVCs not dangling nor initializing                                                                                                                          | []string                                         
-`writeService          ` | Current write pod                                                                                                                                                           | string                                           
-`readService           ` | Current list of read pods                                                                                                                                                   | string                                           
-`phase                 ` | Current phase of the cluster                                                                                                                                                | string                                           
-`phaseReason           ` | Reason for the current phase                                                                                                                                                | string                                           
-`secretsResourceVersion` | The list of resource versions of the secrets managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the secret data | [SecretsResourceVersion](#SecretsResourceVersion)
-`certificates          ` | The configuration for the CA and related certificates, initialized with defaults.                                                                                           | [CertificatesStatus](#CertificatesStatus)        
+Name                     | Description                                                                                                                                                                        | Type                                                 
+------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------------------------------
+`instances               ` | Total number of instances in the cluster                                                                                                                                           | int32                                                
+`readyInstances          ` | Total number of ready instances in the cluster                                                                                                                                     | int32                                                
+`instancesStatus         ` | Instances status                                                                                                                                                                   | map[utils.PodStatus][]string                         
+`latestGeneratedNode     ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                                 | int32                                                
+`currentPrimary          ` | Current primary instance                                                                                                                                                           | string                                               
+`targetPrimary           ` | Target primary instance, this is different from the previous one during a switchover or a failover                                                                                 | string                                               
+`pvcCount                ` | How many PVCs have been created by this cluster                                                                                                                                    | int32                                                
+`jobCount                ` | How many Jobs have been created by this cluster                                                                                                                                    | int32                                                
+`danglingPVC             ` | List of all the PVCs created by this cluster and still available which are not attached to a Pod                                                                                   | []string                                             
+`initializingPVC         ` | List of all the PVCs that are being initialized by this cluster                                                                                                                    | []string                                             
+`healthyPVC              ` | List of all the PVCs not dangling nor initializing                                                                                                                                 | []string                                             
+`writeService            ` | Current write pod                                                                                                                                                                  | string                                               
+`readService             ` | Current list of read pods                                                                                                                                                          | string                                               
+`phase                   ` | Current phase of the cluster                                                                                                                                                       | string                                               
+`phaseReason             ` | Reason for the current phase                                                                                                                                                       | string                                               
+`secretsResourceVersion  ` | The list of resource versions of the secrets managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the secret data        | [SecretsResourceVersion](#SecretsResourceVersion)    
+`configMapResourceVersion` | The list of resource versions of the configmaps, managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the configmap data | [ConfigMapResourceVersion](#ConfigMapResourceVersion)
+`certificates            ` | The configuration for the CA and related certificates, initialized with defaults.                                                                                                  | [CertificatesStatus](#CertificatesStatus)            
 
 <a id='ConfigMapKeySelector'></a>
 ## ConfigMapKeySelector
@@ -305,6 +307,15 @@ ConfigMapKeySelector contains enough information to let you locate the key of a 
 Name  | Description       | Type  
 --- | ----------------- | ------
 `key` | The key to select - *mandatory*  | string
+
+<a id='ConfigMapResourceVersion'></a>
+## ConfigMapResourceVersion
+
+ConfigMapResourceVersion is the resource versions of the secrets managed by the operator
+
+Name    | Description                                                                                                                         | Type             
+------- | ----------------------------------------------------------------------------------------------------------------------------------- | -----------------
+`metrics` | A map with the versions of all the config maps used to pass metrics. Map keys are the config map names, map values are the versions | map[string]string
 
 <a id='DataBackupConfiguration'></a>
 ## DataBackupConfiguration
@@ -477,15 +488,16 @@ Name  | Description       | Type
 
 SecretsResourceVersion is the resource versions of the secrets managed by the operator
 
-Name                     | Description                                                          | Type  
------------------------- | -------------------------------------------------------------------- | ------
-`superuserSecretVersion  ` | The resource version of the "postgres" user secret                   | string
-`replicationSecretVersion` | The resource version of the "streaming_replication" user secret      | string
-`applicationSecretVersion` | The resource version of the "app" user secret                        | string
-`caSecretVersion         ` | Unused. Retained for compatibility with old versions.                | string
-`clientCaSecretVersion   ` | The resource version of the PostgreSQL client-side CA secret version | string
-`serverCaSecretVersion   ` | The resource version of the PostgreSQL server-side CA secret version | string
-`serverSecretVersion     ` | The resource version of the PostgreSQL server-side secret version    | string
+Name                     | Description                                                                                                                 | Type             
+------------------------ | --------------------------------------------------------------------------------------------------------------------------- | -----------------
+`superuserSecretVersion  ` | The resource version of the "postgres" user secret                                                                          | string           
+`replicationSecretVersion` | The resource version of the "streaming_replication" user secret                                                             | string           
+`applicationSecretVersion` | The resource version of the "app" user secret                                                                               | string           
+`caSecretVersion         ` | Unused. Retained for compatibility with old versions.                                                                       | string           
+`clientCaSecretVersion   ` | The resource version of the PostgreSQL client-side CA secret version                                                        | string           
+`serverCaSecretVersion   ` | The resource version of the PostgreSQL server-side CA secret version                                                        | string           
+`serverSecretVersion     ` | The resource version of the PostgreSQL server-side secret version                                                           | string           
+`metrics                 ` | A map with the versions of all the secrets used to pass metrics. Map keys are the secret names, map values are the versions | map[string]string
 
 <a id='StorageConfiguration'></a>
 ## StorageConfiguration

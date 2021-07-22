@@ -160,6 +160,12 @@ type ClusterStatus struct {
 	// secret data
 	SecretsResourceVersion SecretsResourceVersion `json:"secretsResourceVersion,omitempty"`
 
+	// The list of resource versions of the configmaps
+	// managed by the operator. Every change here is done in the
+	// interest of the instance manager, which will refresh the
+	// configmap data
+	ConfigMapResourceVersion ConfigMapResourceVersion `json:"configMapResourceVersion,omitempty"`
+
 	// The configuration for the CA and related certificates, initialized with defaults.
 	Certificates CertificatesStatus `json:"certificates,omitempty"`
 }
@@ -613,6 +619,16 @@ type SecretsResourceVersion struct {
 
 	// The resource version of the PostgreSQL server-side secret version
 	ServerSecretVersion string `json:"serverSecretVersion,omitempty"`
+
+	// The versions of all the secrets used to pass metrics
+	Metrics map[string]string `json:"metrics,omitempty"`
+}
+
+// ConfigMapResourceVersion is the resource versions of the secrets
+// managed by the operator
+type ConfigMapResourceVersion struct {
+	// The versions of all the configmaps used to pass metrics
+	Metrics map[string]string `json:"metrics,omitempty"`
 }
 
 // ExternalCluster represent the connection parameters to an

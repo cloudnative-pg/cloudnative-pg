@@ -219,3 +219,51 @@ var _ = Describe("look up for secrets", func() {
 		Expect(len(cluster.GetClusterAltDNSNames())).To(Equal(9))
 	})
 })
+
+var _ = Describe("A secret resource version", func() {
+	It("do not contains any secret", func() {
+		sec := SecretsResourceVersion{}
+		found := sec.Contains("a-secret")
+		Expect(found).To(BeFalse())
+	})
+
+	It("do not contains any metrics secret", func() {
+		metrics := make(map[string]string, 1)
+		sec := SecretsResourceVersion{
+			Metrics: metrics,
+		}
+		found := sec.Contains("a-secret")
+		Expect(found).To(BeFalse())
+	})
+
+	It("contains the metrics secret we are looking for", func() {
+		metrics := make(map[string]string, 1)
+		sec := SecretsResourceVersion{
+			Metrics: metrics,
+		}
+		sec.Metrics["a-secret"] = "test-version"
+		found := sec.Contains("a-secret")
+		Expect(found).To(BeTrue())
+	})
+})
+
+var _ = Describe("A config map resource version", func() {
+	It("do not contains any metrics secret", func() {
+		metrics := make(map[string]string, 1)
+		conf := ConfigMapResourceVersion{
+			Metrics: metrics,
+		}
+		found := conf.Contains("a-secret")
+		Expect(found).To(BeFalse())
+	})
+
+	It("contains the metrics secret we are looking for", func() {
+		metrics := make(map[string]string, 1)
+		conf := ConfigMapResourceVersion{
+			Metrics: metrics,
+		}
+		conf.Metrics["a-secret"] = "test-version"
+		found := conf.Contains("a-secret")
+		Expect(found).To(BeTrue())
+	})
+})
