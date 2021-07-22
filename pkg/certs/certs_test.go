@@ -50,7 +50,7 @@ var _ = Describe("Keypair generation", func() {
 
 	It("should be able to renew an existing CA certificate", func() {
 		notAfter := time.Now().Add(-10 * time.Hour)
-		notBefore := notAfter.Add(-365 * 24 * time.Hour)
+		notBefore := notAfter.Add(-90 * 24 * time.Hour)
 		ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", "namespace")
 		Expect(err).To(BeNil())
 
@@ -81,7 +81,7 @@ var _ = Describe("Keypair generation", func() {
 	It("should be able to verify if a certificate will expire", func() {
 		When("it is expiring", func() {
 			notAfter := time.Now().Add(-10 * time.Hour)
-			notBefore := notAfter.Add(-365 * 24 * time.Hour)
+			notBefore := notAfter.Add(-90 * 24 * time.Hour)
 			ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", "namespace")
 			Expect(err).To(BeNil())
 			isExpiring, _, err := ca.IsExpiring()
@@ -145,7 +145,7 @@ var _ = Describe("Keypair generation", func() {
 			Expect(err).To(BeNil())
 
 			notAfter := time.Now().Add(-10 * time.Hour)
-			notBefore := notAfter.Add(-365 * 24 * time.Hour)
+			notBefore := notAfter.Add(-90 * 24 * time.Hour)
 
 			privateKey, err := ca.ParseECPrivateKey()
 			Expect(err).To(BeNil())
