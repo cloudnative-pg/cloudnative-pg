@@ -166,6 +166,22 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 
 	setupLog.Info("Operator configuration loaded", "configuration", configuration.Current)
 
+	// Detect if we are running under a system that implements OpenShift Security Context Constraints
+	if err := utils.DetectSecurityContextConstraints(); err != nil {
+		setupLog.Error(err, "unable to detect OpenShift Security Context Constraints presence")
+		return err
+	}
+
+	// Retrieve the Kubernetes cluster system UID
+	if err := utils.DetectKubeSystemUID(ctx, clientSet); err != nil {
+		setupLog.Error(err, "unable to retrieve the Kubernetes cluster system UID")
+		return err
+	}
+
+	setupLog.Info("Kubernetes system metadata",
+		"systemUID", utils.GetKubeSystemUID(),
+		"haveSCC", utils.HaveSecurityContextConstraints())
+
 	err = setupPKI(ctx, certificatesGenerationFolder)
 	if err != nil {
 		setupLog.Error(err, "unable to setup PKI infrastructure")
@@ -244,12 +260,6 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 	mgr.GetWebhookServer().WebhookMux.HandleFunc("/readyz", readinessProbeHandler)
 
 	// +kubebuilder:scaffold:builder
-
-	// Detect if we are running under a system that implements OpenShift Security Context Constraints
-	if err := utils.DetectSecurityContextConstraints(); err != nil {
-		setupLog.Error(err, "unable to detect OpenShift Security Context Constraints presence")
-		return err
-	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
