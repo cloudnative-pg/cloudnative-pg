@@ -27,7 +27,7 @@ import (
 
 const (
 	// This is the lifetime of the generated certificates
-	certificateDuration = 365 * 24 * time.Hour
+	certificateDuration = 90 * 24 * time.Hour
 
 	// This is the PEM block type of elliptic courves private key
 	ecPrivateKeyPEMBlockType = "EC PRIVATE KEY"

@@ -120,7 +120,7 @@ var _ = Describe("Root CA secret generation", func() {
 
 	It("must renew the CA certificate if it is not valid", func() {
 		notAfter := time.Now().Add(-10 * time.Hour)
-		notBefore := notAfter.Add(-365 * 24 * time.Hour)
+		notBefore := notAfter.Add(-90 * 24 * time.Hour)
 		ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", "operator-namespace")
 		Expect(err).To(BeNil())
 
@@ -187,7 +187,7 @@ var _ = Describe("Webhook certificate validation", func() {
 		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
 
 		notAfter := time.Now().Add(-10 * time.Hour)
-		notBefore := notAfter.Add(-365 * 24 * time.Hour)
+		notBefore := notAfter.Add(-90 * 24 * time.Hour)
 		server, _ := ca.createAndSignPairWithValidity("this.server.com", notBefore, notAfter, CertTypeServer, nil)
 		serverSecret := server.GenerateCertificateSecret("operator-namespace", "pki-secret-name")
 
