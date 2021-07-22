@@ -860,6 +860,19 @@ spec:
                       a new secret will be created using the provided CA.
                     type: string
                 type: object
+              configMapResourceVersion:
+                description: The list of resource versions of the configmaps, managed
+                  by the operator. Every change here is done in the interest of the
+                  instance manager, which will refresh the configmap data
+                properties:
+                  metrics:
+                    additionalProperties:
+                      type: string
+                    description: A map with the versions of all the config maps used
+                      to pass metrics. Map keys are the config map names, map values
+                      are the versions
+                    type: object
+                type: object
               currentPrimary:
                 description: Current primary instance
                 type: string
@@ -932,6 +945,13 @@ spec:
                     description: The resource version of the PostgreSQL client-side
                       CA secret version
                     type: string
+                  metrics:
+                    additionalProperties:
+                      type: string
+                    description: A map with the versions of all the secrets used to
+                      pass metrics. Map keys are the secret names, map values are
+                      the versions
+                    type: object
                   replicationSecretVersion:
                     description: The resource version of the "streaming_replication"
                       user secret
@@ -1792,6 +1812,17 @@ spec:
                       a new secret will be created using the provided CA.
                     type: string
                 type: object
+              configMapResourceVersion:
+                description: The list of resource versions of the configmaps managed
+                  by the operator. Every change here is done in the interest of the
+                  instance manager, which will refresh the configmap data
+                properties:
+                  metrics:
+                    additionalProperties:
+                      type: string
+                    description: The versions of all the configmaps used to pass metrics
+                    type: object
+                type: object
               currentPrimary:
                 description: Current primary instance
                 type: string
@@ -1864,6 +1895,11 @@ spec:
                     description: The resource version of the PostgreSQL client-side
                       CA secret version
                     type: string
+                  metrics:
+                    additionalProperties:
+                      type: string
+                    description: The versions of all the secrets used to pass metrics
+                    type: object
                   replicationSecretVersion:
                     description: The resource version of the "streaming_replication"
                       user secret

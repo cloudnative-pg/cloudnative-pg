@@ -7,122 +7,48 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package controllers
 
 import (
-	"reflect"
-
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
 var log = ctrl.Log.WithName("cluster_predicates")
 
-// ClusterPredicate filter events that invoke a Reconciliation loop
-// by listening to changes in the Cluster objects which create a new
-// generation (the Spec field has been updated) all the events related
-// to all Pods that belong to a cluster
-type ClusterPredicate struct{}
-
-// isControlledObject checks if a certain object is controlled
-// by a PostgreSQL cluster
-func isControlledObject(object client.Object) bool {
-	if object == nil {
-		return false
+var (
+	configMapsPredicate = predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			_, ok := e.ObjectNew.(*corev1.ConfigMap)
+			if !ok {
+				return false
+			}
+			_, owned := isOwnedByCluster(e.ObjectNew)
+			return owned || hasReloadLabelSet(e.ObjectNew)
+		},
 	}
-
-	owner := v1.GetControllerOf(v1.Object(object))
-	if owner == nil {
-		return false
+	secretsPredicate = predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			_, ok := e.ObjectNew.(*corev1.Secret)
+			if !ok {
+				return false
+			}
+			_, owned := isOwnedByCluster(e.ObjectNew)
+			return owned || hasReloadLabelSet(e.ObjectNew)
+		},
 	}
-
-	if owner.Kind != apiv1.ClusterKind {
-		return false
+	nodesPredicate = predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldNode, oldOk := e.ObjectOld.(*corev1.Node)
+			newNode, newOk := e.ObjectNew.(*corev1.Node)
+			return oldOk && newOk && oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable
+		},
 	}
+)
 
-	if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
-		return false
-	}
-
-	return true
-}
-
-// isCluster checks if a certain object is a cluster
-func isCluster(object client.Object) bool {
-	_, okv1 := object.(*apiv1.Cluster)
-	if okv1 {
-		return true
-	}
-
-	_, okv1alpha1 := object.(*apiv1alpha1.Cluster)
-	return okv1alpha1
-}
-
-// isUsefulNodeEvent checks if a certain object is a node
-func isUsefulNodeEvent(oldObj client.Object, newObj client.Object) bool {
-	oldNode, oldOk := oldObj.(*corev1.Node)
-	newNode, newOk := newObj.(*corev1.Node)
-	return oldOk && newOk && nodeUschedulableChanged(oldNode, newNode)
-}
-
-// nodeUschedulableChanged checks if a node became unschedulable
-func nodeUschedulableChanged(oldNode *corev1.Node, newNode *corev1.Node) bool {
-	return oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable
-}
-
-// Create implements Predicate
-func (p ClusterPredicate) Create(e event.CreateEvent) bool {
-	if e.Object == nil {
-		log.Error(nil, "Create event has no object to update", "event", e)
-		return false
-	}
-
-	return isCluster(e.Object) || isControlledObject(e.Object)
-}
-
-// Delete implements Predicate
-func (p ClusterPredicate) Delete(e event.DeleteEvent) bool {
-	if e.Object == nil {
-		log.Error(nil, "Delete event has no object to update", "event", e)
-		return false
-	}
-
-	return isCluster(e.Object) || isControlledObject(e.Object)
-}
-
-// Generic implements Predicate
-func (p ClusterPredicate) Generic(e event.GenericEvent) bool {
-	if e.Object == nil {
-		log.Error(nil, "Generic event has no object to update", "event", e)
-		return false
-	}
-
-	return isCluster(e.Object) || isControlledObject(e.Object)
-}
-
-// Update implements default UpdateEvent filter for validating generation change
-func (ClusterPredicate) Update(e event.UpdateEvent) bool {
-	if e.ObjectOld == nil {
-		log.Error(nil, "Update event has no old object to update", "event", e)
-		return false
-	}
-	if e.ObjectNew == nil {
-		log.Error(nil, "Update event has no new object for update", "event", e)
-		return false
-	}
-
-	if isCluster(e.ObjectNew) {
-		// for update notifications, filter only the updates
-		// that result in a change for the cluster specification or
-		// in the cluster annotations (needed to restart the Pods)
-		differentGenerations := e.ObjectNew.GetGeneration() != e.ObjectOld.GetGeneration()
-		differentAnnotations := !reflect.DeepEqual(e.ObjectNew.GetAnnotations(), e.ObjectOld.GetAnnotations())
-
-		return differentGenerations || differentAnnotations
-	}
-
-	return isControlledObject(e.ObjectNew) || isUsefulNodeEvent(e.ObjectOld, e.ObjectNew)
+func hasReloadLabelSet(obj client.Object) bool {
+	_, hasLabel := obj.GetLabels()[specs.ConfigMapWatchedLabelName]
+	return hasLabel
 }

@@ -209,6 +209,10 @@ func (r *ClusterReconciler) updateResourceStatus(
 		return err
 	}
 
+	if err := r.refreshConfigMapResourceVersions(ctx, cluster); err != nil {
+		return err
+	}
+
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
 	}
@@ -285,19 +289,39 @@ func (r *ClusterReconciler) setCertExpiration(ctx context.Context, cluster *apiv
 	return nil
 }
 
+// refreshConfigMapResourceVersions set the resource version of the secrets
+func (r *ClusterReconciler) refreshConfigMapResourceVersions(ctx context.Context, cluster *apiv1.Cluster) error {
+	versions := apiv1.ConfigMapResourceVersion{}
+	if cluster.Spec.Monitoring != nil {
+		versions.Metrics = make(map[string]string)
+		for _, config := range cluster.Spec.Monitoring.CustomQueriesConfigMap {
+			version, err := r.getConfigMapResourceVersion(ctx, cluster, config.Name)
+			if err != nil {
+				return err
+			}
+			versions.Metrics[config.Name] = version
+		}
+	}
+
+	cluster.Status.ConfigMapResourceVersion = versions
+
+	return nil
+}
+
 // refreshSecretResourceVersions set the resource version of the secrets
 func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, cluster *apiv1.Cluster) error {
+	versions := apiv1.SecretsResourceVersion{}
 	version, err := r.getSecretResourceVersion(ctx, cluster, cluster.GetSuperuserSecretName())
 	if err != nil {
 		return err
 	}
-	cluster.Status.SecretsResourceVersion.SuperuserSecretVersion = version
+	versions.SuperuserSecretVersion = version
 
 	version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetApplicationSecretName())
 	if err != nil {
 		return err
 	}
-	cluster.Status.SecretsResourceVersion.ApplicationSecretVersion = version
+	versions.ApplicationSecretVersion = version
 
 	certificates := cluster.Status.Certificates
 
@@ -308,25 +332,38 @@ func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, c
 	if err != nil {
 		return err
 	}
-	cluster.Status.SecretsResourceVersion.ClientCASecretVersion = version
+	versions.ClientCASecretVersion = version
 
 	version, err = r.getSecretResourceVersion(ctx, cluster, certificates.ReplicationTLSSecret)
 	if err != nil {
 		return err
 	}
-	cluster.Status.SecretsResourceVersion.ReplicationSecretVersion = version
+	versions.ReplicationSecretVersion = version
 
 	version, err = r.getSecretResourceVersion(ctx, cluster, certificates.ServerCASecret)
 	if err != nil {
 		return err
 	}
-	cluster.Status.SecretsResourceVersion.ServerCASecretVersion = version
+	versions.ServerCASecretVersion = version
 
 	version, err = r.getSecretResourceVersion(ctx, cluster, certificates.ServerTLSSecret)
 	if err != nil {
 		return err
 	}
-	cluster.Status.SecretsResourceVersion.ServerSecretVersion = version
+	versions.ServerSecretVersion = version
+
+	if cluster.Spec.Monitoring != nil {
+		versions.Metrics = make(map[string]string)
+		for _, secret := range cluster.Spec.Monitoring.CustomQueriesSecret {
+			version, err = r.getSecretResourceVersion(ctx, cluster, secret.Name)
+			if err != nil {
+				return err
+			}
+			versions.Metrics[secret.Name] = version
+		}
+	}
+
+	cluster.Status.SecretsResourceVersion = versions
 
 	return nil
 }
@@ -337,18 +374,36 @@ func (r *ClusterReconciler) getSecretResourceVersion(
 	cluster *apiv1.Cluster,
 	name string,
 ) (string, error) {
-	secret := corev1.Secret{}
+	return r.getObjectResourceVersion(ctx, cluster, name, &corev1.Secret{})
+}
+
+// getSecretResourceVersion retrieves the resource version of a configmap
+func (r *ClusterReconciler) getConfigMapResourceVersion(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	name string,
+) (string, error) {
+	return r.getObjectResourceVersion(ctx, cluster, name, &corev1.ConfigMap{})
+}
+
+// getObjectResourceVersion retrieves the resource version of an object
+func (r *ClusterReconciler) getObjectResourceVersion(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	name string,
+	object client.Object,
+) (string, error) {
 	err := r.Get(
 		ctx,
 		client.ObjectKey{Namespace: cluster.Namespace, Name: name},
-		&secret)
+		object)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			return "", nil
 		}
 		return "", err
 	}
-	return secret.ResourceVersion, nil
+	return object.GetResourceVersion(), nil
 }
 
 func (r *ClusterReconciler) setPrimaryInstance(

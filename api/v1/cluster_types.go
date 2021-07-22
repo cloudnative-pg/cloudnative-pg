@@ -258,6 +258,12 @@ type ClusterStatus struct {
 	// secret data
 	SecretsResourceVersion SecretsResourceVersion `json:"secretsResourceVersion,omitempty"`
 
+	// The list of resource versions of the configmaps,
+	// managed by the operator. Every change here is done in the
+	// interest of the instance manager, which will refresh the
+	// configmap data
+	ConfigMapResourceVersion ConfigMapResourceVersion `json:"configMapResourceVersion,omitempty"`
+
 	// The configuration for the CA and related certificates, initialized with defaults.
 	Certificates CertificatesStatus `json:"certificates,omitempty"`
 }
@@ -772,6 +778,44 @@ type SecretsResourceVersion struct {
 
 	// The resource version of the PostgreSQL server-side secret version
 	ServerSecretVersion string `json:"serverSecretVersion,omitempty"`
+
+	// A map with the versions of all the secrets used to pass metrics.
+	// Map keys are the secret names, map values are the versions
+	Metrics map[string]string `json:"metrics,omitempty"`
+}
+
+// Contains checks if a given secret is contained or not by a SecretsResourceVersion
+func (in *SecretsResourceVersion) Contains(secret string) bool {
+	if _, ok := in.Metrics[secret]; ok {
+		return true
+	}
+	switch secret {
+	case in.SuperuserSecretVersion,
+		in.ReplicationSecretVersion,
+		in.ApplicationSecretVersion,
+		in.CASecretVersion,
+		in.ClientCASecretVersion,
+		in.ServerCASecretVersion,
+		in.ServerSecretVersion:
+		return true
+	}
+	return false
+}
+
+// ConfigMapResourceVersion is the resource versions of the secrets
+// managed by the operator
+type ConfigMapResourceVersion struct {
+	// A map with the versions of all the config maps used to pass metrics.
+	// Map keys are the config map names, map values are the versions
+	Metrics map[string]string `json:"metrics,omitempty"`
+}
+
+// Contains checks if a given secret is contained or not by a SecretsResourceVersion
+func (in *ConfigMapResourceVersion) Contains(config string) (ok bool) {
+	if _, ok := in.Metrics[config]; ok {
+		return true
+	}
+	return false
 }
 
 // Hub marks this type as a conversion hub.

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -349,16 +350,25 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
-		WithEventFilter(&ClusterPredicate{}).
 		Owns(&corev1.Pod{}).
 		Owns(&batchv1.Job{}).
-		Owns(&corev1.Secret{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&policyv1beta1.PodDisruptionBudget{}).
 		Watches(
+			&source.Kind{Type: &corev1.ConfigMap{}},
+			handler.EnqueueRequestsFromMapFunc(r.mapConfigMapsToClusters(ctx)),
+			builder.WithPredicates(configMapsPredicate),
+		).
+		Watches(
+			&source.Kind{Type: &corev1.Secret{}},
+			handler.EnqueueRequestsFromMapFunc(r.mapSecretsToClusters(ctx)),
+			builder.WithPredicates(secretsPredicate),
+		).
+		Watches(
 			&source.Kind{Type: &corev1.Node{}},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters(ctx)),
+			builder.WithPredicates(nodesPredicate),
 		).
 		Complete(r)
 }
@@ -445,6 +455,82 @@ func isOwnedByCluster(obj client.Object) (string, bool) {
 		return "", false
 	}
 	return owner.Name, true
+}
+
+// mapSecretsToClusters returns a function mapping cluster events watched to cluster reconcile requests
+func (r *ClusterReconciler) mapSecretsToClusters(ctx context.Context) handler.MapFunc {
+	return func(obj client.Object) []reconcile.Request {
+		secret := obj.(*corev1.Secret)
+		var clusters apiv1.ClusterList
+		// get all the clusters handled by the operator in the secret namespaces
+		err := r.List(ctx, &clusters,
+			client.InNamespace(secret.Namespace),
+		)
+		if err != nil {
+			r.Log.Error(err, "while getting cluster list", "namespace", secret.Namespace)
+			return nil
+		}
+		// build requests for cluster referring the secret
+		return filterClustersUsingSecret(clusters, secret)
+	}
+}
+
+// mapNodeToClusters returns a function mapping cluster events watched to cluster reconcile requests
+func (r *ClusterReconciler) mapConfigMapsToClusters(ctx context.Context) handler.MapFunc {
+	return func(obj client.Object) []reconcile.Request {
+		config := obj.(*corev1.ConfigMap)
+		var clusters apiv1.ClusterList
+		// get all the clusters handled by the operator in the configmap namespaces
+		err := r.List(ctx, &clusters,
+			client.InNamespace(config.Namespace),
+		)
+		if err != nil {
+			r.Log.Error(err, "while getting cluster list", "namespace", config.Namespace)
+			return nil
+		}
+		// build requests for cluster referring the configmap
+		return filterClustersUsingConfigMap(clusters, config)
+	}
+}
+
+func filterClustersUsingSecret(
+	clusters apiv1.ClusterList,
+	secret *corev1.Secret,
+) (requests []reconcile.Request) {
+	for _, cluster := range clusters.Items {
+		if cluster.Status.SecretsResourceVersion.Contains(secret.Name) {
+			requests = append(requests,
+				reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      cluster.Name,
+						Namespace: cluster.Namespace,
+					},
+				},
+			)
+			continue
+		}
+	}
+	return requests
+}
+
+func filterClustersUsingConfigMap(
+	clusters apiv1.ClusterList,
+	config *corev1.ConfigMap,
+) (requests []reconcile.Request) {
+	for _, cluster := range clusters.Items {
+		if cluster.Status.ConfigMapResourceVersion.Contains(config.Name) {
+			requests = append(requests,
+				reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      cluster.Name,
+						Namespace: cluster.Namespace,
+					},
+				},
+			)
+			continue
+		}
+	}
+	return requests
 }
 
 // mapNodeToClusters returns a function mapping cluster events watched to cluster reconcile requests

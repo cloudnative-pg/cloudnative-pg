@@ -21,6 +21,8 @@ kind: ConfigMap
 metadata:
   namespace: default
   name: example-monitoring
+  labels:
+    k8s.enterprisedb.io/reload: "true"
 data:
   custom-queries: |
     pg_replication:
@@ -219,6 +221,8 @@ kind: Secret
 metadata:
   namespace: default
   name: example-monitoring-secret
+  labels:
+    k8s.enterprisedb.io/reload: "true"
 stringData:
   pg-database: |
     pg_database:
