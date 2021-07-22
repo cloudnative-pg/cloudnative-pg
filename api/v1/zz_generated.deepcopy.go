@@ -173,6 +173,11 @@ func (in *BackupStatus) DeepCopy() *BackupStatus {
 func (in *BarmanObjectStoreConfiguration) DeepCopyInto(out *BarmanObjectStoreConfiguration) {
 	*out = *in
 	out.S3Credentials = in.S3Credentials
+	if in.EndpointCA != nil {
+		in, out := &in.EndpointCA, &out.EndpointCA
+		*out = new(SecretKeySelector)
+		**out = **in
+	}
 	if in.Wal != nil {
 		in, out := &in.Wal, &out.Wal
 		*out = new(WalBackupConfiguration)

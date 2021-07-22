@@ -15,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
@@ -58,30 +57,9 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 					},
 					Containers: []corev1.Container{
 						{
-							Name:  "bootstrap-instance",
-							Image: cluster.GetImageName(),
-							Env: []corev1.EnvVar{
-								{
-									Name:  "PGDATA",
-									Value: "/var/lib/postgresql/data/pgdata",
-								},
-								{
-									Name:  "POD_NAME",
-									Value: podName,
-								},
-								{
-									Name:  "CLUSTER_NAME",
-									Value: cluster.Name,
-								},
-								{
-									Name:  "NAMESPACE",
-									Value: cluster.Namespace,
-								},
-								{
-									Name:  "PGHOST",
-									Value: postgres.SocketDirectory,
-								},
-							},
+							Name:            "bootstrap-instance",
+							Image:           cluster.GetImageName(),
+							Env:             createEnvVarPostgresContainer(cluster, podName),
 							Command:         initCommand,
 							VolumeMounts:    createPostgresVolumeMounts(cluster),
 							Resources:       cluster.Spec.Resources,
@@ -141,40 +119,19 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 						{
 							Name:  "bootstrap-full-recovery",
 							Image: cluster.GetImageName(),
-							Env: []corev1.EnvVar{
-								{
-									Name:  "PGDATA",
-									Value: "/var/lib/postgresql/data/pgdata",
-								},
-								{
-									Name:  "POD_NAME",
-									Value: podName,
-								},
-								{
-									Name:  "CLUSTER_NAME",
-									Value: cluster.Name,
-								},
-								{
-									Name:  "NAMESPACE",
-									Value: cluster.Namespace,
-								},
-								{
+							Env: append(createEnvVarPostgresContainer(cluster, podName),
+								corev1.EnvVar{
 									Name: "AWS_ACCESS_KEY_ID",
 									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: apiv1.SecretKeySelectorToCore(&backup.Status.S3Credentials.AccessKeyIDReference),
 									},
 								},
-								{
+								corev1.EnvVar{
 									Name: "AWS_SECRET_ACCESS_KEY",
 									ValueFrom: &corev1.EnvVarSource{
 										SecretKeyRef: apiv1.SecretKeySelectorToCore(&backup.Status.S3Credentials.SecretAccessKeyReference),
 									},
-								},
-								{
-									Name:  "PGHOST",
-									Value: postgres.SocketDirectory,
-								},
-							},
+								}),
 							Command:         initCommand,
 							VolumeMounts:    createPostgresVolumeMounts(cluster),
 							Resources:       cluster.Spec.Resources,
@@ -221,28 +178,7 @@ func CreatePrimaryJobViaPgBaseBackup(
 						{
 							Name:  "bootstrap-pgbasebackup",
 							Image: cluster.GetImageName(),
-							Env: []corev1.EnvVar{
-								{
-									Name:  "PGDATA",
-									Value: "/var/lib/postgresql/data/pgdata",
-								},
-								{
-									Name:  "POD_NAME",
-									Value: podName,
-								},
-								{
-									Name:  "CLUSTER_NAME",
-									Value: cluster.Name,
-								},
-								{
-									Name:  "NAMESPACE",
-									Value: cluster.Namespace,
-								},
-								{
-									Name:  "PGHOST",
-									Value: "/var/run/postgresql",
-								},
-							},
+							Env:   createEnvVarPostgresContainer(cluster, podName),
 							Command: []string{
 								"/controller/manager",
 								"instance",
@@ -291,28 +227,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 						{
 							Name:  "bootstrap-replica",
 							Image: cluster.GetImageName(),
-							Env: []corev1.EnvVar{
-								{
-									Name:  "PGDATA",
-									Value: "/var/lib/postgresql/data/pgdata",
-								},
-								{
-									Name:  "POD_NAME",
-									Value: podName,
-								},
-								{
-									Name:  "CLUSTER_NAME",
-									Value: cluster.Name,
-								},
-								{
-									Name:  "NAMESPACE",
-									Value: cluster.Namespace,
-								},
-								{
-									Name:  "PGHOST",
-									Value: postgres.SocketDirectory,
-								},
-							},
+							Env:   createEnvVarPostgresContainer(cluster, podName),
 							Command: []string{
 								"/controller/manager",
 								"instance",

@@ -352,6 +352,15 @@ func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, c
 	}
 	versions.ServerSecretVersion = version
 
+	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
+		version, err = r.getSecretResourceVersion(ctx, cluster,
+			cluster.Spec.Backup.BarmanObjectStore.EndpointCA.Name)
+		if err != nil {
+			return err
+		}
+		versions.BarmanEndpointCA = version
+	}
+
 	if cluster.Spec.Monitoring != nil {
 		versions.Metrics = make(map[string]string)
 		for _, secret := range cluster.Spec.Monitoring.CustomQueriesSecret {

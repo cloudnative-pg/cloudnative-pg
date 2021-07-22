@@ -240,6 +240,13 @@ func (r *InstanceReconciler) reconcileSecrets(
 		r.log.Error(err, "Error while getting cluster CA Server secret")
 	}
 
+	barmanEndpointCaSecretChanged, err := r.RefreshBarmanEndpointCA(ctx, cluster)
+	if err == nil {
+		changed = changed || barmanEndpointCaSecretChanged
+	} else if !apierrors.IsNotFound(err) {
+		r.log.Error(err, "Error while getting barman endpoint CA secret")
+	}
+
 	if changed {
 		r.log.Info("reloading the TLS crypto material")
 		err = r.instance.Reload()
@@ -355,8 +362,7 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 	return certificateIsChanged || privateKeyIsChanged, nil
 }
 
-// refreshConfigurationFilesFromObject receive an unstructured object representing
-// a secret and rewrite the file corresponding to the server certificate
+// refreshCAFromSecret receive a secret and rewrite the ca.crt file to the provided location
 func (r *InstanceReconciler) refreshCAFromSecret(secret *corev1.Secret, destLocation string) (bool, error) {
 	caCertificate, ok := secret.Data[certs.CACertKey]
 	if !ok {
@@ -372,6 +378,28 @@ func (r *InstanceReconciler) refreshCAFromSecret(secret *corev1.Secret, destLoca
 		r.log.Info("Refreshed configuration file",
 			"filename", destLocation,
 			"secret", secret.Name)
+	}
+
+	return changed, nil
+}
+
+// refreshFileFromSecret receive a secret and rewrite the file corresponding to the key to the provided location
+func (r *InstanceReconciler) refreshFileFromSecret(secret *corev1.Secret, key, destLocation string) (bool, error) {
+	data, ok := secret.Data[key]
+	if !ok {
+		return false, fmt.Errorf("missing %s entry in Secret", key)
+	}
+
+	changed, err := fileutils.WriteFile(destLocation, data, 0o600)
+	if err != nil {
+		return false, fmt.Errorf("while writing file: %w", err)
+	}
+
+	if changed {
+		r.log.Info("Refreshed configuration file",
+			"filename", destLocation,
+			"secret", secret.Name,
+			"key", key)
 	}
 
 	return changed, nil

@@ -69,6 +69,10 @@ host all all all md5
 	// server certificates
 	ServerCACertificateLocation = CertificatesDir + "server-ca.crt"
 
+	// BarmanEndpointCACertificateLocation is the location where the barman endpoint
+	// CA certificate is stored
+	BarmanEndpointCACertificateLocation = CertificatesDir + "barman-ca.crt"
+
 	// BackupTemporaryDirectory provides a path to backup temporary files
 	// needed in the recovery process
 	BackupTemporaryDirectory = "/controller/backup"

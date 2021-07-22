@@ -141,6 +141,7 @@ Name            | Description                                                   
 --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------
 `s3Credentials  ` | The credentials to use to upload data to S3                                                                                                                                                                - *mandatory*  | [S3Credentials](#S3Credentials)                     
 `endpointURL    ` | Endpoint to be used to upload data to the cloud, overriding the automatic endpoint discovery                                                                                                               | string                                              
+`endpointCA     ` | EndpointCA store the CA bundle of the barman endpoint. Useful when using self-signed certificates to avoid errors with certificate issuer and barman-cloud-wal-archive                                     | [*SecretKeySelector](#SecretKeySelector)            
 `destinationPath` | The path where to store the backup (i.e. s3://bucket/path/to/folder) this path, with different destination folders, will be used for WALs and for data                                                     - *mandatory*  | string                                              
 `serverName     ` | The server name on S3, the cluster name is used if this parameter is omitted                                                                                                                               | string                                              
 `wal            ` | The configuration for the backup of the WAL stream. When not defined, WAL files will be stored uncompressed and may be unencrypted in the object store, according to the bucket default policy.            | [*WalBackupConfiguration](#WalBackupConfiguration)  
@@ -497,6 +498,7 @@ Name                     | Description                                          
 `clientCaSecretVersion   ` | The resource version of the PostgreSQL client-side CA secret version                                                        | string           
 `serverCaSecretVersion   ` | The resource version of the PostgreSQL server-side CA secret version                                                        | string           
 `serverSecretVersion     ` | The resource version of the PostgreSQL server-side secret version                                                           | string           
+`barmanEndpointCA        ` | The resource version of the Barman Endpoint CA if provided                                                                  | string           
 `metrics                 ` | A map with the versions of all the secrets used to pass metrics. Map keys are the secret names, map values are the versions | map[string]string
 
 <a id='StorageConfiguration'></a>

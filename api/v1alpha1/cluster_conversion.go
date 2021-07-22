@@ -13,7 +13,7 @@ import (
 )
 
 // ConvertTo converts this Cluster to the Hub version (v1).
-func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
+func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,gocognit
 	dst := dstRaw.(*v1.Cluster)
 
 	// objectmeta
@@ -82,7 +82,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 	dst.Spec.PrimaryUpdateStrategy = v1.PrimaryUpdateStrategy(src.Spec.PrimaryUpdateStrategy)
 
 	// spec.backup
-	if src.Spec.Backup != nil {
+	if src.Spec.Backup != nil { // nolint:nestif
 		dst.Spec.Backup = &v1.BackupConfiguration{}
 
 		// spec.backup.barmanObjectStore
@@ -97,32 +97,44 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 				s3Credentials.SecretAccessKeyReference.Key
 			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Name =
 				s3Credentials.SecretAccessKeyReference.Name
-		}
 
-		dst.Spec.Backup.BarmanObjectStore.EndpointURL = src.Spec.Backup.BarmanObjectStore.EndpointURL
-		dst.Spec.Backup.BarmanObjectStore.DestinationPath = src.Spec.Backup.BarmanObjectStore.DestinationPath
-		dst.Spec.Backup.BarmanObjectStore.ServerName = src.Spec.Backup.BarmanObjectStore.ServerName
+			dst.Spec.Backup.BarmanObjectStore.EndpointURL =
+				src.Spec.Backup.BarmanObjectStore.EndpointURL
+			dst.Spec.Backup.BarmanObjectStore.DestinationPath =
+				src.Spec.Backup.BarmanObjectStore.DestinationPath
+			dst.Spec.Backup.BarmanObjectStore.ServerName =
+				src.Spec.Backup.BarmanObjectStore.ServerName
 
-		// spec.backup.barmanObjectStore.wal
-		if src.Spec.Backup.BarmanObjectStore.Wal != nil {
-			wal := src.Spec.Backup.BarmanObjectStore.Wal
-			dst.Spec.Backup.BarmanObjectStore.Wal = &v1.WalBackupConfiguration{}
-			dst.Spec.Backup.BarmanObjectStore.Wal.Compression = v1.CompressionType(
-				wal.Compression)
-			dst.Spec.Backup.BarmanObjectStore.Wal.Encryption = v1.EncryptionType(
-				wal.Encryption)
-		}
+			// spec.backup.barmanObjectStore.wal
+			if src.Spec.Backup.BarmanObjectStore.Wal != nil {
+				wal := src.Spec.Backup.BarmanObjectStore.Wal
+				dst.Spec.Backup.BarmanObjectStore.Wal = &v1.WalBackupConfiguration{}
+				dst.Spec.Backup.BarmanObjectStore.Wal.Compression = v1.CompressionType(
+					wal.Compression)
+				dst.Spec.Backup.BarmanObjectStore.Wal.Encryption = v1.EncryptionType(
+					wal.Encryption)
+			}
 
-		// spec.backup.barmanObjectStore.data
-		if src.Spec.Backup.BarmanObjectStore.Data != nil {
-			data := src.Spec.Backup.BarmanObjectStore.Data
-			dst.Spec.Backup.BarmanObjectStore.Data = &v1.DataBackupConfiguration{}
-			dst.Spec.Backup.BarmanObjectStore.Data.Compression = v1.CompressionType(
-				data.Compression)
-			dst.Spec.Backup.BarmanObjectStore.Data.Encryption = v1.EncryptionType(
-				data.Encryption)
-			dst.Spec.Backup.BarmanObjectStore.Data.ImmediateCheckpoint = data.ImmediateCheckpoint
-			dst.Spec.Backup.BarmanObjectStore.Data.Jobs = data.Jobs
+			// spec.backup.barmanObjectStore.data
+			if src.Spec.Backup.BarmanObjectStore.Data != nil {
+				data := src.Spec.Backup.BarmanObjectStore.Data
+				dst.Spec.Backup.BarmanObjectStore.Data = &v1.DataBackupConfiguration{}
+				dst.Spec.Backup.BarmanObjectStore.Data.Compression = v1.CompressionType(
+					data.Compression)
+				dst.Spec.Backup.BarmanObjectStore.Data.Encryption = v1.EncryptionType(
+					data.Encryption)
+				dst.Spec.Backup.BarmanObjectStore.Data.ImmediateCheckpoint = data.ImmediateCheckpoint
+				dst.Spec.Backup.BarmanObjectStore.Data.Jobs = data.Jobs
+			}
+
+			// spec.backup.barmanObjectStore.endpointCA
+			if src.Spec.Backup.BarmanObjectStore.EndpointCA != nil {
+				dst.Spec.Backup.BarmanObjectStore.EndpointCA = &v1.SecretKeySelector{}
+				dst.Spec.Backup.BarmanObjectStore.EndpointCA.LocalObjectReference.Name =
+					src.Spec.Backup.BarmanObjectStore.EndpointCA.LocalObjectReference.Name
+				dst.Spec.Backup.BarmanObjectStore.EndpointCA.Key =
+					src.Spec.Backup.BarmanObjectStore.EndpointCA.Key
+			}
 		}
 	}
 
@@ -204,6 +216,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 	dst.Status.SecretsResourceVersion.ServerCASecretVersion = src.Status.SecretsResourceVersion.ServerCASecretVersion
 	dst.Status.SecretsResourceVersion.ServerSecretVersion = src.Status.SecretsResourceVersion.ServerSecretVersion
 	dst.Status.SecretsResourceVersion.Metrics = src.Status.SecretsResourceVersion.Metrics
+	dst.Status.SecretsResourceVersion.BarmanEndpointCA = src.Status.SecretsResourceVersion.BarmanEndpointCA
 	dst.Status.ConfigMapResourceVersion.Metrics = src.Status.ConfigMapResourceVersion.Metrics
 	dst.Status.Certificates.ServerTLSSecret = src.Status.Certificates.ServerTLSSecret
 	dst.Status.Certificates.ServerCASecret = src.Status.Certificates.ServerCASecret
@@ -328,7 +341,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	}
 
 	// spec.backup
-	if src.Spec.Backup != nil {
+	if src.Spec.Backup != nil { // nolint:nestif
 		dst.Spec.Backup = &BackupConfiguration{}
 
 		// spec.backup.barmanObjectStore
@@ -341,32 +354,41 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 				s3Credentials.SecretAccessKeyReference.Key
 			dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Name =
 				s3Credentials.SecretAccessKeyReference.Name
-		}
 
-		dst.Spec.Backup.BarmanObjectStore.EndpointURL = src.Spec.Backup.BarmanObjectStore.EndpointURL
-		dst.Spec.Backup.BarmanObjectStore.DestinationPath = src.Spec.Backup.BarmanObjectStore.DestinationPath
-		dst.Spec.Backup.BarmanObjectStore.ServerName = src.Spec.Backup.BarmanObjectStore.ServerName
+			dst.Spec.Backup.BarmanObjectStore.EndpointURL = src.Spec.Backup.BarmanObjectStore.EndpointURL
+			dst.Spec.Backup.BarmanObjectStore.DestinationPath = src.Spec.Backup.BarmanObjectStore.DestinationPath
+			dst.Spec.Backup.BarmanObjectStore.ServerName = src.Spec.Backup.BarmanObjectStore.ServerName
 
-		// spec.backup.barmanObjectStore.wal
-		if src.Spec.Backup.BarmanObjectStore.Wal != nil {
-			wal := src.Spec.Backup.BarmanObjectStore.Wal
-			dst.Spec.Backup.BarmanObjectStore.Wal = &WalBackupConfiguration{}
-			dst.Spec.Backup.BarmanObjectStore.Wal.Compression = CompressionType(
-				wal.Compression)
-			dst.Spec.Backup.BarmanObjectStore.Wal.Encryption = EncryptionType(
-				wal.Encryption)
-		}
+			// spec.backup.barmanObjectStore.wal
+			if src.Spec.Backup.BarmanObjectStore.Wal != nil {
+				wal := src.Spec.Backup.BarmanObjectStore.Wal
+				dst.Spec.Backup.BarmanObjectStore.Wal = &WalBackupConfiguration{}
+				dst.Spec.Backup.BarmanObjectStore.Wal.Compression = CompressionType(
+					wal.Compression)
+				dst.Spec.Backup.BarmanObjectStore.Wal.Encryption = EncryptionType(
+					wal.Encryption)
+			}
 
-		// spec.backup.barmanObjectStore.data
-		if src.Spec.Backup.BarmanObjectStore.Data != nil {
-			data := src.Spec.Backup.BarmanObjectStore.Data
-			dst.Spec.Backup.BarmanObjectStore.Data = &DataBackupConfiguration{}
-			dst.Spec.Backup.BarmanObjectStore.Data.Compression = CompressionType(
-				data.Compression)
-			dst.Spec.Backup.BarmanObjectStore.Data.Encryption = EncryptionType(
-				data.Encryption)
-			dst.Spec.Backup.BarmanObjectStore.Data.ImmediateCheckpoint = data.ImmediateCheckpoint
-			dst.Spec.Backup.BarmanObjectStore.Data.Jobs = data.Jobs
+			// spec.backup.barmanObjectStore.data
+			if src.Spec.Backup.BarmanObjectStore.Data != nil {
+				data := src.Spec.Backup.BarmanObjectStore.Data
+				dst.Spec.Backup.BarmanObjectStore.Data = &DataBackupConfiguration{}
+				dst.Spec.Backup.BarmanObjectStore.Data.Compression = CompressionType(
+					data.Compression)
+				dst.Spec.Backup.BarmanObjectStore.Data.Encryption = EncryptionType(
+					data.Encryption)
+				dst.Spec.Backup.BarmanObjectStore.Data.ImmediateCheckpoint = data.ImmediateCheckpoint
+				dst.Spec.Backup.BarmanObjectStore.Data.Jobs = data.Jobs
+			}
+
+			// spec.backup.barmanObjectStore.endpointCA
+			if src.Spec.Backup.BarmanObjectStore.EndpointCA != nil {
+				dst.Spec.Backup.BarmanObjectStore.EndpointCA = &SecretKeySelector{}
+				dst.Spec.Backup.BarmanObjectStore.EndpointCA.LocalObjectReference.Name =
+					src.Spec.Backup.BarmanObjectStore.EndpointCA.LocalObjectReference.Name
+				dst.Spec.Backup.BarmanObjectStore.EndpointCA.Key =
+					src.Spec.Backup.BarmanObjectStore.EndpointCA.Key
+			}
 		}
 	}
 
@@ -411,6 +433,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Status.SecretsResourceVersion.ServerCASecretVersion = src.Status.SecretsResourceVersion.ServerCASecretVersion
 	dst.Status.SecretsResourceVersion.ServerSecretVersion = src.Status.SecretsResourceVersion.ServerSecretVersion
 	dst.Status.SecretsResourceVersion.Metrics = src.Status.SecretsResourceVersion.Metrics
+	dst.Status.SecretsResourceVersion.BarmanEndpointCA = src.Status.SecretsResourceVersion.BarmanEndpointCA
 	dst.Status.ConfigMapResourceVersion.Metrics = src.Status.ConfigMapResourceVersion.Metrics
 	dst.Status.Certificates.ServerTLSSecret = src.Status.Certificates.ServerTLSSecret
 	dst.Status.Certificates.ServerCASecret = src.Status.Certificates.ServerCASecret

@@ -57,6 +57,7 @@ EBS
 EDB
 EKS
 EOF
+EndpointCA
 EncryptionType
 EnterpriseDB
 EnterpriseDB's
