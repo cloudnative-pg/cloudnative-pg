@@ -190,11 +190,44 @@ func createPostgresContainers(
 // CreateAffinitySection creates the affinity sections for Pods, given the configuration
 // from the user
 func CreateAffinitySection(clusterName string, config apiv1.AffinityConfiguration) *corev1.Affinity {
+	// Initialize affinity
+	affinity := CreateGeneratedAntiAffinity(clusterName, config)
+
+	if config.AdditionalPodAffinity == nil &&
+		config.AdditionalPodAntiAffinity == nil {
+		return affinity
+	}
+
+	if affinity == nil {
+		affinity = &corev1.Affinity{}
+	}
+
+	if config.AdditionalPodAffinity != nil {
+		affinity.PodAffinity = config.AdditionalPodAffinity
+	}
+
+	if config.AdditionalPodAntiAffinity != nil {
+		if affinity.PodAntiAffinity == nil {
+			affinity.PodAntiAffinity = &corev1.PodAntiAffinity{}
+		}
+		affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			config.AdditionalPodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution...)
+		affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			config.AdditionalPodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
+	}
+	return affinity
+}
+
+// CreateGeneratedAntiAffinity generates the affinity terms the operator is in charge for if enabled,
+// return nil if disabled or an error occurred, as invalid values should be validated before this method is called
+func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfiguration) *corev1.Affinity {
 	// We have no anti affinity section if the user don't have it configured
 	if config.EnablePodAntiAffinity != nil && !(*config.EnablePodAntiAffinity) {
 		return nil
 	}
-
+	affinity := &corev1.Affinity{PodAntiAffinity: &corev1.PodAntiAffinity{}}
 	topologyKey := config.TopologyKey
 	if len(topologyKey) == 0 {
 		topologyKey = "kubernetes.io/hostname"
@@ -215,9 +248,6 @@ func CreateAffinitySection(clusterName string, config apiv1.AffinityConfiguratio
 		TopologyKey: topologyKey,
 	}
 
-	// Initialize affinity
-	affinity := corev1.Affinity{PodAntiAffinity: &corev1.PodAntiAffinity{}}
-
 	// Switch pod anti-affinity type:
 	// - if it is "required", 'RequiredDuringSchedulingIgnoredDuringExecution' will be properly set.
 	// - if it is "preferred",'PreferredDuringSchedulingIgnoredDuringExecution' will be properly set.
@@ -227,17 +257,17 @@ func CreateAffinitySection(clusterName string, config apiv1.AffinityConfiguratio
 		affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution =
 			[]corev1.PodAffinityTerm{podAffinityTerm}
 	case apiv1.PodAntiAffinityTypePreferred:
-		affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []corev1.WeightedPodAffinityTerm{
-			{
-				Weight:          100,
-				PodAffinityTerm: podAffinityTerm,
-			},
-		}
+		affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution =
+			[]corev1.WeightedPodAffinityTerm{
+				{
+					Weight:          100,
+					PodAffinityTerm: podAffinityTerm,
+				},
+			}
 	default:
 		return nil
 	}
-
-	return &affinity
+	return affinity
 }
 
 // CreatePostgresSecurityContext defines the security context under which

@@ -2,6 +2,8 @@ AES
 API's
 APIs
 AcolumnName
+AdditionalPodAffinity
+AdditionalPodAntiAffinity
 AffinityConfiguration
 Anand
 BackupConfiguration
@@ -114,6 +116,8 @@ Patroni
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
 Philippe
+PodAffinity
+PodAntiAffinity
 PodAntiAffinityType
 PodDisruptionBudget
 PodMonitor
@@ -173,6 +177,7 @@ WalBackupConfiguration
 accessKeyId
 accessModes
 adc
+additionalPodAntiAffinity
 addons
 affinityconfiguration
 aks
@@ -271,6 +276,7 @@ devsecops
 dl
 dockle
 dod
+domainbetakubernetesiozone
 downtimes
 dvcmQ
 ecdsa
@@ -299,6 +305,7 @@ gzip
 hba
 healthz
 horikyota
+hostname
 hostPort
 hostaddr
 hostssl
@@ -333,6 +340,7 @@ kubelet
 kubernetes
 labelColumnName
 labelColumnValue
+labelSelector
 lastCheckTime
 lastScheduleTime
 latestGeneratedNode
@@ -350,6 +358,7 @@ liveness
 localobjectreference
 locktype
 lt
+matchExpressions
 matchLabels
 maxSyncReplicas
 md
@@ -432,6 +441,7 @@ readyInstances
 recoveryTarget
 recoverytarget
 redhat
+requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resourcerequirements
 reusePVC
