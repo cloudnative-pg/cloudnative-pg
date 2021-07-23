@@ -9,8 +9,7 @@ package metrics
 import (
 	"fmt"
 
-	"github.com/blang/semver"
-	"sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 // UserQueries is a collection of custom queries
@@ -39,7 +38,7 @@ type ColumnMapping struct {
 	Mapping map[string]float64 `yaml:"metric_mapping"`
 
 	// SupportedVersions are the semantic version ranges which are supported.
-	SupportedVersions semver.Range `yaml:"pg_version"`
+	SupportedVersions string `yaml:"pg_version"`
 }
 
 // ColumnUsage represent how a certain column should be used

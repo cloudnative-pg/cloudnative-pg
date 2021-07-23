@@ -32,6 +32,42 @@ var _ = Describe("Metrics parser", func() {
 		Expect(result["pg_postmaster"].Master).To(BeTrue())   // wokeignore:rule=master
 	})
 
+	It("correctly parse another query on multiple databases", func() {
+		result, err := ParseQueries([]byte(`
+some_query:
+  query: |
+    SELECT current_database() as datname, count(*) as rows FROM some_table
+  cache_seconds: 100
+  metrics:
+  - datname:
+      usage: "LABEL"
+      description: "Name of current database"
+      pg_version: ">9.4 <11"
+  - rows:
+      usage: "GAUGE"
+      description: "number of rows"
+  target_databases:
+  - test
+  - app
+`))
+		Expect(err).To(BeNil())
+
+		Expect(result).ToNot(BeNil())
+		Expect(len(result)).To(Equal(1))
+
+		Expect(result["some_query"].Query).To(Equal("SELECT current_database() as datname, count(*)" +
+			" as rows FROM some_table\n"))
+		Expect(result["some_query"].Primary).To(BeFalse())
+		Expect(result["some_query"].TargetDatabases).To(ContainElements("test", "app"))
+		Expect(result["some_query"].CacheSeconds).To(BeEquivalentTo(100))
+		Expect(result["some_query"].Master).To(BeFalse()) // wokeignore:rule=master
+		Expect(len(result["some_query"].Metrics)).To(Equal(2))
+		Expect(result["some_query"].Metrics[0]["datname"].Usage).To(Equal(ColumnUsage("LABEL")))
+		Expect(result["some_query"].Metrics[0]["datname"].Description).To(Equal(
+			"Name of current database"))
+		Expect(result["some_query"].Metrics[0]["datname"].SupportedVersions).To(Equal(">9.4 <11"))
+	})
+
 	It("correctly handles YAML errors", func() {
 		result, err := ParseQueries([]byte(`
 test:
