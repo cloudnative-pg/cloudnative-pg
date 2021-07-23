@@ -448,8 +448,10 @@ func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConf
 			strings.Join(escapedReplicas, ",")))
 	}
 
-	// Apply the cluster name
-	configuration.overwriteConfig("cluster_name", info.ClusterName)
+	if info.ClusterName != "" {
+		// Apply the cluster name
+		configuration.overwriteConfig("cluster_name", info.ClusterName)
+	}
 }
 
 // FillCNPConfiguration creates the actual PostgreSQL configuration
