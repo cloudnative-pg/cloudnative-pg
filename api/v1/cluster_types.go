@@ -817,6 +817,7 @@ func (in *SecretsResourceVersion) Contains(secret string) bool {
 		in.CASecretVersion,
 		in.ClientCASecretVersion,
 		in.ServerCASecretVersion,
+		in.BarmanEndpointCA,
 		in.ServerSecretVersion:
 		return true
 	}
