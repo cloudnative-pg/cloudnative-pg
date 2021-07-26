@@ -29,7 +29,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 		}
 		config := CreatePostgresqlConfiguration(info)
 		Expect(len(config.configs)).To(BeNumerically(">", 1))
-		Expect(config.getConfig("hot_standby")).To(Equal("true"))
+		Expect(config.GetConfig("hot_standby")).To(Equal("true"))
 	})
 
 	It("enforce the mandatory values", func() {
@@ -44,7 +44,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			SyncReplicas:       0,
 		}
 		config := CreatePostgresqlConfiguration(info)
-		Expect(config.getConfig("hot_standby")).To(Equal("true"))
+		Expect(config.GetConfig("hot_standby")).To(Equal("true"))
 	})
 
 	It("generate a config file", func() {
@@ -84,7 +84,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 				SyncReplicas:       0,
 			}
 			config := CreatePostgresqlConfiguration(info)
-			Expect(config.getConfig("wal_keep_segments")).To(Equal("32"))
+			Expect(config.GetConfig("wal_keep_segments")).To(Equal("32"))
 		})
 	})
 
@@ -99,7 +99,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 				SyncReplicas:       0,
 			}
 			config := CreatePostgresqlConfiguration(info)
-			Expect(config.getConfig("wal_keep_size")).To(Equal("512MB"))
+			Expect(config.GetConfig("wal_keep_size")).To(Equal("512MB"))
 		})
 	})
 	It("adds shared_preload_library correctly", func() {
@@ -108,10 +108,11 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			MajorVersion:                     130000,
 			IncludingMandatory:               true,
 			SyncReplicas:                     0,
+			IncludingSharedPreloadLibraries:  true,
 			AdditionalSharedPreloadLibraries: []string{"some_library", "another_library", ""},
 		}
 		config := CreatePostgresqlConfiguration(info)
-		libraries := strings.Split(config.getConfig(SharedPreloadLibraries), ",")
+		libraries := strings.Split(config.GetConfig(SharedPreloadLibraries), ",")
 		Expect(len(info.AdditionalSharedPreloadLibraries)).To(BeNumerically(">", len(libraries)))
 		Expect(libraries).Should(SatisfyAll(
 			ContainElements("some_library", "another_library")), Not(ContainElement("")))
@@ -132,7 +133,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 				SyncReplicas: 2,
 			}
 			config := CreatePostgresqlConfiguration(info)
-			Expect(config.getConfig("synchronous_standby_names")).
+			Expect(config.GetConfig("synchronous_standby_names")).
 				To(Equal("ANY 2 (\"one\",\"two\",\"three\")"))
 		})
 	})
@@ -150,30 +151,66 @@ var _ = Describe("pg_hba.conf generation", func() {
 	})
 })
 
-var _ = Describe("pg_audit", func() {
+var _ = Describe("pgaudit", func() {
 	It("is enabled", func() {
 		userConfigsWithPgAudit := make(map[string]string, 1)
 		userConfigsWithPgAudit["pgaudit."] = "test"
-		Expect(IsPgAuditEnabled(userConfigsWithPgAudit)).To(BeTrue())
+		Expect(IsExtensionRequired(userConfigsWithPgAudit, "pgaudit")).To(BeTrue())
 	})
 	It("is not enabled", func() {
 		userConfigsWithNoPgAudit := make(map[string]string, 1)
-		Expect(IsPgAuditEnabled(userConfigsWithNoPgAudit)).To(BeFalse())
+		Expect(IsExtensionRequired(userConfigsWithNoPgAudit, "pgaudit")).To(BeFalse())
 	})
 	It("adds pgaudit to shared_preload_library", func() {
 		info := ConfigurationInfo{
-			Settings:           CnpConfigurationSettings,
-			MajorVersion:       130000,
-			PgAuditEnabled:     true,
-			IncludingMandatory: true,
-			SyncReplicas:       0,
+			Settings:                        CnpConfigurationSettings,
+			MajorVersion:                    130000,
+			UserSettings:                    map[string]string{"pgaudit.something": "something"},
+			IncludingSharedPreloadLibraries: true,
+			IncludingMandatory:              true,
+			SyncReplicas:                    0,
 		}
 		config := CreatePostgresqlConfiguration(info)
-		Expect(config.getConfig(SharedPreloadLibraries)).To(Equal("pgaudit"))
+		Expect(config.GetConfig(SharedPreloadLibraries)).To(Equal("pgaudit"))
 		info.AdditionalSharedPreloadLibraries = []string{"other_library"}
 		config2 := CreatePostgresqlConfiguration(info)
-		libraries := strings.Split(config2.getConfig(SharedPreloadLibraries), ",")
+		libraries := strings.Split(config2.GetConfig(SharedPreloadLibraries), ",")
 		Expect(libraries).ToNot(ContainElement(""))
 		Expect(libraries).To(ContainElements("pgaudit", "other_library"))
+	})
+	It("adds pg_stat_statements to shared_preload_library", func() {
+		info := ConfigurationInfo{
+			Settings:                        CnpConfigurationSettings,
+			MajorVersion:                    130000,
+			UserSettings:                    map[string]string{"pg_stat_statements.something": "something"},
+			IncludingMandatory:              true,
+			IncludingSharedPreloadLibraries: true,
+			SyncReplicas:                    0,
+		}
+		config := CreatePostgresqlConfiguration(info)
+		Expect(config.GetConfig(SharedPreloadLibraries)).To(Equal("pg_stat_statements"))
+		info.AdditionalSharedPreloadLibraries = []string{"other_library"}
+		config2 := CreatePostgresqlConfiguration(info)
+		libraries := strings.Split(config2.GetConfig(SharedPreloadLibraries), ",")
+		Expect(libraries).ToNot(ContainElement(""))
+		Expect(libraries).To(ContainElements("pg_stat_statements", "other_library"))
+	})
+	It("adds pg_stat_statements and pg_audit to shared_preload_library", func() {
+		info := ConfigurationInfo{
+			Settings:     CnpConfigurationSettings,
+			MajorVersion: 130000,
+			UserSettings: map[string]string{
+				"pg_stat_statements.something": "something",
+				"pgaudit.somethingelse":        "somethingelse",
+			},
+			IncludingMandatory:              true,
+			IncludingSharedPreloadLibraries: true,
+			SyncReplicas:                    0,
+		}
+		config := CreatePostgresqlConfiguration(info)
+		libraries := strings.Split(config.GetConfig(SharedPreloadLibraries), ",")
+		Expect(len(libraries)).To(BeNumerically("==", 2))
+		Expect(libraries).ToNot(ContainElement(""))
+		Expect(libraries).To(ContainElements("pg_stat_statements", "pgaudit"))
 	})
 })

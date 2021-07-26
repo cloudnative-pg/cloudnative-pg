@@ -160,14 +160,22 @@ type ConfigurationInfo struct {
 	// The number of desired number of synchronous replicas
 	SyncReplicas int
 
-	// If pgaudit is enabled or not
-	PgAuditEnabled bool
+	// If the generated configuration should contain shared_preload_libraries too or no
+	IncludingSharedPreloadLibraries bool
 
 	// List of additional sharedPreloadLibraries to be loaded
 	AdditionalSharedPreloadLibraries []string
 }
 
 var (
+	// ManagedExtensions contains the list of extensions the operator should manage,
+	// creating and deleting associated extensions
+	// We assume here that the extension has the same name of the shared library
+	ManagedExtensions = []string{
+		"pgaudit",
+		"pg_stat_statements",
+	}
+
 	// FixedConfigurationParameters contains the parameters that can't be
 	// changed by the user
 	FixedConfigurationParameters = map[string]string{
@@ -261,6 +269,10 @@ var (
 			"log_truncate_on_rotation": "false",
 			"log_directory":            LogPath,
 			"log_filename":             LogFileName,
+			// Workaround for PostgreSQL not behaving correctly when
+			// a default value is not explicit in the postgresql.conf and
+			// the parameter cannot be changed without a restart.
+			SharedPreloadLibraries: "",
 		},
 		DefaultSettings: map[MajorVersionRange]SettingsCollection{
 			{MajorVersionRangeUnlimited, 130000}: {
@@ -286,9 +298,6 @@ var (
 			"ssl_key_file":            ServerKeyLocation,
 			"ssl_ca_file":             ClientCACertificateLocation,
 		},
-		PgAuditSettings: SettingsCollection{
-			SharedPreloadLibraries: "pgaudit",
-		},
 	}
 )
 
@@ -311,7 +320,9 @@ type PgConfiguration struct {
 	configs map[string]string
 }
 
-func (p *PgConfiguration) overwriteConfig(key, value string) {
+// OverwriteConfig overwrites a configuration in the map, given the key/value pair.
+// If the map is nil, it is created and the pair is added
+func (p *PgConfiguration) OverwriteConfig(key, value string) {
 	if p.configs == nil {
 		p.configs = make(map[string]string)
 	}
@@ -319,7 +330,8 @@ func (p *PgConfiguration) overwriteConfig(key, value string) {
 	p.configs[key] = value
 }
 
-func (p *PgConfiguration) addSharedPreloadLibrary(newLibrary string) {
+// AddSharedPreloadLibrary add anew shared preloaded library to PostgreSQL configuration
+func (p *PgConfiguration) AddSharedPreloadLibrary(newLibrary string) {
 	if len(newLibrary) == 0 {
 		return
 	}
@@ -334,11 +346,13 @@ func (p *PgConfiguration) addSharedPreloadLibrary(newLibrary string) {
 	p.configs[SharedPreloadLibraries] = newLibrary
 }
 
-func (p *PgConfiguration) getConfig(key string) string {
+// GetConfig retrieves a configuration from the map of configurations, given the key
+func (p *PgConfiguration) GetConfig(key string) string {
 	return p.configs[key]
 }
 
-func (p *PgConfiguration) getSortedList() []string {
+// GetSortedList returns a sorted list of configurations
+func (p *PgConfiguration) GetSortedList() []string {
 	parameters := make([]string, len(p.configs))
 	i := 0
 	for key := range p.configs {
@@ -360,23 +374,26 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 
 	// Apply all the values from the user, overriding defaults
 	for key, value := range info.UserSettings {
-		configuration.overwriteConfig(key, value)
+		configuration.OverwriteConfig(key, value)
 	}
 
 	// Apply all mandatory settings, on top of defaults and user settings
 	if info.IncludingMandatory {
 		for key, value := range info.Settings.MandatorySettings {
-			configuration.overwriteConfig(key, value)
+			configuration.OverwriteConfig(key, value)
 		}
 	}
-
-	// Set pgaudit specific configurations if needed
-	setPgAuditConfigurations(info, configuration)
 
 	// Apply the list of replicas
 	setReplicasListConfigurations(info, configuration)
 
-	setSharedPreloadLibraries(info, configuration)
+	if info.IncludingSharedPreloadLibraries {
+		// Set all managed shared preload libraries
+		setManagedSharedPreloadLibraries(info, configuration)
+
+		// Set all user provided shared preload libraries
+		setUserSharedPreloadLibraries(info, configuration)
+	}
 
 	return configuration
 }
@@ -386,7 +403,7 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 func setDefaultConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
 	// start from the global default settings
 	for key, value := range info.Settings.GlobalDefaultSettings {
-		configuration.overwriteConfig(key, value)
+		configuration.OverwriteConfig(key, value)
 	}
 
 	// apply settings relative to a certain PostgreSQL version
@@ -394,29 +411,25 @@ func setDefaultConfigurations(info ConfigurationInfo, configuration *PgConfigura
 		if constraints.Min == MajorVersionRangeUnlimited || (constraints.Min <= info.MajorVersion) {
 			if constraints.Max == MajorVersionRangeUnlimited || (info.MajorVersion < constraints.Max) {
 				for key, value := range settings {
-					configuration.overwriteConfig(key, value)
+					configuration.OverwriteConfig(key, value)
 				}
 			}
 		}
 	}
 }
 
-// setPgAuditConfigurations sets all pgaudit specific configurations, if needed
-func setPgAuditConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
-	if info.PgAuditEnabled {
-		for key, value := range info.Settings.PgAuditSettings {
-			if key == SharedPreloadLibraries {
-				configuration.addSharedPreloadLibrary(value)
-				continue
-			}
-			configuration.overwriteConfig(key, value)
+// setManagedSharedPreloadLibraries sets all additional preloaded libraries
+func setManagedSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
+	for _, extension := range ManagedExtensions {
+		if IsExtensionRequired(info.UserSettings, extension) {
+			configuration.AddSharedPreloadLibrary(extension)
 		}
 	}
 }
 
-// setSharedPreloadLibraries sets all additional preloaded libraries
-func setSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
-	oldLibraries := strings.Split(configuration.getConfig(SharedPreloadLibraries), ",")
+// setUserSharedPreloadLibraries sets all additional preloaded libraries
+func setUserSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
+	oldLibraries := strings.Split(configuration.GetConfig(SharedPreloadLibraries), ",")
 	dedupedLibraries := make(map[string]bool, len(oldLibraries)+len(info.AdditionalSharedPreloadLibraries))
 	for _, library := range append(oldLibraries, info.AdditionalSharedPreloadLibraries...) {
 		dedupedLibraries[library] = true
@@ -431,7 +444,7 @@ func setSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfigur
 	}
 	sort.Strings(libraries)
 	if len(dedupedLibraries) > 0 {
-		configuration.overwriteConfig(SharedPreloadLibraries, strings.Join(libraries, ","))
+		configuration.OverwriteConfig(SharedPreloadLibraries, strings.Join(libraries, ","))
 	}
 }
 
@@ -442,7 +455,7 @@ func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConf
 		for idx, name := range info.Replicas {
 			escapedReplicas[idx] = escapePostgresConfLiteral(name)
 		}
-		configuration.overwriteConfig("synchronous_standby_names", fmt.Sprintf(
+		configuration.OverwriteConfig("synchronous_standby_names", fmt.Sprintf(
 			"ANY %v (%v)",
 			info.SyncReplicas,
 			strings.Join(escapedReplicas, ",")))
@@ -450,7 +463,7 @@ func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConf
 
 	if info.ClusterName != "" {
 		// Apply the cluster name
-		configuration.overwriteConfig("cluster_name", info.ClusterName)
+		configuration.OverwriteConfig("cluster_name", info.ClusterName)
 	}
 }
 
@@ -462,11 +475,10 @@ func FillCNPConfiguration(
 	userSettings map[string]string,
 ) map[string]string {
 	info := ConfigurationInfo{
-		Settings:       CnpConfigurationSettings,
-		MajorVersion:   majorVersion,
-		UserSettings:   userSettings,
-		Replicas:       nil,
-		PgAuditEnabled: IsPgAuditEnabled(userSettings),
+		Settings:     CnpConfigurationSettings,
+		MajorVersion: majorVersion,
+		UserSettings: userSettings,
+		Replicas:     nil,
 	}
 	pgConfig := CreatePostgresqlConfiguration(info)
 	return pgConfig.configs
@@ -478,7 +490,7 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 	// by operator to know if they are different or not. To do
 	// that we sort the configuration by parameter name as order
 	// is really irrelevant for our purposes
-	parameters := configuration.getSortedList()
+	parameters := configuration.GetSortedList()
 	postgresConf := ""
 	for _, parameter := range parameters {
 		postgresConf += fmt.Sprintf(
@@ -506,10 +518,12 @@ func escapePostgresConfLiteral(value string) string {
 	return fmt.Sprintf("\"%v\"", strings.ReplaceAll(value, "\"", "\"\""))
 }
 
-// IsPgAuditEnabled checks if pgaudit is enabled or not
-func IsPgAuditEnabled(userConfigs map[string]string) bool {
+// IsExtensionRequired checks whether a given extension is required or not given
+// a user provided configuration
+func IsExtensionRequired(userConfigs map[string]string, extension string) bool {
 	for k := range userConfigs {
-		if strings.HasPrefix(k, "pgaudit.") {
+		// Here we assume that the extension's configuration namespace is equal to the extension name
+		if strings.HasPrefix(k, extension+".") {
 			return true
 		}
 	}

@@ -29,7 +29,7 @@ func (cluster *Cluster) CreatePostgresqlConfiguration() (string, string, error) 
 		MajorVersion:                     fromVersion,
 		UserSettings:                     cluster.Spec.PostgresConfiguration.Parameters,
 		IncludingMandatory:               true,
-		PgAuditEnabled:                   postgres.IsPgAuditEnabled(cluster.Spec.PostgresConfiguration.Parameters),
+		IncludingSharedPreloadLibraries:  true,
 		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
 	}
 

@@ -45,6 +45,8 @@ spec:
   postgresql:
     parameters:
       shared_buffers: 256MB
+      pg_stat_statements.max: 10000
+      pg_stat_statements.track: all
     pg_hba:
       - host all all 10.244.0.0/16 md5
 

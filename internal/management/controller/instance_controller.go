@@ -68,11 +68,94 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 		return fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
 	}
 
+	if err = r.reconcileDatabases(cluster); err != nil {
+		return fmt.Errorf("cannot reconcile database configurations: %w", err)
+	}
+
 	// Reconcile PostgreSQL instance parameters
 	r.reconcileInstance(cluster)
 
 	// Reconcile secrets and cryptographic material
 	return r.reconcileSecrets(ctx, cluster)
+}
+
+// reconcileDatabases reconciles all the existing databases
+func (r *InstanceReconciler) reconcileDatabases(cluster *apiv1.Cluster) error {
+	ok, err := r.instance.IsPrimary()
+	if err != nil {
+		return fmt.Errorf("unable to check if instance is primary: %w", err)
+	}
+	if !ok {
+		return nil
+	}
+	db, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		r.log.Error(err, "Cannot connect to primary server")
+		return fmt.Errorf("getting the superuserdb: %w", err)
+	}
+	databases, errors := r.GetAllAccessibleDatabases(db)
+	for _, databaseName := range databases {
+		db, err := r.instance.ConnectionPool().Connection(databaseName)
+		if err != nil {
+			errors = append(errors,
+				fmt.Errorf("could not connect to database %s: %w", databaseName, err))
+			continue
+		}
+		if err = r.reconcileExtensions(db, cluster.Spec.PostgresConfiguration.Parameters); err != nil {
+			errors = append(errors,
+				fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))
+			continue
+		}
+	}
+	if errors != nil {
+		return fmt.Errorf("got errors while reconciling databases: %v", errors)
+	}
+	return nil
+}
+
+// GetAllAccessibleDatabases returns the list of all the accessible databases using the superuser
+func (r *InstanceReconciler) GetAllAccessibleDatabases(db *sql.DB) (databases []string, errors []error) {
+	rows, err := db.Query("SELECT datname FROM pg_database WHERE datallowconn")
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			r.log.Error(err, "while closing rows: %w")
+		}
+	}()
+	if err != nil {
+		return nil, []error{fmt.Errorf("could not get databases: %w", err)}
+	}
+	for rows.Next() {
+		var database string
+		if err := rows.Scan(&database); err != nil {
+			errors = append(errors, fmt.Errorf("could not parse a row: %w", err))
+		} else {
+			databases = append(databases, database)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		errors = append(errors, err)
+	}
+	if len(errors) > 0 {
+		return databases, errors
+	}
+	return databases, nil
+}
+
+// ReconcileExtensions reconciles the expected extensions for this
+// PostgreSQL instance
+func (r *InstanceReconciler) reconcileExtensions(db *sql.DB, userSettings map[string]string) (err error) {
+	for _, extension := range postgres.ManagedExtensions {
+		if postgres.IsExtensionRequired(userSettings, extension) { // info.PgAuditEnabled {
+			_, err = db.Exec(fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s", extension))
+		} else {
+			_, err = db.Exec(fmt.Sprintf("DROP EXTENSION IF EXISTS %s", extension))
+		}
+		if err != nil {
+			break
+		}
+	}
+	return err
 }
 
 // reconcileClusterRole applies the role written in the cluster status to this instance
