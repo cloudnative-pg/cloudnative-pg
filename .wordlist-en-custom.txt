@@ -270,6 +270,7 @@ customizable
 cyber
 danglingPVC
 databackupconfiguration
+datallowconn
 datname
 dbname
 ddl

@@ -66,9 +66,6 @@ type InitInfo struct {
 
 	// Whether it is a temporary instance that will never contain real data.
 	Temporary bool
-
-	// Whether pgaudit is enabled or not
-	PgAuditEnabled bool
 }
 
 const (
@@ -226,19 +223,6 @@ func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
 	return nil
 }
 
-// ConfigureNewInstanceTemplate creates the expected users and databases in a new
-// PostgreSQL instance
-func (info InitInfo) ConfigureNewInstanceTemplate(db *sql.DB) error {
-	if info.PgAuditEnabled {
-		_, err := db.Exec("CREATE EXTENSION pgaudit")
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // Bootstrap create and configure this new PostgreSQL instance
 func (info InitInfo) Bootstrap() error {
 	err := info.CreateDataDirectory()
@@ -268,16 +252,6 @@ func (info InitInfo) Bootstrap() error {
 		}
 
 		err = info.ConfigureNewInstance(superUserDB)
-		if err != nil {
-			return fmt.Errorf("while configuring new instance: %w", err)
-		}
-
-		templateDB, err := instance.GetTemplateDB()
-		if err != nil {
-			return fmt.Errorf("while creating superuser: %w", err)
-		}
-
-		err = info.ConfigureNewInstanceTemplate(templateDB)
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
 		}

@@ -121,6 +121,92 @@ changed.
 
 For further information, please refer to the ["Logging" section](logging.md).
 
+### Shared Preload Libraries
+
+The `shared_preload_libraries` option in PostgreSQL exists to specify one or
+more shared libraries to be pre-loaded at server start, in the form of a
+comma-separated list. Typically, it is used in PostgreSQL to load those
+extensions that need to be available to most database sessions in the whole system
+(e.g. `pg_stat_statements`).
+
+In Cloud Native PostgreSQL the `shared_preload_libraries` option is empty by
+default. Although you can override the content of `shared_preload_libraries`,
+we recommend that only expert Postgres users take advantage of this option.
+
+!!! Important
+    In case a specified library is not found, the server fails to start,
+    preventing Cloud Native PostgreSQL from any self-healing attempt and requiring
+    manual intervention. Please make sure you always test both the extensions and
+    the settings of `shared_preload_libraries` if you plan to directly manage its
+    content.
+
+Cloud Native PostgreSQL is able to automatically manage the content of the
+`shared_preload_libraries` option for some of the most used PostgreSQL
+extensions (see the ["Managed extensions"](#managed-extensions) section below
+for details).
+
+Specifically, as soon as the operator notices that a configuration parameter
+requires one of the managed libraries, it will automatically add the needed
+library. The operator will also remove the library as soon as no actual parameter
+requires it.
+
+!!! Important
+    Please always keep in mind that removing libraries from
+    `shared_preload_libraries` requires a restart of all instances in the cluster
+    in order to be effective.
+
+You can provide additional `shared_preload_libraries` via
+`.spec.postgresql.shared_preload_libraries` as a list of strings: the operator
+will merge them with the ones that it automatically manages.
+
+### Managed extensions
+
+As anticipated in the previous section, Cloud Native PostgreSQL automatically
+manages the content in `shared_preload_libraries` for some well-known and
+supported extensions. The current list includes:
+
+- `pg_stat_statements`
+- `pgaudit`
+
+Some of these libraries also require additional objects in a database before
+using them, normally views and/or functions managed via the `CREATE EXTENSION`
+command to be run in a database (the `DROP EXTENSION` command typically removes
+those objects).
+
+For such libraries, Cloud Native PostgreSQL automatically handles the creation
+and removal of the extension in all databases that accept a connection in the
+cluster, identified by the following query:
+
+```sql
+SELECT datname FROM pg_database WHERE datallowconn
+```
+
+!!! Note
+    The above query also includes template databases like `template1`.
+
+#### Enabling `pg_stat_statements`
+
+The [`pg_stat_statements`](https://www.postgresql.org/docs/current/pgstatstatements.html)
+extension is one of the most important capabilities available in PostgreSQL for
+real-time monitoring of queries.
+
+You can enable `pg_stat_statements` by adding to the configuration a parameter
+that starts with `pg_stat_statements.` as in the following example excerpt:
+
+```yaml
+  # ...
+  postgresql:
+    parameters:
+      pg_stat_statements.max: 10000
+      pg_stat_statements.track: all
+  # ...
+```
+
+As explained previously, the operator will automatically add
+`pg_stat_statements` to `shared_preload_libraries` and run `CREATE EXTENSION IF
+NOT EXISTS pg_stat_statements` on each database, enabling you to run queries
+against the `pg_stat_statements` view.
+
 ## The `pg_hba` section
 
 `pg_hba` is a list of PostgreSQL Host Based Authentication rules
@@ -186,8 +272,8 @@ Users are not allowed to set the following configuration parameters in the
 - `archive_command`
 - `archive_mode`
 - `archive_timeout`
-- `bonjour_name`
 - `bonjour`
+- `bonjour_name`
 - `cluster_name`
 - `config_file`
 - `data_directory`
@@ -216,6 +302,7 @@ Users are not allowed to set the following configuration parameters in the
 - `promote_trigger_file`
 - `recovery_end_command`
 - `recovery_min_apply_delay`
+- `recovery_target`
 - `recovery_target_action`
 - `recovery_target_inclusive`
 - `recovery_target_lsn`
@@ -223,10 +310,11 @@ Users are not allowed to set the following configuration parameters in the
 - `recovery_target_time`
 - `recovery_target_timeline`
 - `recovery_target_xid`
-- `recovery_target`
 - `restart_after_crash`
 - `restore_command`
 - `shared_memory_type`
+- `shared_preload_libraries`
+- `ssl`
 - `ssl_ca_file`
 - `ssl_cert_file`
 - `ssl_ciphers`
@@ -236,10 +324,9 @@ Users are not allowed to set the following configuration parameters in the
 - `ssl_key_file`
 - `ssl_max_protocol_version`
 - `ssl_min_protocol_version`
-- `ssl_passphrase_command_supports_reload`
 - `ssl_passphrase_command`
+- `ssl_passphrase_command_supports_reload`
 - `ssl_prefer_server_ciphers`
-- `ssl`
 - `stats_temp_directory`
 - `synchronous_standby_names`
 - `syslog_facility`
@@ -251,3 +338,4 @@ Users are not allowed to set the following configuration parameters in the
 - `unix_socket_permissions`
 - `wal_level`
 - `wal_log_hints`
+
