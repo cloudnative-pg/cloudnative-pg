@@ -47,8 +47,8 @@ const (
 	// ClusterRoleLabelReplica is written in labels to represent replica servers
 	ClusterRoleLabelReplica = "replica"
 
-	// ConfigMapWatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded
-	ConfigMapWatchedLabelName = MetadataNamespace + "/reload"
+	// WatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded
+	WatchedLabelName = MetadataNamespace + "/reload"
 
 	// ClusterLabelName label is applied to Pods to link them to the owning
 	// cluster

@@ -74,6 +74,11 @@ the following parameters:
     The operator will still create and manage the two secrets related to client
     certificates.
 
+!!! Note
+    If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
+    add a label with key `k8s.enterprisedb.io/reload` to it, otherwise you will have to reload
+    the instances using the `kubectl cnp reload` subcommand.
+
 See below for a complete example.
 
 #### Example
@@ -199,6 +204,11 @@ the following parameters:
 !!! Note
     As the Cluster is not in control of the client CA secret key, client certificates
     can not be generated using `kubectl cnp certificate` anymore.
+
+!!! Note
+    If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
+    add a label with key `k8s.enterprisedb.io/reload` to it, otherwise you will have to reload
+    the instances using the `kubectl cnp reload` subcommand.
 
 #### Cert-manager Example
 

@@ -93,6 +93,11 @@ The `customQueriesConfigMap`/`customQueriesSecret` sections contain a list of
 `ConfigMap`/`Secret` references specifying the key in which the custom queries are defined.
 Take care that the referred resources have to be created **in the same namespace as the Cluster** resource.
 
+!!! Note
+    If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can 
+    add a label with key `k8s.enterprisedb.io/reload` to it, otherwise you will have to reload
+    the instances using the `kubectl cnp reload` subcommand.
+
 #### Example of a user defined metric
 
 Here you can see an example of a `ConfigMap` containing a single custom query,
@@ -104,6 +109,8 @@ kind: ConfigMap
 metadata:
   name: example-monitoring
   namespace: test
+  labels:
+    k8s.enterprisedb.io/reload: ""
 data:
   custom-queries: |
     pg_replication:

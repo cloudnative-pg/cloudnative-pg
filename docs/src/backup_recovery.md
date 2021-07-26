@@ -101,6 +101,11 @@ spec:
     like when using OpenShift or MinIO via HTTPS. In that case, you need to set the option `endpointCA`
     referring to a secret containing the CA bundle so that Barman can verify the certificate correctly.
 
+!!! Note
+    If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
+    add a label with key `k8s.enterprisedb.io/reload` to it, otherwise you will have to reload
+    the instances using the `kubectl cnp reload` subcommand.
+
 ### MinIO Gateway
 
 Optionally, you can use MinIO Gateway as a common interface which

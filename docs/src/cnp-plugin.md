@@ -156,6 +156,10 @@ The following command will restart a given cluster in a rollout fashion:
 kubectl cnp restart [cluster_name]
 ```
 
+!!! Note
+    If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
+    add a label with key `k8s.enterprisedb.io/reload` to it.
+
 ### Reload
 
 The `kubectl cnp reload` command requests the operator to trigger a reconciliation
