@@ -460,7 +460,10 @@ func isOwnedByCluster(obj client.Object) (string, bool) {
 // mapSecretsToClusters returns a function mapping cluster events watched to cluster reconcile requests
 func (r *ClusterReconciler) mapSecretsToClusters(ctx context.Context) handler.MapFunc {
 	return func(obj client.Object) []reconcile.Request {
-		secret := obj.(*corev1.Secret)
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return nil
+		}
 		var clusters apiv1.ClusterList
 		// get all the clusters handled by the operator in the secret namespaces
 		err := r.List(ctx, &clusters,
@@ -478,7 +481,10 @@ func (r *ClusterReconciler) mapSecretsToClusters(ctx context.Context) handler.Ma
 // mapNodeToClusters returns a function mapping cluster events watched to cluster reconcile requests
 func (r *ClusterReconciler) mapConfigMapsToClusters(ctx context.Context) handler.MapFunc {
 	return func(obj client.Object) []reconcile.Request {
-		config := obj.(*corev1.ConfigMap)
+		config, ok := obj.(*corev1.ConfigMap)
+		if !ok {
+			return nil
+		}
 		var clusters apiv1.ClusterList
 		// get all the clusters handled by the operator in the configmap namespaces
 		err := r.List(ctx, &clusters,
@@ -498,7 +504,7 @@ func filterClustersUsingSecret(
 	secret *corev1.Secret,
 ) (requests []reconcile.Request) {
 	for _, cluster := range clusters.Items {
-		if cluster.Status.SecretsResourceVersion.Contains(secret.Name) {
+		if cluster.UsesSecret(secret.Name) {
 			requests = append(requests,
 				reconcile.Request{
 					NamespacedName: types.NamespacedName{
@@ -518,7 +524,7 @@ func filterClustersUsingConfigMap(
 	config *corev1.ConfigMap,
 ) (requests []reconcile.Request) {
 	for _, cluster := range clusters.Items {
-		if cluster.Status.ConfigMapResourceVersion.Contains(config.Name) {
+		if cluster.UsesConfigMap(config.Name) {
 			requests = append(requests,
 				reconcile.Request{
 					NamespacedName: types.NamespacedName{

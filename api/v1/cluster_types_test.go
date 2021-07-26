@@ -222,48 +222,207 @@ var _ = Describe("look up for secrets", func() {
 
 var _ = Describe("A secret resource version", func() {
 	It("do not contains any secret", func() {
-		sec := SecretsResourceVersion{}
-		found := sec.Contains("a-secret")
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+		}
+		found := cluster.UsesSecret("a-secret")
 		Expect(found).To(BeFalse())
 	})
 
 	It("do not contains any metrics secret", func() {
 		metrics := make(map[string]string, 1)
-		sec := SecretsResourceVersion{
-			Metrics: metrics,
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Status: ClusterStatus{
+				SecretsResourceVersion: SecretsResourceVersion{
+					Metrics: metrics,
+				},
+			},
 		}
-		found := sec.Contains("a-secret")
+		found := cluster.UsesSecret("a-secret")
 		Expect(found).To(BeFalse())
 	})
 
 	It("contains the metrics secret we are looking for", func() {
 		metrics := make(map[string]string, 1)
-		sec := SecretsResourceVersion{
-			Metrics: metrics,
+		metrics["a-secret"] = "test-version"
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Status: ClusterStatus{
+				SecretsResourceVersion: SecretsResourceVersion{
+					Metrics: metrics,
+				},
+			},
 		}
-		sec.Metrics["a-secret"] = "test-version"
-		found := sec.Contains("a-secret")
+		found := cluster.UsesSecret("a-secret")
+		Expect(found).To(BeTrue())
+	})
+
+	It("contains the superuser secret", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+		}
+		found := cluster.UsesSecret("clustername-superuser")
+		Expect(found).To(BeTrue())
+	})
+
+	It("contains the application secret", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+		}
+		found := cluster.UsesSecret("clustername-app")
+		Expect(found).To(BeTrue())
+	})
+
+	It("contains the client ca secret", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Status: ClusterStatus{
+				Certificates: CertificatesStatus{
+					CertificatesConfiguration: CertificatesConfiguration{
+						ClientCASecret: "client-ca-secret",
+					},
+				},
+			},
+		}
+		found := cluster.UsesSecret("client-ca-secret")
+		Expect(found).To(BeTrue())
+	})
+
+	It("contains the replication secret", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Status: ClusterStatus{
+				Certificates: CertificatesStatus{
+					CertificatesConfiguration: CertificatesConfiguration{
+						ClientCASecret: "replication-secret",
+					},
+				},
+			},
+		}
+		found := cluster.UsesSecret("replication-secret")
+		Expect(found).To(BeTrue())
+	})
+
+	It("contains the replication secret", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Status: ClusterStatus{
+				Certificates: CertificatesStatus{
+					CertificatesConfiguration: CertificatesConfiguration{
+						ReplicationTLSSecret: "replication-secret",
+					},
+				},
+			},
+		}
+		found := cluster.UsesSecret("replication-secret")
+		Expect(found).To(BeTrue())
+	})
+
+	It("contains the server ca secret", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Status: ClusterStatus{
+				Certificates: CertificatesStatus{
+					CertificatesConfiguration: CertificatesConfiguration{
+						ServerCASecret: "server-ca-secret",
+					},
+				},
+			},
+		}
+		found := cluster.UsesSecret("server-ca-secret")
+		Expect(found).To(BeTrue())
+	})
+
+	It("contains the server cert secret", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Status: ClusterStatus{
+				Certificates: CertificatesStatus{
+					CertificatesConfiguration: CertificatesConfiguration{
+						ServerTLSSecret: "server-cert-secret",
+					},
+				},
+			},
+		}
+		found := cluster.UsesSecret("server-cert-secret")
+		Expect(found).To(BeTrue())
+	})
+
+	It("contains the barman endpoint ca secret", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						EndpointCA: &SecretKeySelector{
+							LocalObjectReference: LocalObjectReference{
+								Name: "barman-endpoint-ca-secret",
+							},
+							Key: "ca.crt",
+						},
+					},
+				},
+			},
+		}
+		found := cluster.UsesSecret("barman-endpoint-ca-secret")
 		Expect(found).To(BeTrue())
 	})
 })
 
 var _ = Describe("A config map resource version", func() {
-	It("do not contains any metrics secret", func() {
+	It("do not contains any metrics configmap", func() {
 		metrics := make(map[string]string, 1)
-		conf := ConfigMapResourceVersion{
-			Metrics: metrics,
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Status: ClusterStatus{
+				ConfigMapResourceVersion: ConfigMapResourceVersion{
+					Metrics: metrics,
+				},
+			},
 		}
-		found := conf.Contains("a-secret")
+		found := cluster.UsesConfigMap("a-configmap")
 		Expect(found).To(BeFalse())
 	})
 
-	It("contains the metrics secret we are looking for", func() {
+	It("contains the metrics configmap we are looking for", func() {
 		metrics := make(map[string]string, 1)
-		conf := ConfigMapResourceVersion{
-			Metrics: metrics,
+		metrics["a-configmap"] = "test-version"
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Status: ClusterStatus{
+				ConfigMapResourceVersion: ConfigMapResourceVersion{
+					Metrics: metrics,
+				},
+			},
 		}
-		conf.Metrics["a-secret"] = "test-version"
-		found := conf.Contains("a-secret")
+		found := cluster.UsesConfigMap("a-configmap")
 		Expect(found).To(BeTrue())
 	})
 })

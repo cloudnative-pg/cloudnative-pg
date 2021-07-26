@@ -805,39 +805,12 @@ type SecretsResourceVersion struct {
 	Metrics map[string]string `json:"metrics,omitempty"`
 }
 
-// Contains checks if a given secret is contained or not by a SecretsResourceVersion
-func (in *SecretsResourceVersion) Contains(secret string) bool {
-	if _, ok := in.Metrics[secret]; ok {
-		return true
-	}
-	switch secret {
-	case in.SuperuserSecretVersion,
-		in.ReplicationSecretVersion,
-		in.ApplicationSecretVersion,
-		in.CASecretVersion,
-		in.ClientCASecretVersion,
-		in.ServerCASecretVersion,
-		in.BarmanEndpointCA,
-		in.ServerSecretVersion:
-		return true
-	}
-	return false
-}
-
 // ConfigMapResourceVersion is the resource versions of the secrets
 // managed by the operator
 type ConfigMapResourceVersion struct {
 	// A map with the versions of all the config maps used to pass metrics.
 	// Map keys are the config map names, map values are the versions
 	Metrics map[string]string `json:"metrics,omitempty"`
-}
-
-// Contains checks if a given secret is contained or not by a SecretsResourceVersion
-func (in *ConfigMapResourceVersion) Contains(config string) (ok bool) {
-	if _, ok := in.Metrics[config]; ok {
-		return true
-	}
-	return false
 }
 
 // Hub marks this type as a conversion hub.
@@ -1073,6 +1046,35 @@ func (cluster *Cluster) GetClusterAltDNSNames() []string {
 	}
 
 	return append(defaultAltDNSNames, cluster.Spec.Certificates.ServerAltDNSNames...)
+}
+
+// UsesSecret checks whether a given secret is used by a Cluster
+func (cluster *Cluster) UsesSecret(secret string) bool {
+	if _, ok := cluster.Status.SecretsResourceVersion.Metrics[secret]; ok {
+		return true
+	}
+	certificates := cluster.Status.Certificates
+	switch secret {
+	case cluster.GetSuperuserSecretName(),
+		cluster.GetApplicationSecretName(),
+		certificates.ClientCASecret,
+		certificates.ReplicationTLSSecret,
+		certificates.ServerCASecret,
+		certificates.ServerTLSSecret:
+		return true
+	}
+	if cluster.Spec.Backup.IsBarmanEndpointCASet() && cluster.Spec.Backup.BarmanObjectStore.EndpointCA.Name == secret {
+		return true
+	}
+	return false
+}
+
+// UsesConfigMap checks whether a given secret is used by a Cluster
+func (cluster *Cluster) UsesConfigMap(config string) (ok bool) {
+	if _, ok := cluster.Status.ConfigMapResourceVersion.Metrics[config]; ok {
+		return true
+	}
+	return false
 }
 
 // IsBarmanEndpointCASet returns true if we have a CA bundle for the endpoint
