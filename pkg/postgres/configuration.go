@@ -427,23 +427,25 @@ func setManagedSharedPreloadLibraries(info ConfigurationInfo, configuration *PgC
 	}
 }
 
-// setUserSharedPreloadLibraries sets all additional preloaded libraries
+// setUserSharedPreloadLibraries sets all additional preloaded libraries.
+// The resulting list will have all the user provided libraries, followed by all the ones managed
+// by the operator, removing any duplicate and keeping the first occurrence in case of duplicates.
+// Therefore the user provided order is preserved, if an overlap (with the ones already present) happens
 func setUserSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
 	oldLibraries := strings.Split(configuration.GetConfig(SharedPreloadLibraries), ",")
 	dedupedLibraries := make(map[string]bool, len(oldLibraries)+len(info.AdditionalSharedPreloadLibraries))
-	for _, library := range append(oldLibraries, info.AdditionalSharedPreloadLibraries...) {
-		dedupedLibraries[library] = true
+	var libraries []string
+	for _, library := range append(info.AdditionalSharedPreloadLibraries, oldLibraries...) {
+		// if any, delete empty string
+		if library == "" {
+			continue
+		}
+		if !dedupedLibraries[library] {
+			dedupedLibraries[library] = true
+			libraries = append(libraries, library)
+		}
 	}
-	// if any, delete empty string
-	delete(dedupedLibraries, "")
-	libraries := make([]string, len(dedupedLibraries))
-	i := 0
-	for library := range dedupedLibraries {
-		libraries[i] = library
-		i++
-	}
-	sort.Strings(libraries)
-	if len(dedupedLibraries) > 0 {
+	if len(libraries) > 0 {
 		configuration.OverwriteConfig(SharedPreloadLibraries, strings.Join(libraries, ","))
 	}
 }
