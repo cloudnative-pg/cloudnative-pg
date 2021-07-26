@@ -90,6 +90,6 @@ func isOwnedOrSatisfiesPredicate(
 }
 
 func hasReloadLabelSet(obj client.Object) bool {
-	_, hasLabel := obj.GetLabels()[specs.ConfigMapWatchedLabelName]
+	_, hasLabel := obj.GetLabels()[specs.WatchedLabelName]
 	return hasLabel
 }
