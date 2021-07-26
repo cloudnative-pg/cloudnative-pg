@@ -22,7 +22,7 @@ metadata:
   namespace: default
   name: example-monitoring
   labels:
-    k8s.enterprisedb.io/reload: "true"
+    k8s.enterprisedb.io/reload: ""
 data:
   custom-queries: |
     pg_replication:
@@ -222,7 +222,7 @@ metadata:
   namespace: default
   name: example-monitoring-secret
   labels:
-    k8s.enterprisedb.io/reload: "true"
+    k8s.enterprisedb.io/reload: ""
 stringData:
   pg-database: |
     pg_database:
