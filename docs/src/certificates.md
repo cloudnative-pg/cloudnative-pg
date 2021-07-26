@@ -138,6 +138,13 @@ metadata:
 spec:
   selfSigned: {}
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-postgres-server-cert
+  labels:
+    k8s.enterprisedb.io/reload: ""
+---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -223,6 +230,13 @@ metadata:
   name: selfsigned-issuer
 spec:
   selfSigned: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-postgres-client-cert
+  labels:
+    k8s.enterprisedb.io/reload: ""
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate

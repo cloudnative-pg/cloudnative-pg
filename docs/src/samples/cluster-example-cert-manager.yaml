@@ -29,6 +29,13 @@ spec:
   ca:
     secretName: server-ca-key-pair
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-postgres-server-cert
+  labels:
+    k8s.enterprisedb.io/reload: ""
+---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -76,6 +83,13 @@ metadata:
 spec:
   ca:
     secretName: client-ca-key-pair
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-postgres-client-cert
+  labels:
+    k8s.enterprisedb.io/reload: ""
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate

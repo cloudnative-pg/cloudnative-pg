@@ -22,14 +22,14 @@ var (
 	isUsefulConfigMap = func(object client.Object) bool {
 		return isOwnedOrSatisfiesPredicate(object, func(object client.Object) bool {
 			_, ok := object.(*corev1.ConfigMap)
-			return ok || hasReloadLabelSet(object)
+			return ok && hasReloadLabelSet(object)
 		})
 	}
 
 	isUsefulSecret = func(object client.Object) bool {
 		return isOwnedOrSatisfiesPredicate(object, func(object client.Object) bool {
 			_, ok := object.(*corev1.Secret)
-			return ok || hasReloadLabelSet(object)
+			return ok && hasReloadLabelSet(object)
 		})
 	}
 
