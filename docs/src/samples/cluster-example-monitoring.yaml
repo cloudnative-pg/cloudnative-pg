@@ -41,6 +41,8 @@ data:
             description: "Time at which postgres started"
 
     pg_stat_user_tables:
+      target_databases:
+      - "*"
       query: |
        SELECT
          current_database() datname,

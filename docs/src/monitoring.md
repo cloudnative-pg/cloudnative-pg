@@ -133,6 +133,17 @@ A list of basic monitoring queries can be found in the [`cnp-basic-monitoring.ya
 If the `target_databases` option lists more than one database
 the metric is collected from each of them.
 
+Database auto-discovery can be enabled for a specific query by specifying a
+*shell-like pattern* (i.e., containing `*`, `?` or `[]`) in the list of
+`target_databases`. If provided, the operator will expand the list of target
+databases by adding all the databases returned by the execution of `SELECT
+datname FROM pg_database WHERE datallowconn AND NOT datistemplate` and matching
+the pattern according to [path.Match()](https://pkg.go.dev/path#Match) rules.
+
+!!! Note
+    The `*` character has a [special meaning](https://yaml.org/spec/1.2/spec.html#id2786448) in yaml,
+    so you need to quote (`"*"`) the `target_databases` value when it includes such a pattern.
+
 It is recommended that you always include the name of the database 
 in the returned labels, for example using the `current_database()` function
 as in the following example:
@@ -165,6 +176,39 @@ cnp_some_query_rows{datname="bb"} 5
 cnp_some_query_rows{datname="freddie"} 10
 ```
 
+Here is an example of a query with auto-discovery enabled which also
+runs on the `template1` database (otherwise not returned by the
+aforementioned query):
+
+```yaml
+some_query:
+  query: |
+    SELECT
+     current_database() as datname,
+     count(*) as rows
+    FROM some_table
+  metrics:
+    - datname:
+        usage: "LABEL"
+        description: "Name of current database"
+    - rows:
+        usage: "GAUGE"
+        description: "number of rows"
+  target_databases:
+    - "*"
+    - "template1"
+```
+
+The above example will produce the following metrics (provided the databases exist):
+
+```text
+cnp_some_query_rows{datname="albert"} 2
+cnp_some_query_rows{datname="bb"} 5
+cnp_some_query_rows{datname="freddie"} 10
+cnp_some_query_rows{datname="template1"} 7
+cnp_some_query_rows{datname="postgres"} 42
+```
+
 ### Structure of a user defined metric
 
 Every custom query has the following basic structure:
@@ -184,8 +228,9 @@ Here is a short description of all the available fields:
     - `query`: the SQL query to run on the target database to generate the metrics
     - `primary`: whether to run the query only on the primary instance <!-- wokeignore:rule=master -->
     - `master`: same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated) <!-- wokeignore:rule=master -->
-    - `target_databases`: a list of databases to run the `query` against, overwrites the default database, take care 
-      to grant the `pg_monitor` role access to the required databases or tables
+    - `target_databases`: a list of databases to run the `query` against,
+      or a [shell-like pattern](#example-of-a-user-defined-metric-running-on-multiple-databases)
+      to enable auto discovery. Overwrites the default database if provided.
     - `metrics`: section containing a list of all exported columns, defined as follows:
       - `<ColumnName>`: the name of the column returned by the query
           - `usage`: one of the values described below

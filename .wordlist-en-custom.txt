@@ -69,6 +69,7 @@ EnterpriseDB's
 ExternalCluster
 Fei
 Filesystem
+Fluentd
 Francesco
 GCE
 GID
@@ -273,13 +274,16 @@ customizable
 cyber
 danglingPVC
 databackupconfiguration
+datacenters
 datallowconn
+datistemplate
 datname
 dbname
 ddl
 declaratively
 defaultMode
 destinationPath
+dev
 devel
 devsecops
 dl
@@ -417,6 +421,7 @@ pgbarman
 pgbasebackup
 pgbench
 pgpass
+pgstatstatements
 phaseReason
 pid
 pitr
@@ -529,6 +534,7 @@ transactionid
 tx
 ubi
 ul
+un
 uncordon
 unencrypted
 unix
