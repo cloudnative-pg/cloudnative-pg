@@ -146,10 +146,10 @@ func (r *InstanceReconciler) GetAllAccessibleDatabases(db *sql.DB) (databases []
 // PostgreSQL instance
 func (r *InstanceReconciler) reconcileExtensions(db *sql.DB, userSettings map[string]string) (err error) {
 	for _, extension := range postgres.ManagedExtensions {
-		if postgres.IsExtensionRequired(userSettings, extension) { // info.PgAuditEnabled {
-			_, err = db.Exec(fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s", extension))
+		if !extension.SkipCreateExtension && extension.IsUsed(userSettings) {
+			_, err = db.Exec(fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s", extension.Name))
 		} else {
-			_, err = db.Exec(fmt.Sprintf("DROP EXTENSION IF EXISTS %s", extension))
+			_, err = db.Exec(fmt.Sprintf("DROP EXTENSION IF EXISTS %s", extension.Name))
 		}
 		if err != nil {
 			break

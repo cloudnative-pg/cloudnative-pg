@@ -167,13 +167,50 @@ type ConfigurationInfo struct {
 	AdditionalSharedPreloadLibraries []string
 }
 
+// ManagedExtension defines all the information about a managed extension
+type ManagedExtension struct {
+	// Name of the extension
+	Name string
+	// SkipCreateExtension is true when the extension is made only from a shared preload library
+	SkipCreateExtension bool
+	// Namespaces contains the configuration namespaces handled by the extension
+	Namespaces []string
+	// SharedPreloadLibraries is the list of needed shared preload libraries
+	SharedPreloadLibraries []string
+}
+
+// IsUsed checks whether a configuration namespace in the namespaces list
+// is used in the user provided configuration
+func (e ManagedExtension) IsUsed(userConfigs map[string]string) bool {
+	for k := range userConfigs {
+		for _, namespace := range e.Namespaces {
+			if strings.HasPrefix(k, namespace+".") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 var (
-	// ManagedExtensions contains the list of extensions the operator should manage,
-	// creating and deleting associated extensions
-	// We assume here that the extension has the same name of the shared library
-	ManagedExtensions = []string{
-		"pgaudit",
-		"pg_stat_statements",
+	// ManagedExtensions contains the list of extensions the operator supports to manage
+	ManagedExtensions = []ManagedExtension{
+		{
+			Name:                   "pgaudit",
+			Namespaces:             []string{"pgaudit"},
+			SharedPreloadLibraries: []string{"pgaudit"},
+		},
+		{
+			Name:                   "pg_stat_statements",
+			Namespaces:             []string{"pg_stat_statements"},
+			SharedPreloadLibraries: []string{"pg_stat_statements"},
+		},
+		{
+			Name:                   "auto_explain",
+			SkipCreateExtension:    true,
+			Namespaces:             []string{"auto_explain"},
+			SharedPreloadLibraries: []string{"auto_explain"},
+		},
 	}
 
 	// FixedConfigurationParameters contains the parameters that can't be
@@ -421,8 +458,10 @@ func setDefaultConfigurations(info ConfigurationInfo, configuration *PgConfigura
 // setManagedSharedPreloadLibraries sets all additional preloaded libraries
 func setManagedSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConfiguration) {
 	for _, extension := range ManagedExtensions {
-		if IsExtensionRequired(info.UserSettings, extension) {
-			configuration.AddSharedPreloadLibrary(extension)
+		if extension.IsUsed(info.UserSettings) {
+			for _, library := range extension.SharedPreloadLibraries {
+				configuration.AddSharedPreloadLibrary(library)
+			}
 		}
 	}
 }
@@ -518,16 +557,4 @@ func escapePostgresConfValue(value string) string {
 // similar to the literals in PostgreSQL
 func escapePostgresConfLiteral(value string) string {
 	return fmt.Sprintf("\"%v\"", strings.ReplaceAll(value, "\"", "\"\""))
-}
-
-// IsExtensionRequired checks whether a given extension is required or not given
-// a user provided configuration
-func IsExtensionRequired(userConfigs map[string]string, extension string) bool {
-	for k := range userConfigs {
-		// Here we assume that the extension's configuration namespace is equal to the extension name
-		if strings.HasPrefix(k, extension+".") {
-			return true
-		}
-	}
-	return false
 }
