@@ -2,6 +2,57 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.7.0
+
+**Release date:** 28 July 2021
+
+Features:
+
+- Add native support to PGAudit with a new type of `logger` called `pgaudit`
+  directly available in the JSON output
+- Enhance monitoring and observability capabilities through:
+
+    - Native support for the `pg_stat_statements` and `auto_explain` extensions
+    - The `target_databases` option in the Prometheus exporter to run a
+      user-defined metric query on one or more databases (including
+      auto-discovery of databases through shell-like pattern matching)
+    - Exposure of the `manual_switchover_required` metric to promptly report
+      whether a cluster with `primaryUpdateStrategy` set to `supervised`
+      requires a manual switchover
+
+- Transparently handle `shared_preload_libraries` for `pg_audit`,
+  `auto_explain` and `pg_stat_statements`
+
+    - Automatic configuration of `shared_preload_libraries` for PostgreSQL when
+      `pg_stat_statements`, ` pgaudit` or `auto_explain` options are added to
+      the `postgresql` parameters section
+
+- Support the `k8s.enterprisedb.io/reload` label to finely control the
+  automated reload of config maps and secrets, including those used for custom
+  monitoring/alerting metrics in the Prometheus exporter or to store certificates
+- Add the `reload` command to the `cnp` plugin for `kubectl` to trigger a
+  reconciliation loop on the instances
+- Improve control of pod affinity and anti-affinity configurations through
+  `additionalPodAffinity` and `additionalPodAntiAffinity`
+- Introduce a separate `PodDisruptionBudget` for primary instances, by
+  requiring at least a primary instance to run at any time
+
+Security Enhancements:
+
+- Add the `.spec.certificates.clientCASecret` and
+  `spec.certificates.replicationTLSSecret` options to define custom client
+  Certification Authority and certificate for the PostgreSQL server, to be used
+  to authenticate client certificates and secure communication between PostgreSQL
+  nodes
+- Add the `.spec.backup.barmanObjectStore.endpointCA` option to define the
+  custom Certification Authority bundle of the endpoint of Barman’s backup
+  object store
+
+Fixes:
+
+- Correctly parse histograms in the Prometheus exporter
+- Reconcile services created by the operator for a cluster
+
 ## Version 1.6.0
 
 **Release date:** 12 July 2021
