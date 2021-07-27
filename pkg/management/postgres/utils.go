@@ -9,10 +9,14 @@ package postgres
 // This code is inspired on [postgres_exporter](https://github.com/prometheus-community/postgres_exporter)
 
 import (
+	"database/sql"
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
 // DBToFloat64 convert a dynamic value to float64s for Prometheus consumption. Null types are mapped to NaN. string
@@ -113,4 +117,36 @@ func DBToString(t interface{}) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+// GetAllAccessibleDatabases returns the list of all the accessible databases using the superuser
+func GetAllAccessibleDatabases(tx *sql.Tx, whereClause string) (databases []string, errors []error) {
+	rows, err := tx.Query(strings.Join(
+		[]string{"SELECT datname FROM pg_database", whereClause},
+		" WHERE "),
+	)
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Log.Error(err, "while closing rows: %w")
+		}
+	}()
+	if err != nil {
+		return nil, []error{fmt.Errorf("could not get databases: %w", err)}
+	}
+	for rows.Next() {
+		var database string
+		if err := rows.Scan(&database); err != nil {
+			errors = append(errors, fmt.Errorf("could not parse a row: %w", err))
+		} else {
+			databases = append(databases, database)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		errors = append(errors, err)
+	}
+	if len(errors) > 0 {
+		return databases, errors
+	}
+	return databases, nil
 }

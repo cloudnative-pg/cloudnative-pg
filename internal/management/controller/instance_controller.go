@@ -25,6 +25,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	postgresManagement "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
@@ -68,7 +69,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 		return fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
 	}
 
-	if err = r.reconcileDatabases(cluster); err != nil {
+	if err = r.reconcileDatabases(ctx, cluster); err != nil {
 		return fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
 
@@ -80,7 +81,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 }
 
 // reconcileDatabases reconciles all the existing databases
-func (r *InstanceReconciler) reconcileDatabases(cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *apiv1.Cluster) error {
 	ok, err := r.instance.IsPrimary()
 	if err != nil {
 		return fmt.Errorf("unable to check if instance is primary: %w", err)
@@ -93,7 +94,7 @@ func (r *InstanceReconciler) reconcileDatabases(cluster *apiv1.Cluster) error {
 		r.log.Error(err, "Cannot connect to primary server")
 		return fmt.Errorf("getting the superuserdb: %w", err)
 	}
-	databases, errors := r.GetAllAccessibleDatabases(db)
+	databases, errors := r.getAllAccessibleDatabases(ctx, db)
 	for _, databaseName := range databases {
 		db, err := r.instance.ConnectionPool().Connection(databaseName)
 		if err != nil {
@@ -113,33 +114,25 @@ func (r *InstanceReconciler) reconcileDatabases(cluster *apiv1.Cluster) error {
 	return nil
 }
 
-// GetAllAccessibleDatabases returns the list of all the accessible databases using the superuser
-func (r *InstanceReconciler) GetAllAccessibleDatabases(db *sql.DB) (databases []string, errors []error) {
-	rows, err := db.Query("SELECT datname FROM pg_database WHERE datallowconn")
+// getAllAccessibleDatabases returns the list of all the accessible databases using the superuser
+func (r *InstanceReconciler) getAllAccessibleDatabases(
+	ctx context.Context,
+	db *sql.DB,
+) (databases []string, errors []error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		errors = append(errors, err)
+		return nil, errors
+	}
+
 	defer func() {
-		err = rows.Close()
-		if err != nil {
-			r.log.Error(err, "while closing rows: %w")
+		if err := tx.Rollback(); err != nil {
+			errors = append(errors, err)
 		}
 	}()
-	if err != nil {
-		return nil, []error{fmt.Errorf("could not get databases: %w", err)}
-	}
-	for rows.Next() {
-		var database string
-		if err := rows.Scan(&database); err != nil {
-			errors = append(errors, fmt.Errorf("could not parse a row: %w", err))
-		} else {
-			databases = append(databases, database)
-		}
-	}
-	if err = rows.Err(); err != nil {
-		errors = append(errors, err)
-	}
-	if len(errors) > 0 {
-		return databases, errors
-	}
-	return databases, nil
+
+	databases, errors = postgresManagement.GetAllAccessibleDatabases(tx, "datallowconn")
+	return databases, errors
 }
 
 // ReconcileExtensions reconciles the expected extensions for this

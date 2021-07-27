@@ -12,6 +12,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path"
+	"regexp"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -40,6 +42,8 @@ func (q QueriesCollector) Name() string {
 	return q.collectorName
 }
 
+var isPathPattern = regexp.MustCompile(`[][*?]`)
+
 // Collect load data from the actual PostgreSQL instance
 func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 	isPrimary, err := q.instance.IsPrimary()
@@ -47,8 +51,12 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 		return err
 	}
 
-	// reset before collecting
+	// Reset before collecting
 	q.errorUserQueries.Reset()
+
+	// In case more than one user query specifies a pattern in target_databases,
+	// we need to get them just once
+	var allAccessibleDatabasesCache []string
 
 	for name, userQuery := range q.userQueries {
 		collector := QueryCollector{
@@ -69,7 +77,25 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 		if len(targetDatabases) == 0 {
 			targetDatabases = append(targetDatabases, q.defaultDBName)
 		}
-		for _, targetDatabase := range targetDatabases {
+
+		// Initialize the cache is one of the target contains a pattern
+		if allAccessibleDatabasesCache == nil {
+			for _, targetDatabase := range targetDatabases {
+				if isPathPattern.MatchString(targetDatabase) {
+					databases, err := q.getAllAccessibleDatabases()
+					if err != nil {
+						q.errorUserQueries.WithLabelValues(name + ": " + err.Error()).Inc()
+						q.errorUserQueriesGauge.Set(1)
+						break
+					}
+					allAccessibleDatabasesCache = databases
+					break
+				}
+			}
+		}
+
+		allTargetDatabases := q.expandTargetDatabases(targetDatabases, allAccessibleDatabasesCache)
+		for targetDatabase := range allTargetDatabases {
 			conn, err := q.instance.ConnectionPool().Connection(targetDatabase)
 			if err != nil {
 				return err
@@ -78,18 +104,59 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 			if err != nil {
 				log.Log.Error(err, "Error collecting user query", "query name", name,
 					"targetDatabase", targetDatabase)
-				// increment metrics counters.
-				q.errorUserQueries.WithLabelValues(name + ": " + err.Error()).Inc()
+				// Increment metrics counters.
+				q.errorUserQueries.WithLabelValues(name + " on db " + targetDatabase + ": " + err.Error()).Inc()
 				q.errorUserQueriesGauge.Set(1)
 			}
 		}
 	}
 
-	// add err it into errorUserQueriesVec and errorUserQueriesGauge metrics.
+	// Add err it into errorUserQueriesVec and errorUserQueriesGauge metrics.
 	q.errorUserQueriesGauge.Collect(ch)
 	q.errorUserQueries.Collect(ch)
 
 	return nil
+}
+
+func (q QueriesCollector) expandTargetDatabases(
+	targetDatabases []string,
+	allAccessibleDatabasesCache []string,
+) (allTargetDatabases map[string]bool) {
+	allTargetDatabases = make(map[string]bool)
+	for _, targetDatabase := range targetDatabases {
+		if !isPathPattern.MatchString(targetDatabase) {
+			allTargetDatabases[targetDatabase] = true
+			continue
+		}
+		for _, database := range allAccessibleDatabasesCache {
+			matched, err := path.Match(targetDatabase, database)
+			if err == nil && matched {
+				allTargetDatabases[database] = true
+			}
+		}
+	}
+	return allTargetDatabases
+}
+
+func (q QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
+	conn, err := q.instance.ConnectionPool().Connection(q.defaultDBName)
+	if err != nil {
+		return nil, fmt.Errorf("while connecting to expand target_database *: %w", err)
+	}
+	tx, err := createMonitoringTx(conn)
+	if err != nil {
+		return nil, fmt.Errorf("while creating monitoring tx to retrieve accessible databases list: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Log.Info("Error while rolling back monitoring tx to retrieve accessible databases list", "err", err.Error())
+		}
+	}()
+	databases, errors := postgres.GetAllAccessibleDatabases(tx, "datallowconn AND NOT datistemplate")
+	if errors != nil {
+		return nil, fmt.Errorf("while discovering databases for metrics: %v", errors)
+	}
+	return databases, nil
 }
 
 // Describe implements the prometheus.Collector and defines the metrics with return
@@ -284,10 +351,7 @@ func (c QueryCollector) collectColumns(columns []string, columnData []interface{
 // createMonitoringTx create a monitoring transaction with read-only access
 // and role set to `pg_monitor`
 func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
-	ctx := context.Background()
-	defer ctx.Done()
-
-	tx, err := conn.BeginTx(ctx, &sql.TxOptions{
+	tx, err := conn.BeginTx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
 	})
 	if err != nil {
