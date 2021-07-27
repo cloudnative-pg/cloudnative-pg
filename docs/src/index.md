@@ -22,13 +22,14 @@ Cloud Native PostgreSQL works with PostgreSQL and is available under the
 [EnterpriseDB Limited Use License](https://www.enterprisedb.com/limited-use-license).
 
 !!! Important
-    Currently, based on the [Operator Capability Levels model](operator_capability_levels.md),
-    users can expect a **"Level III - Full Lifecycle"** set of capabilities from the
+    Based on the [Operator Capability Levels model](operator_capability_levels.md),
+    users can expect a **"Level V - Auto Pilot"** set of capabilities from the
     Cloud Native PostgreSQL Operator.
 
 ## Requirements
 
-Cloud Native PostgreSQL requires Kubernetes 1.16 or higher, tested on AWS, Google, Azure (with multiple availability zones).
+Cloud Native PostgreSQL requires Kubernetes 1.16 or higher, tested on AWS,
+Google, Azure (with multiple availability zones).
 
 Cloud Native PostgreSQL has also been certified for
 [RedHat OpenShift Container Platform (OCP)](https://www.openshift.com/products/container-platform)
