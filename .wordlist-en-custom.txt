@@ -112,6 +112,7 @@ ObjectMeta
 OpenShift
 Openshift
 OperatorHub
+PGAudit
 PGDATA
 PV
 PVCs
@@ -131,6 +132,7 @@ PrimaryUpdateStrategy
 Quaresima
 QuickStart
 RBAC
+README
 RHSA
 RPO
 RUNTIME
@@ -225,6 +227,7 @@ br
 bs
 bzip
 cGFzc
+cb
 ce
 checksums
 chmod
@@ -362,6 +365,7 @@ listmeta
 liveness
 localobjectreference
 locktype
+lsn
 lt
 matchExpressions
 matchLabels
@@ -492,6 +496,7 @@ sslrootcert
 sso
 startDelay
 startedAt
+stdout
 stopDelay
 stoppedAt
 storageClass
@@ -500,6 +505,7 @@ storageclass
 storageconfiguration
 subcommand
 subresource
+substatement
 sudo
 superuserSecret
 svc
