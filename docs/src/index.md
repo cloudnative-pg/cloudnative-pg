@@ -57,6 +57,7 @@ PostgreSQL 13, 12, 11 and 10 are currently supported.
 * Reuse of Persistent Volumes storage in Pods
 * Rolling updates for PostgreSQL minor versions and operator upgrades
 * TLS connections and client certificate authentication
+* Support for custom TLS certificates (including integration with cert-manager)
 * Continuous backup to an S3 compatible object store
 * Full recovery and Point-In-Time recovery from an S3 compatible object store backup
 * Support for Synchronous Replicas
