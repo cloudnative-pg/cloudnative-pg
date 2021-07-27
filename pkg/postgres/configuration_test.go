@@ -152,14 +152,24 @@ var _ = Describe("pg_hba.conf generation", func() {
 })
 
 var _ = Describe("pgaudit", func() {
+	var pgaudit *ManagedExtension
+	It("manages pgaudit", func() {
+		for i, ext := range ManagedExtensions {
+			if ext.Name == "pgaudit" {
+				pgaudit = &ManagedExtensions[i]
+				break
+			}
+		}
+		Expect(pgaudit).ToNot(BeNil())
+	})
 	It("is enabled", func() {
 		userConfigsWithPgAudit := make(map[string]string, 1)
-		userConfigsWithPgAudit["pgaudit."] = "test"
-		Expect(IsExtensionRequired(userConfigsWithPgAudit, "pgaudit")).To(BeTrue())
+		userConfigsWithPgAudit["pgaudit.xxx"] = "test"
+		Expect(pgaudit.IsUsed(userConfigsWithPgAudit)).To(BeTrue())
 	})
 	It("is not enabled", func() {
 		userConfigsWithNoPgAudit := make(map[string]string, 1)
-		Expect(IsExtensionRequired(userConfigsWithNoPgAudit, "pgaudit")).To(BeFalse())
+		Expect(pgaudit.IsUsed(userConfigsWithNoPgAudit)).To(BeFalse())
 	})
 	It("adds pgaudit to shared_preload_library", func() {
 		info := ConfigurationInfo{

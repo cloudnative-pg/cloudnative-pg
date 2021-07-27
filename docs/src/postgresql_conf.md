@@ -207,6 +207,26 @@ As explained previously, the operator will automatically add
 NOT EXISTS pg_stat_statements` on each database, enabling you to run queries
 against the `pg_stat_statements` view.
 
+#### Enabling `auto_explain`
+
+The [`auto_explain`](https://www.postgresql.org/docs/current/auto-explain.html)
+extension provides a means for logging execution plans of slow statements
+automatically, without having to manually run `EXPLAIN` (helpful for tracking
+down un-optimized queries).
+
+You can enable `auto_explain` by adding to the configuration a parameter
+that starts with `auto_explain.` as in the following example excerpt (which
+automatically logs execution plans of queries that take longer than 10 seconds
+to complete):
+
+```yaml
+  # ...
+  postgresql:
+    parameters:
+      auto_explain.log_min_duration: '10s'
+  # ...
+```
+
 ## The `pg_hba` section
 
 `pg_hba` is a list of PostgreSQL Host Based Authentication rules
