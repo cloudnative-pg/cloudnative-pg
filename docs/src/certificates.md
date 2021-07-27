@@ -12,6 +12,20 @@ In order to set up a `Cluster`, the operator requires:
     You can find all the secrets used by the cluster and their expiration dates
     in the cluster's status.
 
+Cloud Native PostgreSQL is very flexible when it comes to TLS certificates, and
+primarily operates in two modes:
+
+1. [**operator managed**](#operator-managed-mode): certificates are internally
+   managed by the operator in a fully automated way, and signed using a CA created
+   by Cloud Native PostgreSQL
+2. [**user provided**](#user-provided-certificates-mode): certificates are
+   generated outside the operator and imported in the cluster definition as
+   secrets - Cloud Native PostgreSQL integrates itself with cert-manager (see
+   examples below)
+
+You can also choose a hybrid approach, where only part of the certificates is
+generated outside CNP.
+
 ## Operator managed mode
 
 By default, the operator generates a single Certification Authority and uses it

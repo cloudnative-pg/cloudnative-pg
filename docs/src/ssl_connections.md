@@ -1,16 +1,19 @@
 # Client TLS/SSL Connections
 
+!!! See also "Certificates"
+    Please refer to the ["Certificates"](certificates.md)
+    page for more details on how Cloud Native PostgreSQL supports TLS certificates.
+
 The Cloud Native PostgreSQL operator has been designed to work with TLS/SSL for both encryption in transit and
 authentication, on server and client sides. Clusters created using the CNP operator come with a Certification
 Authority (CA) to create and sign TLS client certificates. Through the `cnp` plugin for `kubectl` you can
-issue a new TLS client certificate which can be used to authenticate a user in lieu of passwords.
+issue a new TLS client certificate which can be used to authenticate a user instead of using passwords.
 
 Please refer to the following steps to authenticate via TLS/SSL certificates, which assume you have
 installed a cluster using the [cluster-example.yaml](samples/cluster-example.yaml) deployment manifest.
 According to the convention over configuration paradigm, that file automatically creates a `app` database
 which is owned by a user called `app` (you can change this convention through the `initdb` configuration
 in the `bootstrap` section).
-
 
 ## Issuing a new certificate
 
@@ -52,7 +55,7 @@ Certificate:
     Subject: CN = app
 ```
 
-As you can see, TLS client certificates by default are created with one year of validity, and with a simple CN that
+As you can see, TLS client certificates by default are created with 90 days of validity, and with a simple CN that
 corresponds to the username in PostgreSQL. This is necessary to leverage the `cert` authentication method for `hostssl`
 entries in `pg_hba.conf`.
 
@@ -118,9 +121,10 @@ spec:
 
 This Pod will mount secrets managed by the Cloud Native PostgreSQL operator, including:
 
-* TLS client certificate
-* TLS client certificate private key
-* TLS Certification Authority certificate
+* `sslcert`: the TLS client public certificate 
+* `sslkey`: the TLS client certificate private key 
+* `sslrootcert`: the TLS Certification Authority certificate, that signed the certificate on
+  the server to be used to verify the identity of the instances
 
 They will be used to create the default resources that `psql` (and other libpq based applications like `pgbench`)
 requires to establish a TLS encrypted connection to the Postgres database.
@@ -142,9 +146,9 @@ authentication using TLS certificates we just created.
 A readiness probe has been configured to ensure that the application is ready when the database server can be
 reached.
 
-You can verify that the connection works by executing an interactive `bash` inside the Pod's container to run `psql` using the necessary
-options. The PostgreSQL server is exposed through the read-write Kubernetes service. We will point the `psql`
-command to connect to this service:
+You can verify that the connection works by executing an interactive `bash` inside the Pod's container to run `psql`
+using the necessary options. The PostgreSQL server is exposed through the read-write Kubernetes service. We will point
+the `psql` command to connect to this service:
 
 ```shell
 kubectl exec -it cert-test -- bash -c "psql

@@ -190,6 +190,8 @@ Kubernetes API Server and the operator itself.
 The operator automatically creates a certification authority for every PostgreSQL
 cluster, which is used to issue and renew TLS certificates for clients' authentication,
 including streaming replication standby servers (instead of passwords).
+Support for a custom certification authority for client certificates is
+available through secrets: this also includes integration with cert-manager.
 Certificates can be issued with the `cnp` plugin for `kubectl`.
 
 ### TLS connections
@@ -197,7 +199,8 @@ Certificates can be issued with the `cnp` plugin for `kubectl`.
 The operator transparently and natively supports TLS/SSL connections
 to encrypt client/server communications for increased security using the
 cluster's certification authority.
-Support for custom server certificates is available through secrets.
+Support for custom server certificates is available through secrets: this also
+includes integration with cert-manager.
 
 ### Certificate authentication for streaming replication
 
