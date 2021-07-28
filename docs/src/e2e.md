@@ -52,6 +52,7 @@ and the following suite of E2E tests are performed on that cluster:
   the threshold is raised to 20 seconds on GKE and 30 on AKS;
 * Primary endpoint switch in case of switchover in less than 20 seconds;
 * Recover from a degraded state in less than 60 seconds;
+* Physical replica clusters;
 * Storage expansion.
 
 The E2E tests suite is also run for OpenShift versions 4.5, 4.6, and 4.7
