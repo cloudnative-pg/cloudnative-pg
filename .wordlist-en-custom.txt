@@ -6,6 +6,7 @@ AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
 Anand
+Autoscaler
 BackupConfiguration
 BackupList
 BackupPhase
@@ -203,6 +204,7 @@ async
 auth
 authn
 authz
+autoscaler
 autovacuum
 aws
 az
@@ -427,6 +429,9 @@ pid
 pitr
 pluggable
 png
+podAffinityTerm
+podAntiAffinity
+podAntiAffinityType
 podMetricsEndpoints
 podmonitor
 pos
@@ -436,6 +441,7 @@ postgresUID
 postgresconfiguration
 postgresql
 pre
+preferredDuringSchedulingIgnoredDuringExecution
 preload
 prepended
 primaryUpdateStrategy

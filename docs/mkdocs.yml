@@ -17,8 +17,9 @@ nav:
   - quickstart.md
   - cloud_setup.md
   - bootstrap.md
-  - resource_management.md
   - security.md
+  - scheduling.md
+  - resource_management.md
   - failure_modes.md
   - rolling_update.md
   - backup_recovery.md
@@ -29,12 +30,12 @@ nav:
   - samples.md
   - monitoring.md
   - logging.md
-  - expose_pg_services.md
   - certificates.md
   - ssl_connections.md
   - kubernetes_upgrade.md
-  - e2e.md
+  - expose_pg_services.md
   - cnp-plugin.md
+  - e2e.md
   - container_images.md
   - operator_capability_levels.md
   - api_reference.md
