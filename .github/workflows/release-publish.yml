@@ -28,9 +28,11 @@ jobs:
         name: Build meta
         id: build-meta
         run: |
-          images='quay.io/enterprisedb/cloud-native-postgresql-testing,quay.io/enterprisedb/cloud-native-postgresql,enterprisedb/cloud-native-postgresql'
-          images='${images},edbcloud.azurecr.io/enterprisedb/cloud-native-postgresql'
-          images='${images},upmdev.azurecr.io/enterprisedb/cloud-native-postgresql-testing'
+          images="quay.io/enterprisedb/cloud-native-postgresql-testing"
+          images="${images},quay.io/enterprisedb/cloud-native-postgresql"
+          images="${images},enterprisedb/cloud-native-postgresql"
+          images="${images},edbcloud.azurecr.io/enterprisedb/cloud-native-postgresql"
+          images="${images},upmdev.azurecr.io/enterprisedb/cloud-native-postgresql-testing"
           commit_sha=${{ github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
@@ -146,9 +148,10 @@ jobs:
       -
         name: Generate release notes
         run: |
-          docker run --rm -v $(pwd):/src mist/submark \
+          docker run --rm -v $(pwd):/src \
+            -v /tmp:/tmp mist/submark \
             submark -O --h2 "Version ${{ env.TAG }}" \
-            --out-file /src/release_notes.md \
+            --out-file /tmp/release_notes.md \
             /src/docs/src/release_notes.md
       -
         name: Import GPG key
@@ -161,7 +164,7 @@ jobs:
         name: Release
         uses: softprops/action-gh-release@v1
         with:
-          body_path: release_notes.md
+          body_path: /tmp/release_notes.md
           draft: false
           name: Release ${{ env.TAG }}
         env:
