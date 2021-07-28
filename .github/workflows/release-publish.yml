@@ -167,9 +167,13 @@ jobs:
           body_path: /tmp/release_notes.md
           draft: false
           name: Release ${{ env.TAG }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
-          GITHUB_REPOSITORY: EnterpriseDB/kubectl-cnp
+          repository: EnterpriseDB/kubectl-cnp
+          token: ${{ secrets.REPO_GHA_PAT }}
+      -
+        name: Set GoReleaser environment
+        run: |
+          echo GOPATH=$(go env GOPATH) >> $GITHUB_ENV
+          echo PWD=$(pwd) >> $GITHUB_ENV
       -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
