@@ -171,15 +171,18 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.ReadService = cluster.GetServiceReadName()
 
 	// If we are switching, check if the target primary is still active
+	// Ignore this check if current primary is empty (it happens during the bootstrap)
 	if cluster.Status.TargetPrimary != cluster.Status.CurrentPrimary &&
-		cluster.Status.ReadyInstances > 0 {
+		cluster.Status.CurrentPrimary != "" {
 		found := false
-		for _, pod := range utils.FilterActivePods(resources.pods.Items) {
-			// If the target primary is not active, it will never be promoted
-			// since is will not be scheduled anymore
-			if pod.Name == cluster.Status.TargetPrimary {
-				found = true
-				break
+		if cluster.Status.ReadyInstances > 0 {
+			for _, pod := range utils.FilterActivePods(resources.pods.Items) {
+				// If the target primary is not active, it will never be promoted
+				// since is will not be scheduled anymore
+				if pod.Name == cluster.Status.TargetPrimary {
+					found = true
+					break
+				}
 			}
 		}
 
