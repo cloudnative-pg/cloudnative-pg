@@ -20,7 +20,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walrestore"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/versions"
 
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 func main() {
