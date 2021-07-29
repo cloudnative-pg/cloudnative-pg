@@ -12,7 +12,7 @@ on:
         required: true
         default: 'main'
       limit:
-        description: 'Limit to the specified engines list (local, eks, aks, gke)'
+        description: 'Limit to the specified engines list (local, eks, aks, gke, rke)'
         required: false
   schedule:
     - cron:  '0 1 * * *'
@@ -284,6 +284,8 @@ jobs:
       aksEnabled: ${{ steps.generate-jobs.outputs.aksEnabled }}
       gkeMatrix: ${{ steps.generate-jobs.outputs.gkeMatrix }}
       gkeEnabled: ${{ steps.generate-jobs.outputs.gkeEnabled }}
+      rkeMatrix: ${{ steps.generate-jobs.outputs.rkeMatrix }}
+      rkeEnabled: ${{ steps.generate-jobs.outputs.rkeEnabled }}
     steps:
       -
         name: Checkout code
@@ -733,3 +735,159 @@ jobs:
           do
             gcloud compute disks delete --zone "${{env.ZONE}}" --quiet "${ID}" || true
           done
+
+  e2e-rke:
+      name: Run E2E on Rancher RKE
+      if: ${{ needs.generate-jobs.outputs.rkeEnabled == 'true' && needs.duplicate_runs.outputs.should_skip != 'true' }}
+      needs:
+        - generate-jobs
+        - duplicate_runs
+      strategy:
+        fail-fast: false
+        matrix:
+          ${{ fromJSON(needs.generate-jobs.outputs.rkeMatrix) }}
+      runs-on: ubuntu-20.04
+      env:
+        POSTGRES_IMG: "${{ matrix.postgres_img }}"
+        E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
+
+        DOCKER_SERVER: quay.io/enterprisedb
+        DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
+
+        DEBUG: "true"
+        BUILD_IMAGE: "false"
+        CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
+        E2E_DEFAULT_STORAGE_CLASS: gp2
+        LOG_DIR: ${{ github.workspace }}/rke-logs/
+
+        AWS_REGION: eu-central-1
+        TF_WORKDIR: ${{ github.workspace }}/hack/e2e/rke-ec2/
+        TF_LOG: TRACE
+        TF_LOG_PATH: terraform.log
+        TF_VAR_k8s_version: "${{ matrix.k8s_version }}"
+      steps:
+      -
+        name: Set cluster name
+        run: |
+          echo "TF_VAR_cluster_name=cnp-test-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )" >> $GITHUB_ENV
+      -
+        name: Checkout code
+        uses: actions/checkout@v2.3.4
+      -
+        name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name:  Install ginkgo
+        run: |
+          go install -mod=mod github.com/onsi/ginkgo/ginkgo
+      -
+        name:  Install Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 0.14.x
+      -
+        name: Set Docker version
+        run: |
+          echo "K8S_VERSION=$(echo ${{ env.TF_VAR_k8s_version }} | awk -F '[v -]' '{print $2}')" >> $GITHUB_ENV
+          if dpkg --compare-versions "${{ env.K8S_VERSION }}" "lt" "1.17" ]; then
+            echo "TF_VAR_docker_install_url=https://releases.rancher.com/install-docker/18.09.sh" >> $GITHUB_ENV
+          fi
+      -
+        name: Set Source Ip Address
+        run: |
+          # Restrict access to just the source address
+          echo "TF_VAR_source_ip_address=$(curl -s showip.net)" >> $GITHUB_ENV
+      -
+        name: Install kubectl
+        uses: azure/setup-kubectl@v1
+        with:
+          version: v${{ env.K8S_VERSION }}
+      -
+        name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      -
+        name: Terraform RKE cluster
+        working-directory: ${{ env.TF_WORKDIR }}
+        run: |
+          terraform init && terraform apply -auto-approve
+          echo "KUBECONFIG=${PWD}/kube_config_cluster.yml" >> $GITHUB_ENV
+          # Retrieve the private_key and the list of hosts.
+          # They will be used to gather log files
+          jq -r '.outputs.id_rsa.value' terraform.tfstate > ${PWD}/id_rsa && chmod 600 ${PWD}/id_rsa
+          jq -r '.outputs.public_dns.value[]' terraform.tfstate > ${PWD}/host.list
+      -
+        name: Run E2E tests
+        run: hack/e2e/run-e2e.sh
+      -
+        name: Wait for PVs to be released
+        if: always()
+        run: |
+          ITER=0
+          MAX_ITER=12
+          while true; do
+            output=$( kubectl get pv -o json | jq '.items | length' 2>&1 )
+            if [[ $output == "0" ]]; then
+                echo "PVs have been released"
+                break
+            fi
+            (( ++ITER ))
+            if [[ ${ITER} -ge ${MAX_ITER} ]]; then
+                echo "Time out waiting for Pvs to be terminating"
+                exit 1
+            fi
+            sleep 10;
+          done
+      -
+        name: Gather RKE logs
+        if: failure()
+        working-directory: ${{ env.TF_WORKDIR }}
+        run: |
+          # To avoid rsync warnings with vanished files, in case of error we wait and retry
+          # after 20 seconds for 3 times. This could happen because some pods created during the E2E
+          # tests are still being terminated, and their logs may be removed during the copy.
+          for i in $(cat ${PWD}/host.list); do \
+            mkdir -p "${LOG_DIR}/${i}"; \
+            for x in `seq 1 3`; do
+              if rsync -avPL --rsync-path="sudo rsync" -e "ssh -i ${PWD}/id_rsa -l ubuntu -o StrictHostKeyChecking=no" \
+                ${i}:/var/log/containers/* "${LOG_DIR}/${i}/"; then
+                break
+              fi
+              echo "Couldn't transfer logs. Trying again in 20s."
+              sleep 20
+            done
+          done
+      -
+        name: Archive RKE logs
+        if: failure()
+        uses: actions/upload-artifact@v2
+        with:
+          name: rke-logs-${{ matrix.id }}
+          path: |
+           rke-logs/
+           ${{ env.TF_WORKDIR }}/terraform.log
+           ${{ env.TF_WORKDIR }}/rke_debug.log
+          retention-days: 7
+      -
+        name: Archive e2e failure contexts
+        if: failure()
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-failure-contexts-${{ matrix.id }}
+          path: |
+            tests/*/out/
+          retention-days: 7
+          if-no-files-found: ignore
+      -
+        name: Clean up
+        if: always()
+        working-directory: ${{ env.TF_WORKDIR }}
+        run: |
+          terraform destroy -auto-approve
+          rm -fr .terraform* terraform* id_rsa host.list
