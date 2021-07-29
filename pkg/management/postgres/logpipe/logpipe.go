@@ -28,7 +28,7 @@ type logPipe struct {
 	fieldsValidator FieldsValidator
 }
 
-var tagRegex = regexp.MustCompile(`(?P<Tag>^[a-zA-Z]+): (?P<Record>.*)$`)
+var tagRegex = regexp.MustCompile(`(?s)(?P<Tag>^[a-zA-Z]+): (?P<Record>.*)$`)
 
 var consumedLogFiles sync.Map
 

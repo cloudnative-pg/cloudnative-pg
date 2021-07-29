@@ -233,6 +233,8 @@ var _ = Describe("pgAudit parsing internals", func() {
 		validRecords := []*LoggingRecord{
 			{Message: "AUDIT: SESSION,1,1,READ,SELECT,,,\"SELECT pg_last_wal_receive_lsn()," +
 				" pg_last_wal_replay_lsn(), pg_is_wal_replay_paused()\",<none>"},
+			{Message: "AUDIT: SESSION,1,1,DDL,CREATE TABLE,TABLE,public.account,\"create table account\n(" +
+				"\n    id int,\n    name text,\n    password text,\n    description text\n);\",<not logged>"},
 		}
 		It("identifies the message as pgAudit generated", func() {
 			for _, record := range validRecords {
