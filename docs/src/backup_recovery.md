@@ -19,11 +19,23 @@ as it is composed of a community PostgreSQL image and the latest
     Barman to Barman Cloud in the future. For the time being, it is your responsibility 
     to configure retention policies directly on the object store. 
 
-## Cloud credentials
+## Cloud provider support
 
-You can archive the backup files in any service whose API is compatible
-with AWS S3. You will need the following information about your
-environment:
+You can archive the backup files in any service that is supported
+by the Barman Cloud infrastructure. That is:
+
+- [AWS S3](https://aws.amazon.com/s3/)
+- [Microsoft Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/).
+
+You can also use any compatible implementation of the
+supported services.
+
+The required setup depends on the chosen storage provider and is
+discussed in the following sections.
+
+### S3
+
+You will need the following information about your environment:
 
 - `ACCESS_KEY_ID`: the ID of the access key that will be used
   to upload files in S3
@@ -45,10 +57,6 @@ kubectl create secret generic aws-creds \
 
 The credentials will be stored inside Kubernetes and will be encrypted
 if encryption at rest is configured in your installation.
-
-## Configuring the Cluster
-
-### S3
 
 Given that secret, you can configure your cluster like in
 the following example:
@@ -109,8 +117,8 @@ spec:
 ### MinIO Gateway
 
 Optionally, you can use MinIO Gateway as a common interface which
-relays backup objects to other cloud storage solutions, like S3, GCS or
-Azure. For more information, please refer to [MinIO official documentation](https://docs.min.io/).
+relays backup objects to other cloud storage solutions, like S3 or GCS.
+For more information, please refer to [MinIO official documentation](https://docs.min.io/).
 
 Specifically, the Cloud Native PostgreSQL cluster can directly point to a local
 MinIO Gateway as an endpoint, using previously created credentials and service.
@@ -226,6 +234,79 @@ spec:
 
 Verify on `s3://BUCKET_NAME/` the presence of archived WAL files before
 proceeding with a backup.
+
+### Azure Blob Storage
+
+In order to access your storage account, you will need one of the following combinations
+of credentials:
+
+- [**Connection String**](https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string#configure-a-connection-string-for-an-azure-storage-account)
+- **Storage account name** and [**Storage account access key**](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage)
+- **Storage account name** and [**Storage account SAS Token**](https://docs.microsoft.com/en-us/azure/storage/blobs/sas-service-create).
+
+The credentials need to be stored inside a Kubernetes Secret, adding data entries only when
+needed. The following command performs that:
+
+```
+kubectl create secret generic azure-creds \
+  --from-literal=AZURE_STORAGE_ACCOUNT=<storage account name> \
+  --from-literal=AZURE_STORAGE_KEY=<storage account key> \
+  --from-literal=AZURE_STORAGE_SAS_TOKEN=<SAS token> \
+  --from-literal=AZURE_STORAGE_CONNECTION_STRING=<connection string>
+```
+
+The credentials will be encrypted at rest, if this feature is enabled in the used
+Kubernetes cluster.
+
+Given the previous secret, the provided credentials can be injected inside the cluster
+configuration:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "<destination path here>"
+      azureCredentials:
+        connectionString:
+          name: azurite
+          key: AZURE_CONNECTION_STRING
+        storageAccount:
+          name: azurite
+          key: AZURE_STORAGE_ACCOUNT
+        storageKey:
+          name: azurite
+          key: AZURE_STORAGE_KEY
+        storageSasToken:
+          name: azurite
+          key: AZURE_STORAGE_SAS_TOKEN
+```
+
+When using the Azure Blob Storage, the `destinationPath` fulfills the following
+structure:
+
+```
+<http|https>://<account-name>.<service-name>.core.windows.net/<resource-path>
+```
+
+where `<resource-path>` is `<container>/<blob>`. The **account name**,
+which is also called **storage account name**, is included in the used host name.
+
+### Other Azure Blob Storage compatible providers
+
+If you are using a different implementation of the Azure Blob Storage APIs,
+the `destinationPath` will have the following structure:
+
+```
+<http|https>://<local-machine-address>:<port>/<account-name>/<resource-path>
+```
+
+In that case, `<account-name>` is the first component of the path.
+
+This is required if you are testing the Azure support via the Azure Storage
+Emulator or [Azurite](https://github.com/Azure/Azurite).
 
 ## On-demand backups
 

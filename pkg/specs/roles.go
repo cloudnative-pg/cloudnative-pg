@@ -40,13 +40,7 @@ func CreateRole(cluster apiv1.Cluster) rbacv1.Role {
 		}
 	}
 
-	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
-		// If there is a backup section, the instance manager will need to access
-		// the S3 secret too
-		involvedSecretNames = append(involvedSecretNames,
-			cluster.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Name,
-			cluster.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Name)
-	}
+	involvedSecretNames = append(involvedSecretNames, backupSecrets(cluster)...)
 
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil {
 		server, _ := cluster.ExternalServer(cluster.Spec.Bootstrap.PgBaseBackup.Source)
@@ -172,4 +166,42 @@ func CreateRole(cluster apiv1.Cluster) rbacv1.Role {
 		},
 		Rules: rules,
 	}
+}
+
+func backupSecrets(cluster apiv1.Cluster) []string {
+	var result []string
+
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+		return nil
+	}
+
+	// Secrets needed to access S3
+	if cluster.Spec.Backup.BarmanObjectStore.S3Credentials != nil {
+		result = append(result,
+			cluster.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Name,
+			cluster.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Name)
+	}
+
+	// Secrets needed to access Azure
+	if cluster.Spec.Backup.BarmanObjectStore.AzureCredentials != nil {
+		if cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.ConnectionString != nil {
+			result = append(result,
+				cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.ConnectionString.Name)
+		}
+		if cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageAccount != nil {
+			result = append(result,
+				cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageAccount.Name)
+		}
+		if cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageKey != nil {
+			result = append(result,
+				cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageKey.Name)
+		}
+
+		if cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageSasToken != nil {
+			result = append(result,
+				cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageSasToken.Name)
+		}
+	}
+
+	return result
 }

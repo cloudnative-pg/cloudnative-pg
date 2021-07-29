@@ -72,39 +72,9 @@ func NewCmd() *cobra.Command {
 				return nil
 			}
 
-			configuration := cluster.Spec.Backup.BarmanObjectStore
+			options := barmanCloudWalArchiveOptions(cluster, clusterName, walName)
 
-			var options []string
-			if configuration.Wal != nil {
-				if len(configuration.Wal.Compression) != 0 {
-					options = append(
-						options,
-						fmt.Sprintf("--%v", configuration.Wal.Compression))
-				}
-				if len(configuration.Wal.Encryption) != 0 {
-					options = append(
-						options,
-						"-e",
-						string(configuration.Wal.Encryption))
-				}
-			}
-			if len(configuration.EndpointURL) > 0 {
-				options = append(
-					options,
-					"--endpoint-url",
-					configuration.EndpointURL)
-			}
-			serverName := clusterName
-			if len(configuration.ServerName) != 0 {
-				serverName = configuration.ServerName
-			}
-			options = append(
-				options,
-				configuration.DestinationPath,
-				serverName,
-				walName)
-
-			env, err := postgres.EnvSetAWSCredentials(ctx, typedClient, &cluster, os.Environ())
+			env, err := postgres.EnvSetCloudCredentials(ctx, typedClient, &cluster, os.Environ())
 			if err != nil {
 				log.Log.Error(err, "Error while settings AWS environment variables",
 					"walName", walName,
@@ -148,4 +118,51 @@ func NewCmd() *cobra.Command {
 		"the cluster and of the Pod in k8s")
 
 	return &cmd
+}
+
+func barmanCloudWalArchiveOptions(cluster apiv1.Cluster, clusterName string, walName string) []string {
+	configuration := cluster.Spec.Backup.BarmanObjectStore
+
+	var options []string
+	if configuration.Wal != nil {
+		if len(configuration.Wal.Compression) != 0 {
+			options = append(
+				options,
+				fmt.Sprintf("--%v", configuration.Wal.Compression))
+		}
+		if len(configuration.Wal.Encryption) != 0 {
+			options = append(
+				options,
+				"-e",
+				string(configuration.Wal.Encryption))
+		}
+	}
+	if len(configuration.EndpointURL) > 0 {
+		options = append(
+			options,
+			"--endpoint-url",
+			configuration.EndpointURL)
+	}
+	if configuration.S3Credentials != nil {
+		options = append(
+			options,
+			"--cloud-provider",
+			"aws-s3")
+	}
+	if configuration.AzureCredentials != nil {
+		options = append(
+			options,
+			"--cloud-provider",
+			"azure-blob-storage")
+	}
+	serverName := clusterName
+	if len(configuration.ServerName) != 0 {
+		serverName = configuration.ServerName
+	}
+	options = append(
+		options,
+		configuration.DestinationPath,
+		serverName,
+		walName)
+	return options
 }

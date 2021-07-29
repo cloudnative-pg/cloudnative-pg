@@ -752,6 +752,65 @@ spec:
                   barmanObjectStore:
                     description: The configuration for the barman-cloud tool suite
                     properties:
+                      azureCredentials:
+                        description: The credentials to use to upload data in Azure
+                          Blob Storage
+                        properties:
+                          connectionString:
+                            description: The connection string to be used
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          storageAccount:
+                            description: The storage account where to upload data
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          storageKey:
+                            description: The storage account key to be used in conjunction
+                              with the storage account name
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          storageSasToken:
+                            description: A shared-access-signature to be used in conjunction
+                              with the storage account name
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        type: object
                       data:
                         description: The configuration to be used to backup the data
                           files When not defined, base backups files will be stored
@@ -879,7 +938,6 @@ spec:
                         type: object
                     required:
                     - destinationPath
-                    - s3Credentials
                     type: object
                 type: object
               bootstrap:
@@ -2389,6 +2447,64 @@ spec:
                   barmanObjectStore:
                     description: The configuration for the barman-cloud tool suite
                     properties:
+                      azureCredentials:
+                        description: The credentials to use to upload data to S3
+                        properties:
+                          connectionString:
+                            description: The connection string to be used
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          storageAccount:
+                            description: The storage account where to upload data
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          storageKey:
+                            description: The storage account key to be used in conjunction
+                              with the storage account name
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          storageSasToken:
+                            description: A shared-access-signature to be used in conjunction
+                              with the storage account name
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                        type: object
                       data:
                         description: The configuration to be used to backup the data
                           files When not defined, base backups files will be stored
@@ -2503,7 +2619,6 @@ spec:
                         type: object
                     required:
                     - destinationPath
-                    - s3Credentials
                     type: object
                 type: object
               bootstrap:

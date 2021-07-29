@@ -621,7 +621,10 @@ const (
 // using Barman against an S3-compatible object storage
 type BarmanObjectStoreConfiguration struct {
 	// The credentials to use to upload data to S3
-	S3Credentials S3Credentials `json:"s3Credentials"`
+	S3Credentials *S3Credentials `json:"s3Credentials,omitempty"`
+
+	// The credentials to use to upload data in Azure Blob Storage
+	AzureCredentials *AzureCredentials `json:"azureCredentials,omitempty"`
 
 	// Endpoint to be used to upload data to the cloud,
 	// overriding the automatic endpoint discovery
@@ -716,6 +719,29 @@ type S3Credentials struct {
 
 	// The reference to the secret access key
 	SecretAccessKeyReference SecretKeySelector `json:"secretAccessKey"`
+}
+
+// AzureCredentials is the type for the credentials to be used to upload
+// files to Azure Blob Storage. The connection string contains every needed
+// information. If the connection string is not specified, we'll need the
+// storage account name and also one (and only one) of:
+//
+// - storageKey
+// - storageSasToken
+type AzureCredentials struct {
+	// The connection string to be used
+	ConnectionString *SecretKeySelector `json:"connectionString,omitempty"`
+
+	// The storage account where to upload data
+	StorageAccount *SecretKeySelector `json:"storageAccount,omitempty"`
+
+	// The storage account key to be used in conjunction
+	// with the storage account name
+	StorageKey *SecretKeySelector `json:"storageKey,omitempty"`
+
+	// A shared-access-signature to be used in conjunction with
+	// the storage account name
+	StorageSasToken *SecretKeySelector `json:"storageSasToken,omitempty"`
 }
 
 // MonitoringConfiguration is the type containing all the monitoring

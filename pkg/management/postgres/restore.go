@@ -88,6 +88,18 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup) error {
 	options = append(options, backup.Status.DestinationPath)
 	options = append(options, backup.Status.ServerName)
 	options = append(options, backup.Status.BackupID)
+	if backup.Status.S3Credentials != nil {
+		options = append(
+			options,
+			"--cloud-provider",
+			"aws-s3")
+	}
+	if backup.Status.AzureCredentials != nil {
+		options = append(
+			options,
+			"--cloud-provider",
+			"azure-blob-storage")
+	}
 	options = append(options, info.PgData)
 
 	log.Log.Info("Starting barman-cloud-restore",
@@ -146,6 +158,18 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 	}
 	cmd = append(cmd, backup.Status.DestinationPath)
 	cmd = append(cmd, backup.Spec.Cluster.Name)
+	if backup.Status.S3Credentials != nil {
+		cmd = append(
+			cmd,
+			"--cloud-provider",
+			"aws-s3")
+	}
+	if backup.Status.AzureCredentials != nil {
+		cmd = append(
+			cmd,
+			"--cloud-provider",
+			"azure-blob-storage")
+	}
 	cmd = append(cmd, "%f", "%p")
 
 	recoveryFileContents := fmt.Sprintf(

@@ -30,3 +30,35 @@ var _ = Describe("Roles", func() {
 		Expect(len(serviceAccount.Rules)).To(Equal(7))
 	})
 })
+
+var _ = Describe("Secrets", func() {
+	cluster := apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "thistest",
+			Namespace: "default",
+		},
+	}
+
+	It("are properly backed up", func() {
+		secrets := backupSecrets(cluster)
+		Expect(secrets).To(BeEmpty())
+
+		cluster.Spec = apiv1.ClusterSpec{
+			Backup: &apiv1.BackupConfiguration{
+				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+					S3Credentials: &apiv1.S3Credentials{
+						SecretAccessKeyReference: apiv1.SecretKeySelector{
+							LocalObjectReference: apiv1.LocalObjectReference{Name: "test-secret"},
+						},
+						AccessKeyIDReference: apiv1.SecretKeySelector{
+							LocalObjectReference: apiv1.LocalObjectReference{Name: "test-access"},
+						},
+					},
+				},
+			},
+		}
+		secrets = backupSecrets(cluster)
+		Expect(secrets[0]).To(BeEquivalentTo("test-secret"))
+		Expect(secrets[1]).To(BeEquivalentTo("test-access"))
+	})
+})
