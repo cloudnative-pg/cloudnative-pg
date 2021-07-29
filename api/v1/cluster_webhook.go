@@ -132,6 +132,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 	allErrs = append(allErrs, r.validateTolerations()...)
 	allErrs = append(allErrs, r.validateAntiAffinity()...)
 	allErrs = append(allErrs, r.validateReplicaMode()...)
+	allErrs = append(allErrs, r.validateBackupConfiguration()...)
 
 	return allErrs
 }
@@ -863,5 +864,69 @@ func (r *Cluster) validateAntiAffinity() field.ErrorList {
 				PodAntiAffinityTypePreferred, PodAntiAffinityTypeRequired),
 		))
 	}
+	return allErrors
+}
+
+// validateBackupConfiguration validates the backup configuration
+func (r *Cluster) validateBackupConfiguration() field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	if r.Spec.Backup == nil || r.Spec.Backup.BarmanObjectStore == nil {
+		return nil
+	}
+
+	credentialsCount := 0
+	if r.Spec.Backup.BarmanObjectStore.AzureCredentials != nil {
+		credentialsCount++
+		allErrors = r.Spec.Backup.BarmanObjectStore.AzureCredentials.validateAzureCredentials(
+			field.NewPath("spec", "backupConfiguration", "azureCredentials"))
+	}
+	if r.Spec.Backup.BarmanObjectStore.S3Credentials != nil {
+		credentialsCount++
+	}
+
+	if credentialsCount != 1 {
+		allErrors = append(allErrors, field.Invalid(
+			field.NewPath("spec", "backupConfiguration"),
+			r.Spec.Backup.BarmanObjectStore,
+			"one and only one of azureCredentials and s3Credentials are required",
+		))
+	}
+
+	return allErrors
+}
+
+// validateAzureCredentials checks and validates the azure credentials
+func (azure *AzureCredentials) validateAzureCredentials(path *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	secrets := 0
+	if azure.StorageKey != nil {
+		secrets++
+	}
+	if azure.StorageSasToken != nil {
+		secrets++
+	}
+
+	if secrets != 1 && azure.ConnectionString == nil {
+		allErrors = append(
+			allErrors,
+			field.Invalid(
+				path,
+				azure,
+				"when connection string is not specified, one and only one of "+
+					"storage key and storage SAS token is allowed"))
+	}
+
+	if secrets != 0 && azure.ConnectionString != nil {
+		allErrors = append(
+			allErrors,
+			field.Invalid(
+				path,
+				azure,
+				"when connection string is specified, the other parameters "+
+					"must be empty"))
+	}
+
 	return allErrors
 }

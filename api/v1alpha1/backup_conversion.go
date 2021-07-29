@@ -40,12 +40,44 @@ func (src *Backup) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 	dst.Status.EndLSN = src.Status.EndLSN
 
 	// status.s3Credentials
-	dst.Status.S3Credentials.AccessKeyIDReference.Key = src.Status.S3Credentials.AccessKeyIDReference.Key
-	dst.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name =
-		src.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name
-	dst.Status.S3Credentials.SecretAccessKeyReference.Key = src.Status.S3Credentials.SecretAccessKeyReference.Key
-	dst.Status.S3Credentials.SecretAccessKeyReference.LocalObjectReference.Name =
-		src.Status.S3Credentials.SecretAccessKeyReference.Name
+	if src.Status.S3Credentials != nil {
+		dst.Status.S3Credentials = &v1.S3Credentials{}
+		dst.Status.S3Credentials.AccessKeyIDReference.Key = src.Status.S3Credentials.AccessKeyIDReference.Key
+		dst.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name =
+			src.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name
+		dst.Status.S3Credentials.SecretAccessKeyReference.Key = src.Status.S3Credentials.SecretAccessKeyReference.Key
+		dst.Status.S3Credentials.SecretAccessKeyReference.LocalObjectReference.Name =
+			src.Status.S3Credentials.SecretAccessKeyReference.Name
+	}
+
+	// status.azureCredentials
+	if src.Status.AzureCredentials != nil {
+		dst.Status.AzureCredentials = &v1.AzureCredentials{}
+
+		if dst.Status.AzureCredentials.StorageAccount != nil {
+			dst.Status.AzureCredentials.StorageAccount = &v1.SecretKeySelector{}
+			dst.Status.AzureCredentials.StorageAccount.Name =
+				src.Status.AzureCredentials.StorageAccount.Name
+			dst.Status.AzureCredentials.StorageAccount.Key =
+				src.Status.AzureCredentials.StorageAccount.Key
+		}
+
+		if src.Status.AzureCredentials.StorageKey != nil {
+			dst.Status.AzureCredentials.StorageKey = &v1.SecretKeySelector{}
+			dst.Status.AzureCredentials.StorageKey.Name =
+				src.Status.AzureCredentials.StorageKey.Name
+			dst.Status.AzureCredentials.StorageKey.Key =
+				src.Status.AzureCredentials.StorageKey.Key
+		}
+
+		if src.Status.AzureCredentials.StorageSasToken != nil {
+			dst.Status.AzureCredentials.StorageSasToken = &v1.SecretKeySelector{}
+			dst.Status.AzureCredentials.StorageSasToken.Name =
+				src.Status.AzureCredentials.StorageSasToken.Name
+			dst.Status.AzureCredentials.StorageSasToken.Key =
+				src.Status.AzureCredentials.StorageKey.Key
+		}
+	}
 
 	return nil
 }
@@ -78,12 +110,38 @@ func (dst *Backup) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Status.EndLSN = src.Status.EndLSN
 
 	// status.s3Credentials
-	dst.Status.S3Credentials.AccessKeyIDReference.Key = src.Status.S3Credentials.AccessKeyIDReference.Key
-	dst.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name =
-		src.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name
-	dst.Status.S3Credentials.SecretAccessKeyReference.Key = src.Status.S3Credentials.SecretAccessKeyReference.Key
-	dst.Status.S3Credentials.SecretAccessKeyReference.LocalObjectReference.Name =
-		src.Status.S3Credentials.SecretAccessKeyReference.LocalObjectReference.Name
+	if src.Status.S3Credentials != nil {
+		dst.Status.S3Credentials = &S3Credentials{}
+		dst.Status.S3Credentials.AccessKeyIDReference.Key = src.Status.S3Credentials.AccessKeyIDReference.Key
+		dst.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name =
+			src.Status.S3Credentials.AccessKeyIDReference.LocalObjectReference.Name
+		dst.Status.S3Credentials.SecretAccessKeyReference.Key = src.Status.S3Credentials.SecretAccessKeyReference.Key
+		dst.Status.S3Credentials.SecretAccessKeyReference.LocalObjectReference.Name =
+			src.Status.S3Credentials.SecretAccessKeyReference.LocalObjectReference.Name
+	}
+
+	// status.azureCredentials
+	if src.Status.AzureCredentials != nil {
+		dst.Status.AzureCredentials = &AzureCredentials{}
+		dst.Status.AzureCredentials.StorageAccount.Name =
+			src.Status.AzureCredentials.StorageAccount.Name
+
+		if src.Status.AzureCredentials.StorageKey != nil {
+			dst.Status.AzureCredentials.StorageKey = &SecretKeySelector{}
+			dst.Status.AzureCredentials.StorageKey.Name =
+				src.Status.AzureCredentials.StorageKey.Name
+			dst.Status.AzureCredentials.StorageKey.Key =
+				src.Status.AzureCredentials.StorageKey.Key
+		}
+
+		if src.Status.AzureCredentials.StorageSasToken != nil {
+			dst.Status.AzureCredentials.StorageSasToken = &SecretKeySelector{}
+			dst.Status.AzureCredentials.StorageSasToken.Name =
+				src.Status.AzureCredentials.StorageSasToken.Name
+			dst.Status.AzureCredentials.StorageSasToken.Key =
+				src.Status.AzureCredentials.StorageKey.Key
+		}
+	}
 
 	return nil
 }

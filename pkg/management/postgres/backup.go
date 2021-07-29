@@ -154,6 +154,20 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 			configuration.EndpointURL)
 	}
 
+	if configuration.S3Credentials != nil {
+		options = append(
+			options,
+			"--cloud-provider",
+			"aws-s3")
+	}
+
+	if configuration.AzureCredentials != nil {
+		options = append(
+			options,
+			"--cloud-provider",
+			"azure-blob-storage")
+	}
+
 	options = append(
 		options,
 		configuration.DestinationPath,
@@ -172,7 +186,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		return fmt.Errorf("can't set backup as running: %v", err)
 	}
 
-	b.Env, err = EnvSetAWSCredentials(ctx, b.Client, b.Cluster, b.Env)
+	b.Env, err = EnvSetCloudCredentials(ctx, b.Client, b.Cluster, b.Env)
 	if err != nil {
 		return fmt.Errorf("cannot recover AWS credentials: %w", err)
 	}
@@ -234,6 +248,7 @@ func (b *BackupCommand) setupBackupStatus() {
 	backupStatus := b.Backup.GetStatus()
 
 	backupStatus.S3Credentials = barmanConfiguration.S3Credentials
+	backupStatus.AzureCredentials = barmanConfiguration.AzureCredentials
 	backupStatus.EndpointURL = barmanConfiguration.EndpointURL
 	backupStatus.DestinationPath = barmanConfiguration.DestinationPath
 	if barmanConfiguration.Data != nil {
@@ -288,9 +303,24 @@ func (b *BackupCommand) updateCompletedBackupStatus() {
 	backupStatus.EndLSN = latestBackup.EndLSN
 }
 
-// EnvSetAWSCredentials sets the AWS environment variables given the configuration
+// EnvSetCloudCredentials sets the AWS environment variables given the configuration
 // inside the cluster
-func EnvSetAWSCredentials(
+func EnvSetCloudCredentials(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	env []string,
+) ([]string, error) {
+	if cluster.Spec.Backup.BarmanObjectStore.S3Credentials != nil {
+		return envSetAWSCredentials(ctx, c, cluster, env)
+	}
+
+	return envSetAzureCredentials(ctx, c, cluster, env)
+}
+
+// envSetAWSCredentials sets the AWS environment variables given the configuration
+// inside the cluster
+func envSetAWSCredentials(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
@@ -332,6 +362,89 @@ func EnvSetAWSCredentials(
 	return env, nil
 }
 
+// envSetAzureCredentials sets the Azure environment variables given the configuration
+// inside the cluster
+func envSetAzureCredentials(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	env []string,
+) ([]string, error) {
+	configuration := cluster.Spec.Backup.BarmanObjectStore
+	var storageAccountSecret corev1.Secret
+
+	// Get storage account name
+	if configuration.AzureCredentials.StorageAccount != nil {
+		storageAccountName := configuration.AzureCredentials.StorageAccount.Name
+		storageAccountKey := configuration.AzureCredentials.StorageAccount.Key
+		err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: storageAccountName}, &storageAccountSecret)
+		if err != nil {
+			return nil, fmt.Errorf("while getting access key ID secret: %w", err)
+		}
+
+		storageAccount, ok := storageAccountSecret.Data[storageAccountKey]
+		if !ok {
+			return nil, fmt.Errorf("missing key inside storage account name secret")
+		}
+		env = append(env, fmt.Sprintf("AZURE_STORAGE_ACCOUNT=%s", storageAccount))
+	}
+
+	// Get the storage key
+	if configuration.AzureCredentials.StorageKey != nil {
+		var storageKeySecret corev1.Secret
+		storageKeyName := configuration.AzureCredentials.StorageKey.Name
+		storageKeyKey := configuration.AzureCredentials.StorageKey.Key
+
+		err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: storageKeyName}, &storageKeySecret)
+		if err != nil {
+			return nil, fmt.Errorf("while getting access key ID secret: %w", err)
+		}
+
+		storageKey, ok := storageKeySecret.Data[storageKeyKey]
+		if !ok {
+			return nil, fmt.Errorf("missing key inside storage key secret")
+		}
+		env = append(env, fmt.Sprintf("AZURE_STORAGE_KEY=%s", storageKey))
+	}
+
+	// Get the SAS token
+	if configuration.AzureCredentials.StorageSasToken != nil {
+		var storageSasTokenSecret corev1.Secret
+		storageSasTokenName := configuration.AzureCredentials.StorageSasToken.Name
+		storageSasTokenKey := configuration.AzureCredentials.StorageSasToken.Key
+
+		err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: storageSasTokenName}, &storageSasTokenSecret)
+		if err != nil {
+			return nil, fmt.Errorf("while getting storage SAS token secret: %w", err)
+		}
+
+		storageKey, ok := storageSasTokenSecret.Data[storageSasTokenKey]
+		if !ok {
+			return nil, fmt.Errorf("missing key inside storage SAS token secret")
+		}
+		env = append(env, fmt.Sprintf("AZURE_STORAGE_SAS_TOKEN=%s", storageKey))
+	}
+
+	if configuration.AzureCredentials.ConnectionString != nil {
+		var connectionStringSecret corev1.Secret
+		connectionStringName := configuration.AzureCredentials.ConnectionString.Name
+		connectionStringKey := configuration.AzureCredentials.ConnectionString.Key
+
+		err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: connectionStringName}, &connectionStringSecret)
+		if err != nil {
+			return nil, fmt.Errorf("while getting storage SAS token secret: %w", err)
+		}
+
+		storageKey, ok := connectionStringSecret.Data[connectionStringKey]
+		if !ok {
+			return nil, fmt.Errorf("missing key inside connection string secret")
+		}
+		env = append(env, fmt.Sprintf("AZURE_STORAGE_CONNECTION_STRING=%s", storageKey))
+	}
+
+	return env, nil
+}
+
 // getBackupList returns the backup list a
 func (b *BackupCommand) getBackupList() (*BackupListResult, error) {
 	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
@@ -345,6 +458,18 @@ func (b *BackupCommand) getBackupList() (*BackupListResult, error) {
 	}
 	if barmanConfiguration.Data != nil && barmanConfiguration.Data.Encryption != "" {
 		options = append(options, "-e", string(barmanConfiguration.Data.Encryption))
+	}
+	if barmanConfiguration.S3Credentials != nil {
+		options = append(
+			options,
+			"--cloud-provider",
+			"aws-s3")
+	}
+	if barmanConfiguration.AzureCredentials != nil {
+		options = append(
+			options,
+			"--cloud-provider",
+			"azure-blob-storage")
 	}
 	options = append(options, barmanConfiguration.DestinationPath, backupStatus.ServerName)
 

@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: azurite
+  name: azurite
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azurite
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: azurite
+    spec:
+      containers:
+      - image: mcr.microsoft.com/azure-storage/azurite
+        name: azurite
+        env:
+          - name: AZURITE_ACCOUNTS
+            valueFrom:
+              secretKeyRef:
+                name: azurite
+                key: AZURITE_ACCOUNTS
+        ports:
+          - containerPort: 10000
+        resources: {}
+status: {}

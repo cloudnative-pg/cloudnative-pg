@@ -7,6 +7,8 @@ AdditionalPodAntiAffinity
 AffinityConfiguration
 Anand
 Autoscaler
+AzureCredentials
+Azurite
 BackupConfiguration
 BackupList
 BackupPhase
@@ -153,6 +155,7 @@ ReplicationTLSSecret
 ResourceRequirements
 RoleBinding
 RollingUpdateStatus
+SAS
 SCC
 SCCs
 SDK
@@ -523,6 +526,8 @@ stopDelay
 stoppedAt
 storageClass
 storageClassName
+storageKey
+storageSasToken
 storageclass
 storageconfiguration
 subcommand
