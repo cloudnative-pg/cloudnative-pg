@@ -3,7 +3,7 @@
 Scheduling, in Kubernetes, is the process responsible for placing a new pod on
 the best node possible, based on several criteria.
 
-!!! See also "Kubernetes documentation"
+!!! Seealso "Kubernetes documentation"
     Please refer to the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/)
     for more information on scheduling, including all the available policies. In
@@ -82,7 +82,7 @@ available (which is an expected condition when using
 [Cluster Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) <!-- wokeignore:rule=master -->
 for automated horizontal scaling of a Kubernetes cluster).
 
-!!! See also "Inter-pod affinity and anti-affinity"
+!!! Seealso "Inter-pod affinity and anti-affinity"
     More information on this topic in the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity).
 
@@ -142,6 +142,6 @@ Tolerations can be configured for all the pods of a Cluster through the
 `.spec.affinity.tolerations` section, which accepts the usual Kubernetes syntax
 for tolerations.
 
-!!! See also "Taints and Tolerations"
+!!! Seealso "Taints and Tolerations"
     More information on taints and tolerations can be found in the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/).

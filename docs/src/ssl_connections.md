@@ -1,6 +1,6 @@
 # Client TLS/SSL Connections
 
-!!! See also "Certificates"
+!!! Seealso "Certificates"
     Please refer to the ["Certificates"](certificates.md)
     page for more details on how Cloud Native PostgreSQL supports TLS certificates.
 
@@ -17,7 +17,7 @@ in the `bootstrap` section).
 
 ## Issuing a new certificate
 
-!!! See also "About CNP plugin for kubectl"
+!!! Seealso "About CNP plugin for kubectl"
     Please refer to the ["Certificates" section in the "Cloud Native PostgreSQL Plugin"](cnp-plugin.md#certificates)
     page for details on how to use the plugin for `kubectl`.
 
