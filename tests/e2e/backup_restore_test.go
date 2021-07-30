@@ -26,9 +26,19 @@ import (
 )
 
 var _ = Describe("Backup and restore", func() {
-	const namespace = "cluster-backup"
-	const sampleFile = fixturesDir + "/backup/cluster-with-backup.yaml"
-	const clusterName = "pg-backup"
+	const (
+		targetDBOne             = "test"
+		targetDBTwo             = "test1"
+		targetDBSecret          = "secret_test"
+		testTableName           = "test_table"
+		customQueriesSampleFile = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
+		namespace               = "cluster-backup"
+		sampleFile              = fixturesDir + "/backup/cluster-with-backup.yaml"
+		clusterName             = "pg-backup"
+	)
+
+	var restoredClusterName string
+
 	JustAfterEach(func() {
 		if CurrentGinkgoTestDescription().Failed {
 			env.DumpClusterEnv(namespace, clusterName,
@@ -105,8 +115,13 @@ var _ = Describe("Backup and restore", func() {
 			}, timeout).Should(BeTrue())
 		})
 
+		// Create ConfigMap and secrets to verify metrics for target database after backup restore
+		AssertCustomMetricsConfigMapsSecrets(namespace, customQueriesSampleFile, 1, 1)
 		// Create the Cluster
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		CreateTestDataForTargetDB(namespace, clusterName, targetDBOne, testTableName)
+		CreateTestDataForTargetDB(namespace, clusterName, targetDBTwo, testTableName)
+		CreateTestDataForTargetDB(namespace, clusterName, targetDBSecret, testTableName)
 
 		By("creating data on the database", func() {
 			primary := clusterName + "-1"
@@ -200,7 +215,7 @@ var _ = Describe("Backup and restore", func() {
 
 		By("Restoring a backup in a new cluster", func() {
 			backupFile := fixturesDir + "/backup/cluster-from-restore.yaml"
-			restoredClusterName := "cluster-restore"
+			restoredClusterName = "cluster-restore"
 			_, _, err := tests.Run(fmt.Sprintf(
 				"kubectl apply -n %v -f %v",
 				namespace, backupFile))
@@ -238,6 +253,7 @@ var _ = Describe("Backup and restore", func() {
 			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 		})
 
+		AssertMetricsData(namespace, restoredClusterName, targetDBOne, targetDBTwo, targetDBSecret)
 		By("scheduling backups", func() {
 			// We create a ScheduledBackup
 			backupFile := fixturesDir + "/backup/scheduled-backup.yaml"

@@ -1,7 +1,7 @@
 apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
-  name: pg-backup
+  name: metrics-target-databases
 spec:
   instances: 3
 
@@ -22,11 +22,6 @@ spec:
   #               the switchover of the primary
   primaryUpdateStrategy: unsupervised
 
-  # Persistent storage configuration
-  storage:
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
-    size: 1Gi
-
   bootstrap:
     initdb:
       database: app
@@ -40,18 +35,8 @@ spec:
       - name: monitoring-01
         key: additional-queries
 
-  backup:
-    barmanObjectStore:
-        destinationPath: s3://cluster-backups/
-        endpointURL: http://minio-service:9000
-        s3Credentials:
-          accessKeyId:
-            name: aws-creds
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: aws-creds
-            key: ACCESS_SECRET_KEY
-        wal:
-          compression: gzip
-        data:
-          immediateCheckpoint: true
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi

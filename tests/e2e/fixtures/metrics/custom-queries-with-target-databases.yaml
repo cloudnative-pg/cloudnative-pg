@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-01
+  labels:
+    e2e: metrics
+data:
+  additional-queries: |
+    some_query:
+      query: |
+        SELECT
+         current_database() as datname,
+         count(*) as rows
+        FROM test_table
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of current database"
+        - rows:
+            usage: "GAUGE"
+            description: "number of rows"
+      target_databases:
+        - test
+        - test1
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: monitoring-01
+  labels:
+    e2e: metrics
+stringData:
+  additional-queries: |
+    some_query_test:
+      query: |
+        SELECT
+         current_database() as datname,
+         count(*) as rows
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of current database"
+        - rows:
+            usage: "GAUGE"
+            description: "number of rows"
+      target_databases:
+        - secret_test
