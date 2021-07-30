@@ -10,23 +10,23 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/storage/v1"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
 
-const (
-	sampleFile  = fixturesDir + "/storage_expansion/cluster-storage-expansion.yaml"
-	clusterName = "storage-expansion"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // Test case for validating storage expansion
 // with different storage providers in different k8s environments
 var _ = Describe("Verify storage", func() {
+	const (
+		sampleFile  = fixturesDir + "/storage_expansion/cluster-storage-expansion.yaml"
+		clusterName = "storage-expansion"
+	)
 	// Initializing a global namespace variable to be used in each test case
 	var namespace string
 	// Gathering default storage class requires to check whether the value
