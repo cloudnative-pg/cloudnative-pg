@@ -237,8 +237,9 @@ kubectl get pvc cluster-example-3 -o=jsonpath='{.status.capacity.storage}'
 So, you can repeat these steps for the remaining Pods.
 
 !!! Important
-Please leave the resizing of the disk associated with the primary instance as last disk, 
-after promoting through a switchover a new resized Pod, using `kubectl cnp promote` (e.g. `kubectl cnp promote cluster-example 3` to promote `cluster-example-3` to primary).
+    Please leave the resizing of the disk associated with the primary instance as last disk, 
+    after promoting through a switchover a new resized Pod, using `kubectl cnp promote` 
+    (e.g. `kubectl cnp promote cluster-example 3` to promote `cluster-example-3` to primary).
 
 ### Recreating storage
 
