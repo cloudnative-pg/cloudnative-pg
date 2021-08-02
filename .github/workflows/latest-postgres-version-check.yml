@@ -1,0 +1,60 @@
+name: latest-postgres-version-check
+
+on:
+  schedule:
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: "bash -Eeuo pipefail -x {0}"
+
+jobs:
+  check-latest-postgres-version:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2.3.4
+
+      - name: Get the latest version of PostgreSQL Docker image
+        id: latest
+        run: |
+          DOCKER_REGISTRY="enterprisedb/postgresql"
+          QUAY_REPO="quay.io/enterprisedb/postgresql"
+          LATEST_POSTGRES_VERSION=$(curl -s -X GET "https://quay.io/api/v1/repository/${DOCKER_REGISTRY}" | jq -r '.tags[].name' | grep -v '[-[:alpha:]]' | sort -V | tail -1)
+          LATEST_POSTGRES_VERSION_IMAGE="${QUAY_REPO}:${LATEST_POSTGRES_VERSION}"
+          echo "::set-output name=LATEST_POSTGRES_VERSION::$LATEST_POSTGRES_VERSION"
+          echo "::set-output name=LATEST_POSTGRES_VERSION_IMAGE::$LATEST_POSTGRES_VERSION_IMAGE"
+
+      - name: Get the current version of PostgreSQL
+        id: current
+        run: |
+          CURRENT_POSTGRES_VERSION_IMAGE=$(awk -F '"' '/DefaultImageName *=/{print $2}' pkg/versions/versions.go)
+          CURRENT_POSTGRES_VERSION=${CURRENT_POSTGRES_VERSION_IMAGE##*:}
+          echo "::set-output name=CURRENT_POSTGRES_VERSION::$CURRENT_POSTGRES_VERSION"
+          echo "::set-output name=CURRENT_POSTGRES_VERSION_IMAGE::$CURRENT_POSTGRES_VERSION_IMAGE"
+
+      - name: Update files to match the latest version of PostgreSQL
+        if: steps.latest.outputs.LATEST_POSTGRES_VERSION_IMAGE != steps.current.outputs.CURRENT_POSTGRES_VERSION_IMAGE
+        env:
+          CURRENT_POSTGRES_VERSION: ${{ steps.current.outputs.CURRENT_POSTGRES_VERSION }}
+          LATEST_POSTGRES_VERSION: ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}
+          LATEST_POSTGRES_VERSION_IMAGE: ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION_IMAGE }}
+        run: |
+          echo "Version mismatch; updating!"
+
+          # Update pkg/versions/versions.go
+          sed -i '/DefaultImageName *=/s@".*"@"'"${LATEST_POSTGRES_VERSION_IMAGE}"'"@' pkg/versions/versions.go
+
+          # Update docs directory (only .md and .yaml filename extensions)
+          find docs -type f \( -name '*.md' -o -name '*.yaml' \) -exec sed -i "s/${CURRENT_POSTGRES_VERSION//./\\.}/${LATEST_POSTGRES_VERSION}/g" {} +
+      - name: Create PR to update PostgreSQL version
+        uses: gr2m/create-or-update-pull-request-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          title: "Update default PostgreSQL version to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
+          body: "Update default PostgreSQL version from ${{ steps.current.outputs.CURRENT_POSTGRES_VERSION }} to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
+          branch: "latest-postgres-version-update"
+          author: "latest-postgres-version-check <latest-postgres-version-check@users.noreply.github.com>"
+          commit-message: "Update default PostgreSQL version to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
