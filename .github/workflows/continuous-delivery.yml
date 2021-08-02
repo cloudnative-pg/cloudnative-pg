@@ -443,8 +443,18 @@ jobs:
               --node-count 3 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
               --workspace-resource-id ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
               --aks-custom-headers EnableAzureDiskFileCSIDriver=true
+            AZURE_STORAGE_ACCOUNT="${{ github.run_number }}$( echo ${{ matrix.id }} | cut -c4- | tr -d '_.-' | tr '[:upper:]' '[:lower:]' )"
+            az storage account create \
+              --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
+              --name ${AZURE_STORAGE_ACCOUNT} \
+              --sku Standard_LRS -o none
             az aks get-credentials --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )
+
+            # get Storage Account credentials
+            echo "AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT}" >> $GITHUB_ENV
+            AZURE_STORAGE_KEY=$(az storage account keys list -g "${{ secrets.AZURE_RESOURCEGROUP }}" -n "${AZURE_STORAGE_ACCOUNT}" --query "[0].value" -o tsv)
+            echo "AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}" >> $GITHUB_ENV
       -
         # Azure is slow in provisioning disks, and we can't wait two minutes
         # every time we create a pod, otherwise all the tests will time out.
@@ -506,6 +516,7 @@ jobs:
             az account set --subscription "Cloud Native Development"
             az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y \
               --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )
+            az storage account delete -y --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ env.AZURE_STORAGE_ACCOUNT }}
 
   e2e-eks:
     name: Run E2E on Amazon EKS
