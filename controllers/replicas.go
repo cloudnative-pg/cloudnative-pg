@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,7 +38,36 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 		return "", nil
 	}
 
-	// find the primary both real or designated (for replica clusters)
+	// First step: check if the current primary is running in an unschedulable node
+	// and issue a switchover if that's the case
+	unschedulablePrimaryPod, err := r.findUnschedulablePrimaryPod(ctx, cluster, status)
+	if err != nil {
+		return "", nil
+	}
+	if unschedulablePrimaryPod != nil {
+		log.Info("Primary is running on an unschedulable node, will try switching over",
+			"node", unschedulablePrimaryPod.Node, "primary", unschedulablePrimaryPod.PodName)
+		return r.setPrimaryOnSchedulableNode(ctx, cluster, status, unschedulablePrimaryPod)
+	}
+
+	// Second step: check if the first element of the sorted list is the primary
+	if cluster.IsReplica() {
+		return r.updateTargetPrimaryFromPodsReplicaCluster(ctx, cluster, status, resources)
+	}
+
+	return r.updateTargetPrimaryFromPodsPrimaryCluster(ctx, cluster, status, resources)
+}
+
+func (r *ClusterReconciler) findUnschedulablePrimaryPod(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	status postgres.PostgresqlStatusList) (*postgres.PostgresqlStatus, error) {
+	// Find the CURRENT primary Pod in the Cluster (including designated
+	// primary for replica clusters).
+	//
+	// At this stage the Pod running the primary instance of the cluster can
+	// be ready or not. We just want to have a look at the node where this
+	// Pod is scheduled.
 	primaryPod := status.Items[0]
 	for i, pod := range status.Items {
 		if pod.IsPrimary ||
@@ -50,24 +78,17 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 		}
 	}
 
-	// If the first instance in the sorted list is already the primary, we check whether we need
-	// a switchover because it's running on an unschedulable node, e.g. due to a node being drained
+	// Check if primary Pod is running on an unschedulable node
 	primaryUnschedulable, err := r.isNodeUnschedulable(ctx, primaryPod.Node)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if primaryUnschedulable {
-		log.Info("Primary is running on an unschedulable node, will try switching over",
-			"node", status.Items[0].Node, "primary", primaryPod.PodName)
-		return r.setPrimaryOnSchedulableNode(ctx, cluster, status, &primaryPod, log)
+		return &primaryPod, nil
 	}
 
-	if cluster.IsReplica() {
-		return r.updateTargetPrimaryFromPodsReplicaCluster(ctx, cluster, status, resources, &primaryPod)
-	}
-
-	return r.updateTargetPrimaryFromPodsPrimaryCluster(ctx, cluster, status, resources, &primaryPod)
+	return nil, nil
 }
 
 // updateTargetPrimaryFromPodsPrimaryCluster sets the name of the target primary from the Pods status if needed
@@ -77,7 +98,6 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
 	resources *managedResources,
-	primaryPod *postgres.PostgresqlStatus,
 ) (string, error) {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -90,7 +110,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 
 	// If the first pod in the sorted list is already the targetPrimary,
 	// we have nothing to do here.
-	if cluster.Status.TargetPrimary == primaryPod.PodName {
+	if cluster.Status.TargetPrimary == status.Items[0].PodName {
 		return "", nil
 	}
 
@@ -105,12 +125,12 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	// or change the target primary if the current one is not valid anymore.
 	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
 		log.Info("Current primary isn't healthy, failing over",
-			"newPrimary", primaryPod.PodName,
+			"newPrimary", status.Items[0].PodName,
 			"clusterStatus", status)
 		log.V(1).Info("Cluster status before failover", "pods", resources.pods)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Current primary isn't healthy, failing over from %v to %v",
-			cluster.Status.TargetPrimary, primaryPod.PodName)
+			cluster.Status.TargetPrimary, status.Items[0].PodName)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
 			fmt.Sprintf("Failing over to %v", status.Items[0].PodName)); err != nil {
 			return "", err
@@ -122,15 +142,15 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 		log.V(1).Info("Cluster status before switching target", "pods", resources.pods)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Target primary isn't healthy, switching target from %v to %v",
-			cluster.Status.TargetPrimary, primaryPod.PodName)
+			cluster.Status.TargetPrimary, status.Items[0].PodName)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
-			fmt.Sprintf("Switching over to %v", primaryPod.PodName)); err != nil {
+			fmt.Sprintf("Switching over to %v", status.Items[0].PodName)); err != nil {
 			return "", err
 		}
 	}
 
 	// No primary, no party. Failover please!
-	return primaryPod.PodName, r.setPrimaryInstance(ctx, cluster, primaryPod.PodName)
+	return status.Items[0].PodName, r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
 }
 
 // isNodeUnschedulable checks whether a node is set to unschedulable
@@ -150,8 +170,9 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
 	primaryPod *postgres.PostgresqlStatus,
-	log logr.Logger,
 ) (string, error) {
+	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
 	// Checking failed pods, e.g. pending pods due to missing PVCs
 	_, hasFailedPods := cluster.Status.InstancesStatus[utils.PodFailed]
 
@@ -189,16 +210,16 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 
 		// Set the current candidate as targetPrimary
 		log.Info("Current primary is running on unschedulable node, triggering a switchover",
-			"currentPrimary", status.Items[0].PodName, "currentPrimaryNode", status.Items[0].Node,
+			"currentPrimary", primaryPod.PodName, "currentPrimaryNode", primaryPod.Node,
 			"targetPrimary", candidate.PodName, "targetPrimaryNode", candidate.Node)
 		r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
 			"Current primary is running on unschedulable node %v, switching over from %v to %v",
-			status.Items[0].Node, cluster.Status.TargetPrimary, candidate.PodName)
+			primaryPod.Node, cluster.Status.TargetPrimary, candidate.PodName)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
 			fmt.Sprintf("Switching over to %v, because primary instance "+
 				"was running on unschedulable node %v",
 				candidate.PodName,
-				status.Items[0].Node)); err != nil {
+				primaryPod.Node)); err != nil {
 			return "", err
 		}
 		return candidate.PodName, r.setPrimaryInstance(ctx, cluster, candidate.PodName)
@@ -220,7 +241,6 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
 	resources *managedResources,
-	primaryPod *postgres.PostgresqlStatus,
 ) (string, error) {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
@@ -251,7 +271,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 		return "", err
 	}
 
-	return primaryPod.PodName, r.setPrimaryInstance(ctx, cluster, primaryPod.PodName)
+	return status.Items[0].PodName, r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
 }
 
 // GetPodsNotOnPrimaryNode filters out only pods that are not on the same node as the primary one
