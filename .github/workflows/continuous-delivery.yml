@@ -22,6 +22,7 @@ env:
   GOLANGCI_LINT_VERSION: "v1.40"
   KUBEBUILDER_VERSION: "2.3.1"
   KIND_VERSION: "v0.11.0"
+  ROOK_VERSION: "v1.6.8"
 
 defaults:
   run:
@@ -465,7 +466,7 @@ jobs:
         run: |
           STORAGECLASSNAME=default
           GO111MODULE=on go get github.com/mikefarah/yq/v4
-          ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/master/cluster/examples/kubernetes/ceph #wokeignore:rule=master
+          ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/cluster/examples/kubernetes/ceph
           kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
           kubectl apply -f ${ROOK_BASE_URL}/common.yaml
           kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
