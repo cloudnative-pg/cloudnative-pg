@@ -9,8 +9,11 @@ spec:
     initdb:
       database: appdb
       owner: appuser
+      postInitSQL:
+        - create table numbers (i integer)
+        - insert into numbers (select generate_series(1,10000))
       options:
       - "-k"
-      - "--locale=en_US"
+      - "--locale=en_ZA.utf8"
   storage:
     size: 1Gi

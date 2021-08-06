@@ -441,6 +441,11 @@ type BootstrapInitDB struct {
 	// The list of options that must be passed to initdb
 	// when creating the cluster
 	Options []string `json:"options,omitempty"`
+
+	// List of SQL queries to be executed as a superuser immediately
+	// after the cluster has been created - to be used with extreme care
+	// (by default empty)
+	PostInitSQL []string `json:"postInitSQL,omitempty"`
 }
 
 // BootstrapRecovery contains the configuration required to restore
