@@ -195,6 +195,7 @@ affinityconfiguration
 aks
 albert
 allowVolumeExpansion
+angus
 api
 apiVersion
 apidoc
@@ -277,6 +278,7 @@ currentPrimary
 customQueriesConfigMap
 customQueriesSecret
 customizable
+cutover
 cyber
 danglingPVC
 databackupconfiguration
@@ -377,6 +379,7 @@ localobjectreference
 locktype
 lsn
 lt
+malcolm
 matchExpressions
 matchLabels
 maxSyncReplicas
@@ -444,6 +447,7 @@ postgresGID
 postgresUID
 postgresconfiguration
 postgresql
+postInitSQL
 pre
 preferredDuringSchedulingIgnoredDuringExecution
 preload
@@ -526,6 +530,7 @@ superuserSecret
 svc
 tAc
 tablespace
+tablespaces
 targetImmediate
 targetLSN
 targetName

@@ -60,6 +60,10 @@ type InitInfo struct {
 	// create the cluster
 	InitDBOptions []string
 
+	// The list of queries to be executed just after having
+	// configured a new database
+	PostInitSQL []string
+
 	// The recovery target options, only applicable for the
 	// recovery bootstrap type
 	RecoveryTarget string
@@ -186,6 +190,8 @@ func (info InitInfo) GetInstance() Instance {
 // ConfigureNewInstance creates the expected users and databases in a new
 // PostgreSQL instance
 func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
+	log.Log.Info("Configuring new PostgreSQL instance")
+
 	_, err := db.Exec(fmt.Sprintf(
 		"CREATE USER %v",
 		pq.QuoteIdentifier(info.ApplicationUser)))
@@ -215,6 +221,15 @@ func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
 		_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
 			pq.QuoteIdentifier(info.ApplicationDatabase),
 			pq.QuoteIdentifier(info.ApplicationUser)))
+		if err != nil {
+			return err
+		}
+	}
+
+	// Execute the custom set of init queries
+	log.Log.Info("Executing post init SQL instructions")
+	for _, sqlQuery := range info.PostInitSQL {
+		_, err = db.Exec(sqlQuery)
 		if err != nil {
 			return err
 		}

@@ -174,12 +174,13 @@ Name          | Description                                                     
 
 BootstrapInitDB is the configuration of the bootstrap process when initdb is used Refer to the Bootstrap page of the documentation for more information.
 
-Name     | Description                                                                                                                                  | Type                                          
--------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------
-`database` | Name of the database used by the application. Default: `app`.                                                                                - *mandatory*  | string                                        
-`owner   ` | Name of the owner of the database in the instance to be used by applications. Defaults to the value of the `database` key.                   - *mandatory*  | string                                        
-`secret  ` | Name of the secret containing the initial credentials for the owner of the user database. If empty a new secret will be created from scratch | [*LocalObjectReference](#LocalObjectReference)
-`options ` | The list of options that must be passed to initdb when creating the cluster                                                                  | []string                                      
+Name        | Description                                                                                                                                        | Type                                          
+----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------
+`database   ` | Name of the database used by the application. Default: `app`.                                                                                      - *mandatory*  | string                                        
+`owner      ` | Name of the owner of the database in the instance to be used by applications. Defaults to the value of the `database` key.                         - *mandatory*  | string                                        
+`secret     ` | Name of the secret containing the initial credentials for the owner of the user database. If empty a new secret will be created from scratch       | [*LocalObjectReference](#LocalObjectReference)
+`options    ` | The list of options that must be passed to initdb when creating the cluster                                                                        | []string                                      
+`postInitSQL` | List of SQL queries to be executed as a superuser immediately after the cluster has been created - to be used with extreme care (by default empty) | []string                                      
 
 <a id='BootstrapPgBaseBackup'></a>
 

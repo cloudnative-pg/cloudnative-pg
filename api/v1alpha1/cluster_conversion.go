@@ -242,6 +242,7 @@ func (src *BootstrapConfiguration) ConvertTo(dstSpec *v1.BootstrapConfiguration)
 		dstSpec.InitDB.Database = srcInitDB.Database
 		dstSpec.InitDB.Owner = srcInitDB.Owner
 		dstSpec.InitDB.Options = srcInitDB.Options
+		dstSpec.InitDB.PostInitSQL = srcInitDB.PostInitSQL
 	}
 
 	// spec.bootstrap.initdb.secret
@@ -463,6 +464,7 @@ func (dst *BootstrapConfiguration) ConvertFrom(srcSpec *v1.BootstrapConfiguratio
 		dst.InitDB.Database = srcInitDB.Database
 		dst.InitDB.Owner = srcInitDB.Owner
 		dst.InitDB.Options = srcInitDB.Options
+		dst.InitDB.PostInitSQL = srcInitDB.PostInitSQL
 	}
 
 	// spec.bootstrap.initdb.secret

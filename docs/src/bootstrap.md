@@ -150,6 +150,36 @@ spec:
     size: 1Gi
 ```
 
+The user can also specify a custom list of queries that will be executed
+once, just after the database is created and configured. These queries will
+be executed as the *superuser*, connected to the `postgres` database:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-initdb
+spec:
+  instances: 3
+
+  bootstrap:
+    initdb:
+      database: appdb
+      owner: appuser
+      options:
+      - "-k"
+      - "--locale=en_US"
+      postInitSQL:
+        - CREATE ROLE angus
+        - CREATE ROLE malcolm
+  storage:
+    size: 1Gi
+```
+
+!!! Warning
+    Please use the `postInitSQL` option with extreme care as queries
+    are run as a superuser and can disrupt the entire cluster.
+
 ## recovery
 
 The `recovery` bootstrap mode lets you create a new cluster from

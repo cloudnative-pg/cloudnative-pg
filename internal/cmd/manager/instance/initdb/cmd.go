@@ -8,6 +8,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package initdb
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/kballard/go-shellquote"
@@ -30,6 +31,7 @@ func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
 	var initDBFlagsString string
+	var postInitSQLStr string
 
 	cmd := &cobra.Command{
 		Use: "init [options]",
@@ -37,6 +39,12 @@ func NewCmd() *cobra.Command {
 			initDBFlags, err := shellquote.Split(initDBFlagsString)
 			if err != nil {
 				log.Log.Error(err, "Error while parsing initdb flags")
+				return err
+			}
+
+			postInitSQL, err := shellquote.Split(postInitSQLStr)
+			if err != nil {
+				log.Log.Error(err, "Error while parsing post init SQL queries")
 				return err
 			}
 
@@ -51,6 +59,7 @@ func NewCmd() *cobra.Command {
 				Namespace:               namespace,
 				InitDBOptions:           initDBFlags,
 				PodName:                 podName,
+				PostInitSQL:             postInitSQL,
 			}
 
 			return initSubCommand(info)
@@ -73,6 +82,8 @@ func NewCmd() *cobra.Command {
 		"the cluster and of the Pod in k8s")
 	cmd.Flags().StringVar(&initDBFlagsString, "initdb-flags", "", "The list of flags to be passed "+
 		"to initdb while creating the initial database")
+	cmd.Flags().StringVar(&postInitSQLStr, "post-init-sql", "", "The list of SQL queries to be "+
+		"executed to configure the new instance")
 	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
 		"be checked against the cluster state")
 
@@ -87,7 +98,7 @@ func initSubCommand(info postgres.InitInfo) error {
 	}
 	if status {
 		log.Log.Info("PGData already exists, no need to init")
-		return err
+		return fmt.Errorf("PGData already exists")
 	}
 
 	err = info.VerifyConfiguration()
