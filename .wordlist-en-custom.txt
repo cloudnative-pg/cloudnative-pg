@@ -108,6 +108,10 @@ Nenciarini
 Niccolò
 NodeMaintenanceWindow
 NodeSelector
+NOBYPASSRLS
+NOCREATEDB
+NOCREATEROLE
+NOSUPERUSER
 OCP
 OU
 ObjectMeta
