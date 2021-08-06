@@ -22,6 +22,7 @@ nav:
   - resource_management.md
   - failure_modes.md
   - rolling_update.md
+  - replication.md
   - backup_recovery.md
   - postgresql_conf.md
   - operator_conf.md

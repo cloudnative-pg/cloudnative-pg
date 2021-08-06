@@ -16,6 +16,10 @@ Cloud Native PostgreSQL currently supports clusters based on asynchronous and sy
     * PostgreSQL instances can reside in different availability zones in the same region
     * All nodes of a PostgreSQL cluster should reside in the same region
 
+!!! Seealso "Replication"
+    Please refer to the ["Replication" section](replication.md) for more
+    information about how Cloud Native PostgreSQL relies on PostgreSQL replication.
+
 ## Read-write workloads
 
 Applications can decide to connect to the PostgreSQL instance elected as *current primary*
