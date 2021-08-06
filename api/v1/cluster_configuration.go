@@ -9,6 +9,7 @@ package v1
 import (
 	"sort"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -43,13 +44,27 @@ func (cluster *Cluster) CreatePostgresqlConfiguration() (string, string, error) 
 	sort.Strings(info.Replicas)
 
 	// We start with the number of healthy replicas (healthy pods minus one)
-	// and verify it is between minSyncReplicas and maxSyncReplicas
-	info.SyncReplicas = len(cluster.Status.InstancesStatus[utils.PodHealthy]) - 1
-	if info.SyncReplicas > int(cluster.Spec.MaxSyncReplicas) {
-		info.SyncReplicas = int(cluster.Spec.MaxSyncReplicas)
-	}
-	if info.SyncReplicas < int(cluster.Spec.MinSyncReplicas) {
+	// and verify it is greater than 0 and between minSyncReplicas and maxSyncReplicas.
+	// Formula: 1 <= minSyncReplicas <= SyncReplicas <= maxSyncReplicas < readyReplicas
+	readyReplicas := len(cluster.Status.InstancesStatus[utils.PodHealthy]) - 1
+
+	// Initially set it to the max sync replicas requested by user
+	info.SyncReplicas = int(cluster.Spec.MaxSyncReplicas)
+
+	// Lower to min sync replicas if not enough ready replicas
+	if readyReplicas < info.SyncReplicas {
 		info.SyncReplicas = int(cluster.Spec.MinSyncReplicas)
+	}
+
+	// Lower to ready replicas if min sync replicas is too high
+	// (this is a self-healing procedure that prevents from a
+	// temporarily unresponsive system)
+	if readyReplicas < int(cluster.Spec.MinSyncReplicas) {
+		info.SyncReplicas = readyReplicas
+		log.Log.Info("Ignore minSyncReplicas to enforce self-healing",
+			"syncReplicas", readyReplicas,
+			"minSyncReplicas", cluster.Spec.MinSyncReplicas,
+			"maxSyncReplicas", cluster.Spec.MaxSyncReplicas)
 	}
 
 	// Set cluster name

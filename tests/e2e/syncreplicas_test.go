@@ -24,9 +24,8 @@ import (
 )
 
 var _ = Describe("Synchronous Replicas", func() {
-	const namespace = "sync-replicas-e2e"
-	const sampleFile = fixturesDir + "/sync_replicas/cluster-syncreplicas.yaml"
-	const clusterName = "cluster-syncreplicas"
+	var namespace string
+	var clusterName string
 	JustAfterEach(func() {
 		if CurrentGinkgoTestDescription().Failed {
 			env.DumpClusterEnv(namespace, clusterName,
@@ -38,6 +37,10 @@ var _ = Describe("Synchronous Replicas", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 	It("can manage sync replicas", func() {
+		namespace = "sync-replicas-e2e"
+		clusterName = "cluster-syncreplicas"
+		const sampleFile = fixturesDir + "/sync_replicas/cluster-syncreplicas.yaml"
+
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
@@ -145,6 +148,36 @@ var _ = Describe("Synchronous Replicas", func() {
 			cluster.Spec.MinSyncReplicas = 2
 			err = env.Client.Update(env.Ctx, cluster)
 			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	It("will not prevent a cluster with pg_stat_statements from being created", func() {
+		namespace = "sync-replicas-statstatements"
+		clusterName = "cluster-pgstatstatements"
+		const sampleFile = fixturesDir + "/sync_replicas/cluster-pgstatstatements.yaml"
+
+		// Are extensions a problem with synchronous replication? No, absolutely not,
+		// but to install pg_stat_statements you need to create the relative extension
+		// and that will be done just after having bootstrapped the first instance,
+		// which is the primary.
+		// If the number of ready replicas is not taken into consideration while
+		// bootstrapping the cluster, the CREATE EXTENSION instruction will block
+		// the primary since the desired number of synchronous replicas (even when 1)
+		// is not met.
+		// Create a cluster in a namespace we'll delete after the test.
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+
+		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+		By("checking that synchronous_standby_names has the expected value on the primary", func() {
+			out, _, err := tests.Run(
+				fmt.Sprintf("kubectl exec -n %v %v-1 -c postgres -- "+
+					"psql -tAc \"select setting from pg_settings where name = 'synchronous_standby_names'\"",
+					namespace, clusterName))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(strings.Trim(out, "\n")).To(
+				Equal("ANY 1 (\"cluster-pgstatstatements-1\",\"cluster-pgstatstatements-2\",\"cluster-pgstatstatements-3\")"))
 		})
 	})
 })
