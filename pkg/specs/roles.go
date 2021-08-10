@@ -20,6 +20,8 @@ func CreateRole(cluster apiv1.Cluster) rbacv1.Role {
 		cluster.GetClientCASecretName(),
 		cluster.GetServerCASecretName(),
 		cluster.GetServerTLSSecretName(),
+		cluster.GetApplicationSecretName(),
+		cluster.GetSuperuserSecretName(),
 	}
 
 	involvedConfigMapNames := []string{
