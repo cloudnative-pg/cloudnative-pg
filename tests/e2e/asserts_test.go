@@ -67,14 +67,18 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 // AssertConnection is used if a connection from a pod to a postgresql
 // database works
 func AssertConnection(host string, user string, dbname string,
-	password string, queryingPod corev1.Pod, env *tests.TestingEnvironment) {
+	password string, queryingPod corev1.Pod, timeout int, env *tests.TestingEnvironment) {
 	By(fmt.Sprintf("connecting to the %v service as %v", host, user), func() {
-		dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require", host, user, dbname, password)
-		timeout := time.Second * 2
-		stdout, stderr, err := env.ExecCommand(env.Ctx, queryingPod, "postgres", &timeout,
-			"psql", dsn, "-tAc", "SELECT 1")
-		Expect(stdout, err).To(Equal("1\n"))
-		Expect(stderr).To(BeEmpty())
+		Eventually(func() string {
+			dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require", host, user, dbname, password)
+			timeout := time.Second * 2
+			stdout, _, err := env.ExecCommand(env.Ctx, queryingPod, "postgres", &timeout,
+				"psql", dsn, "-tAc", "SELECT 1")
+			if err != nil {
+				return ""
+			}
+			return stdout
+		}, timeout).Should(Equal("1\n"))
 	})
 }
 

@@ -331,6 +331,11 @@ func (r *InstanceReconciler) reconcileSecrets(
 		}
 	}
 
+	err = r.refreshCredentialsFromSecret(ctx, cluster)
+	if err != nil {
+		return fmt.Errorf("while updating database owner password: %w", err)
+	}
+
 	return nil
 }
 
@@ -754,4 +759,77 @@ func (r *InstanceReconciler) configurePgRewindPrivileges(majorVersion int, hasSu
 	}
 
 	return nil
+}
+
+// refreshCredentialsFromSecret updates the PostgreSQL users credentials
+// in the primary pod with the content from the secrets
+func (r *InstanceReconciler) refreshCredentialsFromSecret(
+	ctx context.Context,
+	cluster *apiv1.Cluster) error {
+	// We only update the password in the primary pod
+	primary, err := r.instance.IsPrimary()
+	if err != nil {
+		return err
+	}
+	if !primary {
+		return nil
+	}
+
+	db, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+
+	// TODO: should we create this with a synchronous_commit to local?
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// This has no effect if the transaction
+		// is committed
+		_ = tx.Rollback()
+	}()
+
+	// Let's get the credentials from the secrets
+	if err = r.reconcileUser(ctx, cluster.GetSuperuserSecretName(), tx); err != nil {
+		return err
+	}
+	if err = r.reconcileUser(ctx, cluster.GetApplicationSecretName(), tx); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (r *InstanceReconciler) reconcileUser(ctx context.Context, secretName string, tx *sql.Tx) error {
+	var secret corev1.Secret
+	err := r.GetClient().Get(
+		ctx,
+		client.ObjectKey{Namespace: r.instance.Namespace, Name: secretName},
+		&secret)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	if r.secretVersions[secret.Name] == secret.ResourceVersion {
+		// Everything fine, we already applied this secret
+		return nil
+	}
+
+	username, password, err := utils.GetUserPasswordFromSecret(&secret)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
+		username,
+		pq.QuoteLiteral(password)))
+	if err == nil {
+		r.secretVersions[secret.Name] = secret.ResourceVersion
+	}
+	return err
 }

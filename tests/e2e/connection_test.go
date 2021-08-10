@@ -89,8 +89,8 @@ var _ = Describe("Connection via services", func() {
 		roService := fmt.Sprintf("%v-ro.%v.svc", clusterName, namespace)
 		services := []string{rwService, roService, rService}
 		for _, service := range services {
-			AssertConnection(service, "postgres", appDBName, superuserPassword, *pod, env)
-			AssertConnection(service, appDBUser, appDBName, appPassword, *pod, env)
+			AssertConnection(service, "postgres", appDBName, superuserPassword, *pod, 10, env)
+			AssertConnection(service, appDBUser, appDBName, appPassword, *pod, 10, env)
 		}
 
 		AssertVerifyWrites(pod, roService, appDBName, appDBUser, appPassword, true)
