@@ -83,16 +83,23 @@ In Kubernetes, the operator is by default installed in the `postgresql-operator-
 `Deployment` called `postgresql-operator-controller-manager`. You can get more information by running:
 
 ```sh
-kubectl describe deploy -n postgresql-operator-system postgresql-operator-controller-manager
+kubectl describe deploy \
+  -n postgresql-operator-system \
+  postgresql-operator-controller-manager
 ```
 
-As with any deployment, it sits on top of a replica set and supports rolling upgrades.
-By default, we currently support only 1 replica. In future versions, we plan to
-support multiple replicas and leader election, as well as taints and tolerations
-to enable deployment on the Kubernetes control plane.
+As with any Deployment, it sits on top of a ReplicaSet and supports rolling
+upgrades. The default configuration of the Cloud Native PostgreSQL operator
+comes with a Deployment of a single replica, which is suitable for most
+installations. In case the node where the pod is running is not reachable
+anymore, the pod will be rescheduled on another node.
 
-In case the node where the pod is running is not reachable anymore,
-the pod will be rescheduled on another node.
+If you require high availability at the operator level, it is possible to
+specify multiple replicas in the Deployment configuration - given that the
+operator supports leader election. Also, you can take advantage of taints and
+tolerations to make sure that the operator does not run on the same nodes where
+the actual PostgreSQL clusters are running (this might even include the control
+plane for self-managed Kubernetes installations).
 
 As far as OpenShift is concerned, details might differ depending on the
 selected installation method.

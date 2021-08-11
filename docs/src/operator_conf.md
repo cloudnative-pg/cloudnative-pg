@@ -20,9 +20,10 @@ is located in the same namespace of the operator deployment and with
 `postgresql-operator-controller-manager-config` as the name.
 
 !!! Important
-    Any change to the config's `ConfigMap`/`Secret` will not be automatically detected by the operator,
-    - and as such, it needs to be reloaded (see below). Moreover, changes only
-    apply to the resources created after the configuration is reloaded.
+    Any change to the config's `ConfigMap`/`Secret` will not be automatically
+    detected by the operator, - and as such, it needs to be reloaded (see below).
+    Moreover, changes only apply to the resources created after the configuration
+    is reloaded.
 
 !!! Important
     The operator first processes the ConfigMap values and then the Secret’s, in this order.
