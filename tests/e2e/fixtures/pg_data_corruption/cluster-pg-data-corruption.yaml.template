@@ -1,9 +1,9 @@
 apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
-  name: pg-basebackup-dst-basic-auth
+  name: cluster-pg-data-corruption
 spec:
-  instances: 2
+  instances: 3
 
   postgresql:
     parameters:
@@ -16,21 +16,12 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
 
-  storage:
-    size: 1Gi
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
-
   bootstrap:
-    pg_basebackup:
-      source: pg-basebackup-src
+    initdb:
+      database: app
+      owner: app
 
-  externalClusters:
-    - name: pg-basebackup-src
-      connectionParameters:
-        host: pg-basebackup-src-rw
-        user: postgres
-        port: "5432"
-        dbname: app
-      password:
-        name: pg-basebackup-src-superuser
-        key: password
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
