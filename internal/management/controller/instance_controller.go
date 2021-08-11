@@ -94,6 +94,21 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 		r.log.Error(err, "Cannot connect to primary server")
 		return fmt.Errorf("getting the superuserdb: %w", err)
 	}
+
+	extensionStatusChanged := false
+	for _, extension := range postgres.ManagedExtensions {
+		extensionIsUsed := extension.IsUsed(cluster.Spec.PostgresConfiguration.Parameters)
+		if lastStatus, ok := r.extensionStatus[extension.Name]; !ok || lastStatus != extensionIsUsed {
+			extensionStatusChanged = true
+			break
+		}
+	}
+
+	if !extensionStatusChanged {
+		// Nothing to do now, the list of extensions isn't changed
+		return nil
+	}
+
 	databases, errors := r.getAllAccessibleDatabases(ctx, db)
 	for _, databaseName := range databases {
 		db, err := r.instance.ConnectionPool().Connection(databaseName)
@@ -102,7 +117,7 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 				fmt.Errorf("could not connect to database %s: %w", databaseName, err))
 			continue
 		}
-		if err = r.reconcileExtensions(db, cluster.Spec.PostgresConfiguration.Parameters); err != nil {
+		if err = r.reconcileExtensions(ctx, db, cluster.Spec.PostgresConfiguration.Parameters); err != nil {
 			errors = append(errors,
 				fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))
 			continue
@@ -111,6 +126,12 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 	if errors != nil {
 		return fmt.Errorf("got errors while reconciling databases: %v", errors)
 	}
+
+	for _, extension := range postgres.ManagedExtensions {
+		extensionIsUsed := extension.IsUsed(cluster.Spec.PostgresConfiguration.Parameters)
+		r.extensionStatus[extension.Name] = extensionIsUsed
+	}
+
 	return nil
 }
 
@@ -137,9 +158,25 @@ func (r *InstanceReconciler) getAllAccessibleDatabases(
 
 // ReconcileExtensions reconciles the expected extensions for this
 // PostgreSQL instance
-func (r *InstanceReconciler) reconcileExtensions(db *sql.DB, userSettings map[string]string) (err error) {
+func (r *InstanceReconciler) reconcileExtensions(
+	ctx context.Context, db *sql.DB, userSettings map[string]string) (err error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// This is a no-op when the transaction is committed
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.Exec("SET LOCAL synchronous_commit TO local")
+	if err != nil {
+		return err
+	}
+
 	for _, extension := range postgres.ManagedExtensions {
-		if !extension.SkipCreateExtension && extension.IsUsed(userSettings) {
+		extensionIsUsed := extension.IsUsed(userSettings)
+		if !extension.SkipCreateExtension && extensionIsUsed {
 			_, err = db.Exec(fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s", extension.Name))
 		} else {
 			_, err = db.Exec(fmt.Sprintf("DROP EXTENSION IF EXISTS %s", extension.Name))
@@ -148,7 +185,12 @@ func (r *InstanceReconciler) reconcileExtensions(db *sql.DB, userSettings map[st
 			break
 		}
 	}
-	return err
+
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // reconcileClusterRole applies the role written in the cluster status to this instance
@@ -780,7 +822,6 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 		return err
 	}
 
-	// TODO: should we create this with a synchronous_commit to local?
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -790,6 +831,11 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 		// is committed
 		_ = tx.Rollback()
 	}()
+
+	_, err = tx.Exec("SET LOCAL synchronous_commit to LOCAL")
+	if err != nil {
+		return err
+	}
 
 	// Let's get the credentials from the secrets
 	if err = r.reconcileUser(ctx, cluster.GetSuperuserSecretName(), tx); err != nil {
