@@ -2,6 +2,26 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.7.1
+
+**Release date:** 11 August 2021
+
+Features:
+
+- Prefer self-healing over configuration with regards to synchronous
+  replication, empowering the operator to temporarily override
+  `minSyncReplicas` and `maxSyncReplicas` settings in case the cluster is not
+  able to meet the requirements during self-healing operations
+- Introduce the `postInitSQL` option as part of the `initdb` bootstrap method
+  to specify a list of SQL queries to be executed as a superuser immediately
+  after the cluster has been created
+
+Fixes:
+
+- Allow the operator to failover when the primary is not ready (bug introduced in 1.7.0)
+- Execute administrative queries using the `LOCAL` synchronous commit level
+- Correctly parse multi-line log entries in PGAudit
+
 ## Version 1.7.0
 
 **Release date:** 28 July 2021

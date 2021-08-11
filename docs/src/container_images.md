@@ -16,6 +16,8 @@ with the following requirements:
     - `barman-cloud-backup`
     - `barman-cloud-restore`
     - `barman-cloud-backup-list`
+- PGAudit extension installed (optional - only if PGAudit is required
+  in the actual deployed clusters)
 - Sensible locale settings
 
 No entry point and/or command is required in the image definition, as Cloud
@@ -27,7 +29,9 @@ Native PostgreSQL overrides it with its instance manager.
     only.
 
 EnterpriseDB provides and supports public container images for Cloud Native
-PostgreSQL and publishes them on [Quay.io](https://quay.io/repository/enterprisedb/postgresql).
+PostgreSQL and publishes them on
+[Quay.io](https://quay.io/repository/enterprisedb/postgresql) and
+[DockerHub](https://hub.docker.com/r/enterprisedb/postgresql).
 
 ## Image tag requirements
 
