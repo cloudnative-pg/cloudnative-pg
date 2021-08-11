@@ -8,6 +8,8 @@ package e2e
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -100,4 +102,77 @@ func AssertOperatorPodUnchanged(expectedOperatorPodName string) {
 // AssertOperatorIsReady verifies that the operator is ready
 func AssertOperatorIsReady() {
 	Eventually(env.IsOperatorReady, 120).Should(BeTrue(), "Operator pod is not ready")
+}
+
+// AssertCreateTestData create test data on primary pod
+func AssertCreateTestData(namespace, clusterName, tableName string) {
+	By("creating test data", func() {
+		primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).NotTo(HaveOccurred())
+		commandTimeout := time.Second * 5
+		query := fmt.Sprintf("CREATE TABLE %v AS VALUES (1), (2);", tableName)
+		_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+	})
+}
+
+// AssertTestDataExistence verifies the test data exists on the given pod
+func AssertTestDataExistence(namespace, podName, tableName string) {
+	By(fmt.Sprintf("verifying test data on pod %v", podName), func() {
+		newPodNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      podName,
+		}
+		Pod := &corev1.Pod{}
+		err := env.Client.Get(env.Ctx, newPodNamespacedName, Pod)
+		Expect(err).ToNot(HaveOccurred())
+		query := fmt.Sprintf("select count(*) from %v", tableName)
+		commandTimeout := time.Second * 5
+		// The data previously created should be there
+		stdout, _, err := env.ExecCommand(env.Ctx, *Pod, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Trim(stdout, "\n"), err).To(BeEquivalentTo("2"))
+	})
+}
+
+// assertClusterStandbysAreStreaming verifies that all the standbys of a
+// cluster have a wal receiver running.
+func assertClusterStandbysAreStreaming(namespace string, clusterName string) {
+	Eventually(func() error {
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		if err != nil {
+			return err
+		}
+
+		primary, err := env.GetClusterPrimary(namespace, clusterName)
+		if err != nil {
+			return err
+		}
+
+		for _, pod := range podList.Items {
+			// Primary should be ignored
+			if pod.GetName() == primary.GetName() {
+				continue
+			}
+
+			timeout := time.Second
+			out, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &timeout,
+				"psql", "-U", "postgres", "-tAc", "SELECT count(*) FROM pg_stat_wal_receiver")
+			if err != nil {
+				return err
+			}
+
+			value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
+			if atoiErr != nil {
+				return atoiErr
+			}
+			if value != 1 {
+				return fmt.Errorf("pod %v not streaming", pod.Name)
+			}
+		}
+
+		return nil
+	}, 60).ShouldNot(HaveOccurred())
 }
