@@ -37,7 +37,8 @@ type InstanceReconciler struct {
 	log             logr.Logger
 	watchCollection *WatchCollection
 
-	secretVersions map[string]string
+	secretVersions  map[string]string
+	extensionStatus map[string]bool
 }
 
 // NewInstanceReconciler creates a new instance reconciler
@@ -57,11 +58,12 @@ func NewInstanceReconciler(instance *postgres.Instance) (*InstanceReconciler, er
 	}
 
 	return &InstanceReconciler{
-		instance:       instance,
-		log:            log.Log,
-		client:         client,
-		dynamicClient:  dynamicClient,
-		secretVersions: make(map[string]string),
+		instance:        instance,
+		log:             log.Log,
+		client:          client,
+		dynamicClient:   dynamicClient,
+		secretVersions:  make(map[string]string),
+		extensionStatus: make(map[string]bool),
 	}, nil
 }
 
