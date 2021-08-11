@@ -317,14 +317,14 @@ one and supports all the options available in
 ### Zero Data Loss clusters through synchronous replication
 
 Achieve  *Zero Data Loss* (RPO=0) in your local High Availability Cloud Native PostgreSQL
-cluster through quorum based synchronous replication support.  The operator provides
+cluster through quorum based synchronous replication support. The operator provides
 two configuration options that control the minimum and maximum number of
 expected synchronous standby replicas available at any time. The operator will
 react accordingly, based on the number of available and ready PostgreSQL
-instances in the cluster, through the following formula:
+instances in the cluster, through the following formula for the quorum (`q`):
 
 ```
-0 <= minSyncReplicas <= maxSyncReplicas < instances
+1 <= minSyncReplicas <= q <= maxSyncReplicas <= readyReplicas
 ```
 
 ### Replica clusters

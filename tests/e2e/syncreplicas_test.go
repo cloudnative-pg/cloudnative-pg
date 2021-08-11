@@ -110,7 +110,9 @@ var _ = Describe("Synchronous Replicas", func() {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range podList.Items {
-				podNames = append(podNames, pod.GetName())
+				if cluster.Status.CurrentPrimary != pod.GetName() {
+					podNames = append(podNames, pod.GetName())
+				}
 			}
 			ExpectedValue := "ANY " + fmt.Sprint(cluster.Spec.MaxSyncReplicas) + " (\"" + strings.Join(podNames, "\",\"") + "\")"
 
@@ -164,20 +166,23 @@ var _ = Describe("Synchronous Replicas", func() {
 		// bootstrapping the cluster, the CREATE EXTENSION instruction will block
 		// the primary since the desired number of synchronous replicas (even when 1)
 		// is not met.
-		// Create a cluster in a namespace we'll delete after the test.
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		AssertClusterIsReady(namespace, clusterName, 30, env)
 
 		By("checking that synchronous_standby_names has the expected value on the primary", func() {
-			out, _, err := tests.Run(
-				fmt.Sprintf("kubectl exec -n %v %v-1 -c postgres -- "+
-					"psql -tAc \"select setting from pg_settings where name = 'synchronous_standby_names'\"",
-					namespace, clusterName))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(strings.Trim(out, "\n")).To(
-				Equal("ANY 1 (\"cluster-pgstatstatements-1\",\"cluster-pgstatstatements-2\",\"cluster-pgstatstatements-3\")"))
+			Eventually(func() string {
+				out, _, err := tests.Run(
+					fmt.Sprintf("kubectl exec -n %v %v-1 -c postgres -- "+
+						"psql -tAc \"select setting from pg_settings where name = 'synchronous_standby_names'\"",
+						namespace, clusterName))
+				if err != nil {
+					return ""
+				}
+				return strings.Trim(out, "\n")
+			}, 30).Should(Equal("ANY 1 (\"cluster-pgstatstatements-2\",\"cluster-pgstatstatements-3\")"))
 		})
 	})
 })

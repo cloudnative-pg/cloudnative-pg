@@ -37,7 +37,11 @@ func (cluster *Cluster) CreatePostgresqlConfiguration() (string, string, error) 
 	// We need to include every replica inside the list of possible synchronous standbys
 	info.Replicas = nil
 	for _, instances := range cluster.Status.InstancesStatus {
-		info.Replicas = append(info.Replicas, instances...)
+		for _, instance := range instances {
+			if cluster.Status.CurrentPrimary != instance {
+				info.Replicas = append(info.Replicas, instance)
+			}
+		}
 	}
 
 	// Ensure a consistent ordering to avoid spurious configuration changes
