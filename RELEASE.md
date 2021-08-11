@@ -32,3 +32,5 @@ instructions accordingly for your version.
 - Release version in the Portal
 - Create a ticket to update the current version of the
   slides for Cloud Native PostgreSQL
+- Create a pull request in UPM substrate by changing the version in
+  https://github.com/EnterpriseDB/upm-substrate/blob/main/config/azure/base/cnp-operator/kustomization.yaml
