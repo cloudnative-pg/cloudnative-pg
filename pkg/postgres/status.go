@@ -6,18 +6,20 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 
 package postgres
 
+import corev1 "k8s.io/api/core/v1"
+
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {
-	PodName             string `json:"podName"`
-	CurrentLsn          LSN    `json:"currentLsn,omitempty"`
-	ReceivedLsn         LSN    `json:"receivedLsn,omitempty"`
-	ReplayLsn           LSN    `json:"replayLsn,omitempty"`
-	SystemID            string `json:"systemID"`
-	IsPrimary           bool   `json:"isPrimary"`
-	ReplayPaused        bool   `json:"replayPaused"`
-	PendingRestart      bool   `json:"pendingRestart"`
-	IsWalReceiverActive bool   `json:"isWalReceiverActive"`
-	Node                string `json:"node"`
+	CurrentLsn          LSN        `json:"currentLsn,omitempty"`
+	ReceivedLsn         LSN        `json:"receivedLsn,omitempty"`
+	ReplayLsn           LSN        `json:"replayLsn,omitempty"`
+	SystemID            string     `json:"systemID"`
+	IsPrimary           bool       `json:"isPrimary"`
+	ReplayPaused        bool       `json:"replayPaused"`
+	PendingRestart      bool       `json:"pendingRestart"`
+	IsWalReceiverActive bool       `json:"isWalReceiverActive"`
+	Node                string     `json:"node"`
+	Pod                 corev1.Pod `json:"pod"`
 
 	// This field is set when there is an error while extracting the
 	// status of a Pod
@@ -32,7 +34,7 @@ type PostgresqlStatusList struct {
 }
 
 // Len implements sort.Interface extracting the length of the list
-func (list PostgresqlStatusList) Len() int {
+func (list *PostgresqlStatusList) Len() int {
 	return len(list.Items)
 }
 
@@ -44,7 +46,7 @@ func (list *PostgresqlStatusList) Swap(i, j int) {
 // Less compare two elements. Primary instances always go first, ordered by their Pod
 // name (split brain?), and secondaries always go by their replication status with
 // the more updated one coming as first
-func (list PostgresqlStatusList) Less(i, j int) bool {
+func (list *PostgresqlStatusList) Less(i, j int) bool {
 	// Incomplete status records go to the bottom of
 	// the list, since this is used to elect a new primary
 	// when needed.
@@ -67,7 +69,7 @@ func (list PostgresqlStatusList) Less(i, j int) bool {
 	// Manage primary servers
 	switch {
 	case list.Items[i].IsPrimary && list.Items[j].IsPrimary:
-		return list.Items[i].PodName < list.Items[j].PodName
+		return list.Items[i].Pod.Name < list.Items[j].Pod.Name
 
 	case list.Items[i].IsPrimary:
 		return true
@@ -86,7 +88,7 @@ func (list PostgresqlStatusList) Less(i, j int) bool {
 		return !list.Items[i].ReplayLsn.Less(list.Items[j].ReplayLsn)
 	}
 
-	return list.Items[i].PodName < list.Items[j].PodName
+	return list.Items[i].Pod.Name < list.Items[j].Pod.Name
 }
 
 // AreWalReceiversDown check if every WAL receiver of the cluster is down

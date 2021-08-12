@@ -7,6 +7,9 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
@@ -33,7 +36,7 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	}
 
 	result := postgres.PostgresqlStatus{
-		PodName: instance.PodName,
+		Pod: corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
 	}
 
 	row := superUserDB.QueryRow(
