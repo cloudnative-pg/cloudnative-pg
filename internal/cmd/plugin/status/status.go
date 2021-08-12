@@ -219,7 +219,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 	for _, instance := range instanceStatus.Items {
 		if instance.ExecError != nil {
 			status.AddLine(
-				instance.PodName,
+				instance.Pod.Name,
 				"-",
 				"-",
 				"-",
@@ -231,7 +231,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 				instance.ExecError.Error())
 		} else {
 			status.AddLine(
-				instance.PodName,
+				instance.Pod.Name,
 				instance.CurrentLsn,
 				instance.ReceivedLsn,
 				instance.ReplayLsn,
@@ -277,7 +277,7 @@ func getReplicaStatusFromPodViaExec(
 	pod corev1.Pod,
 	postgresContainerName string) postgres.PostgresqlStatus {
 	result := postgres.PostgresqlStatus{
-		PodName: pod.Name,
+		Pod: pod,
 	}
 
 	timeout := time.Second * 2
@@ -291,14 +291,14 @@ func getReplicaStatusFromPodViaExec(
 		&timeout,
 		"/controller/manager", "instance", "status")
 	if err != nil {
-		result.PodName = pod.Name
+		result.Pod = pod
 		result.ExecError = fmt.Errorf("pod not available")
 		return result
 	}
 
 	err = json.Unmarshal([]byte(stdout), &result)
 	if err != nil {
-		result.PodName = pod.Name
+		result.Pod = pod
 		result.ExecError = fmt.Errorf("can't parse pod output")
 		return result
 	}

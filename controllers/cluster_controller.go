@@ -81,7 +81,7 @@ type ClusterReconciler struct {
 
 // Reconcile is the operator reconciler loop
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
+	clusterControllerLog := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
 
 	var cluster apiv1.Cluster
 	if err := r.Get(ctx, req.NamespacedName, &cluster); err != nil {
@@ -89,7 +89,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// that's the case, let's just wait for the Kubernetes garbage collector
 		// to remove all the Pods of the cluster.
 		if apierrs.IsNotFound(err) {
-			log.Info("Resource has been deleted")
+			clusterControllerLog.Info("Resource has been deleted")
 
 			return ctrl.Result{}, nil
 		}
@@ -117,7 +117,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Update the status of this resource
 	resources, err := r.getManagedResources(ctx, cluster)
 	if err != nil {
-		log.Error(err, "Cannot extract the list of managed resources")
+		clusterControllerLog.Error(err, "Cannot extract the list of managed resources")
 		return ctrl.Result{}, err
 	}
 
@@ -134,7 +134,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if cluster.Status.CurrentPrimary != "" &&
 		cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		log.Info("There is a switchover or a failover "+
+		clusterControllerLog.Info("There is a switchover or a failover "+
 			"in progress, waiting for the operation to complete",
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
@@ -150,17 +150,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, &cluster, instancesStatus, resources)
 	if err != nil {
 		if err == ErrWalReceiversRunning {
-			log.Info("Waiting for the all WAL receivers to be down to elect a new primary")
+			clusterControllerLog.Info("Waiting for the all WAL receivers to be down to elect a new primary")
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
-		log.Info("Cannot update target primary: operation cannot be fulfilled. "+
+		clusterControllerLog.Info("Cannot update target primary: operation cannot be fulfilled. "+
 			"An immediate retry will be scheduled",
 			"cluster", cluster.Name)
 		return ctrl.Result{Requeue: true}, nil
 	}
 	if selectedPrimary != "" {
 		// If we selected a new primary, stop the reconciliation loop here
-		log.Info("Waiting for the new primary to notice the promotion request",
+		clusterControllerLog.Info("Waiting for the new primary to notice the promotion request",
 			"newPrimary", selectedPrimary)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
@@ -172,11 +172,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
 	if runningJobs := resources.countRunningJobs(); runningJobs > 0 {
-		log.V(2).Info("A job is currently running. Waiting", "count", runningJobs)
+		clusterControllerLog.V(2).Info("A job is currently running. Waiting", "count", runningJobs)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 	if !resources.allPodsAreActive() {
-		log.V(2).Info("A managed resource is currently being created or deleted. Waiting")
+		clusterControllerLog.V(2).Info("A managed resource is currently being created or deleted. Waiting")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -243,11 +243,11 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 // ReconcilePods decides when to create, scale up/down or wait for pods
 func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request, cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList) (ctrl.Result, error) {
-	log := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
+	clusterControllerLog := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
 
 	// If we are joining a node, we should wait for the process to finish
 	if resources.countRunningJobs() > 0 {
-		log.V(2).Info("Waiting for jobs to finish",
+		clusterControllerLog.V(2).Info("Waiting for jobs to finish",
 			"clusterName", cluster.Name,
 			"namespace", cluster.Namespace,
 			"jobs", len(resources.jobs.Items))
@@ -259,7 +259,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	if pvcNeedingMaintenance > 0 {
 		if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
 			// A pod is not ready, let's retry
-			log.V(2).Info("Waiting for node to be ready before attaching PVCs")
+			clusterControllerLog.V(2).Info("Waiting for node to be ready before attaching PVCs")
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 
@@ -289,7 +289,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	// The user have choose to wait for the missing nodes to come up
 	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
 		cluster.Status.ReadyInstances < cluster.Status.Instances {
-		log.V(2).Info("Waiting for Pods to be ready")
+		clusterControllerLog.V(2).Info("Waiting for Pods to be ready")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -317,23 +317,24 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	if cluster.Status.ReadyInstances != cluster.Status.Instances ||
 		cluster.Status.ReadyInstances != int32(len(instancesStatus.Items)) ||
 		!instancesStatus.IsComplete() {
-		log.V(2).Info("Waiting for Pods to be ready")
+		clusterControllerLog.V(2).Info("Waiting for Pods to be ready")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// If we need to apply an upgrade to the cluster, this is the right moment
-	upgradedPod, err := r.upgradeCluster(ctx, cluster, resources.pods, instancesStatus)
+	// If we need to rollout a restart of any instance, this is the right moment
+	// Do I have to rollout a new image?
+	done, err := r.rolloutDueToCondition(ctx, cluster, &instancesStatus, IsPodNeedingRollout)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if upgradedPod != "" {
+	if done {
 		// Rolling upgrade is in progress, let's avoid marking stuff as synchronized
 		// (but recheck in one second, just to be sure)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	// When everything is reconciled, update the status
-	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
+	if err = r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
 		return ctrl.Result{}, err
 	}
 

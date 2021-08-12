@@ -12,43 +12,45 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("PostgreSQL status", func() {
 	list := PostgresqlStatusList{
 		Items: []PostgresqlStatus{
 			{
-				PodName:   "server-04",
+				Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-04"}},
 				ExecError: fmt.Errorf("cannot find postgres container"),
 				IsReady:   true,
 			},
 			{
-				PodName:     "server-06",
+				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-06"}},
 				IsPrimary:   false,
 				ReceivedLsn: "1/23",
 				ReplayLsn:   "1/22",
 				IsReady:     false,
 			},
 			{
-				PodName:     "server-30",
+				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-30"}},
 				IsPrimary:   false,
 				ReceivedLsn: "1/23",
 				ReplayLsn:   "1/22",
 				IsReady:     true,
 			},
 			{
-				PodName:     "server-20",
+				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
 				IsPrimary:   false,
 				ReceivedLsn: "1/21",
 				IsReady:     true,
 			},
 			{
-				PodName:   "server-10",
+				Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
 				IsPrimary: true,
 				IsReady:   true,
 			},
 			{
-				PodName:     "server-40",
+				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-40"}},
 				IsPrimary:   false,
 				ReceivedLsn: "1/23",
 				ReplayLsn:   "1/23",
@@ -61,13 +63,13 @@ var _ = Describe("PostgreSQL status", func() {
 		greenList := PostgresqlStatusList{
 			Items: []PostgresqlStatus{
 				{
-					PodName:     "server-20",
+					Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
 					IsPrimary:   false,
 					ReceivedLsn: "1/21",
 					IsReady:     true,
 				},
 				{
-					PodName:   "server-10",
+					Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
 					IsPrimary: true,
 					IsReady:   true,
 				},
@@ -83,27 +85,27 @@ var _ = Describe("PostgreSQL status", func() {
 
 		It("primary servers are come first", func() {
 			Expect(list.Items[0].IsPrimary).To(BeTrue())
-			Expect(list.Items[0].PodName).To(Equal("server-10"))
+			Expect(list.Items[0].Pod.Name).To(Equal("server-10"))
 		})
 
 		It("contains the more updated server as the second element", func() {
 			Expect(list.Items[1].IsPrimary).To(BeFalse())
-			Expect(list.Items[1].PodName).To(Equal("server-40"))
+			Expect(list.Items[1].Pod.Name).To(Equal("server-40"))
 		})
 
 		It("contains other servers considering their status", func() {
-			Expect(list.Items[2].PodName).To(Equal("server-30"))
-			Expect(list.Items[3].PodName).To(Equal("server-20"))
+			Expect(list.Items[2].Pod.Name).To(Equal("server-30"))
+			Expect(list.Items[3].Pod.Name).To(Equal("server-20"))
 		})
 
 		It("put the non-ready servers after the ready ones", func() {
-			Expect(list.Items[4].PodName).To(Equal("server-06"))
-			Expect(list.Items[4].PodName).To(Equal("server-06"))
+			Expect(list.Items[4].Pod.Name).To(Equal("server-06"))
+			Expect(list.Items[4].Pod.Name).To(Equal("server-06"))
 		})
 
 		It("put the incomplete statuses at the bottom of the list", func() {
-			Expect(list.Items[5].PodName).To(Equal("server-04"))
-			Expect(list.Items[5].PodName).To(Equal("server-04"))
+			Expect(list.Items[5].Pod.Name).To(Equal("server-04"))
+			Expect(list.Items[5].Pod.Name).To(Equal("server-04"))
 		})
 	})
 })

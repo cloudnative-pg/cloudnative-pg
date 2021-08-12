@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"sort"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -96,6 +97,10 @@ func (r *ClusterReconciler) getManagedPods(
 		return corev1.PodList{}, err
 	}
 
+	sort.Slice(childPods.Items, func(i, j int) bool {
+		return childPods.Items[i].Name < childPods.Items[j].Name
+	})
+
 	return childPods, nil
 }
 
@@ -114,6 +119,10 @@ func (r *ClusterReconciler) getManagedPVCs(
 		return corev1.PersistentVolumeClaimList{}, err
 	}
 
+	sort.Slice(childPVCs.Items, func(i, j int) bool {
+		return childPVCs.Items[i].Name < childPVCs.Items[j].Name
+	})
+
 	return childPVCs, nil
 }
 
@@ -130,6 +139,10 @@ func (r *ClusterReconciler) getManagedJobs(
 	); err != nil {
 		return batchv1.JobList{}, err
 	}
+
+	sort.Slice(childJobs.Items, func(i, j int) bool {
+		return childJobs.Items[i].Name < childJobs.Items[j].Name
+	})
 
 	return childJobs, nil
 }
@@ -461,6 +474,7 @@ func ExtractInstancesStatus(
 		instanceStatus := getReplicaStatusFromPodViaHTTP(ctx, filteredPods[idx])
 		instanceStatus.IsReady = utils.IsPodReady(filteredPods[idx])
 		instanceStatus.Node = filteredPods[idx].Spec.NodeName
+		instanceStatus.Pod = filteredPods[idx]
 		result.Items = append(result.Items, instanceStatus)
 	}
 	return result
@@ -473,42 +487,36 @@ func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) postgre
 	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus)
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
 	if err != nil {
-		result.PodName = pod.Name
 		result.ExecError = err
 		return result
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		result.PodName = pod.Name
 		result.ExecError = err
 		return result
 	}
 
 	if resp.StatusCode != 200 {
 		bytes, _ := ioutil.ReadAll(resp.Body)
-		result.PodName = pod.Name
 		result.ExecError = fmt.Errorf("%v - %v", resp.StatusCode, string(bytes))
 		_ = resp.Body.Close()
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		result.PodName = pod.Name
 		result.ExecError = err
 		return result
 	}
 
 	err = json.Unmarshal(body, &result)
 	if err != nil {
-		result.PodName = pod.Name
 		result.ExecError = err
 		return result
 	}
 
 	err = resp.Body.Close()
 	if err != nil {
-		result.PodName = pod.Name
 		result.ExecError = err
 		return result
 	}

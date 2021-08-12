@@ -8,9 +8,7 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -21,219 +19,164 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
-// ErrorInconsistentClusterStatus is raised when the current cluster has no primary nor
-// the sufficient number of nodes to issue a switchover
-var ErrorInconsistentClusterStatus = errors.New("inconsistent cluster status")
-
-// updateCluster update a Cluster to a new image, if needed
-func (r *ClusterReconciler) upgradeCluster(
+func (r *ClusterReconciler) rolloutDueToCondition(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	podList v1.PodList,
-	clusterStatus postgres.PostgresqlStatusList,
-) (string, error) {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	podList *postgres.PostgresqlStatusList,
+	conditionFunc func(postgres.PostgresqlStatus, *apiv1.Cluster) (bool, string),
+) (bool, error) {
+	clusterUpgradeLog := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
-	targetImageName := cluster.GetImageName()
+	// The following code works under the assumption that the latest element
+	// is the primary and this assumption should be enforced by the
+	// `updateTargetPrimaryFromPods` function, which is executed before this
 
-	// Sort sortedPodList in reverse order
-	sortedPodList := podList.Items
-	sort.Slice(sortedPodList, func(i, j int) bool {
-		return sortedPodList[i].Name > sortedPodList[j].Name
-	})
+	for i := len(podList.Items) - 1; i >= 0; i-- {
+		postgresqlStatus := podList.Items[i]
 
-	// Ensure we really have an upgrade strategy between the involved versions
-	upgradeNeeded, err := r.checkUpgradePath(ctx, cluster, sortedPodList, targetImageName)
-	if err != nil {
-		return "", err
-	}
-
-	primaryIdx := -1
-	standbyIdx := -1
-	for idx, pod := range sortedPodList {
-		podNeedsRestart, err := isPodNeedingRestart(cluster, clusterStatus, pod)
-		if err != nil {
-			log.Error(err, "pod", pod.Name)
+		shouldRestart, reason := conditionFunc(postgresqlStatus, cluster)
+		if !shouldRestart {
 			continue
 		}
 
-		if podNeedsRestart {
-			if cluster.Status.CurrentPrimary == pod.Name {
-				// This is the primary, and we cannot upgrade it on the fly
-				primaryIdx = idx
-			} else {
-				// Select the standby to upgrade. We can stop here because primaryIdx
-				// is only used when all the standbys are already up-to-date
-				standbyIdx = idx
-				break
+		// if it is not the current primary, we can just upgrade it
+		if cluster.Status.CurrentPrimary != postgresqlStatus.Pod.Name {
+			if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
+				fmt.Sprintf("Restarting instance, beacause: %s", reason)); err != nil {
+				clusterUpgradeLog.Error(err, "postgresqlStatus", postgresqlStatus.Pod.Name)
+				return false, err
 			}
+			return true, r.upgradePod(ctx, cluster, &postgresqlStatus.Pod)
 		}
-	}
 
-	if primaryIdx == -1 && standbyIdx == -1 {
-		// Everything is up-to-date
-		return "", nil
-	}
+		// if it's a primary instance, we need to check whether a manual switchover is required
+		if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
+			clusterUpgradeLog.Info("Waiting for the user to request a switchover to complete the rolling update",
+				"reason", reason, "primaryPod", postgresqlStatus.Pod.Name)
+			return true, r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser,
+				"User must issue a supervised switchover")
+		}
 
-	// Switch phase only if there is some image to update in the standbys
-	if upgradeNeeded && cluster.Status.Phase != apiv1.PhaseWaitingForUser {
+		// if the cluster has more than one instance, we should trigger a switchover before upgrading the
+		if cluster.Status.Instances > 1 && len(podList.Items) > 1 {
+			// podList.Items[1] is the first replica, as the pod list
+			// is sorted in the same order we use for switchover / failovers
+			targetPrimary := podList.Items[1].Pod.Name
+			clusterUpgradeLog.Info("The primary needs to be restarted, we'll trigger a switchover first",
+				"reason", reason,
+				"currentPrimary", postgresqlStatus.Pod.Name,
+				"targetPrimary", targetPrimary)
+			return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)
+		}
+
+		// if there is only one instance in the cluster, we should upgrade it even if it's a primary
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
-			fmt.Sprintf("Upgrading cluster to image: %v", targetImageName)); err != nil {
-			return "", err
-		}
-	}
-
-	// Update the selected standby
-	if standbyIdx != -1 {
-		pod := sortedPodList[standbyIdx]
-		return pod.Name, r.upgradePod(ctx, cluster, &pod)
-	}
-
-	// We still need to upgrade the primary server, let's see
-	// if the user prefer to do it manually
-	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
-		log.Info(
-			"Waiting for the user to request a switchover to complete the rolling update",
-			"primaryPod", sortedPodList[primaryIdx].Name)
-		return sortedPodList[0].Name, r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser,
-			"User must issue a supervised switchover")
-	}
-
-	// Ok, the user want us to automatically update all
-	// the servers.
-	// If we are working on a single-instance cluster
-	// we "just" need to delete the Pod we have, waiting for it to be
-	// created again with the same storage.
-	if cluster.Spec.Instances == 1 {
-		return sortedPodList[0].Name, r.upgradePod(ctx, cluster, &sortedPodList[0])
-	}
-
-	// If we have replicas, let's switch over to the most up-to-date and
-	// then the procedure will continue with the old primary.
-	if len(clusterStatus.Items) < 2 || clusterStatus.Items[1].IsPrimary {
-		return "", ErrorInconsistentClusterStatus
-	}
-
-	// Let's switch over to this server
-	log.Info("Switching over to a replica to complete the rolling update",
-		"oldPrimary", cluster.Status.TargetPrimary,
-		"newPrimary", clusterStatus.Items[1].PodName,
-		"status", clusterStatus)
-	r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
-		"Switching over from %v to %v to complete upgrade",
-		cluster.Status.TargetPrimary, clusterStatus.Items[1].PodName)
-	return sortedPodList[0].Name, r.setPrimaryInstance(ctx, cluster, clusterStatus.Items[1].PodName)
-}
-
-// checkUpgradePath check if we have an available upgrade path to the PostgreSQL version
-// whose name is in `targetImageName`. It returns false if there is nothing to upgrade.
-// It returns and error if the upgrade path is impossible to follow.
-func (r *ClusterReconciler) checkUpgradePath(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	podList []v1.Pod,
-	targetImageName string) (canUpgrade bool, err error) {
-	var newImage bool
-	for _, pod := range podList {
-		usedImageName, err := specs.GetPostgresImageName(pod)
-		if err != nil {
-			log.Error(err, "pod", pod.Name)
-			continue
-		}
-
-		if usedImageName == targetImageName {
-			continue
-		}
-		newImage = true
-
-		canUpgrade, err = postgres.CanUpgrade(usedImageName, targetImageName)
-		if err != nil {
-			log.Error(
-				err, "Error checking image versions", "from", usedImageName, "to", targetImageName)
-			_ = r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgradeFailed,
-				fmt.Sprintf("Upgrade Failed, wrong image version: %v", err))
+			fmt.Sprintf("The primary instance needs to be restarted: %s, reason: %s",
+				postgresqlStatus.Pod.Name, reason)); err != nil {
+			clusterUpgradeLog.Error(err, "postgresqlStatus", postgresqlStatus.Pod.Name)
 			return false, err
 		}
 
-		if !canUpgrade {
-			log.Info("Can't upgrade between these PostgreSQL versions",
-				"from", usedImageName,
-				"to", targetImageName,
-				"pod", pod.Name)
-			_ = r.RegisterPhase(ctx, cluster,
-				apiv1.PhaseUpgradeFailed,
-				fmt.Sprintf("Upgrade Failed, can't upgrade from %v to %v",
-					usedImageName, targetImageName))
-			return false, nil
-		}
-	}
-
-	return newImage, nil
-}
-
-// isPodNeedingRestart return true if we need to restart the
-// Pod to apply a configuration change or a new version of
-// PostgreSQL
-func isPodNeedingRestart(
-	cluster *apiv1.Cluster,
-	clusterStatus postgres.PostgresqlStatusList,
-	pod v1.Pod) (bool, error) {
-	targetImageName := cluster.GetImageName()
-
-	pgCurrentImageName, err := specs.GetPostgresImageName(pod)
-	if err != nil {
-		return false, err
-	}
-
-	opCurrentImageName, err := specs.GetBootstrapControllerImageName(pod)
-	if err != nil {
-		return false, err
-	}
-
-	if pgCurrentImageName != targetImageName {
-		// We need to apply a different PostgreSQL version
-		return true, nil
-	}
-
-	if opCurrentImageName != configuration.Current.OperatorImageName {
-		// We need to apply a different version of the instance manager
-		return true, nil
-	}
-
-	// If the cluster has been restarted and we are working with a Pod
-	// which have not been restarted yet, or restarted in a different
-	// time, let's restart it.
-	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
-		podRestart := pod.Annotations[specs.ClusterRestartAnnotationName]
-		if clusterRestart != podRestart {
-			return true, nil
-		}
-	}
-
-	for _, entry := range clusterStatus.Items {
-		if entry.PodName == pod.Name && entry.PendingRestart {
-			// We need to apply a new configuration
-			return true, nil
-		}
+		return true, r.upgradePod(ctx, cluster, &postgresqlStatus.Pod)
 	}
 
 	return false, nil
 }
 
-// updatePod update an instance to a newer image version
-func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *apiv1.Cluster, pod *v1.Pod) error {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+// IsPodNeedingRollout checks whether a given postgres instance has to be rolled out for any reason,
+// returning if it does need to and a human readable string explaining the reason for it
+func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluster) (bool, string) {
+	if !status.IsReady {
+		return false, ""
+	}
+	// check if the pod requires an image upgrade
+	oldImage, newImage, err := isPodNeedingUpgradedImage(cluster, status.Pod)
+	if err != nil {
+		log.Error(err, "while checking if image could be upgraded")
+		return false, ""
+	}
+	if newImage != "" {
+		return true, fmt.Sprintf("the instance is using an old image: %s -> %s",
+			oldImage, newImage)
+	}
 
-	log.Info("Deleting old Pod",
+	// check if pod needs to be restarted because of some config requiring it
+	return isPodNeedingRestart(cluster, status),
+		"configuration needs a restart to apply some configuration changes"
+}
+
+// isPodNeedingUpgradedImage checks whether an image in a pod has to be changed
+func isPodNeedingUpgradedImage(
+	cluster *apiv1.Cluster,
+	pod v1.Pod,
+) (oldImage string, targetImage string, err error) {
+	targetImageName := cluster.GetImageName()
+
+	pgCurrentImageName, err := specs.GetPostgresImageName(pod)
+	if err != nil {
+		return "", "", err
+	}
+
+	opCurrentImageName, err := specs.GetBootstrapControllerImageName(pod)
+	if err != nil {
+		return "", "", err
+	}
+
+	if pgCurrentImageName != targetImageName {
+		// We need to apply a different PostgreSQL version
+		return pgCurrentImageName, targetImageName, nil
+	}
+
+	if opCurrentImageName != configuration.Current.OperatorImageName {
+		// We need to apply a different version of the instance manager
+		return opCurrentImageName, configuration.Current.OperatorImageName, nil
+	}
+
+	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
+	if err != nil {
+		return "", "", err
+	}
+
+	if !canUpgradeImage {
+		return "", "", nil
+	}
+
+	return "", "", nil
+}
+
+// isPodNeedingRestart returns true if we need to restart the
+// Pod to apply a configuration change or there is a request of restart for the cluster
+func isPodNeedingRestart(
+	cluster *apiv1.Cluster,
+	instanceStatus postgres.PostgresqlStatus,
+) bool {
+	// If the cluster has been restarted and we are working with a Pod
+	// which have not been restarted yet, or restarted in a different
+	// time, let's restart it.
+	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
+		podRestart := instanceStatus.Pod.Annotations[specs.ClusterRestartAnnotationName]
+		if clusterRestart != podRestart {
+			return true
+		}
+	}
+
+	return instanceStatus.PendingRestart
+}
+
+// upgradePod updates an instance to a newer image version
+func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *apiv1.Cluster, pod *v1.Pod) error {
+	clusterUpgradeLog := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+
+	clusterUpgradeLog.Info("Deleting old Pod",
 		"pod", pod.Name,
 		"to", cluster.Spec.ImageName)
 
 	r.Recorder.Eventf(cluster, "Normal", "UpgradingInstance",
 		"Upgrading instance %v", pod.Name)
 
-	// Let's wait for this Pod to be recloned or recreated using the same storage
+	// let's wait for this Pod to be recloned or recreated, using the same storage
 	if err := r.Delete(ctx, pod); err != nil {
-		// Ignore if NotFound, otherwise report the error
+		// ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
 			return err
 		}

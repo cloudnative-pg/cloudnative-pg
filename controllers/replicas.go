@@ -46,7 +46,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	}
 	if unschedulablePrimaryPod != nil {
 		log.Info("Primary is running on an unschedulable node, will try switching over",
-			"node", unschedulablePrimaryPod.Node, "primary", unschedulablePrimaryPod.PodName)
+			"node", unschedulablePrimaryPod.Node, "primary", unschedulablePrimaryPod.Pod.Name)
 		return r.setPrimaryOnSchedulableNode(ctx, cluster, status, unschedulablePrimaryPod)
 	}
 
@@ -71,7 +71,7 @@ func (r *ClusterReconciler) findUnschedulablePrimaryPod(
 	primaryPod := status.Items[0]
 	for i, pod := range status.Items {
 		if pod.IsPrimary ||
-			(pod.PodName == cluster.Status.TargetPrimary &&
+			(pod.Pod.Name == cluster.Status.TargetPrimary &&
 				cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary) {
 			primaryPod = status.Items[i]
 			break
@@ -110,7 +110,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 
 	// If the first pod in the sorted list is already the targetPrimary,
 	// we have nothing to do here.
-	if cluster.Status.TargetPrimary == status.Items[0].PodName {
+	if cluster.Status.TargetPrimary == status.Items[0].Pod.Name {
 		return "", nil
 	}
 
@@ -125,32 +125,32 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	// or change the target primary if the current one is not valid anymore.
 	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
 		log.Info("Current primary isn't healthy, failing over",
-			"newPrimary", status.Items[0].PodName,
+			"newPrimary", status.Items[0].Pod.Name,
 			"clusterStatus", status)
 		log.V(1).Info("Cluster status before failover", "pods", resources.pods)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Current primary isn't healthy, failing over from %v to %v",
-			cluster.Status.TargetPrimary, status.Items[0].PodName)
+			cluster.Status.TargetPrimary, status.Items[0].Pod.Name)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
-			fmt.Sprintf("Failing over to %v", status.Items[0].PodName)); err != nil {
+			fmt.Sprintf("Failing over to %v", status.Items[0].Pod.Name)); err != nil {
 			return "", err
 		}
 	} else {
 		log.Info("Target primary isn't healthy, switching target",
-			"newPrimary", status.Items[0].PodName,
+			"newPrimary", status.Items[0].Pod.Name,
 			"clusterStatus", status)
 		log.V(1).Info("Cluster status before switching target", "pods", resources.pods)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Target primary isn't healthy, switching target from %v to %v",
-			cluster.Status.TargetPrimary, status.Items[0].PodName)
+			cluster.Status.TargetPrimary, status.Items[0].Pod.Name)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
-			fmt.Sprintf("Switching over to %v", status.Items[0].PodName)); err != nil {
+			fmt.Sprintf("Switching over to %v", status.Items[0].Pod.Name)); err != nil {
 			return "", err
 		}
 	}
 
 	// No primary, no party. Failover please!
-	return status.Items[0].PodName, r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
+	return status.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name)
 }
 
 // isNodeUnschedulable checks whether a node is set to unschedulable
@@ -210,24 +210,24 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 
 		// Set the current candidate as targetPrimary
 		log.Info("Current primary is running on unschedulable node, triggering a switchover",
-			"currentPrimary", primaryPod.PodName, "currentPrimaryNode", primaryPod.Node,
-			"targetPrimary", candidate.PodName, "targetPrimaryNode", candidate.Node)
+			"currentPrimary", primaryPod.Pod.Name, "currentPrimaryNode", primaryPod.Node,
+			"targetPrimary", candidate.Pod.Name, "targetPrimaryNode", candidate.Node)
 		r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
 			"Current primary is running on unschedulable node %v, switching over from %v to %v",
-			primaryPod.Node, cluster.Status.TargetPrimary, candidate.PodName)
+			primaryPod.Node, cluster.Status.TargetPrimary, candidate.Pod.Name)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseSwitchover,
 			fmt.Sprintf("Switching over to %v, because primary instance "+
 				"was running on unschedulable node %v",
-				candidate.PodName,
+				candidate.Pod.Name,
 				primaryPod.Node)); err != nil {
 			return "", err
 		}
-		return candidate.PodName, r.setPrimaryInstance(ctx, cluster, candidate.PodName)
+		return candidate.Pod.Name, r.setPrimaryInstance(ctx, cluster, candidate.Pod.Name)
 	}
 
 	// if we are here this means no new primary has been chosen
 	log.Info("Current primary is running on unschedulable node, but there are no valid candidates",
-		"currentPrimary", status.Items[0].PodName,
+		"currentPrimary", status.Items[0].Pod.Name,
 		"primaryNode", status.Items[0].Node,
 		"pods", status.Items)
 	return "", nil
@@ -248,7 +248,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 	// in this list, since from the PostgreSQL point-of-view it's not the real primary.
 
 	for _, statusRecord := range status.Items {
-		if statusRecord.PodName == cluster.Status.TargetPrimary {
+		if statusRecord.Pod.Name == cluster.Status.TargetPrimary {
 			// Everything fine, the current designated primary is active
 			return "", nil
 		}
@@ -260,18 +260,18 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 	}
 
 	log.Info("Current target primary isn't healthy, failing over",
-		"newPrimary", status.Items[0].PodName,
+		"newPrimary", status.Items[0].Pod.Name,
 		"clusterStatus", status)
 	log.V(1).Info("Cluster status before failover", "pods", resources.pods)
 	r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 		"Current target primary isn't healthy, failing over from %v to %v",
-		cluster.Status.TargetPrimary, status.Items[0].PodName)
+		cluster.Status.TargetPrimary, status.Items[0].Pod.Name)
 	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
-		fmt.Sprintf("Failing over to %v", status.Items[0].PodName)); err != nil {
+		fmt.Sprintf("Failing over to %v", status.Items[0].Pod.Name)); err != nil {
 		return "", err
 	}
 
-	return status.Items[0].PodName, r.setPrimaryInstance(ctx, cluster, status.Items[0].PodName)
+	return status.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name)
 }
 
 // GetPodsNotOnPrimaryNode filters out only pods that are not on the same node as the primary one
@@ -284,7 +284,7 @@ func GetPodsNotOnPrimaryNode(
 		return podsOnOtherNodes
 	}
 	for _, candidate := range status.Items {
-		if candidate.PodName != primaryPod.PodName && candidate.Node != primaryPod.Node {
+		if candidate.Pod.Name != primaryPod.Pod.Name && candidate.Node != primaryPod.Node {
 			podsOnOtherNodes.Items = append(podsOnOtherNodes.Items, candidate)
 		}
 	}
@@ -310,7 +310,7 @@ func (r *ClusterReconciler) getStatusFromInstances(
 	for idx := range status.Items {
 		if status.Items[idx].ExecError != nil {
 			r.Log.Info("Cannot extract Pod status",
-				"name", status.Items[idx].PodName,
+				"name", status.Items[idx].Pod.Name,
 				"error", status.Items[idx].ExecError.Error())
 		}
 	}
