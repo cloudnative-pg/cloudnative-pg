@@ -53,8 +53,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          title: "Update default PostgreSQL version to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
+          title: "feat: update default PostgreSQL version to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
           body: "Update default PostgreSQL version from ${{ steps.current.outputs.CURRENT_POSTGRES_VERSION }} to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
           branch: "latest-postgres-version-update"
           author: "latest-postgres-version-check <latest-postgres-version-check@users.noreply.github.com>"
-          commit-message: "Update default PostgreSQL version to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
+          commit-message: "feat: update default PostgreSQL version to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
