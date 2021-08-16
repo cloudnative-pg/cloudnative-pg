@@ -186,7 +186,7 @@ jobs:
           commit_short=$(git rev-parse --short "${commit_sha}")
           if [ "${GITHUB_REF#refs/heads/}" == main ]
           then
-            images="${images},upmdev.azurecr.io/enterprisedb/cloud-native-postgresql-testing"
+            images="${images},upmdev.azurecr.io/enterprisedb/cloud-native-postgresql"
           fi
           echo "::set-output name=images::${images}"
           echo "::set-output name=tags::${tags}"
