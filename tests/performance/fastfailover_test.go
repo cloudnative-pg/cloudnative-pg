@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -68,17 +67,7 @@ var _ = Describe("Fast failover", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 		By("having a Cluster with three instances ready", func() {
-			timeout := 600
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
-
-			Eventually(func() (int32, error) {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
-				return cluster.Status.ReadyInstances, err
-			}, timeout).Should(BeEquivalentTo(3))
+			AssertClusterIsReady(namespace, clusterName, 600, env)
 		})
 		// Node 1 should be the primary, so the -rw service should
 		// point there. We verify this.

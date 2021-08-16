@@ -173,7 +173,7 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 				err = env.DeletePod(namespace, pvClaimNew.Name, forceDelete)
 				Expect(err).ToNot(HaveOccurred())
 				// Ensuring cluster is healthy with three pods
-				ClusterIsReady(namespace, clusterName, timeout, env)
+				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			}
 		}
 		// Deleting primary pvc
@@ -184,7 +184,7 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 		Expect(err).ToNot(HaveOccurred())
 	})
 	// Ensuring cluster is healthy, after failover of the primary pod and new pod is recreated
-	ClusterIsReady(namespace, clusterName, timeout, env)
+	AssertClusterIsReady(namespace, clusterName, timeout, env)
 	By("verifying Cluster storage is expanded", func() {
 		// Gathering PVC list for comparison
 		pvcList, err := env.GetPVCList(namespace)
@@ -203,16 +203,6 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 			}
 			return count
 		}, 30).Should(BeEquivalentTo(3))
-	})
-}
-
-func ClusterIsReady(namespace string, clusterName string, timeout int, env *tests.TestingEnvironment) {
-	By("gather active Cluster instances", func() {
-		Eventually(func() (int, error) {
-			podList, err := env.GetClusterPodList(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			return len(podList.Items), err
-		}, timeout).Should(BeEquivalentTo(3))
 	})
 }
 

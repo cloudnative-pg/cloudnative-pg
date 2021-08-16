@@ -270,17 +270,7 @@ var _ = Describe("Upgrade", func() {
 		})
 
 		By("having a Cluster with three instances ready", func() {
-			timeout := 600
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
-
-			Eventually(func() (int32, error) {
-				cluster := &apiv1alpha1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
-				return cluster.Status.ReadyInstances, err
-			}, timeout).Should(BeEquivalentTo(3))
+			AssertClusterIsReady(namespace, clusterName, 600, env)
 		})
 
 		// The cluster should be found by the v1alpha1 client and not by the v1 one
@@ -454,17 +444,7 @@ var _ = Describe("Upgrade", func() {
 				"kubectl create -n " + namespace + " -f " + sampleFile2)
 			Expect(err).ToNot(HaveOccurred())
 
-			timeout := 600
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName2,
-			}
-
-			Eventually(func() (int32, error) {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
-				return cluster.Status.ReadyInstances, err
-			}, timeout).Should(BeEquivalentTo(3))
+			AssertClusterIsReady(namespace, clusterName2, 600, env)
 		})
 
 		// The API version should have automatically changed for this cluster
@@ -484,17 +464,7 @@ var _ = Describe("Upgrade", func() {
 				namespace, restoreFile))
 			Expect(err).ToNot(HaveOccurred())
 
-			timeout := 800
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      restoredClusterName,
-			}
-
-			Eventually(func() (int32, error) {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
-				return cluster.Status.ReadyInstances, err
-			}, timeout).Should(BeEquivalentTo(3))
+			AssertClusterIsReady(namespace, restoredClusterName, 800, env)
 
 			// Test data should be present on restored primary
 			primary := restoredClusterName + "-1"
@@ -535,3 +505,27 @@ var _ = Describe("Upgrade", func() {
 		AssertScheduledBackupsAreScheduled()
 	})
 })
+
+func AssertClusterIsReady(namespace string, clusterName string, timeout int, env *tests.TestingEnvironment) {
+	By("having a Cluster with each instance in status ready", func() {
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
+		// Eventually the number of ready instances should be equal to the
+		// amount of instances defined in the cluster
+		cluster := &apiv1.Cluster{}
+		// Set cluster to api alpha1v1 if api v1 return error
+		if err := env.Client.Get(env.Ctx, namespacedName, cluster); err != nil {
+			cluster := &apiv1alpha1.Cluster{}
+			err = env.Client.Get(env.Ctx, namespacedName, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		}
+		Eventually(func() (int, error) {
+			podList, err := env.GetClusterPodList(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			readyInstances := utils.CountReadyPods(podList.Items)
+			return readyInstances, err
+		}, timeout).Should(BeEquivalentTo(cluster.Spec.Instances))
+	})
+}

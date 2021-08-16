@@ -155,22 +155,12 @@ func AssertReplicaModeCluster(
 	By("creating source cluster", func() {
 		// Create replica source cluster
 		AssertCreateCluster(namespace, srcClusterName, srcClusterSample, env)
-		// Due to an issue with AssertClusterIsReady sometimes primary
-		// is not ready and it might be return nil value.
-		// We should fix the assert instead inventing new checks
-		// on each separate e2e test.
-		Eventually(func() (string, error) {
+		// Get primary from source cluster
+		Eventually(func() error {
 			primarySrcCluster, err = env.GetClusterPrimary(namespace, srcClusterName)
-			if primarySrcCluster != nil {
-				return primarySrcCluster.GetName(), err
-			}
-			return "", err
-		}, 60).Should(BeEquivalentTo(srcClusterName + "-1"))
+			return err
+		}, 5).Should(BeNil())
 	})
-
-	// Get primary from source cluster
-	primarySrcCluster, err = env.GetClusterPrimary(namespace, srcClusterName)
-	Expect(err).ToNot(HaveOccurred())
 
 	By("creating test data in source cluster", func() {
 		cmd := "CREATE TABLE test_replica AS VALUES (1), (2);"
@@ -182,8 +172,10 @@ func AssertReplicaModeCluster(
 	By("creating replica cluster", func() {
 		AssertCreateCluster(namespace, replicaClusterName, replicaClusterSample, env)
 		// Get primary from replica cluster
-		primaryReplicaCluster, err = env.GetClusterPrimary(namespace, replicaClusterName)
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			primaryReplicaCluster, err = env.GetClusterPrimary(namespace, replicaClusterName)
+			return err
+		}, 5).Should(BeNil())
 	})
 
 	By("verifying that replica cluster primary is in recovery mode", func() {
