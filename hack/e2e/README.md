@@ -10,7 +10,7 @@ of commands.
 Create the cluster:
 
 ```console
-hack/setup-cluster.sh create
+hack/setup-cluster.sh <OPTIONAL_FLAGS> create
 ```
 
 Build the operator image and load it in the local Kubernetes cluster:
@@ -32,6 +32,14 @@ Cleanup everything:
 ```console
 hack/setup-cluster.sh destroy
 ```
+All flags have corresponding environment variables labeled `(Env:...` in the bellow table.
+| Flags                                | Usage                                                                                                                         |
+|--------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| -r\|--registry                       | Enable local registry. (Env: `ENABLE_REGISTRY`)                                                                               |
+| -e\|--engine <CLUSTER_ENGINE>        | Use the provided ENGINE to run the cluster. Available options are 'kind' and 'k3d'. Default 'kind'. (Env: `CLUSTER_ENGINE`) |
+| -k\|--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.21.1`). (Env: `K8S_VERSION`)                                   |
+| -n\|--nodes <NODES>                  | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
+
 
 > **NOTE:** if you want to use custom engine and registry settings, please make
 > sure that they are consistent through all invocations either via command line
@@ -62,6 +70,12 @@ specifying the following variable
 
 * `DOCKER_REGISTRY_MIRROR`: DockerHub mirror URL (i.e. https://mirror.gcr.io)
 
+To run E2E testing you can also use:
+
+|                    kind                        |                     k3d                         |
+|------------------------------------------------|-------------------------------------------------|
+| `TEST_UPGRADE_TO_V1=false make e2e-test-kind`  | `TEST_UPGRADE_TO_V1=false make e2e-test-k3d`    |
+
 # Setting up a local K8s cluster and running the tests
 
 The following scripts use the previous `hack/setup-cluster.sh` and `hack/e2e/run-e2e.sh`
@@ -69,7 +83,7 @@ to create a K8s local cluster and running E2E tests on it.
 
 ## On kind
 
-You can test the operator locally on kind running
+Test the operator locally on **kind**:
 
 ``` bash
 run-e2e-kind.sh
@@ -79,7 +93,7 @@ It will take care of creating a Kind cluster and run the tests on it.
 
 ## On k3d
 
-You can test the operator locally on k3d running
+Test the operator locally on **k3d**:
 
 ``` bash
 run-e2e-k3d.sh
@@ -91,7 +105,7 @@ NOTE: error messages, like the example below, that will be shown during cluster 
 Error response from daemon: manifest for rancher/k3s:v1.20.0-k3s5 not found: manifest unknown: manifest unknown
 ```
 
-It will take care of creating a K3d cluster and run the tests on it.
+The script will take care of creating a K3d cluster and then run the tests on the new cluster.
 
 ## Environment variables
 
@@ -99,15 +113,15 @@ In addition to the environment variables for the script,
 the following ones can be defined:
 
 * `PRESERVE_CLUSTER`: true to prevent the script from destroying the kind cluster.
-  Default: `false`.
+  Default: `false`
 * `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
-  the tests. Only useful if specified with `PRESERVE_CLUSTER=true`.
-* `K8S_VERSION`: the version of K8s to run. Default: `v1.21.1`.
-* `KIND_VERSION`: the version of Kind. Defaults to the latest release.
+  the tests. Only useful if specified with `PRESERVE_CLUSTER=true`
+* `K8S_VERSION`: the version of K8s to run. Default: `v1.21.1`
+* `KIND_VERSION`: the version of Kind. Defaults to the latest release
 * `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
-  false to get the image from a registry. Default: `false`.
+  false to get the image from a registry. Default: `false`
 * `LOG_DIR`: the directory where the container logs are exported. Default:
-  `_logs/` directory in the project root.
+  `_logs/` directory in the project root
 
 `run-e2e-kind.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard` while `run-e2e-k3d.sh` forces `E2E_DEFAULT_STORAGE_CLASS=local-path`
 
