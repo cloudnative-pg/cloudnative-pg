@@ -16,10 +16,34 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+func AssertClusterIsReady(namespace string, clusterName string, timeout int, env *tests.TestingEnvironment) {
+	By("having a Cluster with each instance in status ready", func() {
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
+		// Eventually the number of ready instances should be equal to the
+		// amount of instances defined in the cluster
+		cluster := &apiv1.Cluster{}
+		err := env.Client.Get(env.Ctx, namespacedName, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() (int, error) {
+			podList, err := env.GetClusterPodList(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			cluster := &apiv1.Cluster{}
+			err = env.Client.Get(env.Ctx, namespacedName, cluster)
+			readyInstances := utils.CountReadyPods(podList.Items)
+			return readyInstances, err
+		}, timeout).Should(BeEquivalentTo(cluster.Spec.Instances))
+	})
+}
 
 func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout int32) {
 	// Track the start of the assert. We expect to complete before
@@ -57,18 +81,7 @@ func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout
 	})
 
 	By("having all the instances ready", func() {
-		clusterNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		cluster := &apiv1.Cluster{}
-		err := env.Client.Get(env.Ctx, clusterNamespacedName, cluster)
-		Expect(err).NotTo(HaveOccurred())
-		Eventually(func() (int32, error) {
-			cluster := &apiv1.Cluster{}
-			err := env.Client.Get(env.Ctx, clusterNamespacedName, cluster)
-			return cluster.Status.ReadyInstances, err
-		}, timeout).Should(BeEquivalentTo(cluster.Spec.Instances))
+		AssertClusterIsReady(namespace, clusterName, 600, env)
 	})
 
 	By(fmt.Sprintf("restoring full cluster functionality within %v seconds", timeout), func() {

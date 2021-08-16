@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: cluster-replica-src
 spec:
-  instances: 3
+  instances: 1
 
   postgresql:
     parameters:

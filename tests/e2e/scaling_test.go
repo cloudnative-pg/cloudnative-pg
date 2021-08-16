@@ -9,9 +9,6 @@ package e2e
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/types"
-
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -44,15 +41,7 @@ var _ = Describe("Cluster scale up and down", func() {
 			_, _, err := tests.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
 			Expect(err).ToNot(HaveOccurred())
 			timeout := 300
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
-			Eventually(func() (int32, error) {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
-				return cluster.Status.ReadyInstances, err
-			}, timeout).Should(BeEquivalentTo(4))
+			AssertClusterIsReady(namespace, clusterName, timeout, env)
 		})
 
 		// Remove a node from the cluster and verify the cluster has one
@@ -61,15 +50,7 @@ var _ = Describe("Cluster scale up and down", func() {
 			_, _, err := tests.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
 			Expect(err).ToNot(HaveOccurred())
 			timeout := 60
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      clusterName,
-			}
-			Eventually(func() (int32, error) {
-				cluster := &apiv1.Cluster{}
-				err := env.Client.Get(env.Ctx, namespacedName, cluster)
-				return cluster.Status.ReadyInstances, err
-			}, timeout).Should(BeEquivalentTo(3))
+			AssertClusterIsReady(namespace, clusterName, timeout, env)
 		})
 	})
 })
