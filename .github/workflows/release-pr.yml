@@ -27,4 +27,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           pr_body: "Automated PR. Will trigger the ${{ env.TAG }} release when approved."
           pr_label: release
-          pr_title: "Release ${{ env.TAG }}"
+          pr_title: "feat: release ${{ env.TAG }}"
