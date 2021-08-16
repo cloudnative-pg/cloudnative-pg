@@ -33,7 +33,7 @@ metadata:
   name: cluster-example-full
 spec:
   description: "Example of cluster"
-  imageName: quay.io/enterprisedb/postgresql:13.3
+  imageName: quay.io/enterprisedb/postgresql:13.4
   # imagePullSecret is only required if the images are located in a private registry
   # imagePullSecrets:
   #   - name: private_registry_access
