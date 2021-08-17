@@ -17,7 +17,7 @@ spec:
       log_replication_commands: 'on'
     pg_hba:
       - host replication postgres all md5
-      - hostssl app streaming_replica all cert clientcert=1
+      - hostssl app streaming_replica all cert
 
   storage:
     size: 1Gi

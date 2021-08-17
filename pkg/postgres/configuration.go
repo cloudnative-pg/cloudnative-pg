@@ -21,8 +21,8 @@ const (
 local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
-hostssl postgres streaming_replica all cert clientcert=1
-hostssl replication streaming_replica all cert clientcert=1
+hostssl postgres streaming_replica all cert
+hostssl replication streaming_replica all cert
 `
 
 	// hbaFooter is the footer of generated pg_hba.conf.

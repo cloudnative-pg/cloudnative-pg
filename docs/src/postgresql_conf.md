@@ -244,8 +244,8 @@ Fixed rules:
 ```text
 local all all peer
 
-hostssl postgres streaming_replica all cert clientcert=1
-hostssl replication streaming_replica all cert clientcert=1
+hostssl postgres streaming_replica all cert
+hostssl replication streaming_replica all cert
 ```
 
 Default rules:
@@ -259,8 +259,8 @@ The resulting `pg_hba.conf` will look like this:
 ```text
 local all all peer
 
-hostssl postgres streaming_replica all cert clientcert=1
-hostssl replication streaming_replica all cert clientcert=1
+hostssl postgres streaming_replica all cert
+hostssl replication streaming_replica all cert
 
 <user defined rules>
 
