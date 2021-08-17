@@ -246,7 +246,6 @@ clair
 classid
 cli
 clientCASecret
-clientcert
 clusterlist
 clusterspec
 clusterstatus

@@ -89,8 +89,8 @@ PostgreSQL HBA Rules
 local all all peer
 
 # Require client certificate authentication for the streaming_replica user
-hostssl postgres streaming_replica all cert clientcert=1
-hostssl replication streaming_replica all cert clientcert=1
+hostssl postgres streaming_replica all cert
+hostssl replication streaming_replica all cert
 
 # Otherwise use md5 authentication
 host all all all md5
