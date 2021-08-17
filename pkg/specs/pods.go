@@ -112,10 +112,11 @@ func createPostgresContainers(
 ) []corev1.Container {
 	containers := []corev1.Container{
 		{
-			Name:         PostgresContainerName,
-			Image:        cluster.GetImageName(),
-			Env:          createEnvVarPostgresContainer(cluster, podName),
-			VolumeMounts: createPostgresVolumeMounts(cluster),
+			Name:            PostgresContainerName,
+			Image:           cluster.GetImageName(),
+			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
+			Env:             createEnvVarPostgresContainer(cluster, podName),
+			VolumeMounts:    createPostgresVolumeMounts(cluster),
 			ReadinessProbe: &corev1.Probe{
 				TimeoutSeconds: 5,
 				Handler: corev1.Handler{

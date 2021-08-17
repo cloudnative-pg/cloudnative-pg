@@ -66,6 +66,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 						{
 							Name:            "bootstrap-instance",
 							Image:           cluster.GetImageName(),
+							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 							Env:             createEnvVarPostgresContainer(cluster, podName),
 							Command:         initCommand,
 							VolumeMounts:    createPostgresVolumeMounts(cluster),
@@ -124,8 +125,9 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 					},
 					Containers: []corev1.Container{
 						{
-							Name:  "bootstrap-full-recovery",
-							Image: cluster.GetImageName(),
+							Name:            "bootstrap-full-recovery",
+							Image:           cluster.GetImageName(),
+							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 							Env: append(createEnvVarPostgresContainer(cluster, podName),
 								corev1.EnvVar{
 									Name: "AWS_ACCESS_KEY_ID",
@@ -183,9 +185,10 @@ func CreatePrimaryJobViaPgBaseBackup(
 					},
 					Containers: []corev1.Container{
 						{
-							Name:  "bootstrap-pgbasebackup",
-							Image: cluster.GetImageName(),
-							Env:   createEnvVarPostgresContainer(cluster, podName),
+							Name:            "bootstrap-pgbasebackup",
+							Image:           cluster.GetImageName(),
+							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
+							Env:             createEnvVarPostgresContainer(cluster, podName),
 							Command: []string{
 								"/controller/manager",
 								"instance",
@@ -232,9 +235,10 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 					},
 					Containers: []corev1.Container{
 						{
-							Name:  "bootstrap-replica",
-							Image: cluster.GetImageName(),
-							Env:   createEnvVarPostgresContainer(cluster, podName),
+							Name:            "bootstrap-replica",
+							Image:           cluster.GetImageName(),
+							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
+							Env:             createEnvVarPostgresContainer(cluster, podName),
 							Command: []string{
 								"/controller/manager",
 								"instance",

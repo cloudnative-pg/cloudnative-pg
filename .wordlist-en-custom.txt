@@ -82,6 +82,7 @@ Gi
 Golang
 GolangCI
 Grafana
+IfNotPresent
 InfoSec
 JSON
 Jitendra
@@ -136,6 +137,7 @@ PodStatus
 Postgres
 PostgresConfiguration
 PrimaryUpdateStrategy
+PullPolicy
 Quaresima
 QuickStart
 RBAC

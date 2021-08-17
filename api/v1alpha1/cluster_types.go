@@ -21,6 +21,14 @@ type ClusterSpec struct {
 	// Name of the container image
 	ImageName string `json:"imageName,omitempty"`
 
+	// Image pull policy.
+	// One of `Always`, `Never` or `IfNotPresent`.
+	// If not defined, it defaults to `IfNotPresent`.
+	// Cannot be updated.
+	// More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
+	// +optional
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
 	// The UID of the `postgres` user inside the image, defaults to `26`
 	PostgresUID int64 `json:"postgresUID,omitempty"`
 
