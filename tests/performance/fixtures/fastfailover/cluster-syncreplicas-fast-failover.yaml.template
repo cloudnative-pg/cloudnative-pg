@@ -1,0 +1,39 @@
+# Example of PostgreSQL cluster
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-syncreplicas-fast-failover
+spec:
+  instances: 3
+  minSyncReplicas: 1
+  maxSyncReplicas: 2
+
+  postgresql:
+    parameters:
+      log_checkpoints: "on"
+      log_line_prefix: '%m [%p]: u=[%u] db=[%d] app=[%a] c=[%h] s=[%c:%l] tx=[%v:%x] '
+      log_lock_waits: "on"
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
+      # WAL sender timeout default is 60s, but we want this value to be smaller for failover and switchover tests,
+      # so that PostgreSQL can perform its shutdown in a short time
+      wal_sender_timeout: '10s'
+      log_replication_commands: 'on'
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+
+  # Example of rolling update strategy:
+  # - unsupervised: automated update of the primary once all
+  #                 replicas have been upgraded (default)
+  # - supervised: requires manual supervision to perform
+  #               the switchover of the primary
+  primaryUpdateStrategy: unsupervised
+
+  # Require 1Gi of space
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

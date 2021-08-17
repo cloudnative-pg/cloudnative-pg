@@ -21,5 +21,5 @@ spec:
       log_replication_commands: 'on'
 
   storage:
-    storageClass: standard
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1G

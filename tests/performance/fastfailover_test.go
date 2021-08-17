@@ -22,157 +22,21 @@ import (
 )
 
 var _ = Describe("Fast failover", func() {
-	const namespace = "primary-failover-time"
-	const sampleFile = "./fixtures/fastfailover/cluster-fast-failover.yaml"
-	const webTestFile = "./fixtures/fastfailover/webtest.yaml"
-	const webTestJob = "./fixtures/fastfailover/hey-job-webtest.yaml"
-	const clusterName = "cluster-fast-failover"
-	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
-			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+".log")
-		}
-	})
-	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
-	// Confirm that a standby closely following the primary doesn't need more
-	// than 10 seconds to be promoted and be able to start inserting records.
-	// We test this setting up an application pointing to the rw service,
-	// forcing a failover and measuring how much time passes between the
-	// last row written on timeline 1 and the first one on timeline 2
-	It("can do a fast failover", func() {
-		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-		By(fmt.Sprintf("having a %v namespace", namespace), func() {
-			// Creating a namespace should be quick
-			timeout := 20
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      namespace,
-			}
+	const (
+		sampleFile             = "./fixtures/fastfailover/cluster-fast-failover.yaml"
+		sampleFileSyncReplicas = "./fixtures/fastfailover/cluster-syncreplicas-fast-failover.yaml"
+		webTestFile            = "./fixtures/fastfailover/webtest.yaml"
+		webTestSyncReplicas    = "./fixtures/fastfailover/webtest-syncreplicas.yaml"
+		webTestJob             = "./fixtures/fastfailover/hey-job-webtest.yaml"
+	)
+	var (
+		namespace       string
+		clusterName     string
+		maxReattachTime int32 = 60
+		maxFailoverTime int32 = 10
+	)
 
-			Eventually(func() (string, error) {
-				namespaceResource := &corev1.Namespace{}
-				err := env.Client.Get(env.Ctx, namespacedName, namespaceResource)
-				return namespaceResource.GetName(), err
-			}, timeout).Should(BeEquivalentTo(namespace))
-		})
-		By(fmt.Sprintf("creating a Cluster in the %v namespace",
-			namespace), func() {
-			_, _, err := tests.Run(
-				"kubectl create -n " + namespace + " -f " + sampleFile)
-			Expect(err).ToNot(HaveOccurred())
-		})
-		By("having a Cluster with three instances ready", func() {
-			AssertClusterIsReady(namespace, clusterName, 600, env)
-		})
-		// Node 1 should be the primary, so the -rw service should
-		// point there. We verify this.
-		By("having the current primary on node1", func() {
-			endpointName := clusterName + "-rw"
-			endpoint := &corev1.Endpoints{}
-			endpointNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      endpointName,
-			}
-			podName := clusterName + "-1"
-			pod := &corev1.Pod{}
-			podNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      podName,
-			}
-			err := env.Client.Get(env.Ctx, endpointNamespacedName,
-				endpoint)
-			Expect(err).ToNot(HaveOccurred())
-			err = env.Client.Get(env.Ctx, podNamespacedName, pod)
-			Expect(tests.FirstEndpointIP(endpoint), err).To(
-				BeEquivalentTo(pod.Status.PodIP))
-		})
-		By("preparing the db for the test scenario", func() {
-			// Create the table used by the scenario
-			query := "CREATE SCHEMA tps; " +
-				"CREATE TABLE tps.tl ( " +
-				"id BIGSERIAL" +
-				", timeline TEXT DEFAULT (substring(pg_walfile_name(" +
-				"    pg_current_wal_lsn()), 1, 8))" +
-				", t timestamp DEFAULT (clock_timestamp() AT TIME ZONE 'UTC')" +
-				", source text NOT NULL" +
-				", PRIMARY KEY (id)" +
-				")"
-
-			commandTimeout := time.Second * 5
-			primaryPodName := clusterName + "-1"
-			primaryPod := &corev1.Pod{}
-			primaryPodNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      primaryPodName,
-			}
-			err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
-			Expect(err).ToNot(HaveOccurred())
-			_, _, err = env.ExecCommand(env.Ctx, *primaryPod, "postgres",
-				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-			Expect(err).ToNot(HaveOccurred())
-		})
-		By("starting load", func() {
-			// We set up hey and webtest. Hey, a load generator,
-			// continuously calls the webtest api to execute inserts
-			// on the postgres primary. We make sure that the first
-			// records appear on the database before moving to the next
-			// step.
-
-			_, _, err := tests.Run("kubectl create -n " + namespace +
-				" -f " + webTestFile)
-			Expect(err).ToNot(HaveOccurred())
-			_, _, err = tests.Run("kubectl create -n " + namespace +
-				" -f " + webTestJob)
-			Expect(err).ToNot(HaveOccurred())
-
-			commandTimeout := time.Second * 2
-			timeout := 60
-			primaryPodName := clusterName + "-1"
-			primaryPodNamespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      primaryPodName,
-			}
-			Eventually(func() (string, error) {
-				primaryPod := &corev1.Pod{}
-				err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
-				out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, "postgres",
-					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
-					"SELECT count(*) > 0 FROM tps.tl")
-				return strings.TrimSpace(out), err
-			}, timeout).Should(BeEquivalentTo("t"))
-		})
-		By("deleting the primary", func() {
-			// The primary is force-deleted.
-			zero := int64(0)
-			forceDelete := &ctrlclient.DeleteOptions{
-				GracePeriodSeconds: &zero,
-			}
-			lm := clusterName + "-1"
-			err := env.DeletePod(namespace, lm, forceDelete)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		var maxReattachTime int32 = 60
-		var maxFailoverTime int32 = 10
-
-		// GKE has an higher kube-proxy timeout, and the connections could try
-		// using a service for which the routing table hasn't changed, getting
-		// stuck for a while. We raise the timeout, since we can't intervene
-		// on GKE configuration.
-		isGKE, err := env.IsGKE()
-		if err != nil {
-			fmt.Println("Couldn't verify if tests are running on GKE, assuming they aren't")
-		}
-		if isGKE {
-			maxReattachTime = 180
-			maxFailoverTime = 20
-		}
-
+	BeforeEach(func() {
 		// Sometimes on AKS the promotion itself takes more than 10 seconds.
 		// Nothing to be done operator side, we raise the timeout to avoid
 		// failures in the test.
@@ -180,12 +44,194 @@ var _ = Describe("Fast failover", func() {
 		if err != nil {
 			fmt.Println("Couldn't verify if tests are running on AKS, assuming they aren't")
 		}
+
 		if isAKS {
 			maxFailoverTime = 30
 		}
 
-		AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
+		// GKE has a higher kube-proxy timeout, and the connections could try
+		// using a service, for which the routing table hasn't changed, getting
+		// stuck for a while.
+		// We raise the timeout, since we can't intervene on GKE configuration.
+		isGKE, err := env.IsGKE()
+		if err != nil {
+			fmt.Println("Couldn't verify if tests are running on GKE, assuming they aren't")
+		}
 
-		AssertWritesResumedBeforeTimeout(namespace, clusterName, maxFailoverTime)
+		if isGKE {
+			maxReattachTime = 180
+			maxFailoverTime = 20
+		}
+	})
+
+	JustAfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentGinkgoTestDescription().FullTestText+".log")
+		}
+	})
+
+	AfterEach(func() {
+		err := env.DeleteNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	Context("with async replicas cluster", func() {
+		// Confirm that a standby closely following the primary doesn't need more
+		// than 10 seconds to be promoted and be able to start inserting records.
+		// We test this setting up an application pointing to the rw service,
+		// forcing a failover and measuring how much time passes between the
+		// last row written on timeline 1 and the first one on timeline 2.
+		It("can do a fast failover", func() {
+			namespace = "primary-failover-time"
+			clusterName = "cluster-fast-failover"
+			AssertFastFailOver(namespace, sampleFile, clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
+		})
+	})
+
+	Context("with sync replicas cluster", func() {
+		It("can do a fast failover", func() {
+			namespace = "primary-failover-time-sync-replicas"
+			clusterName = "cluster-syncreplicas-fast-failover"
+			AssertFastFailOver(
+				namespace, sampleFileSyncReplicas, clusterName, webTestSyncReplicas, webTestJob, maxReattachTime, maxFailoverTime)
+		})
 	})
 })
+
+func AssertFastFailOver(
+	namespace,
+	sampleFile,
+	clusterName,
+	webTestFile,
+	webTestJob string,
+	maxReattachTime,
+	maxFailoverTime int32) {
+	// Create a cluster in a namespace we'll delete after the test
+	err := env.CreateNamespace(namespace)
+	Expect(err).ToNot(HaveOccurred())
+
+	By(fmt.Sprintf("having a %v namespace", namespace), func() {
+		// Creating a namespace should be quick
+		timeout := 20
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      namespace,
+		}
+
+		Eventually(func() (string, error) {
+			namespaceResource := &corev1.Namespace{}
+			err = env.Client.Get(env.Ctx, namespacedName, namespaceResource)
+			return namespaceResource.GetName(), err
+		}, timeout).Should(BeEquivalentTo(namespace))
+	})
+
+	By(fmt.Sprintf("creating a Cluster in the %v namespace",
+		namespace), func() {
+		_, _, err = tests.Run(
+			"kubectl create -n " + namespace + " -f " + sampleFile)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By("having a Cluster with three instances ready", func() {
+		AssertClusterIsReady(namespace, clusterName, 600, env)
+	})
+
+	// Node 1 should be the primary, so the -rw service should
+	// point there. We verify this.
+	By("having the current primary on node1", func() {
+		endpointName := clusterName + "-rw"
+		endpoint := &corev1.Endpoints{}
+		endpointNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      endpointName,
+		}
+		podName := clusterName + "-1"
+		pod := &corev1.Pod{}
+		podNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      podName,
+		}
+		err = env.Client.Get(env.Ctx, endpointNamespacedName,
+			endpoint)
+		Expect(err).ToNot(HaveOccurred())
+		err = env.Client.Get(env.Ctx, podNamespacedName, pod)
+		Expect(tests.FirstEndpointIP(endpoint), err).To(
+			BeEquivalentTo(pod.Status.PodIP))
+	})
+
+	By("preparing the db for the test scenario", func() {
+		// Create the table used by the scenario
+		query := "CREATE SCHEMA tps; " +
+			"CREATE TABLE tps.tl ( " +
+			"id BIGSERIAL" +
+			", timeline TEXT DEFAULT (substring(pg_walfile_name(" +
+			"    pg_current_wal_lsn()), 1, 8))" +
+			", t timestamp DEFAULT (clock_timestamp() AT TIME ZONE 'UTC')" +
+			", source text NOT NULL" +
+			", PRIMARY KEY (id)" +
+			")"
+
+		commandTimeout := time.Second * 5
+		primaryPodName := clusterName + "-1"
+		primaryPod := &corev1.Pod{}
+		primaryPodNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      primaryPodName,
+		}
+
+		err = env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
+		Expect(err).ToNot(HaveOccurred())
+		_, _, err = env.ExecCommand(env.Ctx, *primaryPod, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By("starting load", func() {
+		// We set up hey and webtest. Hey, a load generator,
+		// continuously calls the webtest api to execute inserts
+		// on the postgres primary. We make sure that the first
+		// records appear on the database before moving to the next
+		// step.
+		_, _, err = tests.Run("kubectl create -n " + namespace +
+			" -f " + webTestFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		_, _, err = tests.Run("kubectl create -n " + namespace +
+			" -f " + webTestJob)
+		Expect(err).ToNot(HaveOccurred())
+
+		commandTimeout := time.Second * 2
+		timeout := 60
+		primaryPodName := clusterName + "-1"
+		primaryPodNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      primaryPodName,
+		}
+
+		Eventually(func() (string, error) {
+			primaryPod := &corev1.Pod{}
+			err = env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
+			out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, "postgres",
+				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
+				"SELECT count(*) > 0 FROM tps.tl")
+			return strings.TrimSpace(out), err
+		}, timeout).Should(BeEquivalentTo("t"))
+	})
+
+	By("deleting the primary", func() {
+		// The primary is force-deleted.
+		zero := int64(0)
+		forceDelete := &ctrlclient.DeleteOptions{
+			GracePeriodSeconds: &zero,
+		}
+		lm := clusterName + "-1"
+		err = env.DeletePod(namespace, lm, forceDelete)
+
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
+
+	AssertWritesResumedBeforeTimeout(namespace, clusterName, maxFailoverTime)
+}
