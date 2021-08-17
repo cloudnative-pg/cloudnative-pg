@@ -120,6 +120,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 	allErrs = append(allErrs, r.validateBootstrapMethod()...)
 	allErrs = append(allErrs, r.validateStorageConfiguration()...)
 	allErrs = append(allErrs, r.validateImageName()...)
+	allErrs = append(allErrs, r.validateImagePullPolicy()...)
 	allErrs = append(allErrs, r.validateRecoveryTarget()...)
 	allErrs = append(allErrs, r.validatePrimaryUpdateStrategy()...)
 	allErrs = append(allErrs, r.validateMinSyncReplicas()...)
@@ -354,7 +355,7 @@ func (r *Cluster) validateStorageConfiguration() field.ErrorList {
 	return result
 }
 
-// validateImageName validate the image name ensuring we aren't
+// validateImageName validates the image name ensuring we aren't
 // using the "latest" tag
 func (r *Cluster) validateImageName() field.ErrorList {
 	var result field.ErrorList
@@ -391,8 +392,26 @@ func (r *Cluster) validateImageName() field.ErrorList {
 					"invalid version tag"))
 		}
 	}
-
 	return result
+}
+
+// validateImagePullPolicy validates the image pull policy,
+// ensuring it is one of "Always", "Never" or "IfNotPresent" when defined
+func (r *Cluster) validateImagePullPolicy() field.ErrorList {
+	var result field.ErrorList
+
+	switch r.Spec.ImagePullPolicy {
+	case v1.PullAlways, v1.PullNever, v1.PullIfNotPresent, "":
+		return result
+	default:
+		return append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "imagePullPolicy"),
+				r.Spec.ImagePullPolicy,
+				fmt.Sprintf("invalid imagePullPolicy, if defined must be one of '%s', '%s' or '%s'",
+					v1.PullAlways, v1.PullNever, v1.PullIfNotPresent)))
+	}
 }
 
 // validateConfigurationChange determine whether a PostgreSQL configuration

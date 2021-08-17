@@ -17,8 +17,9 @@ import (
 // executable inside the generated Pods
 func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 	container := corev1.Container{
-		Name:  BootstrapControllerContainerName,
-		Image: configuration.Current.OperatorImageName,
+		Name:            BootstrapControllerContainerName,
+		Image:           configuration.Current.OperatorImageName,
+		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Command: []string{
 			"/manager",
 			"bootstrap",

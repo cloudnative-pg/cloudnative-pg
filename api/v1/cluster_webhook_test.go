@@ -224,6 +224,29 @@ var _ = Describe("cluster configuration", func() {
 	})
 })
 
+var _ = Describe("ImagePullPolicy validation", func() {
+	It("complains if the imagePullPolicy isn't valid", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImagePullPolicy: "wrong",
+			},
+		}
+
+		result := cluster.validateImagePullPolicy()
+		Expect(len(result)).To(Equal(1))
+	})
+	It("does not complain if the imagePullPolicy is valid", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImagePullPolicy: "Always",
+			},
+		}
+
+		result := cluster.validateImagePullPolicy()
+		Expect(len(result)).To(Equal(0))
+	})
+})
+
 var _ = Describe("Storage validation", func() {
 	It("complains if the value isn't correct", func() {
 		cluster := Cluster{

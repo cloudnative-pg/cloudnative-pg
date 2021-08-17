@@ -22,6 +22,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 	// spec
 	dst.Spec.Description = src.Spec.Description
 	dst.Spec.ImageName = src.Spec.ImageName
+	dst.Spec.ImagePullPolicy = src.Spec.ImagePullPolicy
 	dst.Spec.PostgresUID = src.Spec.PostgresUID
 	dst.Spec.PostgresGID = src.Spec.PostgresGID
 	dst.Spec.Instances = src.Spec.Instances
@@ -288,6 +289,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	// spec
 	dst.Spec.Description = src.Spec.Description
 	dst.Spec.ImageName = src.Spec.ImageName
+	dst.Spec.ImagePullPolicy = src.Spec.ImagePullPolicy
 	dst.Spec.PostgresUID = src.Spec.PostgresUID
 	dst.Spec.PostgresGID = src.Spec.PostgresGID
 	dst.Spec.Instances = src.Spec.Instances

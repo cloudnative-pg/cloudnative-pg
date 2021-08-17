@@ -1131,6 +1131,11 @@ spec:
                 description: Name of the container image, supporting both tags (`<image>:<tag>`)
                   and digests for deterministic and repeatable deployments (`<image>:<tag>@sha256:<digestValue>`)
                 type: string
+              imagePullPolicy:
+                description: 'Image pull policy. One of `Always`, `Never` or `IfNotPresent`.
+                  If not defined, it defaults to `IfNotPresent`. Cannot be updated.
+                  More info: https://kubernetes.io/docs/concepts/containers/images#updating-images'
+                type: string
               imagePullSecrets:
                 description: The list of pull secrets to be used to pull the images
                 items:
@@ -2746,6 +2751,11 @@ spec:
                 type: array
               imageName:
                 description: Name of the container image
+                type: string
+              imagePullPolicy:
+                description: 'Image pull policy. One of `Always`, `Never` or `IfNotPresent`.
+                  If not defined, it defaults to `IfNotPresent`. Cannot be updated.
+                  More info: https://kubernetes.io/docs/concepts/containers/images#updating-images'
                 type: string
               imagePullSecrets:
                 description: The list of pull secrets to be used to pull the images
