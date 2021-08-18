@@ -176,7 +176,7 @@ var _ = Describe("Synchronous Replicas", func() {
 			Eventually(func() string {
 				out, _, err := tests.Run(
 					fmt.Sprintf("kubectl exec -n %v %v-1 -c postgres -- "+
-						"psql -tAc \"select setting from pg_settings where name = 'synchronous_standby_names'\"",
+						"psql -U postgres -tAc \"select setting from pg_settings where name = 'synchronous_standby_names'\"",
 						namespace, clusterName))
 				if err != nil {
 					return ""
