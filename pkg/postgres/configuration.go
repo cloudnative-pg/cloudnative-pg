@@ -99,6 +99,9 @@ host all all all md5
 
 	// SharedPreloadLibraries shared preload libraries key in the config
 	SharedPreloadLibraries = "shared_preload_libraries"
+
+	// SynchronousStandbyNames is the postgresql parameter key for synchronous standbys
+	SynchronousStandbyNames = "synchronous_standby_names"
 )
 
 // MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
@@ -496,7 +499,7 @@ func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConf
 		for idx, name := range info.Replicas {
 			escapedReplicas[idx] = escapePostgresConfLiteral(name)
 		}
-		configuration.OverwriteConfig("synchronous_standby_names", fmt.Sprintf(
+		configuration.OverwriteConfig(SynchronousStandbyNames, fmt.Sprintf(
 			"ANY %v (%v)",
 			info.SyncReplicas,
 			strings.Join(escapedReplicas, ",")))
