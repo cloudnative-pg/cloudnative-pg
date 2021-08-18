@@ -8,17 +8,24 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package metrics
 
 import (
+	"database/sql"
+	"fmt"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	postgresconf "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // PrometheusNamespace is the namespace to be used for all custom metrics exposed by instances
 // or the operator
 const PrometheusNamespace = "cnp"
+
+var synchronousStandbyNamesRegex = regexp.MustCompile(`ANY ([0-9]+) \(.*\)`)
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
@@ -36,6 +43,7 @@ type metrics struct {
 	PostgreSQLUp       prometheus.Gauge
 	CollectionDuration *prometheus.GaugeVec
 	SwitchoverRequired prometheus.Gauge
+	SyncReplicas       *prometheus.GaugeVec
 }
 
 // NewExporter creates an exporter
@@ -86,6 +94,12 @@ func newMetrics() *metrics {
 			Name:      "manual_switchover_required",
 			Help:      "1 if a manual switchover is required, 0 otherwise",
 		}),
+		SyncReplicas: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "sync_replicas",
+			Help:      "number of requested synchronous replicas (synchronous_standby_names)",
+		}, []string{"value"}),
 	}
 }
 
@@ -97,6 +111,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.Metrics.PostgreSQLUp.Desc()
 	ch <- e.Metrics.SwitchoverRequired.Desc()
 	e.Metrics.CollectionDuration.Describe(ch)
+	e.Metrics.SyncReplicas.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -114,6 +129,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ch <- e.Metrics.PostgreSQLUp
 	ch <- e.Metrics.SwitchoverRequired
 	e.Metrics.CollectionDuration.Collect(ch)
+	e.Metrics.SyncReplicas.Collect(ch)
 }
 
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
@@ -150,6 +166,37 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		}
 		e.Metrics.CollectionDuration.WithLabelValues(label).Set(time.Since(collectionStart).Seconds())
 	}
+
+	isPrimary, err := e.instance.IsPrimary()
+	if err != nil {
+		log.Log.Error(err, "unable to get if primary")
+	}
+
+	if isPrimary {
+		// getting required synchronous standby number from postgres itself
+		nStandbys, err := getSynchronousStandbysNumber(db)
+		if err != nil {
+			log.Log.Error(err, "unable to collect metrics")
+			e.Metrics.Error.Set(1)
+			e.Metrics.PgCollectionErrors.WithLabelValues("Collect.SynchronousStandbys").Inc()
+			e.Metrics.SyncReplicas.WithLabelValues("observed").Set(-1)
+		} else {
+			e.Metrics.SyncReplicas.WithLabelValues("observed").Set(float64(nStandbys))
+		}
+	}
+}
+
+func getSynchronousStandbysNumber(db *sql.DB) (int, error) {
+	var syncReplicasFromConfig string
+	err := db.QueryRow(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).
+		Scan(&syncReplicasFromConfig)
+	if err != nil || syncReplicasFromConfig == "" {
+		return 0, err
+	}
+	if !synchronousStandbyNamesRegex.Match([]byte(syncReplicasFromConfig)) {
+		return 0, fmt.Errorf("not matching synchronous standby names regex: %s", syncReplicasFromConfig)
+	}
+	return strconv.Atoi(synchronousStandbyNamesRegex.FindStringSubmatch(syncReplicasFromConfig)[1])
 }
 
 // PgCollector is the interface for all the collectors that need to do queries
