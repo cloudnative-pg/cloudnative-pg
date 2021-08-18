@@ -59,6 +59,16 @@ var _ = Describe("InitDB settings", func() {
 					cmd))
 				Expect(err).ToNot(HaveOccurred())
 			})
+			By("checking inside the database the default locale", func() {
+				cmd := "psql -U postgres postgres -tAc \"select datcollate from pg_database where datname='template0'\""
+				stdout, _, err := tests.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primaryDst,
+					cmd))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(stdout, err).To(Equal("C\n"))
+			})
 		})
 	})
 
@@ -97,7 +107,7 @@ var _ = Describe("InitDB settings", func() {
 					primaryDst,
 					cmd))
 				Expect(err).ToNot(HaveOccurred())
-				Expect(stdout, err).To(Equal("en_ZA.utf8\n"))
+				Expect(stdout, err).To(Equal("en_US.utf8\n"))
 			})
 		})
 	})
