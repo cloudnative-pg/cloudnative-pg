@@ -6,7 +6,7 @@ that are analyzed at 3 different layers: Code, Container and Cluster.
 !!! Warning
     The information contained in this page must not exonerate you from
     performing regular InfoSec duties on your Kubernetes cluster. Please
-    familiarize with the ["Overview of Cloud Native Security"](https://kubernetes.io/docs/concepts/security/overview/)
+    familiarize yourself with the ["Overview of Cloud Native Security"](https://kubernetes.io/docs/concepts/security/overview/)
     page from the Kubernetes documentation.
 
 !!! Seealso "About the 4C's Security Model"
@@ -60,7 +60,7 @@ The following guidelines and frameworks have been taken into account for contain
 !!! Seealso "About the Container level security"
     Please refer to ["Security and Containers in Cloud Native PostgreSQL"](https://www.enterprisedb.com/blog/security-and-containers-cloud-native-postgresql)
     blog article for more information about the approach that EDB has taken on
-    security at container level in Cloud Native PostgreSQL.
+    security at the container level in Cloud Native PostgreSQL.
 
 ## Cluster
 

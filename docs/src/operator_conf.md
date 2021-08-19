@@ -9,7 +9,7 @@ to change the default behavior, such as:
   by the operator and that are set in the cluster resource
 - defining a different default image for PostgreSQL or an additional pull secret
 
-By the default, the operator is installed in the `postgresql-operator-system`
+By default, the operator is installed in the `postgresql-operator-system`
 namespace as a Kubernetes `Deployment` called `postgresql-operator-controller-manager`.
 
 !!! Note
@@ -102,7 +102,7 @@ kubectl delete pods -n [NAMESPACE_NAME_HERE] \
 
 !!! Warning
     Customizations will be applied only to `Cluster` resources created
-    after the reload of the operator deployment. 
+    after the reload of the operator deployment.
 
 Following the above example, if the `Cluster` definition contains a `categories`
 annotation and any of the `environment`, `workload`, or `app` labels, these will

@@ -87,7 +87,7 @@ and use them in the PostgreSQL cluster - as described in the above example.
 The supplied secrets must comply with the specifications of the
 [`kubernetes.io/basic-auth` type](https://kubernetes.io/docs/concepts/configuration/secret/#basic-authentication-secret).
 The operator will only use the `password` field of the secret,
-ignoring the `username` one. If you plan to reuse the secret for application
+ignoring the `username` field. If you plan to reuse the secret for application
 connections, you can set the `username` field to the same value as the `owner`.
 
 The following is an example of a `basic-auth` secret:
@@ -259,7 +259,7 @@ spec:
         targetTime: "2020-11-26 15:22:00.00000+00"
 ```
 
-Beside `targetTime`, you can use the following criteria to stop the recovery:
+Besides `targetTime`, you can use the following criteria to stop the recovery:
 
 - `targetXID` specify a transaction ID up to which recovery will proceed
 

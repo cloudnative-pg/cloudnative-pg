@@ -5,13 +5,13 @@
     page for more details on how Cloud Native PostgreSQL supports TLS certificates.
 
 The Cloud Native PostgreSQL operator has been designed to work with TLS/SSL for both encryption in transit and
-authentication, on server and client sides. Clusters created using the CNP operator come with a Certification
+authentication, on server and client sides. Clusters created using the CNP operator comes with a Certification
 Authority (CA) to create and sign TLS client certificates. Through the `cnp` plugin for `kubectl` you can
 issue a new TLS client certificate which can be used to authenticate a user instead of using passwords.
 
 Please refer to the following steps to authenticate via TLS/SSL certificates, which assume you have
 installed a cluster using the [cluster-example.yaml](samples/cluster-example.yaml) deployment manifest.
-According to the convention over configuration paradigm, that file automatically creates a `app` database
+According to the convention over configuration paradigm, that file automatically creates an `app` database
 which is owned by a user called `app` (you can change this convention through the `initdb` configuration
 in the `bootstrap` section).
 
@@ -121,8 +121,8 @@ spec:
 
 This Pod will mount secrets managed by the Cloud Native PostgreSQL operator, including:
 
-* `sslcert`: the TLS client public certificate 
-* `sslkey`: the TLS client certificate private key 
+* `sslcert`: the TLS client public certificate
+* `sslkey`: the TLS client certificate private key
 * `sslrootcert`: the TLS Certification Authority certificate, that signed the certificate on
   the server to be used to verify the identity of the instances
 

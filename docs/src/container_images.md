@@ -17,7 +17,7 @@ with the following requirements:
     - `barman-cloud-restore`
     - `barman-cloud-backup-list`
 - PGAudit extension installed (optional - only if PGAudit is required
-  in the actual deployed clusters)
+  in the deployed clusters)
 - Sensible locale settings
 
 No entry point and/or command is required in the image definition, as Cloud

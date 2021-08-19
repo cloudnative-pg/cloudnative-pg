@@ -1,16 +1,16 @@
 # Replication
 
 Physical replication is one of the strengths of PostgreSQL and one of the
-reasons why some of the world's largest organizations in the world have chosen 
+reasons why some of the world's largest organizations in the world have chosen
 it for the management of their data in business continuity contexts.
-Primarily used to achieve high availability, physical replication also allows 
-scale-out of read-only workloads and offloading some work from the primary. 
+Primarily used to achieve high availability, physical replication also allows
+scale-out of read-only workloads and offloading some work from the primary.
 
 ## Application-level replication
 
-Having contributed throughout the years to the replication feature in PostgreSQL, 
-we have decided to build high availability in Cloud Native PostgreSQL on top of 
-the native physical replication technology and integrate it 
+Having contributed throughout the years to the replication feature in PostgreSQL,
+we have decided to build high availability in Cloud Native PostgreSQL on top of
+the native physical replication technology and integrate it
 directly in the Kubernetes API.
 
 In Kubernetes terms, this is referred to as **application-level replication**, in
@@ -19,7 +19,7 @@ contrast with *storage-level replication*.
 ## A very mature technology
 
 PostgreSQL has a very robust and mature native framework for replicating data
-from the primary instance to one or more replicas which is built around the
+from the primary instance to one or more replicas, built around the
 concept of transactional changes continuously stored in the WAL (Write Ahead Log).
 
 Started as the evolution of crash recovery and point in time recovery
@@ -28,7 +28,7 @@ technologies, physical replication was first introduced in PostgreSQL 8.2
 continuous recovery.
 
 PostgreSQL 9.0 (2010) enhanced it with WAL streaming and read-only replicas via
-*hot standby*, while 9.1 (2011) introduced synchronous replication at
+*hot standby*, while 9.1 (2011) introduced synchronous replication at the
 transaction level (for RPO=0 clusters). Cascading replication was released with
 PostgreSQL 9.2 (2012). The foundations of logical replication were laid in
 PostgreSQL 9.4, while version 10 (2017) introduced native support for the
@@ -122,4 +122,3 @@ requested number of synchronous standbys in the list*.
     synchronous replication settings, our recommendation is to plan for
     synchronous replication only in clusters with 3+ instances or,
     more generally, when `maxSyncReplicas < (instances - 1)`.
-

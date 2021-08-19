@@ -58,7 +58,7 @@ Briefly, `cnp-bench` is designed to operate at two levels:
     (when we don't have the luxury anymore to run this kind of tests). Databases indeed
     change and evolve over time, so does the distribution of data, potentially affecting
     performance: knowing the theoretical maximum throughput of sequential reads or
-    writes will turn out to be extremely useful in those situations. Especially in 
+    writes will turn out to be extremely useful in those situations. Especially in
     shared-nothing contexts, where results do not vary due to the influence of external workloads.
     **Know your system, benchmark it.**
 
@@ -85,7 +85,7 @@ spec:
 
 Using the previous configuration, the generated PVCs will be satisfied by the default storage
 class. If the target Kubernetes cluster has no default storage class, or even if you need your PVCs
-to satisfied by a known storage class, you can set it into the custom resource:
+to be satisfied by a known storage class, you can set it into the custom resource:
 
 ```yaml
 apiVersion: postgresql.k8s.enterprisedb.io/v1
@@ -168,7 +168,7 @@ cluster-example-2   1/1     Running   0          2m22s
 cluster-example-3   1/1     Running   0          2m10s
 ```
 
-An Azure disk can only be expanded while in "unattached" state, as described in the 
+An Azure disk can only be expanded while in "unattached" state, as described in the
 [docs](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/known-issues/sizegrow.md).  <!-- wokeignore:rule=master -->
 This means, that to resize a disk used by a PostgresSQL cluster, you will need to perform a manual rollout,
 first cordoning the node that hosts the Pod using the PVC bound to the disk. This will prevent the Operator
@@ -237,8 +237,8 @@ kubectl get pvc cluster-example-3 -o=jsonpath='{.status.capacity.storage}'
 So, you can repeat these steps for the remaining Pods.
 
 !!! Important
-    Please leave the resizing of the disk associated with the primary instance as last disk, 
-    after promoting through a switchover a new resized Pod, using `kubectl cnp promote` 
+    Please leave the resizing of the disk associated with the primary instance as last disk,
+    after promoting through a switchover a new resized Pod, using `kubectl cnp promote`
     (e.g. `kubectl cnp promote cluster-example 3` to promote `cluster-example-3` to primary).
 
 ### Recreating storage

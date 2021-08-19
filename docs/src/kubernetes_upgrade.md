@@ -25,7 +25,7 @@ at a time by:
 3. re-joining the node to the cluster (`uncordon`)
 
 The above process requires workloads to be either stopped for the
-entire duration of the upgrade or migrated on another node.
+entire duration of the upgrade or migrated to another node.
 
 While the latest case is the expected one in terms of service
 reliability and self-healing capabilities of Kubernetes, there can

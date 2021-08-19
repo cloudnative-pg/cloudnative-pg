@@ -133,7 +133,7 @@ users need to complete the rolling update by manually promoting a new instance
 through the `cnp` plugin for `kubectl`.
 
 !!! Seealso "Rolling updates"
-    This process is discussed in-depth in the [Rolling Updates](rolling_update.md) page.
+    This process is discussed in-depth on the [Rolling Updates](rolling_update.md) page.
 
 !!! Important
     In case `primaryUpdateStrategy` is set to the default value of `unsupervised`,
@@ -143,18 +143,18 @@ through the `cnp` plugin for `kubectl`.
 ### Compatibility among versions
 
 We strive to maintain compatibility between different operator versions, but in
-some cases this might not be possible.
+some cases, this might not be possible.
 Every version of the operator is compatible with the previous one, unless
 [release notes](release_notes.md) state the opposite.
 The release notes page indeed contains a detailed list of the changes introduced
 in every released version of the Cloud Native PostgreSQL Operator, and it must
 be read before upgrading to a newer version of the software.
 
-Most versions are directly upgradable and in that case applying the newer
+Most versions are directly upgradable and in that case, applying the newer
 manifest for plain Kubernetes installations or using the native package
 manager of the chosen distribution is enough.
 
-When versions are not directly upgradable, the old version need to be
+When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself. Please consult the release notes for
 detailed information on how to upgrade to any released version.
@@ -177,7 +177,7 @@ kubectl delete deployments \
 
 !!! Warning
     Remember to install the new version of the operator after having performed
-    the above command. Otherwise, your PostgreSQL clusters will keep running 
+    the above command. Otherwise, your PostgreSQL clusters will keep running
     without an operator and, as such, without any self-healing and high-availability
     capabilities.
 
