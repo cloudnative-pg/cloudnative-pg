@@ -65,10 +65,10 @@ All you need to do is add the required `pgaudit` parameters to the `postgresql`
 section in the configuration of the cluster.
 
 !!! Important
-    It is unnecessary to add the PGAudit library to `shared_preload_libraries`. 
-    The library will be added automatically by Cloud Native PostgreSQL based on the        
-    presence of `pgaudit.*` parameters in the postgresql configuration. 
-    The operator will detect and manage the addition and removal of the 
+    It is unnecessary to add the PGAudit library to `shared_preload_libraries`.
+    The library will be added automatically by Cloud Native PostgreSQL based on the
+    presence of `pgaudit.*` parameters in the postgresql configuration.
+    The operator will detect and manage the addition and removal of the
     library from `shared_preload_libraries`.
 
 The operator also takes care of creating and removing the extension from all

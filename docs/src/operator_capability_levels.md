@@ -425,7 +425,7 @@ PostgreSQL that can be integrated and adapted to your context.
 
 ### Standard output logging of PostgreSQL error messages in JSON format
 
-Every log message is delivered to standard output in JSON format, with first level
+Every log message is delivered to standard output in JSON format, with the first level
 definition of the timestamp, the log level and the type of log entry, such as
 `postgres` for the canonical PostgreSQL error message channel.
 As a result, every Pod managed by Cloud Native PostgreSQL can be easily and directly
@@ -434,7 +434,7 @@ data type.
 
 ### Real-time query monitoring
 
-Cloud Native PostgreSQL transparently and natively manages support for:
+Cloud Native PostgreSQL transparently and natively supports:
 
 - the essential [`pg_stat_statements` extension](https://www.postgresql.org/docs/current/pgstatstatements.html),
   which enables tracking of planning and execution statistics of all SQL
@@ -461,7 +461,7 @@ the `kubectl describe` and `kubectl get events` command.
 ## Level 5 - Auto Pilot
 
 Capability level 5 is focused on **automated scaling**, **healing** and
-**tuning** - through the discovery of anomalies and insights emerged
+**tuning** - through the discovery of anomalies and insights that emerged
 from the observability layer.
 
 ### Automated Failover for self-healing

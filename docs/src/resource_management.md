@@ -44,7 +44,7 @@ while creating a cluster:
 
 -  Specify your required values for memory and CPU in the resources section of the manifest file.
    This way, you can avoid the `OOM Killed` (where "OOM" stands for Out Of Memory) and `CPU throttle` or any other
-   resources related issues on running instances.
+   resource-related issues on running instances.
 -  For your cluster's pods to get assigned to the "Guaranteed" QoS class, you must set limits and requests
    for both memory and CPU to the same value.
 -  Specify your required PostgreSQL memory parameters consistently with the pod resources (as you would do

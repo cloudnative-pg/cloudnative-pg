@@ -94,7 +94,7 @@ The `customQueriesConfigMap`/`customQueriesSecret` sections contain a list of
 Take care that the referred resources have to be created **in the same namespace as the Cluster** resource.
 
 !!! Note
-    If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can 
+    If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
     add a label with key `k8s.enterprisedb.io/reload` to it, otherwise you will have to reload
     the instances using the `kubectl cnp reload` subcommand.
 
@@ -144,7 +144,7 @@ the pattern according to [path.Match()](https://pkg.go.dev/path#Match) rules.
     The `*` character has a [special meaning](https://yaml.org/spec/1.2/spec.html#id2786448) in yaml,
     so you need to quote (`"*"`) the `target_databases` value when it includes such a pattern.
 
-It is recommended that you always include the name of the database 
+It is recommended that you always include the name of the database
 in the returned labels, for example using the `current_database()` function
 as in the following example:
 
@@ -247,7 +247,7 @@ The possible values for `usage` are:
 | `GAUGE`             | use this column as a gauge                               |
 | `MAPPEDMETRIC`      | use this column with the supplied mapping of text values |
 | `DURATION`          | use this column as a text duration (in milliseconds)     |
-| `HISTOGRAM`         | use this column as an histogram                          |
+| `HISTOGRAM`         | use this column as a histogram                          |
 
 
 Please visit the ["Metric Types" page](https://prometheus.io/docs/concepts/metric_types/)

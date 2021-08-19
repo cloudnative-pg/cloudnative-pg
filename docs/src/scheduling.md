@@ -6,7 +6,7 @@ the best node possible, based on several criteria.
 !!! Seealso "Kubernetes documentation"
     Please refer to the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/)
-    for more information on scheduling, including all the available policies. In
+    for more information on scheduling, including all the available policies. On
     this page we assume you are familiar with concepts like affinity,
     anti-affinity, node selectors, and so on.
 
@@ -83,7 +83,7 @@ available (which is an expected condition when using
 for automated horizontal scaling of a Kubernetes cluster).
 
 !!! Seealso "Inter-pod affinity and anti-affinity"
-    More information on this topic in the
+    More information on this topic is in the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity).
 
 Another possible value for `topologyKey` in a cloud environment can be
@@ -105,7 +105,7 @@ if enabled, or passed transparently otherwise.
     You have to pass to `additionalPodAntiAffinity` or `additionalPodAffinity`
     the whole content of `podAntiAffinity` or `podAffinity` that is expected by the
     Pod spec (please look at the following YAML as an example of having only one
-    instance of PostgreSQL running on every worker node, regardless which
+    instance of PostgreSQL running on every worker node, regardless of which
     PostgreSQL cluster they belong to).
 
 ```yaml
@@ -132,12 +132,12 @@ on nodes that have those labels.
 
 ## Tolerations
 
-Kubernetes allows you to specify, through `taints`, whether a node should repel
+Kubernetes allows you to specify (through `taints`) whether a node should repel
 all pods not explicitly tolerating (through `tolerations`) their `taints`.
 
-So, by setting a proper set `tolerations` for a workload matching a specific
-node's `taints`, Kubernetes scheduler will take into consideration also the
-tainted node, while deciding on which node to schedule the new workload.
+So, by setting a proper set of `tolerations` for a workload matching a specific
+node's `taints`, Kubernetes scheduler will now take into consideration the
+tainted node, while deciding on which node to schedule the workload.
 Tolerations can be configured for all the pods of a Cluster through the
 `.spec.affinity.tolerations` section, which accepts the usual Kubernetes syntax
 for tolerations.
