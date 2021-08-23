@@ -16,11 +16,12 @@ func NewCmd() *cobra.Command {
 	var enableLeaderElection bool
 	var configMapName string
 	var secretName string
+	var port int
 
 	cmd := cobra.Command{
 		Use: "controller [flags]",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return RunController(metricsAddr, configMapName, secretName, enableLeaderElection)
+			return RunController(metricsAddr, configMapName, secretName, enableLeaderElection, port)
 		},
 	}
 
@@ -31,7 +32,9 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().StringVar(&configMapName, "config-map-name", "", "The name of the ConfigMap containing "+
 		"the operator configuration")
 	cmd.Flags().StringVar(&secretName, "secret-name", "", "The name of the Secret containing "+
-		"the operator configuration, values are merged with the ConfigMap's one, overwriting them if already defined")
+		"the operator configuration. Values are merged with the ConfigMap's one, overwriting them if already defined")
+	cmd.Flags().IntVar(&port, "webhook-port", 9443, "The port the controller should be listening on."+
+		" If modified, take care to update the service pointing to it")
 
 	return &cmd
 }
