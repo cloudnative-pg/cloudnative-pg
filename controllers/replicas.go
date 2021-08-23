@@ -40,14 +40,18 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 
 	// First step: check if the current primary is running in an unschedulable node
 	// and issue a switchover if that's the case
-	unschedulablePrimaryPod, err := r.findUnschedulablePrimaryPod(ctx, cluster, status)
-	if err != nil {
-		return "", nil
-	}
-	if unschedulablePrimaryPod != nil {
-		log.Info("Primary is running on an unschedulable node, will try switching over",
-			"node", unschedulablePrimaryPod.Node, "primary", unschedulablePrimaryPod.Pod.Name)
-		return r.setPrimaryOnSchedulableNode(ctx, cluster, status, unschedulablePrimaryPod)
+	if primary := status.Items[0]; (primary.IsPrimary || (cluster.IsReplica() && primary.IsReady)) &&
+		primary.Pod.Name == cluster.Status.CurrentPrimary &&
+		cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
+		isPrimaryOnUnschedulableNode, err := r.isNodeUnschedulable(ctx, primary.Node)
+		if err != nil {
+			log.Error(err, "while checking if current primary is on an unschedulable node")
+			// in case of error it's better to proceed with the normal target primary reconciliation
+		} else if isPrimaryOnUnschedulableNode {
+			log.Info("Primary is running on an unschedulable node, will try switching over",
+				"node", primary.Node, "primary", primary.Pod.Name)
+			return r.setPrimaryOnSchedulableNode(ctx, cluster, status, &primary)
+		}
 	}
 
 	// Second step: check if the first element of the sorted list is the primary
@@ -56,39 +60,6 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	}
 
 	return r.updateTargetPrimaryFromPodsPrimaryCluster(ctx, cluster, status, resources)
-}
-
-func (r *ClusterReconciler) findUnschedulablePrimaryPod(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	status postgres.PostgresqlStatusList) (*postgres.PostgresqlStatus, error) {
-	// Find the CURRENT primary Pod in the Cluster (including designated
-	// primary for replica clusters).
-	//
-	// At this stage the Pod running the primary instance of the cluster can
-	// be ready or not. We just want to have a look at the node where this
-	// Pod is scheduled.
-	primaryPod := status.Items[0]
-	for i, pod := range status.Items {
-		if pod.IsPrimary ||
-			(pod.Pod.Name == cluster.Status.TargetPrimary &&
-				cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary) {
-			primaryPod = status.Items[i]
-			break
-		}
-	}
-
-	// Check if primary Pod is running on an unschedulable node
-	primaryUnschedulable, err := r.isNodeUnschedulable(ctx, primaryPod.Node)
-	if err != nil {
-		return nil, err
-	}
-
-	if primaryUnschedulable {
-		return &primaryPod, nil
-	}
-
-	return nil, nil
 }
 
 // updateTargetPrimaryFromPodsPrimaryCluster sets the name of the target primary from the Pods status if needed
