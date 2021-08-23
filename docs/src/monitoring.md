@@ -118,11 +118,15 @@ data:
               THEN 0
               ELSE GREATEST (0,
                 EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())))
-              END AS lag"
+              END AS lag,
+              pg_is_in_recovery() AS in_recovery"
       metrics:
         - lag:
             usage: "GAUGE"
             description: "Replication lag behind primary in seconds"
+        - in_recovery:
+            usage: "GAUGE"
+            description: "Whether the instance is in recovery"
 ```
 
 A list of basic monitoring queries can be found in the [`cnp-basic-monitoring.yaml` file](
@@ -270,9 +274,13 @@ Considering the `pg_replication` example above, the exporter's endpoint would
 return the following output when invoked:
 
 ```text
+# HELP cnp_pg_replication_in_recovery Whether the instance is in recovery
+# TYPE cnp_pg_replication_in_recovery gauge
+cnp_pg_replication_in_recovery 0
 # HELP cnp_pg_replication_lag Replication lag behind primary in seconds
 # TYPE cnp_pg_replication_lag gauge
 cnp_pg_replication_lag 0
+
 ```
 
 ### Differences with the Prometheus Postgres exporter

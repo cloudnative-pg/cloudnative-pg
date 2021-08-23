@@ -238,6 +238,11 @@ func (r *InstanceReconciler) reconcileMetrics(
 	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
 	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
 	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(cluster.GetSyncReplicasNumber()))
+	if cluster.IsReplica() {
+		exporter.Metrics.ReplicaCluster.Set(1)
+	} else {
+		exporter.Metrics.ReplicaCluster.Set(0)
+	}
 }
 
 // reconcileMonitoringQueries applies the custom monitoring queries to the
