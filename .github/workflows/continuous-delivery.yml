@@ -93,7 +93,11 @@ jobs:
         name: Install Kubebuilder
         run: |
           mkdir -p /tmp/kubebuilder
-          curl -sSL https://go.kubebuilder.io/dl/${{ env.KUBEBUILDER_VERSION }}/$(go env GOOS)/$(go env GOARCH) | tar --strip-components=1 -xz -C /tmp/kubebuilder
+          # The doc suggests using go.kubebuilder.io, but the redirects
+          # are currently not working there. We get the release directly
+          # from github.
+          kubebuilder_url="https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${{ env.KUBEBUILDER_VERSION }}/kubebuilder_${{ env.KUBEBUILDER_VERSION }}_$(go env GOOS)_$(go env GOARCH).tar.gz"
+          curl -sSL ${kubebuilder_url} | tar --strip-components=1 -xz -C /tmp/kubebuilder
           sudo mv /tmp/kubebuilder /usr/local/
       -
         name: Run unit tests
