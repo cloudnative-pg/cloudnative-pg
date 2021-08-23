@@ -44,6 +44,7 @@ type metrics struct {
 	CollectionDuration *prometheus.GaugeVec
 	SwitchoverRequired prometheus.Gauge
 	SyncReplicas       *prometheus.GaugeVec
+	ReplicaCluster     prometheus.Gauge
 }
 
 // NewExporter creates an exporter
@@ -100,6 +101,12 @@ func newMetrics() *metrics {
 			Name:      "sync_replicas",
 			Help:      "number of requested synchronous replicas (synchronous_standby_names)",
 		}, []string{"value"}),
+		ReplicaCluster: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "replica_mode",
+			Help:      "1 if the cluster is in replica mode, 0 otherwise",
+		}),
 	}
 }
 
@@ -112,6 +119,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.Metrics.SwitchoverRequired.Desc()
 	e.Metrics.CollectionDuration.Describe(ch)
 	e.Metrics.SyncReplicas.Describe(ch)
+	ch <- e.Metrics.ReplicaCluster.Desc()
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -130,6 +138,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ch <- e.Metrics.SwitchoverRequired
 	e.Metrics.CollectionDuration.Collect(ch)
 	e.Metrics.SyncReplicas.Collect(ch)
+	ch <- e.Metrics.ReplicaCluster
 }
 
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {

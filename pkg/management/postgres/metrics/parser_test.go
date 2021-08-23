@@ -22,7 +22,7 @@ var _ = Describe("Metrics parser", func() {
 		Expect(result["pg_replication"].Query).To(Equal("SELECT CASE WHEN NOT pg_is_in_recovery() [...]"))
 		Expect(result["pg_replication"].Primary).To(BeTrue())
 		Expect(result["pg_replication"].Master).To(BeFalse()) // wokeignore:rule=master
-		Expect(len(result["pg_replication"].Metrics)).To(Equal(1))
+		Expect(len(result["pg_replication"].Metrics)).To(Equal(2))
 		Expect(len(result["pg_replication"].Metrics[0])).To(Equal(1))
 		Expect(result["pg_replication"].Metrics[0]["lag"].Usage).To(Equal(ColumnUsage("GAUGE")))
 		Expect(result["pg_replication"].Metrics[0]["lag"].Description).To(Equal(
@@ -82,10 +82,14 @@ const pgExporterQueries = `
 pg_replication:
   query: "SELECT CASE WHEN NOT pg_is_in_recovery() [...]"
   primary: true
-  metrics:   # wokeignore:rule=master
+  metrics:
     - lag:
         usage: "GAUGE"
         description: "Replication lag behind primary in seconds"
+    - in_recovery:
+        usage: "GAUGE"
+        description: "Whether the instance is in recovery"
+
 
 pg_postmaster:  # wokeignore:rule=master
   query: "SELECT pg_postmaster_start_time as start_time from pg_postmaster_start_time()"  # wokeignore:rule=master

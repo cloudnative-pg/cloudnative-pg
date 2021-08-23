@@ -102,11 +102,19 @@ data:
             description: "Time at which postgres started (based on epoch)"
 
     pg_replication:
-      query: "SELECT CASE WHEN NOT pg_is_in_recovery() THEN 0 ELSE GREATEST (0, EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))) END AS lag"
+      query: "SELECT CASE WHEN NOT pg_is_in_recovery()
+              THEN 0
+              ELSE GREATEST (0, 
+                EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))) 
+              END AS lag, 
+              pg_is_in_recovery() AS in_recovery"
       metrics:
         - lag:
             usage: "GAUGE"
             description: "Replication lag behind primary in seconds"
+        - in_recovery:
+            usage: "GAUGE"
+            description: "Whether the instance is in recovery"
 
     pg_replication_slots:
       query: "SELECT slot_name, database, active, pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) FROM pg_replication_slots"
