@@ -38,6 +38,7 @@ spec:
         - --enable-leader-election
         - --config-map-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --secret-name=$(OPERATOR_DEPLOYMENT_NAME)-config
+        - --webhook-port=9443
         image: controller:latest
         name: manager
         ports:

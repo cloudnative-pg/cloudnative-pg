@@ -85,7 +85,7 @@ func init() {
 //
 // This code really belongs to app/controller_manager.go but we can't put
 // it here to respect the project layout created by kubebuilder.
-func RunController(metricsAddr, configMapName, secretName string, enableLeaderElection bool) error {
+func RunController(metricsAddr, configMapName, secretName string, enableLeaderElection bool, port int) error {
 	ctx := context.Background()
 
 	setupLog.Info("Starting Cloud Native PostgreSQL Operator",
@@ -96,7 +96,7 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 	managerOptions := ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
-		Port:               9443,
+		Port:               port,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   LeaderElectionID,
 		Namespace:          configuration.Current.WatchNamespace,
