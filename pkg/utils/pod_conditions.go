@@ -38,12 +38,25 @@ func IsPodReady(pod corev1.Pod) bool {
 	return false
 }
 
-// IsPodActive check if a pod is active
+// IsPodActive check if a pod is active, copied from:
+//nolint:lll // https://github.com/kubernetes/kubernetes/blob/1bd00776b5d78828a065b5c21e7003accc308a06/test/e2e/framework/pod/resource.go#L664
 func IsPodActive(p corev1.Pod) bool {
 	return corev1.PodSucceeded != p.Status.Phase &&
 		corev1.PodPending != p.Status.Phase &&
 		corev1.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil
+}
+
+// IsPodAlive check if a pod is active and not crash-looping
+func IsPodAlive(p corev1.Pod) bool {
+	if corev1.PodRunning == p.Status.Phase {
+		for _, container := range append(p.Status.InitContainerStatuses, p.Status.ContainerStatuses...) {
+			if container.State.Waiting != nil && container.State.Waiting.Reason == "CrashLoopBackOff" {
+				return false
+			}
+		}
+	}
+	return IsPodActive(p)
 }
 
 // FilterActivePods returns pods that have not terminated.

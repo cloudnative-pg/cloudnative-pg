@@ -206,6 +206,9 @@ const (
 	// PhaseHealthy for a cluster doing nothing
 	PhaseHealthy = "Cluster in healthy state"
 
+	// PhaseUnrecoverable for an unrecoverable cluster
+	PhaseUnrecoverable = "Cluster is in an unrecoverable state, needs manual intervention"
+
 	// PhaseApplyingConfiguration is set by the instance manager when a configuration
 	// change is being detected
 	PhaseApplyingConfiguration = "Applying configuration"
