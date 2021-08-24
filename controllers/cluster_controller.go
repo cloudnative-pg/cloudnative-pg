@@ -175,6 +175,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		clusterControllerLog.V(2).Info("A job is currently running. Waiting", "count", runningJobs)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
+
+	if len(resources.pods.Items) > 0 && resources.noPodsAreAlive() {
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx, &cluster, apiv1.PhaseUnrecoverable,
+			"No pods are active, the cluster needs manual intervention ")
+	}
+
 	if !resources.allPodsAreActive() {
 		clusterControllerLog.V(2).Info("A managed resource is currently being created or deleted. Waiting")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil

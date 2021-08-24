@@ -56,6 +56,16 @@ func (resources managedResources) allPodsAreActive() bool {
 	return true
 }
 
+// Check if at least one Pod is alive (active and not crash-looping)
+func (resources managedResources) noPodsAreAlive() bool {
+	for idx := range resources.pods.Items {
+		if utils.IsPodAlive(resources.pods.Items[idx]) {
+			return false
+		}
+	}
+	return true
+}
+
 // getManagedResources get the managed resources of various types
 func (r *ClusterReconciler) getManagedResources(ctx context.Context,
 	cluster apiv1.Cluster) (*managedResources, error) {
