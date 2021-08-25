@@ -57,6 +57,10 @@ The script can be configured through the following environment variables:
 * `E2E_PRE_ROLLING_UPDATE_IMG`: test a rolling upgrade from this version to the
   latest minor
 * `E2E_DEFAULT_STORAGE_CLASS`: default storage class, depending on the provider
+* `AZURE_STORAGE_ACCOUNT`: Azure storage account to test backup and restore, using Barman Cloud on Azure 
+   blob storage
+* `AZURE_STORAGE_KEY`: Azure storage key to test backup and restore, using Barman Cloud on Azure
+  blob storage
 
 If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
 the following variables to create a pull secret:

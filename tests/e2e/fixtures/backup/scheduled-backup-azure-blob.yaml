@@ -1,0 +1,8 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: ScheduledBackup
+metadata:
+  name: scheduled-backup
+spec:
+  schedule: "*/30 * * * * *"
+  cluster:
+    name: pg-backup-azure-blob

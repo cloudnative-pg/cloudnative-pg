@@ -37,8 +37,10 @@ and the following suite of E2E tests are performed on that cluster:
 * Manage PostgreSQL configuration changes;
 * Rolling updates when changing PostgreSQL images;
 * Backup and ScheduledBackups execution;
+* Backup and ScheduledBackups execution using Barman Cloud on Azure blob storage;
 * Synchronous replication;
 * Restore from backup;
+* Restore from backup using Barman Cloud on Azure blob storage;
 * Pod affinity using `NodeSelector`;
 * Metrics collection;
 * JSON log format;
