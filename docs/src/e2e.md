@@ -58,7 +58,7 @@ and the following suite of E2E tests are performed on that cluster:
 * Storage expansion;
 * Data corruption;
 
-The E2E tests suite is also run for OpenShift versions 4.5, 4.6, and 4.7
+The E2E tests suite is also run for OpenShift versions 4.6 and 4.7
 and the latest Kubernetes and PostgreSQL releases on clusters created on the
 following services:
 
