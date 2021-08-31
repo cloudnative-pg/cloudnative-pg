@@ -230,7 +230,7 @@ jobs:
           password: ${{ secrets.AZURECR_SECRET }}
       -
         name: Build and push
-        uses: docker/build-push-action@v2.6.1
+        uses: docker/build-push-action@v2.7.0
         with:
           # Available architecture on UBI8 are: linux/amd64, linux/arm64, linux/ppc64le
           platforms: linux/amd64
