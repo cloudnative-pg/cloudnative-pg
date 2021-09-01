@@ -17,6 +17,7 @@ EKS_VERSIONS_FILE = ".github/eks_versions.json"
 GKE_VERSIONS_FILE = ".github/gke_versions.json"
 RKE_VERSIONS_FILE = ".github/rke_versions.json"
 
+
 class VersionList(list):
     """List of versions"""
 
@@ -255,6 +256,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     engines = set(ENGINE_MODES.keys())
+
     if args.limit:
         required_engines = set(re.split(r"[, ]+", args.limit.strip()))
         if len(wrong_engines := required_engines - engines):
@@ -262,6 +264,9 @@ if __name__ == "__main__":
                 f"Limit contains unknown engines {wrong_engines}. Available engines: {engines}"
             )
         engines = required_engines
+    else:
+        # Do not run `gke` and `rke` by default
+        engines = engines - {"gke", "rke"}
 
     matrix = {}
     for engine in ENGINE_MODES:
@@ -271,7 +276,7 @@ if __name__ == "__main__":
                 sorted(ENGINE_MODES[engine][args.mode](), key=itemgetter("id"))
             )
         for job in include:
-            job['id'] = engine + "-" + job['id']
+            job["id"] = engine + "-" + job["id"]
             print(f"Generating {engine}: {job['id']}", file=sys.stderr)
         print(f"::set-output name={engine}Matrix::" + json.dumps({"include": include}))
         print(f"::set-output name={engine}Enabled::" + str(len(include) > 0))
