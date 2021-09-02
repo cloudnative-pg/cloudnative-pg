@@ -15,8 +15,8 @@ import (
 
 var _ = Describe("PostgreSQL CSV log record", func() {
 	Context("Given a CSV record from logging collector", func() {
-		It("fills the fields for PostgreSQL 13", func() {
-			values := make([]string, FieldsPerRecord12)
+		It("fills the fields for PostgreSQL 14", func() {
+			values := make([]string, FieldsPerRecord14)
 			for i := range values {
 				values[i] = fmt.Sprintf("%d", i)
 			}
@@ -46,10 +46,11 @@ var _ = Describe("PostgreSQL CSV log record", func() {
 				QueryPos:             "20",
 				Location:             "21",
 				ApplicationName:      "22",
-				BackendType:          "",
+				BackendType:          "23",
+				LeaderPid:            "24",
+				QueryID:              "25",
 			}))
 		})
-
 		It("fills the fields for PostgreSQL 13", func() {
 			values := make([]string, FieldsPerRecord13)
 			for i := range values {
@@ -82,6 +83,39 @@ var _ = Describe("PostgreSQL CSV log record", func() {
 				Location:             "21",
 				ApplicationName:      "22",
 				BackendType:          "23",
+			}))
+		})
+		It("fills the fields for PostgreSQL 12 or below", func() {
+			values := make([]string, FieldsPerRecord12)
+			for i := range values {
+				values[i] = fmt.Sprintf("%d", i)
+			}
+			var r LoggingRecord
+			r.FromCSV(values)
+			Expect(r).To(Equal(LoggingRecord{
+				LogTime:              "0",
+				Username:             "1",
+				DatabaseName:         "2",
+				ProcessID:            "3",
+				ConnectionFrom:       "4",
+				SessionID:            "5",
+				SessionLineNum:       "6",
+				CommandTag:           "7",
+				SessionStartTime:     "8",
+				VirtualTransactionID: "9",
+				TransactionID:        "10",
+				ErrorSeverity:        "11",
+				SQLStateCode:         "12",
+				Message:              "13",
+				Detail:               "14",
+				Hint:                 "15",
+				InternalQuery:        "16",
+				InternalQueryPos:     "17",
+				Context:              "18",
+				Query:                "19",
+				QueryPos:             "20",
+				Location:             "21",
+				ApplicationName:      "22",
 			}))
 		})
 	})

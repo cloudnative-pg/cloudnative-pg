@@ -61,6 +61,22 @@ var _ = Describe("CSV file reader", func() {
 			Expect(len(spy.records)).To(Equal(2))
 		})
 
+		It("can read multiple CSV lines on PostgreSQL version == 14", func() {
+			f, err := os.Open("testdata/two_lines_14.csv")
+			defer func() {
+				_ = f.Close()
+			}()
+			Expect(err).ToNot(HaveOccurred())
+
+			spy := SpyRecordWriter{}
+			p := logPipe{
+				record:          &LoggingRecord{},
+				fieldsValidator: LogFieldValidator,
+			}
+			Expect(p.streamLogFromCSVFile(f, &spy)).To(Succeed())
+			Expect(len(spy.records)).To(Equal(2))
+		})
+
 		It("can read pgAudit CSV lines", func() {
 			f, err := os.Open("testdata/pgaudit.csv")
 			defer func() {
