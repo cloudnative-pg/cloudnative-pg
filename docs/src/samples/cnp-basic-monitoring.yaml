@@ -79,7 +79,8 @@ data:
       query: |
         SELECT datname
           , pg_database_size(datname) AS size_bytes
-          , age(datfrozenxid) AS age
+          , age(datfrozenxid) AS xid_age
+          , mxid_age(datminmxid) AS mxid_age
         FROM pg_database
       metrics:
         - datname:
@@ -88,9 +89,12 @@ data:
         - size_bytes:
             usage: "GAUGE"
             description: "Disk space used by the database"
-        - age:
+        - xid_age:
             usage: "GAUGE"
             description: "Number of transactions from the frozen XID to the current one"
+        - mxid_age:
+            usage: "GAUGE"
+            description: "Number of multiple transactions (Multixact) from the frozen XID to the current one"
 
     pg_postmaster:
       query: |
@@ -480,9 +484,11 @@ data:
 
     pg_settings:
       query: |
-        SELECT name, setting
+        SELECT name,
+        CASE setting WHEN 'on' THEN '1' WHEN 'off' THEN '0' ELSE setting END AS setting
         FROM pg_settings
-        WHERE vartype NOT IN ('string', 'enum', 'bool')
+        WHERE vartype IN ('integer', 'real', 'bool')
+        ORDER BY 1
       metrics:
         - name:
             usage: "LABEL"
