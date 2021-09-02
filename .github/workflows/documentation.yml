@@ -146,10 +146,12 @@ jobs:
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           repository: enterprisedb/docs
-          event-type: cloud-native-postgresql
+          event-type: sync_files
           client-payload: |
             {
-              "commit_sha": "${{ github.sha }}",
               "maturity": "${{ needs.mkdocs_documentation.outputs.maturity }}",
               "version": "${{ needs.mkdocs_documentation.outputs.version }}"
+              "ref": "${{ github.ref }}",
+              "repo": "${{ github.repository }}",
+              "sha": "${{ github.sha }}"
             }
