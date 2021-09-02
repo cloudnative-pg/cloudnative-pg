@@ -1157,7 +1157,7 @@ func (target RecoveryTarget) BuildPostgresOptions() string {
 	if target.TargetTime != "" {
 		result += fmt.Sprintf(
 			"recovery_target_time = '%v'\n",
-			target.TargetTime)
+			utils.ConvertToPostgresFormat(target.TargetTime))
 	}
 	if target.TargetImmediate != nil && *target.TargetImmediate {
 		result += "recovery_target = immediate\n"
