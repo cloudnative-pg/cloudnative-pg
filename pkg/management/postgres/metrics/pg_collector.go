@@ -37,14 +37,15 @@ type Exporter struct {
 // metrics here are related to the exporter itself, which is instrumented to
 // expose them
 type metrics struct {
-	CollectionsTotal   prometheus.Counter
-	PgCollectionErrors *prometheus.CounterVec
-	Error              prometheus.Gauge
-	PostgreSQLUp       prometheus.Gauge
-	CollectionDuration *prometheus.GaugeVec
-	SwitchoverRequired prometheus.Gauge
-	SyncReplicas       *prometheus.GaugeVec
-	ReplicaCluster     prometheus.Gauge
+	CollectionsTotal        prometheus.Counter
+	PgCollectionErrors      *prometheus.CounterVec
+	Error                   prometheus.Gauge
+	PostgreSQLUp            prometheus.Gauge
+	CollectionDuration      *prometheus.GaugeVec
+	SwitchoverRequired      prometheus.Gauge
+	SyncReplicas            *prometheus.GaugeVec
+	ReplicaCluster          prometheus.Gauge
+	ArchiveCommandQueueSize prometheus.Gauge
 }
 
 // NewExporter creates an exporter
@@ -107,6 +108,12 @@ func newMetrics() *metrics {
 			Name:      "replica_mode",
 			Help:      "1 if the cluster is in replica mode, 0 otherwise",
 		}),
+		ArchiveCommandQueueSize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "archive_command_queue_size",
+			Help:      "Number of WAL segments waiting to be archived in the backup object store",
+		}),
 	}
 }
 
@@ -120,6 +127,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.CollectionDuration.Describe(ch)
 	e.Metrics.SyncReplicas.Describe(ch)
 	ch <- e.Metrics.ReplicaCluster.Desc()
+	ch <- e.Metrics.ArchiveCommandQueueSize.Desc()
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -139,6 +147,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.Metrics.CollectionDuration.Collect(ch)
 	e.Metrics.SyncReplicas.Collect(ch)
 	ch <- e.Metrics.ReplicaCluster
+	ch <- e.Metrics.ArchiveCommandQueueSize
 }
 
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {

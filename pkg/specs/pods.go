@@ -64,6 +64,9 @@ const (
 
 	// PgDataPath is the path to PGDATA variable
 	PgDataPath = "/var/lib/postgresql/data/pgdata"
+
+	// PgWalArchiveStatusPath is the path to the archive status directory
+	PgWalArchiveStatusPath = PgDataPath + "/pg_wal/archive_status"
 )
 
 func createEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []corev1.EnvVar {
