@@ -21,10 +21,14 @@ const FieldsPerRecord12 int = 23
 // since PostgreSQL 13
 const FieldsPerRecord13 int = 24
 
+// FieldsPerRecord14 is the number of fields in a CSV log line
+// since PostgreSQL 14
+const FieldsPerRecord14 int = 26
+
 // LoggingCollectorRecordName is the value of the logger field for logging_collector
 const LoggingCollectorRecordName = "postgres"
 
-// Start start a new goroutine running the logging collector core, reading
+// Start starts a new goroutine running the logging collector core, reading
 // from the logging_collector process and translating its content to JSON
 func Start() error {
 	p := logPipe{
@@ -37,7 +41,7 @@ func Start() error {
 
 // LogFieldValidator checks if the provided number of fields is valid or not for logging_collector logs
 func LogFieldValidator(fields int) *ErrFieldCountExtended {
-	if fields != FieldsPerRecord12 && fields != FieldsPerRecord13 {
+	if fields != FieldsPerRecord12 && fields != FieldsPerRecord13 && fields != FieldsPerRecord14 {
 		// If the number of fields is not recognised return an error
 		return &ErrFieldCountExtended{
 			Err: fmt.Errorf("invalid number of fields opening logging_collector CSV log stream"),
@@ -72,9 +76,11 @@ type LoggingRecord struct {
 	Location             string `json:"location,omitempty"`
 	ApplicationName      string `json:"application_name,omitempty"`
 	BackendType          string `json:"backend_type,omitempty"`
+	LeaderPid            string `json:"leader_pid,omitempty"`
+	QueryID              string `json:"query_id,omitempty"`
 }
 
-// FromCSV store inside the record structure the relative fields
+// FromCSV stores inside the record structure the relative fields
 // of the CSV log record.
 //
 // See https://www.postgresql.org/docs/current/runtime-config-logging.html
@@ -104,9 +110,16 @@ func (r *LoggingRecord) FromCSV(content []string) NamedRecord {
 	r.Location = content[21]
 	r.ApplicationName = content[22]
 
-	// Starting from PostgreSQL 13 there is also the BackendType field.
-	if len(content) == FieldsPerRecord13 {
+	// Starting from PostgreSQL 13, there is also the BackendType field.
+	// See https://www.postgresql.org/docs/13/runtime-config-logging.html#RUNTIME-CONFIG-LOGGING-CSVLOG
+	if len(content) >= FieldsPerRecord13 {
 		r.BackendType = content[23]
+	}
+	// Starting from PostgreSQL 14, there are also the LeaderPid and the QueryID fields.
+	// See https://www.postgresql.org/docs/14/runtime-config-logging.html#RUNTIME-CONFIG-LOGGING-CSVLOG
+	if len(content) == FieldsPerRecord14 {
+		r.LeaderPid = content[24]
+		r.QueryID = content[25]
 	}
 	return r
 }
