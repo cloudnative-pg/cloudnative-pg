@@ -146,7 +146,7 @@ jobs:
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           repository: enterprisedb/docs
-          event-type: sync_files
+          event-type: sync-to-docs
           client-payload: |
             {
               "maturity": "${{ needs.mkdocs_documentation.outputs.maturity }}",
