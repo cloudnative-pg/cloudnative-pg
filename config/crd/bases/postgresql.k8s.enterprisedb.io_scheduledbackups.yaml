@@ -56,11 +56,15 @@ spec:
                 required:
                 - name
                 type: object
+              immediate:
+                description: If the first backup has to be immediately start after
+                  creation or not
+                type: boolean
               schedule:
                 description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
                 type: string
               suspend:
-                description: If this backup is suspended of not
+                description: If this backup is suspended or not
                 type: boolean
             required:
             - schedule
@@ -129,11 +133,15 @@ spec:
                 required:
                 - name
                 type: object
+              immediate:
+                description: If the first backup has to be immediately start after
+                  creation or not
+                type: boolean
               schedule:
                 description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
                 type: string
               suspend:
-                description: If this backup is suspended of not
+                description: If this backup is suspended or not
                 type: boolean
             required:
             - schedule

@@ -7,6 +7,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package e2e
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -26,18 +27,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Backup and restore", func() {
-	const (
-		targetDBOne             = "test"
-		targetDBTwo             = "test1"
-		targetDBSecret          = "secret_test"
-		testTableName           = "test_table"
-		customQueriesSampleFile = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
-		sampleFile              = fixturesDir + "/backup/cluster-with-backup.yaml"
-		azureBlobSampleFile     = fixturesDir + "/backup/cluster-with-backup-azure-blob.yaml"
-	)
+const (
+	minioClientName = "mc"
+)
 
-	var namespace, clusterName, restoredClusterName, azStorageAccount, azStorageKey string
+var _ = Describe("Backup and restore", func() {
+	var namespace, clusterName string
 
 	JustAfterEach(func() {
 		if CurrentGinkgoTestDescription().Failed {
@@ -51,18 +46,40 @@ var _ = Describe("Backup and restore", func() {
 	})
 
 	Context("using minio as object storage", func() {
-		It("restores a backed up cluster", func() {
+		// This is a set of tests using a minio server deployed in the same
+		// namespace as the cluster. Since each cluster is installed in its
+		// own namespace, they can share the configuration file
+		const clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml"
+
+		// We backup and restore a cluster, and verify some expected data to
+		// be there
+		It("backs up and restore a cluster", func() {
+			const (
+				targetDBOne              = "test"
+				targetDBTwo              = "test1"
+				targetDBSecret           = "secret_test"
+				testTableName            = "test_table"
+				customQueriesSampleFile  = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
+				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore.yaml"
+			)
 			namespace = "cluster-backup-minio"
-			clusterName = "pg-backup"
-			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+
+			clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 			Expect(err).ToNot(HaveOccurred())
+			restoredClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
 			By("creating the credentials for minio", func() {
-				createStorageCredentials(namespace, "minio", "minio123")
+				assertStorageCredentialsAreCreated(namespace, "minio", "minio123")
 			})
+
 			By("setting up minio", func() {
 				installMinio(namespace)
 			})
+
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly.
 			By("setting up minio client pod", func() {
@@ -70,10 +87,10 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			// Create ConfigMap and secrets to verify metrics for target database after backup restore
-			AssertCustomMetricsConfigMapsSecrets(namespace, customQueriesSampleFile, 1, 1)
+			AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
 
 			// Create the Cluster
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
 
 			// Create required test data
 			CreateTestDataForTargetDB(namespace, clusterName, targetDBOne, testTableName)
@@ -94,97 +111,149 @@ var _ = Describe("Backup and restore", func() {
 					primary,
 					switchWalCmd))
 				Expect(err).ToNot(HaveOccurred())
+
 				latestWAL := strings.TrimSpace(out)
-
-				mcName := "mc"
-				timeout := 30
-				Eventually(func() (int, error, error) {
-					// In the fixture WALs are compressed with gzip
-					findCmd := fmt.Sprintf(
-						"sh -c 'mc find minio --name %v.gz | wc -l'",
-						latestWAL)
-					out, _, err := tests.RunUnchecked(fmt.Sprintf(
-						"kubectl exec -n %v %v -- %v",
-						namespace,
-						mcName,
-						findCmd))
-
-					value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
-					return value, err, atoiErr
-				}, timeout).Should(BeEquivalentTo(1))
+				Eventually(func() (int, error) {
+					// WALs are compressed with gzip in the fixture
+					return countFilesOnMinio(namespace, latestWAL+".gz")
+				}, 30).Should(BeEquivalentTo(1))
 			})
 
-			By("uploading a backup", func() {
-				// We create a Backup
-				backupFile := fixturesDir + "/backup/backup.yaml"
+			// There should be a backup resource and
+			By("backing up a cluster and verifying it exists on minio", func() {
+				backupFile := fixturesDir + "/backup/minio/backup-minio.yaml"
 				executeBackup(namespace, backupFile)
 
-				// A file called data.tar should be available on minio
-				mcName := "mc"
-				Eventually(func() (int, error, error) {
-					findCmd := "sh -c 'mc find minio --name data.tar | wc -l'"
-					out, _, err := tests.RunUnchecked(fmt.Sprintf(
-						"kubectl exec -n %v %v -- %v",
-						namespace,
-						mcName,
-						findCmd))
-					value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
-					return value, err, atoiErr
+				Eventually(func() (int, error) {
+					return countFilesOnMinio(namespace, "data.tar")
 				}, 30).Should(BeEquivalentTo(1))
 			})
 
 			// Restore backup in a new cluster
-			restoreCluster(namespace)
+			assertClusterRestore(namespace, clusterRestoreSampleFile)
 
 			AssertMetricsData(namespace, restoredClusterName, targetDBOne, targetDBTwo, targetDBSecret)
+		})
+
+		// We create a cluster, create a scheduled backup, patch it to suspend its
+		// execution. We verify that the number of backups does not increase.
+		// We then patch it again back to its initial state and verify that
+		// the amount of backups keeps increasing again.
+		It("verifies that scheduled backups can be suspended", func() {
+			namespace = "scheduled-backups-suspend-minio"
+			const scheduledBackupSampleFile = fixturesDir +
+				"/backup/scheduled_backup_suspend/scheduled-backup-suspend-minio.yaml"
+			clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Create a cluster in a namespace we'll delete after the test
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating the credentials for minio", func() {
+				assertStorageCredentialsAreCreated(namespace, "minio", "minio123")
+			})
+
+			By("setting up minio", func() {
+				installMinio(namespace)
+			})
+
+			// Create the minio client pod and wait for it to be ready.
+			// We'll use it to check if everything is archived correctly.
+			By("setting up minio client pod", func() {
+				installMinioClient(namespace)
+			})
+
+			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
 
 			By("scheduling backups", func() {
-				backupFile := fixturesDir + "/backup/scheduled-backup.yaml"
-				scheduleBackup(namespace, backupFile)
-
-				// After a while we should be able to find two more backups
-				mcName := "mc"
+				assertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
 				Eventually(func() (int, error) {
-					findCmd := "sh -c 'mc find minio --name data.tar | wc -l'"
-					out, _, err := tests.RunUnchecked(fmt.Sprintf(
-						"kubectl exec -n %v %v -- %v",
-						namespace,
-						mcName,
-						findCmd))
-					if err != nil {
-						return 0, err
-					}
-					return strconv.Atoi(strings.Trim(out, "\n"))
-				}, 30).Should(BeNumerically(">=", 3))
+					return countFilesOnMinio(namespace, "data.tar")
+				}, 60).Should(BeNumerically(">=", 2))
 			})
+
+			assertSuspendScheduleBackups(namespace, scheduledBackupName)
+		})
+
+		// Create a schedule backup with a schedule remote in time but
+		// the immediate option enable. We expect a backup to be available.
+		It("immediately starts a backup using ScheduledBackups immediate option", func() {
+			namespace = "scheduled-backups-immediate-minio"
+			const scheduledBackupSampleFile = fixturesDir +
+				"/backup/scheduled_backup_immediate/scheduled-backup-immediate-minio.yaml"
+			clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating the credentials for minio", func() {
+				assertStorageCredentialsAreCreated(namespace, "minio", "minio123")
+			})
+
+			By("setting up minio", func() {
+				installMinio(namespace)
+			})
+
+			// Create the minio client pod and wait for it to be ready.
+			// We'll use it to check if everything is archived correctly.
+			By("setting up minio client pod", func() {
+				installMinioClient(namespace)
+			})
+
+			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
+
+			assertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
+
+			// assertScheduledBackupsImmediate creates at least two backups, we should find
+			// their base backups
+			Eventually(func() (int, error) {
+				return countFilesOnMinio(namespace, "data.tar")
+			}, 30).Should(BeNumerically("==", 1))
 		})
 	})
 
 	Context("using azure blobs as object storage", func() {
+		// We must be careful here. All the clusters use the same remote storage
+		// and that means that we must use different cluster names otherwise
+		// we risk mixing WALs and backups.
+
+		var azStorageAccount, azStorageKey string
 		BeforeEach(func() {
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
 			if !isAKS {
 				Skip("This test is only executed on AKS clusters")
 			}
+
 			azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 			azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
 		})
 
-		It("restores a backed up cluster", func() {
+		// We backup and restore a cluster, and verify some expected data to
+		// be there
+		It("backs up and restore a cluster", func() {
 			namespace = "cluster-backup-azure-blob"
-			clusterName = "pg-backup-azure-blob"
+			const azureBlobSampleFile = fixturesDir + "/backup/azure_blob/cluster-with-backup-azure-blob.yaml"
+			const clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore.yaml"
+			clusterName, err := env.GetResourceNameFromYAML(azureBlobSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
 			// Create a cluster in a namespace we'll delete after the test
-			err := env.CreateNamespace(namespace)
+			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 
 			// The Azure Blob Storage should have been created ad-hoc for the test,
 			// we get the credentials from the environment variables as we can't create
 			// a fixture for them
-			By("creating the Azure Blob Storage credentials",
-				func() {
-					createStorageCredentials(namespace, azStorageAccount, azStorageKey)
-				})
+			By("creating the Azure Blob Storage credentials", func() {
+				assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
+			})
 
 			// Create the Cluster
 			AssertCreateCluster(namespace, clusterName, azureBlobSampleFile, env)
@@ -205,57 +274,127 @@ var _ = Describe("Backup and restore", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				latestWAL := strings.TrimSpace(out)
+				// Define what file we are looking for in Azure.
+				// Escapes are required since az expects forward slashes to be escaped
+				path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
 				// verifying on blob storage using az
-				Eventually(func() (bool, error) {
-					// In the fixture WALs are compressed with gzip
-					// az command to validate compressed file on blob storage
-					cmd := fmt.Sprintf("az storage blob exists --account-name %v "+
-						"--account-key %v --container-name %v "+
-						"--name %v/wals/0000000100000000/%v.gz", azStorageAccount, azStorageKey, clusterName, clusterName, latestWAL)
-					out, _, err := tests.RunUnchecked(cmd)
-					return strings.Contains(out, "true"), err
-				}, 30).Should(BeTrue())
+				Eventually(func() (int, error) {
+					return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, path)
+				}, 30).Should(BeEquivalentTo(1))
 			})
 
 			By("uploading a backup", func() {
 				// We create a Backup
-				backupFile := fixturesDir + "/backup/backup-azure-blob.yaml"
+				backupFile := fixturesDir + "/backup/azure_blob/backup-azure-blob.yaml"
 				executeBackup(namespace, backupFile)
 
 				// Verifying file called data.tar should be available on Azure blob storage
-				Eventually(func() (bool, error) {
-					findCmd := fmt.Sprintf("az storage blob list --account-name %v "+
-						"--account-key %v "+
-						"--container-name %v --query \"[?contains(@.name, \\`data.tar\\`)==\\`true\\`].name\"",
-						azStorageAccount, azStorageKey, clusterName)
-					out, _, err := tests.RunUnchecked(findCmd)
-					return strings.Contains(out, "data.tar"), err
-				}, 30).Should(BeTrue())
+				Eventually(func() (int, error) {
+					return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+				}, 30).Should(BeNumerically(">=", 1))
 			})
 
 			// Restore backup in a new cluster
-			restoreCluster(namespace)
+			assertClusterRestore(namespace, clusterRestoreSampleFile)
+		})
+
+		// We create a cluster, create a scheduled backup, patch it to suspend its
+		// execution. We verify that the number of backups does not increase.
+		// We then patch it again back to its initial state and verify that
+		// the amount of backups keeps increasing again.
+		It("verifies that scheduled backups can be suspended", func() {
+			namespace = "scheduled-backups-suspend-azure-blob"
+			const sampleFile = fixturesDir +
+				"/backup/scheduled_backup_suspend/cluster-with-backup-azure-blob.yaml"
+			const scheduledBackupSampleFile = fixturesDir +
+				"/backup/scheduled_backup_suspend/scheduled-backup-suspend-azure-blob.yaml"
+			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Create a cluster in a namespace we'll delete after the test
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating the Azure Blob Storage credentials", func() {
+				assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
+			})
+
+			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			By("scheduling backups", func() {
-				backupFile := fixturesDir + "/backup/scheduled-backup-azure-blob.yaml"
-				scheduleBackup(namespace, backupFile)
+				assertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 480)
 
-				timeout := 480
+				// assertScheduledBackupsImmediate creates at least two backups, we should find
+				// their base backups
 				Eventually(func() (int, error) {
-					findCmd := fmt.Sprintf("az storage blob list --account-name %v  "+
-						"--account-key %v  "+
-						"--container-name %v --query \"[?contains(@.name, \\`data.tar\\`)==\\`true\\`].name\"",
-						azStorageAccount, azStorageKey, clusterName)
-					out, _, err := tests.RunUnchecked(findCmd)
-					dataCount := strings.Split(out, ",")
-					return len(dataCount), err
-				}, timeout).Should(BeNumerically(">=", 3))
+					return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+				}, 60).Should(BeNumerically(">=", 2))
 			})
+			assertSuspendScheduleBackups(namespace, scheduledBackupName)
+		})
+
+		// Create a schedule backup with a schedule remote in time but
+		// the immediate option enable. We expect a backup to be available.
+		It("immediately starts a backup using ScheduledBackups immediate option", func() {
+			namespace = "scheduled-backup-immediate-azure-blob"
+			const sampleFile = fixturesDir + "/backup/scheduled_backup_immediate/cluster-with-backup-azure-blob.yaml"
+			const scheduledBackupSampleFile = fixturesDir +
+				"/backup/scheduled_backup_immediate/scheduled-backup-immediate-azure-blob.yaml"
+			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating the Azure Blob Storage credentials", func() {
+				assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
+			})
+
+			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			assertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
+
+			// only one data.tar files should be present
+			Eventually(func() (int, error) {
+				return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+			}, 30).Should(BeNumerically("==", 1))
 		})
 	})
 })
 
-func createStorageCredentials(namespace string, id string, key string) {
+func assertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string, timeout int) {
+	_, _, err := tests.Run(fmt.Sprintf(
+		"kubectl apply -n %v -f %v",
+		namespace, backupYAMLPath))
+	Expect(err).NotTo(HaveOccurred())
+
+	scheduledBackupName, err := env.GetResourceNameFromYAML(backupYAMLPath)
+	Expect(err).NotTo(HaveOccurred())
+
+	// We expect the scheduled backup to be scheduled before a
+	// timeout
+	scheduledBackupNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      scheduledBackupName,
+	}
+
+	Eventually(func() (*v1.Time, error) {
+		scheduledBackup := &apiv1.ScheduledBackup{}
+		err := env.Client.Get(env.Ctx,
+			scheduledBackupNamespacedName, scheduledBackup)
+		return scheduledBackup.Status.LastScheduleTime, err
+	}, timeout).ShouldNot(BeNil())
+
+	// Within a few minutes we should have at least two backups
+	Eventually(func() (int, error) {
+		return getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
+	}, timeout).Should(BeNumerically(">=", 2))
+}
+
+func assertStorageCredentialsAreCreated(namespace string, id string, key string) {
 	_, _, err := tests.Run(fmt.Sprintf("kubectl create secret generic backup-storage-creds -n %v "+
 		"--from-literal=ID=%v "+
 		"--from-literal=KEY=%v",
@@ -263,13 +402,13 @@ func createStorageCredentials(namespace string, id string, key string) {
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func restoreCluster(namespace string) {
+func assertClusterRestore(namespace string, restoreClusterFile string) {
 	By("Restoring a backup in a new cluster", func() {
-		backupFile := fixturesDir + "/backup/cluster-from-restore.yaml"
-		restoredClusterName := "cluster-restore"
-		_, _, err := tests.Run(fmt.Sprintf(
+		restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
+		Expect(err).ToNot(HaveOccurred())
+		_, _, err = tests.Run(fmt.Sprintf(
 			"kubectl apply -n %v -f %v",
-			namespace, backupFile))
+			namespace, restoreClusterFile))
 		Expect(err).ToNot(HaveOccurred())
 
 		// We give more time than the usual 600s, since the recovery is slower
@@ -310,9 +449,9 @@ func restoreCluster(namespace string) {
 func installMinio(namespace string) {
 	// Create a PVC-based deployment for the minio version
 	// minio/minio:RELEASE.2020-04-23T00-58-49Z
-	minioPVCFile := fixturesDir + "/backup/minio-pvc.yaml"
+	minioPVCFile := fixturesDir + "/backup/minio/minio-pvc.yaml"
 	minioDeploymentFile := fixturesDir +
-		"/backup/minio-deployment.yaml"
+		"/backup/minio/minio-deployment.yaml"
 
 	_, _, err := tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
 		namespace, minioPVCFile))
@@ -322,7 +461,6 @@ func installMinio(namespace string) {
 	Expect(err).ToNot(HaveOccurred())
 
 	// Wait for the minio pod to be ready
-	timeout := 300
 	deploymentName := "minio"
 	deploymentNamespacedName := types.NamespacedName{
 		Namespace: namespace,
@@ -330,45 +468,45 @@ func installMinio(namespace string) {
 	}
 	Eventually(func() (int32, error) {
 		deployment := &appsv1.Deployment{}
-		err := env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
+		err = env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
 		return deployment.Status.ReadyReplicas, err
-	}, timeout).Should(BeEquivalentTo(1))
+	}, 300).Should(BeEquivalentTo(1))
 
 	// Create a minio service
-	serviceFile := fixturesDir + "/backup/minio-service.yaml"
+	serviceFile := fixturesDir + "/backup/minio/minio-service.yaml"
 	_, _, err = tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
 		namespace, serviceFile))
 	Expect(err).ToNot(HaveOccurred())
 }
 
 func installMinioClient(namespace string) {
-	clientFile := fixturesDir + "/backup/minio-client.yaml"
+	clientFile := fixturesDir + "/backup/minio/minio-client.yaml"
 	_, _, err := tests.Run(fmt.Sprintf(
 		"kubectl apply -n %v -f %v",
 		namespace, clientFile))
 	Expect(err).ToNot(HaveOccurred())
-	timeout := 180
-	mcName := "mc"
 	mcNamespacedName := types.NamespacedName{
 		Namespace: namespace,
-		Name:      mcName,
+		Name:      minioClientName,
 	}
 	Eventually(func() (bool, error) {
 		mc := &corev1.Pod{}
-		err := env.Client.Get(env.Ctx, mcNamespacedName, mc)
+		err = env.Client.Get(env.Ctx, mcNamespacedName, mc)
 		return utils.IsPodReady(*mc), err
-	}, timeout).Should(BeTrue())
+	}, 180).Should(BeTrue())
 }
 
 func executeBackup(namespace string, backupFile string) {
-	_, _, err := tests.Run(fmt.Sprintf(
+	backupName, err := env.GetResourceNameFromYAML(backupFile)
+	Expect(err).ToNot(HaveOccurred())
+
+	_, _, err = tests.Run(fmt.Sprintf(
 		"kubectl apply -n %v -f %v",
 		namespace, backupFile))
 	Expect(err).ToNot(HaveOccurred())
 
 	// After a while the Backup should be completed
 	timeout := 180
-	backupName := "cluster-backup"
 	backupNamespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      backupName,
@@ -376,11 +514,11 @@ func executeBackup(namespace string, backupFile string) {
 	backup := &apiv1.Backup{}
 	// Verifying backup status
 	Eventually(func() (apiv1.BackupPhase, error) {
-		err := env.Client.Get(env.Ctx, backupNamespacedName, backup)
+		err = env.Client.Get(env.Ctx, backupNamespacedName, backup)
 		return backup.Status.Phase, err
 	}, timeout).Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 	Eventually(func() (string, error) {
-		err := env.Client.Get(env.Ctx, backupNamespacedName, backup)
+		err = env.Client.Get(env.Ctx, backupNamespacedName, backup)
 		if err != nil {
 			return "", err
 		}
@@ -394,47 +532,180 @@ func executeBackup(namespace string, backupFile string) {
 	Expect(backupStatus.EndWal).NotTo(BeEmpty())
 }
 
-func scheduleBackup(namespace string, backupYAMLPath string) {
-	_, _, err := tests.Run(fmt.Sprintf(
-		"kubectl apply -n %v -f %v",
-		namespace, backupYAMLPath))
-	Expect(err).NotTo(HaveOccurred())
+func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupName string) (int, error) {
+	backups, err := getScheduledBackupBackups(namespace, scheduledBackupName)
+	if err != nil {
+		return -1, err
+	}
+	completed := 0
+	for _, backup := range backups {
+		if strings.HasPrefix(backup.Name, scheduledBackupName+"-") &&
+			backup.Status.Phase == apiv1.BackupPhaseCompleted {
+			completed++
+		}
+	}
+	return completed, nil
+}
 
-	// We expect the scheduled backup to be scheduled before a
-	// timeout
-	timeout := 480
-	scheduledBackupName := "scheduled-backup"
+func getScheduledBackupBackups(namespace string, scheduledBackupName string) ([]apiv1.Backup, error) {
 	scheduledBackupNamespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      scheduledBackupName,
 	}
+	// Get all the backups that are children of the ScheduledBackup
+	scheduledBackup := &apiv1.ScheduledBackup{}
+	err := env.Client.Get(env.Ctx, scheduledBackupNamespacedName,
+		scheduledBackup)
+	backups := &apiv1.BackupList{}
+	if err != nil {
+		return nil, err
+	}
+	err = env.Client.List(env.Ctx, backups,
+		ctrlclient.InNamespace(namespace))
+	if err != nil {
+		return nil, err
+	}
+	ret := []apiv1.Backup{}
 
-	Eventually(func() (*v1.Time, error) {
-		scheduledBackup := &apiv1.ScheduledBackup{}
-		err := env.Client.Get(env.Ctx,
-			scheduledBackupNamespacedName, scheduledBackup)
-		return scheduledBackup.Status.LastScheduleTime, err
-	}, timeout).ShouldNot(BeNil())
-
-	// Within a few minutes we should have at least two backups
-	Eventually(func() (int, error) {
-		// Get all the backups children of the ScheduledBackup
-		scheduledBackup := &apiv1.ScheduledBackup{}
-		err := env.Client.Get(env.Ctx, scheduledBackupNamespacedName,
-			scheduledBackup)
-		Expect(err).NotTo(HaveOccurred())
-		// Get all the backups children of the ScheduledBackup
-		backups := &apiv1.BackupList{}
-		err = env.Client.List(env.Ctx, backups,
-			ctrlclient.InNamespace(namespace))
-		Expect(err).NotTo(HaveOccurred())
-		completed := 0
-		for _, backup := range backups.Items {
-			if strings.HasPrefix(backup.Name, scheduledBackup.Name+"-") &&
-				backup.Status.Phase == apiv1.BackupPhaseCompleted {
-				completed++
-			}
+	for _, backup := range backups.Items {
+		if strings.HasPrefix(backup.Name, scheduledBackup.Name+"-") {
+			ret = append(ret, backup)
 		}
-		return completed, nil
-	}, timeout).Should(BeNumerically(">=", 2))
+	}
+	return ret, nil
+}
+
+func assertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupName string) {
+	By("scheduling immediate backups", func() {
+		var err error
+		// We create a ScheduledBackup
+		_, _, err = tests.Run(fmt.Sprintf(
+			"kubectl apply -n %v -f %v",
+			namespace, backupYAMLPath))
+		Expect(err).NotTo(HaveOccurred())
+
+		// We expect the scheduled backup to be scheduled after creation
+		scheduledBackupNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      scheduledBackupName,
+		}
+		Eventually(func() (*v1.Time, error) {
+			scheduledBackup := &apiv1.ScheduledBackup{}
+			err = env.Client.Get(env.Ctx,
+				scheduledBackupNamespacedName, scheduledBackup)
+			return scheduledBackup.Status.LastScheduleTime, err
+		}, 30).ShouldNot(BeNil())
+
+		// backup count should be 1 that is immediate one
+		Eventually(func() (int, error) {
+			currentBackupCount, err := getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
+			if err != nil {
+				return 0, err
+			}
+			return currentBackupCount, err
+		}, 60).Should(BeNumerically("==", 1))
+	})
+}
+
+func assertSuspendScheduleBackups(namespace, scheduledBackupName string) {
+	var completedBackupsCount int
+	var err error
+	By("suspending the scheduled backup", func() {
+		// update suspend status to true
+		cmd := fmt.Sprintf("kubectl patch ScheduledBackup %v -n %v -p '{\"spec\":{\"suspend\":true}}' "+
+			"--type='merge'", scheduledBackupName, namespace)
+		_, _, err = tests.Run(cmd)
+		Expect(err).ToNot(HaveOccurred())
+		scheduledBackupNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      scheduledBackupName,
+		}
+		Eventually(func() bool {
+			scheduledBackup := &apiv1.ScheduledBackup{}
+			err = env.Client.Get(env.Ctx, scheduledBackupNamespacedName, scheduledBackup)
+			return *scheduledBackup.Spec.Suspend
+		}, 30).Should(BeTrue())
+	})
+	By("waiting for ongoing backup to complete", func() {
+		Eventually(func() (bool, error) {
+			completedBackupsCount, err = getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
+			if err != nil {
+				return false, err
+			}
+			backups, err := getScheduledBackupBackups(namespace, scheduledBackupName)
+			if err != nil {
+				return false, err
+			}
+			return len(backups) == completedBackupsCount, nil
+		}, 60).Should(BeTrue())
+	})
+	By("verifying backup has suspended", func() {
+		Consistently(func() (int, error) {
+			backups, err := getScheduledBackupBackups(namespace, scheduledBackupName)
+			if err != nil {
+				return 0, err
+			}
+			return len(backups), err
+		}, 40).Should(BeEquivalentTo(completedBackupsCount))
+	})
+	By("resuming suspended backup", func() {
+		// take current backup count before suspend the schedule backup
+		completedBackupsCount, err = getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
+		Expect(err).ToNot(HaveOccurred())
+
+		cmd := fmt.Sprintf("kubectl patch ScheduledBackup %v -n %v -p '{\"spec\":{\"suspend\":false}}' "+
+			"--type='merge'", scheduledBackupName, namespace)
+		_, _, err = tests.Run(cmd)
+		Expect(err).ToNot(HaveOccurred())
+	})
+	By("verifying backup has resumed", func() {
+		Eventually(func() (int, error) {
+			currentBackupCount, err := getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
+			if err != nil {
+				return 0, err
+			}
+			return currentBackupCount, err
+		}, 70).Should(BeNumerically(">", completedBackupsCount))
+	})
+}
+
+func composeFindMinioCmd(path string, serviceName string) string {
+	return fmt.Sprintf("sh -c 'mc find %v --name %v | wc -l'", serviceName, path)
+}
+
+// Use the minioClient `minioClientName` in namespace `namespace` to count
+// the amount of files matching the `path`
+func countFilesOnMinio(namespace string, path string) (int, error) {
+	out, _, err := tests.RunUnchecked(fmt.Sprintf(
+		"kubectl exec -n %v %v -- %v",
+		namespace,
+		minioClientName,
+		composeFindMinioCmd(path, "minio")))
+	if err != nil {
+		return -1, err
+	}
+	value, err := strconv.Atoi(strings.Trim(out, "\n"))
+	return value, err
+}
+
+func composeAzBlobListCmd(azStorageAccount, azStorageKey, clusterName string, path string) string {
+	return fmt.Sprintf("az storage blob list --account-name %v  "+
+		"--account-key %v  "+
+		"--container-name %v --query \"[?contains(@.name, \\`%v\\`)].name\"",
+		azStorageAccount, azStorageKey, clusterName, path)
+}
+
+func countFilesOnAzureBlobStorage(
+	azStorageAccount string,
+	azStorageKey string,
+	clusterName string,
+	path string) (int, error) {
+	azBlobListCmd := composeAzBlobListCmd(azStorageAccount, azStorageKey, clusterName, path)
+	out, _, err := tests.RunUnchecked(azBlobListCmd)
+	if err != nil {
+		return -1, err
+	}
+	var arr []string
+	err = json.Unmarshal([]byte(out), &arr)
+	return len(arr), err
 }

@@ -907,6 +907,11 @@ func (in *ScheduledBackupSpec) DeepCopyInto(out *ScheduledBackupSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.Immediate != nil {
+		in, out := &in.Immediate, &out.Immediate
+		*out = new(bool)
+		**out = **in
+	}
 	out.Cluster = in.Cluster
 }
 

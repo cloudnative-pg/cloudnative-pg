@@ -1,4 +1,4 @@
-cluster-with-backup.yaml
+cluster-from-restore.yaml
+cluster-with-backup-minio.yaml
 cluster-with-backup-azure-blob.yaml
 minio-pvc.yaml
-

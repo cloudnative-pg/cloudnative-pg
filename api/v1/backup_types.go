@@ -24,8 +24,11 @@ const (
 	// BackupPhaseCompleted means that the backup is now completed
 	BackupPhaseCompleted = "completed"
 
-	// BackupPhaseFailed means that the
+	// BackupPhaseFailed means that the backup is failed
 	BackupPhaseFailed = "failed"
+
+	// BackupPhaseWalArchivingFailing means wal archiving isn't properly working
+	BackupPhaseWalArchivingFailing = "walArchivingFailing"
 )
 
 // BackupSpec defines the desired state of Backup

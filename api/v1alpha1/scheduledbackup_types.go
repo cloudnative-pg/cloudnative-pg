@@ -12,8 +12,11 @@ import (
 
 // ScheduledBackupSpec defines the desired state of ScheduledBackup
 type ScheduledBackupSpec struct {
-	// If this backup is suspended of not
+	// If this backup is suspended or not
 	Suspend *bool `json:"suspend,omitempty"`
+
+	// If the first backup has to be immediately start after creation or not
+	Immediate *bool `json:"immediate,omitempty"`
 
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	Schedule string `json:"schedule"`

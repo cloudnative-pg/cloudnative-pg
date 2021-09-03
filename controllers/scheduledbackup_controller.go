@@ -54,6 +54,11 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	if scheduledBackup.IsSuspended() {
+		log.Info("Skipping as backup is suspended")
+		return ctrl.Result{}, nil
+	}
+
 	// We are supposed to start a new backup. Let's extract
 	// the list of backups we already taken to see if anything
 	// is running now
@@ -114,7 +119,13 @@ func ReconcileScheduledBackup(
 			return ctrl.Result{}, err
 		}
 
-		nextTime := schedule.Next(scheduledBackup.GetStatus().LastCheckTime.Time)
+		if scheduledBackup.IsImmediate() {
+			event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
+				"BackupSchedule", "Scheduled immediate backup now: %v", now)
+			return CreateScheduledBackup(ctx, event, client, log, scheduledBackup, now, now, schedule)
+		}
+
+		nextTime := schedule.Next(now)
 		log.Info("Next backup schedule", "next", nextTime)
 		event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
 			"BackupSchedule", "Scheduled first backup by %v", nextTime)
@@ -124,19 +135,34 @@ func ReconcileScheduledBackup(
 	// Let's check if we are supposed to start a new backup.
 	nextTime := schedule.Next(scheduledBackup.GetStatus().LastCheckTime.Time)
 	log.Info("Next backup schedule", "next", nextTime)
+
 	if now.Before(nextTime) {
 		// No need to schedule a new backup, let's wait a bit
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
+	return CreateScheduledBackup(ctx, event, client, log, scheduledBackup, nextTime, now, schedule)
+}
+
+// CreateScheduledBackup creates a scheduled backup for a backuptime, updating the ScheduledBackup accordingly
+func CreateScheduledBackup(
+	ctx context.Context,
+	event record.EventRecorder,
+	client client.Client,
+	log logr.Logger,
+	scheduledBackup apiv1.ScheduledBackupCommon,
+	backupTime time.Time,
+	now time.Time,
+	schedule cron.Schedule,
+) (ctrl.Result, error) {
 	// So we have no backup running, let's create a backup.
 	// Let's have deterministic names to avoid creating the job two
 	// times
-	name := fmt.Sprintf("%s-%d", scheduledBackup.GetName(), nextTime.Unix())
+	name := fmt.Sprintf("%s-%d", scheduledBackup.GetName(), backupTime.Unix())
 	backup := scheduledBackup.CreateBackup(name)
 
 	log.Info("Creating backup", "backupName", backup.GetName())
-	if err = client.Create(ctx, backup.GetKubernetesObject()); err != nil {
+	if err := client.Create(ctx, backup.GetKubernetesObject()); err != nil {
 		if apierrs.IsConflict(err) {
 			// Retry later, the cache is stale
 			return ctrl.Result{}, nil
@@ -155,14 +181,14 @@ func ReconcileScheduledBackup(
 		Time: now,
 	}
 	scheduledBackup.GetStatus().LastScheduleTime = &metav1.Time{
-		Time: nextTime,
+		Time: backupTime,
 	}
-	nextTime = schedule.Next(now)
+	nextBackupTime := schedule.Next(now)
 	scheduledBackup.GetStatus().NextScheduleTime = &metav1.Time{
-		Time: nextTime,
+		Time: nextBackupTime,
 	}
 
-	if err = client.Status().Update(ctx, scheduledBackup.GetKubernetesObject()); err != nil {
+	if err := client.Status().Update(ctx, scheduledBackup.GetKubernetesObject()); err != nil {
 		if apierrs.IsConflict(err) {
 			// Retry later, the cache is stale
 			return ctrl.Result{}, nil
@@ -170,11 +196,10 @@ func ReconcileScheduledBackup(
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Next backup schedule", "next", nextTime)
+	log.Info("Next backup schedule", "next", backupTime)
 	event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
-		"BackupSchedule", "Next backup scheduled by %v", nextTime)
-
-	return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
+		"BackupSchedule", "Next backup scheduled by %v", nextBackupTime)
+	return ctrl.Result{RequeueAfter: nextBackupTime.Sub(now)}, nil
 }
 
 // GetChildBackups gets all the backups scheduled by a certain scheduler
