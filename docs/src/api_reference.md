@@ -501,11 +501,12 @@ Name     | Description                                                          
 
 ScheduledBackupSpec defines the desired state of ScheduledBackup
 
-Name     | Description                                                          | Type                                         
--------- | -------------------------------------------------------------------- | ---------------------------------------------
-`suspend ` | If this backup is suspended of not                                   | *bool                                        
-`schedule` | The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron. - *mandatory*  | string                                       
-`cluster ` | The cluster to backup                                                | [LocalObjectReference](#LocalObjectReference)
+Name      | Description                                                           | Type                                         
+--------- | --------------------------------------------------------------------- | ---------------------------------------------
+`suspend  ` | If this backup is suspended or not                                    | *bool                                        
+`immediate` | If the first backup has to be immediately start after creation or not | *bool                                        
+`schedule ` | The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.  - *mandatory*  | string                                       
+`cluster  ` | The cluster to backup                                                 | [LocalObjectReference](#LocalObjectReference)
 
 <a id='ScheduledBackupStatus'></a>
 

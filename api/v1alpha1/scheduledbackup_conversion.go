@@ -23,6 +23,7 @@ func (src *ScheduledBackup) ConvertTo(dstRaw conversion.Hub) error { //nolint:re
 	dst.Spec.Cluster.Name = src.Spec.Cluster.Name
 	dst.Spec.Schedule = src.Spec.Schedule
 	dst.Spec.Suspend = src.Spec.Suspend
+	dst.Spec.Immediate = src.Spec.Immediate
 
 	// status
 	dst.Status.LastCheckTime = src.Status.LastCheckTime
@@ -43,6 +44,7 @@ func (dst *ScheduledBackup) ConvertFrom(srcRaw conversion.Hub) error { //nolint:
 	dst.Spec.Cluster.Name = src.Spec.Cluster.Name
 	dst.Spec.Schedule = src.Spec.Schedule
 	dst.Spec.Suspend = src.Spec.Suspend
+	dst.Spec.Immediate = src.Spec.Immediate
 
 	// status
 	dst.Status.LastCheckTime = src.Status.LastCheckTime

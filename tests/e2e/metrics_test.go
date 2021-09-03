@@ -65,7 +65,7 @@ var _ = Describe("Metrics", func() {
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCustomMetricsConfigMapsSecrets(namespace, fixturesDir+"/metrics/custom-queries.yaml", 2, 1)
+		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries.yaml", 2, 1)
 
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsFile, env)
@@ -93,7 +93,7 @@ var _ = Describe("Metrics", func() {
 		// Create the cluster namespace
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCustomMetricsConfigMapsSecrets(namespace, customQueriesSampleFile, 1, 1)
+		AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, ClusterSampleFile, env)
 		CreateTestDataForTargetDB(namespace, metricsClusterName, targetDBOne, testTableName)
@@ -103,7 +103,7 @@ var _ = Describe("Metrics", func() {
 	})
 })
 
-func AssertCustomMetricsConfigMapsSecrets(namespace, sampleFile string, configMapsCount, secretsCount int) {
+func AssertCustomMetricsResourcesExist(namespace, sampleFile string, configMapsCount, secretsCount int) {
 	By("verifying the custom metrics ConfigMaps and Secrets exist", func() {
 		// Create the ConfigMaps and a Secret
 		_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + sampleFile)

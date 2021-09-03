@@ -13,7 +13,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
@@ -575,4 +578,45 @@ func (env TestingEnvironment) checkWebhookReady(namespace string) error {
 		}
 	}
 	return nil
+}
+
+// GetResourceNamespacedNameFromYAML returns the NamespacedName representing a resource in a YAML file
+func (env TestingEnvironment) GetResourceNamespacedNameFromYAML(path string) (types.NamespacedName, error) {
+	data, err := ioutil.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return types.NamespacedName{}, err
+	}
+	decoder := serializer.NewCodecFactory(env.Scheme).UniversalDeserializer()
+	obj, _, err := decoder.Decode(data, nil, nil)
+	if err != nil {
+		return types.NamespacedName{}, err
+	}
+	switch o := obj.(type) {
+	case *apiv1.ScheduledBackup:
+		return types.NamespacedName{Namespace: o.GetNamespace(), Name: o.GetName()}, nil
+	case *apiv1.Backup:
+		return types.NamespacedName{Namespace: o.GetNamespace(), Name: o.GetName()}, nil
+	case *apiv1.Cluster:
+		return types.NamespacedName{Namespace: o.GetNamespace(), Name: o.GetName()}, nil
+	default:
+		return types.NamespacedName{}, fmt.Errorf("unknown resource type: %T", o)
+	}
+}
+
+// GetResourceNameFromYAML returns the name of a resource in a YAML file
+func (env TestingEnvironment) GetResourceNameFromYAML(path string) (string, error) {
+	namespacedName, err := env.GetResourceNamespacedNameFromYAML(path)
+	if err != nil {
+		return "", err
+	}
+	return namespacedName.Name, err
+}
+
+// GetResourceNamespaceFromYAML returns the namespace of a resource in a YAML file
+func (env TestingEnvironment) GetResourceNamespaceFromYAML(path string) (string, error) {
+	namespacedName, err := env.GetResourceNamespacedNameFromYAML(path)
+	if err != nil {
+		return "", err
+	}
+	return namespacedName.Namespace, err
 }

@@ -77,10 +77,10 @@ var RetryUntilServerAvailable = wait.Backoff{
 // GetSocketDir get the name of the directory that will contain
 // the Unix socket for the PostgreSQL server. This is detected using
 // the PGHOST environment variable or using a default
-func (instance Instance) GetSocketDir() string {
+func GetSocketDir() string {
 	socketDir := os.Getenv("PGHOST")
 	if socketDir == "" {
-		socketDir = "/var/run/postgresql"
+		socketDir = postgres.SocketDirectory
 	}
 
 	return socketDir
@@ -89,7 +89,7 @@ func (instance Instance) GetSocketDir() string {
 // Startup starts up a PostgreSQL instance and wait for the instance to be
 // started
 func (instance Instance) Startup() error {
-	socketDir := instance.GetSocketDir()
+	socketDir := GetSocketDir()
 	if err := fileutils.EnsureDirectoryExist(socketDir); err != nil {
 		return fmt.Errorf("while creating socket directory: %w", err)
 	}
@@ -198,7 +198,7 @@ func (instance *Instance) Reload() error {
 // Run this instance returning an exec.Cmd structure
 // to control the instance execution
 func (instance Instance) Run() (*exec.Cmd, error) {
-	socketDir := instance.GetSocketDir()
+	socketDir := GetSocketDir()
 	if err := fileutils.EnsureDirectoryExist(socketDir); err != nil {
 		return nil, fmt.Errorf("while creating socket directory: %w", err)
 	}
@@ -248,7 +248,7 @@ func (instance *Instance) GetTemplateDB() (*sql.DB, error) {
 // ConnectionPool gets or initializes the connection pool for this instance
 func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
 	if instance.pool == nil {
-		socketDir := instance.GetSocketDir()
+		socketDir := GetSocketDir()
 		dsn := fmt.Sprintf(
 			"host=%s port=5432 user=postgres sslmode=disable",
 			socketDir)

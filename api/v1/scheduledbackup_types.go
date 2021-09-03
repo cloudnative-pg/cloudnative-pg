@@ -16,8 +16,11 @@ import (
 
 // ScheduledBackupSpec defines the desired state of ScheduledBackup
 type ScheduledBackupSpec struct {
-	// If this backup is suspended of not
+	// If this backup is suspended or not
 	Suspend *bool `json:"suspend,omitempty"`
+
+	// If the first backup has to be immediately start after creation or not
+	Immediate *bool `json:"immediate,omitempty"`
 
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	Schedule string `json:"schedule"`
@@ -80,6 +83,15 @@ func (scheduledBackup ScheduledBackup) IsSuspended() bool {
 	}
 
 	return *scheduledBackup.Spec.Suspend
+}
+
+// IsImmediate check if a backup has to be issued immediately upon creation or not
+func (scheduledBackup ScheduledBackup) IsImmediate() bool {
+	if scheduledBackup.Spec.Immediate == nil {
+		return false
+	}
+
+	return *scheduledBackup.Spec.Immediate
 }
 
 // GetName gets the scheduled backup name

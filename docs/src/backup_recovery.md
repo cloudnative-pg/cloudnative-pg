@@ -411,6 +411,12 @@ spec:
 
 The proposed specification will schedule a backup every day at midnight.
 
+ScheduledBackups can be suspended if needed by setting `.spec.suspend: true`,
+this will stop any new backup to be scheduled as long as the option is set to false.
+
+In case you want to issue a backup as soon as the ScheduledBackup resource is created
+you can set `.spec.immediate: true`.
+
 ## WAL archiving
 
 WAL archiving is enabled as soon as you choose a destination path

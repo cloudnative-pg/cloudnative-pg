@@ -32,4 +32,10 @@ type ScheduledBackupCommon interface {
 
 	// Create a backup from this scheduled backup
 	CreateBackup(name string) BackupCommon
+
+	// IsImmediate returns whether a backup should be started upon creation or not
+	IsImmediate() bool
+
+	// IsSuspended returns whether the backup is suspended or not
+	IsSuspended() bool
 }

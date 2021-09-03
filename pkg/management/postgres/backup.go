@@ -9,6 +9,7 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -25,6 +26,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -184,6 +186,45 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 	err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject())
 	if err != nil {
 		return fmt.Errorf("can't set backup as running: %v", err)
+	}
+
+	db, err := sql.Open(
+		"postgres",
+		fmt.Sprintf("host=%s port=5432 dbname=postgres user=postgres sslmode=disable",
+			GetSocketDir()),
+	)
+	if err != nil {
+		log.Log.Error(err, "can not open postgres database")
+		return err
+	}
+
+	walArchivingWorking := false
+	for {
+		row := db.QueryRow("SELECT COALESCE(last_archived_time,'-infinity') > " +
+			"COALESCE(last_failed_time, '-infinity') AS is_archiving FROM pg_stat_archiver;")
+
+		if err := row.Scan(&walArchivingWorking); err != nil {
+			log.Log.Error(err, "can't get wal archiving status")
+		}
+		if walArchivingWorking && err == nil {
+			log.Log.Info("wal archiving is working, will retry proceed with the backup")
+			if b.Backup.GetStatus().Phase != apiv1.BackupPhaseRunning {
+				b.Backup.GetStatus().Phase = apiv1.BackupPhaseRunning
+				err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject())
+				if err != nil {
+					log.Log.Error(err, "can't set backup as wal archiving failing")
+				}
+			}
+			break
+		}
+
+		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
+		err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject())
+		if err != nil {
+			log.Log.Error(err, "can't set backup as wal archiving failing")
+		}
+		log.Log.Info("wal archiving is not working, will retry in 10 seconds")
+		time.Sleep(time.Minute * 1)
 	}
 
 	b.Env, err = EnvSetCloudCredentials(ctx, b.Client, b.Cluster, b.Env)
