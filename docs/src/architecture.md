@@ -110,8 +110,8 @@ you can use the following environment variables in your applications:
 
 ## Secrets
 
-The PostgreSQL operator will generate two secrets for every PostgreSQL cluster
-it deploys:
+The PostgreSQL operator will generate two `basic-auth` type secrets for every
+PostgreSQL cluster it deploys:
 
 * `[cluster name]-superuser`
 * `[cluster name]-app`

@@ -19,8 +19,8 @@ spec:
 
   bootstrap:
     initdb:
-      database: appdb
-      owner: appuser
+      database: app
+      owner: app
 
   storage:
     size: 1Gi
@@ -37,6 +37,13 @@ We currently support the following bootstrap methods:
    same major version using `pg_basebackup` via streaming replication protocol -
    useful if you want to migrate databases to Cloud Native PostgreSQL, even
    from outside Kubernetes.
+
+!!! Important
+    Cloud Native PostgreSQL requires both the `postgres` user and database to
+    always exists. Using the local Unix Domain Socket, it needs to connect
+    as `postgres` user to the `postgres` database via `peer` authentication in
+    order to perform administrative tasks on the cluster.  
+    **DO NOT DELETE** the `postgres` user or the `postgres` database!!!
 
 ## initdb
 
@@ -58,10 +65,10 @@ spec:
 
   bootstrap:
     initdb:
-      database: appdb
-      owner: appuser
+      database: app
+      owner: app
       secret:
-        name: appuser-secret
+        name: app-secret
 
   storage:
     size: 1Gi
@@ -70,10 +77,11 @@ spec:
 The above example of bootstrap will:
 
 1. create a new `PGDATA` folder using PostgreSQL's native `initdb` command
-2. set a *superuser* password from the secret named `superuser-secret`
-3. create an *unprivileged* user named `appuser`
-4. set the password of the latter using the one in the `appuser-secret` secret
-5. create a database called `appdb` owned by the `appuser` user.
+2. set a password for the `postgres` *superuser* from the secret named `superuser-secret`
+3. create an *unprivileged* user named `app`
+4. set the password of the latter (`app`) using the one in the `app-secret`
+   secret (make sure that `username` matches the same name of the `owner`)
+5. create a database called `app` owned by the `app` user.
 
 Thanks to the *convention over configuration paradigm*, you can let the
 operator choose a default database name (`app`) and a default application
@@ -86,19 +94,19 @@ and use them in the PostgreSQL cluster - as described in the above example.
 
 The supplied secrets must comply with the specifications of the
 [`kubernetes.io/basic-auth` type](https://kubernetes.io/docs/concepts/configuration/secret/#basic-authentication-secret).
-The operator will only use the `password` field of the secret,
-ignoring the `username` field. If you plan to reuse the secret for application
-connections, you can set the `username` field to the same value as the `owner`.
+As a result, the `username` in the secret must match the one of the `owner`
+(for the application secret) and `postgres` for the superuser one.
 
 The following is an example of a `basic-auth` secret:
 
 ```yaml
 apiVersion: v1
 data:
+  username: YXBw
   password: cGFzc3dvcmQ=
 kind: Secret
 metadata:
-  name: cluster-example-app-user
+  name: app-secret
 type: kubernetes.io/basic-auth
 ```
 
@@ -141,8 +149,8 @@ spec:
 
   bootstrap:
     initdb:
-      database: appdb
-      owner: appuser
+      database: app
+      owner: app
       options:
       - "-k"
       - "--locale=en_US"
@@ -152,7 +160,8 @@ spec:
 
 The user can also specify a custom list of queries that will be executed
 once, just after the database is created and configured. These queries will
-be executed as the *superuser*, connected to the `postgres` database:
+be executed as the *superuser* (`postgres`), connected to the `postgres`
+database:
 
 ```yaml
 apiVersion: postgresql.k8s.enterprisedb.io/v1
@@ -164,8 +173,8 @@ spec:
 
   bootstrap:
     initdb:
-      database: appdb
-      owner: appuser
+      database: app
+      owner: app
       options:
       - "-k"
       - "--locale=en_US"
