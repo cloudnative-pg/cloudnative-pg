@@ -7,7 +7,7 @@ require (
 	github.com/go-logr/logr v0.4.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/lib/pq v1.10.2
+	github.com/lib/pq v1.10.3
 	github.com/logrusorgru/aurora/v3 v3.0.0
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.14.0
