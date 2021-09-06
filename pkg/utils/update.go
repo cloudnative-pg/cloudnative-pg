@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// UpdateStatusAndRetry update a certain backup in the k8s database
+// UpdateStatusAndRetry updates a certain object in the k8s database,
 // retrying when conflicts are detected
 func UpdateStatusAndRetry(
 	ctx context.Context,
@@ -21,6 +21,8 @@ func UpdateStatusAndRetry(
 	obj client.Object,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// TODO: we should refresh the object here before trying
+		// setting the status again
 		return client.Status().Update(ctx, obj)
 	})
 }

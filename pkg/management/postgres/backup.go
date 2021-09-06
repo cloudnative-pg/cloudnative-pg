@@ -178,7 +178,7 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 	return options
 }
 
-// Start start a backup for this instance using
+// Start initiates a backup for this instance using
 // barman-cloud-backup
 func (b *BackupCommand) Start(ctx context.Context) error {
 	b.setupBackupStatus()
@@ -223,7 +223,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		if err != nil {
 			log.Log.Error(err, "can't set backup as wal archiving failing")
 		}
-		log.Log.Info("wal archiving is not working, will retry in 10 seconds")
+		log.Log.Info("wal archiving is not working, will retry in one minute")
 		time.Sleep(time.Minute * 1)
 	}
 
