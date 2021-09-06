@@ -122,7 +122,7 @@ func ReconcileScheduledBackup(
 		if scheduledBackup.IsImmediate() {
 			event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
 				"BackupSchedule", "Scheduled immediate backup now: %v", now)
-			return CreateScheduledBackup(ctx, event, client, log, scheduledBackup, now, now, schedule)
+			return createBackup(ctx, event, client, log, scheduledBackup, now, now, schedule)
 		}
 
 		nextTime := schedule.Next(now)
@@ -141,11 +141,11 @@ func ReconcileScheduledBackup(
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
-	return CreateScheduledBackup(ctx, event, client, log, scheduledBackup, nextTime, now, schedule)
+	return createBackup(ctx, event, client, log, scheduledBackup, nextTime, now, schedule)
 }
 
-// CreateScheduledBackup creates a scheduled backup for a backuptime, updating the ScheduledBackup accordingly
-func CreateScheduledBackup(
+// createBackup creates a scheduled backup for a backuptime, updating the ScheduledBackup accordingly
+func createBackup(
 	ctx context.Context,
 	event record.EventRecorder,
 	client client.Client,
