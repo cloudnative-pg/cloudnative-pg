@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/lib/pq"
@@ -26,12 +25,10 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	postgresManagement "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
 // RetryUntilWalReceiverDown is the default retry configuration that is used
@@ -236,16 +233,6 @@ func (r *InstanceReconciler) reconcileMetrics(
 		} else {
 			exporter.Metrics.SwitchoverRequired.Set(0)
 		}
-	}
-
-	files, err := filepath.Glob(filepath.Join(specs.PgWalArchiveStatusPath, "*.ready"))
-	if err != nil {
-		log.Log.Error(err, "while reading directory", "path", specs.PgWalArchiveStatusPath)
-		exporter.Metrics.Error.Set(1)
-		exporter.Metrics.PgCollectionErrors.WithLabelValues("Collect.ArchiveCommandQueue").Inc()
-		exporter.Metrics.ArchiveCommandQueueSize.Set(-1)
-	} else {
-		exporter.Metrics.ArchiveCommandQueueSize.Set(float64(len(files)))
 	}
 
 	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
