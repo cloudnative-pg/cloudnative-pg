@@ -10,8 +10,10 @@ package metrics
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,6 +21,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	postgresconf "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
 // PrometheusNamespace is the namespace to be used for all custom metrics exposed by instances
@@ -26,6 +29,9 @@ import (
 const PrometheusNamespace = "cnp"
 
 var synchronousStandbyNamesRegex = regexp.MustCompile(`ANY ([0-9]+) \(.*\)`)
+
+// The wal_segment_size value in bytes
+var walSegmentSize *int
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
@@ -37,15 +43,16 @@ type Exporter struct {
 // metrics here are related to the exporter itself, which is instrumented to
 // expose them
 type metrics struct {
-	CollectionsTotal        prometheus.Counter
-	PgCollectionErrors      *prometheus.CounterVec
-	Error                   prometheus.Gauge
-	PostgreSQLUp            prometheus.Gauge
-	CollectionDuration      *prometheus.GaugeVec
-	SwitchoverRequired      prometheus.Gauge
-	SyncReplicas            *prometheus.GaugeVec
-	ReplicaCluster          prometheus.Gauge
-	ArchiveCommandQueueSize prometheus.Gauge
+	CollectionsTotal   prometheus.Counter
+	PgCollectionErrors *prometheus.CounterVec
+	Error              prometheus.Gauge
+	PostgreSQLUp       prometheus.Gauge
+	CollectionDuration *prometheus.GaugeVec
+	SwitchoverRequired prometheus.Gauge
+	SyncReplicas       *prometheus.GaugeVec
+	ReplicaCluster     prometheus.Gauge
+	PgWALArchiveStatus *prometheus.GaugeVec
+	PgWALDirectory     *prometheus.GaugeVec
 }
 
 // NewExporter creates an exporter
@@ -100,7 +107,7 @@ func newMetrics() *metrics {
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "sync_replicas",
-			Help:      "number of requested synchronous replicas (synchronous_standby_names)",
+			Help:      "Number of requested synchronous replicas (synchronous_standby_names)",
 		}, []string{"value"}),
 		ReplicaCluster: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
@@ -108,12 +115,21 @@ func newMetrics() *metrics {
 			Name:      "replica_mode",
 			Help:      "1 if the cluster is in replica mode, 0 otherwise",
 		}),
-		ArchiveCommandQueueSize: prometheus.NewGauge(prometheus.GaugeOpts{
+		PgWALArchiveStatus: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
-			Name:      "archive_command_queue_size",
-			Help:      "Number of WAL segments waiting to be archived in the backup object store",
-		}),
+			Name:      "pg_wal_archive_status",
+			Help: fmt.Sprintf("Number of WAL segments in the '%s' directory (ready, done)",
+				specs.PgWalArchiveStatusPath),
+		}, []string{"value"}),
+		PgWALDirectory: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "pg_wal",
+			Help: fmt.Sprintf("Total size in bytes of WAL segments in the '%s' directory "+
+				" computed as (wal_segment_size * count)",
+				specs.PgWalPath),
+		}, []string{"value"}),
 	}
 }
 
@@ -127,7 +143,8 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.CollectionDuration.Describe(ch)
 	e.Metrics.SyncReplicas.Describe(ch)
 	ch <- e.Metrics.ReplicaCluster.Desc()
-	ch <- e.Metrics.ArchiveCommandQueueSize.Desc()
+	e.Metrics.PgWALArchiveStatus.Describe(ch)
+	e.Metrics.PgWALDirectory.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -147,7 +164,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.Metrics.CollectionDuration.Collect(ch)
 	e.Metrics.SyncReplicas.Collect(ch)
 	ch <- e.Metrics.ReplicaCluster
-	ch <- e.Metrics.ArchiveCommandQueueSize
+	e.Metrics.PgWALArchiveStatus.Collect(ch)
+	e.Metrics.PgWALDirectory.Collect(ch)
 }
 
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
@@ -202,6 +220,97 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 			e.Metrics.SyncReplicas.WithLabelValues("observed").Set(float64(nStandbys))
 		}
 	}
+
+	if err := collectPGWalArchiveMetric(e); err != nil {
+		log.Log.Error(err, "while collecting WAL archive metrics", "path", specs.PgWalArchiveStatusPath)
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PgWALArchiveStats").Inc()
+		e.Metrics.PgWALArchiveStatus.Reset()
+	}
+
+	if err := collectPGWalMetric(e, db); err != nil {
+		log.Log.Error(err, "while collecting WAL metrics", "path", specs.PgWalPath)
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PgWALStats").Inc()
+		e.Metrics.PgWALDirectory.Reset()
+	}
+}
+
+func collectPGWalArchiveMetric(exporter *Exporter) error {
+	pgWalArchiveDir, err := os.Open(specs.PgWalArchiveStatusPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = pgWalArchiveDir.Close()
+	}()
+	files, err := pgWalArchiveDir.Readdir(-1)
+	if err != nil {
+		return err
+	}
+	var ready, done int
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		fileName := f.Name()
+		switch {
+		case strings.HasSuffix(fileName, ".ready"):
+			ready++
+		case strings.HasSuffix(fileName, ".done"):
+			done++
+		}
+	}
+	exporter.Metrics.PgWALArchiveStatus.WithLabelValues("ready").Set(float64(ready))
+	exporter.Metrics.PgWALArchiveStatus.WithLabelValues("done").Set(float64(done))
+	return nil
+}
+
+var regexPGWalFileName = regexp.MustCompile("^[0-9A-F]{24}")
+
+func collectPGWalMetric(exporter *Exporter, db *sql.DB) error {
+	pgWalDir, err := os.Open(specs.PgWalPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = pgWalDir.Close()
+	}()
+	files, err := pgWalDir.Readdir(-1)
+	if err != nil {
+		return err
+	}
+	var count int
+	for _, f := range files {
+		if f.IsDir() || !regexPGWalFileName.MatchString(f.Name()) {
+			continue
+		}
+		count++
+	}
+
+	exporter.Metrics.PgWALDirectory.WithLabelValues("count").Set(float64(count))
+	WALSegmentSize, err := getWALSegmentSize(db)
+	if err != nil {
+		return err
+	}
+	exporter.Metrics.PgWALDirectory.WithLabelValues("size").Set(float64(count * WALSegmentSize))
+	return nil
+}
+
+// We cache the value of wal_segment_size the first time we retrieve it from the database
+func getWALSegmentSize(db *sql.DB) (int, error) {
+	if walSegmentSize != nil {
+		return *walSegmentSize, nil
+	}
+	var size int
+	err := db.QueryRow("SELECT setting FROM pg_settings WHERE name='wal_segment_size'").
+		Scan(&size)
+	if err != nil {
+		log.Log.Error(err, "while getting the wal_segment_size value from the database")
+		return 0, err
+	}
+	walSegmentSize = &size
+	return *walSegmentSize, nil
 }
 
 func getSynchronousStandbysNumber(db *sql.DB) (int, error) {
