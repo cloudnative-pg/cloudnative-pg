@@ -19,7 +19,7 @@ In addition, check you have these already installed:
 On Mac OS X, you can install the above components with [brew](https://brew.sh/):
 
 ``` bash
-brew install go kind golangci/tap/golangci-lintr
+brew install go kind golangci/tap/golangci-lint
 ```
 
 >**⚠️ Note:**
