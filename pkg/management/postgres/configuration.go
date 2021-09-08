@@ -125,9 +125,12 @@ func configureRecoveryConfFile(pgData string, primaryConnInfo string) (changed b
 
 	options := map[string]string{
 		"standby_mode":             "on",
-		"primary_conninfo":         primaryConnInfo,
 		"restore_command":          "/controller/manager wal-restore %f %p",
 		"recovery_target_timeline": "latest",
+	}
+
+	if primaryConnInfo != "" {
+		options["primary_conninfo"] = primaryConnInfo
 	}
 
 	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
@@ -147,9 +150,12 @@ func configurePostgresAutoConfFile(pgData string, primaryConnInfo string) (chang
 	targetFile := path.Join(pgData, "postgresql.auto.conf")
 
 	options := map[string]string{
-		"primary_conninfo":         primaryConnInfo,
 		"restore_command":          "/controller/manager wal-restore %f %p",
 		"recovery_target_timeline": "latest",
+	}
+
+	if primaryConnInfo != "" {
+		options["primary_conninfo"] = primaryConnInfo
 	}
 
 	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)

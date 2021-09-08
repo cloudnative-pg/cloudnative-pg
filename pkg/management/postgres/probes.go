@@ -112,8 +112,13 @@ func (instance *Instance) fillWalStatusReplica(result *postgres.PostgresqlStatus
 		return err
 	}
 
+	// pg_last_wal_receive_lsn may be NULL when using non-streaming
+	// replicas
 	row := superUserDB.QueryRow(
-		"SELECT pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), pg_is_wal_replay_paused()")
+		"SELECT " +
+			"COALESCE(pg_last_wal_receive_lsn()::varchar, ''), " +
+			"COALESCE(pg_last_wal_replay_lsn()::varchar, ''), " +
+			"pg_is_wal_replay_paused()")
 	err = row.Scan(&result.ReceivedLsn, &result.ReplayLsn, &result.ReplayPaused)
 	if err != nil {
 		return err
@@ -149,25 +154,6 @@ func (instance *Instance) IsWALReceiverActive() (bool, error) {
 	err = row.Scan(&result)
 	if err != nil {
 		return false, err
-	}
-
-	return result, nil
-}
-
-// GetWALApplyLag gets the amount of bytes of transaction log info need
-// still to be applied
-func (instance *Instance) GetWALApplyLag() (int64, error) {
-	var result int64
-
-	superUserDB, err := instance.GetSuperUserDB()
-	if err != nil {
-		return -1, err
-	}
-
-	row := superUserDB.QueryRow("SELECT pg_last_wal_receive_lsn() - pg_last_wal_replay_lsn()")
-	err = row.Scan(&result)
-	if err != nil {
-		return -1, err
 	}
 
 	return result, nil
