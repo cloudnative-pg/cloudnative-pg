@@ -79,7 +79,7 @@ func (r *ScheduledBackup) ValidateUpdate(old runtime.Object) error {
 	scheduledBackupLog.Info("validate update", "name", r.Name)
 
 	oldV1ScheduledBackup := v1.ScheduledBackup{}
-	if err := old.(*Cluster).ConvertTo(&oldV1ScheduledBackup); err != nil {
+	if err := old.(*ScheduledBackup).ConvertTo(&oldV1ScheduledBackup); err != nil {
 		return err
 	}
 
