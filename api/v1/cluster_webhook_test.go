@@ -968,42 +968,77 @@ var _ = Describe("Cluster name validation", func() {
 	})
 })
 
-var _ = Describe("validation of the list of external servers", func() {
+var _ = Describe("validation of the list of external clusters", func() {
 	It("is correct when it's empty", func() {
 		cluster := Cluster{}
-		Expect(cluster.validateExternalServers()).To(BeEmpty())
+		Expect(cluster.validateExternalClusters()).To(BeEmpty())
 	})
 
-	It("complains when the list of servers contains duplicates", func() {
+	It("complains when the list of clusters contains duplicates", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				ExternalClusters: []ExternalCluster{
 					{
 						Name: "one",
+						ConnectionParameters: map[string]string{
+							"dbname": "postgres",
+						},
 					},
 					{
 						Name: "one",
+						ConnectionParameters: map[string]string{
+							"dbname": "postgres",
+						},
 					},
 				},
 			},
 		}
-		Expect(cluster.validateExternalServers()).ToNot(BeEmpty())
+		Expect(cluster.validateExternalClusters()).ToNot(BeEmpty())
 	})
 
-	It("should not raise errors is the server name is unique", func() {
+	It("should not raise errors is the cluster name is unique", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				ExternalClusters: []ExternalCluster{
 					{
 						Name: "one",
+						ConnectionParameters: map[string]string{
+							"dbname": "postgres",
+						},
 					},
 					{
 						Name: "two",
+						ConnectionParameters: map[string]string{
+							"dbname": "postgres",
+						},
 					},
 				},
 			},
 		}
-		Expect(cluster.validateExternalServers()).To(BeEmpty())
+		Expect(cluster.validateExternalClusters()).To(BeEmpty())
+	})
+})
+
+var _ = Describe("validation of an external cluster", func() {
+	It("ensure that one of connectionParameters and barmanObjectStore is set", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ExternalClusters: []ExternalCluster{
+					{},
+				},
+			},
+		}
+		Expect(cluster.validateExternalClusters()).To(Not(BeEmpty()))
+
+		cluster.Spec.ExternalClusters[0].ConnectionParameters = map[string]string{
+			"dbname": "postgres",
+		}
+		cluster.Spec.ExternalClusters[0].BarmanObjectStore = nil
+		Expect(cluster.validateExternalClusters()).To(BeEmpty())
+
+		cluster.Spec.ExternalClusters[0].ConnectionParameters = nil
+		cluster.Spec.ExternalClusters[0].BarmanObjectStore = &BarmanObjectStoreConfiguration{}
+		Expect(cluster.validateExternalClusters()).To(BeEmpty())
 	})
 })
 
@@ -1204,7 +1239,7 @@ var _ = Describe("validate anti-affinity", func() {
 var _ = Describe("validation of the list of external servers", func() {
 	It("is correct when it's empty", func() {
 		cluster := Cluster{}
-		Expect(cluster.validateExternalServers()).To(BeEmpty())
+		Expect(cluster.validateExternalClusters()).To(BeEmpty())
 	})
 
 	It("complains when the list of servers contains duplicates", func() {
@@ -1212,15 +1247,17 @@ var _ = Describe("validation of the list of external servers", func() {
 			Spec: ClusterSpec{
 				ExternalClusters: []ExternalCluster{
 					{
-						Name: "one",
+						Name:                 "one",
+						ConnectionParameters: map[string]string{},
 					},
 					{
-						Name: "one",
+						Name:                 "one",
+						ConnectionParameters: map[string]string{},
 					},
 				},
 			},
 		}
-		Expect(cluster.validateExternalServers()).ToNot(BeEmpty())
+		Expect(cluster.validateExternalClusters()).ToNot(BeEmpty())
 	})
 
 	It("should not raise errors is the server name is unique", func() {
@@ -1228,15 +1265,17 @@ var _ = Describe("validation of the list of external servers", func() {
 			Spec: ClusterSpec{
 				ExternalClusters: []ExternalCluster{
 					{
-						Name: "one",
+						Name:                 "one",
+						ConnectionParameters: map[string]string{},
 					},
 					{
-						Name: "two",
+						Name:                 "two",
+						ConnectionParameters: map[string]string{},
 					},
 				},
 			},
 		}
-		Expect(cluster.validateExternalServers()).To(BeEmpty())
+		Expect(cluster.validateExternalClusters()).To(BeEmpty())
 	})
 })
 

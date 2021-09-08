@@ -1,0 +1,30 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-replica-async
+spec:
+  instances: 3
+
+  bootstrap:
+    recovery:
+      source: postgresql-bkp
+
+  replica:
+    enabled: true
+    source: postgresql-bkp
+
+  storage:
+    size: 1Gi
+
+  externalClusters:
+  - name: postgresql-bkp
+    barmanObjectStore:
+      destinationPath: s3://backups/
+      endpointURL: http://minio:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: minio
+          key: ACCESS_SECRET_KEY

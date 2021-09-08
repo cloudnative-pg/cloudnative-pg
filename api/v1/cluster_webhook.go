@@ -129,7 +129,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 	allErrs = append(allErrs, r.validateName()...)
 	allErrs = append(allErrs, r.validateBootstrapPgBaseBackupSource()...)
 	allErrs = append(allErrs, r.validateBootstrapRecoverySource()...)
-	allErrs = append(allErrs, r.validateExternalServers()...)
+	allErrs = append(allErrs, r.validateExternalClusters()...)
 	allErrs = append(allErrs, r.validateTolerations()...)
 	allErrs = append(allErrs, r.validateAntiAffinity()...)
 	allErrs = append(allErrs, r.validateReplicaMode()...)
@@ -722,12 +722,16 @@ func (r *Cluster) validateName() field.ErrorList {
 }
 
 // Check if the external servers list contains two servers with the same name
-func (r *Cluster) validateExternalServers() field.ErrorList {
+func (r *Cluster) validateExternalClusters() field.ErrorList {
 	var result field.ErrorList
 	stringSet := configfile.NewStringSet()
 
-	for _, server := range r.Spec.ExternalClusters {
-		stringSet.Put(server.Name)
+	for idx, externalCluster := range r.Spec.ExternalClusters {
+		path := field.NewPath("spec", "externalClusters").Index(idx)
+		stringSet.Put(externalCluster.Name)
+		result = append(
+			result,
+			r.validateExternalCluster(&r.Spec.ExternalClusters[idx], path)...)
 	}
 
 	if stringSet.Len() != len(r.Spec.ExternalClusters) {
@@ -735,6 +739,21 @@ func (r *Cluster) validateExternalServers() field.ErrorList {
 			field.NewPath("spec", "externalServers"),
 			r.Spec.ExternalClusters,
 			"the list of external servers contains duplicate values"))
+	}
+
+	return result
+}
+
+// validateExternalCluster check the validity of a certain ExternalCluster
+func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path *field.Path) field.ErrorList {
+	var result field.ErrorList
+
+	if externalCluster.ConnectionParameters == nil && externalCluster.BarmanObjectStore == nil {
+		result = append(result,
+			field.Invalid(
+				path,
+				externalCluster,
+				"one of connectionParameters and barmanObjectStore is required"))
 	}
 
 	return result

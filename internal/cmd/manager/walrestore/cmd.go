@@ -55,7 +55,45 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
-			if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+			var barmanConfiguration *apiv1.BarmanObjectStoreConfiguration
+			recoverClusterName := clusterName
+
+			switch {
+			case !cluster.IsReplica() && cluster.Status.CurrentPrimary == podName:
+				// Why a request to restore a WAL file is arriving from the primary server?
+				// Something strange is happening here
+				log.Log.Info("Received request to restore a WAL file on the current primary",
+					"walName", walName,
+					"pod", podName,
+					"cluster", clusterName,
+					"namespace", namespace,
+					"currentPrimary", cluster.Status.CurrentPrimary,
+					"targetPrimary", cluster.Status.TargetPrimary,
+				)
+				return fmt.Errorf("avoiding restoring WAL on the primary server")
+
+			case cluster.IsReplica() && cluster.Status.CurrentPrimary == podName:
+				// I am the designated primary. Let's use the recovery object store for this wal
+				sourceName := cluster.Spec.ReplicaCluster.Source
+				externalServer, found := cluster.ExternalServer(sourceName)
+				if !found {
+					log.Log.Info("External cluster not found, cannot recover WAL",
+						"sourceName", sourceName)
+					return fmt.Errorf("external cluster not found: %v", sourceName)
+				}
+
+				barmanConfiguration = externalServer.BarmanObjectStore
+				recoverClusterName = externalServer.Name
+
+			default:
+				// I am a plain replica. Let's use the object store which we are using to
+				// back up this cluster
+				if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
+					barmanConfiguration = cluster.Spec.Backup.BarmanObjectStore
+				}
+			}
+
+			if barmanConfiguration == nil {
 				// Backup not configured, skipping WAL
 				log.Log.V(4).Info("Skipping WAL restore, there is no backup configuration",
 					"walName", walName,
@@ -68,27 +106,13 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("backup not configured")
 			}
 
-			if cluster.Status.CurrentPrimary == podName {
-				// Why a request to restore a WAL file is arriving from the primary server?
-				// Something strange is happening here
-				log.Log.Info("Received request to restore a WAL file on the current primary",
-					"walName", walName,
-					"pod", podName,
-					"cluster", clusterName,
-					"namespace", namespace,
-					"currentPrimary", cluster.Status.CurrentPrimary,
-					"targetPrimary", cluster.Status.TargetPrimary,
-				)
-				return fmt.Errorf("avoiding restoring WAL on the primary server")
-			}
-
-			options := barmanCloudWalRestoreOptions(cluster, clusterName, walName, destinationPath)
+			options := barmanCloudWalRestoreOptions(barmanConfiguration, recoverClusterName, walName, destinationPath)
 
 			env, err := barman.EnvSetCloudCredentials(
 				ctx,
 				typedClient,
 				namespace,
-				cluster.Spec.Backup.BarmanObjectStore,
+				barmanConfiguration,
 				os.Environ())
 			if err != nil {
 				log.Log.Error(err, "Error while settings AWS environment variables",
@@ -136,9 +160,11 @@ func NewCmd() *cobra.Command {
 }
 
 func barmanCloudWalRestoreOptions(
-	cluster apiv1.Cluster, clusterName string, walName string, destinationPath string) []string {
-	configuration := cluster.Spec.Backup.BarmanObjectStore
-
+	configuration *apiv1.BarmanObjectStoreConfiguration,
+	clusterName string,
+	walName string,
+	destinationPath string,
+) []string {
 	var options []string
 	if configuration.Wal != nil {
 		if len(configuration.Wal.Encryption) != 0 {
