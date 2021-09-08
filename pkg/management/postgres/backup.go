@@ -23,6 +23,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/catalog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
@@ -225,10 +226,28 @@ func (b *BackupCommand) run(ctx context.Context) {
 	backupStatus.SetAsCompleted()
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
 
+	// Extracting latest backup using barman-cloud-backup-list
+	backupList, err := barman.GetBackupList(b.Cluster.Spec.Backup.BarmanObjectStore, backupStatus.ServerName, b.Env)
+	if err != nil || backupList.Len() == 0 {
+		// Proper logging already happened inside getBackupList
+		return
+	}
+
 	// Update status
-	b.updateCompletedBackupStatus()
+	b.updateCompletedBackupStatus(backupList)
 	if err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject()); err != nil {
 		b.Log.Error(err, "Can't set backup status as completed")
+	}
+
+	// Set the first recoverability point
+	if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
+		firstRecoverabilityPoint := ts.Format(time.RFC3339)
+		if b.Cluster.Status.FirstRecoverabilityPoint != firstRecoverabilityPoint {
+			b.Cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
+			if err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Cluster); err != nil {
+				b.Log.Error(err, "Can't update first recoverability point")
+			}
+		}
 	}
 }
 
@@ -255,15 +274,8 @@ func (b *BackupCommand) setupBackupStatus() {
 
 // updateCompletedBackupStatus updates the backup calling barman-cloud-backup-list
 // to retrieve all the relevant data
-func (b *BackupCommand) updateCompletedBackupStatus() {
+func (b *BackupCommand) updateCompletedBackupStatus(backupList *catalog.Catalog) {
 	backupStatus := b.Backup.GetStatus()
-
-	// Extracting latest backup using barman-cloud-backup-list
-	backupList, err := barman.GetBackupList(b.Cluster.Spec.Backup.BarmanObjectStore, backupStatus.ServerName, b.Env)
-	if err != nil {
-		// Proper logging already happened inside getBackupList
-		return
-	}
 
 	// Update the backup with the data from the backup list retrieved
 	// get latest backup and set BackupId, StartedAt, StoppedAt, BeginWal, EndWAL, BeginLSN, EndLSN
