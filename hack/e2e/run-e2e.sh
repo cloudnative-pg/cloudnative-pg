@@ -68,6 +68,11 @@ if ! which ginkgo &>/dev/null; then
   install_go_module "github.com/onsi/ginkgo/ginkgo"
 fi
 
+# Skip upgrade tests on v14
+if [[ "${POSTGRES_IMG}" =~ "14-beta" ]]; then
+  TEST_UPGRADE_TO_V1=false
+fi
+
 # To run all ginkgo test suite, store return code for individual ginkgo suite and
 # after completion the run it will exit on any of the failure
 RC=0

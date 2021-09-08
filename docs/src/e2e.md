@@ -17,6 +17,7 @@ process:
 
 The following PostgreSQL versions are tested:
 
+* PostgreSQL 14
 * PostgreSQL 13
 * PostgreSQL 12
 * PostgreSQL 11

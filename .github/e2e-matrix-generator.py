@@ -92,6 +92,7 @@ RKE_K8S = VersionList(rke_versions)
 POSTGRES = MajorVersionList(
     {
         "13": ["13.3", "13.2"],
+        "14": ["14-beta3", "14-beta3-1"],
         "12": ["12.7", "12.6"],
         "11": ["11.12", "11.11"],
         "10": ["10.17", "10.16"],
