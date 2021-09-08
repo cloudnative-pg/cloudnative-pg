@@ -400,6 +400,11 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 // createOrPatchRole ensures that the required role for the instance manager exists and
 // contains the right rules
 func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv1.Cluster) error {
+	originBackup, err := r.getOriginBackup(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
 	var role rbacv1.Role
 	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &role); err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -407,10 +412,10 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 		}
 
 		r.Recorder.Event(cluster, "Normal", "CreatingRole", "Creating Cluster Role")
-		return r.createRole(ctx, cluster)
+		return r.createRole(ctx, cluster, originBackup)
 	}
 
-	generatedRole := specs.CreateRole(*cluster)
+	generatedRole := specs.CreateRole(*cluster, originBackup)
 	if reflect.DeepEqual(generatedRole.Rules, role.Rules) {
 		// Everything fine, the two config maps are exactly the same
 		return nil
@@ -430,10 +435,10 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 }
 
 // createRole creates the role
-func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) error {
 	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
 
-	role := specs.CreateRole(*cluster)
+	role := specs.CreateRole(*cluster, backupOrigin)
 	SetClusterOwnerAnnotationsAndLabels(&role.ObjectMeta, cluster)
 
 	err := r.Create(ctx, &role)
@@ -533,21 +538,23 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	switch {
 	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil:
-		backup, err := r.getOriginBackup(ctx, cluster)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if backup == nil {
-			log.Info("Missing backup object, can't continue full recovery",
-				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
-			return ctrl.Result{
-				Requeue:      true,
-				RequeueAfter: time.Minute,
-			}, nil
+		if cluster.Spec.Bootstrap.Recovery.Backup != nil {
+			backup, err := r.getOriginBackup(ctx, cluster)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if backup == nil {
+				log.Info("Missing backup object, can't continue full recovery",
+					"backup", cluster.Spec.Bootstrap.Recovery.Backup)
+				return ctrl.Result{
+					Requeue:      true,
+					RequeueAfter: time.Minute,
+				}, nil
+			}
 		}
 
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
-		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup)
+		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial)
 	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
 		job = specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial)
@@ -597,7 +604,9 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 // getOriginBackup gets the backup that is used to bootstrap a new PostgreSQL cluster
 func (r *ClusterReconciler) getOriginBackup(ctx context.Context, cluster *apiv1.Cluster) (*apiv1.Backup, error) {
-	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil {
+	if cluster.Spec.Bootstrap == nil ||
+		cluster.Spec.Bootstrap.Recovery == nil ||
+		cluster.Spec.Bootstrap.Recovery.Backup == nil {
 		return nil, nil
 	}
 

@@ -41,6 +41,9 @@ type Instance struct {
 	// The data directory
 	PgData string
 
+	// The environment variables that will be used to start the instance
+	Env []string
+
 	// Command line options to pass to the postgres process, see the
 	// '-c' option of pg_ctl for an useful example
 	StartupOptions []string
@@ -115,6 +118,7 @@ func (instance Instance) Startup() error {
 	log.Log.Info("Starting up instance", "pgdata", instance.PgData)
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
+	pgCtlCmd.Env = instance.Env
 	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
 	if err != nil {
 		return fmt.Errorf("error starting PostgreSQL instance: %w", err)
@@ -208,6 +212,7 @@ func (instance Instance) Run() (*exec.Cmd, error) {
 	}
 
 	postgresCmd := exec.Command(postgresName, options...) // #nosec
+	postgresCmd.Env = instance.Env
 	postgresCmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
@@ -414,6 +419,7 @@ func (instance *Instance) Rewind() error {
 		"options", options)
 
 	pgRewindCmd := exec.Command(pgRewindName, options...) // #nosec
+	pgRewindCmd.Env = instance.Env
 	err := execlog.RunStreaming(pgRewindCmd, pgRewindName)
 	if err != nil {
 		return fmt.Errorf("error executing pg_rewind: %w", err)

@@ -24,7 +24,6 @@ func NewCmd() *cobra.Command {
 	var pwFile string
 	var pgData string
 	var clusterName string
-	var backupName string
 	var namespace string
 	var recoveryTarget string
 
@@ -39,7 +38,6 @@ func NewCmd() *cobra.Command {
 				PasswordFile:   pwFile,
 				ClusterName:    clusterName,
 				Namespace:      namespace,
-				BackupName:     backupName,
 				RecoveryTarget: recoveryTarget,
 			}
 
@@ -50,7 +48,6 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().StringVar(&pwFile, "pw-file", "",
 		"The file containing the PostgreSQL superuser password to use during the init phase")
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
-	cmd.Flags().StringVar(&backupName, "backup-name", "", "The name of the backup that should be restored")
 	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
 		"current cluster in k8s, used to coordinate switchover and failover")
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+

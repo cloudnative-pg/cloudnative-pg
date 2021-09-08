@@ -2,50 +2,90 @@
 
 This section describes the options you have to create a new
 PostgreSQL cluster and the design rationale behind them.
+There are primarily two ways to bootstrap a new cluster:
 
-When a PostgreSQL cluster is defined, you can configure the
-*bootstrap* method using the `bootstrap` section of the cluster
-specification.
-
-In the following example:
-
-```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
-kind: Cluster
-metadata:
-  name: cluster-example-initdb
-spec:
-  instances: 3
-
-  bootstrap:
-    initdb:
-      database: app
-      owner: app
-
-  storage:
-    size: 1Gi
-```
-
-The `initdb` bootstrap method is used.
-
-We currently support the following bootstrap methods:
-
-- `initdb`: initialize an empty PostgreSQL cluster
-- `recovery`: create a PostgreSQL cluster by restoring from an existing backup
-   and replaying all the available WAL files or up to a given point in time
-- `pg_basebackup`: create a PostgreSQL cluster by cloning an existing one of the
-   same major version using `pg_basebackup` via streaming replication protocol -
-   useful if you want to migrate databases to Cloud Native PostgreSQL, even
-   from outside Kubernetes.
+- from scratch (`initdb`)
+- from an existing PostgreSQL cluster, either directly (`pg_basebackup`)
+  or indirectly (`recovery`)
 
 !!! Important
+    Bootstrapping from an existing cluster opens up the possibility
+    to create a **replica cluster**, that is an independent PostgreSQL
+    cluster which is in continuous recovery, synchronized with the source
+    and that accepts read-only connections.
+
+!!! Warning
     Cloud Native PostgreSQL requires both the `postgres` user and database to
     always exists. Using the local Unix Domain Socket, it needs to connect
     as `postgres` user to the `postgres` database via `peer` authentication in
     order to perform administrative tasks on the cluster.  
     **DO NOT DELETE** the `postgres` user or the `postgres` database!!!
 
-## initdb
+## The `bootstrap` section
+
+The *bootstrap* method can be defined in the `bootstrap` section of the cluster
+specification.
+Cloud Native PostgreSQL currently supports the following bootstrap methods:
+
+- `initdb`: initialize an empty PostgreSQL cluster (default)
+- `recovery`: create a PostgreSQL cluster by restoring from an existing cluster
+  via a backup object store, and replaying all the available WAL files or up to
+  a given *point in time*
+- `pg_basebackup`: create a PostgreSQL cluster by cloning an existing one of
+  the same major version using `pg_basebackup` via streaming replication protocol -
+  useful if you want to migrate databases to Cloud Native PostgreSQL, even
+  from outside Kubernetes.
+
+Differently from the `initdb` method, both `recovery` and `pg_basebackup`
+create a new cluster based on another one (either offline or online) and can be
+used to spin up replica clusters. They both rely on the definition of external
+clusters.
+
+!!! Seealso "API reference"
+    Please refer to the ["API reference for the `bootstrap` section](api_reference.md#BootstrapConfiguration)
+    for more information.
+
+## The `externalClusters` section
+
+The `externalClusters` section allows you to define one or more PostgreSQL
+clusters that are somehow related to the current one. While in the future
+this section will enable more complex scenarios, it is currently intended
+to define a cross-region PostgreSQL cluster based on physical replication,
+and spanning over different Kubernetes clusters or even traditional VM/bare-metal
+environments.
+
+As far as bootstrapping is concerned, `externalClusters` can be used
+to define the source PostgreSQL cluster for either the `pg_basebackup`
+method or the `recovery` one. An external cluster needs to have:
+
+- a name that identifies the origin cluster, to be used as a reference via the
+  `source` option
+- at least one of the following:
+
+    - information about streaming connection
+    - information about the **recovery object store**, which is a Barman Cloud
+      compatible object store that contains the backup files of the source
+      cluster - that is, base backups and WAL archives.
+
+!!! Note
+    A recovery object store is normally an AWS S3 or an Azure Blob Storage
+    compatible source that is managed by Barman Cloud.
+
+When only the streaming connection is defined, the source can be used for the
+`pg_basebackup` method. When only the recovery object store is defined, the
+source can be used for the `recovery` method. When both are defined, any of the
+two bootstrap methods can be chosen.
+
+Furthermore, in case of `pg_basebackup` or full `recovery`point in time), the
+cluster is eligible for replica cluster mode. This means that the cluster is
+continuously fed from the source, either via streaming, via WAL shipping
+through the PostgreSQL's `restore_command`, or any of the two.
+
+!!! Seealso "API reference"
+    Please refer to the ["API reference for the `externalClusters` section](api_reference.md#ExternalCluster)
+    for more information.
+
+## Bootstrap an empty cluster (`initdb`)
 
 The `initdb` bootstrap method is used to create a new PostgreSQL cluster from
 scratch. It is the default one unless specified differently.
@@ -118,8 +158,8 @@ the application database.
     Future implementations of the operator might allow you to create
     additional users in a declarative configuration fashion.
 
-The superuser and the `postgres` database are supposed to be used only
-by the operator to configure the cluster.
+The `postgres` superuser and the `postgres` database are supposed to be used
+only by the operator to configure the cluster.
 
 In case you don't supply any database name, the operator will proceed
 by convention and create the `app` database, and adds it to the cluster
@@ -189,14 +229,96 @@ spec:
     Please use the `postInitSQL` option with extreme care as queries
     are run as a superuser and can disrupt the entire cluster.
 
-## recovery
+## Bootstrap from another cluster
+
+Cloud Native PostgreSQL enables the bootstrap of a cluster starting from
+another one of the same major version.
+This operation can happen by connecting directly to the source cluster via
+streaming replication (`pg_basebackup`), or indirectly via a *recovery object
+store* (`recovery`).
+
+The source cluster must be defined in the `externalClusters` section, identified
+by `name` (our recommendation is to use the same `name` of the origin cluster).
+
+!!! Important
+    By default the `recovery` method strictly uses the `name` of the
+    cluster in the `externalClusters` section to locate the main folder
+    of the backup data within the object store, which is normally reserved
+    for the name of the server. You can specify a different one with the
+    `backupObjectStore.serverName` property (by default assigned to the
+    value of `name` in the external cluster definition).
+
+
+### Bootstrap from a backup (`recovery`)
 
 The `recovery` bootstrap mode lets you create a new cluster from
-an existing backup. You can find more information about the recovery
-feature in the ["Backup and recovery" page](backup_recovery.md).
+an existing backup, namely a *recovery object store*.
 
-The following example contains the full structure of the `recovery`
-section:
+There are two ways to achieve this result in Cloud Native PostgreSQL:
+
+- using a recovery object store, that is a backup of another cluster
+  created by Barman Cloud and defined via the `barmanObjectStore` option
+  in the `externalClusters` section
+- using an existing `Backup` object in the same namespace (this was the
+  only option available before version 1.8.0).
+
+Both recovery methods enable either full recovery (up to the last
+available WAL) or up to a [point in time](#point-in-time-recovery).
+When performing a full recovery, the cluster can also be started
+in replica mode.
+
+!!! Note
+    You can find more information about backup and recovery of a running cluster
+    in the ["Backup and recovery" page](backup_recovery.md).
+
+#### Recovery from an object store
+
+You can recover from a backup created by Barman Cloud and stored on a supported
+object storage. Once you have defined the external cluster, including all the
+required configuration in the `barmanObjectStore` section, you need to
+reference it in the `.spec.recovery.source` option. The following example
+defines a recovery object store in a blob container in Azure:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restore
+spec:
+  [...]
+  
+  superuserSecret:
+    name: superuser-secret
+    
+  bootstrap:
+    recovery:
+      source: clusterBackup
+
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: https://STORAGEACCOUNTNAME.blob.core.windows.net/CONTAINERNAME/
+        azureCredentials:
+          storageAccount:
+            name: recovery-object-store-secret
+            key: storage_account_name
+          storageKey:
+            name: recovery-object-store-secret
+            key: storage_account_key
+```
+
+!!! Important
+    By default the `recovery` method strictly uses the `name` of the
+    cluster in the `externalClusters` section to locate the main folder
+    of the backup data within the object store, which is normally reserved
+    for the name of the server. You can specify a different one with the
+    `backupObjectStore.serverName` property (by default assigned to the
+    value of `name` in the external clusters definition).
+
+#### Recovery from a `Backup` object
+
+In case a Backup resource is already available in the namespace in which the cluster should be created,
+you can specify its name through `.spec.bootstrap.recovery.backup.name`, as in the following example:
 
 ```yaml
 apiVersion: postgresql.k8s.enterprisedb.io/v1
@@ -221,32 +343,37 @@ spec:
 This bootstrap method allows you to specify just a reference to the
 backup that needs to be restored.
 
-The application database name and the application database user are preserved
-from the backup that is being restored. The operator does not currently attempt
-to backup the underlying secrets, as this is part of the usual maintenance
-activity of the Kubernetes cluster itself.
+#### Additional considerations
 
-In case you don't supply any `superuserSecret`, a new one is automatically
+Whether you recover from a recovery object store or an existing `Backup`
+resource, the following considerations apply:
+
+- The application database name and the application database user are preserved
+from the backup that is being restored. The operator does not currently attempt
+to back up the underlying secrets, as this is part of the usual maintenance
+activity of the Kubernetes cluster itself.
+- In case you don't supply any `superuserSecret`, a new one is automatically
 generated with a secure and random password. The secret is then used to
 reset the password for the `postgres` user of the cluster.
-
-By default, the recovery will continue up to the latest
+- By default, the recovery will continue up to the latest
 available WAL on the default target timeline (`current` for PostgreSQL up to
 11, `latest` for version 12 and above).
 You can optionally specify a `recoveryTarget` to perform a point in time
-recovery (see the ["Point in time recovery" chapter](#point-in-time-recovery)).
+recovery (see the ["Point in time recovery" section](#point-in-time-recovery)).
 
-### Point in time recovery
+#### Point in time recovery (PITR)
 
-Instead of replaying all the WALs up to the latest one,
-we can ask PostgreSQL to stop replaying WALs at any given point in time.
-PostgreSQL uses this technique to implement *point-in-time* recovery.
-This allows you to restore the database to its state at any time after
-the base backup was taken.
+Instead of replaying all the WALs up to the latest one, we can ask PostgreSQL
+to stop replaying WALs at any given point in time, after having extracted a
+base backup. PostgreSQL uses this technique to achieve *point-in-time* recovery
+(PITR).
+
+!!! Note
+    PITR is available from recovery object stores as well as `Backup` objects.
 
 The operator will generate the configuration parameters required for this
-feature to work if a recovery target is specified like in the following
-example:
+feature to work in case a recovery target is specified, like in the following
+example that uses a recovery object stored in Azure:
 
 ```yaml
 apiVersion: postgresql.k8s.enterprisedb.io/v1
@@ -261,11 +388,21 @@ spec:
 
   bootstrap:
     recovery:
-      backup:
-        name: backup-example
-
+      source: clusterBackup
       recoveryTarget:
         targetTime: "2020-11-26 15:22:00.00000+00"
+
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: https://STORAGEACCOUNTNAME.blob.core.windows.net/CONTAINERNAME/
+        azureCredentials:
+          storageAccount:
+            name: recovery-object-store-secret
+            key: storage_account_name
+          storageKey:
+            name: recovery-object-store-secret
+            key: storage_account_key
 ```
 
 Besides `targetTime`, you can use the following criteria to stop the recovery:
@@ -290,7 +427,7 @@ timeline.
 By default, the previous parameters are considered to be exclusive, stopping
 just before the recovery target. You can request inclusive behavior,
 stopping right after the recovery target, setting the `exclusive` parameter to
-`false` like in the following example:
+`false` like in the following example relying on a blob container in Azure:
 
 ```yaml
 apiVersion: postgresql.k8s.enterprisedb.io/v1
@@ -305,15 +442,25 @@ spec:
 
   bootstrap:
     recovery:
-      backup:
-        name: backup-example
-
+      source: clusterBackup
       recoveryTarget:
         targetName: "maintenance-activity"
         exclusive: false
+
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: https://STORAGEACCOUNTNAME.blob.core.windows.net/CONTAINERNAME/
+        azureCredentials:
+          storageAccount:
+            name: recovery-object-store-secret
+            key: storage_account_name
+          storageKey:
+            name: recovery-object-store-secret
+            key: storage_account_key
 ```
 
-## pg_basebackup
+### Bootstrap from a live cluster (`pg_basebackup`)
 
 The `pg_basebackup` bootstrap mode lets you create a new cluster (*target*) as
 an exact physical copy of an existing and **binary compatible** PostgreSQL
@@ -354,7 +501,7 @@ PostgreSQL server in general, and might be the easiest way if the source
 instance is on a traditional environment outside Kubernetes.
 Both cases are explained below.
 
-### Requirements
+#### Requirements
 
 The following requirements apply to the `pg_basebackup` bootstrap method:
 
@@ -381,7 +528,7 @@ The following requirements apply to the `pg_basebackup` bootstrap method:
     ["High Availability, Load Balancing, and Replication" chapter](https://www.postgresql.org/docs/current/high-availability.html)
     in the PostgreSQL documentation.
 
-### About the replication user
+#### About the replication user
 
 As explained in the requirements section, you need to have a user
 with either the `SUPERUSER` or, preferably, just the `REPLICATION`
@@ -410,7 +557,7 @@ will need to add it to a secret in the target instance.
     for the sake of simplicity. Feel free to change it as you like,
     provided you adapt the instructions in the following sections.
 
-### Username/Password authentication
+#### Username/Password authentication
 
 The first authentication method supported by Cloud Native PostgreSQL
 with the `pg_basebackup` bootstrap is based on username and password matching.
@@ -467,7 +614,7 @@ spec:
 All the requirements must be met for the clone operation to work, including
 the same PostgreSQL version (in our case 13.4).
 
-### TLS certificate authentication
+#### TLS certificate authentication
 
 The second authentication method supported by Cloud Native PostgreSQL
 with the `pg_basebackup` bootstrap is based on TLS client certificates.
@@ -521,9 +668,9 @@ spec:
       key: ca.crt
 ```
 
-### Current limitations
+#### Current limitations
 
-#### Missing tablespace support
+##### Missing tablespace support
 
 Cloud Native PostgreSQL does not currently include full declarative management
 of PostgreSQL global objects, namely roles, databases, and tablespaces.
@@ -538,7 +685,7 @@ migrate in Cloud Native PostgreSQL a PostgreSQL instance that takes advantage
 of tablespaces (you first need to remove them from the source or, if your
 organization requires this feature, contact EDB to prioritize it).
 
-#### Snapshot copy
+##### Snapshot copy
 
 The `pg_basebackup` method takes a snapshot of the source instance in the form of
 a PostgreSQL base backup. All transactions written from the start of

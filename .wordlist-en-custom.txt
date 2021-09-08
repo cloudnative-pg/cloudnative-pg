@@ -24,6 +24,7 @@ BootstrapRecovery
 CIS
 CN
 CONFIG
+CONTAINERNAME
 CR's
 CRC
 CRD
@@ -163,6 +164,7 @@ SELinux
 SHA
 SQLQuery
 SSL
+STORAGEACCOUNTNAME
 ScheduledBackup
 ScheduledBackupList
 ScheduledBackupSpec
@@ -221,6 +223,7 @@ autoscaler
 autovacuum
 aws
 az
+azureCredentials
 ba
 backend
 backends
@@ -252,6 +255,7 @@ clair
 classid
 cli
 clientCASecret
+clusterBackup
 clusterlist
 clusterspec
 clusterstatus
@@ -525,6 +529,7 @@ startedAt
 stdout
 stopDelay
 stoppedAt
+storageAccount
 storageClass
 storageClassName
 storageKey

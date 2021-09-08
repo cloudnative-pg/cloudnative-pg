@@ -275,7 +275,10 @@ type CertificatesConfiguration struct {
 // Refer to the Bootstrap page of the documentation for more information.
 type BootstrapRecovery struct {
 	// The backup we need to restore
-	Backup LocalObjectReference `json:"backup"`
+	Backup *LocalObjectReference `json:"backup,omitempty"`
+
+	// The external cluster whose backup we will restore
+	Source string `json:"source,omitempty"`
 
 	// By default, the recovery will end as soon as a consistent state is
 	// reached: in this case, that means at the end of a backup.
@@ -714,6 +717,9 @@ type ExternalCluster struct {
 
 	// The reference to the password to be used to connect to the server
 	Password *corev1.SecretKeySelector `json:"password,omitempty"`
+
+	// The configuration for the barman-cloud tool suite
+	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
 }
 
 func init() {

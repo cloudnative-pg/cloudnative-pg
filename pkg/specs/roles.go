@@ -14,7 +14,7 @@ import (
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
-func CreateRole(cluster apiv1.Cluster) rbacv1.Role {
+func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 	involvedSecretNames := []string{
 		cluster.GetReplicationSecretName(),
 		cluster.GetClientCASecretName(),
@@ -40,7 +40,7 @@ func CreateRole(cluster apiv1.Cluster) rbacv1.Role {
 		}
 	}
 
-	involvedSecretNames = append(involvedSecretNames, backupSecrets(cluster)...)
+	involvedSecretNames = append(involvedSecretNames, backupSecrets(cluster, backupOrigin)...)
 
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil {
 		server, _ := cluster.ExternalServer(cluster.Spec.Bootstrap.PgBaseBackup.Source)
@@ -168,40 +168,76 @@ func CreateRole(cluster apiv1.Cluster) rbacv1.Role {
 	}
 }
 
-func backupSecrets(cluster apiv1.Cluster) []string {
+func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 	var result []string
 
-	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
-		return nil
+	// Secrets needed to access S3 and Azure
+	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
+		result = append(
+			result,
+			s3CredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.S3Credentials)...)
+		result = append(
+			result,
+			azureCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.AzureCredentials)...)
 	}
 
-	// Secrets needed to access S3
-	if cluster.Spec.Backup.BarmanObjectStore.S3Credentials != nil {
-		result = append(result,
-			cluster.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Name,
-			cluster.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Name)
+	if backupOrigin != nil {
+		result = append(
+			result,
+			s3CredentialsSecrets(backupOrigin.Status.S3Credentials)...)
+		result = append(
+			result,
+			azureCredentialsSecrets(backupOrigin.Status.AzureCredentials)...)
 	}
 
-	// Secrets needed to access Azure
-	if cluster.Spec.Backup.BarmanObjectStore.AzureCredentials != nil {
-		if cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.ConnectionString != nil {
-			result = append(result,
-				cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.ConnectionString.Name)
-		}
-		if cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageAccount != nil {
-			result = append(result,
-				cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageAccount.Name)
-		}
-		if cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageKey != nil {
-			result = append(result,
-				cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageKey.Name)
-		}
-
-		if cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageSasToken != nil {
-			result = append(result,
-				cluster.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageSasToken.Name)
+	for _, externalCluster := range cluster.Spec.ExternalClusters {
+		if externalCluster.BarmanObjectStore != nil {
+			result = append(
+				result,
+				s3CredentialsSecrets(externalCluster.BarmanObjectStore.S3Credentials)...)
+			result = append(
+				result,
+				azureCredentialsSecrets(externalCluster.BarmanObjectStore.AzureCredentials)...)
 		}
 	}
 
 	return result
+}
+
+func azureCredentialsSecrets(azureCredentials *apiv1.AzureCredentials) []string {
+	var result []string
+
+	if azureCredentials == nil {
+		return nil
+	}
+
+	if azureCredentials.ConnectionString != nil {
+		result = append(result,
+			azureCredentials.ConnectionString.Name)
+	}
+	if azureCredentials.StorageAccount != nil {
+		result = append(result,
+			azureCredentials.StorageAccount.Name)
+	}
+	if azureCredentials.StorageKey != nil {
+		result = append(result,
+			azureCredentials.StorageKey.Name)
+	}
+
+	if azureCredentials.StorageSasToken != nil {
+		result = append(result,
+			azureCredentials.StorageSasToken.Name)
+	}
+	return result
+}
+
+func s3CredentialsSecrets(s3Credentials *apiv1.S3Credentials) []string {
+	if s3Credentials == nil {
+		return nil
+	}
+
+	return []string{
+		s3Credentials.SecretAccessKeyReference.Name,
+		s3Credentials.AccessKeyIDReference.Name,
+	}
 }

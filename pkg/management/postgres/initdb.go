@@ -53,9 +53,6 @@ type InitInfo struct {
 	// The namespace where the cluster will be installed
 	Namespace string
 
-	// The name of the backup to recover
-	BackupName string
-
 	// The list options that should be passed to initdb to
 	// create the cluster
 	InitDBOptions []string
