@@ -181,6 +181,15 @@ var _ = Describe("external server list", func() {
 					ConnectionParameters: map[string]string{
 						"dbname": "test",
 					},
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						ServerName: "testServerRealName",
+					},
+				},
+				{
+					Name: "testServer2",
+					ConnectionParameters: map[string]string{
+						"dbname": "test",
+					},
 				},
 			},
 		},
@@ -194,6 +203,14 @@ var _ = Describe("external server list", func() {
 	It("fails for non existent replicas", func() {
 		_, ok := cluster.ExternalServer("nonExistentServer")
 		Expect(ok).To(BeFalse())
+	})
+	It("return the correct server name", func() {
+		server, ok := cluster.ExternalServer("testServer")
+		Expect(ok).To(BeTrue())
+		Expect(server.GetServerName()).To(BeEquivalentTo("testServerRealName"), "explicit server name")
+		server2, ok2 := cluster.ExternalServer("testServer2")
+		Expect(ok2).To(BeTrue())
+		Expect(server2.GetServerName()).To(BeEquivalentTo("testServer2"), "default server name")
 	})
 })
 

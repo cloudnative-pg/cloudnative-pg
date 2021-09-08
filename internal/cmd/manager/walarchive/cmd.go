@@ -18,9 +18,9 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
 
 // NewCmd create the new cobra command
@@ -74,7 +74,12 @@ func NewCmd() *cobra.Command {
 
 			options := barmanCloudWalArchiveOptions(cluster, clusterName, walName)
 
-			env, err := postgres.EnvSetCloudCredentials(ctx, typedClient, &cluster, os.Environ())
+			env, err := barman.EnvSetCloudCredentials(
+				ctx,
+				typedClient,
+				cluster.Namespace,
+				cluster.Spec.Backup.BarmanObjectStore,
+				os.Environ())
 			if err != nil {
 				log.Log.Error(err, "Error while settings AWS environment variables",
 					"walName", walName,

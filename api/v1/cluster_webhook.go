@@ -128,6 +128,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 	allErrs = append(allErrs, r.validateStorageSize()...)
 	allErrs = append(allErrs, r.validateName()...)
 	allErrs = append(allErrs, r.validateBootstrapPgBaseBackupSource()...)
+	allErrs = append(allErrs, r.validateBootstrapRecoverySource()...)
 	allErrs = append(allErrs, r.validateExternalServers()...)
 	allErrs = append(allErrs, r.validateTolerations()...)
 	allErrs = append(allErrs, r.validateAntiAffinity()...)
@@ -332,9 +333,32 @@ func (r *Cluster) validateBootstrapPgBaseBackupSource() field.ErrorList {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec.bootstrap.physicalBackup.serverName"),
+				field.NewPath("spec", "bootstrap", "pg_basebackup", "source"),
 				r.Spec.Bootstrap.PgBaseBackup.Source,
 				fmt.Sprintf("External server %v not found", r.Spec.Bootstrap.PgBaseBackup.Source)))
+	}
+
+	return result
+}
+
+// validateBootstrapRecoverySource is used to ensure that the source
+// server is correctly defined
+func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
+	var result field.ErrorList
+
+	// This validation is only applicable for recovery based bootstrap
+	if r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.Source == "" {
+		return result
+	}
+
+	_, found := r.ExternalServer(r.Spec.Bootstrap.Recovery.Source)
+	if !found {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "source"),
+				r.Spec.Bootstrap.Recovery.Source,
+				fmt.Sprintf("External server %v not found", r.Spec.Bootstrap.Recovery.Source)))
 	}
 
 	return result

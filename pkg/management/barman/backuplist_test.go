@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package postgres
+package barman
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -69,18 +69,18 @@ const (
 
 var _ = Describe("barman-cloud-backup-list parsing", func() {
 	It("must parse a correct output", func() {
-		result, err := parseBarmanCloudBackupList(barmanCloudListOutput)
+		result, err := ParseBarmanCloudBackupList(barmanCloudListOutput)
 		Expect(err).To(BeNil())
 		Expect(len(result.List)).To(Equal(2))
 		Expect(result.List[0].ID).To(Equal("20201020T115231"))
 		Expect(result.List[0].SystemID).To(Equal("6885668674852188181"))
-		Expect(result.List[0].BeginTime).To(Equal("Tue Oct 20 11:52:31 2020"))
-		Expect(result.List[0].EndTime).To(Equal("Tue Oct 20 11:52:34 2020"))
+		Expect(result.List[0].BeginTimeString).To(Equal("Tue Oct 20 11:52:31 2020"))
+		Expect(result.List[0].EndTimeString).To(Equal("Tue Oct 20 11:52:34 2020"))
 	})
 
 	It("must extract the latest backup id", func() {
-		result, err := parseBarmanCloudBackupList(barmanCloudListOutput)
+		result, err := ParseBarmanCloudBackupList(barmanCloudListOutput)
 		Expect(err).To(BeNil())
-		Expect(result.GetLatestBackup().ID).To(Equal("20201020T115231"))
+		Expect(result.LatestBackupInfo().ID).To(Equal("20201020T115231"))
 	})
 })

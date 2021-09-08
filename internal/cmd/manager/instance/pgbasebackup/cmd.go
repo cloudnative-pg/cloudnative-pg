@@ -125,5 +125,13 @@ func (env *CloneInfo) configureInstanceAsNewPrimary(ctx context.Context) error {
 		return err
 	}
 
-	return env.info.ConfigureInstanceAfterRestore()
+	// We are passing an empty environment variable since the
+	// cluster has just been bootstrap via pg_basebackup and at
+	// this moment we only use streaming replication to download
+	// the WALs.
+	//
+	// In the future, when we will support recovering WALs in the
+	// designated primary from an object store, we'll need to use
+	// the environment variables of the recovery object store.
+	return env.info.ConfigureInstanceAfterRestore(nil)
 }

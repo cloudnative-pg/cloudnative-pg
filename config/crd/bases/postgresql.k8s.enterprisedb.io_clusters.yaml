@@ -1040,8 +1040,12 @@ spec:
                             description: The target transaction ID
                             type: string
                         type: object
-                    required:
-                    - backup
+                      source:
+                        description: The external cluster whose backup we will restore.
+                          This is also used as the name of the folder under which
+                          the backup is stored, so it must be set to the name of the
+                          source cluster
+                        type: string
                     type: object
                 type: object
               certificates:
@@ -1096,6 +1100,196 @@ spec:
                   description: ExternalCluster represents the connection parameters
                     of an external server which is used in the cluster configuration
                   properties:
+                    barmanObjectStore:
+                      description: The configuration for the barman-cloud tool suite
+                      properties:
+                        azureCredentials:
+                          description: The credentials to use to upload data in Azure
+                            Blob Storage
+                          properties:
+                            connectionString:
+                              description: The connection string to be used
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            storageAccount:
+                              description: The storage account where to upload data
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            storageKey:
+                              description: The storage account key to be used in conjunction
+                                with the storage account name
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            storageSasToken:
+                              description: A shared-access-signature to be used in
+                                conjunction with the storage account name
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                          type: object
+                        data:
+                          description: The configuration to be used to backup the
+                            data files When not defined, base backups files will be
+                            stored uncompressed and may be unencrypted in the object
+                            store, according to the bucket default policy.
+                          properties:
+                            compression:
+                              description: Compress a backup file (a tar file per
+                                tablespace) while streaming it to the object store.
+                                Available options are empty string (no compression,
+                                default), `gzip` or `bzip2`.
+                              enum:
+                              - gzip
+                              - bzip2
+                              type: string
+                            encryption:
+                              description: Whenever to force the encryption of files
+                                (if the bucket is not already configured for that).
+                                Allowed options are empty string (use the bucket policy,
+                                default), `AES256` and `aws:kms`
+                              enum:
+                              - AES256
+                              - aws:kms
+                              type: string
+                            immediateCheckpoint:
+                              description: Control whether the I/O workload for the
+                                backup initial checkpoint will be limited, according
+                                to the `checkpoint_completion_target` setting on the
+                                PostgreSQL server. If set to true, an immediate checkpoint
+                                will be used, meaning PostgreSQL will complete the
+                                checkpoint as soon as possible. `false` by default.
+                              type: boolean
+                            jobs:
+                              description: The number of parallel jobs to be used
+                                to upload the backup, defaults to 2
+                              format: int32
+                              minimum: 1
+                              type: integer
+                          type: object
+                        destinationPath:
+                          description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
+                            this path, with different destination folders, will be
+                            used for WALs and for data
+                          minLength: 1
+                          type: string
+                        endpointCA:
+                          description: EndpointCA store the CA bundle of the barman
+                            endpoint. Useful when using self-signed certificates to
+                            avoid errors with certificate issuer and barman-cloud-wal-archive
+                          properties:
+                            key:
+                              description: The key to select
+                              type: string
+                            name:
+                              description: Name of the referent.
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                        endpointURL:
+                          description: Endpoint to be used to upload data to the cloud,
+                            overriding the automatic endpoint discovery
+                          type: string
+                        s3Credentials:
+                          description: The credentials to use to upload data to S3
+                          properties:
+                            accessKeyId:
+                              description: The reference to the access key id
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            secretAccessKey:
+                              description: The reference to the secret access key
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                          required:
+                          - accessKeyId
+                          - secretAccessKey
+                          type: object
+                        serverName:
+                          description: The server name on S3, the cluster name is
+                            used if this parameter is omitted
+                          type: string
+                        wal:
+                          description: The configuration for the backup of the WAL
+                            stream. When not defined, WAL files will be stored uncompressed
+                            and may be unencrypted in the object store, according
+                            to the bucket default policy.
+                          properties:
+                            compression:
+                              description: Compress a WAL file before sending it to
+                                the object store. Available options are empty string
+                                (no compression, default), `gzip` or `bzip2`.
+                              enum:
+                              - gzip
+                              - bzip2
+                              type: string
+                            encryption:
+                              description: Whenever to force the encryption of files
+                                (if the bucket is not already configured for that).
+                                Allowed options are empty string (use the bucket policy,
+                                default), `AES256` and `aws:kms`
+                              enum:
+                              - AES256
+                              - aws:kms
+                              type: string
+                          type: object
+                      required:
+                      - destinationPath
+                      type: object
                     connectionParameters:
                       additionalProperties:
                         type: string
@@ -2718,8 +2912,9 @@ spec:
                             description: The target transaction ID
                             type: string
                         type: object
-                    required:
-                    - backup
+                      source:
+                        description: The external cluster whose backup we will restore
+                        type: string
                     type: object
                 type: object
               certificates:
@@ -2775,6 +2970,182 @@ spec:
                   description: ExternalCluster represent the connection parameters
                     to an external server which is used in the cluster configuration
                   properties:
+                    barmanObjectStore:
+                      description: The configuration for the barman-cloud tool suite
+                      properties:
+                        azureCredentials:
+                          description: The credentials to use to upload data to S3
+                          properties:
+                            connectionString:
+                              description: The connection string to be used
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            storageAccount:
+                              description: The storage account where to upload data
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            storageKey:
+                              description: The storage account key to be used in conjunction
+                                with the storage account name
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            storageSasToken:
+                              description: A shared-access-signature to be used in
+                                conjunction with the storage account name
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                          type: object
+                        data:
+                          description: The configuration to be used to backup the
+                            data files When not defined, base backups files will be
+                            stored uncompressed and may be unencrypted in the object
+                            store, according to the bucket default policy.
+                          properties:
+                            compression:
+                              description: Compress a backup file (a tar file per
+                                tablespace) while streaming it to the object store.
+                                Available options are empty string (no compression,
+                                default), `gzip` or `bzip2`.
+                              type: string
+                            encryption:
+                              description: Whenever to force the encryption of files
+                                (if the bucket is not already configured for that).
+                                Allowed options are empty string (use the bucket policy,
+                                default), `AES256` and `aws:kms`
+                              type: string
+                            immediateCheckpoint:
+                              description: Control whether the I/O workload for the
+                                backup initial checkpoint will be limited, according
+                                to the `checkpoint_completion_target` setting on the
+                                PostgreSQL server. If set to true, an immediate checkpoint
+                                will be used, meaning PostgreSQL will complete the
+                                checkpoint as soon as possible. `false` by default.
+                              type: boolean
+                            jobs:
+                              description: The number of parallel jobs to be used
+                                to upload the backup, defaults to 2
+                              format: int32
+                              type: integer
+                          type: object
+                        destinationPath:
+                          description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
+                            this path, with different destination folders, will be
+                            used for WALs and for data
+                          minLength: 1
+                          type: string
+                        endpointCA:
+                          description: EndpointCA store the CA bundle of the barman
+                            endpoint. Useful when using self-signed certificates to
+                            avoid errors with certificate issuer and barman-cloud-wal-archive
+                          properties:
+                            key:
+                              description: The key to select
+                              type: string
+                            name:
+                              description: Name of the referent.
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                        endpointURL:
+                          description: Endpoint to be used to upload data to the cloud,
+                            overriding the automatic endpoint discovery
+                          type: string
+                        s3Credentials:
+                          description: The credentials to use to upload data to S3
+                          properties:
+                            accessKeyId:
+                              description: The reference to the access key id
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            secretAccessKey:
+                              description: The reference to the secret access key
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                          required:
+                          - accessKeyId
+                          - secretAccessKey
+                          type: object
+                        serverName:
+                          description: The server name on S3, the cluster name is
+                            used if this parameter is omitted
+                          type: string
+                        wal:
+                          description: The configuration for the backup of the WAL
+                            stream. When not defined, WAL files will be stored uncompressed
+                            and may be unencrypted in the object store, according
+                            to the bucket default policy.
+                          properties:
+                            compression:
+                              description: Compress a WAL file before sending it to
+                                the object store. Available options are empty string
+                                (no compression, default), `gzip` or `bzip2`.
+                              type: string
+                            encryption:
+                              description: Whenever to force the encryption of files
+                                (if the bucket is not already configured for that).
+                                Allowed options are empty string (use the bucket policy,
+                                default), `AES256` and `aws:kms`
+                              type: string
+                          type: object
+                      required:
+                      - destinationPath
+                      type: object
                     connectionParameters:
                       additionalProperties:
                         type: string

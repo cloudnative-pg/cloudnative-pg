@@ -89,98 +89,9 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 	// spec.backup
 	if src.Spec.Backup != nil { // nolint:nestif
 		dst.Spec.Backup = &v1.BackupConfiguration{}
-
-		// spec.backup.barmanObjectStore
 		if src.Spec.Backup.BarmanObjectStore != nil {
-			s3Credentials := src.Spec.Backup.BarmanObjectStore.S3Credentials
-			azureCredentials := src.Spec.Backup.BarmanObjectStore.AzureCredentials
 			dst.Spec.Backup.BarmanObjectStore = &v1.BarmanObjectStoreConfiguration{}
-
-			if s3Credentials != nil {
-				dst.Spec.Backup.BarmanObjectStore.S3Credentials = &v1.S3Credentials{}
-				dst.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Key =
-					s3Credentials.AccessKeyIDReference.Key
-				dst.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Name =
-					s3Credentials.AccessKeyIDReference.Name
-				dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Key =
-					s3Credentials.SecretAccessKeyReference.Key
-				dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Name =
-					s3Credentials.SecretAccessKeyReference.Name
-			}
-
-			if azureCredentials != nil {
-				dst.Spec.Backup.BarmanObjectStore.AzureCredentials = &v1.AzureCredentials{}
-
-				if azureCredentials.StorageAccount != nil {
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageAccount = &v1.SecretKeySelector{}
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageAccount.Name =
-						azureCredentials.StorageAccount.Name
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageAccount.Key =
-						azureCredentials.StorageAccount.Key
-				}
-
-				if azureCredentials.ConnectionString != nil {
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.ConnectionString = &v1.SecretKeySelector{}
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.ConnectionString.Name =
-						azureCredentials.ConnectionString.Name
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.ConnectionString.Key =
-						azureCredentials.ConnectionString.Key
-				}
-
-				if azureCredentials.StorageKey != nil {
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageKey = &v1.SecretKeySelector{}
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageKey.Name =
-						azureCredentials.StorageKey.Name
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageKey.Key =
-						azureCredentials.StorageKey.Key
-				}
-
-				if azureCredentials.StorageSasToken != nil {
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageSasToken = &v1.SecretKeySelector{}
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageSasToken.Name =
-						azureCredentials.StorageSasToken.Name
-					dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageSasToken.Key =
-						azureCredentials.StorageKey.Key
-				}
-			}
-
-			dst.Spec.Backup.BarmanObjectStore.EndpointURL =
-				src.Spec.Backup.BarmanObjectStore.EndpointURL
-			dst.Spec.Backup.BarmanObjectStore.DestinationPath =
-				src.Spec.Backup.BarmanObjectStore.DestinationPath
-			dst.Spec.Backup.BarmanObjectStore.ServerName =
-				src.Spec.Backup.BarmanObjectStore.ServerName
-
-			// spec.backup.barmanObjectStore.wal
-			if src.Spec.Backup.BarmanObjectStore.Wal != nil {
-				wal := src.Spec.Backup.BarmanObjectStore.Wal
-				dst.Spec.Backup.BarmanObjectStore.Wal = &v1.WalBackupConfiguration{}
-				dst.Spec.Backup.BarmanObjectStore.Wal.Compression = v1.CompressionType(
-					wal.Compression)
-				dst.Spec.Backup.BarmanObjectStore.Wal.Encryption = v1.EncryptionType(
-					wal.Encryption)
-			}
-
-			// spec.backup.barmanObjectStore.data
-			if src.Spec.Backup.BarmanObjectStore.Data != nil {
-				data := src.Spec.Backup.BarmanObjectStore.Data
-				dst.Spec.Backup.BarmanObjectStore.Data = &v1.DataBackupConfiguration{}
-				dst.Spec.Backup.BarmanObjectStore.Data.Compression = v1.CompressionType(
-					data.Compression)
-				dst.Spec.Backup.BarmanObjectStore.Data.Encryption = v1.EncryptionType(
-					data.Encryption)
-				dst.Spec.Backup.BarmanObjectStore.Data.ImmediateCheckpoint = data.ImmediateCheckpoint
-				dst.Spec.Backup.BarmanObjectStore.Data.Jobs = data.Jobs
-			}
-
-			// spec.backup.barmanObjectStore.endpointCA
-			if src.Spec.Backup.BarmanObjectStore.EndpointCA != nil {
-				dst.Spec.Backup.BarmanObjectStore.EndpointCA = &v1.SecretKeySelector{}
-				dst.Spec.Backup.BarmanObjectStore.EndpointCA.LocalObjectReference.Name =
-					src.Spec.Backup.BarmanObjectStore.EndpointCA.LocalObjectReference.Name
-				dst.Spec.Backup.BarmanObjectStore.EndpointCA.Key =
-					src.Spec.Backup.BarmanObjectStore.EndpointCA.Key
-			}
+			src.Spec.Backup.BarmanObjectStore.ConvertTo(dst.Spec.Backup.BarmanObjectStore)
 		}
 	}
 
@@ -215,7 +126,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 		}
 	}
 
-	// spec.externalServers
+	// spec.externalClusters
 	if src.Spec.ExternalClusters != nil {
 		dst.Spec.ExternalClusters = make([]v1.ExternalCluster, len(src.Spec.ExternalClusters))
 		for idx, entry := range src.Spec.ExternalClusters {
@@ -225,6 +136,10 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 			dst.Spec.ExternalClusters[idx].SSLKey = entry.SSLKey
 			dst.Spec.ExternalClusters[idx].SSLRootCert = entry.SSLRootCert
 			dst.Spec.ExternalClusters[idx].Password = entry.Password
+			if entry.BarmanObjectStore != nil {
+				dst.Spec.ExternalClusters[idx].BarmanObjectStore = &v1.BarmanObjectStoreConfiguration{}
+				entry.BarmanObjectStore.ConvertTo(dst.Spec.ExternalClusters[idx].BarmanObjectStore)
+			}
 		}
 	}
 
@@ -296,6 +211,12 @@ func (src *BootstrapConfiguration) ConvertTo(dstSpec *v1.BootstrapConfiguration)
 	// spec.bootstrap.recovery
 	if src.Recovery != nil {
 		dstSpec.Recovery = &v1.BootstrapRecovery{}
+		dstSpec.Recovery.Source = src.Recovery.Source
+	}
+
+	// spec.bootstrap.recovery.backup
+	if src.Recovery != nil && src.Recovery.Backup != nil {
+		dstSpec.Recovery.Backup = &v1.LocalObjectReference{}
 		dstSpec.Recovery.Backup.Name = src.Recovery.Backup.Name
 	}
 
@@ -317,6 +238,99 @@ func (src *BootstrapConfiguration) ConvertTo(dstSpec *v1.BootstrapConfiguration)
 	if src != nil && src.PgBaseBackup != nil {
 		dstSpec.PgBaseBackup = &v1.BootstrapPgBaseBackup{}
 		dstSpec.PgBaseBackup.Source = src.PgBaseBackup.Source
+	}
+}
+
+// ConvertTo convert this backup configuration to the relative Hub version (v1)
+func (src *BarmanObjectStoreConfiguration) ConvertTo(dst *v1.BarmanObjectStoreConfiguration) { //nolint:revive
+	// spec.backup.barmanObjectStore
+	s3Credentials := src.S3Credentials
+	azureCredentials := src.AzureCredentials
+
+	if s3Credentials != nil {
+		dst.S3Credentials = &v1.S3Credentials{}
+		dst.S3Credentials.AccessKeyIDReference.Key =
+			s3Credentials.AccessKeyIDReference.Key
+		dst.S3Credentials.AccessKeyIDReference.Name =
+			s3Credentials.AccessKeyIDReference.Name
+		dst.S3Credentials.SecretAccessKeyReference.Key =
+			s3Credentials.SecretAccessKeyReference.Key
+		dst.S3Credentials.SecretAccessKeyReference.Name =
+			s3Credentials.SecretAccessKeyReference.Name
+	}
+
+	if azureCredentials != nil {
+		dst.AzureCredentials = &v1.AzureCredentials{}
+
+		if azureCredentials.StorageAccount != nil {
+			dst.AzureCredentials.StorageAccount = &v1.SecretKeySelector{}
+			dst.AzureCredentials.StorageAccount.Name =
+				azureCredentials.StorageAccount.Name
+			dst.AzureCredentials.StorageAccount.Key =
+				azureCredentials.StorageAccount.Key
+		}
+
+		if azureCredentials.ConnectionString != nil {
+			dst.AzureCredentials.ConnectionString = &v1.SecretKeySelector{}
+			dst.AzureCredentials.ConnectionString.Name =
+				azureCredentials.ConnectionString.Name
+			dst.AzureCredentials.ConnectionString.Key =
+				azureCredentials.ConnectionString.Key
+		}
+
+		if azureCredentials.StorageKey != nil {
+			dst.AzureCredentials.StorageKey = &v1.SecretKeySelector{}
+			dst.AzureCredentials.StorageKey.Name =
+				azureCredentials.StorageKey.Name
+			dst.AzureCredentials.StorageKey.Key =
+				azureCredentials.StorageKey.Key
+		}
+
+		if azureCredentials.StorageSasToken != nil {
+			dst.AzureCredentials.StorageSasToken = &v1.SecretKeySelector{}
+			dst.AzureCredentials.StorageSasToken.Name =
+				azureCredentials.StorageSasToken.Name
+			dst.AzureCredentials.StorageSasToken.Key =
+				azureCredentials.StorageKey.Key
+		}
+	}
+
+	dst.EndpointURL =
+		src.EndpointURL
+	dst.DestinationPath =
+		src.DestinationPath
+	dst.ServerName =
+		src.ServerName
+
+	// spec.backup.barmanObjectStore.wal
+	if src.Wal != nil {
+		wal := src.Wal
+		dst.Wal = &v1.WalBackupConfiguration{}
+		dst.Wal.Compression = v1.CompressionType(
+			wal.Compression)
+		dst.Wal.Encryption = v1.EncryptionType(
+			wal.Encryption)
+	}
+
+	// spec.backup.barmanObjectStore.data
+	if src.Data != nil {
+		data := src.Data
+		dst.Data = &v1.DataBackupConfiguration{}
+		dst.Data.Compression = v1.CompressionType(
+			data.Compression)
+		dst.Data.Encryption = v1.EncryptionType(
+			data.Encryption)
+		dst.Data.ImmediateCheckpoint = data.ImmediateCheckpoint
+		dst.Data.Jobs = data.Jobs
+	}
+
+	// spec.backup.barmanObjectStore.endpointCA
+	if src.EndpointCA != nil {
+		dst.EndpointCA = &v1.SecretKeySelector{}
+		dst.EndpointCA.LocalObjectReference.Name =
+			src.EndpointCA.LocalObjectReference.Name
+		dst.EndpointCA.Key =
+			src.EndpointCA.Key
 	}
 }
 
@@ -397,7 +411,10 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 		dst.Spec.Backup = &BackupConfiguration{}
 
 		// spec.backup.barmanObjectStore
-		dst.convertBarmanObjectStore(src)
+		if src.Spec.Backup.BarmanObjectStore != nil {
+			dst.Spec.Backup.BarmanObjectStore = &BarmanObjectStoreConfiguration{}
+			dst.Spec.Backup.BarmanObjectStore.ConvertFrom(src.Spec.Backup.BarmanObjectStore)
+		}
 	}
 
 	// spec.nodeMaintenanceWindow
@@ -412,6 +429,22 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 		dst.Spec.ReplicaCluster = &ReplicaClusterConfiguration{}
 		dst.Spec.ReplicaCluster.Enabled = src.Spec.ReplicaCluster.Enabled
 		dst.Spec.ReplicaCluster.Source = src.Spec.ReplicaCluster.Source
+	}
+
+	if src.Spec.ExternalClusters != nil {
+		dst.Spec.ExternalClusters = make([]ExternalCluster, len(src.Spec.ExternalClusters))
+		for idx, entry := range src.Spec.ExternalClusters {
+			dst.Spec.ExternalClusters[idx].Name = entry.Name
+			dst.Spec.ExternalClusters[idx].ConnectionParameters = entry.ConnectionParameters
+			dst.Spec.ExternalClusters[idx].SSLCert = entry.SSLCert
+			dst.Spec.ExternalClusters[idx].SSLKey = entry.SSLKey
+			dst.Spec.ExternalClusters[idx].SSLRootCert = entry.SSLRootCert
+			dst.Spec.ExternalClusters[idx].Password = entry.Password
+			if entry.BarmanObjectStore != nil {
+				dst.Spec.ExternalClusters[idx].BarmanObjectStore = &BarmanObjectStoreConfiguration{}
+				dst.Spec.ExternalClusters[idx].BarmanObjectStore.ConvertFrom(entry.BarmanObjectStore)
+			}
+		}
 	}
 
 	// status
@@ -453,87 +486,82 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	return nil
 }
 
-func (dst *Cluster) convertBarmanObjectStore(src *v1.Cluster) { //nolint:revive
-	if src.Spec.Backup.BarmanObjectStore == nil {
-		return
-	}
-
-	s3Credentials := src.Spec.Backup.BarmanObjectStore.S3Credentials
-	azureCredentials := src.Spec.Backup.BarmanObjectStore.AzureCredentials
-
-	dst.Spec.Backup.BarmanObjectStore = &BarmanObjectStoreConfiguration{}
+// ConvertFrom convert a BarmanObjectStoreConfiguration from the v1 API to the v1alpha1
+func (dst *BarmanObjectStoreConfiguration) ConvertFrom(src *v1.BarmanObjectStoreConfiguration) { //nolint:revive
+	s3Credentials := src.S3Credentials
+	azureCredentials := src.AzureCredentials
 
 	if s3Credentials != nil {
-		dst.Spec.Backup.BarmanObjectStore.S3Credentials = &S3Credentials{}
-		dst.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Key = s3Credentials.AccessKeyIDReference.Key
-		dst.Spec.Backup.BarmanObjectStore.S3Credentials.AccessKeyIDReference.Name = s3Credentials.AccessKeyIDReference.Name
-		dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Key =
+		dst.S3Credentials = &S3Credentials{}
+		dst.S3Credentials.AccessKeyIDReference.Key = s3Credentials.AccessKeyIDReference.Key
+		dst.S3Credentials.AccessKeyIDReference.Name = s3Credentials.AccessKeyIDReference.Name
+		dst.S3Credentials.SecretAccessKeyReference.Key =
 			s3Credentials.SecretAccessKeyReference.Key
-		dst.Spec.Backup.BarmanObjectStore.S3Credentials.SecretAccessKeyReference.Name =
+		dst.S3Credentials.SecretAccessKeyReference.Name =
 			s3Credentials.SecretAccessKeyReference.Name
 	}
 
 	if azureCredentials != nil {
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials = &AzureCredentials{}
+		dst.AzureCredentials = &AzureCredentials{}
 	}
 
 	if azureCredentials != nil && azureCredentials.ConnectionString != nil {
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.ConnectionString = &SecretKeySelector{}
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.ConnectionString.Name = azureCredentials.ConnectionString.Name
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.ConnectionString.Key = azureCredentials.ConnectionString.Key
+		dst.AzureCredentials.ConnectionString = &SecretKeySelector{}
+		dst.AzureCredentials.ConnectionString.Name = azureCredentials.ConnectionString.Name
+		dst.AzureCredentials.ConnectionString.Key = azureCredentials.ConnectionString.Key
 	}
 
 	if azureCredentials != nil && azureCredentials.StorageAccount != nil {
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageAccount = &SecretKeySelector{}
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageAccount.Name = azureCredentials.StorageAccount.Name
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageAccount.Key = azureCredentials.StorageAccount.Key
+		dst.AzureCredentials.StorageAccount = &SecretKeySelector{}
+		dst.AzureCredentials.StorageAccount.Name = azureCredentials.StorageAccount.Name
+		dst.AzureCredentials.StorageAccount.Key = azureCredentials.StorageAccount.Key
 	}
 
 	if azureCredentials != nil && azureCredentials.StorageKey != nil {
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageKey = &SecretKeySelector{}
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageKey.Name = azureCredentials.StorageKey.Name
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageKey.Key = azureCredentials.StorageKey.Key
+		dst.AzureCredentials.StorageKey = &SecretKeySelector{}
+		dst.AzureCredentials.StorageKey.Name = azureCredentials.StorageKey.Name
+		dst.AzureCredentials.StorageKey.Key = azureCredentials.StorageKey.Key
 	}
 
 	if azureCredentials != nil && azureCredentials.StorageSasToken != nil {
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageSasToken = &SecretKeySelector{}
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageSasToken.Name = azureCredentials.StorageSasToken.Name
-		dst.Spec.Backup.BarmanObjectStore.AzureCredentials.StorageSasToken.Key = azureCredentials.StorageSasToken.Key
+		dst.AzureCredentials.StorageSasToken = &SecretKeySelector{}
+		dst.AzureCredentials.StorageSasToken.Name = azureCredentials.StorageSasToken.Name
+		dst.AzureCredentials.StorageSasToken.Key = azureCredentials.StorageSasToken.Key
 	}
 
-	dst.Spec.Backup.BarmanObjectStore.EndpointURL = src.Spec.Backup.BarmanObjectStore.EndpointURL
-	dst.Spec.Backup.BarmanObjectStore.DestinationPath = src.Spec.Backup.BarmanObjectStore.DestinationPath
-	dst.Spec.Backup.BarmanObjectStore.ServerName = src.Spec.Backup.BarmanObjectStore.ServerName
+	dst.EndpointURL = src.EndpointURL
+	dst.DestinationPath = src.DestinationPath
+	dst.ServerName = src.ServerName
 
 	// spec.backup.barmanObjectStore.wal
-	if src.Spec.Backup.BarmanObjectStore.Wal != nil {
-		wal := src.Spec.Backup.BarmanObjectStore.Wal
-		dst.Spec.Backup.BarmanObjectStore.Wal = &WalBackupConfiguration{}
-		dst.Spec.Backup.BarmanObjectStore.Wal.Compression = CompressionType(
+	if src.Wal != nil {
+		wal := src.Wal
+		dst.Wal = &WalBackupConfiguration{}
+		dst.Wal.Compression = CompressionType(
 			wal.Compression)
-		dst.Spec.Backup.BarmanObjectStore.Wal.Encryption = EncryptionType(
+		dst.Wal.Encryption = EncryptionType(
 			wal.Encryption)
 	}
 
 	// spec.backup.barmanObjectStore.data
-	if src.Spec.Backup.BarmanObjectStore.Data != nil {
-		data := src.Spec.Backup.BarmanObjectStore.Data
-		dst.Spec.Backup.BarmanObjectStore.Data = &DataBackupConfiguration{}
-		dst.Spec.Backup.BarmanObjectStore.Data.Compression = CompressionType(
+	if src.Data != nil {
+		data := src.Data
+		dst.Data = &DataBackupConfiguration{}
+		dst.Data.Compression = CompressionType(
 			data.Compression)
-		dst.Spec.Backup.BarmanObjectStore.Data.Encryption = EncryptionType(
+		dst.Data.Encryption = EncryptionType(
 			data.Encryption)
-		dst.Spec.Backup.BarmanObjectStore.Data.ImmediateCheckpoint = data.ImmediateCheckpoint
-		dst.Spec.Backup.BarmanObjectStore.Data.Jobs = data.Jobs
+		dst.Data.ImmediateCheckpoint = data.ImmediateCheckpoint
+		dst.Data.Jobs = data.Jobs
 	}
 
 	// spec.backup.barmanObjectStore.endpointCA
-	if src.Spec.Backup.BarmanObjectStore.EndpointCA != nil {
-		dst.Spec.Backup.BarmanObjectStore.EndpointCA = &SecretKeySelector{}
-		dst.Spec.Backup.BarmanObjectStore.EndpointCA.LocalObjectReference.Name =
-			src.Spec.Backup.BarmanObjectStore.EndpointCA.LocalObjectReference.Name
-		dst.Spec.Backup.BarmanObjectStore.EndpointCA.Key =
-			src.Spec.Backup.BarmanObjectStore.EndpointCA.Key
+	if src.EndpointCA != nil {
+		dst.EndpointCA = &SecretKeySelector{}
+		dst.EndpointCA.LocalObjectReference.Name =
+			src.EndpointCA.LocalObjectReference.Name
+		dst.EndpointCA.Key =
+			src.EndpointCA.Key
 	}
 }
 
@@ -561,6 +589,12 @@ func (dst *BootstrapConfiguration) ConvertFrom(srcSpec *v1.BootstrapConfiguratio
 	// spec.bootstrap.recovery
 	if srcSpec.Recovery != nil {
 		dst.Recovery = &BootstrapRecovery{}
+		dst.Recovery.Source = srcSpec.Recovery.Source
+	}
+
+	// spec.bootstrap.recovery.backup
+	if srcSpec.Recovery != nil && srcSpec.Recovery.Backup != nil {
+		dst.Recovery.Backup = &LocalObjectReference{}
 		dst.Recovery.Backup.Name = srcSpec.Recovery.Backup.Name
 	}
 

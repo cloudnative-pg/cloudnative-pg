@@ -7,10 +7,8 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,72 +16,18 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
-
-// BackupListResult represent the result of a
-// barman-cloud-backup-list invocation
-type BackupListResult struct {
-	// The list of backups
-	List []BarmanBackup `json:"backups_list"`
-}
-
-// GetLatestBackup gets the latest backup between the ones available in the list, scanning the IDs
-func (backupList *BackupListResult) GetLatestBackup() BarmanBackup {
-	id := ""
-	var latestBackup BarmanBackup
-	for _, backup := range backupList.List {
-		if backup.ID > id {
-			id = backup.ID
-			latestBackup = backup
-		}
-	}
-	return latestBackup
-}
-
-// BarmanBackup represent a backup as created
-// by Barman
-type BarmanBackup struct {
-	// The backup label
-	Label string `json:"backup_label"`
-
-	// The moment where the backup started
-	BeginTime string `json:"begin_time"`
-
-	// The moment where the backup ended
-	EndTime string `json:"end_time"`
-
-	// The WAL where the backup started
-	BeginWal string `json:"begin_wal"`
-
-	// The WAL where the backup ended
-	EndWal string `json:"end_wal"`
-
-	// The LSN where the backup started
-	BeginLSN string `json:"begin_xlog"`
-
-	// The LSN where the backup ended
-	EndLSN string `json:"end_xlog"`
-
-	// The systemID of the cluster
-	SystemID string `json:"systemid"`
-
-	// The ID of the backup
-	ID string `json:"backup_id"`
-
-	// The error output if present
-	Error string `json:"error"`
-}
 
 // BackupCommand represent a backup command that is being executed
 type BackupCommand struct {
@@ -227,7 +171,12 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		time.Sleep(time.Minute * 1)
 	}
 
-	b.Env, err = EnvSetCloudCredentials(ctx, b.Client, b.Cluster, b.Env)
+	b.Env, err = barman.EnvSetCloudCredentials(
+		ctx,
+		b.Client,
+		b.Cluster.Namespace,
+		b.Cluster.Spec.Backup.BarmanObjectStore,
+		b.Env)
 	if err != nil {
 		return fmt.Errorf("cannot recover AWS credentials: %w", err)
 	}
@@ -310,7 +259,7 @@ func (b *BackupCommand) updateCompletedBackupStatus() {
 	backupStatus := b.Backup.GetStatus()
 
 	// Extracting latest backup using barman-cloud-backup-list
-	backupList, err := b.getBackupList()
+	backupList, err := barman.GetBackupList(b.Cluster.Spec.Backup.BarmanObjectStore, backupStatus.ServerName, b.Env)
 	if err != nil {
 		// Proper logging already happened inside getBackupList
 		return
@@ -318,231 +267,12 @@ func (b *BackupCommand) updateCompletedBackupStatus() {
 
 	// Update the backup with the data from the backup list retrieved
 	// get latest backup and set BackupId, StartedAt, StoppedAt, BeginWal, EndWAL, BeginLSN, EndLSN
-	latestBackup := backupList.GetLatestBackup()
+	latestBackup := backupList.LatestBackupInfo()
 	backupStatus.BackupID = latestBackup.ID
-	// date parsing layout
-	layout := "Mon Jan 2 15:04:05 2006"
-	started, err := time.Parse(layout, latestBackup.BeginTime)
-	if err != nil {
-		b.Log.Error(err, "Can't parse beginTime from latest backup")
-	} else {
-		startedAt := &metav1.Time{Time: started}
-		backupStatus.StartedAt = startedAt
-	}
-
-	stopped, err := time.Parse(layout, latestBackup.EndTime)
-	if err != nil {
-		b.Log.Error(err, "Can't parse endTime from latest backup")
-	} else {
-		stoppedAt := &metav1.Time{Time: stopped}
-		backupStatus.StoppedAt = stoppedAt
-	}
-
+	backupStatus.StartedAt = &metav1.Time{Time: latestBackup.BeginTime}
+	backupStatus.StoppedAt = &metav1.Time{Time: latestBackup.EndTime}
 	backupStatus.BeginWal = latestBackup.BeginWal
 	backupStatus.EndWal = latestBackup.EndWal
 	backupStatus.BeginLSN = latestBackup.BeginLSN
 	backupStatus.EndLSN = latestBackup.EndLSN
-}
-
-// EnvSetCloudCredentials sets the AWS environment variables given the configuration
-// inside the cluster
-func EnvSetCloudCredentials(
-	ctx context.Context,
-	c client.Client,
-	cluster *apiv1.Cluster,
-	env []string,
-) ([]string, error) {
-	if cluster.Spec.Backup.BarmanObjectStore.S3Credentials != nil {
-		return envSetAWSCredentials(ctx, c, cluster, env)
-	}
-
-	return envSetAzureCredentials(ctx, c, cluster, env)
-}
-
-// envSetAWSCredentials sets the AWS environment variables given the configuration
-// inside the cluster
-func envSetAWSCredentials(
-	ctx context.Context,
-	c client.Client,
-	cluster *apiv1.Cluster,
-	env []string,
-) ([]string, error) {
-	configuration := cluster.Spec.Backup.BarmanObjectStore
-	var accessKeyIDSecret corev1.Secret
-	var secretAccessKeySecret corev1.Secret
-
-	// Get access key ID
-	secretName := configuration.S3Credentials.AccessKeyIDReference.Name
-	secretKey := configuration.S3Credentials.AccessKeyIDReference.Key
-	err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: secretName}, &accessKeyIDSecret)
-	if err != nil {
-		return nil, fmt.Errorf("while getting access key ID secret: %w", err)
-	}
-
-	accessKeyID, ok := accessKeyIDSecret.Data[secretKey]
-	if !ok {
-		return nil, fmt.Errorf("missing key inside access key ID secret")
-	}
-
-	// Get secret access key
-	secretName = configuration.S3Credentials.SecretAccessKeyReference.Name
-	secretKey = configuration.S3Credentials.SecretAccessKeyReference.Key
-	err = c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: secretName}, &secretAccessKeySecret)
-	if err != nil {
-		return nil, fmt.Errorf("while getting secret access key secret: %w", err)
-	}
-
-	secretAccessKey, ok := secretAccessKeySecret.Data[secretKey]
-	if !ok {
-		return nil, fmt.Errorf("missing key inside secret access key secret")
-	}
-
-	env = append(env, fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", accessKeyID))
-	env = append(env, fmt.Sprintf("AWS_SECRET_ACCESS_KEY=%s", secretAccessKey))
-
-	return env, nil
-}
-
-// envSetAzureCredentials sets the Azure environment variables given the configuration
-// inside the cluster
-func envSetAzureCredentials(
-	ctx context.Context,
-	c client.Client,
-	cluster *apiv1.Cluster,
-	env []string,
-) ([]string, error) {
-	configuration := cluster.Spec.Backup.BarmanObjectStore
-	var storageAccountSecret corev1.Secret
-
-	// Get storage account name
-	if configuration.AzureCredentials.StorageAccount != nil {
-		storageAccountName := configuration.AzureCredentials.StorageAccount.Name
-		storageAccountKey := configuration.AzureCredentials.StorageAccount.Key
-		err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: storageAccountName}, &storageAccountSecret)
-		if err != nil {
-			return nil, fmt.Errorf("while getting access key ID secret: %w", err)
-		}
-
-		storageAccount, ok := storageAccountSecret.Data[storageAccountKey]
-		if !ok {
-			return nil, fmt.Errorf("missing key inside storage account name secret")
-		}
-		env = append(env, fmt.Sprintf("AZURE_STORAGE_ACCOUNT=%s", storageAccount))
-	}
-
-	// Get the storage key
-	if configuration.AzureCredentials.StorageKey != nil {
-		var storageKeySecret corev1.Secret
-		storageKeyName := configuration.AzureCredentials.StorageKey.Name
-		storageKeyKey := configuration.AzureCredentials.StorageKey.Key
-
-		err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: storageKeyName}, &storageKeySecret)
-		if err != nil {
-			return nil, fmt.Errorf("while getting access key ID secret: %w", err)
-		}
-
-		storageKey, ok := storageKeySecret.Data[storageKeyKey]
-		if !ok {
-			return nil, fmt.Errorf("missing key inside storage key secret")
-		}
-		env = append(env, fmt.Sprintf("AZURE_STORAGE_KEY=%s", storageKey))
-	}
-
-	// Get the SAS token
-	if configuration.AzureCredentials.StorageSasToken != nil {
-		var storageSasTokenSecret corev1.Secret
-		storageSasTokenName := configuration.AzureCredentials.StorageSasToken.Name
-		storageSasTokenKey := configuration.AzureCredentials.StorageSasToken.Key
-
-		err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: storageSasTokenName}, &storageSasTokenSecret)
-		if err != nil {
-			return nil, fmt.Errorf("while getting storage SAS token secret: %w", err)
-		}
-
-		storageKey, ok := storageSasTokenSecret.Data[storageSasTokenKey]
-		if !ok {
-			return nil, fmt.Errorf("missing key inside storage SAS token secret")
-		}
-		env = append(env, fmt.Sprintf("AZURE_STORAGE_SAS_TOKEN=%s", storageKey))
-	}
-
-	if configuration.AzureCredentials.ConnectionString != nil {
-		var connectionStringSecret corev1.Secret
-		connectionStringName := configuration.AzureCredentials.ConnectionString.Name
-		connectionStringKey := configuration.AzureCredentials.ConnectionString.Key
-
-		err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: connectionStringName}, &connectionStringSecret)
-		if err != nil {
-			return nil, fmt.Errorf("while getting storage SAS token secret: %w", err)
-		}
-
-		storageKey, ok := connectionStringSecret.Data[connectionStringKey]
-		if !ok {
-			return nil, fmt.Errorf("missing key inside connection string secret")
-		}
-		env = append(env, fmt.Sprintf("AZURE_STORAGE_CONNECTION_STRING=%s", storageKey))
-	}
-
-	return env, nil
-}
-
-// getBackupList returns the backup list a
-func (b *BackupCommand) getBackupList() (*BackupListResult, error) {
-	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
-	backupStatus := b.Backup.GetStatus()
-
-	var stdoutBuffer bytes.Buffer
-	var stderrBuffer bytes.Buffer
-	options := []string{"--format", "json"}
-	if barmanConfiguration.EndpointURL != "" {
-		options = append(options, "--endpoint-url", barmanConfiguration.EndpointURL)
-	}
-	if barmanConfiguration.Data != nil && barmanConfiguration.Data.Encryption != "" {
-		options = append(options, "-e", string(barmanConfiguration.Data.Encryption))
-	}
-	if barmanConfiguration.S3Credentials != nil {
-		options = append(
-			options,
-			"--cloud-provider",
-			"aws-s3")
-	}
-	if barmanConfiguration.AzureCredentials != nil {
-		options = append(
-			options,
-			"--cloud-provider",
-			"azure-blob-storage")
-	}
-	options = append(options, barmanConfiguration.DestinationPath, backupStatus.ServerName)
-
-	cmd := exec.Command("barman-cloud-backup-list", options...) // #nosec G204
-	cmd.Env = b.Env
-	cmd.Stdout = &stdoutBuffer
-	cmd.Stderr = &stderrBuffer
-	err := cmd.Run()
-	if err != nil {
-		b.Log.Error(err,
-			"Can't extract backup id using barman-cloud-backup-list",
-			"options", options,
-			"stdout", stdoutBuffer.String(),
-			"stderr", stderrBuffer.String())
-		return nil, err
-	}
-
-	backupList, err := parseBarmanCloudBackupList(stdoutBuffer.String())
-	if err != nil {
-		b.Log.Error(err, "Can't parse barman-cloud-backup-list output")
-		return nil, err
-	}
-
-	return backupList, nil
-}
-
-// parseBarmanCloudBackupList parses the output of barman-cloud-backup-list
-func parseBarmanCloudBackupList(output string) (*BackupListResult, error) {
-	result := &BackupListResult{}
-	err := json.Unmarshal([]byte(output), result)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
 }

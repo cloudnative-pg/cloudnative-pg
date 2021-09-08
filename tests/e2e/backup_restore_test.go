@@ -29,11 +29,12 @@ import (
 
 const (
 	minioClientName = "mc"
+	switchWalCmd    = "psql -U postgres app -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"
 )
 
-var _ = Describe("Backup and restore", func() {
-	var namespace, clusterName string
+var namespace, clusterName, azStorageAccount, azStorageKey string
 
+var _ = Describe("Backup and restore", func() {
 	JustAfterEach(func() {
 		if CurrentGinkgoTestDescription().Failed {
 			env.DumpClusterEnv(namespace, clusterName,
@@ -100,24 +101,7 @@ var _ = Describe("Backup and restore", func() {
 			// Write a table and some data on the "app" database
 			AssertCreateTestData(namespace, clusterName, "to_restore")
 
-			// Create a WAL on the primary and check if it arrives on
-			// minio within a short time.
-			By("archiving WALs and verifying they exist", func() {
-				primary := clusterName + "-1"
-				switchWalCmd := "psql -U postgres app -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"
-				out, _, err := tests.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primary,
-					switchWalCmd))
-				Expect(err).ToNot(HaveOccurred())
-
-				latestWAL := strings.TrimSpace(out)
-				Eventually(func() (int, error) {
-					// WALs are compressed with gzip in the fixture
-					return countFilesOnMinio(namespace, latestWAL+".gz")
-				}, 30).Should(BeEquivalentTo(1))
-			})
+			assertArchiveWalOnMinio(namespace, clusterName)
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
@@ -223,7 +207,6 @@ var _ = Describe("Backup and restore", func() {
 		// and that means that we must use different cluster names otherwise
 		// we risk mixing WALs and backups.
 
-		var azStorageAccount, azStorageKey string
 		BeforeEach(func() {
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
@@ -260,29 +243,7 @@ var _ = Describe("Backup and restore", func() {
 
 			// Write a table and some data on the "app" database
 			AssertCreateTestData(namespace, clusterName, "to_restore")
-
-			// Create a WAL on the primary and check if it arrives on
-			// Azure Blob Storage within a short time
-			By("archiving WALs and verifying they exist", func() {
-				primary := clusterName + "-1"
-				switchWalCmd := "psql -U postgres app -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"
-				out, _, err := tests.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					primary,
-					switchWalCmd))
-				Expect(err).ToNot(HaveOccurred())
-
-				latestWAL := strings.TrimSpace(out)
-				// Define what file we are looking for in Azure.
-				// Escapes are required since az expects forward slashes to be escaped
-				path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
-				// verifying on blob storage using az
-				Eventually(func() (int, error) {
-					return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, path)
-				}, 30).Should(BeEquivalentTo(1))
-			})
-
+			assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 			By("uploading a backup", func() {
 				// We create a Backup
 				backupFile := fixturesDir + "/backup/azure_blob/backup-azure-blob.yaml"
@@ -361,6 +322,140 @@ var _ = Describe("Backup and restore", func() {
 			Eventually(func() (int, error) {
 				return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
 			}, 30).Should(BeNumerically("==", 1))
+		})
+	})
+})
+
+var _ = Describe("Clusters Recovery From Barman Object Store", func() {
+	const (
+		fixturesBackupDir        = fixturesDir + "/backup/recovery_external_clusters/"
+		externalClusterFileMinio = fixturesBackupDir + "external-clusters-minio-03.yaml"
+		sourceBackupFileMinio    = fixturesBackupDir + "backup-minio-02.yaml"
+		clusterSourceFileMinio   = fixturesBackupDir + "source-cluster-minio-01.yaml"
+		sourceBackupFileAzure    = fixturesBackupDir + "backup-azure-blob-02.yaml"
+		clusterSourceFileAzure   = fixturesBackupDir + "source-cluster-azure-blob-01.yaml"
+		externalClusterFileAzure = fixturesBackupDir + "external-clusters-azure-blob-03.yaml"
+		tableName                = "to_restore"
+	)
+
+	JustAfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentGinkgoTestDescription().FullTestText+".log")
+		}
+	})
+	AfterEach(func() {
+		err := env.DeleteNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	// Restore cluster using a recovery object store, that is a backup of another cluster,
+	// created by Barman Cloud, and defined via the barmanObjectStore option in the externalClusters section
+	Context("using minio as object storage", func() {
+		It("restore cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
+			namespace = "recovery-barman-object-minio"
+			clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileMinio)
+			Expect(err).ToNot(HaveOccurred())
+			externalClusterName, err := env.GetResourceNameFromYAML(externalClusterFileMinio)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Create a cluster in a namespace we'll delete after the test
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			By("creating the credentials for minio", func() {
+				assertStorageCredentialsAreCreated(namespace, "minio", "minio123")
+			})
+			By("setting up minio", func() {
+				installMinio(namespace)
+			})
+
+			// Create the minio client pod and wait for it to be ready.
+			// We'll use it to check if everything is archived correctly.
+			By("setting up minio client pod", func() {
+				installMinioClient(namespace)
+			})
+
+			// Create the Cluster
+			AssertCreateCluster(namespace, clusterName, clusterSourceFileMinio, env)
+
+			// Write a table and some data on the "app" database
+			AssertCreateTestData(namespace, clusterName, tableName)
+
+			assertArchiveWalOnMinio(namespace, clusterName)
+
+			// There should be a backup resource and
+			By("backing up a cluster and verifying it exists on minio", func() {
+				executeBackup(namespace, sourceBackupFileMinio)
+				Eventually(func() (int, error) {
+					return countFilesOnMinio(namespace, "data.tar")
+				}, 30).Should(BeEquivalentTo(1))
+			})
+
+			// Restoring cluster using a recovery barman object store, which is defined
+			// in the externalClusters section
+			assertClusterRestore(namespace, externalClusterFileMinio)
+
+			// verify test data on restored external cluster
+			primaryPodInfo, err := env.GetClusterPrimary(namespace, externalClusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertTestDataExistence(namespace, primaryPodInfo.GetName(), tableName)
+		})
+	})
+
+	Context("using azure blobs as object storage", func() {
+		BeforeEach(func() {
+			isAKS, err := env.IsAKS()
+			Expect(err).ToNot(HaveOccurred())
+			if !isAKS {
+				Skip("This test is only executed on AKS clusters")
+			}
+			azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
+			azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
+		})
+
+		It("restore cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
+			namespace = "recovery-barman-object-azure"
+			clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileAzure)
+			Expect(err).ToNot(HaveOccurred())
+			externalClusterName, err := env.GetResourceNameFromYAML(externalClusterFileAzure)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Create a cluster in a namespace we'll delete after the test
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			// The Azure Blob Storage should have been created ad-hoc for the test,
+			// we get the credentials from the environment variables as we can't create
+			// a fixture for them
+			By("creating the Azure Blob Storage credentials",
+				func() {
+					assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
+				})
+
+			// Create the Cluster
+			AssertCreateCluster(namespace, clusterName, clusterSourceFileAzure, env)
+
+			// Write a table and some data on the "app" database
+			AssertCreateTestData(namespace, clusterName, tableName)
+			assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+
+			By("backing up a cluster and verifying it exists on azure blob storage", func() {
+				// We create a Backup
+				executeBackup(namespace, sourceBackupFileAzure)
+				// Verifying file called data.tar should be available on Azure blob storage
+				Eventually(func() (int, error) {
+					return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+				}, 30).Should(BeNumerically(">=", 1))
+			})
+
+			// Restoring cluster using a recovery barman object store, which is defined
+			// in the externalClusters section
+			assertClusterRestore(namespace, externalClusterFileAzure)
+
+			// verify test data on restored external cluster
+			primaryPodInfo, err := env.GetClusterPrimary(namespace, externalClusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertTestDataExistence(namespace, primaryPodInfo.GetName(), tableName)
 		})
 	})
 })
@@ -673,8 +768,7 @@ func composeFindMinioCmd(path string, serviceName string) string {
 	return fmt.Sprintf("sh -c 'mc find %v --name %v | wc -l'", serviceName, path)
 }
 
-// Use the minioClient `minioClientName` in namespace `namespace` to count
-// the amount of files matching the `path`
+// Use the minioClient `minioClientName` in namespace `namespace` to count  the amount of files matching the `path`
 func countFilesOnMinio(namespace string, path string) (int, error) {
 	out, _, err := tests.RunUnchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
@@ -708,4 +802,45 @@ func countFilesOnAzureBlobStorage(
 	var arr []string
 	err = json.Unmarshal([]byte(out), &arr)
 	return len(arr), err
+}
+
+func assertArchiveWalOnMinio(namespace, clusterName string) {
+	// Create a WAL on the primary and check if it arrives at minio, within a short time
+	By("archiving WALs and verifying they exist", func() {
+		primary := clusterName + "-1"
+		out, _, err := tests.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primary,
+			switchWalCmd))
+		Expect(err).ToNot(HaveOccurred())
+
+		latestWAL := strings.TrimSpace(out)
+		Eventually(func() (int, error) {
+			// WALs are compressed with gzip in the fixture
+			return countFilesOnMinio(namespace, latestWAL+".gz")
+		}, 30).Should(BeEquivalentTo(1))
+	})
+}
+
+func assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey string) {
+	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage, within a short time
+	By("archiving WALs and verifying they exist", func() {
+		primary := clusterName + "-1"
+		out, _, err := tests.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primary,
+			switchWalCmd))
+		Expect(err).ToNot(HaveOccurred())
+
+		latestWAL := strings.TrimSpace(out)
+		// Define what file we are looking for in Azure.
+		// Escapes are required since az expects forward slashes to be escaped
+		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
+		// Verifying on blob storage using az
+		Eventually(func() (int, error) {
+			return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, path)
+		}, 30).Should(BeEquivalentTo(1))
+	})
 }

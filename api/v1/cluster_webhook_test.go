@@ -1033,6 +1033,46 @@ var _ = Describe("bootstrap base backup validation", func() {
 	})
 })
 
+var _ = Describe("bootstrap recovery validation", func() {
+	It("does not complain when bootstrap recovery source matches one of the names of external clusters", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Source: "test",
+					},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		errorsList := recoveryCluster.validateBootstrapRecoverySource()
+		Expect(errorsList).To(BeEmpty())
+	})
+
+	It("complains when bootstrap recovery source does not match one of the names of external clusters", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Source: "test",
+					},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "another-test",
+					},
+				},
+			},
+		}
+		errorsList := recoveryCluster.validateBootstrapRecoverySource()
+		Expect(errorsList).ToNot(BeEmpty())
+	})
+})
+
 var _ = Describe("toleration validation", func() {
 	It("doesn't complain if we provide a proper toleration", func() {
 		recoveryCluster := &Cluster{

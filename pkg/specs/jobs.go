@@ -92,7 +92,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 }
 
 // CreatePrimaryJobViaRecovery creates a new primary instance in a Pod
-func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup *apiv1.Backup) *batchv1.Job {
+func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 	jobName := fmt.Sprintf("%s-%v-full-recovery", cluster.Name, nodeSerial)
 
@@ -101,76 +101,12 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 		"instance",
 		"restore",
 		"--pw-file", "/etc/superuser-secret/password",
-		"--backup-name", cluster.Spec.Bootstrap.Recovery.Backup.Name,
 	}
 
 	if cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
 		initCommand = append(initCommand,
 			"--target",
 			cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
-	}
-
-	var cloudEnvVars []corev1.EnvVar
-	if backup.Status.S3Credentials != nil {
-		cloudEnvVars = []corev1.EnvVar{
-			{
-				Name: "AWS_ACCESS_KEY_ID",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: apiv1.SecretKeySelectorToCore(&backup.Status.S3Credentials.AccessKeyIDReference),
-				},
-			},
-			{
-				Name: "AWS_SECRET_ACCESS_KEY",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: apiv1.SecretKeySelectorToCore(&backup.Status.S3Credentials.SecretAccessKeyReference),
-				},
-			},
-		}
-	}
-	if backup.Status.AzureCredentials != nil {
-		if backup.Status.AzureCredentials.StorageAccount != nil {
-			cloudEnvVars = []corev1.EnvVar{
-				{
-					Name: "AZURE_STORAGE_ACCOUNT",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: apiv1.SecretKeySelectorToCore(backup.Status.AzureCredentials.StorageAccount),
-					},
-				},
-			}
-		}
-
-		if backup.Status.AzureCredentials.StorageKey != nil {
-			cloudEnvVars = append(cloudEnvVars,
-				corev1.EnvVar{
-					Name: "AZURE_STORAGE_KEY",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: apiv1.SecretKeySelectorToCore(backup.Status.AzureCredentials.StorageKey),
-					},
-				},
-			)
-		}
-
-		if backup.Status.AzureCredentials.StorageSasToken != nil {
-			cloudEnvVars = append(cloudEnvVars,
-				corev1.EnvVar{
-					Name: "AZURE_STORAGE_SAS_TOKEN",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: apiv1.SecretKeySelectorToCore(backup.Status.AzureCredentials.StorageSasToken),
-					},
-				},
-			)
-		}
-
-		if backup.Status.AzureCredentials.ConnectionString != nil {
-			cloudEnvVars = append(cloudEnvVars,
-				corev1.EnvVar{
-					Name: "AZURE_STORAGE_CONNECTION_STRING",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: apiv1.SecretKeySelectorToCore(backup.Status.AzureCredentials.ConnectionString),
-					},
-				},
-			)
-		}
 	}
 
 	job := &batchv1.Job{
@@ -191,7 +127,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 							Name:            "bootstrap-full-recovery",
 							Image:           cluster.GetImageName(),
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-							Env:             append(createEnvVarPostgresContainer(cluster, podName), cloudEnvVars...),
+							Env:             createEnvVarPostgresContainer(cluster, podName),
 							Command:         initCommand,
 							VolumeMounts:    createPostgresVolumeMounts(cluster),
 							Resources:       cluster.Spec.Resources,

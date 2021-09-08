@@ -466,7 +466,12 @@ type BootstrapInitDB struct {
 // Refer to the Bootstrap page of the documentation for more information.
 type BootstrapRecovery struct {
 	// The backup we need to restore
-	Backup LocalObjectReference `json:"backup"`
+	Backup *LocalObjectReference `json:"backup,omitempty"`
+
+	// The external cluster whose backup we will restore. This is also
+	// used as the name of the folder under which the backup is stored,
+	// so it must be set to the name of the source cluster
+	Source string `json:"source,omitempty"`
 
 	// By default, the recovery process applies all the available
 	// WAL files in the archive (full recovery). However, you can also
@@ -777,6 +782,18 @@ type ExternalCluster struct {
 
 	// The reference to the password to be used to connect to the server
 	Password *corev1.SecretKeySelector `json:"password,omitempty"`
+
+	// The configuration for the barman-cloud tool suite
+	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
+}
+
+// GetServerName returns the server name, defaulting to the name of the external cluster or using the one specified
+// in the BarmanObjectStore
+func (in ExternalCluster) GetServerName() string {
+	if in.BarmanObjectStore != nil && in.BarmanObjectStore.ServerName != "" {
+		return in.BarmanObjectStore.ServerName
+	}
+	return in.Name
 }
 
 // +kubebuilder:object:root=true

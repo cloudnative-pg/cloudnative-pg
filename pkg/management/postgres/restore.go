@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,6 +27,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
@@ -52,12 +54,12 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	backup, err := info.loadBackup()
+	backup, env, err := info.loadBackup(client)
 	if err != nil {
 		return err
 	}
 
-	if err := info.restoreDataDir(backup); err != nil {
+	if err := info.restoreDataDir(backup, env); err != nil {
 		return err
 	}
 
@@ -73,11 +75,11 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	return info.ConfigureInstanceAfterRestore()
+	return info.ConfigureInstanceAfterRestore(env)
 }
 
 // restoreDataDir restores PGDATA from an existing backup
-func (info InitInfo) restoreDataDir(backup *apiv1.Backup) error {
+func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	var options []string
 	if backup.Status.EndpointURL != "" {
 		options = append(options, "--endpoint-url", backup.Status.EndpointURL)
@@ -107,6 +109,7 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup) error {
 
 	const barmanCloudRestoreName = "barman-cloud-restore"
 	cmd := exec.Command(barmanCloudRestoreName, options...) // #nosec G204
+	cmd.Env = env
 	err := execlog.RunStreaming(cmd, barmanCloudRestoreName)
 	if err != nil {
 		log.Log.Error(err, "Can't restore backup")
@@ -116,26 +119,128 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup) error {
 	return nil
 }
 
-// getBackupObjectKey constructs the object key where the backup will be found
-func (info InitInfo) getBackupObjectKey() client.ObjectKey {
-	return client.ObjectKey{Namespace: info.Namespace, Name: info.BackupName}
+// loadBackup loads the backup manifest from the API server of from the object store.
+// It also gets the environment variables that are needed to recover the cluster
+func (info InitInfo) loadBackup(typedClient client.Client) (*apiv1.Backup, []string, error) {
+	ctx := context.Background()
+
+	var cluster apiv1.Cluster
+	err := typedClient.Get(ctx, client.ObjectKey{Namespace: info.Namespace, Name: info.ClusterName}, &cluster)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Recovery given an existing backup
+	if cluster.Spec.Bootstrap.Recovery.Backup != nil {
+		return info.loadBackupFromReference(ctx, typedClient, &cluster)
+	}
+
+	return info.loadBackupObjectFromExternalCluster(ctx, typedClient, &cluster)
 }
 
-// loadBackup loads the backup manifest from the API server
-func (info InitInfo) loadBackup() (*apiv1.Backup, error) {
-	typedClient, err := management.NewControllerRuntimeClient()
+// loadBackupObjectFromExternalCluster generates an in-memory Backup structure given a reference to
+// an external server, loading the required information from the object store
+func (info InitInfo) loadBackupObjectFromExternalCluster(
+	ctx context.Context,
+	typedClient client.Client,
+	cluster *apiv1.Cluster) (*apiv1.Backup, []string, error) {
+	sourceName := cluster.Spec.Bootstrap.Recovery.Source
+	log.Log.Info("Recovering from external server", "sourceName", sourceName)
+
+	server, found := cluster.ExternalServer(sourceName)
+	if !found {
+		return nil, nil, fmt.Errorf("missing external server: %v", sourceName)
+	}
+	serverName := server.GetServerName()
+
+	env, err := barman.EnvSetCloudCredentials(
+		ctx,
+		typedClient,
+		cluster.Namespace,
+		server.BarmanObjectStore,
+		os.Environ())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	ctx := context.Background()
+	catalog, err := barman.GetBackupList(server.BarmanObjectStore, serverName, env)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Here we are simply loading the latest backup from the object store but
+	// since we have a catalog we could easily find the required backup to
+	// restore given a certain point in time, and we have it into
+	// cluster.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTime
+	//
+	// TODO: we need to think about the API or just simply use the stated
+	// property to do the job
+	latestBackup := catalog.LatestBackupInfo()
+	if latestBackup == nil {
+		return nil, nil, fmt.Errorf("no backup found")
+	}
+
+	log.Log.Info("Latest backup found", "backup", latestBackup)
+
+	return &apiv1.Backup{
+		Spec: apiv1.BackupSpec{
+			Cluster: apiv1.LocalObjectReference{
+				Name: serverName,
+			},
+		},
+		Status: apiv1.BackupStatus{
+			S3Credentials:    server.BarmanObjectStore.S3Credentials,
+			AzureCredentials: server.BarmanObjectStore.AzureCredentials,
+			EndpointURL:      server.BarmanObjectStore.EndpointURL,
+			DestinationPath:  server.BarmanObjectStore.DestinationPath,
+			ServerName:       serverName,
+			BackupID:         latestBackup.ID,
+			Phase:            apiv1.BackupPhaseCompleted,
+			StartedAt:        &metav1.Time{Time: latestBackup.BeginTime},
+			StoppedAt:        &metav1.Time{Time: latestBackup.EndTime},
+			BeginWal:         latestBackup.BeginWal,
+			EndWal:           latestBackup.EndWal,
+			BeginLSN:         latestBackup.BeginLSN,
+			EndLSN:           latestBackup.EndLSN,
+			Error:            latestBackup.Error,
+			CommandOutput:    "",
+			CommandError:     "",
+		},
+	}, env, nil
+}
+
+// loadBackupFromReference loads a backup object and the required credentials given the backup object resource
+func (info InitInfo) loadBackupFromReference(
+	ctx context.Context,
+	typedClient client.Client,
+	cluster *apiv1.Cluster) (*apiv1.Backup, []string, error) {
 	var backup apiv1.Backup
-	err = typedClient.Get(ctx, info.getBackupObjectKey(), &backup)
+	err := typedClient.Get(
+		ctx,
+		client.ObjectKey{Namespace: info.Namespace, Name: cluster.Spec.Bootstrap.Recovery.Backup.Name},
+		&backup)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &backup, nil
+	env, err := barman.EnvSetCloudCredentials(
+		ctx,
+		typedClient,
+		cluster.Namespace,
+		&apiv1.BarmanObjectStoreConfiguration{
+			S3Credentials:    backup.Status.S3Credentials,
+			AzureCredentials: backup.Status.AzureCredentials,
+			EndpointURL:      backup.Status.EndpointURL,
+			DestinationPath:  backup.Status.DestinationPath,
+			ServerName:       backup.Status.ServerName,
+		},
+		os.Environ())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	log.Log.Info("Recovering existing backup", "backup", backup)
+	return &backup, env, nil
 }
 
 // writeRestoreWalConfig writes a `custom.conf` allowing PostgreSQL
@@ -311,13 +416,14 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 // of the instance to be coherent with the one specified in the
 // cluster. This function also ensures that we can really connect
 // to this cluster using the password in the secrets
-func (info InitInfo) ConfigureInstanceAfterRestore() error {
+func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 	superUserPassword, err := fileutils.ReadFile(info.PasswordFile)
 	if err != nil {
 		return fmt.Errorf("cannot read superUserPassword file: %w", err)
 	}
 
 	instance := info.GetInstance()
+	instance.Env = env
 
 	majorVersion, err := postgresSpec.GetMajorVersion(info.PgData)
 	if err != nil {
