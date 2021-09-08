@@ -1270,7 +1270,44 @@ var _ = Describe("bootstrap base backup validation", func() {
 })
 
 var _ = Describe("replica mode validation", func() {
-	It("complain if pg_basebackup bootstrap option is not used", func() {
+	It("complains if the bootstrap method is not specified", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateReplicaMode()).ToNot(BeEmpty())
+	})
+
+	It("complains if the initdb bootstrap method is used", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateReplicaMode()).ToNot(BeEmpty())
+	})
+
+	It("is valid when the pg_basebackup bootstrap option is used", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
@@ -1289,10 +1326,27 @@ var _ = Describe("replica mode validation", func() {
 		}
 		result := cluster.validateReplicaMode()
 		Expect(result).To(BeEmpty())
+	})
 
-		cluster.Spec.Bootstrap.PgBaseBackup = nil
-		result = cluster.validateReplicaMode()
-		Expect(result).ToNot(BeEmpty())
+	It("is valid when the restore bootstrap option is used", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
 	})
 
 	It("complains when the external server doesn't exist", func() {

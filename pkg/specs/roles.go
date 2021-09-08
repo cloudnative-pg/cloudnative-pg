@@ -41,26 +41,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 	}
 
 	involvedSecretNames = append(involvedSecretNames, backupSecrets(cluster, backupOrigin)...)
-
-	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil {
-		server, _ := cluster.ExternalServer(cluster.Spec.Bootstrap.PgBaseBackup.Source)
-		if server.SSLCert != nil {
-			involvedSecretNames = append(involvedSecretNames,
-				server.SSLCert.Name)
-		}
-		if server.SSLRootCert != nil {
-			involvedSecretNames = append(involvedSecretNames,
-				server.SSLRootCert.Name)
-		}
-		if server.SSLKey != nil {
-			involvedSecretNames = append(involvedSecretNames,
-				server.SSLKey.Name)
-		}
-		if server.Password != nil {
-			involvedSecretNames = append(involvedSecretNames,
-				server.Password.Name)
-		}
-	}
+	involvedSecretNames = append(involvedSecretNames, externalClusterSecrets(cluster)...)
 
 	rules := []rbacv1.PolicyRule{
 		{
@@ -166,6 +147,31 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		Rules: rules,
 	}
+}
+
+func externalClusterSecrets(cluster apiv1.Cluster) []string {
+	var result []string
+
+	for _, server := range cluster.Spec.ExternalClusters {
+		if server.SSLCert != nil {
+			result = append(result,
+				server.SSLCert.Name)
+		}
+		if server.SSLRootCert != nil {
+			result = append(result,
+				server.SSLRootCert.Name)
+		}
+		if server.SSLKey != nil {
+			result = append(result,
+				server.SSLKey.Name)
+		}
+		if server.Password != nil {
+			result = append(result,
+				server.Password.Name)
+		}
+	}
+
+	return result
 }
 
 func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {

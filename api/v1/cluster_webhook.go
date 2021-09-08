@@ -768,11 +768,16 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 		return result
 	}
 
-	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.PgBaseBackup == nil {
+	if r.Spec.Bootstrap == nil {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "bootstrap"),
+			r.Spec.ReplicaCluster,
+			"bootstrap configuration is required for replica mode"))
+	} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "replicaCluster"),
 			r.Spec.ReplicaCluster,
-			"replica mode is compatible only with bootstrap using pg_basebackup"))
+			"replica mode is compatible only with bootstrap using pg_basebackup or recovery"))
 	}
 
 	_, found := r.ExternalServer(r.Spec.ReplicaCluster.Source)
