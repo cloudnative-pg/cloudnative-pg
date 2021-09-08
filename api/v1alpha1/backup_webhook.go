@@ -79,7 +79,7 @@ func (r *Backup) ValidateUpdate(old runtime.Object) error {
 	backupLog.Info("validate update", "name", r.Name)
 
 	oldV1Backup := v1.Backup{}
-	if err := old.(*Cluster).ConvertTo(&oldV1Backup); err != nil {
+	if err := old.(*Backup).ConvertTo(&oldV1Backup); err != nil {
 		return err
 	}
 
