@@ -29,6 +29,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/external"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
@@ -49,12 +50,17 @@ var (
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore(ctx context.Context) error {
-	client, err := management.NewControllerRuntimeClient()
+	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return err
 	}
 
-	backup, env, err := info.loadBackup(client)
+	cluster, err := info.loadCluster(ctx, typedClient)
+	if err != nil {
+		return err
+	}
+
+	backup, env, err := info.loadBackup(ctx, typedClient, cluster)
 	if err != nil {
 		return err
 	}
@@ -63,7 +69,23 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.WriteInitialPostgresqlConf(ctx, client); err != nil {
+	if err := info.WriteInitialPostgresqlConf(ctx, typedClient); err != nil {
+		return err
+	}
+
+	if cluster.IsReplica() {
+		server, ok := cluster.ExternalServer(cluster.Spec.ReplicaCluster.Source)
+		if !ok {
+			return fmt.Errorf("missing external server: %v", cluster.Spec.ReplicaCluster.Source)
+		}
+
+		connectionString, _, err := external.ConfigureConnectionToServer(
+			ctx, typedClient, info.Namespace, &server)
+		if err != nil {
+			return err
+		}
+
+		_, err = UpdateReplicaConfigurationForPrimary(info.PgData, connectionString)
 		return err
 	}
 
@@ -119,23 +141,30 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	return nil
 }
 
-// loadBackup loads the backup manifest from the API server of from the object store.
-// It also gets the environment variables that are needed to recover the cluster
-func (info InitInfo) loadBackup(typedClient client.Client) (*apiv1.Backup, []string, error) {
-	ctx := context.Background()
-
+// loadCluster loads the cluster definition from the API server
+func (info InitInfo) loadCluster(ctx context.Context, typedClient client.Client) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
 	err := typedClient.Get(ctx, client.ObjectKey{Namespace: info.Namespace, Name: info.ClusterName}, &cluster)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
+	return &cluster, nil
+}
+
+// loadBackup loads the backup manifest from the API server of from the object store.
+// It also gets the environment variables that are needed to recover the cluster
+func (info InitInfo) loadBackup(
+	ctx context.Context,
+	typedClient client.Client,
+	cluster *apiv1.Cluster,
+) (*apiv1.Backup, []string, error) {
 	// Recovery given an existing backup
 	if cluster.Spec.Bootstrap.Recovery.Backup != nil {
-		return info.loadBackupFromReference(ctx, typedClient, &cluster)
+		return info.loadBackupFromReference(ctx, typedClient, cluster)
 	}
 
-	return info.loadBackupObjectFromExternalCluster(ctx, typedClient, &cluster)
+	return info.loadBackupObjectFromExternalCluster(ctx, typedClient, cluster)
 }
 
 // loadBackupObjectFromExternalCluster generates an in-memory Backup structure given a reference to
