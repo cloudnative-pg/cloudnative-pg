@@ -2,6 +2,58 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.8.0
+
+**Release date:** 13 September 2021
+
+Features:
+
+- Bootstrap a new cluster via full or Point-In-Time Recovery directly from an
+  object store defined in the external cluster section, eliminating the
+  previous requirement to have a Backup CR defined
+- Introduce the `immediate` option in scheduled backups to request a backup
+  immediately after the first Postgres instance running, adding the capability
+  to rewind to the very beginning of a cluster when Point-In-Time Recovery is
+  configured
+- Add the `firstRecoverabilityPoint` in the cluster status to report the oldest
+  consistent point in time to request a recovery based on the backup object
+  store’s content
+- Enhance the default Prometheus exporter for a PostgreSQL instance by exposing
+  the following new metrics:
+
+    1. number of WAL files and computed total size on disk
+    2. number of `.ready` and `.done` files in the archive status folder
+    3. flag for replica mode
+    4. number of requested minimum/maximum synchronous replicas, as well as
+       the expected and actually observed ones
+
+- Add support for the `runonserver` option when defining custom metrics in the
+  Prometheus exporter to limit the collection of a metric to a range of
+  PostgreSQL versions
+- Natively support Azure Blob Storage for backup and recovery, by taking
+  advantage of the feature introduced in Barman 2.13 for Barman Cloud
+- Rely on `pg_isready` for the liveness probe
+- Support RFC3339 format for timestamp specification in recovery target times
+- Introduce `.spec.imagePullPolicy` to control the pull policy of image
+  containers for all pods and jobs created for a cluster
+- Add support for OpenShift 4.8, which replaces OpenShift 4.5
+- Support PostgreSQL 14 (beta)
+- Enhance the replica cluster feature with cross-cluster replication from an
+  object store defined in an external cluster section, without requiring a
+  streaming connection (experimental)
+- Introduce `logLevel` option to the cluster's spec to specify one of the
+  following levels: error, info, debug or trace
+
+Security Enhancements:
+
+- Introduce `.spec.enableSuperuserAccess` to enable/disable network access with the
+  `postgres` user through password authentication
+
+Fixes:
+
+- Properly inform users when a cluster enters an unrecoverable state and
+  requires human intervention
+
 ## Version 1.7.1
 
 **Release date:** 11 August 2021
