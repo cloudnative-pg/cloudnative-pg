@@ -142,7 +142,7 @@ func (backupStatus *BackupStatus) SetAsFailed(
 	}
 }
 
-// SetAsCompleted marks a certain backup as invalid
+// SetAsCompleted marks a certain backup as completed
 func (backupStatus *BackupStatus) SetAsCompleted() {
 	backupStatus.Phase = BackupPhaseCompleted
 	backupStatus.Error = ""

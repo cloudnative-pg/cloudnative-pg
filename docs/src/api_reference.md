@@ -328,6 +328,7 @@ Name                     | Description                                          
 `secretsResourceVersion  ` | The list of resource versions of the secrets managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the secret data        | [SecretsResourceVersion](#SecretsResourceVersion)    
 `configMapResourceVersion` | The list of resource versions of the configmaps, managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the configmap data | [ConfigMapResourceVersion](#ConfigMapResourceVersion)
 `certificates            ` | The configuration for the CA and related certificates, initialized with defaults.                                                                                                  | [CertificatesStatus](#CertificatesStatus)            
+`firstRecoverabilityPoint` | The first recoverability point, stored as a date in RFC3339 format                                                                                                                 | string                                               
 
 <a id='ConfigMapKeySelector'></a>
 

@@ -1800,6 +1800,10 @@ spec:
                 items:
                   type: string
                 type: array
+              firstRecoverabilityPoint:
+                description: The first recoverability point, stored as a date in RFC3339
+                  format
+                type: string
               healthyPVC:
                 description: List of all the PVCs not dangling nor initializing
                 items:

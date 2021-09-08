@@ -277,6 +277,9 @@ type ClusterStatus struct {
 
 	// The configuration for the CA and related certificates, initialized with defaults.
 	Certificates CertificatesStatus `json:"certificates,omitempty"`
+
+	// The first recoverability point, stored as a date in RFC3339 format
+	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 }
 
 // ReplicaClusterConfiguration encapsulates the configuration of a replica
