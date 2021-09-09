@@ -18,7 +18,7 @@ import (
 
 const (
 	// externalSecretsPath is the path where the cryptographic material
-	// needed to connect to an external server will be dumped
+	// needed to connect to an external cluster will be dumped
 	externalSecretsPath = "/controller/external" // #nosec
 )
 

@@ -368,7 +368,7 @@ Name                | Description                                               
 
 ## ExternalCluster
 
-ExternalCluster represents the connection parameters of an external server which is used in the cluster configuration
+ExternalCluster represents the connection parameters to an external cluster which is used in the other sections of the configuration
 
 Name                 | Description                                                                  | Type                                                                                                                       
 -------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------
@@ -452,7 +452,7 @@ ReplicaClusterConfiguration encapsulates the configuration of a replica cluster
 Name    | Description                                                                                                                                                     | Type  
 ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------
 `enabled` | If replica mode is enabled, this cluster will be a replica of an existing cluster. A cluster of such type can be created only using bootstrap via pg_basebackup - *mandatory*  | bool  
-`source ` | The name of the external server which is the replication origin                                                                                                 - *mandatory*  | string
+`source ` | The name of the external cluster which is the replication origin                                                                                                - *mandatory*  | string
 
 <a id='RollingUpdateStatus'></a>
 

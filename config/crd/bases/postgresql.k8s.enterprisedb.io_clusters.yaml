@@ -1107,7 +1107,8 @@ spec:
                 description: The list of external clusters which are used in the configuration
                 items:
                   description: ExternalCluster represents the connection parameters
-                    of an external server which is used in the cluster configuration
+                    to an external cluster which is used in the other sections of
+                    the configuration
                   properties:
                     barmanObjectStore:
                       description: The configuration for the barman-cloud tool suite
@@ -1531,7 +1532,7 @@ spec:
                       be created only using bootstrap via pg_basebackup
                     type: boolean
                   source:
-                    description: The name of the external server which is the replication
+                    description: The name of the external cluster which is the replication
                       origin
                     minLength: 1
                     type: string
@@ -2986,11 +2987,12 @@ spec:
                   by default.
                 type: boolean
               externalClusters:
-                description: The list of external server which are used in the cluster
-                  configuration
+                description: The list of external clusters which are used in the other
+                  sections of the configuration
                 items:
                   description: ExternalCluster represent the connection parameters
-                    to an external server which is used in the cluster configuration
+                    to an external cluster which is used in the other sections of
+                    the configuration
                   properties:
                     barmanObjectStore:
                       description: The configuration for the barman-cloud tool suite
@@ -3399,7 +3401,7 @@ spec:
                       be created only using bootstrap via pg_basebackup
                     type: boolean
                   source:
-                    description: The name of the external server which is the replication
+                    description: The name of the external cluster which is the replication
                       origin
                     minLength: 1
                     type: string

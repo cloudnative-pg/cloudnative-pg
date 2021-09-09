@@ -627,7 +627,7 @@ func (r *InstanceReconciler) reconcileReplica(ctx context.Context, cluster *apiv
 }
 
 // refreshParentServer will ensure that this replica instance is actually replicating from the correct
-// parent server, which is the external server for the designated primary and the designated primary
+// parent server, which is the external cluster for the designated primary and the designated primary
 // for the replicas
 func (r *InstanceReconciler) refreshParentServer(ctx context.Context, cluster *apiv1.Cluster) error {
 	// Let's update the replication configuration

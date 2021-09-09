@@ -299,7 +299,7 @@ type ReplicaClusterConfiguration struct {
 	//+optional
 	Enabled bool `json:"enabled"`
 
-	// The name of the external server which is the replication origin
+	// The name of the external cluster which is the replication origin
 	// +kubebuilder:validation:MinLength=1
 	Source string `json:"source"`
 }
@@ -770,8 +770,8 @@ type MonitoringConfiguration struct {
 	CustomQueriesSecret []SecretKeySelector `json:"customQueriesSecret,omitempty"`
 }
 
-// ExternalCluster represents the connection parameters of an
-// external server which is used in the cluster configuration
+// ExternalCluster represents the connection parameters to an
+// external cluster which is used in the other sections of the configuration
 type ExternalCluster struct {
 	// The server name, required
 	Name string `json:"name"`
@@ -1091,7 +1091,7 @@ func (cluster Cluster) GetPostgresGID() int64 {
 
 // ExternalServer gets the external server with a known name, returning
 // true if the server was found and false otherwise
-func (cluster Cluster) ExternalServer(name string) (ExternalCluster, bool) {
+func (cluster Cluster) ExternalCluster(name string) (ExternalCluster, bool) {
 	for _, server := range cluster.Spec.ExternalClusters {
 		if server.Name == name {
 			return server, true

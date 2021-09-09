@@ -1236,7 +1236,7 @@ var _ = Describe("validate anti-affinity", func() {
 	})
 })
 
-var _ = Describe("validation of the list of external servers", func() {
+var _ = Describe("validation of the list of external clusters", func() {
 	It("is correct when it's empty", func() {
 		cluster := Cluster{}
 		Expect(cluster.validateExternalClusters()).To(BeEmpty())
@@ -1388,7 +1388,7 @@ var _ = Describe("replica mode validation", func() {
 		Expect(result).To(BeEmpty())
 	})
 
-	It("complains when the external server doesn't exist", func() {
+	It("complains when the external cluster doesn't exist", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{

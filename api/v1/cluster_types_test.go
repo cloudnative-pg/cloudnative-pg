@@ -181,7 +181,7 @@ var _ = Describe("resize in use volumes", func() {
 	})
 })
 
-var _ = Describe("external server list", func() {
+var _ = Describe("external cluster list", func() {
 	cluster := Cluster{
 		Spec: ClusterSpec{
 			ExternalClusters: []ExternalCluster{
@@ -204,20 +204,20 @@ var _ = Describe("external server list", func() {
 		},
 	}
 	It("can be looked up by name", func() {
-		server, ok := cluster.ExternalServer("testServer")
+		server, ok := cluster.ExternalCluster("testServer")
 		Expect(ok).To(BeTrue())
 		Expect(server.Name).To(Equal("testServer"))
 		Expect(server.ConnectionParameters["dbname"]).To(Equal("test"))
 	})
 	It("fails for non existent replicas", func() {
-		_, ok := cluster.ExternalServer("nonExistentServer")
+		_, ok := cluster.ExternalCluster("nonExistentServer")
 		Expect(ok).To(BeFalse())
 	})
 	It("return the correct server name", func() {
-		server, ok := cluster.ExternalServer("testServer")
+		server, ok := cluster.ExternalCluster("testServer")
 		Expect(ok).To(BeTrue())
 		Expect(server.GetServerName()).To(BeEquivalentTo("testServerRealName"), "explicit server name")
-		server2, ok2 := cluster.ExternalServer("testServer2")
+		server2, ok2 := cluster.ExternalCluster("testServer2")
 		Expect(ok2).To(BeTrue())
 		Expect(server2.GetServerName()).To(BeEquivalentTo("testServer2"), "default server name")
 	})

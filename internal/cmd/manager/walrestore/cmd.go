@@ -75,15 +75,15 @@ func NewCmd() *cobra.Command {
 			case cluster.IsReplica() && cluster.Status.CurrentPrimary == podName:
 				// I am the designated primary. Let's use the recovery object store for this wal
 				sourceName := cluster.Spec.ReplicaCluster.Source
-				externalServer, found := cluster.ExternalServer(sourceName)
+				externalCluster, found := cluster.ExternalCluster(sourceName)
 				if !found {
 					log.Log.Info("External cluster not found, cannot recover WAL",
 						"sourceName", sourceName)
 					return fmt.Errorf("external cluster not found: %v", sourceName)
 				}
 
-				barmanConfiguration = externalServer.BarmanObjectStore
-				recoverClusterName = externalServer.Name
+				barmanConfiguration = externalCluster.BarmanObjectStore
+				recoverClusterName = externalCluster.Name
 
 			default:
 				// I am a plain replica. Let's use the object store which we are using to
