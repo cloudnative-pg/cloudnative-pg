@@ -76,6 +76,7 @@ Fei
 Filesystem
 Fluentd
 Francesco
+GC
 GCE
 GID
 GKE
@@ -204,6 +205,8 @@ addons
 affinityconfiguration
 aks
 albert
+alloc
+allocator
 allowVolumeExpansion
 angus
 api
@@ -329,12 +332,14 @@ ffd
 filesystem
 fio
 freddie
+gc
 gcc
 gce
 github
 gmail
 golangci
 goodwithtech
+goroutines
 gosec
 gzip
 hba
@@ -359,6 +364,7 @@ initdb
 initialise
 initializingPVC
 instancesStatus
+inuse
 io
 ip
 ips
@@ -391,14 +397,18 @@ listmeta
 liveness
 localobjectreference
 locktype
+lookups
 lsn
 lt
 malcolm
+mallocs
 matchExpressions
 matchLabels
 maxSyncReplicas
+mcache
 md
 mem
+memstats
 metav
 metric's
 metricNameKS
@@ -409,6 +419,7 @@ minio
 monitoringconfiguration
 mountPath
 msg
+mspan
 myAKSCluster
 myResourceGroup
 namespace
@@ -443,6 +454,7 @@ pgaudit
 pgbarman
 pgbasebackup
 pgbench
+pgdata
 pgpass
 pgstatstatements
 phaseReason
@@ -474,6 +486,7 @@ psql
 pvc
 pvcCount
 pvcTemplate
+quantile
 quickstart
 rbac
 readService
@@ -546,6 +559,8 @@ substatement
 sudo
 superuserSecret
 svc
+switchovers
+sys
 tAc
 tablespace
 tablespaces
