@@ -337,11 +337,16 @@ func (r *ClusterReconciler) refreshConfigMapResourceVersions(ctx context.Context
 // refreshSecretResourceVersions set the resource version of the secrets
 func (r *ClusterReconciler) refreshSecretResourceVersions(ctx context.Context, cluster *apiv1.Cluster) error {
 	versions := apiv1.SecretsResourceVersion{}
-	version, err := r.getSecretResourceVersion(ctx, cluster, cluster.GetSuperuserSecretName())
-	if err != nil {
-		return err
+	var version string
+	var err error
+
+	if cluster.GetEnableSuperuserAccess() {
+		version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetSuperuserSecretName())
+		if err != nil {
+			return err
+		}
+		versions.SuperuserSecretVersion = version
 	}
-	versions.SuperuserSecretVersion = version
 
 	version, err = r.getSecretResourceVersion(ctx, cluster, cluster.GetApplicationSecretName())
 	if err != nil {

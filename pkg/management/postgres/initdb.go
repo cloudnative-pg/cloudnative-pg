@@ -88,12 +88,14 @@ const (
 
 // VerifyConfiguration verify if the passed configuration is OK and returns an error otherwise
 func (info InitInfo) VerifyConfiguration() error {
-	passwordFileExists, err := fileutils.FileExists(info.PasswordFile)
-	if err != nil {
-		return err
-	}
-	if !passwordFileExists {
-		return fmt.Errorf("superuser password file doesn't exist (%v)", info.PasswordFile)
+	if info.PasswordFile != "" {
+		passwordFileExists, err := fileutils.FileExists(info.PasswordFile)
+		if err != nil {
+			return err
+		}
+		if !passwordFileExists {
+			return fmt.Errorf("superuser password file doesn't exist (%v)", info.PasswordFile)
+		}
 	}
 
 	if info.ApplicationPasswordFile != "" {

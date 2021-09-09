@@ -36,7 +36,7 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
-	err = r.createPostgresSecrets(ctx, cluster)
+	err = r.reconcilePostgresSecrets(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -87,9 +87,25 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 	return nil
 }
 
-func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *apiv1.Cluster) error {
-	if cluster.Spec.SuperuserSecret == nil ||
-		cluster.Spec.SuperuserSecret.Name == "" {
+func (r *ClusterReconciler) reconcilePostgresSecrets(ctx context.Context, cluster *apiv1.Cluster) error {
+	err := r.reconcileSuperuserSecret(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
+	err = r.reconcileAppUserSecret(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluster *apiv1.Cluster) error {
+	// We need to create a secret for the 'postgres' user when superuser
+	// access is enabled and the user haven't specified his own
+	if cluster.GetEnableSuperuserAccess() &&
+		(cluster.Spec.SuperuserSecret == nil || cluster.Spec.SuperuserSecret.Name == "") {
 		postgresPassword, err := password.Generate(64, 10, 0, false, true)
 		if err != nil {
 			return err
@@ -111,6 +127,29 @@ func (r *ClusterReconciler) createPostgresSecrets(ctx context.Context, cluster *
 		}
 	}
 
+	// If we don't have Superuser enabled we make sure the automatically generated secret doesn't exist
+	if !cluster.GetEnableSuperuserAccess() {
+		var secret corev1.Secret
+		err := r.Get(
+			ctx,
+			client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.GetSuperuserSecretName()},
+			&secret)
+		if err != nil {
+			if apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
+				return nil
+			}
+			return err
+		}
+
+		if _, owned := isOwnedByCluster(&secret); owned {
+			return r.Delete(ctx, &secret)
+		}
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster *apiv1.Cluster) error {
 	if cluster.ShouldCreateApplicationDatabase() &&
 		(cluster.Spec.Bootstrap.InitDB.Secret == nil ||
 			cluster.Spec.Bootstrap.InitDB.Secret.Name == "") {

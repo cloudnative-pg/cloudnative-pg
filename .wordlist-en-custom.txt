@@ -299,6 +299,7 @@ datistemplate
 datname
 dbname
 ddl
+de
 declaratively
 defaultMode
 destinationPath
@@ -315,11 +316,13 @@ ecdsa
 edb
 eks
 enablePodAntiAffinity
+enableSuperuserAccess
 endpointURL
 enterprisedb
 env
 executables
 externalClusters
+facto
 failover
 fastpath
 ffd

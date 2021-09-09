@@ -19,15 +19,15 @@ import (
 
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
 func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
-	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
-	jobName := fmt.Sprintf("%s-%v-initdb", cluster.Name, nodeSerial)
-
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
 		"init",
-		"--pw-file", "/etc/superuser-secret/password",
 		"--parent-node", cluster.GetServiceReadWriteName(),
+	}
+
+	if cluster.GetEnableSuperuserAccess() {
+		initCommand = append(initCommand, "--pw-file", "/etc/superuser-secret/password")
 	}
 
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.InitDB != nil {
@@ -51,56 +51,19 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 			"--app-pw-file", "/etc/app-secret/password")
 	}
 
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: cluster.Namespace,
-		},
-		Spec: batchv1.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
-						createBootstrapContainer(cluster),
-					},
-					Containers: []corev1.Container{
-						{
-							Name:            "bootstrap-instance",
-							Image:           cluster.GetImageName(),
-							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-							Env:             createEnvVarPostgresContainer(cluster, podName),
-							Command:         initCommand,
-							VolumeMounts:    createPostgresVolumeMounts(cluster),
-							Resources:       cluster.Spec.Resources,
-							SecurityContext: CreateContainerSecurityContext(),
-						},
-					},
-					Volumes:            createPostgresVolumes(cluster, podName),
-					SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
-					Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-					Tolerations:        cluster.Spec.Affinity.Tolerations,
-					ServiceAccountName: cluster.Name,
-					RestartPolicy:      corev1.RestartPolicyNever,
-					NodeSelector:       cluster.Spec.Affinity.NodeSelector,
-				},
-			},
-		},
-	}
-
-	addManagerLoggingOptions(&job.Spec.Template.Spec.Containers[0])
-
-	return job
+	return createPrimaryJob(cluster, nodeSerial, "initdb", initCommand)
 }
 
 // CreatePrimaryJobViaRecovery creates a new primary instance in a Pod
 func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
-	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
-	jobName := fmt.Sprintf("%s-%v-full-recovery", cluster.Name, nodeSerial)
-
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
 		"restore",
-		"--pw-file", "/etc/superuser-secret/password",
+	}
+
+	if cluster.GetEnableSuperuserAccess() {
+		initCommand = append(initCommand, "--pw-file", "/etc/superuser-secret/password")
 	}
 
 	if cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
@@ -109,103 +72,40 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32) *batch
 			cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
 	}
 
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: cluster.Namespace,
-		},
-		Spec: batchv1.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Hostname:  jobName,
-					Subdomain: cluster.GetServiceAnyName(),
-					InitContainers: []corev1.Container{
-						createBootstrapContainer(cluster),
-					},
-					Containers: []corev1.Container{
-						{
-							Name:            "bootstrap-full-recovery",
-							Image:           cluster.GetImageName(),
-							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-							Env:             createEnvVarPostgresContainer(cluster, podName),
-							Command:         initCommand,
-							VolumeMounts:    createPostgresVolumeMounts(cluster),
-							Resources:       cluster.Spec.Resources,
-							SecurityContext: CreateContainerSecurityContext(),
-						},
-					},
-					Volumes:            createPostgresVolumes(cluster, podName),
-					SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
-					Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-					Tolerations:        cluster.Spec.Affinity.Tolerations,
-					ServiceAccountName: cluster.Name,
-					RestartPolicy:      corev1.RestartPolicyNever,
-					NodeSelector:       cluster.Spec.Affinity.NodeSelector,
-				},
-			},
-		},
-	}
-
-	addManagerLoggingOptions(&job.Spec.Template.Spec.Containers[0])
-
-	return job
+	return createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
 }
 
 // CreatePrimaryJobViaPgBaseBackup creates a new primary instance in a Pod
-func CreatePrimaryJobViaPgBaseBackup(
-	cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
-	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
-	jobName := fmt.Sprintf("%s-%v-pgbasebackup", cluster.Name, nodeSerial)
-
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: cluster.Namespace,
-		},
-		Spec: batchv1.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Hostname:  jobName,
-					Subdomain: cluster.GetServiceAnyName(),
-					InitContainers: []corev1.Container{
-						createBootstrapContainer(cluster),
-					},
-					Containers: []corev1.Container{
-						{
-							Name:            "bootstrap-pgbasebackup",
-							Image:           cluster.GetImageName(),
-							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-							Env:             createEnvVarPostgresContainer(cluster, podName),
-							Command: []string{
-								"/controller/manager",
-								"instance",
-								"pgbasebackup",
-								"--pw-file", "/etc/superuser-secret/password",
-							},
-							VolumeMounts:    createPostgresVolumeMounts(cluster),
-							Resources:       cluster.Spec.Resources,
-							SecurityContext: CreateContainerSecurityContext(),
-						},
-					},
-					Volumes:            createPostgresVolumes(cluster, podName),
-					SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
-					Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-					Tolerations:        cluster.Spec.Affinity.Tolerations,
-					ServiceAccountName: cluster.Name,
-					RestartPolicy:      corev1.RestartPolicyNever,
-					NodeSelector:       cluster.Spec.Affinity.NodeSelector,
-				},
-			},
-		},
+func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
+	initCommand := []string{
+		"/controller/manager",
+		"instance",
+		"pgbasebackup",
 	}
 
-	return job
+	if cluster.GetEnableSuperuserAccess() {
+		initCommand = append(initCommand, "--pw-file", "/etc/superuser-secret/password")
+	}
+
+	return createPrimaryJob(cluster, nodeSerial, "pgbasebackup", initCommand)
 }
 
 // JoinReplicaInstance create a new PostgreSQL node, copying the contents from another Pod
 func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
+	initCommand := []string{
+		"/controller/manager",
+		"instance",
+		"join",
+		"--parent-node", cluster.GetServiceReadWriteName(),
+	}
+
+	return createPrimaryJob(cluster, nodeSerial, "join", initCommand)
+}
+
+// createPrimaryJob create a job that executes the provided command
+func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int32, shortName string, initCommand []string) *batchv1.Job {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
-	jobName := fmt.Sprintf("%s-%v-join", cluster.Name, nodeSerial)
+	jobName := fmt.Sprintf("%s-%v-%s", cluster.Name, nodeSerial, shortName)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -222,16 +122,11 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 					},
 					Containers: []corev1.Container{
 						{
-							Name:            "bootstrap-replica",
+							Name:            shortName,
 							Image:           cluster.GetImageName(),
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 							Env:             createEnvVarPostgresContainer(cluster, podName),
-							Command: []string{
-								"/controller/manager",
-								"instance",
-								"join",
-								"--parent-node", cluster.GetServiceReadWriteName(),
-							},
+							Command:         initCommand,
 							VolumeMounts:    createPostgresVolumeMounts(cluster),
 							Resources:       cluster.Spec.Resources,
 							SecurityContext: CreateContainerSecurityContext(),
