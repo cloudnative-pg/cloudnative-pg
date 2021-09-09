@@ -1,0 +1,20 @@
+name: slash-command-dispatch
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  chatops:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run E2E main on CNP
+        uses: peter-evans/slash-command-dispatch@v2
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          issue-type: pull-request
+          dispatch-type: workflow
+          permission: none
+          commands: |
+            test
+          repository: EnterpriseDB/cloud-native-postgresql

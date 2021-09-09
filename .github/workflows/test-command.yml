@@ -1,0 +1,16 @@
+name: test-command
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Run E2E on OpenShift
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          workflow: continuous-delivery
+          repo: enterprisedb/cloud-native-postgresql-ocp-certified
+          inputs: '{ "upstream_commit": "${{ github.event.pull_request.head.sha || github.sha }}", "run_e2e": true}'
