@@ -21,6 +21,22 @@ data:
         - total:
             usage: "GAUGE"
             description: "Total no. of WAL files on disk"
+    runonserver_match:
+      query: "SELECT 42"
+      primary: false
+      runonserver: ">=10 <99"
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 42, used to test runonserver"
+    runonserver_nomatch:
+      query: "SELECT 99"
+      primary: false
+      runonserver: "<10"
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 99, used to test runonserver"
 ---
 apiVersion: v1
 kind: ConfigMap

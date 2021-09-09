@@ -15,6 +15,8 @@ import (
 	"path"
 	"regexp"
 
+	"github.com/blang/semver"
+	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
@@ -46,19 +48,33 @@ var isPathPattern = regexp.MustCompile(`[][*?]`)
 
 // Collect load data from the actual PostgreSQL instance
 func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
+	// Reset before collecting
+	q.errorUserQueries.Reset()
+
+	err := q.collectUserQueries(ch)
+	if err != nil {
+		return err
+	}
+
+	// Add errors into errorUserQueriesVec and errorUserQueriesGauge metrics
+	q.errorUserQueriesGauge.Collect(ch)
+	q.errorUserQueries.Collect(ch)
+
+	return nil
+}
+
+func (q QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error {
 	isPrimary, err := q.instance.IsPrimary()
 	if err != nil {
 		return err
 	}
 
-	// Reset before collecting
-	q.errorUserQueries.Reset()
-
-	// In case more than one user query specifies a pattern in target_databases,
+	// In case more than one user query specify a pattern in target_databases,
 	// we need to get them just once
 	var allAccessibleDatabasesCache []string
 
 	for name, userQuery := range q.userQueries {
+		queryLogger := log.Log.WithValues("query", name)
 		collector := QueryCollector{
 			namespace:      name,
 			userQuery:      userQuery,
@@ -66,12 +82,11 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 			variableLabels: q.variableLabels[name],
 		}
 
-		if (userQuery.Primary || userQuery.Master) && !isPrimary { // wokeignore:rule=master
-			log.Log.V(1).Info("Skipping because runs only on primary", "query", name)
+		if !q.toBeChecked(name, userQuery, isPrimary, queryLogger) {
 			continue
 		}
 
-		log.Log.V(1).Info("Collecting data", "query", name)
+		queryLogger.V(1).Info("Collecting data")
 
 		targetDatabases := userQuery.TargetDatabases
 		if len(targetDatabases) == 0 {
@@ -84,8 +99,7 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 				if isPathPattern.MatchString(targetDatabase) {
 					databases, err := q.getAllAccessibleDatabases()
 					if err != nil {
-						q.errorUserQueries.WithLabelValues(name + ": " + err.Error()).Inc()
-						q.errorUserQueriesGauge.Set(1)
+						q.reportUserQueryErrorMetric(name + ": " + err.Error())
 						break
 					}
 					allAccessibleDatabasesCache = databases
@@ -98,24 +112,64 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 		for targetDatabase := range allTargetDatabases {
 			conn, err := q.instance.ConnectionPool().Connection(targetDatabase)
 			if err != nil {
-				return err
+				q.reportUserQueryErrorMetric(name + ": " + err.Error())
+				continue
 			}
 			err = collector.collect(conn, ch)
 			if err != nil {
-				log.Log.Error(err, "Error collecting user query", "query name", name,
+				queryLogger.Error(err, "Error collecting user query",
 					"targetDatabase", targetDatabase)
 				// Increment metrics counters.
-				q.errorUserQueries.WithLabelValues(name + " on db " + targetDatabase + ": " + err.Error()).Inc()
-				q.errorUserQueriesGauge.Set(1)
+				q.reportUserQueryErrorMetric(name + " on db " + targetDatabase + ": " + err.Error())
 			}
 		}
 	}
-
-	// Add err it into errorUserQueriesVec and errorUserQueriesGauge metrics.
-	q.errorUserQueriesGauge.Collect(ch)
-	q.errorUserQueries.Collect(ch)
-
 	return nil
+}
+
+func (q QueriesCollector) toBeChecked(name string, userQuery UserQuery, isPrimary bool, queryLogger logr.Logger) bool {
+	if (userQuery.Primary || userQuery.Master) && !isPrimary { // wokeignore:rule=master
+		queryLogger.V(1).Info("Skipping because runs only on primary")
+		return false
+	}
+
+	if runOnServer := userQuery.RunOnServer; runOnServer != "" {
+		matchesVersion, err := q.checkRunOnServerMatches(runOnServer, name)
+		// any error should result in the query not being executed
+		if err != nil {
+			queryLogger.Error(err, "while checking runOnServer version matches",
+				"runOnServer", runOnServer)
+			q.reportUserQueryErrorMetric(name)
+			return false
+		} else if !matchesVersion {
+			queryLogger.V(1).Info("Skipping because runs only on other postgres versions",
+				"runOnServer", runOnServer)
+			return false
+		}
+	}
+
+	return true
+}
+
+func (q QueriesCollector) reportUserQueryErrorMetric(label string) {
+	q.errorUserQueries.WithLabelValues(label).Inc()
+	q.errorUserQueriesGauge.Set(1)
+}
+
+func (q QueriesCollector) checkRunOnServerMatches(runOnServer string, name string) (bool, error) {
+	isVersionInRange, err := semver.ParseRange(runOnServer)
+	if err != nil {
+		log.Log.Error(err, "while parsing runOnServer version range",
+			"runOnServer", runOnServer, "query", name)
+		return false, err
+	}
+	pgVersion, err := q.instance.GetPgVersion()
+	if err != nil {
+		log.Log.Error(err, "while getting current pgVersion",
+			"runOnServer", runOnServer, "query", name)
+		return false, err
+	}
+	return isVersionInRange(*pgVersion), nil
 }
 
 func (q QueriesCollector) expandTargetDatabases(

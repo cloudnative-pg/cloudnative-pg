@@ -232,6 +232,8 @@ Here is a short description of all the available fields:
     - `query`: the SQL query to run on the target database to generate the metrics
     - `primary`: whether to run the query only on the primary instance <!-- wokeignore:rule=master -->
     - `master`: same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated) <!-- wokeignore:rule=master -->
+    - `runonserver`: a semantic version range to limit the versions of PostgreSQL the query should run on
+       (e.g. `">=10.0.0"` or `">=12.0.0 <=14.0.0"`)
     - `target_databases`: a list of databases to run the `query` against,
       or a [shell-like pattern](#example-of-a-user-defined-metric-running-on-multiple-databases)
       to enable auto discovery. Overwrites the default database if provided.
@@ -291,7 +293,6 @@ are defined in the official Prometheus exporter are not implemented in Cloud
 Native PostgreSQL's exporter:
 
 - `cache_seconds`: number of seconds to cache the result of the query
-- `runonserver`: a semantic version range to limit the versions of PostgreSQL the query should run on (e.g. `">=10.0.0"`)
 
 Similarly, the `pg_version` field of a column definition is not implemented.
 

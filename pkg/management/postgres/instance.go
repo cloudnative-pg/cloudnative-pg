@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/blang/semver"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
@@ -66,6 +67,32 @@ type Instance struct {
 
 	// PgCtlTimeoutForPromotion specifies the maximum number of seconds to wait when waiting for promotion to complete
 	PgCtlTimeoutForPromotion int32
+
+	pgVersion *semver.Version
+}
+
+// GetPgVersion queries the postgres instance to know the current version, parses it and memoize it for future uses
+func (instance *Instance) GetPgVersion() (*semver.Version, error) {
+	if instance.pgVersion != nil {
+		return instance.pgVersion, nil
+	}
+	db, err := instance.GetSuperUserDB()
+	if err != nil {
+		return nil, err
+	}
+	var versionString string
+	row := db.QueryRow("SHOW server_version;")
+	err = row.Scan(&versionString)
+	if err != nil {
+		return nil, err
+	}
+	parsedVersion, err := semver.ParseTolerant(versionString)
+	if err != nil {
+		return nil, err
+	}
+	instance.pgVersion = &parsedVersion
+
+	return instance.pgVersion, nil
 }
 
 // RetryUntilServerAvailable is the default retry configuration that is used
