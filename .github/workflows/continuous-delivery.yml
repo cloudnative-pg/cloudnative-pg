@@ -42,7 +42,16 @@ jobs:
           concurrent_skipping: 'same_content'
           skip_after_successful_duplicate: 'true'
           paths_ignore: '["README.md", "docs/**"]'
-          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule", "repository_dispatch"]'
+
+  checkout_pr:
+    if: ( github.event_name  == 'repository_dispatch' && github.event.action == 'run-e2e-cnp-command' )
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2.3.4
+        with:
+          repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.client_payload.pull_request.head.ref }}
 
   golangci:
     name: Run linters
@@ -907,3 +916,20 @@ jobs:
         run: |
           terraform destroy -auto-approve
           rm -fr .terraform* terraform* id_rsa host.list
+
+  report_workflow_url:
+    if: ( github.event_name  == 'repository_dispatch' && github.event.action == 'run-e2e-cnp-command' )
+    name: Create comment in PR
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Create URL to the run output
+        id: vars
+        run: echo ::set-output name=run-url::https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+      - name: Create comment
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          issue-number: ${{ github.event.client_payload.github.payload.issue.number }}
+          body: |
+            @${{ github.event.client_payload.github.actor }}, here's the link to the E2E on CNP workflow run: ${{ steps.vars.outputs.run-url }}
