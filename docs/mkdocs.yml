@@ -15,7 +15,6 @@ nav:
   - architecture.md
   - installation_upgrade.md
   - quickstart.md
-  - cloud_setup.md
   - bootstrap.md
   - security.md
   - scheduling.md

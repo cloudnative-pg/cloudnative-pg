@@ -26,10 +26,9 @@ Cloud Native PostgreSQL works with PostgreSQL and is available under the
     users can expect a **"Level V - Auto Pilot"** set of capabilities from the
     Cloud Native PostgreSQL Operator.
 
-## Requirements
+## Supported Kubernetes distributions
 
-Cloud Native PostgreSQL requires Kubernetes 1.16 or higher, tested on AWS,
-Google, Azure (with multiple availability zones).
+Cloud Native PostgreSQL requires Kubernetes 1.16 or higher.
 
 Cloud Native PostgreSQL has also been certified for
 [RedHat OpenShift Container Platform (OCP)](https://www.openshift.com/products/container-platform)
@@ -37,6 +36,10 @@ Cloud Native PostgreSQL has also been certified for
 OpenShift Container Platform is an open-source distribution of Kubernetes which is
 [maintained and commercially supported](https://access.redhat.com/support/policy/updates/openshift#ocp4)
 by Red Hat.
+
+Please refer to the
+["Platform Compatibility"](https://www.enterprisedb.com/product-compatibility#cnp)
+page from the EDB website for a list of the currently supported Kubernetes distributions.
 
 ## Supported PostgreSQL versions
 
