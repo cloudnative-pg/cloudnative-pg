@@ -52,17 +52,10 @@ and the following suite of E2E tests are performed on that cluster:
 * Operator High Availability;
 * Node drain;
 * Primary endpoint switch in case of failover in less than 10 seconds;
-  the threshold is raised to 20 seconds on GKE and 30 on AKS;
 * Primary endpoint switch in case of switchover in less than 20 seconds;
 * Recover from a degraded state in less than 60 seconds;
 * Physical replica clusters;
 * Storage expansion;
 * Data corruption;
 
-The E2E tests suite is also run for OpenShift versions 4.6 and 4.7
-and the latest Kubernetes and PostgreSQL releases on clusters created on the
-following services:
-
-* Google GKE
-* Amazon EKS
-* Microsoft Azure AKS
+The E2E tests suite is also run for OpenShift versions 4.6 and 4.7.
