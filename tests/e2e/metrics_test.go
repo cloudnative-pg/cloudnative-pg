@@ -27,8 +27,9 @@ var _ = Describe("Metrics", func() {
 		targetDBTwo             = "test1"
 		targetDBSecret          = "secret_test"
 		testTableName           = "test_table"
-		customQueriesSampleFile = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
 		clusterMetricsFile      = fixturesDir + "/metrics/cluster-metrics.yaml"
+		clusterMetricsDBFile    = fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml"
+		customQueriesSampleFile = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
 	)
 
 	// Cluster identifiers
@@ -45,6 +46,7 @@ var _ = Describe("Metrics", func() {
 			`cnp_pg_stat_archiver_archived_count \d+|` +
 			`cnp_pg_stat_archiver_failed_count \d+|` +
 			`cnp_pg_locks_blocked_queries 0|` +
+			`cnp_runonserver_match 42|` +
 			`cnp_collector_last_collection_error 0)` +
 			`$)`)
 
@@ -89,13 +91,12 @@ var _ = Describe("Metrics", func() {
 	It("can gather metrics with multiple target databases", func() {
 		namespace = "metrics-target-databases-e2e"
 		metricsClusterName = "metrics-target-databases"
-		ClusterSampleFile := fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml"
 		// Create the cluster namespace
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
 		// Create the cluster
-		AssertCreateCluster(namespace, metricsClusterName, ClusterSampleFile, env)
+		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsDBFile, env)
 		CreateTestDataForTargetDB(namespace, metricsClusterName, targetDBOne, testTableName)
 		CreateTestDataForTargetDB(namespace, metricsClusterName, targetDBTwo, testTableName)
 		CreateTestDataForTargetDB(namespace, metricsClusterName, targetDBSecret, testTableName)
