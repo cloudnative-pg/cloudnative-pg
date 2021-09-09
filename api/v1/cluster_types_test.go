@@ -24,6 +24,15 @@ var _ = Describe("PostgreSQL cluster type", func() {
 		Expect(postgresql.GetSuperuserSecretName()).To(Equal("clustername-superuser"))
 	})
 
+	It("correctly get if the superuser is enabled", func() {
+		postgresql.Spec.EnableSuperuserAccess = nil
+		Expect(postgresql.GetEnableSuperuserAccess()).To(BeTrue())
+
+		falseValue := false
+		postgresql.Spec.EnableSuperuserAccess = &falseValue
+		Expect(postgresql.GetEnableSuperuserAccess()).To(BeFalse())
+	})
+
 	It("correctly set the name of the secret of the application user", func() {
 		Expect(postgresql.GetApplicationSecretName()).To(Equal("clustername-app"))
 	})

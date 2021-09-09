@@ -66,6 +66,14 @@ type ClusterSpec struct {
 	// +optional
 	SuperuserSecret *LocalObjectReference `json:"superuserSecret,omitempty"`
 
+	// When this option is enabled, the operator will use the `SuperuserSecret`
+	// to update the `postgres` user password (if the secret is
+	// not present, the operator will automatically create one). When this
+	// option is disabled, the operator will ignore the `SuperuserSecret` content, delete
+	// it when automatically created, and then blank the password of the `postgres`
+	// user by setting it to `NULL`. Enabled by default.
+	EnableSuperuserAccess *bool `json:"enableSuperuserAccess,omitempty"`
+
 	// The configuration for the CA and related certificates
 	// +optional
 	Certificates *CertificatesConfiguration `json:"certificates,omitempty"`

@@ -484,6 +484,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(LocalObjectReference)
 		**out = **in
 	}
+	if in.EnableSuperuserAccess != nil {
+		in, out := &in.EnableSuperuserAccess, &out.EnableSuperuserAccess
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Certificates != nil {
 		in, out := &in.Certificates, &out.Certificates
 		*out = new(CertificatesConfiguration)

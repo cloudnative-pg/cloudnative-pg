@@ -28,6 +28,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 	dst.Spec.Instances = src.Spec.Instances
 	dst.Spec.MinSyncReplicas = src.Spec.MinSyncReplicas
 	dst.Spec.MaxSyncReplicas = src.Spec.MaxSyncReplicas
+	dst.Spec.EnableSuperuserAccess = src.Spec.EnableSuperuserAccess
 
 	// spec.postgresql
 	dst.Spec.PostgresConfiguration.Parameters = src.Spec.PostgresConfiguration.Parameters
@@ -350,6 +351,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Spec.Instances = src.Spec.Instances
 	dst.Spec.MinSyncReplicas = src.Spec.MinSyncReplicas
 	dst.Spec.MaxSyncReplicas = src.Spec.MaxSyncReplicas
+	dst.Spec.EnableSuperuserAccess = src.Spec.EnableSuperuserAccess
 
 	// spec.postgresql
 	dst.Spec.PostgresConfiguration.Parameters = src.Spec.PostgresConfiguration.Parameters
@@ -362,6 +364,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 		dst.Spec.Bootstrap.ConvertFrom(src.Spec.Bootstrap)
 	}
 
+	// spec.superuserSecret
 	if src.Spec.SuperuserSecret != nil {
 		dst.Spec.SuperuserSecret = &LocalObjectReference{}
 		dst.Spec.SuperuserSecret.Name = src.Spec.SuperuserSecret.Name

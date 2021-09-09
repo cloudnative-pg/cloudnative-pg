@@ -846,10 +846,18 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 		return err
 	}
 
-	// Let's get the credentials from the secrets
-	if err = r.reconcileUser(ctx, cluster.GetSuperuserSecretName(), tx); err != nil {
-		return err
+	if cluster.GetEnableSuperuserAccess() {
+		err = r.reconcileUser(ctx, cluster.GetSuperuserSecretName(), tx)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = r.disableSuperuserPassword(tx)
+		if err != nil {
+			return err
+		}
 	}
+
 	if err = r.reconcileUser(ctx, cluster.GetApplicationSecretName(), tx); err != nil {
 		return err
 	}
@@ -886,5 +894,10 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, secretName strin
 	if err == nil {
 		r.secretVersions[secret.Name] = secret.ResourceVersion
 	}
+	return err
+}
+
+func (r *InstanceReconciler) disableSuperuserPassword(tx *sql.Tx) error {
+	_, err := tx.Exec("ALTER ROLE postgres WITH PASSWORD NULL")
 	return err
 }
