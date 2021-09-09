@@ -328,14 +328,14 @@ func (r *Cluster) validateBootstrapPgBaseBackupSource() field.ErrorList {
 		return result
 	}
 
-	_, found := r.ExternalServer(r.Spec.Bootstrap.PgBaseBackup.Source)
+	_, found := r.ExternalCluster(r.Spec.Bootstrap.PgBaseBackup.Source)
 	if !found {
 		result = append(
 			result,
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "pg_basebackup", "source"),
 				r.Spec.Bootstrap.PgBaseBackup.Source,
-				fmt.Sprintf("External server %v not found", r.Spec.Bootstrap.PgBaseBackup.Source)))
+				fmt.Sprintf("External cluster %v not found", r.Spec.Bootstrap.PgBaseBackup.Source)))
 	}
 
 	return result
@@ -351,14 +351,14 @@ func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
 		return result
 	}
 
-	_, found := r.ExternalServer(r.Spec.Bootstrap.Recovery.Source)
+	_, found := r.ExternalCluster(r.Spec.Bootstrap.Recovery.Source)
 	if !found {
 		result = append(
 			result,
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "source"),
 				r.Spec.Bootstrap.Recovery.Source,
-				fmt.Sprintf("External server %v not found", r.Spec.Bootstrap.Recovery.Source)))
+				fmt.Sprintf("External cluster %v not found", r.Spec.Bootstrap.Recovery.Source)))
 	}
 
 	return result
@@ -721,7 +721,7 @@ func (r *Cluster) validateName() field.ErrorList {
 	return result
 }
 
-// Check if the external servers list contains two servers with the same name
+// Check if the external clusters list contains two servers with the same name
 func (r *Cluster) validateExternalClusters() field.ErrorList {
 	var result field.ErrorList
 	stringSet := configfile.NewStringSet()
@@ -736,9 +736,9 @@ func (r *Cluster) validateExternalClusters() field.ErrorList {
 
 	if stringSet.Len() != len(r.Spec.ExternalClusters) {
 		result = append(result, field.Invalid(
-			field.NewPath("spec", "externalServers"),
+			field.NewPath("spec", "externalClusters"),
 			r.Spec.ExternalClusters,
-			"the list of external servers contains duplicate values"))
+			"the list of external clusters contains duplicate values"))
 	}
 
 	return result
@@ -799,7 +799,7 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 			"replica mode is compatible only with bootstrap using pg_basebackup or recovery"))
 	}
 
-	_, found := r.ExternalServer(r.Spec.ReplicaCluster.Source)
+	_, found := r.ExternalCluster(r.Spec.ReplicaCluster.Source)
 	if !found {
 		result = append(
 			result,

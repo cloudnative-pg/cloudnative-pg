@@ -74,9 +74,9 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	}
 
 	if cluster.IsReplica() {
-		server, ok := cluster.ExternalServer(cluster.Spec.ReplicaCluster.Source)
+		server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
 		if !ok {
-			return fmt.Errorf("missing external server: %v", cluster.Spec.ReplicaCluster.Source)
+			return fmt.Errorf("missing external cluster: %v", cluster.Spec.ReplicaCluster.Source)
 		}
 
 		connectionString, _, err := external.ConfigureConnectionToServer(
@@ -168,17 +168,17 @@ func (info InitInfo) loadBackup(
 }
 
 // loadBackupObjectFromExternalCluster generates an in-memory Backup structure given a reference to
-// an external server, loading the required information from the object store
+// an external cluster, loading the required information from the object store
 func (info InitInfo) loadBackupObjectFromExternalCluster(
 	ctx context.Context,
 	typedClient client.Client,
 	cluster *apiv1.Cluster) (*apiv1.Backup, []string, error) {
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
-	log.Log.Info("Recovering from external server", "sourceName", sourceName)
+	log.Log.Info("Recovering from external cluster", "sourceName", sourceName)
 
-	server, found := cluster.ExternalServer(sourceName)
+	server, found := cluster.ExternalCluster(sourceName)
 	if !found {
-		return nil, nil, fmt.Errorf("missing external server: %v", sourceName)
+		return nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
 	}
 	serverName := server.GetServerName()
 

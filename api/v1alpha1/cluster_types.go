@@ -117,7 +117,7 @@ type ClusterSpec struct {
 	// The configuration of the monitoring infrastructure of this cluster
 	Monitoring *MonitoringConfiguration `json:"monitoring,omitempty"`
 
-	// The list of external server which are used in the cluster configuration
+	// The list of external clusters which are used in the other sections of the configuration
 	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
 }
 
@@ -195,7 +195,7 @@ type ReplicaClusterConfiguration struct {
 	//+optional
 	Enabled bool `json:"enabled"`
 
-	// The name of the external server which is the replication origin
+	// The name of the external cluster which is the replication origin
 	// +kubebuilder:validation:MinLength=1
 	Source string `json:"source"`
 }
@@ -703,7 +703,7 @@ type ConfigMapResourceVersion struct {
 }
 
 // ExternalCluster represent the connection parameters to an
-// external server which is used in the cluster configuration
+// external cluster which is used in the other sections of the configuration
 type ExternalCluster struct {
 	// The server name, required
 	Name string `json:"name"`

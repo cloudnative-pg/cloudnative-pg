@@ -58,9 +58,9 @@ func (r *InstanceReconciler) writeReplicaConfigurationForReplica() (changed bool
 
 func (r *InstanceReconciler) writeReplicaConfigurationForDesignatedPrimary(
 	ctx context.Context, cluster *apiv1.Cluster) (changed bool, err error) {
-	server, ok := cluster.ExternalServer(cluster.Spec.ReplicaCluster.Source)
+	server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
 	if !ok {
-		return false, fmt.Errorf("missing external server")
+		return false, fmt.Errorf("missing external cluster")
 	}
 
 	connectionString, pgpassfile, err := external.ConfigureConnectionToServer(

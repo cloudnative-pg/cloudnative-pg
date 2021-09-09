@@ -82,9 +82,9 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 		return err
 	}
 
-	server, ok := cluster.ExternalServer(cluster.Spec.Bootstrap.PgBaseBackup.Source)
+	server, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.PgBaseBackup.Source)
 	if !ok {
-		return fmt.Errorf("missing external server")
+		return fmt.Errorf("missing external cluster")
 	}
 
 	connectionString, pgpass, err := external.ConfigureConnectionToServer(
