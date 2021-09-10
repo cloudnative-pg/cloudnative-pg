@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // CreateClusterAnyService create a service insisting on all the pods
@@ -28,8 +29,8 @@ func CreateClusterAnyService(cluster apiv1.Cluster) *corev1.Service {
 				{
 					Name:       "postgres",
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(5432),
-					Port:       5432,
+					TargetPort: intstr.FromInt(postgres.ServerPort),
+					Port:       postgres.ServerPort,
 				},
 			},
 			Selector: map[string]string{
@@ -52,8 +53,8 @@ func CreateClusterReadService(cluster apiv1.Cluster) *corev1.Service {
 				{
 					Name:       "postgres",
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(5432),
-					Port:       5432,
+					TargetPort: intstr.FromInt(postgres.ServerPort),
+					Port:       postgres.ServerPort,
 				},
 			},
 			Selector: map[string]string{
@@ -76,8 +77,8 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 				{
 					Name:       "postgres",
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(5432),
-					Port:       5432,
+					TargetPort: intstr.FromInt(postgres.ServerPort),
+					Port:       postgres.ServerPort,
 				},
 			},
 			Selector: map[string]string{
@@ -101,8 +102,8 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 				{
 					Name:       "postgres",
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(5432),
-					Port:       5432,
+					TargetPort: intstr.FromInt(postgres.ServerPort),
+					Port:       postgres.ServerPort,
 				},
 			},
 			Selector: map[string]string{

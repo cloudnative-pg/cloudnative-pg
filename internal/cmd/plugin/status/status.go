@@ -217,7 +217,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		"Pending restart",
 		"Status")
 	for _, instance := range instanceStatus.Items {
-		if instance.ExecError != nil {
+		if instance.Error != nil {
 			status.AddLine(
 				instance.Pod.Name,
 				"-",
@@ -228,7 +228,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 				"-",
 				"-",
 				"-",
-				instance.ExecError.Error())
+				instance.Error.Error())
 		} else {
 			status.AddLine(
 				instance.Pod.Name,
@@ -292,14 +292,14 @@ func getReplicaStatusFromPodViaExec(
 		"/controller/manager", "instance", "status")
 	if err != nil {
 		result.Pod = pod
-		result.ExecError = fmt.Errorf("pod not available")
+		result.Error = fmt.Errorf("pod not available")
 		return result
 	}
 
 	err = json.Unmarshal([]byte(stdout), &result)
 	if err != nil {
 		result.Pod = pod
-		result.ExecError = fmt.Errorf("can't parse pod output")
+		result.Error = fmt.Errorf("can't parse pod output")
 		return result
 	}
 

@@ -85,6 +85,10 @@ host all all all md5
 	// used by the PostgreSQL server
 	SocketDirectory = "/controller/run"
 
+	// ServerPort is the port where the postmaster process will be listening.
+	// It's also used in the naming of the Unix socket
+	ServerPort = 5432
+
 	// LogPath is the path of the folder used by the logging_collector
 	LogPath = "/controller/log"
 
@@ -328,7 +332,7 @@ var (
 			"hot_standby":             "true",
 			"archive_mode":            "on",
 			"archive_command":         "/controller/manager wal-archive %p",
-			"port":                    "5432",
+			"port":                    fmt.Sprint(ServerPort),
 			"wal_level":               "logical",
 			"wal_log_hints":           "on",
 			"archive_timeout":         "5min", // TODO support configurable archive timeout

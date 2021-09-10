@@ -150,7 +150,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, &cluster, instancesStatus, resources)
 	if err != nil {
 		if err == ErrWalReceiversRunning {
-			clusterControllerLog.Info("Waiting for the all WAL receivers to be down to elect a new primary")
+			clusterControllerLog.Info("Waiting for all WAL receivers to be down to elect a new primary")
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 		clusterControllerLog.Info("Cannot update target primary: operation cannot be fulfilled. "+

@@ -23,8 +23,8 @@ type PostgresqlStatus struct {
 
 	// This field is set when there is an error while extracting the
 	// status of a Pod
-	ExecError error `json:"-"`
-	IsReady   bool  `json:"isReady"`
+	Error   error `json:"-"`
+	IsReady bool  `json:"isReady"`
 }
 
 // PostgresqlStatusList is a list of PostgreSQL instances status, useful to
@@ -51,9 +51,9 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 	// the list, since this is used to elect a new primary
 	// when needed.
 	switch {
-	case list.Items[i].ExecError != nil && list.Items[j].ExecError == nil:
+	case list.Items[i].Error != nil && list.Items[j].Error == nil:
 		return false
-	case list.Items[i].ExecError == nil && list.Items[j].ExecError != nil:
+	case list.Items[i].Error == nil && list.Items[j].Error != nil:
 		return true
 	}
 
@@ -102,12 +102,23 @@ func (list PostgresqlStatusList) AreWalReceiversDown() bool {
 	return true
 }
 
+// IsPodReporting if a pod is ready
+func (list PostgresqlStatusList) IsPodReporting(podname string) bool {
+	for _, item := range list.Items {
+		if item.Pod.Name == podname {
+			return item.Error == nil
+		}
+	}
+
+	return false
+}
+
 // IsComplete check the PostgreSQL status list for Pods which
 // contain errors. Returns true if everything is green and
 // false otherwise
 func (list PostgresqlStatusList) IsComplete() bool {
 	for idx := range list.Items {
-		if list.Items[idx].ExecError != nil {
+		if list.Items[idx].Error != nil {
 			return false
 		}
 	}

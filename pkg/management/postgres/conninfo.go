@@ -17,7 +17,7 @@ import (
 func buildPrimaryConnInfo(primaryHostname, applicationName string) string {
 	primaryConnInfo := fmt.Sprintf("host=%v ", primaryHostname) +
 		fmt.Sprintf("user=%v ", apiv1.StreamingReplicationUser) +
-		"port=5432 " +
+		fmt.Sprintf("port=%v ", GetServerPort()) +
 		fmt.Sprintf("sslkey=%v ", postgres.StreamingReplicaKeyLocation) +
 		fmt.Sprintf("sslcert=%v ", postgres.StreamingReplicaCertificateLocation) +
 		fmt.Sprintf("sslrootcert=%v ", postgres.ServerCACertificateLocation) +

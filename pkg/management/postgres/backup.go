@@ -135,8 +135,9 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 
 	db, err := sql.Open(
 		"postgres",
-		fmt.Sprintf("host=%s port=5432 dbname=postgres user=postgres sslmode=disable",
-			GetSocketDir()),
+		fmt.Sprintf("host=%s port=%v dbname=postgres user=postgres sslmode=disable",
+			GetSocketDir(),
+			GetServerPort()),
 	)
 	if err != nil {
 		log.Log.Error(err, "can not open postgres database")
