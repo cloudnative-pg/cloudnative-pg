@@ -1,0 +1,22 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: pg-backup-azurite
+spec:
+  instances: 3
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  # Backup properties
+  backup:
+    barmanObjectStore:
+      destinationPath: http://azurite:10000/storageaccountname/pg-backup-azurite
+      azureCredentials:
+        connectionString:
+          name: azurite
+          key: AZURE_CONNECTION_STRING
+      wal:
+        compression: gzip

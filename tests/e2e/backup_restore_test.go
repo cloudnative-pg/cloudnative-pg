@@ -324,6 +324,85 @@ var _ = Describe("Backup and restore", func() {
 			}, 30).Should(BeNumerically("==", 1))
 		})
 	})
+	Context("using Azurite blobs as object storage", func() {
+		BeforeEach(func() {
+			isAKS, err := env.IsAKS()
+			Expect(err).ToNot(HaveOccurred())
+			if isAKS {
+				Skip("This test is only executed on gke, openshift and local")
+			}
+		})
+
+		It("restores a backed up cluster", func() {
+			namespace = "cluster-backup-azurite"
+			clusterName = "pg-backup-azurite"
+			const azuriteBlobSampleFile = fixturesDir + "/backup/azurite/cluster-backup.yaml"
+			const clusterRestoreSampleFile = fixturesDir + "/backup/azurite/cluster-from-restore.yaml"
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating the Azurite storage credentials", func() {
+				// This is required by Azurite deployment
+				secretFile := fixturesDir + "/backup/azurite/azurite-secret.yaml"
+				_, _, err := tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+					namespace, secretFile))
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("setting up Azurite to hold the backups", func() {
+				// Deploying azurite for blob storage
+				installAzurite(namespace)
+			})
+
+			By("setting up az-cli", func() {
+				// This is required as we have a service of Azurite running locally.
+				// In order to connect, we need az cli inside the namespace
+				installAzCli(namespace)
+			})
+
+			// Create the Cluster
+			AssertCreateCluster(namespace, clusterName, azuriteBlobSampleFile, env)
+
+			// Write a table and some data on the "app" database
+			AssertCreateTestData(namespace, clusterName, "to_restore")
+
+			// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
+			By("archiving WALs and verifying they exist", func() {
+				primary := clusterName + "-1"
+				out, _, err := tests.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primary,
+					switchWalCmd))
+				Expect(err).ToNot(HaveOccurred())
+
+				latestWAL := strings.TrimSpace(out)
+				// verifying on blob storage using az
+				// Define what file we are looking for in Azurite.
+				// Escapes are required since az expects forward slashes to be escaped
+				path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
+				// verifying on blob storage using az
+				Eventually(func() (int, error) {
+					return countFilesOnAzuriteBlobStorage(namespace, clusterName, path)
+				}, 60).Should(BeEquivalentTo(1))
+			})
+
+			By("uploading a backup", func() {
+				// We create a Backup
+				backupFile := fixturesDir + "/backup/azurite/backup.yaml"
+				executeBackup(namespace, backupFile)
+
+				// Verifying file called data.tar should be available on Azurite blob storage
+				Eventually(func() (int, error) {
+					return countFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
+				}, 30).Should(BeNumerically(">=", 1))
+			})
+
+			// Restore backup in a new cluster
+			assertClusterRestore(namespace, clusterRestoreSampleFile)
+		})
+	})
 })
 
 var _ = Describe("Clusters Recovery From Barman Object Store", func() {
@@ -843,4 +922,69 @@ func assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azSto
 			return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, path)
 		}, 30).Should(BeEquivalentTo(1))
 	})
+}
+
+func composeAzBlobListAzuriteCmd(clusterName string, path string) string {
+	return fmt.Sprintf("az storage blob list --container-name %v --query \"[?contains(@.name, \\`%v\\`)].name\" "+
+		"--connection-string $AZURE_CONNECTION_STRING",
+		clusterName, path)
+}
+
+func countFilesOnAzuriteBlobStorage(
+	namespace,
+	clusterName string,
+	path string) (int, error) {
+	azBlobListCmd := composeAzBlobListAzuriteCmd(clusterName, path)
+	out, _, err := tests.RunUnchecked(fmt.Sprintf("kubectl exec -n %v az-cli "+
+		"-- /bin/bash -c '%v'", namespace, azBlobListCmd))
+	if err != nil {
+		return -1, err
+	}
+	var arr []string
+	err = json.Unmarshal([]byte(out), &arr)
+	return len(arr), err
+}
+
+func installAzurite(namespace string) {
+	// Create an Azurite for blob storage
+	azuriteDeploymentFile := fixturesDir +
+		"/backup/azurite/azurite-deployment.yaml"
+
+	_, _, err := tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+		namespace, azuriteDeploymentFile))
+	Expect(err).ToNot(HaveOccurred())
+
+	// Wait for the Azurite pod to be ready
+	deploymentNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      "azurite",
+	}
+	Eventually(func() (int32, error) {
+		deployment := &appsv1.Deployment{}
+		err = env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
+		return deployment.Status.ReadyReplicas, err
+	}, 300).Should(BeEquivalentTo(1))
+
+	// Create an Azurite service
+	serviceFile := fixturesDir + "/backup/azurite/azurite-service.yaml"
+	_, _, err = tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+		namespace, serviceFile))
+	Expect(err).ToNot(HaveOccurred())
+}
+
+func installAzCli(namespace string) {
+	clientFile := fixturesDir + "/backup/azurite/az-cli.yaml"
+	_, _, err := tests.Run(fmt.Sprintf(
+		"kubectl apply -n %v -f %v",
+		namespace, clientFile))
+	Expect(err).ToNot(HaveOccurred())
+	azCliNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      "az-cli",
+	}
+	Eventually(func() (bool, error) {
+		az := &corev1.Pod{}
+		err = env.Client.Get(env.Ctx, azCliNamespacedName, az)
+		return utils.IsPodReady(*az), err
+	}, 180).Should(BeTrue())
 }
