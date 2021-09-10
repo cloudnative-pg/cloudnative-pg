@@ -502,37 +502,37 @@ func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) postgre
 	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus)
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
 	if err != nil {
-		result.ExecError = err
+		result.Error = err
 		return result
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		result.ExecError = err
+		result.Error = err
 		return result
 	}
 
 	if resp.StatusCode != 200 {
 		bytes, _ := ioutil.ReadAll(resp.Body)
-		result.ExecError = fmt.Errorf("%v - %v", resp.StatusCode, string(bytes))
+		result.Error = fmt.Errorf("%v - %v", resp.StatusCode, string(bytes))
 		_ = resp.Body.Close()
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		result.ExecError = err
+		result.Error = err
 		return result
 	}
 
 	err = json.Unmarshal(body, &result)
 	if err != nil {
-		result.ExecError = err
+		result.Error = err
 		return result
 	}
 
 	err = resp.Body.Close()
 	if err != nil {
-		result.ExecError = err
+		result.Error = err
 		return result
 	}
 

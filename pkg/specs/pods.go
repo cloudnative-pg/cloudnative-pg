@@ -92,7 +92,7 @@ func createEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []core
 		},
 		{
 			Name:  "PGPORT",
-			Value: "5432",
+			Value: strconv.Itoa(postgres.ServerPort),
 		},
 		{
 			Name:  "PGHOST",
@@ -151,12 +151,12 @@ func createPostgresContainers(
 				PreStop: &corev1.Handler{
 					Exec: &corev1.ExecAction{
 						Command: []string{
-							"pg_ctl",
-							"stop",
-							"-m",
-							"smart",
-							"-t",
-							strconv.Itoa(int(cluster.GetMaxStopDelay())),
+							"sh",
+							"-c",
+							fmt.Sprintf(
+								"pg_ctl stop -m smart -t %v || exit 0",
+								cluster.GetMaxStopDelay(),
+							),
 						},
 					},
 				},
@@ -171,7 +171,7 @@ func createPostgresContainers(
 			Ports: []corev1.ContainerPort{
 				{
 					Name:          "postgresql",
-					ContainerPort: 5432,
+					ContainerPort: postgres.ServerPort,
 					Protocol:      "TCP",
 				},
 				{

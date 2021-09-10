@@ -20,9 +20,9 @@ var _ = Describe("PostgreSQL status", func() {
 	list := PostgresqlStatusList{
 		Items: []PostgresqlStatus{
 			{
-				Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-04"}},
-				ExecError: fmt.Errorf("cannot find postgres container"),
-				IsReady:   true,
+				Pod:     corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-04"}},
+				Error:   fmt.Errorf("cannot find postgres container"),
+				IsReady: true,
 			},
 			{
 				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-06"}},

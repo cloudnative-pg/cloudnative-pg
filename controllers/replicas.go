@@ -63,7 +63,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 }
 
 // updateTargetPrimaryFromPodsPrimaryCluster sets the name of the target primary from the Pods status if needed
-// this function will returns the name of the new primary selected for promotion
+// this function will return the name of the new primary selected for promotion
 func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -74,7 +74,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 
 	// When replica mode is not active, the first instance in the list is the primary one.
 	// This means we can just look at the first element of the list to check if the primary
-	// if available or not.
+	// is available or not.
 
 	// If the first pod in the sorted list is not the primary we need to execute a failover
 	// or wait if the failover has already been triggered
@@ -85,9 +85,14 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 		return "", nil
 	}
 
-	// We can select a new primary only if all the alive pods agrees
-	// that the old one isn't streaming anymore.
-	if !status.AreWalReceiversDown() {
+	// The current primary is not correctly working, and we need to elect a new one
+	// but before doing that we need to wait for all the WAL receivers to be
+	// terminated. This is needed to avoid losing the WAL data that is being received
+	// (think about a switchover).
+	//
+	// Anyway we don't need to wait if the current primary isn't reporting the status,
+	// because in that case we are just waiting for the connections to time out.
+	if status.IsPodReporting(cluster.Status.CurrentPrimary) && !status.AreWalReceiversDown() {
 		return "", ErrWalReceiversRunning
 	}
 
@@ -205,7 +210,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 }
 
 // updateTargetPrimaryFromPodsReplicaCluster sets the name of the target designated
-// primary from the Pods status if needed this function will returns the name of the
+// primary from the Pods status if needed this function will return the name of the
 // new primary selected for promotion
 func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 	ctx context.Context,
@@ -225,8 +230,14 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 		}
 	}
 
-	// The designated primary is not correctly working and we need to elect a new one
-	if !status.AreWalReceiversDown() {
+	// The designated primary is not correctly working, and we need to elect a new one
+	// but before doing that we need to wait for all the WAL receivers to be
+	// terminated. This is needed to avoid losing the WAL data that is being received
+	// (think about a switchover).
+	//
+	// Anyway we don't need to wait if the designated primary isn't reporting the status,
+	// because in that case we are just waiting for the connections to time out.
+	if status.IsPodReporting(cluster.Status.CurrentPrimary) && !status.AreWalReceiversDown() {
 		return "", ErrWalReceiversRunning
 	}
 
@@ -279,10 +290,10 @@ func (r *ClusterReconciler) getStatusFromInstances(
 	status := ExtractInstancesStatus(ctx, filteredPods)
 	sort.Sort(&status)
 	for idx := range status.Items {
-		if status.Items[idx].ExecError != nil {
+		if status.Items[idx].Error != nil {
 			r.Log.Info("Cannot extract Pod status",
 				"name", status.Items[idx].Pod.Name,
-				"error", status.Items[idx].ExecError.Error())
+				"error", status.Items[idx].Error.Error())
 		}
 	}
 	return status

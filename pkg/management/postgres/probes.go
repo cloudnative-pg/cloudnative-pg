@@ -7,25 +7,36 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
+	"errors"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
-// IsHealthy check if the instance can really accept connections
-func (instance *Instance) IsHealthy() error {
+// IsServerHealthy check if the instance is healthy
+func (instance *Instance) IsServerHealthy() error {
+	err := instance.PgIsReady()
+
+	// A healthy server can also be actively rejecting connections.
+	// That's not a problem: it's only the server starting up or shutting
+	// down.
+	if errors.Is(err, ErrPgRejectingConnection) {
+		return nil
+	}
+
+	return err
+}
+
+// IsServerReady check if the instance is healthy and can really accept connections
+func (instance *Instance) IsServerReady() error {
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return err
 	}
 
-	err = superUserDB.Ping()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return superUserDB.Ping()
 }
 
 // GetStatus Extract the status of this PostgreSQL database

@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -33,7 +34,21 @@ const (
 	pgCtlName        = "pg_ctl"
 	pgRewindName     = "pg_rewind"
 	pgBaseBackupName = "pg_basebackup"
+	pgIsReady        = "pg_isready"
 	pgCtlTimeout     = "40000000" // greater than one year in seconds, big enough to simulate an infinite timeout
+
+	pqPingOk         = 0 // server is accepting connections
+	pqPingReject     = 1 // server is alive but rejecting connections
+	pqPingNoResponse = 2 // could not establish connection
+	pgPingNoAttempt  = 3 // connection not attempted (bad params)
+)
+
+var (
+	// ErrPgRejectingConnection postgres is alive, but rejecting connections
+	ErrPgRejectingConnection = fmt.Errorf("server is alive but rejecting connections")
+
+	// ErrNoConnectionEstablished postgres is alive, but rejecting connections
+	ErrNoConnectionEstablished = fmt.Errorf("could not establish connection")
 )
 
 // Instance represent a PostgreSQL instance to be executed
@@ -104,7 +119,7 @@ var RetryUntilServerAvailable = wait.Backoff{
 	Steps: math.MaxInt32,
 }
 
-// GetSocketDir get the name of the directory that will contain
+// GetSocketDir gets the name of the directory that will contain
 // the Unix socket for the PostgreSQL server. This is detected using
 // the PGHOST environment variable or using a default
 func GetSocketDir() string {
@@ -114,6 +129,24 @@ func GetSocketDir() string {
 	}
 
 	return socketDir
+}
+
+// GetServerPort gets the port where the postmaster will be listening
+// using the environment variable or, when empty, the default one
+func GetServerPort() int {
+	pgPort := os.Getenv("PGPORT")
+	if pgPort == "" {
+		return postgres.ServerPort
+	}
+
+	result, err := strconv.Atoi(pgPort)
+	if err != nil {
+		log.Log.Info("Wrong port number inside the process environment variables",
+			"PGPORT", pgPort)
+		return postgres.ServerPort
+	}
+
+	return result
 }
 
 // Startup starts up a PostgreSQL instance and wait for the instance to be
@@ -133,7 +166,7 @@ func (instance Instance) Startup() error {
 		"start",
 		"-w",
 		"-D", instance.PgData,
-		"-o", "-c port=5432 -c unix_socket_directories=" + socketDir,
+		"-o", fmt.Sprintf("-c port=%v -c unix_socket_directories=%v", GetServerPort(), socketDir),
 		"-t " + pgCtlTimeout,
 	}
 
@@ -282,8 +315,9 @@ func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
 	if instance.pool == nil {
 		socketDir := GetSocketDir()
 		dsn := fmt.Sprintf(
-			"host=%s port=5432 user=postgres sslmode=disable",
-			socketDir)
+			"host=%s port=%v user=postgres sslmode=disable",
+			socketDir,
+			GetServerPort())
 
 		instance.pool = pool.NewConnectionPool(dsn)
 	}
@@ -453,4 +487,32 @@ func (instance *Instance) Rewind() error {
 	}
 
 	return nil
+}
+
+// PgIsReady gets the status from the pg_isready command
+func (instance *Instance) PgIsReady() error {
+	// We just use the environment variables we already have
+	// to pass the connection parameters
+	options := []string{
+		"-d", "postgres",
+		"-q",
+	}
+
+	cmd := exec.Command(pgIsReady, options...) // #nosec G204
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	switch code := cmd.ProcessState.ExitCode(); code {
+	case pqPingOk:
+		return nil
+	case pqPingReject:
+		return ErrPgRejectingConnection
+	case pqPingNoResponse:
+		return ErrNoConnectionEstablished
+	case pgPingNoAttempt:
+		return fmt.Errorf("pg_isready usage error")
+	default:
+		return fmt.Errorf("unknown exit code: %d", code)
+	}
 }

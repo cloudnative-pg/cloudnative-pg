@@ -31,16 +31,25 @@ var (
 	server *http.Server
 )
 
-// This is the readiness probe
 func isServerHealthy(w http.ResponseWriter, r *http.Request) {
-	err := instance.IsHealthy()
+	err := instance.IsServerHealthy()
 	if err != nil {
 		log.Log.Info("Server doesn't look healthy", "err", err.Error())
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	log.Log.V(2).Info("Readiness probe succeeded")
+	_, _ = fmt.Fprint(w, "OK")
+}
+
+// This is the readiness probe
+func isServerReady(w http.ResponseWriter, r *http.Request) {
+	err := instance.IsServerReady()
+	if err != nil {
+		log.Log.Info("Server doesn't look ready", "err", err.Error())
+		http.Error(w, err.Error(), 500)
+		return
+	}
 
 	_, _ = fmt.Fprint(w, "OK")
 }
@@ -160,7 +169,7 @@ func ListenAndServe() error {
 
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc(url.PathHealth, isServerHealthy)
-	serveMux.HandleFunc(url.PathReady, isServerHealthy)
+	serveMux.HandleFunc(url.PathReady, isServerReady)
 	serveMux.HandleFunc(url.PathPgStatus, pgStatus)
 	serveMux.HandleFunc(url.PathPgBackup,
 		func(w http.ResponseWriter, r *http.Request) {
