@@ -13,10 +13,10 @@ Each pod of a `Cluster` has a `postgres` container with a **liveness**
 and a **readiness**
 [probe](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes).
 
-The liveness and readiness probes check if the database is up and able to accept
-connections using the superuser credentials.
-The two probes will report a failure if the probe command fails 3 times with a
-10 seconds interval between each check.
+The liveness probe relies on `pg_isready`, while the readiness probe checks if
+the database is up and able to accept connections using the superuser
+credentials. The two probes will report a failure if the probe command fails 3
+times with a 10 seconds interval between each check.
 
 For now, the operator doesn't configure a `startupProbe` on the Pods, since
 startup probes have been introduced only in Kubernetes 1.17.
