@@ -55,15 +55,17 @@ type VariableSet []string
 // ToMetricMap transform this user query in the metadata for a collection of Prometheus metrics,
 // returning the metrics map and the list of variable labels
 func (userQuery UserQuery) ToMetricMap(namespace string) (result MetricMapSet, variableLabels VariableSet) {
-	result = make(MetricMapSet)
+	// Create the list of variable labels
 	for _, columnMapping := range userQuery.Metrics {
-		// Create the list of variable labels
 		for columnName, columnDescriptor := range columnMapping {
 			if columnDescriptor.Usage == LABEL {
 				variableLabels = append(variableLabels, columnName)
 			}
 		}
+	}
 
+	result = make(MetricMapSet)
+	for _, columnMapping := range userQuery.Metrics {
 		// Create a mapping given the list of variable names
 		for columnName, columnDescriptor := range columnMapping {
 			for k, v := range columnDescriptor.ToMetricMap(columnName, namespace, variableLabels) {

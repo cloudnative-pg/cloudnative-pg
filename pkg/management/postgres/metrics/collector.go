@@ -378,7 +378,7 @@ func (c QueryCollector) collectColumns(columns []string, columnData []interface{
 		// We implemented the same behavior here.
 
 		switch {
-		case mapping.Discard:
+		case mapping.Discard || mapping.Label:
 			continue
 
 		case mapping.Histogram:
@@ -396,7 +396,7 @@ func (c QueryCollector) collectColumns(columns []string, columnData []interface{
 				c.collectHistogramMetric(mapping, histogramData, labels, ch)
 			}
 
-		case !mapping.Histogram:
+		default:
 			c.collectConstMetric(mapping, columnData[idx], labels, ch)
 		}
 	}
@@ -442,7 +442,11 @@ func (c QueryCollector) collectConstMetric(
 	}
 
 	// Generate the metric
-	metric := prometheus.MustNewConstMetric(mapping.Desc, mapping.Vtype, floatData, variableLabels...)
+	metric, err := prometheus.NewConstMetric(mapping.Desc, mapping.Vtype, floatData, variableLabels...)
+	if err != nil {
+		log.Log.Error(err, "while collecting constant metric", "metric", mapping.Name)
+		return
+	}
 	ch <- metric
 }
 
@@ -452,10 +456,14 @@ func (c QueryCollector) collectHistogramMetric(
 	columnData *histogram.Value,
 	variableLabels []string,
 	ch chan<- prometheus.Metric) {
-	metric := prometheus.MustNewConstHistogram(
+	metric, err := prometheus.NewConstHistogram(
 		mapping.Desc,
 		columnData.Count, columnData.Sum, columnData.Buckets,
 		variableLabels...,
 	)
+	if err != nil {
+		log.Log.Error(err, "while collecting histogram metric", "metric", mapping.Name)
+		return
+	}
 	ch <- metric
 }
