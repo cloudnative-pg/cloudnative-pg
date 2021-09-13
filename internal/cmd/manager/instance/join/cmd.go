@@ -68,11 +68,11 @@ func NewCmd() *cobra.Command {
 func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postgres.JoinInfo) error {
 	status, err := fileutils.FileExists(info.PgData)
 	if err != nil {
-		log.Log.Error(err, "Error while checking for an existent PGData")
+		log.Error(err, "Error while checking for an existent PGData")
 		return err
 	}
 	if status {
-		log.Log.Info("PGData already exists, no need to init")
+		log.Info("PGData already exists, no need to init")
 		return fmt.Errorf("pgdata already existent")
 	}
 
@@ -80,7 +80,7 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 	// secrets.
 	reconciler, err := controller.NewInstanceReconciler(instance)
 	if err != nil {
-		log.Log.Error(err, "Error creating reconciler to download certificates")
+		log.Error(err, "Error creating reconciler to download certificates")
 		return err
 	}
 
@@ -89,31 +89,31 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		ctrl.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName},
 		&cluster)
 	if err != nil {
-		log.Log.Error(err, "Error while getting cluster")
+		log.Error(err, "Error while getting cluster")
 		return err
 	}
 
 	_, err = reconciler.RefreshReplicationUserCertificate(ctx, &cluster)
 	if err != nil {
-		log.Log.Error(err, "Error while writing the TLS server certificates")
+		log.Error(err, "Error while writing the TLS server certificates")
 		return err
 	}
 
 	_, err = reconciler.RefreshClientCA(ctx, &cluster)
 	if err != nil {
-		log.Log.Error(err, "Error while writing the TLS Client CA certificates")
+		log.Error(err, "Error while writing the TLS Client CA certificates")
 		return err
 	}
 
 	_, err = reconciler.RefreshServerCA(ctx, &cluster)
 	if err != nil {
-		log.Log.Error(err, "Error while writing the TLS Server CA certificates")
+		log.Error(err, "Error while writing the TLS Server CA certificates")
 		return err
 	}
 
 	err = info.Join()
 	if err != nil {
-		log.Log.Error(err, "Error joining node")
+		log.Error(err, "Error joining node")
 		return err
 	}
 

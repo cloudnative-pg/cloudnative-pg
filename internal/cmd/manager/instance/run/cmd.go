@@ -67,19 +67,19 @@ func NewCmd() *cobra.Command {
 func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	var err error
 
-	log.Log.Info("Starting Cloud Native PostgreSQL Instance Manager",
+	log.Info("Starting Cloud Native PostgreSQL Instance Manager",
 		"version", versions.Version,
 		"build", versions.Info)
 
 	reconciler, err := controller.NewInstanceReconciler(instance)
 	if err != nil {
-		log.Log.Error(err, "Error while starting reconciler")
+		log.Error(err, "Error while starting reconciler")
 		return err
 	}
 
 	_, err = instance.RefreshConfigurationFiles(ctx, reconciler.GetClient())
 	if err != nil {
-		log.Log.Error(err, "Error while writing the bootstrap configuration")
+		log.Error(err, "Error while writing the bootstrap configuration")
 		return err
 	}
 
@@ -88,56 +88,56 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		ctrl.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName},
 		&cluster)
 	if err != nil {
-		log.Log.Error(err, "Error while getting cluster")
+		log.Error(err, "Error while getting cluster")
 		return err
 	}
 
 	_, err = reconciler.RefreshServerCertificateFiles(ctx, &cluster)
 	if err != nil {
-		log.Log.Error(err, "Error while writing the TLS server certificates")
+		log.Error(err, "Error while writing the TLS server certificates")
 		return err
 	}
 
 	_, err = reconciler.RefreshReplicationUserCertificate(ctx, &cluster)
 	if err != nil {
-		log.Log.Error(err, "Error while writing the TLS server certificates")
+		log.Error(err, "Error while writing the TLS server certificates")
 		return err
 	}
 
 	_, err = reconciler.RefreshClientCA(ctx, &cluster)
 	if err != nil {
-		log.Log.Error(err, "Error while writing the TLS CA Client certificates")
+		log.Error(err, "Error while writing the TLS CA Client certificates")
 		return err
 	}
 
 	_, err = reconciler.RefreshServerCA(ctx, &cluster)
 	if err != nil {
-		log.Log.Error(err, "Error while writing the TLS CA Server certificates")
+		log.Error(err, "Error while writing the TLS CA Server certificates")
 		return err
 	}
 
 	err = reconciler.VerifyPgDataCoherence(ctx)
 	if err != nil {
-		log.Log.Error(err, "Error while checking Kubernetes cluster status")
+		log.Error(err, "Error while checking Kubernetes cluster status")
 		return err
 	}
 
 	primary, err := instance.IsPrimary()
 	if err != nil {
-		log.Log.Error(err, "Error while getting the primary status")
+		log.Error(err, "Error while getting the primary status")
 		os.Exit(1)
 	}
 
 	if !primary {
 		err = reconciler.RefreshReplicaConfiguration(ctx)
 		if err != nil {
-			log.Log.Error(err, "Error while creating the replica configuration")
+			log.Error(err, "Error while creating the replica configuration")
 			os.Exit(1)
 		}
 	}
 
 	if err = startWebServer(instance); err != nil {
-		log.Log.Error(err, "Error while starting the web server")
+		log.Error(err, "Error while starting the web server")
 		return err
 	}
 
@@ -150,25 +150,25 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+instance.PgData)
 	err = execlog.RunBuffering(pgControlDataCmd, pgControlDataName)
 	if err != nil {
-		log.Log.Error(err, "Error printing the control information of this PostgreSQL instance")
+		log.Error(err, "Error printing the control information of this PostgreSQL instance")
 		return err
 	}
 
 	if err = logpipe.Start(); err != nil {
-		log.Log.Error(err, "Error while starting the logging collector routine")
+		log.Error(err, "Error while starting the logging collector routine")
 		return err
 	}
 
 	postgresCommand, err := instance.Run()
 	if err != nil {
-		log.Log.Error(err, "Unable to start PostgreSQL up")
+		log.Error(err, "Unable to start PostgreSQL up")
 		return err
 	}
 
 	registerSignalHandler(reconciler, postgresCommand)
 
 	if err = postgresCommand.Wait(); err != nil {
-		log.Log.Error(err, "PostgreSQL exited with errors")
+		log.Error(err, "PostgreSQL exited with errors")
 		return err
 	}
 
@@ -186,14 +186,14 @@ func startWebServer(instance *postgres.Instance) error {
 	go func() {
 		err := webserver.ListenAndServe()
 		if err != nil {
-			log.Log.Error(err, "Error while starting the status web server")
+			log.Error(err, "Error while starting the status web server")
 		}
 	}()
 
 	go func() {
 		err := metricsserver.ListenAndServe()
 		if err != nil {
-			log.Log.Error(err, "Error while starting the metrics server")
+			log.Error(err, "Error while starting the metrics server")
 		}
 	}()
 
@@ -213,31 +213,31 @@ func registerSignalHandler(reconciler *controller.InstanceReconciler, postgresCo
 
 	go func() {
 		sig := <-signals
-		log.Log.Info("Received termination signal", "signal", sig)
+		log.Info("Received termination signal", "signal", sig)
 
-		log.Log.Info("Shutting down web server")
+		log.Info("Shutting down web server")
 		err := webserver.Shutdown()
 		if err != nil {
-			log.Log.Error(err, "Error while shutting down the web server")
+			log.Error(err, "Error while shutting down the web server")
 		} else {
-			log.Log.Info("Web server shut down")
+			log.Info("Web server shut down")
 		}
 
 		err = metricsserver.Shutdown()
 		if err != nil {
-			log.Log.Error(err, "Error while shutting down the metrics server")
+			log.Error(err, "Error while shutting down the metrics server")
 		} else {
-			log.Log.Info("Metrics server shut down")
+			log.Info("Metrics server shut down")
 		}
 
-		log.Log.Info("Shutting down controller")
+		log.Info("Shutting down controller")
 		reconciler.Stop()
 
 		if postgresCommand != nil {
-			log.Log.Info("Shutting down PostgreSQL instance")
+			log.Info("Shutting down PostgreSQL instance")
 			err := postgresCommand.Process.Signal(syscall.SIGINT)
 			if err != nil {
-				log.Log.Error(err, "Unable to send SIGINT to PostgreSQL instance")
+				log.Error(err, "Unable to send SIGINT to PostgreSQL instance")
 			}
 		}
 	}()

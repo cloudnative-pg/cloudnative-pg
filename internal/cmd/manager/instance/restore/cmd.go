@@ -61,24 +61,24 @@ func NewCmd() *cobra.Command {
 func restoreSubCommand(ctx context.Context, info postgres.InitInfo) error {
 	status, err := fileutils.FileExists(info.PgData)
 	if err != nil {
-		log.Log.Error(err, "Error while checking for an existent PGData")
+		log.Error(err, "Error while checking for an existent PGData")
 		return err
 	}
 	if status {
-		log.Log.Info("PGData already exists, can't restore over an existing folder")
+		log.Info("PGData already exists, can't restore over an existing folder")
 		return fmt.Errorf("pgdata already existent")
 	}
 
 	err = info.VerifyConfiguration()
 	if err != nil {
-		log.Log.Error(err, "Configuration not valid",
+		log.Error(err, "Configuration not valid",
 			"info", info)
 		return err
 	}
 
 	err = info.Restore(ctx)
 	if err != nil {
-		log.Log.Error(err, "Error while restoring a backup")
+		log.Error(err, "Error while restoring a backup")
 		return err
 	}
 

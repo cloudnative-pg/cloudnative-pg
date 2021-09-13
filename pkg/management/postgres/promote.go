@@ -29,7 +29,7 @@ func (instance *Instance) PromoteAndWait() error {
 		"-t " + strconv.Itoa(int(instance.PgCtlTimeoutForPromotion)),
 	}
 
-	log.Log.Info("Promoting instance", "pgctl_options", options)
+	log.Info("Promoting instance", "pgctl_options", options)
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
 	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
@@ -40,7 +40,7 @@ func (instance *Instance) PromoteAndWait() error {
 	timeLimit := time.Now().Add(1 * time.Minute)
 	for {
 		if time.Now().After(timeLimit) {
-			log.Log.Info("The standby.signal file still exists but timeout reached, " +
+			log.Info("The standby.signal file still exists but timeout reached, " +
 				"error during PostgreSQL instance promotion")
 			return fmt.Errorf("standby.signal still existent")
 		}
@@ -52,7 +52,7 @@ func (instance *Instance) PromoteAndWait() error {
 		time.Sleep(1 * time.Second)
 	}
 
-	log.Log.Info("Requesting a checkpoint")
+	log.Info("Requesting a checkpoint")
 
 	db, err := instance.GetSuperUserDB()
 	if err != nil {
@@ -70,7 +70,7 @@ func (instance *Instance) PromoteAndWait() error {
 		return fmt.Errorf("checkpoint after instance promotion: %v", err)
 	}
 
-	log.Log.Info("The PostgreSQL instance has been promoted successfully")
+	log.Info("The PostgreSQL instance has been promoted successfully")
 
 	return nil
 }

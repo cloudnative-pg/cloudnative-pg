@@ -10,7 +10,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -27,7 +27,6 @@ import (
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
-	Log      logr.Logger
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
@@ -41,7 +40,7 @@ type BackupReconciler struct {
 
 // Reconcile is the main reconciliation loop
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("backup", req.NamespacedName)
+	contextLogger, ctx := log.SetupLogger(ctx)
 
 	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
@@ -90,7 +89,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	r.Recorder.Eventf(&backup, "Normal", "Starting", "Started backup for cluster %v", clusterName)
-	log.Info("Starting backup",
+	contextLogger.Info("Starting backup",
 		"cluster", cluster.Name,
 		"pod", pod.Name)
 
@@ -131,7 +130,7 @@ func StartBackup(
 		"backup",
 		backup.GetName())
 	if err != nil {
-		log.Error(err, "executing backup", "stdout", stdout, "stderr", stderr)
+		log.FromContext(ctx).Error(err, "executing backup", "stdout", stdout, "stderr", stderr)
 		status := backup.GetStatus()
 		status.SetAsFailed(fmt.Errorf("can't execute backup: %w", err))
 		status.CommandError = stderr

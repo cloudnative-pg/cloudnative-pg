@@ -25,7 +25,7 @@ func NewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dest := args[0]
 
-			log.Log.Info("Installing the manager executable",
+			log.Info("Installing the manager executable",
 				"destination", dest,
 				"version", versions.Version,
 				"build", versions.Info)
@@ -34,13 +34,13 @@ func NewCmd() *cobra.Command {
 				panic(err)
 			}
 
-			log.Log.Info("Setting 0755 permissions")
+			log.Info("Setting 0755 permissions")
 			err = os.Chmod(dest, 0o755) // #nosec
 			if err != nil {
 				panic(err)
 			}
 
-			log.Log.Info("Bootstrap completed")
+			log.Info("Bootstrap completed")
 
 			return nil
 		},

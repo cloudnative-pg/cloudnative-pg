@@ -126,7 +126,7 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	}
 	options = append(options, info.PgData)
 
-	log.Log.Info("Starting barman-cloud-restore",
+	log.Info("Starting barman-cloud-restore",
 		"options", options)
 
 	const barmanCloudRestoreName = "barman-cloud-restore"
@@ -134,10 +134,10 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	cmd.Env = env
 	err := execlog.RunStreaming(cmd, barmanCloudRestoreName)
 	if err != nil {
-		log.Log.Error(err, "Can't restore backup")
+		log.Error(err, "Can't restore backup")
 		return err
 	}
-	log.Log.Info("Restore completed")
+	log.Info("Restore completed")
 	return nil
 }
 
@@ -174,7 +174,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	typedClient client.Client,
 	cluster *apiv1.Cluster) (*apiv1.Backup, []string, error) {
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
-	log.Log.Info("Recovering from external cluster", "sourceName", sourceName)
+	log.Info("Recovering from external cluster", "sourceName", sourceName)
 
 	server, found := cluster.ExternalCluster(sourceName)
 	if !found {
@@ -209,7 +209,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		return nil, nil, fmt.Errorf("no backup found")
 	}
 
-	log.Log.Info("Latest backup found", "backup", latestBackup)
+	log.Info("Latest backup found", "backup", latestBackup)
 
 	return &apiv1.Backup{
 		Spec: apiv1.BackupSpec{
@@ -268,7 +268,7 @@ func (info InitInfo) loadBackupFromReference(
 		return nil, nil, err
 	}
 
-	log.Log.Info("Recovering existing backup", "backup", backup)
+	log.Info("Recovering existing backup", "backup", backup)
 	return &backup, env, nil
 }
 
@@ -313,7 +313,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		strings.Join(cmd, " "),
 		info.RecoveryTarget)
 
-	log.Log.Info("Generated recovery configuration", "configuration", recoveryFileContents)
+	log.Info("Generated recovery configuration", "configuration", recoveryFileContents)
 
 	// Disable archiving
 	err = fileutils.AppendStringToFile(
@@ -369,7 +369,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, client clie
 	defer func() {
 		err = os.RemoveAll(tempDataDir)
 		if err != nil {
-			log.Log.Error(
+			log.Error(
 				err,
 				"skipping error while deleting temporary data directory")
 		}
@@ -512,7 +512,7 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 			return fmt.Errorf("error while reading results of pg_is_in_recovery: %w", err)
 		}
 
-		log.Log.Info("Checking if the server is still in recovery",
+		log.Info("Checking if the server is still in recovery",
 			"recovery", status)
 
 		if status {

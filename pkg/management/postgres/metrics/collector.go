@@ -16,7 +16,6 @@ import (
 	"regexp"
 
 	"github.com/blang/semver"
-	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
@@ -74,7 +73,7 @@ func (q QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error 
 	var allAccessibleDatabasesCache []string
 
 	for name, userQuery := range q.userQueries {
-		queryLogger := log.Log.WithValues("query", name)
+		queryLogger := log.WithValues("query", name)
 		collector := QueryCollector{
 			namespace:      name,
 			userQuery:      userQuery,
@@ -86,7 +85,7 @@ func (q QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error 
 			continue
 		}
 
-		queryLogger.V(1).Info("Collecting data")
+		queryLogger.Debug("Collecting data")
 
 		targetDatabases := userQuery.TargetDatabases
 		if len(targetDatabases) == 0 {
@@ -127,9 +126,9 @@ func (q QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error 
 	return nil
 }
 
-func (q QueriesCollector) toBeChecked(name string, userQuery UserQuery, isPrimary bool, queryLogger logr.Logger) bool {
+func (q QueriesCollector) toBeChecked(name string, userQuery UserQuery, isPrimary bool, queryLogger log.Logger) bool {
 	if (userQuery.Primary || userQuery.Master) && !isPrimary { // wokeignore:rule=master
-		queryLogger.V(1).Info("Skipping because runs only on primary")
+		queryLogger.Info("Skipping because runs only on primary")
 		return false
 	}
 
@@ -142,7 +141,7 @@ func (q QueriesCollector) toBeChecked(name string, userQuery UserQuery, isPrimar
 			q.reportUserQueryErrorMetric(name)
 			return false
 		} else if !matchesVersion {
-			queryLogger.V(1).Info("Skipping because runs only on other postgres versions",
+			queryLogger.Info("Skipping because runs only on other postgres versions",
 				"runOnServer", runOnServer)
 			return false
 		}
@@ -159,13 +158,13 @@ func (q QueriesCollector) reportUserQueryErrorMetric(label string) {
 func (q QueriesCollector) checkRunOnServerMatches(runOnServer string, name string) (bool, error) {
 	isVersionInRange, err := semver.ParseRange(runOnServer)
 	if err != nil {
-		log.Log.Error(err, "while parsing runOnServer version range",
+		log.Error(err, "while parsing runOnServer version range",
 			"runOnServer", runOnServer, "query", name)
 		return false, err
 	}
 	pgVersion, err := q.instance.GetPgVersion()
 	if err != nil {
-		log.Log.Error(err, "while getting current pgVersion",
+		log.Error(err, "while getting current pgVersion",
 			"runOnServer", runOnServer, "query", name)
 		return false, err
 	}
@@ -203,7 +202,7 @@ func (q QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
 	}
 	defer func() {
 		if err := tx.Rollback(); err != nil {
-			log.Log.Info("Error while rolling back monitoring tx to retrieve accessible databases list", "err", err.Error())
+			log.Info("Error while rolling back monitoring tx to retrieve accessible databases list", "err", err.Error())
 		}
 	}()
 	databases, errors := postgres.GetAllAccessibleDatabases(tx, "datallowconn AND NOT datistemplate")
@@ -290,7 +289,7 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 
 	defer func() {
 		if err := tx.Rollback(); err != nil {
-			log.Log.Info("Error while rolling back metrics extraction", "err", err.Error())
+			log.Info("Error while rolling back metrics extraction", "err", err.Error())
 		}
 	}()
 
@@ -300,11 +299,11 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			log.Log.Info("Error while closing metrics extraction",
+			log.Info("Error while closing metrics extraction",
 				"err", err.Error())
 		}
 		if rows.Err() != nil {
-			log.Log.Info("Error while loading metrics",
+			log.Info("Error while loading metrics",
 				"err", err.Error())
 		}
 	}()
@@ -321,7 +320,7 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 	}
 
 	if len(columns) != len(c.columnMapping) {
-		log.Log.Info("Columns number mismatch",
+		log.Info("Columns number mismatch",
 			"name", c.namespace,
 			"columnNumberFromDB", len(columns),
 			"columnNumberFromConfiguration", len(c.columnMapping))
@@ -349,7 +348,7 @@ func (c QueryCollector) collectLabels(columns []string, columnData []interface{}
 		if mapping, ok := c.columnMapping[columnName]; ok && mapping.Label {
 			value, ok := postgres.DBToString(columnData[idx])
 			if !ok {
-				log.Log.Info("Label value cannot be converted to string",
+				log.Info("Label value cannot be converted to string",
 					"value", value,
 					"mapping", mapping)
 				return nil, false
@@ -367,7 +366,7 @@ func (c QueryCollector) collectColumns(columns []string, columnData []interface{
 	for idx, columnName := range columns {
 		mapping, ok := c.columnMapping[columnName]
 		if !ok {
-			log.Log.Info("Missing mapping for column", "column", columnName, "mapping", c.columnMapping)
+			log.Info("Missing mapping for column", "column", columnName, "mapping", c.columnMapping)
 			continue
 		}
 
@@ -384,7 +383,7 @@ func (c QueryCollector) collectColumns(columns []string, columnData []interface{
 		case mapping.Histogram:
 			histogramData, err := histogram.NewFromRawData(columnData, columns, columnName)
 			if err != nil {
-				log.Log.Error(err, "Cannot process histogram metric",
+				log.Error(err, "Cannot process histogram metric",
 					"columns", columns,
 					"columnName", columnName,
 					"mapping.Name", mapping.Name,
@@ -434,7 +433,7 @@ func (c QueryCollector) collectConstMetric(
 	mapping MetricMap, value interface{}, variableLabels []string, ch chan<- prometheus.Metric) {
 	floatData, ok := postgres.DBToFloat64(value)
 	if !ok {
-		log.Log.Info("Error while parsing value",
+		log.Info("Error while parsing value",
 			"namespace", c.namespace,
 			"value", value,
 			"mapping", mapping)
@@ -444,7 +443,7 @@ func (c QueryCollector) collectConstMetric(
 	// Generate the metric
 	metric, err := prometheus.NewConstMetric(mapping.Desc, mapping.Vtype, floatData, variableLabels...)
 	if err != nil {
-		log.Log.Error(err, "while collecting constant metric", "metric", mapping.Name)
+		log.Error(err, "while collecting constant metric", "metric", mapping.Name)
 		return
 	}
 	ch <- metric
@@ -462,7 +461,7 @@ func (c QueryCollector) collectHistogramMetric(
 		variableLabels...,
 	)
 	if err != nil {
-		log.Log.Error(err, "while collecting histogram metric", "metric", mapping.Name)
+		log.Error(err, "while collecting histogram metric", "metric", mapping.Name)
 		return
 	}
 	ch <- metric

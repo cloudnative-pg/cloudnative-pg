@@ -34,7 +34,7 @@ var (
 func isServerHealthy(w http.ResponseWriter, r *http.Request) {
 	err := instance.IsServerHealthy()
 	if err != nil {
-		log.Log.Info("Server doesn't look healthy", "err", err.Error())
+		log.Info("Server doesn't look healthy", "err", err.Error())
 		http.Error(w, err.Error(), 500)
 		return
 	}
@@ -46,7 +46,7 @@ func isServerHealthy(w http.ResponseWriter, r *http.Request) {
 func isServerReady(w http.ResponseWriter, r *http.Request) {
 	err := instance.IsServerReady()
 	if err != nil {
-		log.Log.Info("Server doesn't look ready", "err", err.Error())
+		log.Info("Server doesn't look ready", "err", err.Error())
 		http.Error(w, err.Error(), 500)
 		return
 	}
@@ -58,18 +58,18 @@ func isServerReady(w http.ResponseWriter, r *http.Request) {
 func pgStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := instance.GetStatus()
 	if err != nil {
-		log.Log.Info(
+		log.Info(
 			"Server doesn't look healthy, cannot extract instance status",
 			"err", err.Error())
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	log.Log.V(2).Info("Cluster status extraction succeeded")
+	log.Debug("Cluster status extraction succeeded")
 
 	js, err := json.Marshal(status)
 	if err != nil {
-		log.Log.Info(
+		log.Info(
 			"Internal error marshalling instance status",
 			"err", err.Error())
 		http.Error(w, err.Error(), 500)
@@ -122,7 +122,7 @@ func requestBackup(typedClient client.Client, recorder record.EventRecorder, w h
 		return
 	}
 
-	backupLog := log.Log.WithValues(
+	backupLog := log.WithValues(
 		"backupName", backup.Name,
 		"backupNamespace", backup.Name)
 

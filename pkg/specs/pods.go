@@ -189,7 +189,7 @@ func createPostgresContainers(
 		},
 	}
 
-	addManagerLoggingOptions(&containers[0])
+	addManagerLoggingOptions(cluster, &containers[0])
 
 	return containers
 }

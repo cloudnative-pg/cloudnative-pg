@@ -41,7 +41,7 @@ func ClonePgData(connectionString, targetPgData string) error {
 	// https://www.postgresql.org/docs/current/protocol-replication.html
 	connectionString += " replication=1"
 
-	log.Log.Info("Waiting for server to be available", "connectionString", connectionString)
+	log.Info("Waiting for server to be available", "connectionString", connectionString)
 	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
 		return err

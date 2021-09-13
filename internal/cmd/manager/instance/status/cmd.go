@@ -34,13 +34,13 @@ func NewCmd() *cobra.Command {
 func statusSubCommand() error {
 	resp, err := http.Get(url.Local(url.PathPgStatus))
 	if err != nil {
-		log.Log.Error(err, "Error while requesting instance status")
+		log.Error(err, "Error while requesting instance status")
 		return err
 	}
 
 	if resp.StatusCode != 200 {
 		bytes, _ := ioutil.ReadAll(resp.Body)
-		log.Log.Info(
+		log.Info(
 			"Error while extracting status",
 			"statusCode", resp.StatusCode, "body", string(bytes))
 		_ = resp.Body.Close()
@@ -50,7 +50,7 @@ func statusSubCommand() error {
 	_, err = io.Copy(os.Stdout, resp.Body)
 	_ = resp.Body.Close()
 	if err != nil {
-		log.Log.Error(err, "Error while showing status info")
+		log.Error(err, "Error while showing status info")
 		return err
 	}
 

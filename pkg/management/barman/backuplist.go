@@ -41,7 +41,7 @@ import (
 )
 
 // barmanLog is the log that will be used for interactions with Barman
-var barmanLog = log.Log.WithName("barman")
+var barmanLog = log.WithName("barman")
 
 // barmanTimeLayout is the format that is being used to parse
 // the backupInfo from barman-cloud-backup-list

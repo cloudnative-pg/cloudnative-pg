@@ -128,7 +128,7 @@ func GetAllAccessibleDatabases(tx *sql.Tx, whereClause string) (databases []stri
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Log.Error(err, "while closing rows: %w")
+			log.Error(err, "while closing rows: %w")
 		}
 	}()
 	if err != nil {

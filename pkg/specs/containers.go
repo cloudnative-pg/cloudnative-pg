@@ -7,6 +7,8 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package specs
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
@@ -30,16 +32,16 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 		SecurityContext: CreateContainerSecurityContext(),
 	}
 
-	addManagerLoggingOptions(&container)
+	addManagerLoggingOptions(cluster, &container)
 
 	return container
 }
 
 // addManagerLoggingOptions propagate the logging configuration
 // to the manager inside the generated pod.
-func addManagerLoggingOptions(container *corev1.Container) {
-	if configuration.Current.EnablePodDebugging {
-		container.Command = append(container.Command, "--zap-log-level=4")
+func addManagerLoggingOptions(cluster apiv1.Cluster, container *corev1.Container) {
+	if cluster.Spec.LogLevel != "" {
+		container.Command = append(container.Command, fmt.Sprintf("--log-level=%s", cluster.Spec.LogLevel))
 	}
 }
 

@@ -6,12 +6,14 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 
 package execlog
 
-import "github.com/go-logr/logr"
+import (
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+)
 
 // LogWriter implements the `Writer` interface using the logger,
 // It uses "Info" as logging level.
 type LogWriter struct {
-	Logger logr.Logger
+	Logger log.Logger
 }
 
 // Write logs the given slice of bytes using the provided Logger.

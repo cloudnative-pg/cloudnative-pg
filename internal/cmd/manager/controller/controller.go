@@ -26,6 +26,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/controllers"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
+	l "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 	// +kubebuilder:scaffold:imports
@@ -33,7 +34,7 @@ import (
 
 var (
 	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	setupLog = l.WithName("setup")
 
 	// clientset is the kubernetes client used during
 	// the initialization of the operator
@@ -190,7 +191,6 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 
 	if err = (&controllers.ClusterReconciler{
 		Client:   mgr.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("Cluster"),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cloud-native-postgresql"),
 	}).SetupWithManager(ctx, mgr); err != nil {
@@ -199,7 +199,6 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 	}
 	if err = (&controllers.BackupReconciler{
 		Client:   mgr.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("Backup"),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cloud-native-postgresql-backup"),
 	}).SetupWithManager(mgr); err != nil {
@@ -208,7 +207,6 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 	}
 	if err = (&controllers.ScheduledBackupReconciler{
 		Client:   mgr.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("ScheduledBackup"),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cloud-native-postgresql-scheduledbackup"),
 	}).SetupWithManager(ctx, mgr); err != nil {

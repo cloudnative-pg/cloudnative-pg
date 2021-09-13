@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
@@ -25,7 +26,7 @@ func (r *ClusterReconciler) cleanupCluster(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	jobs batchv1.JobList) error {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextlogger := log.FromContext(ctx)
 
 	completeJobs := utils.FilterCompleteJobs(jobs.Items)
 	if len(completeJobs) == 0 {
@@ -33,7 +34,7 @@ func (r *ClusterReconciler) cleanupCluster(
 	}
 
 	for idx := range completeJobs {
-		log.V(2).Info("Removing job", "job", jobs.Items[idx].Name)
+		contextlogger.Debug("Removing job", "job", jobs.Items[idx].Name)
 
 		foreground := metav1.DeletePropagationForeground
 		if err := r.Delete(ctx, &jobs.Items[idx], &client.DeleteOptions{

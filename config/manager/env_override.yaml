@@ -20,4 +20,4 @@ spec:
         - --enable-leader-election
         - --config-map-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --secret-name=$(OPERATOR_DEPLOYMENT_NAME)-config
-        - --zap-log-level=4
+        - --log-level=info

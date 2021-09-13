@@ -21,17 +21,17 @@ import (
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configfile"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 // clusterLog is for logging in this package.
-var clusterLog = logf.Log.WithName("cluster-resource").WithValues("version", "v1")
+var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 
 // SetupWebhookWithManager setup the webhook inside the controller manager
 func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -91,6 +91,10 @@ func (r *Cluster) Default() {
 		r.Spec.PostgresConfiguration.Parameters = postgres.FillCNPConfiguration(
 			psqlVersion,
 			r.Spec.PostgresConfiguration.Parameters)
+	}
+
+	if r.Spec.LogLevel == "" {
+		r.Spec.LogLevel = log.InfoLevelString
 	}
 }
 

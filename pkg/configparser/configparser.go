@@ -43,10 +43,10 @@ import (
 	"strconv"
 	"strings"
 
-	ctrl "sigs.k8s.io/controller-runtime"
+	l "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-var log = ctrl.Log.WithName("configparser")
+var log = l.WithName("configparser")
 
 // ReadConfigMap reads the configuration from the environment and the passed in data map.
 // Config and defaults are supposed to be pointers to structs of the same type

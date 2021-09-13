@@ -48,18 +48,18 @@ func (p *logPipe) start() error {
 			for {
 				// check if the directory exists
 				if err := fileutils.EnsureDirectoryExist(filepath.Dir(p.fileName)); err != nil {
-					log.Log.WithValues("fileName", p.fileName).Error(err,
+					log.WithValues("fileName", p.fileName).Error(err,
 						"Error checking if the directory exists")
 					continue
 				}
 
 				if err := fileutils.CreateFifo(p.fileName); err != nil {
-					log.Log.WithValues("fileName", p.fileName).Error(err, "Error creating log FIFO")
+					log.WithValues("fileName", p.fileName).Error(err, "Error creating log FIFO")
 					continue
 				}
 
 				if err := p.collectLogsFromFile(); err != nil {
-					log.Log.WithValues("fileName", p.fileName).Error(err, "Error consuming log stream")
+					log.WithValues("fileName", p.fileName).Error(err, "Error consuming log stream")
 				}
 			}
 		}()
@@ -73,7 +73,7 @@ func (p *logPipe) start() error {
 func (p *logPipe) collectLogsFromFile() error {
 	defer func() {
 		if condition := recover(); condition != nil {
-			log.Log.Info("Recover from panic condition while collecting PostgreSQL logs",
+			log.Info("Recover from panic condition while collecting PostgreSQL logs",
 				"condition", condition, "fileName", p.fileName, "stacktrace", debug.Stack())
 		}
 	}()
@@ -85,7 +85,7 @@ func (p *logPipe) collectLogsFromFile() error {
 
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Log.Error(err, "Error while closing FIFO file for logs")
+			log.Error(err, "Error while closing FIFO file for logs")
 			return
 		}
 	}()

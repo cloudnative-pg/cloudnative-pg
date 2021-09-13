@@ -24,6 +24,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
@@ -96,14 +97,12 @@ func (r *ClusterReconciler) getManagedPods(
 	ctx context.Context,
 	cluster apiv1.Cluster,
 ) (corev1.PodList, error) {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
-
 	var childPods corev1.PodList
 	if err := r.List(ctx, &childPods,
 		client.InNamespace(cluster.Namespace),
 		client.MatchingFields{podOwnerKey: cluster.Name},
 	); err != nil {
-		log.Error(err, "Unable to list child pods resource")
+		log.FromContext(ctx).Error(err, "Unable to list child pods resource")
 		return corev1.PodList{}, err
 	}
 
@@ -118,14 +117,12 @@ func (r *ClusterReconciler) getManagedPVCs(
 	ctx context.Context,
 	cluster apiv1.Cluster,
 ) (corev1.PersistentVolumeClaimList, error) {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
-
 	var childPVCs corev1.PersistentVolumeClaimList
 	if err := r.List(ctx, &childPVCs,
 		client.InNamespace(cluster.Namespace),
 		client.MatchingFields{pvcOwnerKey: cluster.Name},
 	); err != nil {
-		log.Error(err, "Unable to list child PVCs")
+		log.FromContext(ctx).Error(err, "Unable to list child PVCs")
 		return corev1.PersistentVolumeClaimList{}, err
 	}
 
@@ -212,7 +209,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 		if !found {
 			// Reset the target primary, since the available one is not active
 			// or not present
-			r.Log.Info("Wrong target primary, the chosen one is not active or not present",
+			log.FromContext(ctx).Info("Wrong target primary, the chosen one is not active or not present",
 				"targetPrimary", cluster.Status.TargetPrimary,
 				"pods", resources.pods)
 			cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary

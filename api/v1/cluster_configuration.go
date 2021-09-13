@@ -78,7 +78,7 @@ func (cluster *Cluster) GetSyncReplicasNumber() (syncReplicas int) {
 	// temporarily unresponsive system)
 	if readyReplicas < int(cluster.Spec.MinSyncReplicas) {
 		syncReplicas = readyReplicas
-		log.Log.Info("Ignore minSyncReplicas to enforce self-healing",
+		log.Info("Ignore minSyncReplicas to enforce self-healing",
 			"syncReplicas", readyReplicas,
 			"minSyncReplicas", cluster.Spec.MinSyncReplicas,
 			"maxSyncReplicas", cluster.Spec.MaxSyncReplicas)

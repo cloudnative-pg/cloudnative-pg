@@ -32,7 +32,7 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 	}
 
 	if result {
-		log.Log.Info(
+		log.Info(
 			"Installed configuration file",
 			"pgdata", pgdata,
 			"filename", destinationFile)
@@ -138,7 +138,7 @@ func configureRecoveryConfFile(pgData string, primaryConnInfo string) (changed b
 		return false, err
 	}
 	if changed {
-		log.Log.Info("Updated replication settings in recovery.conf file")
+		log.Info("Updated replication settings in recovery.conf file")
 	}
 
 	return changed, nil
@@ -163,7 +163,7 @@ func configurePostgresAutoConfFile(pgData string, primaryConnInfo string) (chang
 		return false, err
 	}
 	if changed {
-		log.Log.Info("Updated replication settings in postgresql.auto.conf file")
+		log.Info("Updated replication settings in postgresql.auto.conf file")
 	}
 
 	return changed, nil

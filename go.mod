@@ -7,6 +7,7 @@ require (
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/go-logr/logr v0.4.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
+	github.com/google/uuid v1.3.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/lib/pq v1.10.3
 	github.com/logrusorgru/aurora/v3 v3.0.0
@@ -17,6 +18,7 @@ require (
 	github.com/sethvargo/go-password v0.2.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
+	go.uber.org/zap v1.18.1
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	k8s.io/api v0.21.3
 	k8s.io/apiextensions-apiserver v0.21.3

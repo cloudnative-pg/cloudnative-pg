@@ -187,6 +187,9 @@ type ClusterSpec struct {
 
 	// The list of external clusters which are used in the configuration
 	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
+
+	// The instances' log level, one of the following values: error, info (default), debug, trace
+	LogLevel string `json:"logLevel,omitempty"`
 }
 
 const (

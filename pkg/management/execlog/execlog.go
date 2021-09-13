@@ -15,8 +15,6 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/go-logr/logr"
-
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
@@ -39,7 +37,7 @@ func RunStreaming(cmd *exec.Cmd, cmdName string) (err error) {
 // RunStreamingNoWait executes the command redirecting its stdout and stderr to the logger.
 // This function does not wait for command to terminate.
 func RunStreamingNoWait(cmd *exec.Cmd, cmdName string) (err error) {
-	logger := log.Log.WithName(cmdName)
+	logger := log.WithName(cmdName)
 
 	stdoutPipeRead, stdoutPipeWrite, err := os.Pipe()
 	if err != nil {
@@ -81,7 +79,7 @@ func RunStreamingNoWait(cmd *exec.Cmd, cmdName string) (err error) {
 
 // copyPipe is an internal function used to copy the content of a io.Reader
 // into a io.Writer one line at a time.
-func copyPipe(dst io.Writer, src io.ReadCloser, logger logr.Logger) {
+func copyPipe(dst io.Writer, src io.ReadCloser, logger log.Logger) {
 	defer func() {
 		err := src.Close()
 		if err != nil {
@@ -107,7 +105,7 @@ func copyPipe(dst io.Writer, src io.ReadCloser, logger logr.Logger) {
 // RunBuffering creates two dedicated pipes for stdout and stderr, run the command and logs its output after
 // the command exited
 func RunBuffering(cmd *exec.Cmd, cmdName string) (err error) {
-	logger := log.Log.WithName(cmdName)
+	logger := log.WithName(cmdName)
 
 	var stdoutBuffer, stderrBuffer bytes.Buffer
 

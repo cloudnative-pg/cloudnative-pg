@@ -15,6 +15,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
@@ -25,7 +26,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 	podList *postgres.PostgresqlStatusList,
 	conditionFunc func(postgres.PostgresqlStatus, *apiv1.Cluster) (bool, string),
 ) (bool, error) {
-	clusterUpgradeLog := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 
 	// The following code works under the assumption that the latest element
 	// is the primary and this assumption should be enforced by the
@@ -43,7 +44,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		if cluster.Status.CurrentPrimary != postgresqlStatus.Pod.Name {
 			if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
 				fmt.Sprintf("Restarting instance, beacause: %s", reason)); err != nil {
-				clusterUpgradeLog.Error(err, "postgresqlStatus", postgresqlStatus.Pod.Name)
+				contextLogger.Error(err, "postgresqlStatus", postgresqlStatus.Pod.Name)
 				return false, err
 			}
 			return true, r.upgradePod(ctx, cluster, &postgresqlStatus.Pod)
@@ -51,7 +52,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 
 		// if it's a primary instance, we need to check whether a manual switchover is required
 		if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
-			clusterUpgradeLog.Info("Waiting for the user to request a switchover to complete the rolling update",
+			contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
 				"reason", reason, "primaryPod", postgresqlStatus.Pod.Name)
 			return true, r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser,
 				"User must issue a supervised switchover")
@@ -62,7 +63,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 			// podList.Items[1] is the first replica, as the pod list
 			// is sorted in the same order we use for switchover / failovers
 			targetPrimary := podList.Items[1].Pod.Name
-			clusterUpgradeLog.Info("The primary needs to be restarted, we'll trigger a switchover first",
+			contextLogger.Info("The primary needs to be restarted, we'll trigger a switchover first",
 				"reason", reason,
 				"currentPrimary", postgresqlStatus.Pod.Name,
 				"targetPrimary", targetPrimary)
@@ -73,7 +74,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
 			fmt.Sprintf("The primary instance needs to be restarted: %s, reason: %s",
 				postgresqlStatus.Pod.Name, reason)); err != nil {
-			clusterUpgradeLog.Error(err, "postgresqlStatus", postgresqlStatus.Pod.Name)
+			contextLogger.Error(err, "postgresqlStatus", postgresqlStatus.Pod.Name)
 			return false, err
 		}
 
@@ -165,9 +166,7 @@ func isPodNeedingRestart(
 
 // upgradePod updates an instance to a newer image version
 func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *apiv1.Cluster, pod *v1.Pod) error {
-	clusterUpgradeLog := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
-
-	clusterUpgradeLog.Info("Deleting old Pod",
+	log.FromContext(ctx).Info("Deleting old Pod",
 		"pod", pod.Name,
 		"to", cluster.Spec.ImageName)
 

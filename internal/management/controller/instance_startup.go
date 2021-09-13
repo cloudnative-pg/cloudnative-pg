@@ -19,6 +19,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
@@ -26,6 +27,8 @@ import (
 // RefreshServerCertificateFiles gets the latest server certificates files from the
 // secrets. Returns true if configuration has been changed
 func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
+	contextLogger := log.FromContext(ctx)
+
 	var secret corev1.Secret
 
 	err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true },
@@ -35,7 +38,7 @@ func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context, 
 				client.ObjectKey{Namespace: r.instance.Namespace, Name: cluster.Status.Certificates.ServerTLSSecret},
 				&secret)
 			if err != nil {
-				r.log.Info("Error accessing server TLS Certificate. Retrying with exponential backoff.",
+				contextLogger.Info("Error accessing server TLS Certificate. Retrying with exponential backoff.",
 					"secret", cluster.Status.Certificates.ServerTLSSecret)
 				return err
 			}
@@ -46,6 +49,7 @@ func (r *InstanceReconciler) RefreshServerCertificateFiles(ctx context.Context, 
 	}
 
 	return r.refreshCertificateFilesFromSecret(
+		ctx,
 		&secret,
 		postgresSpec.ServerCertificateLocation,
 		postgresSpec.ServerKeyLocation)
@@ -65,6 +69,7 @@ func (r *InstanceReconciler) RefreshReplicationUserCertificate(ctx context.Conte
 	}
 
 	return r.refreshCertificateFilesFromSecret(
+		ctx,
 		&secret,
 		postgresSpec.StreamingReplicaCertificateLocation,
 		postgresSpec.StreamingReplicaKeyLocation)
@@ -82,7 +87,7 @@ func (r *InstanceReconciler) RefreshClientCA(ctx context.Context, cluster *apiv1
 		return false, err
 	}
 
-	return r.refreshCAFromSecret(&secret, postgresSpec.ClientCACertificateLocation)
+	return r.refreshCAFromSecret(ctx, &secret, postgresSpec.ClientCACertificateLocation)
 }
 
 // RefreshServerCA gets the latest server CA certificates from the secrets.
@@ -97,7 +102,7 @@ func (r *InstanceReconciler) RefreshServerCA(ctx context.Context, cluster *apiv1
 		return false, err
 	}
 
-	return r.refreshCAFromSecret(&secret, postgresSpec.ServerCACertificateLocation)
+	return r.refreshCAFromSecret(ctx, &secret, postgresSpec.ServerCACertificateLocation)
 }
 
 // RefreshBarmanEndpointCA gets the latest barman endpoint CA certificates from the secrets.
@@ -117,13 +122,15 @@ func (r *InstanceReconciler) RefreshBarmanEndpointCA(ctx context.Context, cluste
 		return false, err
 	}
 
-	return r.refreshFileFromSecret(&secret, endpointCA.Key, postgresSpec.BarmanEndpointCACertificateLocation)
+	return r.refreshFileFromSecret(ctx, &secret, endpointCA.Key, postgresSpec.BarmanEndpointCACertificateLocation)
 }
 
 // VerifyPgDataCoherence checks if this cluster exists in K8s. It panics if this
 // pod belongs to a primary but the cluster status is not coherent with that
 func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
-	r.log.Info("Checking PGDATA coherence")
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("Checking PGDATA coherence")
 
 	var cluster apiv1.Cluster
 	err := r.GetClient().Get(
@@ -152,7 +159,7 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 		return err
 	}
 
-	r.log.Info("Instance type", "isPrimary", isPrimary)
+	contextLogger.Info("Instance type", "isPrimary", isPrimary)
 
 	if isPrimary {
 		return r.verifyPgDataCoherenceForPrimary(ctx, &cluster)
@@ -166,10 +173,12 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 // current primary
 func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 	ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
 	targetPrimary := cluster.Status.TargetPrimary
 	currentPrimary := cluster.Status.CurrentPrimary
 
-	r.log.Info("Cluster status",
+	contextLogger.Info("Cluster status",
 		"currentPrimary", currentPrimary,
 		"targetPrimary", targetPrimary)
 
@@ -178,7 +187,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 		if currentPrimary == "" {
 			// This means that this cluster has been just started up and the
 			// current primary still need to be written
-			r.log.Info("First primary instance bootstrap, marking myself as primary",
+			contextLogger.Info("First primary instance bootstrap, marking myself as primary",
 				"currentPrimary", currentPrimary,
 				"targetPrimary", targetPrimary)
 
@@ -192,7 +201,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 		// I'm an old primary and not the current one. I need to wait for
 		// the switchover procedure to finish and then I can demote myself
 		// and start following the new primary
-		r.log.Info("This is an old primary instance, waiting for the "+
+		contextLogger.Info("This is an old primary instance, waiting for the "+
 			"switchover to finish",
 			"currentPrimary", currentPrimary,
 			"targetPrimary", targetPrimary)
@@ -217,7 +226,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 		// retrying after having started up the instance.
 		err = r.instance.Rewind()
 		if err != nil {
-			r.log.Info(
+			contextLogger.Info(
 				"pg_rewind failed, starting the server to complete the crash recovery",
 				"err", err)
 
@@ -246,6 +255,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 // progress. The function will create a watch on the cluster resource and wait
 // until the switchover is completed
 func (r *InstanceReconciler) waitForSwitchoverToBeCompleted(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
 	switchoverWatch, err := r.dynamicClient.
 		Resource(apiv1.ClusterGVK).
 		Namespace(r.instance.Namespace).
@@ -274,13 +284,13 @@ func (r *InstanceReconciler) waitForSwitchoverToBeCompleted(ctx context.Context)
 		currentPrimary := cluster.Status.CurrentPrimary
 
 		if targetPrimary == currentPrimary {
-			r.log.Info("Switchover completed",
+			contextLogger.Info("Switchover completed",
 				"targetPrimary", targetPrimary,
 				"currentPrimary", currentPrimary)
 			switchoverWatch.Stop()
 			break
 		} else {
-			r.log.Info("Switchover in progress",
+			contextLogger.Info("Switchover in progress",
 				"targetPrimary", targetPrimary,
 				"currentPrimary", currentPrimary)
 		}
