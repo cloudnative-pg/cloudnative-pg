@@ -17,6 +17,7 @@ BackupStatus
 BarmanObjectStoreConfiguration
 Bartolini
 Battiato
+BDR
 BootstrapConfiguration
 BootstrapInitDB
 BootstrapPgBaseBackup
@@ -148,6 +149,7 @@ RBAC
 README
 RHSA
 RPO
+RTO
 RUNTIME
 ReadWriteOnce
 RedHat
@@ -240,6 +242,7 @@ barmanObjectStore
 barmanobjectstoreconfiguration
 basebackup
 bb
+bdr
 benchmarking
 bool
 bootstrapconfiguration
