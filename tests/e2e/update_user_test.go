@@ -160,7 +160,8 @@ var _ = Describe("Disabling superuser password", func() {
 			// We should have the `postgres` user with a null password
 			Eventually(func() string {
 				stdout, _, err := env.ExecCommand(env.Ctx, *pod, "postgres", &timeout,
-					"psql", "-tAc", "SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres'")
+					"psql", "-U", "postgres", "-tAc",
+					"SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres'")
 				if err != nil {
 					return ""
 				}
@@ -265,7 +266,8 @@ var _ = Describe("Creating a cluster without superuser password", func() {
 			// We should have the `postgres` user with a null password
 			Eventually(func() string {
 				stdout, _, err := env.ExecCommand(env.Ctx, *pod, "postgres", &timeout,
-					"psql", "-tAc", "SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres'")
+					"psql", "-U", "postgres", "-tAc",
+					"SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres'")
 				if err != nil {
 					return ""
 				}
