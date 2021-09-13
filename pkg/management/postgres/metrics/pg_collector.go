@@ -173,14 +173,14 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	collectionStart := time.Now()
 	db, err := e.instance.GetSuperUserDB()
 	if err != nil {
-		log.Log.Error(err, "Error opening connection to PostgreSQL")
+		log.Error(err, "Error opening connection to PostgreSQL")
 		e.Metrics.Error.Set(1)
 		return
 	}
 
 	// First, let's check the connection. No need to proceed if this fails.
 	if err := db.Ping(); err != nil {
-		log.Log.Error(err, "Error pinging PostgreSQL")
+		log.Error(err, "Error pinging PostgreSQL")
 		e.Metrics.PostgreSQLUp.Set(0)
 		e.Metrics.Error.Set(1)
 		e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
@@ -196,7 +196,7 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		label := "Collect." + e.queries.Name()
 		collectionStart := time.Now()
 		if err := e.queries.Collect(ch); err != nil {
-			log.Log.Error(err, "Error during collection", "collector", e.queries.Name())
+			log.Error(err, "Error during collection", "collector", e.queries.Name())
 			e.Metrics.PgCollectionErrors.WithLabelValues(label).Inc()
 			e.Metrics.Error.Set(1)
 		}
@@ -205,14 +205,14 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 
 	isPrimary, err := e.instance.IsPrimary()
 	if err != nil {
-		log.Log.Error(err, "unable to get if primary")
+		log.Error(err, "unable to get if primary")
 	}
 
 	if isPrimary {
 		// getting required synchronous standby number from postgres itself
 		nStandbys, err := getSynchronousStandbysNumber(db)
 		if err != nil {
-			log.Log.Error(err, "unable to collect metrics")
+			log.Error(err, "unable to collect metrics")
 			e.Metrics.Error.Set(1)
 			e.Metrics.PgCollectionErrors.WithLabelValues("Collect.SynchronousStandbys").Inc()
 			e.Metrics.SyncReplicas.WithLabelValues("observed").Set(-1)
@@ -222,14 +222,14 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	}
 
 	if err := collectPGWalArchiveMetric(e); err != nil {
-		log.Log.Error(err, "while collecting WAL archive metrics", "path", specs.PgWalArchiveStatusPath)
+		log.Error(err, "while collecting WAL archive metrics", "path", specs.PgWalArchiveStatusPath)
 		e.Metrics.Error.Set(1)
 		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PgWALArchiveStats").Inc()
 		e.Metrics.PgWALArchiveStatus.Reset()
 	}
 
 	if err := collectPGWalMetric(e, db); err != nil {
-		log.Log.Error(err, "while collecting WAL metrics", "path", specs.PgWalPath)
+		log.Error(err, "while collecting WAL metrics", "path", specs.PgWalPath)
 		e.Metrics.Error.Set(1)
 		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PgWALStats").Inc()
 		e.Metrics.PgWALDirectory.Reset()
@@ -306,7 +306,7 @@ func getWALSegmentSize(db *sql.DB) (int, error) {
 	err := db.QueryRow("SELECT setting FROM pg_settings WHERE name='wal_segment_size'").
 		Scan(&size)
 	if err != nil {
-		log.Log.Error(err, "while getting the wal_segment_size value from the database")
+		log.Error(err, "while getting the wal_segment_size value from the database")
 		return 0, err
 	}
 	walSegmentSize = &size

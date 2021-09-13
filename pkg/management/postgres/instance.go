@@ -141,7 +141,7 @@ func GetServerPort() int {
 
 	result, err := strconv.Atoi(pgPort)
 	if err != nil {
-		log.Log.Info("Wrong port number inside the process environment variables",
+		log.Info("Wrong port number inside the process environment variables",
 			"PGPORT", pgPort)
 		return postgres.ServerPort
 	}
@@ -175,7 +175,7 @@ func (instance Instance) Startup() error {
 		options = append(options, "-o", "-c "+opt)
 	}
 
-	log.Log.Info("Starting up instance", "pgdata", instance.PgData)
+	log.Info("Starting up instance", "pgdata", instance.PgData)
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
 	pgCtlCmd.Env = instance.Env
@@ -214,7 +214,7 @@ func (instance *Instance) Shutdown() error {
 		"stop",
 	}
 
-	log.Log.Info("Shutting down instance",
+	log.Info("Shutting down instance",
 		"pgdata", instance.PgData)
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
@@ -247,7 +247,7 @@ func (instance *Instance) Reload() error {
 		"reload",
 	}
 
-	log.Log.Info("Requesting configuration reload",
+	log.Info("Requesting configuration reload",
 		"pgdata", instance.PgData)
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
@@ -293,7 +293,7 @@ func (instance Instance) WithActiveInstance(inner func() error) error {
 	}
 	defer func() {
 		if err := instance.Shutdown(); err != nil {
-			log.Log.Info("Error while deactivating instance", "err", err)
+			log.Info("Error while deactivating instance", "err", err)
 		}
 	}()
 
@@ -351,7 +351,7 @@ func (instance *Instance) IsPrimary() (bool, error) {
 
 // Demote demote an existing PostgreSQL instance
 func (instance *Instance) Demote() error {
-	log.Log.Info("Demoting instance",
+	log.Info("Demoting instance",
 		"pgpdata", instance.PgData)
 
 	_, err := UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName)
@@ -363,7 +363,7 @@ func (instance *Instance) WaitForPrimaryAvailable() error {
 	primaryConnInfo := buildPrimaryConnInfo(
 		instance.ClusterName+"-rw", instance.PodName) + " dbname=postgres connect_timeout=5"
 
-	log.Log.Info("Waiting for the new primary to be available",
+	log.Info("Waiting for the new primary to be available",
 		"primaryConnInfo", primaryConnInfo)
 
 	db, err := sql.Open("postgres", primaryConnInfo)
@@ -382,7 +382,7 @@ func (instance *Instance) WaitForPrimaryAvailable() error {
 // is fully done.
 // Important: this function must be called only when the instance isn't started
 func (instance *Instance) CompleteCrashRecovery() error {
-	log.Log.Info("Waiting for server to complete crash recovery")
+	log.Info("Waiting for server to complete crash recovery")
 
 	defer func() {
 		instance.ShutdownConnections()
@@ -412,7 +412,7 @@ func waitForConnectionAvailable(db *sql.DB) error {
 	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
 		err := db.Ping()
 		if err != nil {
-			log.Log.Info("DB not available, will retry", "err", err)
+			log.Info("DB not available, will retry", "err", err)
 		}
 		return err
 	})
@@ -452,7 +452,7 @@ func waitForStreamingConnectionAvailable(db *sql.DB) error {
 	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
 		result, err := db.Query("IDENTIFY_SYSTEM")
 		if err != nil || result.Err() != nil {
-			log.Log.Info("DB not available, will retry", "err", err)
+			log.Info("DB not available, will retry", "err", err)
 			return err
 		}
 		defer func() {
@@ -475,7 +475,7 @@ func (instance *Instance) Rewind() error {
 		"--target-pgdata", instance.PgData,
 	}
 
-	log.Log.Info("Starting up pg_rewind",
+	log.Info("Starting up pg_rewind",
 		"pgdata", instance.PgData,
 		"options", options)
 

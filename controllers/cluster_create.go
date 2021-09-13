@@ -24,6 +24,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
@@ -227,7 +228,7 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 		return nil
 	}
 
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 	var oldPdb v1beta1.PodDisruptionBudget
 
 	if err := r.Get(ctx, client.ObjectKey{Name: pdb.Name, Namespace: pdb.Namespace}, &oldPdb); err != nil {
@@ -239,7 +240,7 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 		r.Recorder.Event(cluster, "Normal", "CreatingPodDisruptionBudget",
 			fmt.Sprintf("Creating PodDisruptionBudget %s", pdb.Name))
 		if err = r.Create(ctx, pdb); err != nil {
-			log.Error(err, "Unable to create PodDisruptionBudget", "object", pdb)
+			contextLogger.Error(err, "Unable to create PodDisruptionBudget", "object", pdb)
 			return fmt.Errorf("while creating PodDisruptionBudget: %w", err)
 		}
 		return nil
@@ -265,14 +266,14 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 
 // deleteClusterPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
 func (r *ClusterReconciler) deleteClusterPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 
 	// If we have a PDB, we need to delete it
 	var targetPdb v1beta1.PodDisruptionBudget
 	err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &targetPdb)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
-			log.Error(err, "Unable to retrieve PodDisruptionBudget")
+			contextLogger.Error(err, "Unable to retrieve PodDisruptionBudget")
 			return err
 		}
 		return nil
@@ -283,7 +284,7 @@ func (r *ClusterReconciler) deleteClusterPodDisruptionBudget(ctx context.Context
 	err = r.Delete(ctx, &targetPdb)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
-			log.Error(err, "Unable to delete PodDisruptionBudget", "object", targetPdb)
+			contextLogger.Error(err, "Unable to delete PodDisruptionBudget", "object", targetPdb)
 			return err
 		}
 		return nil
@@ -294,7 +295,7 @@ func (r *ClusterReconciler) deleteClusterPodDisruptionBudget(ctx context.Context
 // createOrPatchServiceAccount creates or synchronizes the ServiceAccount used by the
 // cluster with the latest cluster specification
 func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, cluster *apiv1.Cluster) error {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 
 	var sa corev1.ServiceAccount
 	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &sa); err != nil {
@@ -313,7 +314,7 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 
 	serviceAccountAligned, err := specs.IsServiceAccountAligned(&sa, generatedPullSecretNames)
 	if err != nil {
-		log.Error(err, "Cannot detect if a ServiceAccount need to be refreshed or not, refreshing it",
+		contextLogger.Error(err, "Cannot detect if a ServiceAccount need to be refreshed or not, refreshing it",
 			"serviceAccount", sa)
 		serviceAccountAligned = false
 	}
@@ -475,14 +476,12 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 
 // createRole creates the role
 func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) error {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
-
 	role := specs.CreateRole(*cluster, backupOrigin)
 	SetClusterOwnerAnnotationsAndLabels(&role.ObjectMeta, cluster)
 
 	err := r.Create(ctx, &role)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
-		log.Error(err, "Unable to create the Role", "object", role)
+		log.FromContext(ctx).Error(err, "Unable to create the Role", "object", role)
 		return err
 	}
 
@@ -491,14 +490,12 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Clust
 
 // createRoleBinding creates the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv1.Cluster) error {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
-
 	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
 	SetClusterOwnerAnnotationsAndLabels(&roleBinding.ObjectMeta, cluster)
 
 	err := r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
-		log.Error(err, "Unable to create the ServiceAccount", "object", roleBinding)
+		log.FromContext(ctx).Error(err, "Unable to create the ServiceAccount", "object", roleBinding)
 		return err
 	}
 
@@ -519,7 +516,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (ctrl.Result, error) {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 
 	if cluster.Status.LatestGeneratedNode != 0 {
 		// We are we creating a new blank primary when we had previously generated
@@ -536,7 +533,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		// healing this cluster as we have nothing to do.
 		// For the second option we can just retry when the next
 		// reconciliation loop is started by the informers.
-		log.Info("refusing to create the primary instance while the latest generated serial is not zero",
+		contextLogger.Info("refusing to create the primary instance while the latest generated serial is not zero",
 			"latestGeneratedNode", cluster.Status.LatestGeneratedNode)
 		return ctrl.Result{}, nil
 	}
@@ -553,7 +550,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			// This error should have been caught by the validating
 			// webhook, but since we are here the user must have disabled server-side
 			// validation and we must react.
-			log.Info("The size specified for the cluster is not valid",
+			contextLogger.Info("The size specified for the cluster is not valid",
 				"size",
 				cluster.Spec.StorageConfiguration.Size)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
@@ -568,7 +565,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
 		// We cannot observe a creation if it was not accepted by the server
 
-		log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
+		contextLogger.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 		return ctrl.Result{}, err
 	}
 
@@ -583,7 +580,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 				return ctrl.Result{}, err
 			}
 			if backup == nil {
-				log.Info("Missing backup object, can't continue full recovery",
+				contextLogger.Info("Missing backup object, can't continue full recovery",
 					"backup", cluster.Spec.Bootstrap.Recovery.Backup)
 				return ctrl.Result{
 					Requeue:      true,
@@ -603,12 +600,12 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
-		log.Error(err, "Unable to set the owner reference for instance")
+		contextLogger.Error(err, "Unable to set the owner reference for instance")
 		return ctrl.Result{}, err
 	}
 
 	if err = r.setPrimaryInstance(ctx, cluster, fmt.Sprintf("%v-%v", cluster.Name, nodeSerial)); err != nil {
-		log.Error(err, "Unable to set the primary instance name")
+		contextLogger.Error(err, "Unable to set the primary instance name")
 		return ctrl.Result{}, err
 	}
 
@@ -618,7 +615,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Creating new Job",
+	contextLogger.Info("Creating new Job",
 		"name", job.Name,
 		"primary", true)
 
@@ -634,7 +631,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			return ctrl.Result{}, nil
 		}
 
-		log.Error(err, "Unable to create job", "job", job)
+		contextLogger.Error(err, "Unable to create job", "job", job)
 		return ctrl.Result{}, err
 	}
 
@@ -675,14 +672,14 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	nodeSerial int32,
 	cluster *apiv1.Cluster,
 ) (ctrl.Result, error) {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 
 	var job *batchv1.Job
 	var err error
 
 	job = specs.JoinReplicaInstance(*cluster, nodeSerial)
 
-	log.Info("Creating new Job",
+	contextLogger.Info("Creating new Job",
 		"job", job.Name,
 		"primary", false)
 
@@ -696,7 +693,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	}
 
 	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
-		log.Error(err, "Unable to set the owner reference for joined PostgreSQL node")
+		contextLogger.Error(err, "Unable to set the owner reference for joined PostgreSQL node")
 		return ctrl.Result{}, err
 	}
 
@@ -709,11 +706,11 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	if err = r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
-			log.Info("Job already exist, maybe the cache is stale", "pod", job.Name)
+			contextLogger.Info("Job already exist, maybe the cache is stale", "pod", job.Name)
 			return ctrl.Result{}, nil
 		}
 
-		log.Error(err, "Unable to create Job", "job", job)
+		contextLogger.Error(err, "Unable to create Job", "job", job)
 		return ctrl.Result{}, err
 	}
 
@@ -723,7 +720,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 			// This error should have been caught by the validating
 			// webhook, but since we are here the user must have disabled server-side
 			// validation and we must react.
-			log.Info("The size specified for the cluster is not valid",
+			contextLogger.Info("The size specified for the cluster is not valid",
 				"size",
 				cluster.Spec.StorageConfiguration.Size)
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
@@ -734,7 +731,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, cluster)
 
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-		log.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
+		contextLogger.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 		return ctrl.Result{}, err
 	}
 
@@ -743,7 +740,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 // reconcilePVCs reattaches a dangling PVC
 func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cluster) error {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 
 	pvcToReattach := electPvcToReattach(cluster)
 	if pvcToReattach == "" {
@@ -753,7 +750,7 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 	if len(cluster.Status.DanglingPVC) > 0 {
 		if (cluster.IsNodeMaintenanceWindowInProgress() && !cluster.IsReusePVCEnabled()) ||
 			cluster.Spec.Instances <= cluster.Status.Instances {
-			log.Info(
+			contextLogger.Info(
 				"Detected unneeded PVCs, removing them",
 				"statusInstances", cluster.Status.Instances,
 				"specInstances", cluster.Spec.Instances,
@@ -784,12 +781,12 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 		pod.Annotations[specs.ClusterRestartAnnotationName] = clusterRestart
 	}
 
-	log.Info("Creating new Pod to reattach a PVC",
+	contextLogger.Info("Creating new Pod to reattach a PVC",
 		"pod", pod.Name,
 		"pvc", pvc.Name)
 
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
-		log.Error(err, "Unable to set the owner reference for the Pod")
+		contextLogger.Error(err, "Unable to set the owner reference for the Pod")
 		return err
 	}
 
@@ -801,11 +798,11 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 		if apierrs.IsAlreadyExists(err) {
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
-			log.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
+			contextLogger.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
 			return nil
 		}
 
-		log.Error(err, "Unable to create Pod", "pod", pod)
+		contextLogger.Error(err, "Unable to create Pod", "pod", pod)
 		return err
 	}
 

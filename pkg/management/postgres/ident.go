@@ -22,7 +22,7 @@ func WritePostgresUserMaps(pgData string) error {
 
 	currentUser, err := user.Current()
 	if err != nil {
-		log.Log.Info("Unable to identify the current user. Falling back to insecure mapping.")
+		log.Info("Unable to identify the current user. Falling back to insecure mapping.")
 		username = "/"
 	} else {
 		username = currentUser.Username

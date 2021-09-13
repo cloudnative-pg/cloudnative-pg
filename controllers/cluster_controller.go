@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -31,6 +30,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
@@ -49,7 +49,6 @@ var (
 // ClusterReconciler reconciles a Cluster objects
 type ClusterReconciler struct {
 	client.Client
-	Log      logr.Logger
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
@@ -81,7 +80,7 @@ type ClusterReconciler struct {
 
 // Reconcile is the operator reconcile loop
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	clusterControllerLog := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
+	contextLogger, ctx := log.SetupLogger(ctx)
 
 	var cluster apiv1.Cluster
 	if err := r.Get(ctx, req.NamespacedName, &cluster); err != nil {
@@ -89,7 +88,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// that's the case, let's just wait for the Kubernetes garbage collector
 		// to remove all the Pods of the cluster.
 		if apierrs.IsNotFound(err) {
-			clusterControllerLog.Info("Resource has been deleted")
+			contextLogger.Info("Resource has been deleted")
 
 			return ctrl.Result{}, nil
 		}
@@ -117,7 +116,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Update the status of this resource
 	resources, err := r.getManagedResources(ctx, cluster)
 	if err != nil {
-		clusterControllerLog.Error(err, "Cannot extract the list of managed resources")
+		contextLogger.Error(err, "Cannot extract the list of managed resources")
 		return ctrl.Result{}, err
 	}
 
@@ -134,7 +133,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if cluster.Status.CurrentPrimary != "" &&
 		cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		clusterControllerLog.Info("There is a switchover or a failover "+
+		contextLogger.Info("There is a switchover or a failover "+
 			"in progress, waiting for the operation to complete",
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
@@ -150,17 +149,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, &cluster, instancesStatus, resources)
 	if err != nil {
 		if err == ErrWalReceiversRunning {
-			clusterControllerLog.Info("Waiting for all WAL receivers to be down to elect a new primary")
+			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
-		clusterControllerLog.Info("Cannot update target primary: operation cannot be fulfilled. "+
+		contextLogger.Info("Cannot update target primary: operation cannot be fulfilled. "+
 			"An immediate retry will be scheduled",
 			"cluster", cluster.Name)
 		return ctrl.Result{Requeue: true}, nil
 	}
 	if selectedPrimary != "" {
 		// If we selected a new primary, stop the reconciliation loop here
-		clusterControllerLog.Info("Waiting for the new primary to notice the promotion request",
+		contextLogger.Info("Waiting for the new primary to notice the promotion request",
 			"newPrimary", selectedPrimary)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
@@ -172,7 +171,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
 	if runningJobs := resources.countRunningJobs(); runningJobs > 0 {
-		clusterControllerLog.V(2).Info("A job is currently running. Waiting", "count", runningJobs)
+		contextLogger.Debug("A job is currently running. Waiting", "count", runningJobs)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -182,7 +181,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if !resources.allPodsAreActive() {
-		clusterControllerLog.V(2).Info("A managed resource is currently being created or deleted. Waiting")
+		contextLogger.Debug("A managed resource is currently being created or deleted. Waiting")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -201,6 +200,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // ReconcilePVCs align the PVCs that are backing our cluster with the user specifications
 func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cluster,
 	resources *managedResources) error {
+	contextLogger := log.FromContext(ctx)
 	if !cluster.ShouldResizeInUseVolumes() {
 		return nil
 	}
@@ -224,7 +224,7 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 			resources.pvcs.Items[idx].Spec.Resources.Requests["storage"] = quantity
 			if err = r.Patch(ctx, &resources.pvcs.Items[idx], client.MergeFrom(oldPVC)); err != nil {
 				// Decreasing resources is not possible
-				log.Error(err, "error while changing PVC storage requirement",
+				contextLogger.Error(err, "error while changing PVC storage requirement",
 					"from", oldQuantity, "to", quantity,
 					"pvcName", resources.pvcs.Items[idx].Name)
 
@@ -237,7 +237,7 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 
 		case oldQuantity.AsDec().Cmp(quantity.AsDec()) == 1:
 			// Decreasing resources is not possible
-			log.Info("cannot decrease storage requirement",
+			contextLogger.Info("cannot decrease storage requirement",
 				"from", oldQuantity, "to", quantity,
 				"pvcName", resources.pvcs.Items[idx].Name)
 		}
@@ -249,11 +249,11 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 // ReconcilePods decides when to create, scale up/down or wait for pods
 func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request, cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList) (ctrl.Result, error) {
-	clusterControllerLog := r.Log.WithValues("namespace", req.Namespace, "name", req.Name)
+	contextLogger := log.FromContext(ctx)
 
 	// If we are joining a node, we should wait for the process to finish
 	if resources.countRunningJobs() > 0 {
-		clusterControllerLog.V(2).Info("Waiting for jobs to finish",
+		contextLogger.Debug("Waiting for jobs to finish",
 			"clusterName", cluster.Name,
 			"namespace", cluster.Namespace,
 			"jobs", len(resources.jobs.Items))
@@ -265,7 +265,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	if pvcNeedingMaintenance > 0 {
 		if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
 			// A pod is not ready, let's retry
-			clusterControllerLog.V(2).Info("Waiting for node to be ready before attaching PVCs")
+			contextLogger.Debug("Waiting for node to be ready before attaching PVCs")
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 
@@ -295,7 +295,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	// The user have choose to wait for the missing nodes to come up
 	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
 		cluster.Status.ReadyInstances < cluster.Status.Instances {
-		clusterControllerLog.V(2).Info("Waiting for Pods to be ready")
+		contextLogger.Debug("Waiting for Pods to be ready")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -323,7 +323,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	if cluster.Status.ReadyInstances != cluster.Status.Instances ||
 		cluster.Status.ReadyInstances != int32(len(instancesStatus.Items)) ||
 		!instancesStatus.IsComplete() {
-		clusterControllerLog.V(2).Info("Waiting for Pods to be ready")
+		contextLogger.Debug("Waiting for Pods to be ready")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -477,7 +477,7 @@ func (r *ClusterReconciler) mapSecretsToClusters(ctx context.Context) handler.Ma
 			client.InNamespace(secret.Namespace),
 		)
 		if err != nil {
-			r.Log.Error(err, "while getting cluster list", "namespace", secret.Namespace)
+			log.FromContext(ctx).Error(err, "while getting cluster list", "namespace", secret.Namespace)
 			return nil
 		}
 		// build requests for cluster referring the secret
@@ -498,7 +498,7 @@ func (r *ClusterReconciler) mapConfigMapsToClusters(ctx context.Context) handler
 			client.InNamespace(config.Namespace),
 		)
 		if err != nil {
-			r.Log.Error(err, "while getting cluster list", "namespace", config.Namespace)
+			log.FromContext(ctx).Error(err, "while getting cluster list", "namespace", config.Namespace)
 			return nil
 		}
 		// build requests for cluster referring the configmap
@@ -563,7 +563,7 @@ func (r *ClusterReconciler) mapNodeToClusters(ctx context.Context) handler.MapFu
 			client.HasLabels{specs.ClusterLabelName},
 		)
 		if err != nil {
-			r.Log.Error(err, "while getting primary instances for node")
+			log.FromContext(ctx).Error(err, "while getting primary instances for node")
 			return nil
 		}
 		var requests []reconcile.Request

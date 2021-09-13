@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,7 +36,7 @@ type BackupCommand struct {
 	Client   client.Client
 	Recorder record.EventRecorder
 	Env      []string
-	Log      logr.Logger
+	Log      log.Logger
 }
 
 // NewBackupCommand initializes a BackupCommand object
@@ -46,7 +45,7 @@ func NewBackupCommand(
 	backup *apiv1.Backup,
 	client client.Client,
 	recorder record.EventRecorder,
-	log logr.Logger,
+	log log.Logger,
 ) *BackupCommand {
 	return &BackupCommand{
 		Cluster:  cluster,
@@ -140,7 +139,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 			GetServerPort()),
 	)
 	if err != nil {
-		log.Log.Error(err, "can not open postgres database")
+		log.Error(err, "can not open postgres database")
 		return err
 	}
 
@@ -150,15 +149,15 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 			"COALESCE(last_failed_time, '-infinity') AS is_archiving FROM pg_stat_archiver;")
 
 		if err := row.Scan(&walArchivingWorking); err != nil {
-			log.Log.Error(err, "can't get wal archiving status")
+			log.Error(err, "can't get wal archiving status")
 		}
 		if walArchivingWorking && err == nil {
-			log.Log.Info("wal archiving is working, will retry proceed with the backup")
+			log.Info("wal archiving is working, will retry proceed with the backup")
 			if b.Backup.GetStatus().Phase != apiv1.BackupPhaseRunning {
 				b.Backup.GetStatus().Phase = apiv1.BackupPhaseRunning
 				err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject())
 				if err != nil {
-					log.Log.Error(err, "can't set backup as wal archiving failing")
+					log.Error(err, "can't set backup as wal archiving failing")
 				}
 			}
 			break
@@ -167,9 +166,9 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
 		err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject())
 		if err != nil {
-			log.Log.Error(err, "can't set backup as wal archiving failing")
+			log.Error(err, "can't set backup as wal archiving failing")
 		}
-		log.Log.Info("wal archiving is not working, will retry in one minute")
+		log.Info("wal archiving is not working, will retry in one minute")
 		time.Sleep(time.Minute * 1)
 	}
 

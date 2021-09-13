@@ -7,18 +7,18 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package v1
 
 import (
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/robfig/cron"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // scheduledBackupLog is for logging in this package.
-var scheduledBackupLog = logf.Log.WithName("scheduledbackup-resource").WithValues("version", "v1")
+var scheduledBackupLog = log.WithName("scheduledbackup-resource").WithValues("version", "v1")
 
 // SetupWebhookWithManager setup the webhook inside the controller manager
 func (r *ScheduledBackup) SetupWebhookWithManager(mgr ctrl.Manager) error {

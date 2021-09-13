@@ -8,10 +8,11 @@ package utils
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
+
+	l "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-var log = ctrl.Log.WithName("utils")
+var log = l.WithName("utils")
 
 // PodStatus represent the possible status of pods
 type PodStatus string
@@ -66,7 +67,7 @@ func FilterActivePods(pods []corev1.Pod) []corev1.Pod {
 		if IsPodActive(p) {
 			result = append(result, p)
 		} else {
-			log.V(4).Info("Ignoring inactive pod",
+			log.Trace("Ignoring inactive pod",
 				"namespace", p.Namespace,
 				"name", p.Name,
 				"phase", p.Status.Phase,

@@ -25,5 +25,5 @@ type LogRecordWriter struct{}
 
 // Write writes the PostgreSQL log record to the instance manager logger
 func (writer *LogRecordWriter) Write(record NamedRecord) {
-	log.Log.WithName(record.GetName()).Info(logRecordKey, logRecordKey, record)
+	log.WithName(record.GetName()).Info(logRecordKey, logRecordKey, record)
 }

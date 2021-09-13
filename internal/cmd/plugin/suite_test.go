@@ -11,16 +11,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -39,8 +36,6 @@ func TestPlugin(t *testing.T) {
 }
 
 var _ = BeforeSuite(func(done Done) {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
-
 	By("bootstrapping test environment")
 
 	if os.Getenv("USE_EXISTING_CLUSTER") == "true" {

@@ -40,7 +40,7 @@ func NewCmd() *cobra.Command {
 
 			typedClient, err := management.NewControllerRuntimeClient()
 			if err != nil {
-				log.Log.Error(err, "Error while creating k8s client")
+				log.Error(err, "Error while creating k8s client")
 				return err
 			}
 
@@ -50,13 +50,13 @@ func NewCmd() *cobra.Command {
 				Name:      clusterName,
 			}, &cluster)
 			if err != nil {
-				log.Log.Error(err, "Error while getting the cluster status")
+				log.Error(err, "Error while getting the cluster status")
 				return err
 			}
 
 			if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 				// Backup not configured, skipping WAL
-				log.Log.V(4).Info("Backup not configured, skipping WAL",
+				log.Trace("Backup not configured, skipping WAL",
 					"walName", walName,
 					"pod", podName,
 					"cluster", clusterName,
@@ -81,7 +81,7 @@ func NewCmd() *cobra.Command {
 				cluster.Spec.Backup.BarmanObjectStore,
 				os.Environ())
 			if err != nil {
-				log.Log.Error(err, "Error while settings AWS environment variables",
+				log.Error(err, "Error while settings AWS environment variables",
 					"walName", walName,
 					"pod", podName,
 					"cluster", clusterName,
@@ -97,7 +97,7 @@ func NewCmd() *cobra.Command {
 			barmanCloudWalArchiveCmd.Env = env
 			err = execlog.RunStreaming(barmanCloudWalArchiveCmd, barmanCloudWalArchiveName)
 			if err != nil {
-				log.Log.Info("Error invoking "+barmanCloudWalArchiveName,
+				log.Info("Error invoking "+barmanCloudWalArchiveName,
 					"error", err.Error(),
 					"walName", walName,
 					"pod", podName,

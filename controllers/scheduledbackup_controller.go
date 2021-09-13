@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/robfig/cron"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
 const (
@@ -30,7 +30,6 @@ const (
 // ScheduledBackupReconciler reconciles a ScheduledBackup object
 type ScheduledBackupReconciler struct {
 	client.Client
-	Log      logr.Logger
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
@@ -42,7 +41,7 @@ type ScheduledBackupReconciler struct {
 
 // Reconcile is the main reconciler logic
 func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("scheduledbackup", req.NamespacedName)
+	contextLogger, ctx := log.SetupLogger(ctx)
 
 	var scheduledBackup apiv1.ScheduledBackup
 	if err := r.Get(ctx, req.NamespacedName, &scheduledBackup); err != nil {
@@ -55,7 +54,7 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	if scheduledBackup.IsSuspended() {
-		log.Info("Skipping as backup is suspended")
+		contextLogger.Info("Skipping as backup is suspended")
 		return ctrl.Result{}, nil
 	}
 
@@ -64,7 +63,7 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// is running now
 	childBackups, err := r.GetChildBackups(ctx, scheduledBackup)
 	if err != nil {
-		log.Error(err,
+		contextLogger.Error(err,
 			"Cannot extract the list of created backups")
 		return ctrl.Result{}, err
 	}
@@ -74,7 +73,7 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// is running now
 	for _, backup := range childBackups {
 		if backup.GetStatus().IsInProgress() {
-			log.Info(
+			contextLogger.Info(
 				"The system is already taking a scheduledBackup, retrying in 60 seconds",
 				"backupName", backup.GetName(),
 				"backupPhase", backup.GetStatus().Phase)
@@ -82,7 +81,7 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	return ReconcileScheduledBackup(ctx, r.Recorder, r.Client, log, &scheduledBackup)
+	return ReconcileScheduledBackup(ctx, r.Recorder, r.Client, &scheduledBackup)
 }
 
 // ReconcileScheduledBackup is the main reconciliation logic for a scheduled backup
@@ -90,13 +89,14 @@ func ReconcileScheduledBackup(
 	ctx context.Context,
 	event record.EventRecorder,
 	client client.Client,
-	log logr.Logger,
 	scheduledBackup apiv1.ScheduledBackupCommon,
 ) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
 	// Let's check
 	schedule, err := cron.Parse(scheduledBackup.GetSchedule())
 	if err != nil {
-		log.Info("Detected an invalid cron schedule",
+		contextLogger.Info("Detected an invalid cron schedule",
 			"schedule", scheduledBackup.GetSchedule())
 		return ctrl.Result{}, err
 	}
@@ -122,11 +122,11 @@ func ReconcileScheduledBackup(
 		if scheduledBackup.IsImmediate() {
 			event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
 				"BackupSchedule", "Scheduled immediate backup now: %v", now)
-			return createBackup(ctx, event, client, log, scheduledBackup, now, now, schedule)
+			return createBackup(ctx, event, client, scheduledBackup, now, now, schedule)
 		}
 
 		nextTime := schedule.Next(now)
-		log.Info("Next backup schedule", "next", nextTime)
+		contextLogger.Info("Next backup schedule", "next", nextTime)
 		event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
 			"BackupSchedule", "Scheduled first backup by %v", nextTime)
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
@@ -134,14 +134,14 @@ func ReconcileScheduledBackup(
 
 	// Let's check if we are supposed to start a new backup.
 	nextTime := schedule.Next(scheduledBackup.GetStatus().LastCheckTime.Time)
-	log.Info("Next backup schedule", "next", nextTime)
+	contextLogger.Info("Next backup schedule", "next", nextTime)
 
 	if now.Before(nextTime) {
 		// No need to schedule a new backup, let's wait a bit
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
-	return createBackup(ctx, event, client, log, scheduledBackup, nextTime, now, schedule)
+	return createBackup(ctx, event, client, scheduledBackup, nextTime, now, schedule)
 }
 
 // createBackup creates a scheduled backup for a backuptime, updating the ScheduledBackup accordingly
@@ -149,26 +149,27 @@ func createBackup(
 	ctx context.Context,
 	event record.EventRecorder,
 	client client.Client,
-	log logr.Logger,
 	scheduledBackup apiv1.ScheduledBackupCommon,
 	backupTime time.Time,
 	now time.Time,
 	schedule cron.Schedule,
 ) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
 	// So we have no backup running, let's create a backup.
 	// Let's have deterministic names to avoid creating the job two
 	// times
 	name := fmt.Sprintf("%s-%d", scheduledBackup.GetName(), backupTime.Unix())
 	backup := scheduledBackup.CreateBackup(name)
 
-	log.Info("Creating backup", "backupName", backup.GetName())
+	contextLogger.Info("Creating backup", "backupName", backup.GetName())
 	if err := client.Create(ctx, backup.GetKubernetesObject()); err != nil {
 		if apierrs.IsConflict(err) {
 			// Retry later, the cache is stale
 			return ctrl.Result{}, nil
 		}
 
-		log.Error(
+		contextLogger.Error(
 			err, "Error while creating backup object",
 			"backupName", backup.GetName())
 		event.Event(scheduledBackup.GetKubernetesObject(), "Warning",
@@ -196,7 +197,7 @@ func createBackup(
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Next backup schedule", "next", backupTime)
+	contextLogger.Info("Next backup schedule", "next", backupTime)
 	event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
 		"BackupSchedule", "Next backup scheduled by %v", nextBackupTime)
 	return ctrl.Result{RequeueAfter: nextBackupTime.Sub(now)}, nil
@@ -208,12 +209,13 @@ func (r *ScheduledBackupReconciler) GetChildBackups(
 	scheduledBackup apiv1.ScheduledBackup,
 ) ([]apiv1.Backup, error) {
 	var childBackups apiv1.BackupList
+	contextLogger := log.FromContext(ctx)
 
 	if err := r.List(ctx, &childBackups,
 		client.InNamespace(scheduledBackup.Namespace),
 		client.MatchingFields{backupOwnerKey: scheduledBackup.Name},
 	); err != nil {
-		r.Log.Error(err, "Unable to list child pods resource",
+		contextLogger.Error(err, "Unable to list child pods resource",
 			"namespace", scheduledBackup.Namespace,
 			"name", scheduledBackup.Name)
 		return nil, err

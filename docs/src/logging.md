@@ -12,6 +12,15 @@ Each log entry has the following fields:
 - `record`: the actual record (with structure that varies depending on the
   `logger` type)
 
+## Operator log
+
+A log level can be specified in the cluster spec with the option `logLevel` and
+can be set to any of `error`, `info`(default), `debug` or `trace`.
+
+At the moment, the log level can only be set when an instance starts and can not be
+changed at runtime. If the value is changed in the cluster spec after the cluster
+was started, this will take effect only in the new pods and not the old ones.
+
 ## PostgreSQL log
 
 Each entry in the PostgreSQL log is a JSON object having the `logger` key set

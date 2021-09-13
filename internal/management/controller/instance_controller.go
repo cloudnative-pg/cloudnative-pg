@@ -25,6 +25,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	postgresManagement "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
@@ -42,7 +43,8 @@ var RetryUntilWalReceiverDown = wait.Backoff{
 
 // Reconcile is the main reconciliation loop for the instance
 func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) error {
-	r.log.V(2).Info(
+	contextLogger, ctx := log.SetupLogger(ctx)
+	contextLogger.Debug(
 		"Reconciliation loop",
 		"eventType", event.Type,
 		"type", event.Object.GetObjectKind().GroupVersionKind())
@@ -82,6 +84,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 
 // reconcileDatabases reconciles all the existing databases
 func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
 	ok, err := r.instance.IsPrimary()
 	if err != nil {
 		return fmt.Errorf("unable to check if instance is primary: %w", err)
@@ -91,7 +94,7 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 	}
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
-		r.log.Error(err, "Cannot connect to primary server")
+		contextLogger.Error(err, "Cannot connect to primary server")
 		return fmt.Errorf("getting the superuserdb: %w", err)
 	}
 
@@ -251,7 +254,9 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) {
-	r.log.Info("Reconciling custom monitoring queries")
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("Reconciling custom monitoring queries")
 
 	configuration := cluster.Spec.Monitoring
 
@@ -269,7 +274,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			client.ObjectKey{Namespace: r.instance.Namespace, Name: reference.Name},
 			&configMap)
 		if err != nil {
-			r.log.Info("Unable to get configMap containing custom monitoring queries",
+			contextLogger.Info("Unable to get configMap containing custom monitoring queries",
 				"reference", reference,
 				"clusterName", r.instance.ClusterName,
 				"namespace", r.instance.Namespace,
@@ -279,7 +284,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 
 		data, ok := configMap.Data[reference.Key]
 		if !ok {
-			r.log.Info("Missing key in configMap",
+			contextLogger.Info("Missing key in configMap",
 				"reference", reference,
 				"clusterName", r.instance.ClusterName,
 				"namespace", r.instance.Namespace)
@@ -288,7 +293,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 
 		err = queries.ParseQueries([]byte(data))
 		if err != nil {
-			r.log.Info("Error while parsing custom queries in ConfigMap",
+			contextLogger.Info("Error while parsing custom queries in ConfigMap",
 				"reference", reference,
 				"clusterName", r.instance.ClusterName,
 				"namespace", r.instance.Namespace,
@@ -301,7 +306,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		var secret corev1.Secret
 		err := r.GetClient().Get(ctx, client.ObjectKey{Namespace: r.instance.Namespace, Name: reference.Name}, &secret)
 		if err != nil {
-			r.log.Info("Unable to get secret containing custom monitoring queries",
+			contextLogger.Info("Unable to get secret containing custom monitoring queries",
 				"reference", reference,
 				"clusterName", r.instance.ClusterName,
 				"namespace", r.instance.Namespace,
@@ -311,7 +316,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 
 		data, ok := secret.Data[reference.Key]
 		if !ok {
-			r.log.Info("Missing key in secret",
+			contextLogger.Info("Missing key in secret",
 				"reference", reference,
 				"clusterName", r.instance.ClusterName,
 				"namespace", r.instance.Namespace)
@@ -320,7 +325,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 
 		err = queries.ParseQueries(data)
 		if err != nil {
-			r.log.Info("Error while parsing custom queries in Secret",
+			contextLogger.Info("Error while parsing custom queries in Secret",
 				"reference", reference,
 				"clusterName", r.instance.ClusterName,
 				"namespace", r.instance.Namespace,
@@ -337,45 +342,47 @@ func (r *InstanceReconciler) reconcileSecrets(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) error {
+	contextLogger := log.FromContext(ctx)
+
 	changed := false
 
 	serverSecretChanged, err := r.RefreshServerCertificateFiles(ctx, cluster)
 	if err == nil {
 		changed = changed || serverSecretChanged
 	} else if !apierrors.IsNotFound(err) {
-		r.log.Error(err, "Error while getting server secret")
+		contextLogger.Error(err, "Error while getting server secret")
 	}
 
 	replicationSecretChanged, err := r.RefreshReplicationUserCertificate(ctx, cluster)
 	if err == nil {
 		changed = changed || replicationSecretChanged
 	} else if !apierrors.IsNotFound(err) {
-		r.log.Error(err, "Error while getting streaming replication secret")
+		contextLogger.Error(err, "Error while getting streaming replication secret")
 	}
 
 	clientCaSecretChanged, err := r.RefreshClientCA(ctx, cluster)
 	if err == nil {
 		changed = changed || clientCaSecretChanged
 	} else if !apierrors.IsNotFound(err) {
-		r.log.Error(err, "Error while getting cluster CA Client secret")
+		contextLogger.Error(err, "Error while getting cluster CA Client secret")
 	}
 
 	serverCaSecretChanged, err := r.RefreshServerCA(ctx, cluster)
 	if err == nil {
 		changed = changed || serverCaSecretChanged
 	} else if !apierrors.IsNotFound(err) {
-		r.log.Error(err, "Error while getting cluster CA Server secret")
+		contextLogger.Error(err, "Error while getting cluster CA Server secret")
 	}
 
 	barmanEndpointCaSecretChanged, err := r.RefreshBarmanEndpointCA(ctx, cluster)
 	if err == nil {
 		changed = changed || barmanEndpointCaSecretChanged
 	} else if !apierrors.IsNotFound(err) {
-		r.log.Error(err, "Error while getting barman endpoint CA secret")
+		contextLogger.Error(err, "Error while getting barman endpoint CA secret")
 	}
 
 	if changed {
-		r.log.Info("reloading the TLS crypto material")
+		contextLogger.Info("reloading the TLS crypto material")
 		err = r.instance.Reload()
 		if err != nil {
 			return fmt.Errorf("while applying new certificates: %w", err)
@@ -455,10 +462,13 @@ func (r *InstanceReconciler) reconcileConfiguration(ctx context.Context, cluster
 // refreshCertificateFilesFromSecret receive a secret and rewrite the file
 // corresponding to the server certificate
 func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
+	ctx context.Context,
 	secret *corev1.Secret,
 	certificateLocation string,
 	privateKeyLocation string,
 ) (bool, error) {
+	contextLogger := log.FromContext(ctx)
+
 	certificate, ok := secret.Data[corev1.TLSCertKey]
 	if !ok {
 		return false, fmt.Errorf("missing %s field in Secret", corev1.TLSCertKey)
@@ -475,7 +485,7 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 	}
 
 	if certificateIsChanged {
-		r.log.Info("Refreshed configuration file",
+		contextLogger.Info("Refreshed configuration file",
 			"filename", certificateLocation,
 			"secret", secret.Name)
 	}
@@ -486,7 +496,7 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 	}
 
 	if certificateIsChanged {
-		r.log.Info("Refreshed configuration file",
+		contextLogger.Info("Refreshed configuration file",
 			"filename", privateKeyLocation,
 			"secret", secret.Name)
 	}
@@ -495,7 +505,11 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 }
 
 // refreshCAFromSecret receive a secret and rewrite the ca.crt file to the provided location
-func (r *InstanceReconciler) refreshCAFromSecret(secret *corev1.Secret, destLocation string) (bool, error) {
+func (r *InstanceReconciler) refreshCAFromSecret(
+	ctx context.Context,
+	secret *corev1.Secret,
+	destLocation string,
+) (bool, error) {
 	caCertificate, ok := secret.Data[certs.CACertKey]
 	if !ok {
 		return false, fmt.Errorf("missing %s entry in Secret", certs.CACertKey)
@@ -507,7 +521,7 @@ func (r *InstanceReconciler) refreshCAFromSecret(secret *corev1.Secret, destLoca
 	}
 
 	if changed {
-		r.log.Info("Refreshed configuration file",
+		log.FromContext(ctx).Info("Refreshed configuration file",
 			"filename", destLocation,
 			"secret", secret.Name)
 	}
@@ -516,7 +530,12 @@ func (r *InstanceReconciler) refreshCAFromSecret(secret *corev1.Secret, destLoca
 }
 
 // refreshFileFromSecret receive a secret and rewrite the file corresponding to the key to the provided location
-func (r *InstanceReconciler) refreshFileFromSecret(secret *corev1.Secret, key, destLocation string) (bool, error) {
+func (r *InstanceReconciler) refreshFileFromSecret(
+	ctx context.Context,
+	secret *corev1.Secret,
+	key, destLocation string,
+) (bool, error) {
+	contextLogger := log.FromContext(ctx)
 	data, ok := secret.Data[key]
 	if !ok {
 		return false, fmt.Errorf("missing %s entry in Secret", key)
@@ -528,7 +547,7 @@ func (r *InstanceReconciler) refreshFileFromSecret(secret *corev1.Secret, key, d
 	}
 
 	if changed {
-		r.log.Info("Refreshed configuration file",
+		contextLogger.Info("Refreshed configuration file",
 			"filename", destLocation,
 			"secret", secret.Name,
 			"key", key)
@@ -539,6 +558,7 @@ func (r *InstanceReconciler) refreshFileFromSecret(secret *corev1.Secret, key, d
 
 // Reconciler primary logic
 func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
 	oldCluster := cluster.DeepCopy()
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
@@ -547,7 +567,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
-		r.log.Info("I'm the target primary, wait for the wal_receiver to be terminated")
+		contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
 		if r.instance.PodName != cluster.Status.CurrentPrimary {
 			// if the cluster is not replicating it means it's doing a failover and
 			// we have to wait for wal receivers to be down
@@ -556,7 +576,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 				return err
 			}
 		}
-		r.log.Info("I'm the target primary, applying WALs and promoting my instance")
+		contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
 		// I must promote my instance here
 		err = r.instance.PromoteAndWait()
 		if err != nil {
@@ -567,7 +587,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	// If it is already the current primary, everything is ok
 	if cluster.Status.CurrentPrimary != r.instance.PodName {
 		cluster.Status.CurrentPrimary = r.instance.PodName
-		r.log.Info("Setting myself as the current primary")
+		contextLogger.Info("Setting myself as the current primary")
 		return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 	}
 
@@ -587,7 +607,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(ctx context.Context, clu
 	}
 
 	// I'm the primary, need to inform the operator
-	r.log.Info("Setting myself as the current designated primary")
+	log.FromContext(ctx).Info("Setting myself as the current designated primary")
 
 	oldCluster := cluster.DeepCopy()
 	cluster.Status.CurrentPrimary = r.instance.PodName
@@ -596,6 +616,8 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(ctx context.Context, clu
 
 // Reconciler replica logic
 func (r *InstanceReconciler) reconcileReplica(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
 		return err
@@ -606,19 +628,19 @@ func (r *InstanceReconciler) reconcileReplica(ctx context.Context, cluster *apiv
 		return r.refreshParentServer(ctx, cluster)
 	}
 
-	r.log.Info("This is an old primary node. Requesting a checkpoint before demotion")
+	contextLogger.Info("This is an old primary node. Requesting a checkpoint before demotion")
 
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
-		r.log.Error(err, "Cannot connect to primary server")
+		contextLogger.Error(err, "Cannot connect to primary server")
 	} else {
 		_, err = db.Exec("CHECKPOINT")
 		if err != nil {
-			r.log.Error(err, "Error while requesting a checkpoint")
+			contextLogger.Error(err, "Error while requesting a checkpoint")
 		}
 	}
 
-	r.log.Info("This is an old primary node. Shutting it down to get it demoted to a replica")
+	contextLogger.Info("This is an old primary node. Shutting it down to get it demoted to a replica")
 
 	// I was the primary, but now I'm not the primary anymore.
 	// Here we need to invoke a fast shutdown on the instance, and wait the the pod
@@ -659,7 +681,7 @@ func (r *InstanceReconciler) waitForWalReceiverDown() error {
 			return true, nil
 		}
 
-		r.log.Info("WAL receiver is still active, waiting")
+		log.Info("WAL receiver is still active, waiting")
 		return false, nil
 	})
 }
@@ -679,14 +701,14 @@ func (r *InstanceReconciler) configureInstancePermissions() error {
 		return fmt.Errorf("while getting a connection to the instance: %w", err)
 	}
 
-	r.log.Info("Verifying connection to DB")
+	log.Info("Verifying connection to DB")
 	err = r.instance.WaitForSuperuserConnectionAvailable()
 	if err != nil {
-		r.log.Error(err, "DB not available")
+		log.Error(err, "DB not available")
 		os.Exit(1)
 	}
 
-	r.log.V(2).Info("Validating DB configuration")
+	log.Debug("Validating DB configuration")
 
 	// A transaction is required to temporarily disable synchronous replication
 	tx, err := db.Begin()

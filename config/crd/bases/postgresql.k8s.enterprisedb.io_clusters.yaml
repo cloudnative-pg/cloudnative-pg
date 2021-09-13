@@ -1417,6 +1417,10 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              logLevel:
+                description: 'The instances'' log level, one of the following values:
+                  error, info (default), debug, trace'
+                type: string
               maxSyncReplicas:
                 description: The target value for the synchronous replication quorum,
                   that can be decreased if the number of ready standbys is lower than
@@ -3286,6 +3290,10 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              logLevel:
+                description: 'The instances'' log level, one of the following values:
+                  error, info (default), debug, trace'
+                type: string
               maxSyncReplicas:
                 description: The target value for the synchronous replication quorum,
                   that can be decreased if the number of ready standbys is lower than

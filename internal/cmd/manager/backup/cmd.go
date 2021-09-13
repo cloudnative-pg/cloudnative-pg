@@ -27,13 +27,13 @@ func NewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resp, err := http.Get(url.Local(url.PathPgBackup) + "?name=" + args[0])
 			if err != nil {
-				log.Log.Error(err, "Error while requesting backup")
+				log.Error(err, "Error while requesting backup")
 				return err
 			}
 
 			if resp.StatusCode != 200 {
 				bytes, _ := ioutil.ReadAll(resp.Body)
-				log.Log.Info(
+				log.Info(
 					"Error while requesting backup",
 					"statusCode", resp.StatusCode,
 					"body", string(bytes))
@@ -44,7 +44,7 @@ func NewCmd() *cobra.Command {
 			_, err = io.Copy(os.Stderr, resp.Body)
 			_ = resp.Body.Close()
 			if err != nil {
-				log.Log.Error(err, "Error while starting a backup")
+				log.Error(err, "Error while starting a backup")
 				return err
 			}
 

@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -34,7 +33,6 @@ type InstanceReconciler struct {
 	client          ctrl.Client
 	dynamicClient   dynamic.Interface
 	instance        *postgres.Instance
-	log             logr.Logger
 	watchCollection *WatchCollection
 
 	secretVersions  map[string]string
@@ -59,7 +57,6 @@ func NewInstanceReconciler(instance *postgres.Instance) (*InstanceReconciler, er
 
 	return &InstanceReconciler{
 		instance:        instance,
-		log:             log.Log,
 		client:          client,
 		dynamicClient:   dynamicClient,
 		secretVersions:  make(map[string]string),
@@ -72,7 +69,7 @@ func (r *InstanceReconciler) Run(ctx context.Context) {
 	for {
 		// Retry with exponential back-off, unless it is a connection refused error
 		err := retry.OnError(retry.DefaultBackoff, func(err error) bool {
-			r.log.Error(err, "Error calling Watch", "cluster", r.instance.ClusterName)
+			log.Error(err, "Error calling Watch", "cluster", r.instance.ClusterName)
 			return !utilnet.IsConnectionRefused(err)
 		}, func() error {
 			return r.watch(ctx)
@@ -115,7 +112,7 @@ func (r *InstanceReconciler) watch(ctx context.Context) error {
 			return r.Reconcile(ctx, &receivedEvent)
 		})
 		if err != nil {
-			r.log.Error(err, "Reconciliation error")
+			log.Error(err, "Reconciliation error")
 		}
 	}
 

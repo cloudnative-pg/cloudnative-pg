@@ -29,6 +29,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 	dst.Spec.MinSyncReplicas = src.Spec.MinSyncReplicas
 	dst.Spec.MaxSyncReplicas = src.Spec.MaxSyncReplicas
 	dst.Spec.EnableSuperuserAccess = src.Spec.EnableSuperuserAccess
+	dst.Spec.LogLevel = src.Spec.LogLevel
 
 	// spec.postgresql
 	dst.Spec.PostgresConfiguration.Parameters = src.Spec.PostgresConfiguration.Parameters
@@ -352,6 +353,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Spec.MinSyncReplicas = src.Spec.MinSyncReplicas
 	dst.Spec.MaxSyncReplicas = src.Spec.MaxSyncReplicas
 	dst.Spec.EnableSuperuserAccess = src.Spec.EnableSuperuserAccess
+	dst.Spec.LogLevel = src.Spec.LogLevel
 
 	// spec.postgresql
 	dst.Spec.PostgresConfiguration.Parameters = src.Spec.PostgresConfiguration.Parameters

@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
 // scaleDownCluster handles the scaling down operations of a PostgreSQL cluster.
@@ -26,7 +27,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 	cluster *apiv1.Cluster,
 	resources *managedResources,
 ) error {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 
 	if cluster.Spec.MaxSyncReplicas > 0 && cluster.Spec.Instances < (cluster.Spec.MaxSyncReplicas+1) {
 		cluster.Spec.Instances = cluster.Status.Instances
@@ -44,21 +45,21 @@ func (r *ClusterReconciler) scaleDownCluster(
 	// Is there one pod to be deleted?
 	sacrificialPod := getSacrificialPod(resources.pods.Items)
 	if sacrificialPod == nil {
-		log.Info("There are no instances to be sacrificed. Wait for the next sync loop")
+		contextLogger.Info("There are no instances to be sacrificed. Wait for the next sync loop")
 		return nil
 	}
 
 	r.Recorder.Eventf(cluster, "Normal", "ScaleDown",
 		"Scaling down: removing instance %v", sacrificialPod.Name)
 
-	log.Info("Too many nodes for cluster, deleting an instance",
+	contextLogger.Info("Too many nodes for cluster, deleting an instance",
 		"pod", sacrificialPod.Name)
 	if err := r.Delete(ctx, sacrificialPod); err != nil {
 		// We cannot observe a deletion if it was not accepted by the server
 
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
-			log.Error(err, "Cannot kill the Pod to scale down",
+			contextLogger.Error(err, "Cannot kill the Pod to scale down",
 				"pod", sacrificialPod.Name)
 			return err
 		}

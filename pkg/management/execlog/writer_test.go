@@ -14,7 +14,7 @@ import (
 )
 
 var _ = Describe("Writing to a LogWriter", func() {
-	l := LogWriter{Logger: log.Log}
+	l := LogWriter{Logger: log.GetLogger()}
 	When("it is passed nil", func() {
 		n, err := l.Write(nil)
 		It("does not crash", func() {

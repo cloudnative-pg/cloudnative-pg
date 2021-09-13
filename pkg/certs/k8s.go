@@ -19,12 +19,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	l "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-var log = ctrl.Log.WithName("pki")
+var log = l.WithName("pki")
 
 // PublicKeyInfrastructure represent the PKI under which the operator and the WebHook server
 // will work

@@ -38,13 +38,13 @@ func NewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			initDBFlags, err := shellquote.Split(initDBFlagsString)
 			if err != nil {
-				log.Log.Error(err, "Error while parsing initdb flags")
+				log.Error(err, "Error while parsing initdb flags")
 				return err
 			}
 
 			postInitSQL, err := shellquote.Split(postInitSQLStr)
 			if err != nil {
-				log.Log.Error(err, "Error while parsing post init SQL queries")
+				log.Error(err, "Error while parsing post init SQL queries")
 				return err
 			}
 
@@ -93,24 +93,24 @@ func NewCmd() *cobra.Command {
 func initSubCommand(info postgres.InitInfo) error {
 	status, err := fileutils.FileExists(info.PgData)
 	if err != nil {
-		log.Log.Error(err, "Error while checking for an existent PGData")
+		log.Error(err, "Error while checking for an existent PGData")
 		return err
 	}
 	if status {
-		log.Log.Info("PGData already exists, no need to init")
+		log.Info("PGData already exists, no need to init")
 		return fmt.Errorf("PGData already exists")
 	}
 
 	err = info.VerifyConfiguration()
 	if err != nil {
-		log.Log.Error(err, "Configuration not valid",
+		log.Error(err, "Configuration not valid",
 			"info", info)
 		return err
 	}
 
 	err = info.Bootstrap()
 	if err != nil {
-		log.Log.Error(err, "Error while bootstrapping data directory")
+		log.Error(err, "Error while bootstrapping data directory")
 		return err
 	}
 

@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
@@ -32,6 +33,8 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 	status postgres.PostgresqlStatusList,
 	resources *managedResources,
 ) (string, error) {
+	contextLogger := log.FromContext(ctx)
+
 	if len(status.Items) == 0 {
 		// We have no status to check and we can't make a
 		// switchover under those conditions
@@ -45,10 +48,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 		cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
 		isPrimaryOnUnschedulableNode, err := r.isNodeUnschedulable(ctx, primary.Node)
 		if err != nil {
-			log.Error(err, "while checking if current primary is on an unschedulable node")
+			contextLogger.Error(err, "while checking if current primary is on an unschedulable node")
 			// in case of error it's better to proceed with the normal target primary reconciliation
 		} else if isPrimaryOnUnschedulableNode {
-			log.Info("Primary is running on an unschedulable node, will try switching over",
+			contextLogger.Info("Primary is running on an unschedulable node, will try switching over",
 				"node", primary.Node, "primary", primary.Pod.Name)
 			return r.setPrimaryOnSchedulableNode(ctx, cluster, status, &primary)
 		}
@@ -70,7 +73,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	status postgres.PostgresqlStatusList,
 	resources *managedResources,
 ) (string, error) {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 
 	// When replica mode is not active, the first instance in the list is the primary one.
 	// This means we can just look at the first element of the list to check if the primary
@@ -100,10 +103,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	// This may trigger a failover if previous primary disappeared
 	// or change the target primary if the current one is not valid anymore.
 	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
-		log.Info("Current primary isn't healthy, failing over",
+		contextLogger.Info("Current primary isn't healthy, failing over",
 			"newPrimary", status.Items[0].Pod.Name,
 			"clusterStatus", status)
-		log.V(1).Info("Cluster status before failover", "pods", resources.pods)
+		contextLogger.Debug("Cluster status before failover", "pods", resources.pods)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Current primary isn't healthy, failing over from %v to %v",
 			cluster.Status.TargetPrimary, status.Items[0].Pod.Name)
@@ -112,10 +115,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 			return "", err
 		}
 	} else {
-		log.Info("Target primary isn't healthy, switching target",
+		contextLogger.Info("Target primary isn't healthy, switching target",
 			"newPrimary", status.Items[0].Pod.Name,
 			"clusterStatus", status)
-		log.V(1).Info("Cluster status before switching target", "pods", resources.pods)
+		contextLogger.Debug("Cluster status before switching target", "pods", resources.pods)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Target primary isn't healthy, switching target from %v to %v",
 			cluster.Status.TargetPrimary, status.Items[0].Pod.Name)
@@ -147,7 +150,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	status postgres.PostgresqlStatusList,
 	primaryPod *postgres.PostgresqlStatus,
 ) (string, error) {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 
 	// Checking failed pods, e.g. pending pods due to missing PVCs
 	_, hasFailedPods := cluster.Status.InstancesStatus[utils.PodFailed]
@@ -162,7 +165,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 		(cluster.Spec.Instances != cluster.Status.ReadyInstances ||
 			// e.g. we want all instances to be moved to a schedulable node before triggering the switchover
 			len(podsOnOtherNodes.Items) < int(cluster.Spec.Instances)-1) {
-		log.Info("Current primary is running on unschedulable node and something is already in progress",
+		contextLogger.Info("Current primary is running on unschedulable node and something is already in progress",
 			"currentPrimary", primaryPod,
 			"podsOnOtherNodes", len(podsOnOtherNodes.Items),
 			"instances", cluster.Spec.Instances,
@@ -185,7 +188,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 		}
 
 		// Set the current candidate as targetPrimary
-		log.Info("Current primary is running on unschedulable node, triggering a switchover",
+		contextLogger.Info("Current primary is running on unschedulable node, triggering a switchover",
 			"currentPrimary", primaryPod.Pod.Name, "currentPrimaryNode", primaryPod.Node,
 			"targetPrimary", candidate.Pod.Name, "targetPrimaryNode", candidate.Node)
 		r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
@@ -202,7 +205,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	}
 
 	// if we are here this means no new primary has been chosen
-	log.Info("Current primary is running on unschedulable node, but there are no valid candidates",
+	contextLogger.Info("Current primary is running on unschedulable node, but there are no valid candidates",
 		"currentPrimary", status.Items[0].Pod.Name,
 		"primaryNode", status.Items[0].Node,
 		"pods", status.Items)
@@ -218,7 +221,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 	status postgres.PostgresqlStatusList,
 	resources *managedResources,
 ) (string, error) {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 
 	// When replica mode is active, the designated primary may not be the first element
 	// in this list, since from the PostgreSQL point-of-view it's not the real primary.
@@ -241,10 +244,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 		return "", ErrWalReceiversRunning
 	}
 
-	log.Info("Current target primary isn't healthy, failing over",
+	contextLogger.Info("Current target primary isn't healthy, failing over",
 		"newPrimary", status.Items[0].Pod.Name,
 		"clusterStatus", status)
-	log.V(1).Info("Cluster status before failover", "pods", resources.pods)
+	contextLogger.Debug("Cluster status before failover", "pods", resources.pods)
 	r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 		"Current target primary isn't healthy, failing over from %v to %v",
 		cluster.Status.TargetPrimary, status.Items[0].Pod.Name)
@@ -291,7 +294,7 @@ func (r *ClusterReconciler) getStatusFromInstances(
 	sort.Sort(&status)
 	for idx := range status.Items {
 		if status.Items[idx].Error != nil {
-			r.Log.Info("Cannot extract Pod status",
+			log.FromContext(ctx).Info("Cannot extract Pod status",
 				"name", status.Items[idx].Pod.Name,
 				"error", status.Items[idx].Error.Error())
 		}
@@ -305,7 +308,7 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 	cluster *apiv1.Cluster,
 	pods corev1.PodList,
 ) error {
-	log := r.Log.WithValues("namespace", cluster.Namespace, "name", cluster.Name)
+	contextLogger := log.FromContext(ctx)
 
 	// No current primary, no work to do
 	if cluster.Status.CurrentPrimary == "" {
@@ -317,7 +320,7 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 		pod := &pods.Items[idx]
 
 		if !utils.IsPodActive(*pod) {
-			log.Info("Ignoring not active Pod during label update",
+			contextLogger.Info("Ignoring not active Pod during label update",
 				"pod", pod.Name, "status", pod.Status)
 			continue
 		}
@@ -329,7 +332,7 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 			primaryFound = true
 
 			if !hasRole || podRole != specs.ClusterRoleLabelPrimary {
-				log.Info("Setting primary label", "pod", pod.Name)
+				contextLogger.Info("Setting primary label", "pod", pod.Name)
 				patch := client.MergeFrom(pod.DeepCopy())
 				pod.Labels[specs.ClusterRoleLabelName] = specs.ClusterRoleLabelPrimary
 				if err := r.Patch(ctx, pod, patch); err != nil {
@@ -339,7 +342,7 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 
 		default:
 			if !hasRole || podRole != specs.ClusterRoleLabelReplica {
-				log.Info("Setting replica label", "pod", pod.Name)
+				contextLogger.Info("Setting replica label", "pod", pod.Name)
 				patch := client.MergeFrom(pod.DeepCopy())
 				pod.Labels[specs.ClusterRoleLabelName] = specs.ClusterRoleLabelReplica
 				if err := r.Patch(ctx, pod, patch); err != nil {
@@ -350,7 +353,7 @@ func (r *ClusterReconciler) updateLabelsOnPods(
 	}
 
 	if !primaryFound {
-		log.Info("No primary instance found for this cluster")
+		contextLogger.Info("No primary instance found for this cluster")
 	}
 
 	return nil

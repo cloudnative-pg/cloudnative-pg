@@ -11,13 +11,12 @@ package configuration
 import (
 	"path"
 
-	ctrl "sigs.k8s.io/controller-runtime"
-
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configparser"
+	l "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
-var log = ctrl.Log.WithName("configuration")
+var log = l.WithName("configuration")
 
 // DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
 const DefaultOperatorPullSecretName = "postgresql-operator-pull-secret" // #nosec

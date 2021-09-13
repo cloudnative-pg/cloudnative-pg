@@ -144,7 +144,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int32, shortName string,
 		},
 	}
 
-	addManagerLoggingOptions(&job.Spec.Template.Spec.Containers[0])
+	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 
 	return job
 }

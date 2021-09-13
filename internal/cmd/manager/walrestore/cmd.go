@@ -41,7 +41,7 @@ func NewCmd() *cobra.Command {
 
 			typedClient, err := management.NewControllerRuntimeClient()
 			if err != nil {
-				log.Log.Error(err, "Error while creating k8s client")
+				log.Error(err, "Error while creating k8s client")
 				return err
 			}
 
@@ -51,7 +51,7 @@ func NewCmd() *cobra.Command {
 				Name:      clusterName,
 			}, &cluster)
 			if err != nil {
-				log.Log.Error(err, "Error while getting the cluster status")
+				log.Error(err, "Error while getting the cluster status")
 				return err
 			}
 
@@ -62,7 +62,7 @@ func NewCmd() *cobra.Command {
 			case !cluster.IsReplica() && cluster.Status.CurrentPrimary == podName:
 				// Why a request to restore a WAL file is arriving from the primary server?
 				// Something strange is happening here
-				log.Log.Info("Received request to restore a WAL file on the current primary",
+				log.Info("Received request to restore a WAL file on the current primary",
 					"walName", walName,
 					"pod", podName,
 					"cluster", clusterName,
@@ -77,7 +77,7 @@ func NewCmd() *cobra.Command {
 				sourceName := cluster.Spec.ReplicaCluster.Source
 				externalCluster, found := cluster.ExternalCluster(sourceName)
 				if !found {
-					log.Log.Info("External cluster not found, cannot recover WAL",
+					log.Info("External cluster not found, cannot recover WAL",
 						"sourceName", sourceName)
 					return fmt.Errorf("external cluster not found: %v", sourceName)
 				}
@@ -95,7 +95,7 @@ func NewCmd() *cobra.Command {
 
 			if barmanConfiguration == nil {
 				// Backup not configured, skipping WAL
-				log.Log.V(4).Info("Skipping WAL restore, there is no backup configuration",
+				log.Trace("Skipping WAL restore, there is no backup configuration",
 					"walName", walName,
 					"pod", podName,
 					"cluster", clusterName,
@@ -115,7 +115,7 @@ func NewCmd() *cobra.Command {
 				barmanConfiguration,
 				os.Environ())
 			if err != nil {
-				log.Log.Error(err, "Error while settings AWS environment variables",
+				log.Error(err, "Error while settings AWS environment variables",
 					"walName", walName,
 					"pod", podName,
 					"cluster", clusterName,
@@ -131,7 +131,7 @@ func NewCmd() *cobra.Command {
 			barmanCloudWalRestoreCmd.Env = env
 			err = execlog.RunStreaming(barmanCloudWalRestoreCmd, barmanCloudWalRestoreName)
 			if err != nil {
-				log.Log.Info("Error invoking "+barmanCloudWalRestoreName,
+				log.Info("Error invoking "+barmanCloudWalRestoreName,
 					"error", err.Error(),
 					"walName", walName,
 					"pod", podName,

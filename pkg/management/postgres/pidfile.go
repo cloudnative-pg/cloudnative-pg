@@ -38,7 +38,7 @@ func (instance *Instance) CleanupStalePidFile() error {
 		return fmt.Errorf("deleting file %s: %w", pidFile, err)
 	}
 
-	log.Log.Info("Deleted stale PostgreSQL pid file from PGDATA directory")
+	log.Info("Deleted stale PostgreSQL pid file from PGDATA directory")
 
 	return nil
 }

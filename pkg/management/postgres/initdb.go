@@ -144,7 +144,7 @@ func (info InitInfo) CreateDataDirectory() error {
 		)
 	}
 
-	log.Log.Info("Creating new data directory",
+	log.Info("Creating new data directory",
 		"pgdata", info.PgData,
 		"initDbOptions", options)
 
@@ -189,7 +189,7 @@ func (info InitInfo) GetInstance() Instance {
 // ConfigureNewInstance creates the expected users and databases in a new
 // PostgreSQL instance
 func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
-	log.Log.Info("Configuring new PostgreSQL instance")
+	log.Info("Configuring new PostgreSQL instance")
 
 	_, err := db.Exec(fmt.Sprintf(
 		"CREATE USER %v",
@@ -226,7 +226,7 @@ func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
 	}
 
 	// Execute the custom set of init queries
-	log.Log.Info("Executing post init SQL instructions")
+	log.Info("Executing post init SQL instructions")
 	for _, sqlQuery := range info.PostInitSQL {
 		_, err = db.Exec(sqlQuery)
 		if err != nil {
