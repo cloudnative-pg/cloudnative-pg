@@ -9,6 +9,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -65,12 +66,14 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Name:      clusterName,
 	}, &cluster); err != nil {
 		if apierrs.IsNotFound(err) {
-			backup.Status.SetAsFailed(fmt.Errorf("unknown cluster: %w", err))
-			r.Recorder.Eventf(&backup, "Warning", "FindingCluster", "Unknown cluster %v", clusterName)
-			return ctrl.Result{}, r.Status().Update(ctx, &backup)
+			r.Recorder.Eventf(&backup, "Warning", "FindingCluster",
+				"Unknown cluster %v, will retry in 30 seconds", clusterName)
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 
-		r.Recorder.Event(&backup, "Warning", "FindingCluster", "Unknown cluster")
+		backup.Status.SetAsFailed(fmt.Errorf("while getting cluster %s: %w", clusterName, err))
+		r.Recorder.Eventf(&backup, "Warning", "FindingCluster",
+			"Error getting cluster %v, will not retry: %s", clusterName, err.Error())
 		return ctrl.Result{}, err
 	}
 
@@ -83,8 +86,14 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Name:      cluster.Status.TargetPrimary,
 	}, &pod)
 	if err != nil {
-		backup.Status.SetAsFailed(fmt.Errorf("unknown pod: %w", err))
-		r.Recorder.Event(&backup, "Warning", "FindingPod", "Couldn't found target pods")
+		if apierrs.IsNotFound(err) {
+			r.Recorder.Eventf(&backup, "Warning", "FindingPod",
+				"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
+		backup.Status.SetAsFailed(fmt.Errorf("while getting pod: %w", err))
+		r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
+			cluster.Status.TargetPrimary)
 		return ctrl.Result{}, r.Status().Update(ctx, &backup)
 	}
 

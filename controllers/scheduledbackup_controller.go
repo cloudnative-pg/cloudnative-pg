@@ -9,6 +9,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/robfig/cron"
@@ -21,10 +22,19 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
 const (
 	backupOwnerKey = ".metadata.controller"
+
+	// ImmediateBackupLabelName label is applied to backups to tell if a backup
+	// is immediate or not
+	ImmediateBackupLabelName = specs.MetadataNamespace + "/immediateBackup"
+
+	// ParentScheduledBackupLabelName label is applied to backups to easily tell the scheduled backup
+	// it was created from.
+	ParentScheduledBackupLabelName = specs.MetadataNamespace + "/scheduled-backup"
 )
 
 // ScheduledBackupReconciler reconciles a ScheduledBackup object
@@ -122,7 +132,7 @@ func ReconcileScheduledBackup(
 		if scheduledBackup.IsImmediate() {
 			event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
 				"BackupSchedule", "Scheduled immediate backup now: %v", now)
-			return createBackup(ctx, event, client, scheduledBackup, now, now, schedule)
+			return createBackup(ctx, event, client, scheduledBackup, now, now, schedule, true)
 		}
 
 		nextTime := schedule.Next(now)
@@ -141,7 +151,7 @@ func ReconcileScheduledBackup(
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
-	return createBackup(ctx, event, client, scheduledBackup, nextTime, now, schedule)
+	return createBackup(ctx, event, client, scheduledBackup, nextTime, now, schedule, false)
 }
 
 // createBackup creates a scheduled backup for a backuptime, updating the ScheduledBackup accordingly
@@ -153,6 +163,7 @@ func createBackup(
 	backupTime time.Time,
 	now time.Time,
 	schedule cron.Schedule,
+	immediate bool,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -161,9 +172,17 @@ func createBackup(
 	// times
 	name := fmt.Sprintf("%s-%d", scheduledBackup.GetName(), backupTime.Unix())
 	backup := scheduledBackup.CreateBackup(name)
+	metadata := backup.GetMetadata()
+	if metadata.Labels == nil {
+		metadata.Labels = make(map[string]string)
+	}
+	metadata.Labels[ImmediateBackupLabelName] = strconv.FormatBool(immediate)
+	metadata.Labels[ParentScheduledBackupLabelName] = scheduledBackup.GetName()
+
+	backupObject := backup.GetKubernetesObject()
 
 	contextLogger.Info("Creating backup", "backupName", backup.GetName())
-	if err := client.Create(ctx, backup.GetKubernetesObject()); err != nil {
+	if err := client.Create(ctx, backupObject); err != nil {
 		if apierrs.IsConflict(err) {
 			// Retry later, the cache is stale
 			return ctrl.Result{}, nil
