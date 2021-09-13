@@ -163,6 +163,11 @@ func (backup *Backup) GetStatus() *BackupStatus {
 	return &backup.Status
 }
 
+// GetMetadata get the metadata
+func (backup *Backup) GetMetadata() *metav1.ObjectMeta {
+	return &backup.ObjectMeta
+}
+
 // GetName get the backup name
 func (backup *Backup) GetName() string {
 	return backup.Name
