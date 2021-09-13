@@ -1,10 +1,18 @@
 # Architecture
 
-For High Availability goals, the PostgreSQL database management system provides administrators with built-in **physical replication** capabilities based on **Write Ahead Log (WAL) shipping**.
+For High Availability and Scalability goals, the PostgreSQL database management
+system provides administrators with built-in **physical replication**
+capabilities based on **Write Ahead Log (WAL) shipping**.
 
-PostgreSQL supports both asynchronous and synchronous streaming replication, as well as asynchronous file-based log shipping (normally used as a fallback option, for example, to store WAL files in an object store). Replicas are usually called *standby servers* and can also be used for read-only workloads, thanks to the *Hot Standby* feature.
+PostgreSQL supports both asynchronous and synchronous streaming replication
+over the network, as well as asynchronous file-based log shipping (normally
+used as a fallback option, for example, to store WAL files in an object store).
+Replicas are usually called *standby servers* and can also be used for
+read-only workloads, thanks to the *Hot Standby* feature.
 
-Cloud Native PostgreSQL currently supports clusters based on asynchronous and synchronous streaming replication to manage multiple hot standby replicas, with the following specifications:
+Cloud Native PostgreSQL supports clusters based on asynchronous and synchronous
+streaming replication to manage multiple hot standby replicas within the same
+Kubernetes cluster, with the following specifications:
 
 * One primary, with optional multiple hot standby replicas for High Availability
 * Available services for applications:
@@ -12,32 +20,38 @@ Cloud Native PostgreSQL currently supports clusters based on asynchronous and sy
     * `-ro`: applications connect to the only hot standby replicas for read-only-workloads
     * `-r`: applications connect to any of the instances for read-only workloads
 * Shared-nothing architecture recommended for better resilience of the PostgreSQL cluster:
-    * PostgreSQL instances should reside on different Kubernetes worker nodes and share only the network
-    * PostgreSQL instances can reside in different availability zones in the same region
+    * PostgreSQL instances should reside on different Kubernetes worker nodes
+      and share only the network
+    * PostgreSQL instances can reside in different
+      availability zones in the same region
     * All nodes of a PostgreSQL cluster should reside in the same region
 
 !!! Seealso "Replication"
     Please refer to the ["Replication" section](replication.md) for more
-    information about how Cloud Native PostgreSQL relies on PostgreSQL replication.
+    information about how Cloud Native PostgreSQL relies on PostgreSQL replication,
+    including synchronous settings.
 
 ## Read-write workloads
 
-Applications can decide to connect to the PostgreSQL instance elected as *current primary*
-by the Kubernetes operator, as depicted in the following diagram:
+Applications can decide to connect to the PostgreSQL instance elected as
+*current primary* by the Kubernetes operator, as depicted in the following
+diagram:
 
 ![Applications writing to the single primary](./images/architecture-rw.png)
 
 Applications can use the `-rw` suffix service.
 
 In case of temporary or permanent unavailability of the primary, Kubernetes
-will move the `-rw` to another instance of the cluster for high availability
+will move the `-rw` service to another instance of the cluster for high availability
 purposes.
 
 ## Read-only workloads
 
 !!! Important
-    Applications must be aware of the limitations that [Hot Standby](https://www.postgresql.org/docs/current/hot-standby.html)
-    presents and familiar with the way PostgreSQL operates when dealing with these workloads.
+    Applications must be aware of the limitations that
+    [Hot Standby](https://www.postgresql.org/docs/current/hot-standby.html)
+    presents and familiar with the way PostgreSQL operates when dealing with
+    these workloads.
 
 Applications can access hot standby replicas through the `-ro` service made available
 by the operator. This service enables the application to offload read-only queries from the
@@ -47,7 +61,8 @@ The following diagram shows the architecture:
 
 ![Applications reading from hot standby replicas in round robin](./images/architecture-read-only.png)
 
-Applications can also access any PostgreSQL instance at any time through the `-r` service at connection time.
+Applications can also access any PostgreSQL instance through the
+`-r` service.
 
 ## Application deployments
 
@@ -63,8 +78,8 @@ implement a form of Virtual IP as described in the
 ["Service" page of the Kubernetes Documentation](https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies).
 
 !!! Hint
-    It is highly recommended to use those services in your applications,
-    and avoid connecting directly to a specific PostgreSQL instance, as the latter
+    It is highly recommended using those services in your applications,
+    and avoiding connecting directly to a specific PostgreSQL instance, as the latter
     can change during the cluster lifetime.
 
 You can use these services in your applications through:
@@ -72,7 +87,7 @@ You can use these services in your applications through:
 * DNS resolution
 * environment variables
 
-As far as the credentials to connect to PostgreSQL are concerned, you can
+For the credentials to connect to PostgreSQL, you can
 use the secrets generated by the operator.
 
 !!! Warning
@@ -80,18 +95,18 @@ use the secrets generated by the operator.
     service is used internally to manage PostgreSQL instance discovery.
     It's not supposed to be used directly by applications.
 
-## DNS resolution
+### DNS resolution
 
-You can use the Kubernetes DNS service, which is required by this operator,
-to point to a given server.
-You can do that by just using the name of the service if the application is
+You can use the Kubernetes DNS service to point to a given server.
+The Kubernetes DNS service is required by the operator.
+You can do that by using the name of the service if the application is
 deployed in the same namespace as the PostgreSQL cluster.
 In case the PostgreSQL cluster resides in a different namespace, you can use the
 full qualifier: `service-name.namespace-name`.
 
 DNS is the preferred and recommended discovery method.
 
-## Environment variables
+### Environment variables
 
 If you deploy your application in the same namespace that contains the
 PostgreSQL cluster, you can also use environment variables to connect to the database.
@@ -108,7 +123,7 @@ you can use the following environment variables in your applications:
 * `PG_DATABASE_RW_SERVICE_HOST`: the IP address of the
   service pointing to the *primary* instance of the cluster
 
-## Secrets
+### Secrets
 
 The PostgreSQL operator will generate two `basic-auth` type secrets for every
 PostgreSQL cluster it deploys:
@@ -124,4 +139,82 @@ The `-app` credentials are the ones that should be used by applications
 connecting to the PostgreSQL cluster.
 
 The `-superuser` ones are supposed to be used only for administrative purposes.
+
+## Multi-cluster deployments
+
+!!! Info
+    Cloud Native PostgreSQL supports deploying PostgreSQL across multiple
+    Kubernetes clusters through a feature called **Replica Cluster**,
+    which is described in this section.
+
+In a distributed PostgreSQL cluster there can only be a single PostgreSQL
+instance acting as a primary at all times. This means that applications can
+only write inside a single Kubernetes cluster, at any time.
+
+!!! Tip
+   If you are interested in a PostgreSQL architecture where all instances accept writes, 
+   please take a look at  [BDR (Bi-Directional Replication) by EDB](https://www.enterprisedb.com/docs/bdr/latest/). 
+   For Kubernetes, BDR will have its own Operator, expected late in 2021. 
+
+However, for business continuity objectives it is fundamental to:
+
+- reduce global **recovery point objectives** (RPO) by storing PostgreSQL backup data
+  in multiple locations, regions and possibly using different providers
+  (**Disaster Recovery**)
+- reduce global **recovery time objectives** (RTO) by taking advantage of PostgreSQL
+  replication beyond the primary Kubernetes cluster (**High Availability**)
+
+In order to address the above concerns, Cloud Native PostgreSQL introduces the
+concept of a *PostgreSQL Replica Cluster*. Replica clusters are the Cloud
+Native PostgreSQL way to enable multi-cluster deployments in private, public,
+hybrid, and multi-cloud contexts.
+
+A replica cluster is a separate `Cluster` resource:
+
+1. having either `pg_basebackup` or full `recovery` as the `bootstrap`
+   option from a defined external source cluster
+2. having the `replica.enabled` option set to `true`
+3. replicating from a defined external cluster identified by `replica.source`,
+   normally located outside the Kubernetes cluster
+4. replaying WAL information received from the recovery object store
+   (using PostgreSQL's `restore_command` parameter), or via streaming
+   replication (using PostgreSQL's `primary_conninfo` parameter), or any of
+   the two (in case both the `barmanObjectStore` and `connectionParameters`
+   are defined in the external cluster)
+5. accepting only read connections, as supported by PostgreSQL's Hot Standby
+
+!!! Seealso
+    Please refer to the ["Bootstrap" section](bootstrap.md) for more information
+    about cloning a PostgreSQL cluster from another one (defined in the
+    `externalClusters` section).
+
+The diagram below depicts a PostgreSQL cluster spanning over two different
+Kubernetes clusters, where the primary cluster is in the first Kubernetes
+cluster and the replica cluster is in the second. The second Kubernetes cluster
+acts as the company's disaster recovery cluster, ready to be activated in case
+of disaster and unavailability of the first one.
+
+![An example of multi-cluster deployment with a primary and a replica cluster](./images/multi-cluster.png)
+
+A replica cluster can have the same architecture of the primary cluster. In
+place of the primary instance, a replica cluster has a **designated primary**
+instance, which is a standby server with an arbitrary number of cascading
+standby servers in streaming replication (symmetric architecture).
+
+The designated primary can be promoted at any time, making the replica cluster
+a primary cluster capable of accepting write connections.
+
+!!! Warning
+    Cloud Native PostgreSQL does not perform any cross-cluster switchover
+    or failover at the moment. Such operation must be performed manually
+    or delegated to a multi-cluster/federated cluster aware authority.
+    Each PostgreSQL cluster is independent from any other.
+
+The designated primary in the above example is fed via WAL streaming
+(`primary_conninfo`), with fallback option for file-based WAL shipping through
+the `restore_command` and `barman-cloud-wal-restore`.
+
+Cloud Native PostgreSQL allows you to define multiple replica clusters.
+You can also define replica clusters with a lower number of replicas, and then
+increase this number when the cluster is promoted to primary.
 

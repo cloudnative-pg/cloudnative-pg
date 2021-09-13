@@ -337,9 +337,9 @@ version: such a source can be anywhere, as long as a direct streaming
 connection via TLS is allowed from the two endpoints.
 Moreover, the source can be even outside Kubernetes, running in a physical or
 virtual environment.
-Currently, only the `pg_basebackup` bootstrap method is allowed, even though
-future implementations will enable bootstrap from a backup, as well as
-WAL file shipping instead/on top of WAL streaming.
+Replica clusters can be created from a recovery object store (backup in Barman
+Cloud format) or via streaming through `pg_basebackup`. Both WAL file shipping
+and WAL streaming are allowed.
 Replica clusters dramatically improve the business continuity posture of your
 PostgreSQL databases in Kubernetes, spanning over multiple datacenters and
 opening up for hybrid and multi-cloud setups (currently, manual switchover

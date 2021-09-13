@@ -3,7 +3,7 @@
 **Cloud Native PostgreSQL** is an [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 designed by [EnterpriseDB](https://www.enterprisedb.com)
 to manage [PostgreSQL](https://www.postgresql.org/) workloads on any supported [Kubernetes](https://kubernetes.io)
-cluster running in private, public, or hybrid cloud environments.
+cluster running in private, public, hybrid, or multi-cloud environments.
 Cloud Native PostgreSQL adheres to DevOps principles and concepts
 such as declarative configuration and immutable infrastructure.
 
@@ -64,6 +64,8 @@ PostgreSQL 13, 12, 11 and 10 are currently supported.
 * Support for custom TLS certificates (including integration with cert-manager)
 * Continuous backup to an S3 compatible object store
 * Full recovery and Point-In-Time recovery from an S3 compatible object store backup
+* Replica clusters for PostgreSQL deployments across multiple Kubernetes
+  clusters, enabling private, public, hybrid, and multi-cloud architectures
 * Support for Synchronous Replicas
 * Support for node affinity via `nodeSelector`
 * Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)

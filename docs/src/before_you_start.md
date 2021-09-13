@@ -31,6 +31,8 @@ Cloud Native PostgreSQL requires Kubernetes 1.16 or higher.
 | Replica | A PostgreSQL instance replicating from the only primary instance in a cluster and is kept updated by reading a stream of Write-Ahead Log (WAL) records. A replica is also known as *standby* or *secondary* server. PostgreSQL relies on physical streaming replication (async/sync) and file-based log shipping (async). |
 | Hot Standby | PostgreSQL feature that allows a *replica* to accept read-only workloads. |
 | Cluster | To be intended as High Availability (HA) Cluster: a set of PostgreSQL instances made up by a single primary and an optional arbitrary number of replicas. |
+| Replica Cluster | A Cloud Native PostgreSQL `Cluster` that is in continuous recovery mode from a selected PostgreSQL cluster, normally residing outside the Kubernetes cluster. It is a feature that enables multi-cluster deployments in private, public, hybrid, and multi-cloud contexts. |
+| Designated Primary | A PostgreSQL standby instance in a replica cluster that is in continuous recovery from another PostgreSQL cluster and that is designated to become primary in case the replica cluster becomes primary. |
 | Superuser | In PostgreSQL a *superuser* is any role with both `LOGIN` and `SUPERUSER` privileges. For security reasons, Cloud Native PostgreSQL performs administrative tasks by connecting to the `postgres` database as the `postgres` user via `peer` authentication over the local Unix Domain Socket. |
 
 ## Cloud terminology

@@ -34,7 +34,9 @@ PostgreSQL 9.2 (2012). The foundations of logical replication were laid in
 PostgreSQL 9.4, while version 10 (2017) introduced native support for the
 publisher/subscriber pattern to replicate data from an origin to a destination.
 
-## Streaming replication support
+## Replication within a PostgreSQL cluster
+
+### Streaming replication support
 
 At the moment, Cloud Native PostgreSQL natively and transparently manages
 physical streaming replicas within a cluster in a declarative way, based on
@@ -73,14 +75,14 @@ hostssl replication streaming_replica all cert
     in the documentation.
 
 
-## Continuous backup integration
+### Continuous backup integration
 
 In case continuous backup is configured in the cluster, Cloud Native PostgreSQL
 transparently configures replicas to take advantage of `restore_command` when
 in continuous recovery. As a result, PostgreSQL is able to use the WAL archive
 as a fallback option everytime pulling WALs via streaming replication fails.
 
-## Synchronous replication
+### Synchronous replication
 
 Cloud Native PostgreSQL supports configuration of **quorum-based synchronous
 streaming replication** via two configuration options called `minSyncReplicas`
@@ -122,3 +124,55 @@ requested number of synchronous standbys in the list*.
     synchronous replication settings, our recommendation is to plan for
     synchronous replication only in clusters with 3+ instances or,
     more generally, when `maxSyncReplicas < (instances - 1)`.
+
+## Replication from an external PostgreSQL cluster
+
+Cloud Native PostgreSQL relies on the foundations of the PostgreSQL replication
+framework even when a PostgreSQL cluster is created from an existing one (source)
+and kept synchronized through the
+[replica cluster](architecture.md#multi-cluster-deployments) feature. The source
+can be a primary cluster or another replica cluster (cascading replica cluster).
+
+The available options in terms of replication, both at bootstrap and continuous
+recovery level, are:
+
+- use streaming replication between the replica cluster and the source
+  (this will certainly require some administrative and security related
+  work to be done to make sure that the network connection between the
+  two clusters is correctly setup)
+- use a Barman Cloud object store for recovery of the base backups and
+  the WAL files that are regularly shipped from the source to the object
+  store and pulled by `barman-cloud-wal-restore` in the replica cluster
+- any of the two
+
+All you have to do is actually define an external cluster.
+Please refer to the ["Bootstrap" section](bootstrap.md#bootstrap-from-another-cluster)
+for information on how to clone a PostgreSQL server using either
+`pg_basebackup` (streaming) or `recovery` (object store).
+
+If the external cluster contains a `barmanObjectStore` section:
+
+- you'll be able to boostrap the replica cluster from an object store
+  using the `recovery` section
+- Cloud Native PostgreSQL will automatically set the `restore_command`
+  in the designated primary instance
+
+If the external cluster contains a `connectionParameters` section:
+
+- you'll be able to boostrap the replica cluster via streaming replication
+  using the `pg_basebackup` section
+- Cloud Native PostgreSQL will automatically set the `primary_conninfo`
+  option in the designated primary instance, so that a WAL receiver
+  process is started to connect to the source cluster and receive data
+
+You have full flexibility and freedom to decide your favourite
+distributed architecture for a PostgreSQL database, by choosing:
+
+- a private cloud spanning over multiple Kubernetes clusters in different data
+  centers
+- a public cloud spanning over multiple Kubernetes clusters in different
+  regions
+- a mix of the previous two (hybrid)
+- a public cloud spanning over multiple Kubernetes clusters in different
+  regions and on different Cloud Service Providers
+
