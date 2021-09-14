@@ -152,9 +152,9 @@ instance acting as a primary at all times. This means that applications can
 only write inside a single Kubernetes cluster, at any time.
 
 !!! Tip
-   If you are interested in a PostgreSQL architecture where all instances accept writes, 
-   please take a look at  [BDR (Bi-Directional Replication) by EDB](https://www.enterprisedb.com/docs/bdr/latest/). 
-   For Kubernetes, BDR will have its own Operator, expected late in 2021. 
+    If you are interested in a PostgreSQL architecture where all instances accept writes, 
+    please take a look at  [BDR (Bi-Directional Replication) by EDB](https://www.enterprisedb.com/docs/bdr/latest/). 
+    For Kubernetes, BDR will have its own Operator, expected late in 2021. 
 
 However, for business continuity objectives it is fundamental to:
 
