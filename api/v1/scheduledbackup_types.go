@@ -119,8 +119,8 @@ func (scheduledBackup *ScheduledBackup) GetKubernetesObject() client.Object {
 	return scheduledBackup
 }
 
-// CreateBackup create a backup from this scheduled backup
-func (scheduledBackup *ScheduledBackup) CreateBackup(name string) BackupCommon {
+// CreateBackup creates a backup from this scheduled backup
+func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 	backup := Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

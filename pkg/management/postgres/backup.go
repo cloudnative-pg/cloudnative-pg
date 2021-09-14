@@ -16,7 +16,9 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
@@ -26,7 +28,6 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 // BackupCommand represent a backup command that is being executed
@@ -127,7 +128,7 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 func (b *BackupCommand) Start(ctx context.Context) error {
 	b.setupBackupStatus()
 
-	err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject())
+	err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
 	if err != nil {
 		return fmt.Errorf("can't set backup as running: %v", err)
 	}
@@ -155,7 +156,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 			log.Info("wal archiving is working, will retry proceed with the backup")
 			if b.Backup.GetStatus().Phase != apiv1.BackupPhaseRunning {
 				b.Backup.GetStatus().Phase = apiv1.BackupPhaseRunning
-				err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject())
+				err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
 				if err != nil {
 					log.Error(err, "can't set backup as wal archiving failing")
 				}
@@ -164,7 +165,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		}
 
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
-		err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject())
+		err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
 		if err != nil {
 			log.Error(err, "can't set backup as wal archiving failing")
 		}
@@ -215,7 +216,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 		b.Log.Error(err, "Backup failed")
 		backupStatus.SetAsFailed(err)
 		b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
-		if err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject()); err != nil {
+		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 			b.Log.Error(err, "Can't mark backup as failed")
 		}
 		return
@@ -235,7 +236,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 
 	// Update status
 	b.updateCompletedBackupStatus(backupList)
-	if err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Backup.GetKubernetesObject()); err != nil {
+	if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 		b.Log.Error(err, "Can't set backup status as completed")
 	}
 
@@ -244,11 +245,40 @@ func (b *BackupCommand) run(ctx context.Context) {
 		firstRecoverabilityPoint := ts.Format(time.RFC3339)
 		if b.Cluster.Status.FirstRecoverabilityPoint != firstRecoverabilityPoint {
 			b.Cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
-			if err := utils.UpdateStatusAndRetry(ctx, b.Client, b.Cluster); err != nil {
+
+			if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				oldCluster := &apiv1.Cluster{}
+				err := b.Client.Get(ctx,
+					types.NamespacedName{Namespace: b.Cluster.GetNamespace(), Name: b.Cluster.GetName()},
+					oldCluster)
+				if err != nil {
+					return err
+				}
+				oldCluster.Status = b.Cluster.Status
+				return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(oldCluster))
+			}); err != nil {
 				b.Log.Error(err, "Can't update first recoverability point")
 			}
 		}
 	}
+}
+
+// UpdateBackupStatusAndRetry updates a certain backup's status in the k8s database,
+// retrying when conflicts are detected
+func UpdateBackupStatusAndRetry(
+	ctx context.Context,
+	cli client.Client,
+	backup *apiv1.Backup,
+) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		newBackup := &apiv1.Backup{}
+		err := cli.Get(ctx, types.NamespacedName{Namespace: backup.GetNamespace(), Name: backup.GetName()}, newBackup)
+		if err != nil {
+			return err
+		}
+		newBackup.Status = backup.Status
+		return cli.Status().Update(ctx, backup)
+	})
 }
 
 // setupBackupStatus configures the backup's status from the provided configuration and instance
