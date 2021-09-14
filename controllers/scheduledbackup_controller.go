@@ -99,7 +99,7 @@ func ReconcileScheduledBackup(
 	ctx context.Context,
 	event record.EventRecorder,
 	client client.Client,
-	scheduledBackup apiv1.ScheduledBackupCommon,
+	scheduledBackup *apiv1.ScheduledBackup,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -159,7 +159,7 @@ func createBackup(
 	ctx context.Context,
 	event record.EventRecorder,
 	client client.Client,
-	scheduledBackup apiv1.ScheduledBackupCommon,
+	scheduledBackup *apiv1.ScheduledBackup,
 	backupTime time.Time,
 	now time.Time,
 	schedule cron.Schedule,

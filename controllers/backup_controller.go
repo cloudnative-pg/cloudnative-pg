@@ -21,6 +21,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -103,7 +104,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		"pod", pod.Name)
 
 	// This backup has been started
-	err = StartBackup(ctx, r, &backup, pod)
+	err = StartBackup(ctx, r.Client, &backup, pod)
 	if err != nil {
 		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
 	}
@@ -115,13 +116,13 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 // or failed if needed
 func StartBackup(
 	ctx context.Context,
-	client client.StatusClient,
-	backup apiv1.BackupCommon,
+	client client.Client,
+	backup *apiv1.Backup,
 	pod corev1.Pod,
 ) error {
 	// This backup has been started
 	backup.GetStatus().Phase = apiv1.BackupPhaseStarted
-	if err := utils.UpdateStatusAndRetry(ctx, client, backup.GetKubernetesObject()); err != nil {
+	if err := postgres.UpdateBackupStatusAndRetry(ctx, client, backup); err != nil {
 		backup.GetStatus().SetAsFailed(fmt.Errorf("can't update backup: %w", err))
 		return err
 	}
@@ -144,7 +145,7 @@ func StartBackup(
 		status.SetAsFailed(fmt.Errorf("can't execute backup: %w", err))
 		status.CommandError = stderr
 		status.CommandError = stdout
-		return utils.UpdateStatusAndRetry(ctx, client, backup.GetKubernetesObject())
+		return postgres.UpdateBackupStatusAndRetry(ctx, client, backup)
 	}
 
 	return nil
