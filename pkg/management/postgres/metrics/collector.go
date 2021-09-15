@@ -29,6 +29,7 @@ type QueriesCollector struct {
 	instance      *postgres.Instance
 	defaultDBName string
 	collectorName string
+	pgVersion     *semver.Version
 
 	userQueries    UserQueries
 	mappings       map[string]MetricMapSet
@@ -155,6 +156,30 @@ func (q QueriesCollector) reportUserQueryErrorMetric(label string) {
 	q.errorUserQueriesGauge.Set(1)
 }
 
+// GetPgVersion queries the postgres instance to know the current version, parses it and memoize it for future uses
+func (q QueriesCollector) GetPgVersion() (*semver.Version, error) {
+	if q.pgVersion != nil {
+		return q.pgVersion, nil
+	}
+	db, err := q.instance.GetSuperUserDB()
+	if err != nil {
+		return nil, err
+	}
+	var versionString string
+	row := db.QueryRow("SHOW server_version;")
+	err = row.Scan(&versionString)
+	if err != nil {
+		return nil, err
+	}
+	parsedVersion, err := semver.ParseTolerant(versionString)
+	if err != nil {
+		return nil, err
+	}
+	q.pgVersion = &parsedVersion
+
+	return q.pgVersion, nil
+}
+
 func (q QueriesCollector) checkRunOnServerMatches(runOnServer string, name string) (bool, error) {
 	isVersionInRange, err := semver.ParseRange(runOnServer)
 	if err != nil {
@@ -162,13 +187,13 @@ func (q QueriesCollector) checkRunOnServerMatches(runOnServer string, name strin
 			"runOnServer", runOnServer, "query", name)
 		return false, err
 	}
-	pgVersion, err := q.instance.GetPgVersion()
+	q.pgVersion, err = q.GetPgVersion()
 	if err != nil {
 		log.Error(err, "while getting current pgVersion",
 			"runOnServer", runOnServer, "query", name)
 		return false, err
 	}
-	return isVersionInRange(*pgVersion), nil
+	return isVersionInRange(*q.pgVersion), nil
 }
 
 func (q QueriesCollector) expandTargetDatabases(
