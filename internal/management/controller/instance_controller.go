@@ -84,7 +84,6 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 
 // reconcileDatabases reconciles all the existing databases
 func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *apiv1.Cluster) error {
-	contextLogger := log.FromContext(ctx)
 	ok, err := r.instance.IsPrimary()
 	if err != nil {
 		return fmt.Errorf("unable to check if instance is primary: %w", err)
@@ -94,7 +93,6 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 	}
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
-		contextLogger.Error(err, "Cannot connect to primary server")
 		return fmt.Errorf("getting the superuserdb: %w", err)
 	}
 

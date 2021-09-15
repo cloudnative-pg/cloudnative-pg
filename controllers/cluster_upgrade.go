@@ -44,8 +44,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		if cluster.Status.CurrentPrimary != postgresqlStatus.Pod.Name {
 			if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
 				fmt.Sprintf("Restarting instance, beacause: %s", reason)); err != nil {
-				contextLogger.Error(err, "postgresqlStatus", postgresqlStatus.Pod.Name)
-				return false, err
+				return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", postgresqlStatus.Pod.Name, err)
 			}
 			return true, r.upgradePod(ctx, cluster, &postgresqlStatus.Pod)
 		}
@@ -74,8 +73,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
 			fmt.Sprintf("The primary instance needs to be restarted: %s, reason: %s",
 				postgresqlStatus.Pod.Name, reason)); err != nil {
-			contextLogger.Error(err, "postgresqlStatus", postgresqlStatus.Pod.Name)
-			return false, err
+			return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", postgresqlStatus.Pod.Name, err)
 		}
 
 		return true, r.upgradePod(ctx, cluster, &postgresqlStatus.Pod)

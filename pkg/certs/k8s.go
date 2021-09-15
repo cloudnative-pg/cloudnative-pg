@@ -21,10 +21,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	l "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-var log = l.WithName("pki")
+var pkiLog = log.WithName("pki")
 
 // PublicKeyInfrastructure represent the PKI under which the operator and the WebHook server
 // will work
@@ -174,7 +174,7 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 		client,
 		webhookSecret)
 	if err != nil && apierrors.IsNotFound(err) {
-		log.Info("mutating pki configuration not found, cannot inject public key",
+		pkiLog.Info("mutating pki configuration not found, cannot inject public key",
 			"name", pki.MutatingWebhookConfigurationName)
 	} else if err != nil {
 		return err
@@ -185,7 +185,7 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 		client,
 		webhookSecret)
 	if err != nil && apierrors.IsNotFound(err) {
-		log.Info("validating pki configuration not found, cannot inject public key",
+		pkiLog.Info("validating pki configuration not found, cannot inject public key",
 			"name", pki.ValidatingWebhookConfigurationName)
 	} else if err != nil {
 		return err
@@ -207,10 +207,10 @@ func (pki PublicKeyInfrastructure) SchedulePeriodicMaintenance(
 	client kubernetes.Interface,
 	apiClient apiextensionsclientset.Interface) error {
 	maintenance := func() {
-		log.Info("Periodic TLS certificates maintenance")
+		pkiLog.Info("Periodic TLS certificates maintenance")
 		err := pki.Setup(ctx, client, apiClient)
 		if err != nil {
-			log.Error(err, "TLS maintenance failed")
+			pkiLog.Error(err, "TLS maintenance failed")
 		}
 	}
 

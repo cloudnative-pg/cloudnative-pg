@@ -26,7 +26,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/controllers"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
-	l "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 	// +kubebuilder:scaffold:imports
@@ -34,7 +34,7 @@ import (
 
 var (
 	scheme   = runtime.NewScheme()
-	setupLog = l.WithName("setup")
+	setupLog = log.WithName("setup")
 
 	// clientset is the kubernetes client used during
 	// the initialization of the operator

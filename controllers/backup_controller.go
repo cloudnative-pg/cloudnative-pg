@@ -44,6 +44,12 @@ type BackupReconciler struct {
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 
+	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
+
+	defer func() {
+		contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
+	}()
+
 	var backup apiv1.Backup
 	if err := r.Get(ctx, req.NamespacedName, &backup); err != nil {
 		// This also happens when you delete a Backup resource in k8s.

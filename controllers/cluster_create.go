@@ -228,7 +228,6 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 		return nil
 	}
 
-	contextLogger := log.FromContext(ctx)
 	var oldPdb v1beta1.PodDisruptionBudget
 
 	if err := r.Get(ctx, client.ObjectKey{Name: pdb.Name, Namespace: pdb.Namespace}, &oldPdb); err != nil {
@@ -240,7 +239,6 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 		r.Recorder.Event(cluster, "Normal", "CreatingPodDisruptionBudget",
 			fmt.Sprintf("Creating PodDisruptionBudget %s", pdb.Name))
 		if err = r.Create(ctx, pdb); err != nil {
-			contextLogger.Error(err, "Unable to create PodDisruptionBudget", "object", pdb)
 			return fmt.Errorf("while creating PodDisruptionBudget: %w", err)
 		}
 		return nil
@@ -266,15 +264,12 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 
 // deleteClusterPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
 func (r *ClusterReconciler) deleteClusterPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
-	contextLogger := log.FromContext(ctx)
-
 	// If we have a PDB, we need to delete it
 	var targetPdb v1beta1.PodDisruptionBudget
 	err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &targetPdb)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
-			contextLogger.Error(err, "Unable to retrieve PodDisruptionBudget")
-			return err
+			return fmt.Errorf("unable to retrieve PodDisruptionBudget: %w", err)
 		}
 		return nil
 	}
@@ -284,8 +279,7 @@ func (r *ClusterReconciler) deleteClusterPodDisruptionBudget(ctx context.Context
 	err = r.Delete(ctx, &targetPdb)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
-			contextLogger.Error(err, "Unable to delete PodDisruptionBudget", "object", targetPdb)
-			return err
+			return fmt.Errorf("unable to delete PodDisruptionBudget: %w", err)
 		}
 		return nil
 	}
@@ -731,8 +725,9 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, cluster)
 
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-		contextLogger.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("unable to create a PVC for this node (nodeSerial: %d): %w",
+			nodeSerial,
+			err)
 	}
 
 	return ctrl.Result{}, nil
@@ -786,8 +781,7 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 		"pvc", pvc.Name)
 
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
-		contextLogger.Error(err, "Unable to set the owner reference for the Pod")
-		return err
+		return fmt.Errorf("unable to set the owner reference for the Pod: %w", err)
 	}
 
 	utils.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
@@ -802,8 +796,7 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 			return nil
 		}
 
-		contextLogger.Error(err, "Unable to create Pod", "pod", pod)
-		return err
+		return fmt.Errorf("unable to create Pod: %w", err)
 	}
 
 	return nil

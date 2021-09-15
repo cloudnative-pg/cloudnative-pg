@@ -82,6 +82,12 @@ type ClusterReconciler struct {
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 
+	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
+
+	defer func() {
+		contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
+	}()
+
 	var cluster apiv1.Cluster
 	if err := r.Get(ctx, req.NamespacedName, &cluster); err != nil {
 		// This also happens when you delete a Cluster resource in k8s. If
