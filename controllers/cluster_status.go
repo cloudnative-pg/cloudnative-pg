@@ -223,6 +223,11 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.Certificates.ReplicationTLSSecret = cluster.GetReplicationSecretName()
 	cluster.Status.Certificates.ServerAltDNSNames = cluster.GetClusterAltDNSNames()
 
+	// Set the version of the operator inside the status. This will allow us
+	// to discover the exact version of the operator which worked the last time
+	// on this cluster
+	cluster.Status.CommitHash = versions.Info.Commit
+
 	// refresh expiration dates of certifications
 	if err := r.refreshCertsExpirations(ctx, cluster); err != nil {
 		return err

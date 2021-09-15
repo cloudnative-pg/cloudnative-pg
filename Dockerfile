@@ -25,9 +25,9 @@ ARG DATE="unknown"
 # Build
 RUN CGO_ENABLED=0 GOCACHE=/tmp/.gocache GO111MODULE=on go build -a -o manager -ldflags \
     "-s -w \
-    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion=\"$VERSION\" \
-    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit=\"$COMMIT\" \
-    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate=\"$DATE\"" \
+    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion=$VERSION \
+    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit=$COMMIT \
+    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate=$DATE" \
     ./cmd/manager
 
 # Use UBI Minimal image as base https://developers.redhat.com/products/rhel/ubi

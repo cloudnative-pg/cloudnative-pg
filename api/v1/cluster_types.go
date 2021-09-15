@@ -291,6 +291,9 @@ type ClusterStatus struct {
 
 	// The first recoverability point, stored as a date in RFC3339 format
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
+
+	// The commit hash number of which this operator running
+	CommitHash string `json:"cloudNativePostgresqlCommitHash,omitempty"`
 }
 
 // ReplicaClusterConfiguration encapsulates the configuration of a replica

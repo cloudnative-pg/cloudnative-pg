@@ -187,6 +187,9 @@ type ClusterStatus struct {
 
 	// The configuration for the CA and related certificates, initialized with defaults.
 	Certificates CertificatesStatus `json:"certificates,omitempty"`
+
+	// The commit hash number of which this operator running
+	CommitHash string `json:"cloudNativePostgresqlCommitHash,omitempty"`
 }
 
 // ReplicaClusterConfiguration encapsulates the configuration of a replica

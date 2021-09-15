@@ -168,6 +168,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 	dst.Status.ReadService = src.Status.ReadService
 	dst.Status.Phase = src.Status.Phase
 	dst.Status.PhaseReason = src.Status.PhaseReason
+	dst.Status.CommitHash = src.Status.CommitHash
 	dst.Status.SecretsResourceVersion.SuperuserSecretVersion =
 		src.Status.SecretsResourceVersion.SuperuserSecretVersion
 	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =
@@ -468,6 +469,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Status.ReadService = src.Status.ReadService
 	dst.Status.Phase = src.Status.Phase
 	dst.Status.PhaseReason = src.Status.PhaseReason
+	dst.Status.CommitHash = src.Status.CommitHash
 	dst.Status.SecretsResourceVersion.SuperuserSecretVersion =
 		src.Status.SecretsResourceVersion.SuperuserSecretVersion
 	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =

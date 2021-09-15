@@ -1792,6 +1792,9 @@ spec:
                       a new secret will be created using the provided CA.
                     type: string
                 type: object
+              cloudNativePostgresqlCommitHash:
+                description: The commit hash number of which this operator running
+                type: string
               configMapResourceVersion:
                 description: The list of resource versions of the configmaps, managed
                   by the operator. Every change here is done in the interest of the
@@ -3666,6 +3669,9 @@ spec:
                       a new secret will be created using the provided CA.
                     type: string
                 type: object
+              cloudNativePostgresqlCommitHash:
+                description: The commit hash number of which this operator running
+                type: string
               configMapResourceVersion:
                 description: The list of resource versions of the configmaps managed
                   by the operator. Every change here is done in the interest of the
