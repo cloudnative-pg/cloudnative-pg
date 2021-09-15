@@ -165,7 +165,6 @@ func createPostgresContainers(
 				"/controller/manager",
 				"instance",
 				"run",
-				"--pw-file", "/etc/superuser-secret/password",
 			},
 			Resources: cluster.Spec.Resources,
 			Ports: []corev1.ContainerPort{
