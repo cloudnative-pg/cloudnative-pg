@@ -8,7 +8,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -26,21 +25,22 @@ func (r *ClusterReconciler) cleanupCluster(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	jobs batchv1.JobList) error {
-	contextlogger := log.FromContext(ctx)
+	contextLogger := log.FromContext(ctx)
 
 	completeJobs := utils.FilterCompleteJobs(jobs.Items)
 	if len(completeJobs) == 0 {
 		return nil
 	}
 
-	for idx := range completeJobs {
-		contextlogger.Debug("Removing job", "job", jobs.Items[idx].Name)
+	for i, job := range completeJobs {
+		contextLogger.Debug("Removing job", "job", job.Name)
 
 		foreground := metav1.DeletePropagationForeground
-		if err := r.Delete(ctx, &jobs.Items[idx], &client.DeleteOptions{
+		if err := r.Delete(ctx, &completeJobs[i], &client.DeleteOptions{
 			PropagationPolicy: &foreground,
 		}); err != nil {
-			return fmt.Errorf("cannot delete job: %w", err)
+			contextLogger.Error(err, "cannot delete job", "job", job.Name)
+			continue
 		}
 	}
 

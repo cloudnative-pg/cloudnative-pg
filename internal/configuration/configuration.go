@@ -12,11 +12,11 @@ import (
 	"path"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configparser"
-	l "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
-var log = l.WithName("configuration")
+var configurationLog = log.WithName("configuration")
 
 // DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
 const DefaultOperatorPullSecretName = "postgresql-operator-pull-secret" // #nosec
@@ -101,7 +101,7 @@ func evaluateGlobPatterns(patterns []string, value string) (result bool) {
 
 	for _, pattern := range patterns {
 		if result, err = path.Match(pattern, value); err != nil {
-			log.Info(
+			configurationLog.Info(
 				"Skipping invalid glob pattern during labels/annotations inheritance",
 				"pattern", pattern)
 			continue

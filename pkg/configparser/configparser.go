@@ -43,10 +43,10 @@ import (
 	"strconv"
 	"strings"
 
-	l "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-var log = l.WithName("configparser")
+var configparserLog = log.WithName("configparser")
 
 // ReadConfigMap reads the configuration from the environment and the passed in data map.
 // Config and defaults are supposed to be pointers to structs of the same type
@@ -74,7 +74,7 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 
 		case reflect.Slice:
 			if valueField.Type().Elem().Kind() != reflect.String {
-				log.Info(
+				configparserLog.Info(
 					"Skipping invalid slice type while parsing default configuration",
 					"field", field.Name, "value", value)
 			} else {
@@ -97,7 +97,7 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 		case reflect.Bool:
 			boolValue, err := strconv.ParseBool(value)
 			if err != nil {
-				log.Info(
+				configparserLog.Info(
 					"Skipping invalid boolean value parsing configuration",
 					"field", field.Name, "value", value)
 				continue

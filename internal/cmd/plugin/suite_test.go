@@ -11,13 +11,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to

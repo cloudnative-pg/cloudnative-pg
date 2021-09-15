@@ -59,9 +59,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
-			contextLogger.Error(err, "Cannot kill the Pod to scale down",
-				"pod", sacrificialPod.Name)
-			return err
+			return fmt.Errorf("cannot kill the Pod to scale down: %w", err)
 		}
 	}
 

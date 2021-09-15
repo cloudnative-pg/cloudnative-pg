@@ -53,6 +53,12 @@ type ScheduledBackupReconciler struct {
 func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 
+	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
+
+	defer func() {
+		contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
+	}()
+
 	var scheduledBackup apiv1.ScheduledBackup
 	if err := r.Get(ctx, req.NamespacedName, &scheduledBackup); err != nil {
 		// This also happens when you delete a Backup resource in k8s.
@@ -228,16 +234,12 @@ func (r *ScheduledBackupReconciler) GetChildBackups(
 	scheduledBackup apiv1.ScheduledBackup,
 ) ([]apiv1.Backup, error) {
 	var childBackups apiv1.BackupList
-	contextLogger := log.FromContext(ctx)
 
 	if err := r.List(ctx, &childBackups,
 		client.InNamespace(scheduledBackup.Namespace),
 		client.MatchingFields{backupOwnerKey: scheduledBackup.Name},
 	); err != nil {
-		contextLogger.Error(err, "Unable to list child pods resource",
-			"namespace", scheduledBackup.Namespace,
-			"name", scheduledBackup.Name)
-		return nil, err
+		return nil, fmt.Errorf("unable to list child pods resource: %w", err)
 	}
 
 	return childBackups.Items, nil

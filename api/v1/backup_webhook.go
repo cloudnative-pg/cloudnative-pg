@@ -7,10 +7,11 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package v1
 
 import (
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
 // backupLog is for logging in this package.
