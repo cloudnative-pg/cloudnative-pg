@@ -30,7 +30,6 @@ import (
 
 // NewCmd creates the "instance run" subcommand
 func NewCmd() *cobra.Command {
-	var pwFile string
 	var pgData string
 	var podName string
 	var clusterName string
@@ -58,8 +57,6 @@ func NewCmd() *cobra.Command {
 		"current cluster in k8s, used to coordinate switchover and failover")
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and of the Pod in k8s")
-	cmd.Flags().StringVar(&pwFile, "pw-file", "",
-		"The file containing the PostgreSQL superuser password to be used to connect to PostgreSQL")
 
 	return cmd
 }
