@@ -17,7 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/blang/semver"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
@@ -82,32 +81,6 @@ type Instance struct {
 
 	// PgCtlTimeoutForPromotion specifies the maximum number of seconds to wait when waiting for promotion to complete
 	PgCtlTimeoutForPromotion int32
-
-	pgVersion *semver.Version
-}
-
-// GetPgVersion queries the postgres instance to know the current version, parses it and memoize it for future uses
-func (instance *Instance) GetPgVersion() (*semver.Version, error) {
-	if instance.pgVersion != nil {
-		return instance.pgVersion, nil
-	}
-	db, err := instance.GetSuperUserDB()
-	if err != nil {
-		return nil, err
-	}
-	var versionString string
-	row := db.QueryRow("SHOW server_version;")
-	err = row.Scan(&versionString)
-	if err != nil {
-		return nil, err
-	}
-	parsedVersion, err := semver.ParseTolerant(versionString)
-	if err != nil {
-		return nil, err
-	}
-	instance.pgVersion = &parsedVersion
-
-	return instance.pgVersion, nil
 }
 
 // RetryUntilServerAvailable is the default retry configuration that is used
@@ -465,14 +438,20 @@ func waitForStreamingConnectionAvailable(db *sql.DB) error {
 	})
 }
 
-// Rewind use pg_rewind to align this data directory
-// with the contents of the primary node
-func (instance *Instance) Rewind() error {
+// Rewind uses pg_rewind to align this data directory with the contents of the primary node.
+// If postgres major version is >= 13, add "--restore-target-wal" option
+func (instance *Instance) Rewind(postgresMajorVersion int) error {
 	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
 	options := []string{
 		"-P",
 		"--source-server", primaryConnInfo + " dbname=postgres",
 		"--target-pgdata", instance.PgData,
+	}
+
+	// As PostgreSQL 13 introduces support of restore from the WAL archive in pg_rewind,
+	// let’s automatically use it, if possible
+	if postgresMajorVersion >= 13 {
+		options = append(options, "--restore-target-wal")
 	}
 
 	log.Info("Starting up pg_rewind",

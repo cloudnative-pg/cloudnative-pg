@@ -61,6 +61,22 @@ func GetPostgresVersionFromTag(version string) (int, error) {
 	return parsedVersion, nil
 }
 
+// GetPostgresMajorVersionFromTag retrieves the major version from a version tag
+func GetPostgresMajorVersionFromTag(version string) (int, error) {
+	if versionDelimiter := strings.IndexAny(version, "_-"); versionDelimiter >= 0 {
+		version = version[:versionDelimiter]
+	}
+
+	splitVersion := strings.Split(version, ".")
+
+	majorVersion, err := strconv.Atoi(splitVersion[0])
+	if err != nil {
+		return 0, fmt.Errorf("wrong format in PostgreSQL major version from %v: %w", splitVersion[0], err)
+	}
+
+	return majorVersion, err
+}
+
 // GetPostgresMajorVersion gets only the Major version from a PostgreSQL version string.
 // Example:
 //

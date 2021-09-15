@@ -22,6 +22,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	pkgUtils "github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 // RefreshServerCertificateFiles gets the latest server certificates files from the
@@ -218,13 +219,19 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 			return err
 		}
 
+		tag := pkgUtils.GetImageTag(cluster.GetImageName())
+		pgMajorVersion, err := postgresSpec.GetPostgresMajorVersionFromTag(tag)
+		if err != nil {
+			return err
+		}
+
 		// pg_rewind could require a clean shutdown of the old primary to
 		// work. Unfortunately, if the old primary is already clean starting
 		// it up may make it advance in respect to the new one.
 		// The only way to check if we really need to start it up before
 		// invoking pg_rewind is to try using pg_rewind and, on failures,
 		// retrying after having started up the instance.
-		err = r.instance.Rewind()
+		err = r.instance.Rewind(pgMajorVersion)
 		if err != nil {
 			contextLogger.Info(
 				"pg_rewind failed, starting the server to complete the crash recovery",
@@ -239,7 +246,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 			}
 
 			// Then let's go back to the point of the new primary
-			err = r.instance.Rewind()
+			err = r.instance.Rewind(pgMajorVersion)
 			if err != nil {
 				return err
 			}

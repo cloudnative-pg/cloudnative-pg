@@ -43,6 +43,17 @@ var _ = Describe("PostgreSQL version handling", func() {
 			_, err = GetPostgresVersionFromTag("10.old")
 			Expect(err).To(Not(BeNil()))
 		})
+
+		It("should correctly detect major version from tag", func() {
+			Expect(GetPostgresMajorVersionFromTag("9.5.3")).To(Equal(9))
+			Expect(GetPostgresMajorVersionFromTag("14.1.0")).To(Equal(14))
+		})
+
+		It("should return error if major version is not well-formed in the tag", func() {
+			res, err := GetPostgresMajorVersionFromTag("test.5.3")
+			Expect(res).To(Equal(0))
+			Expect(err).ToNot(BeNil())
+		})
 	})
 
 	Describe("major version extraction", func() {
