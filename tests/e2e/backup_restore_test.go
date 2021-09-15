@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,9 +31,12 @@ import (
 const (
 	minioClientName = "mc"
 	switchWalCmd    = "psql -U postgres app -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"
+	tableName       = "to_restore"
 )
 
-var namespace, clusterName, azStorageAccount, azStorageKey string
+var namespace, clusterName, azStorageAccount, azStorageKey, currentTimeStamp string
+
+var commandTimeout = time.Second * 5
 
 var _ = Describe("Backup and restore", func() {
 	JustAfterEach(func() {
@@ -50,7 +54,11 @@ var _ = Describe("Backup and restore", func() {
 		// This is a set of tests using a minio server deployed in the same
 		// namespace as the cluster. Since each cluster is installed in its
 		// own namespace, they can share the configuration file
-		const clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml"
+
+		const (
+			clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml"
+			backupFile                 = fixturesDir + "/backup/minio/backup-minio.yaml"
+		)
 
 		// We backup and restore a cluster, and verify some expected data to
 		// be there
@@ -82,7 +90,7 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			// Create the minio client pod and wait for it to be ready.
-			// We'll use it to check if everything is archived correctly.
+			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
 				installMinioClient(namespace)
 			})
@@ -90,7 +98,7 @@ var _ = Describe("Backup and restore", func() {
 			// Create ConfigMap and secrets to verify metrics for target database after backup restore
 			AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
 
-			// Create the Cluster
+			// Create the cluster
 			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
 
 			// Create required test data
@@ -99,13 +107,12 @@ var _ = Describe("Backup and restore", func() {
 			CreateTestDataForTargetDB(namespace, clusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(namespace, clusterName, "to_restore")
+			AssertCreateTestData(namespace, clusterName, tableName)
 
 			assertArchiveWalOnMinio(namespace, clusterName)
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
-				backupFile := fixturesDir + "/backup/minio/backup-minio.yaml"
 				executeBackup(namespace, backupFile)
 
 				Eventually(func() (int, error) {
@@ -119,10 +126,10 @@ var _ = Describe("Backup and restore", func() {
 			AssertMetricsData(namespace, restoredClusterName, targetDBOne, targetDBTwo, targetDBSecret)
 		})
 
-		// We create a cluster, create a scheduled backup, patch it to suspend its
+		// We create a cluster and a scheduled backup, then it is patched to suspend its
 		// execution. We verify that the number of backups does not increase.
 		// We then patch it again back to its initial state and verify that
-		// the amount of backups keeps increasing again.
+		// the amount of backups keeps increasing again
 		It("verifies that scheduled backups can be suspended", func() {
 			namespace = "scheduled-backups-suspend-minio"
 			const scheduledBackupSampleFile = fixturesDir +
@@ -145,7 +152,7 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			// Create the minio client pod and wait for it to be ready.
-			// We'll use it to check if everything is archived correctly.
+			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
 				installMinioClient(namespace)
 			})
@@ -162,9 +169,8 @@ var _ = Describe("Backup and restore", func() {
 			assertSuspendScheduleBackups(namespace, scheduledBackupName)
 		})
 
-		// Create a schedule backup with a schedule remote in time but
-		// the immediate option enable. We expect a backup to be available.
-		It("immediately starts a backup using ScheduledBackups immediate option", func() {
+		// Create a scheduled backup with the 'immediate' option enable. We expect the backup to be available
+		It("immediately starts a backup using ScheduledBackups 'immediate' option", func() {
 			namespace = "scheduled-backups-immediate-minio"
 			const scheduledBackupSampleFile = fixturesDir +
 				"/backup/scheduled_backup_immediate/scheduled-backup-immediate-minio.yaml"
@@ -185,7 +191,7 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			// Create the minio client pod and wait for it to be ready.
-			// We'll use it to check if everything is archived correctly.
+			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
 				installMinioClient(namespace)
 			})
@@ -200,12 +206,26 @@ var _ = Describe("Backup and restore", func() {
 				return countFilesOnMinio(namespace, "data.tar")
 			}, 30).Should(BeNumerically("==", 1))
 		})
-	})
 
+		It("backs up and restore a cluster with PITR", func() {
+			namespace = "backup-restore-pitr-minio"
+			clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			restoredClusterName := "restore-cluster-pitr"
+
+			prepareClusterForPITROnMinio(
+				namespace, clusterName, clusterWithMinioSampleFile, backupFile)
+
+			err = createClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, currentTimeStamp)
+			Expect(err).NotTo(HaveOccurred())
+
+			assertClusterRestorePITR(namespace, restoredClusterName)
+		})
+	})
 	Context("using azure blobs as object storage", func() {
 		// We must be careful here. All the clusters use the same remote storage
 		// and that means that we must use different cluster names otherwise
-		// we risk mixing WALs and backups.
+		// we risk mixing WALs and backups
 
 		BeforeEach(func() {
 			isAKS, err := env.IsAKS()
@@ -231,21 +251,21 @@ var _ = Describe("Backup and restore", func() {
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 
-			// The Azure Blob Storage should have been created ad-hoc for the test,
-			// we get the credentials from the environment variables as we can't create
+			// The Azure Blob Storage should have been created ad-hoc for the test.
+			// The credentials are retrieved from the environment variables, as we can't create
 			// a fixture for them
 			By("creating the Azure Blob Storage credentials", func() {
 				assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
 			})
 
-			// Create the Cluster
+			// Create the cluster
 			AssertCreateCluster(namespace, clusterName, azureBlobSampleFile, env)
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(namespace, clusterName, "to_restore")
+			AssertCreateTestData(namespace, clusterName, tableName)
 			assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 			By("uploading a backup", func() {
-				// We create a Backup
+				// We create a backup
 				backupFile := fixturesDir + "/backup/azure_blob/backup-azure-blob.yaml"
 				executeBackup(namespace, backupFile)
 
@@ -262,7 +282,7 @@ var _ = Describe("Backup and restore", func() {
 		// We create a cluster, create a scheduled backup, patch it to suspend its
 		// execution. We verify that the number of backups does not increase.
 		// We then patch it again back to its initial state and verify that
-		// the amount of backups keeps increasing again.
+		// the amount of backups keeps increasing again
 		It("verifies that scheduled backups can be suspended", func() {
 			namespace = "scheduled-backups-suspend-azure-blob"
 			const sampleFile = fixturesDir +
@@ -296,9 +316,8 @@ var _ = Describe("Backup and restore", func() {
 			assertSuspendScheduleBackups(namespace, scheduledBackupName)
 		})
 
-		// Create a schedule backup with a schedule remote in time but
-		// the immediate option enable. We expect a backup to be available.
-		It("immediately starts a backup using ScheduledBackups immediate option", func() {
+		// Create a scheduled backup with the 'immediate' option enabled. We expect the backup to be available
+		It("immediately starts a backup using ScheduledBackups 'immediate' option", func() {
 			namespace = "scheduled-backup-immediate-azure-blob"
 			const sampleFile = fixturesDir + "/backup/scheduled_backup_immediate/cluster-with-backup-azure-blob.yaml"
 			const scheduledBackupSampleFile = fixturesDir +
@@ -318,10 +337,39 @@ var _ = Describe("Backup and restore", func() {
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			assertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
 
-			// only one data.tar files should be present
+			// Only one data.tar files should be present
 			Eventually(func() (int, error) {
 				return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
 			}, 30).Should(BeNumerically("==", 1))
+		})
+
+		It("backs up and restore a cluster with PITR", func() {
+			namespace = "backup-azure-blob-pitr"
+
+			const (
+				azureBlobSampleFile = fixturesDir + "/backup/pitr/cluster-with-backup-azure-blob.yaml"
+				backupFile          = fixturesDir + "/backup/pitr/backup-azure-blob.yaml"
+			)
+
+			clusterName, err := env.GetResourceNameFromYAML(azureBlobSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			restoredClusterName := "restore-cluster-azure-pitr"
+
+			prepareClusterForPITROnAzureBlob(
+				namespace,
+				clusterName,
+				azureBlobSampleFile,
+				backupFile,
+				azStorageAccount,
+				azStorageKey)
+
+			assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+
+			err = createClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, currentTimeStamp)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Restore backup in a new cluster
+			assertClusterRestorePITR(namespace, restoredClusterName)
 		})
 	})
 	Context("using Azurite blobs as object storage", func() {
@@ -361,11 +409,11 @@ var _ = Describe("Backup and restore", func() {
 				installAzCli(namespace)
 			})
 
-			// Create the Cluster
+			// Create the cluster
 			AssertCreateCluster(namespace, clusterName, azuriteBlobSampleFile, env)
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(namespace, clusterName, "to_restore")
+			AssertCreateTestData(namespace, clusterName, tableName)
 
 			// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
 			By("archiving WALs and verifying they exist", func() {
@@ -389,9 +437,8 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			By("uploading a backup", func() {
-				// We create a Backup
-				backupFile := fixturesDir + "/backup/azurite/backup.yaml"
-				executeBackup(namespace, backupFile)
+				// Create the backup
+				executeBackup(namespace, fixturesDir+"/backup/azurite/backup.yaml")
 
 				// Verifying file called data.tar should be available on Azurite blob storage
 				Eventually(func() (int, error) {
@@ -407,14 +454,15 @@ var _ = Describe("Backup and restore", func() {
 
 var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 	const (
-		fixturesBackupDir        = fixturesDir + "/backup/recovery_external_clusters/"
-		externalClusterFileMinio = fixturesBackupDir + "external-clusters-minio-03.yaml"
-		sourceBackupFileMinio    = fixturesBackupDir + "backup-minio-02.yaml"
-		clusterSourceFileMinio   = fixturesBackupDir + "source-cluster-minio-01.yaml"
-		sourceBackupFileAzure    = fixturesBackupDir + "backup-azure-blob-02.yaml"
-		clusterSourceFileAzure   = fixturesBackupDir + "source-cluster-azure-blob-01.yaml"
-		externalClusterFileAzure = fixturesBackupDir + "external-clusters-azure-blob-03.yaml"
-		tableName                = "to_restore"
+		fixturesBackupDir          = fixturesDir + "/backup/recovery_external_clusters/"
+		externalClusterFileMinio   = fixturesBackupDir + "external-clusters-minio-03.yaml"
+		sourceBackupFileMinio      = fixturesBackupDir + "backup-minio-02.yaml"
+		clusterSourceFileMinio     = fixturesBackupDir + "source-cluster-minio-01.yaml"
+		sourceBackupFileAzure      = fixturesBackupDir + "backup-azure-blob-02.yaml"
+		clusterSourceFileAzure     = fixturesBackupDir + "source-cluster-azure-blob-01.yaml"
+		externalClusterFileAzure   = fixturesBackupDir + "external-clusters-azure-blob-03.yaml"
+		clusterSourceFileAzurePITR = fixturesBackupDir + "source-cluster-azure-blob-pitr.yaml"
+		sourceBackupFileAzurePITR  = fixturesBackupDir + "backup-azure-blob-pitr.yaml"
 	)
 
 	JustAfterEach(func() {
@@ -431,7 +479,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 	// Restore cluster using a recovery object store, that is a backup of another cluster,
 	// created by Barman Cloud, and defined via the barmanObjectStore option in the externalClusters section
 	Context("using minio as object storage", func() {
-		It("restore cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
+		It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 			namespace = "recovery-barman-object-minio"
 			clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileMinio)
 			Expect(err).ToNot(HaveOccurred())
@@ -449,12 +497,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			})
 
 			// Create the minio client pod and wait for it to be ready.
-			// We'll use it to check if everything is archived correctly.
+			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
 				installMinioClient(namespace)
 			})
 
-			// Create the Cluster
+			// Create the cluster
 			AssertCreateCluster(namespace, clusterName, clusterSourceFileMinio, env)
 
 			// Write a table and some data on the "app" database
@@ -477,7 +525,23 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			// verify test data on restored external cluster
 			primaryPodInfo, err := env.GetClusterPrimary(namespace, externalClusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertTestDataExistence(namespace, primaryPodInfo.GetName(), tableName)
+			AssertTestDataExpectedCount(namespace, primaryPodInfo.GetName(), tableName, 2)
+		})
+		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
+			" option in 'externalClusters' section", func() {
+			namespace = "recovery-barman-object-pitr-minio"
+			clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileMinio)
+			Expect(err).ToNot(HaveOccurred())
+			externalClusterRestoreName := "restore-external-cluster-pitr"
+
+			prepareClusterForPITROnMinio(
+				namespace, clusterName, clusterSourceFileMinio, sourceBackupFileMinio)
+
+			err = createClusterFromExternalClusterBackupWithPITROnMinio(
+				namespace, externalClusterRestoreName, clusterName, currentTimeStamp)
+
+			Expect(err).NotTo(HaveOccurred())
+			assertClusterRestorePITR(namespace, externalClusterRestoreName)
 		})
 	})
 
@@ -492,7 +556,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
 		})
 
-		It("restore cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
+		It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 			namespace = "recovery-barman-object-azure"
 			clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileAzure)
 			Expect(err).ToNot(HaveOccurred())
@@ -503,15 +567,15 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 
-			// The Azure Blob Storage should have been created ad-hoc for the test,
-			// we get the credentials from the environment variables as we can't create
+			// The Azure Blob Storage should have been created ad-hoc for the test.
+			// The credentials are retrieved from the environment variables, as we can't create
 			// a fixture for them
 			By("creating the Azure Blob Storage credentials",
 				func() {
 					assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
 				})
 
-			// Create the Cluster
+			// Create the cluster
 			AssertCreateCluster(namespace, clusterName, clusterSourceFileAzure, env)
 
 			// Write a table and some data on the "app" database
@@ -519,7 +583,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 
 			By("backing up a cluster and verifying it exists on azure blob storage", func() {
-				// We create a Backup
+				// Create the backup
 				executeBackup(namespace, sourceBackupFileAzure)
 				// Verifying file called data.tar should be available on Azure blob storage
 				Eventually(func() (int, error) {
@@ -534,7 +598,31 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			// verify test data on restored external cluster
 			primaryPodInfo, err := env.GetClusterPrimary(namespace, externalClusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertTestDataExistence(namespace, primaryPodInfo.GetName(), tableName)
+			AssertTestDataExpectedCount(namespace, primaryPodInfo.GetName(), tableName, 2)
+		})
+
+		It("restores a cluster with 'PITR' from barman object using "+
+			"'barmanObjectStore' option in 'externalClusters' section", func() {
+			namespace = "recovery-pitr-barman-object-azure"
+			clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileAzurePITR)
+			Expect(err).ToNot(HaveOccurred())
+			externalClusterName := "external-cluster-azure-pitr"
+
+			prepareClusterForPITROnAzureBlob(
+				namespace,
+				clusterName,
+				clusterSourceFileAzurePITR,
+				sourceBackupFileAzurePITR,
+				azStorageAccount,
+				azStorageKey)
+
+			err = createClusterFromExternalClusterBackupWithPITROnAzure(
+				namespace, externalClusterName, clusterName, currentTimeStamp)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Restoring cluster using a recovery barman object store, which is defined
+			// in the externalClusters section
+			assertClusterRestorePITR(namespace, externalClusterName)
 		})
 	})
 })
@@ -752,7 +840,7 @@ func getScheduledBackupBackups(namespace string, scheduledBackupName string) ([]
 func assertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupName string) {
 	By("scheduling immediate backups", func() {
 		var err error
-		// We create a ScheduledBackup
+		// Create the ScheduledBackup
 		_, _, err = tests.Run(fmt.Sprintf(
 			"kubectl apply -n %v -f %v",
 			namespace, backupYAMLPath))
@@ -987,4 +1075,351 @@ func installAzCli(namespace string) {
 		err = env.Client.Get(env.Ctx, azCliNamespacedName, az)
 		return utils.IsPodReady(*az), err
 	}, 180).Should(BeTrue())
+}
+
+func createClusterFromBackupUsingPITR(namespace, clusterName, backupFilePath, targetTime string) error {
+	backupName, err := env.GetResourceNameFromYAML(backupFilePath)
+	if err != nil {
+		return err
+	}
+	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	restoreCluster := &apiv1.Cluster{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: apiv1.ClusterSpec{
+			Instances: 3,
+
+			StorageConfiguration: apiv1.StorageConfiguration{
+				Size:         "1Gi",
+				StorageClass: &storageClassName,
+			},
+
+			PostgresConfiguration: apiv1.PostgresConfiguration{
+				Parameters: map[string]string{
+					"log_checkpoints":             "on",
+					"log_line_prefix":             "%m [%p]: u=[%u] db=[%d] app=[%a] c=[%h] s=[%c:%l] tx=[%v:%x]",
+					"log_lock_waits":              "on",
+					"log_min_duration_statement":  "1000",
+					"log_statement":               "ddl",
+					"log_temp_files":              "1024",
+					"log_autovacuum_min_duration": "1s",
+					"log_replication_commands":    "on",
+				},
+			},
+
+			Bootstrap: &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					Backup: &apiv1.LocalObjectReference{
+						Name: backupName,
+					},
+					RecoveryTarget: &apiv1.RecoveryTarget{
+						TargetTime: targetTime,
+					},
+				},
+			},
+		},
+	}
+	return env.Client.Create(env.Ctx, restoreCluster)
+}
+
+func createClusterFromExternalClusterBackupWithPITROnAzure(
+	namespace,
+	externalClusterName,
+	sourceClusterName,
+	targetTime string) error {
+	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/", azStorageAccount, sourceClusterName)
+
+	restoreCluster := &apiv1.Cluster{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      externalClusterName,
+			Namespace: namespace,
+		},
+		Spec: apiv1.ClusterSpec{
+			Instances: 3,
+
+			StorageConfiguration: apiv1.StorageConfiguration{
+				Size:         "1Gi",
+				StorageClass: &storageClassName,
+			},
+
+			PostgresConfiguration: apiv1.PostgresConfiguration{
+				Parameters: map[string]string{
+					"log_checkpoints":             "on",
+					"log_line_prefix":             "%m [%p]: u=[%u] db=[%d] app=[%a] c=[%h] s=[%c:%l] tx=[%v:%x]",
+					"log_lock_waits":              "on",
+					"log_min_duration_statement":  "1000",
+					"log_statement":               "ddl",
+					"log_temp_files":              "1024",
+					"log_autovacuum_min_duration": "1s",
+					"log_replication_commands":    "on",
+				},
+			},
+
+			Bootstrap: &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					Source: sourceClusterName,
+					RecoveryTarget: &apiv1.RecoveryTarget{
+						TargetTime: targetTime,
+					},
+				},
+			},
+
+			ExternalClusters: []apiv1.ExternalCluster{
+				{
+					Name: sourceClusterName,
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						DestinationPath: destinationPath,
+						AzureCredentials: &apiv1.AzureCredentials{
+							StorageAccount: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{
+									Name: "backup-storage-creds",
+								},
+								Key: "ID",
+							},
+							StorageKey: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{
+									Name: "backup-storage-creds",
+								},
+								Key: "KEY",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return env.Client.Create(env.Ctx, restoreCluster)
+}
+
+func createClusterFromExternalClusterBackupWithPITROnMinio(
+	namespace,
+	externalClusterName,
+	sourceClusterName,
+	targetTime string) error {
+	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+
+	restoreCluster := &apiv1.Cluster{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      externalClusterName,
+			Namespace: namespace,
+		},
+		Spec: apiv1.ClusterSpec{
+			Instances: 3,
+
+			StorageConfiguration: apiv1.StorageConfiguration{
+				Size:         "1Gi",
+				StorageClass: &storageClassName,
+			},
+
+			PostgresConfiguration: apiv1.PostgresConfiguration{
+				Parameters: map[string]string{
+					"log_checkpoints":             "on",
+					"log_line_prefix":             "%m [%p]: u=[%u] db=[%d] app=[%a] c=[%h] s=[%c:%l] tx=[%v:%x]",
+					"log_lock_waits":              "on",
+					"log_min_duration_statement":  "1000",
+					"log_statement":               "ddl",
+					"log_temp_files":              "1024",
+					"log_autovacuum_min_duration": "1s",
+					"log_replication_commands":    "on",
+				},
+			},
+
+			Bootstrap: &apiv1.BootstrapConfiguration{
+				Recovery: &apiv1.BootstrapRecovery{
+					Source: sourceClusterName,
+					RecoveryTarget: &apiv1.RecoveryTarget{
+						TargetTime: targetTime,
+					},
+				},
+			},
+
+			ExternalClusters: []apiv1.ExternalCluster{
+				{
+					Name: sourceClusterName,
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						DestinationPath: "s3://cluster-backups/",
+						EndpointURL:     "http://minio-service:9000",
+						S3Credentials: &apiv1.S3Credentials{
+							AccessKeyIDReference: apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{
+									Name: "backup-storage-creds",
+								},
+								Key: "ID",
+							},
+							SecretAccessKeyReference: apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{
+									Name: "backup-storage-creds",
+								},
+								Key: "KEY",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return env.Client.Create(env.Ctx, restoreCluster)
+}
+
+func assertClusterRestorePITR(namespace, clusterName string) {
+	primaryInfo := &corev1.Pod{}
+	var err error
+
+	By("restoring a backup cluster with PITR in a new cluster", func() {
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, clusterName, 800, env)
+
+		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Restored primary should be on timeline 2
+		query := "select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)"
+		stdOut, _, err := env.ExecCommand(env.Ctx, *primaryInfo, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Trim(stdOut, "\n"), err).To(Equal("00000002"))
+
+		// Restored standby should be attached to restored primary
+		query = "SELECT count(*) FROM pg_stat_replication"
+		stdOut, _, err = env.ExecCommand(env.Ctx, *primaryInfo, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Trim(stdOut, "\n"), err).To(BeEquivalentTo("2"))
+	})
+
+	By(fmt.Sprintf("after restored, 3rd entry should not be exists in table '%v'", tableName), func() {
+		// Only 2 entries should be present
+		AssertTestDataExpectedCount(namespace, primaryInfo.GetName(), tableName, 2)
+	})
+}
+
+// getCurrentTimeStamp getting current time stamp from postgres server
+func getCurrentTimeStamp(namespace, clusterName string) (string, error) {
+	primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+	if err != nil {
+		return "", err
+	}
+
+	query := "select CURRENT_TIMESTAMP;"
+	stdOut, _, err := env.ExecCommand(env.Ctx, *primaryPodInfo, "postgres",
+		&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+	if err != nil {
+		return "", err
+	}
+
+	currentTimeStamp = strings.Trim(stdOut, "\n")
+	return currentTimeStamp, nil
+}
+
+// insertRecordIntoTestTable insert an entry entry into test table
+func insertRecordIntoTestTable(namespace, clusterName, tableName string, value int) error {
+	primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+	if err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf("INSERT INTO %v VALUES (%v);", tableName, value)
+	_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, "postgres",
+		&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func prepareClusterForPITROnMinio(
+	namespace,
+	clusterName,
+	clusterSampleFile,
+	backupSampleFile string) {
+	err := env.CreateNamespace(namespace)
+	Expect(err).ToNot(HaveOccurred())
+
+	By("creating the credentials for minio", func() {
+		assertStorageCredentialsAreCreated(namespace, "minio", "minio123")
+	})
+
+	By("setting up minio", func() {
+		installMinio(namespace)
+	})
+
+	// Create the minio client pod and wait for it to be ready.
+	// We'll use it to check if everything is archived correctly
+	By("setting up minio client pod", func() {
+		installMinioClient(namespace)
+	})
+
+	// Create the cluster
+	AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
+
+	By("backing up a cluster and verifying it exists on minio", func() {
+		executeBackup(namespace, backupSampleFile)
+
+		Eventually(func() (int, error) {
+			return countFilesOnMinio(namespace, "data.tar")
+		}, 30).Should(BeEquivalentTo(1))
+	})
+
+	// Write a table and insert 2 entries on the "app" database
+	AssertCreateTestData(namespace, clusterName, tableName)
+
+	By("getting currentTimestamp", func() {
+		currentTimeStamp, err = getCurrentTimeStamp(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableName), func() {
+		err = insertRecordIntoTestTable(namespace, clusterName, tableName, 3)
+		Expect(err).ToNot(HaveOccurred())
+	})
+	assertArchiveWalOnMinio(namespace, clusterName)
+}
+
+func prepareClusterForPITROnAzureBlob(
+	namespace,
+	clusterName,
+	clusterSampleFile,
+	backupSampleFile string,
+	azStorageAccount string,
+	azStorageKey string) {
+	err := env.CreateNamespace(namespace)
+	Expect(err).ToNot(HaveOccurred())
+
+	// The Azure Blob Storage should have been created ad-hoc for the test.
+	// The credentials are retrieved from the environment variables, as we can't create
+	// a fixture for them
+	By("creating the Azure Blob Storage credentials", func() {
+		assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
+	})
+
+	// Create the cluster
+	AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
+
+	By("backing up a cluster and verifying it exists on Azure Blob", func() {
+		executeBackup(namespace, backupSampleFile)
+
+		Eventually(func() (int, error) {
+			return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+		}, 30).Should(BeEquivalentTo(1))
+	})
+
+	// Write a table and insert 2 entries on the "app" database
+	AssertCreateTestData(namespace, clusterName, tableName)
+
+	By("getting currentTimestamp", func() {
+		currentTimeStamp, err = getCurrentTimeStamp(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableName), func() {
+		err = insertRecordIntoTestTable(namespace, clusterName, tableName, 3)
+		Expect(err).ToNot(HaveOccurred())
+	})
+	assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 }

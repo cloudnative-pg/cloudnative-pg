@@ -121,8 +121,8 @@ func AssertCreateTestData(namespace, clusterName, tableName string) {
 	})
 }
 
-// AssertTestDataExistence verifies the test data exists on the given pod
-func AssertTestDataExistence(namespace, podName, tableName string) {
+// AssertTestDataExpectedCount verifies that an expected amount of rows exist on the table
+func AssertTestDataExpectedCount(namespace, podName, tableName string, expectedValue int) {
 	By(fmt.Sprintf("verifying test data on pod %v", podName), func() {
 		newPodNamespacedName := types.NamespacedName{
 			Namespace: namespace,
@@ -137,7 +137,8 @@ func AssertTestDataExistence(namespace, podName, tableName string) {
 		stdout, _, err := env.ExecCommand(env.Ctx, *Pod, "postgres",
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(strings.Trim(stdout, "\n"), err).To(BeEquivalentTo("2"))
+		value, err := strconv.Atoi(strings.Trim(stdout, "\n"))
+		Expect(value, err).To(BeEquivalentTo(expectedValue))
 	})
 }
 
