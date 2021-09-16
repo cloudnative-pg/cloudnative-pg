@@ -150,7 +150,7 @@ jobs:
           client-payload: |
             {
               "maturity": "${{ needs.mkdocs_documentation.outputs.maturity }}",
-              "version": "${{ needs.mkdocs_documentation.outputs.version }}"
+              "version": "${{ needs.mkdocs_documentation.outputs.version }}",
               "ref": "${{ github.ref }}",
               "repo": "${{ github.repository }}",
               "sha": "${{ github.sha }}"
