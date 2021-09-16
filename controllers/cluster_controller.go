@@ -181,11 +181,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	if len(resources.pods.Items) > 0 && resources.noPodsAreAlive() {
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx, &cluster, apiv1.PhaseUnrecoverable,
-			"No pods are active, the cluster needs manual intervention ")
-	}
-
 	if !resources.allPodsAreActive() {
 		contextLogger.Debug("A managed resource is currently being created or deleted. Waiting")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
@@ -200,7 +195,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Reconcile Pods
-	return r.ReconcilePods(ctx, req, &cluster, resources, instancesStatus)
+	if res, err := r.ReconcilePods(ctx, req, &cluster, resources, instancesStatus); err != nil {
+		return res, err
+	}
+
+	if len(resources.pods.Items) > 0 && resources.noPodsAreAlive() {
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx, &cluster, apiv1.PhaseUnrecoverable,
+			"No pods are active, the cluster needs manual intervention ")
+	}
+
+	return ctrl.Result{}, nil
 }
 
 // ReconcilePVCs align the PVCs that are backing our cluster with the user specifications
