@@ -1099,7 +1099,6 @@ func createClusterFromBackupUsingPITR(namespace, clusterName, backupFilePath, ta
 			PostgresConfiguration: apiv1.PostgresConfiguration{
 				Parameters: map[string]string{
 					"log_checkpoints":             "on",
-					"log_line_prefix":             "%m [%p]: u=[%u] db=[%d] app=[%a] c=[%h] s=[%c:%l] tx=[%v:%x]",
 					"log_lock_waits":              "on",
 					"log_min_duration_statement":  "1000",
 					"log_statement":               "ddl",
@@ -1148,7 +1147,6 @@ func createClusterFromExternalClusterBackupWithPITROnAzure(
 			PostgresConfiguration: apiv1.PostgresConfiguration{
 				Parameters: map[string]string{
 					"log_checkpoints":             "on",
-					"log_line_prefix":             "%m [%p]: u=[%u] db=[%d] app=[%a] c=[%h] s=[%c:%l] tx=[%v:%x]",
 					"log_lock_waits":              "on",
 					"log_min_duration_statement":  "1000",
 					"log_statement":               "ddl",
@@ -1218,7 +1216,6 @@ func createClusterFromExternalClusterBackupWithPITROnMinio(
 			PostgresConfiguration: apiv1.PostgresConfiguration{
 				Parameters: map[string]string{
 					"log_checkpoints":             "on",
-					"log_line_prefix":             "%m [%p]: u=[%u] db=[%d] app=[%a] c=[%h] s=[%c:%l] tx=[%v:%x]",
 					"log_lock_waits":              "on",
 					"log_min_duration_statement":  "1000",
 					"log_statement":               "ddl",
