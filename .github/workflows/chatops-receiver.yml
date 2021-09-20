@@ -1,0 +1,37 @@
+name: slash-command-receiver
+
+on:
+  repository_dispatch:
+    types:
+      - test-command
+      - test-cnp-command
+
+jobs:
+  chatops-receiver:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Get the target branch name
+        id: vars
+        run: |
+          if [[ "${{ github.event.client_payload.pull_request.head.ref }}" != "" ]]
+          then
+            ref=${{ github.event.client_payload.pull_request.head.ref }}
+            echo ::set-output name=ref::$ref
+          fi
+      - name: Invoke workflow-dispatch
+        id: trigger-workflow
+        uses: aurelien-baudet/workflow-dispatch@v2
+        with:
+          workflow: continuous-delivery
+          token: ${{ secrets.REPO_GHA_PAT }}
+          ref: ${{ steps.vars.outputs.ref }}
+          display-workflow-run-url: true
+          wait-for-completion: false
+      - name: Create comment
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          issue-number: ${{ github.event.client_payload.github.payload.issue.number }}
+          body: |
+            @${{ github.event.client_payload.github.actor }}, here's the link to the E2E on CNP workflow run: ${{ steps.trigger-workflow.outputs.workflow-url }}

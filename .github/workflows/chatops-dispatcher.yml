@@ -1,0 +1,29 @@
+name: slash-command-dispatcher
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  chatops-dispatcher:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Run E2E on OpenShift
+        uses: peter-evans/slash-command-dispatch@v2
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          issue-type: pull-request
+          repository: EnterpriseDB/cloud-native-postgresql-ocp-certified
+          permission: write
+          commands: |
+            test
+            test-ocp
+      - name: Run E2E on CNP
+        uses: peter-evans/slash-command-dispatch@v2
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          issue-type: pull-request
+          permission: write
+          commands: |
+            test
+            test-cnp
