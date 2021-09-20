@@ -11,10 +11,18 @@ containers, users are not allowed to directly touch those files. Configuration
 is possible through the `postgresql` section of the `Cluster` resource definition
 by defining custom `postgresql.conf` and `pg_hba.conf` settings via the
 `parameters` and the `pg_hba` keys.
-A reference for custom settings usage is included in the samples, see
-[`cluster-example-custom.yaml`](samples/cluster-example-custom.yaml).
 
 These settings are the same across all instances.
+
+!!! Warning
+    Please don't use the `ALTER SYSTEM` query to change the configuration of
+    the PostgreSQL instances in an imperative way. Changing some of the options
+    that are normally controlled by the operator might indeed lead to an
+    unpredictable/unrecoverable state of the cluster.
+    Moreover, `ALTER SYSTEM` changes are not replicated across the cluster.
+
+A reference for custom settings usage is included in the samples, see
+[`cluster-example-custom.yaml`](samples/cluster-example-custom.yaml).
 
 !!! Warning
     **OpenShift users:** due to a current limitation of the OpenShift user interface,
@@ -103,9 +111,9 @@ archiving and replication.
 
 ### Replication settings
 
-The `primary_conninfo` and `recovery_target_timeline` parameters are managed
-automatically by the operator according to the state of the instance in
-the cluster.
+The `primary_conninfo`, `restore_command`,  and `recovery_target_timeline`
+parameters are managed automatically by the operator according to the state of
+the instance in the cluster.
 
 ```text
 primary_conninfo = 'host=cluster-example-rw user=postgres dbname=postgres'
