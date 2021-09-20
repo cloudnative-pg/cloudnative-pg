@@ -7,8 +7,8 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package v1
 
 import (
+	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -146,6 +146,9 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	clusterLog.Info("validate update", "name", r.Name)
 	oldCluster := old.(*Cluster)
+
+	// applying defaults before validating updates to set any new default
+	oldCluster.Default()
 
 	allErrs := append(
 		r.Validate(),
@@ -443,23 +446,25 @@ func (r *Cluster) validateImagePullPolicy() field.ErrorList {
 	}
 }
 
-// validateConfigurationChange determine whether a PostgreSQL configuration
+// validateConfigurationChange determines whether a PostgreSQL configuration
 // change can be applied
 func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
 
-	configChanged := !reflect.DeepEqual(
-		old.Spec.PostgresConfiguration.Parameters,
-		r.Spec.PostgresConfiguration.Parameters)
-
-	if old.Spec.ImageName != r.Spec.ImageName && configChanged {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
-				"Can't change image name and configuration at the same time"))
-		return result
+	if old.Spec.ImageName != r.Spec.ImageName {
+		diff := utils.CollectDifferencesFromMaps(old.Spec.PostgresConfiguration.Parameters,
+			r.Spec.PostgresConfiguration.Parameters)
+		if len(diff) > 0 {
+			jsonDiff, _ := json.Marshal(diff)
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "imageName"),
+					r.Spec.ImageName,
+					fmt.Sprintf("Can't change image name and configuration at the same time. "+
+						"There are differences in PostgreSQL configuration parameters: %s", jsonDiff)))
+			return result
+		}
 	}
 
 	imageName := r.GetImageName()
