@@ -144,7 +144,6 @@ func FromContext(ctx context.Context) Logger {
 	if ok {
 		l = l.WithValues("uuid", uuid)
 	}
-
 	return l
 }
 
@@ -167,6 +166,5 @@ func SetupLogger(ctx context.Context) (Logger, context.Context) {
 	if newCtx, err := AddUUID(ctx); err == nil {
 		ctx = newCtx
 	}
-	contextLogger := FromContext(ctx)
-	return contextLogger, IntoContext(ctx, contextLogger)
+	return FromContext(ctx), IntoContext(ctx, &logger{logr.FromContext(ctx)})
 }
