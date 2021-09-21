@@ -1,0 +1,10 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: ScheduledBackup
+metadata:
+  name: scheduled-backups-suspend-azurite
+spec:
+  # Every 30 second
+  schedule: "*/30 * * * * *"
+  cluster:
+    name: pg-backup-azurite
+  suspend: false
