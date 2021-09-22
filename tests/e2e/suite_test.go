@@ -7,13 +7,17 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package e2e
 
 import (
+	"regexp"
 	"testing"
 	"time"
 
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
-	//+kubebuilder:scaffold:imports
+	"github.com/thoas/go-funk"
+
+	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -38,11 +42,24 @@ var _ = BeforeSuite(func() {
 	}
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
-	//+kubebuilder:scaffold:scheme
+	_ = apiv1alpha1.AddToScheme(env.Scheme)
+	// +kubebuilder:scaffold:scheme
 
-	// Check operator pod should be running
-	AssertOperatorIsReady()
+	// AssertOperatorIsReady can't work with v1alpha1,
+	// let's ignore it if we're upgrading
+	// TODO: remove this when removing the upgrade test
+	deployment, err := env.GetOperatorDeployment()
+	Expect(err).NotTo(HaveOccurred())
+	image := deployment.Spec.Template.Spec.Containers[0].Image
+	re := regexp.MustCompile(`v0\.7\.0`)
 
+	if !(re.MatchString(image)) {
+		// Check operator pod should be running
+		AssertOperatorIsReady()
+	}
+})
+
+var _ = BeforeEach(func() {
 	operatorPod, err := env.GetOperatorPod()
 	Expect(err).NotTo(HaveOccurred())
 	expectedOperatorPodName = operatorPod.GetName()
@@ -55,7 +72,12 @@ func TestE2ESuite(t *testing.T) {
 }
 
 // Before the end of the tests we should verify that the operator never restarted
-// and that the operator pod name didn't change
+// and that the operator pod name didn't change.
 var _ = AfterEach(func() {
-	AssertOperatorPodUnchanged(expectedOperatorPodName)
+	labelsForTestsBreakingTheOperator := []string{"upgrade", "disruptive"}
+	breakingLabelsInCurrentTest := funk.Join(CurrentSpecReport().Labels(),
+		labelsForTestsBreakingTheOperator, funk.InnerJoin)
+	if len(breakingLabelsInCurrentTest.([]string)) == 0 {
+		AssertOperatorPodUnchanged(expectedOperatorPodName)
+	}
 })

@@ -28,9 +28,9 @@ var _ = Describe("Update user password", func() {
 	const clusterName = "cluster-basic"
 
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {
@@ -100,9 +100,9 @@ var _ = Describe("Disabling superuser password", func() {
 	const clusterName = "cluster-basic"
 
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {
@@ -199,9 +199,9 @@ var _ = Describe("Creating a cluster without superuser password", func() {
 	const clusterName = "cluster-no-postgres-pwd"
 
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {

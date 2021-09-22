@@ -65,7 +65,7 @@ if notinpath "${go_bin}"; then
 fi
 
 if ! which ginkgo &>/dev/null; then
-  install_go_module "github.com/onsi/ginkgo/ginkgo"
+  install_go_module "github.com/onsi/ginkgo/ginkgo@a9b2e3398"
 fi
 
 # Skip upgrade tests on v14
@@ -94,7 +94,7 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
       "${KUSTOMIZE}" edit add patch env_override.yaml
       "${KUSTOMIZE}" edit add configmap controller-manager-env "--from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMG}"
   )
-  "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${ROOT_DIR}/tests/upgrade/fixtures/current-manifest.yaml"
+  "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml"
 
   # Wait for the v1alpha1 operator (0.7.0) to be up and running
   kubectl wait --for=condition=Available --timeout=2m \
@@ -102,10 +102,10 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
     postgresql-operator-controller-manager
 
   # Run the upgrade tests
-  mkdir -p "${ROOT_DIR}/tests/upgrade/out"
+  mkdir -p "${ROOT_DIR}/tests/e2e/out"
   # Unset DEBUG to prevent k8s from spamming messages
   unset DEBUG
-  ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/upgrade/..." || RC=$?
+  ginkgo --nodes=1 --slow-spec-threshold=5m --label-filter "upgrade" -v "${ROOT_DIR}/tests/e2e/..." || RC=$?
 fi
 
 CONTROLLER_IMG="${CONTROLLER_IMG}" \
@@ -125,13 +125,5 @@ export PATH=${ROOT_DIR}/bin/:${PATH}
 mkdir -p "${ROOT_DIR}/tests/e2e/out"
 # Create at most 4 testing nodes. Using -p instead of --nodes
 # would create CPUs-1 nodes and saturate the testing server
-ginkgo --nodes=4 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/e2e/..." || RC=$?
-
-mkdir -p "${ROOT_DIR}/tests/sequential/out"
-# These e2e tests need to be run sequentially since they may break concurrent test run
-ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/sequential/..." || RC=$?
-
-mkdir -p "${ROOT_DIR}/tests/performance/out"
-# Performance tests need to run on a single node to avoid concurrency
-ginkgo --nodes=1 --slowSpecThreshold=300 -v "${ROOT_DIR}/tests/performance/..." || RC=$?
+ginkgo --nodes=4 --slow-spec-threshold=5m --label-filter "!(upgrade)" -v "${ROOT_DIR}/tests/e2e/..." || RC=$?
 exit $RC

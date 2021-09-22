@@ -14,8 +14,8 @@ import (
 )
 
 var _ = Describe("Cluster conversion to v1 cluster", func() {
-	It("returns nil error ", func() {
-		When("destination cluster is empty", func() {
+	When("destination cluster is empty", func() {
+		It("returns nil error ", func() {
 			src := Cluster{}
 			dst := v1.Cluster{}
 			err := src.ConvertTo(&dst)
@@ -26,15 +26,17 @@ var _ = Describe("Cluster conversion to v1 cluster", func() {
 })
 
 var _ = Describe("Cluster conversion from v1 cluster", func() {
-	It("returns nil error ", func() {
-		When("source cluster is empty", func() {
+	When("source cluster is empty", func() {
+		It("returns nil error ", func() {
 			src := v1.Cluster{}
 			dst := Cluster{}
 			err := dst.ConvertFrom(&src)
 			Expect(err).To(BeNil())
 			Expect(dst).ToNot(BeNil())
 		})
-		When("source cluster specifies the certificates", func() {
+	})
+	When("source cluster specifies the certificates", func() {
+		It("returns nil error ", func() {
 			src := v1.Cluster{Spec: v1.ClusterSpec{
 				Certificates: &v1.CertificatesConfiguration{
 					ServerCASecret:  "test-server-ca",

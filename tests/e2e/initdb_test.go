@@ -31,9 +31,9 @@ var _ = Describe("InitDB settings", func() {
 
 		var namespace string
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
@@ -80,9 +80,9 @@ var _ = Describe("InitDB settings", func() {
 
 		var namespace string
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {

@@ -35,11 +35,11 @@ var _ = Describe("Replica Mode", func() {
 		replicaClusterName := "cluster-replica-tls"
 
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, srcClusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+"-source-cluster.log")
+					"out/"+CurrentSpecReport().LeafNodeText+"-source-cluster.log")
 				env.DumpClusterEnv(namespace, replicaClusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+"-replica-cluster.log")
+					"out/"+CurrentSpecReport().LeafNodeText+"-replica-cluster.log")
 			}
 		})
 		AfterEach(func() {
@@ -67,11 +67,11 @@ var _ = Describe("Replica Mode", func() {
 		replicaClusterName := "cluster-replica-basicauth"
 
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, srcClusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+"-source-cluster.log")
+					"out/"+CurrentSpecReport().LeafNodeText+"-source-cluster.log")
 				env.DumpClusterEnv(namespace, replicaClusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+"-replica-cluster.log")
+					"out/"+CurrentSpecReport().LeafNodeText+"-replica-cluster.log")
 			}
 		})
 		AfterEach(func() {

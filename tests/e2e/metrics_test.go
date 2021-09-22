@@ -51,9 +51,9 @@ var _ = Describe("Metrics", func() {
 			`$)`)
 
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterMetricsFile,
-				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {

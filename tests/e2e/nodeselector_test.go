@@ -25,9 +25,9 @@ var _ = Describe("nodeSelector", func() {
 		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-not-exists.yaml"
 		const clusterName = "postgresql-nodeselector-none-label"
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
@@ -87,9 +87,9 @@ var _ = Describe("nodeSelector", func() {
 		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-exists.yaml"
 		const clusterName = "postgresql-nodeselector"
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {

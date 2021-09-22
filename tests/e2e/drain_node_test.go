@@ -4,13 +4,10 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package sequential
+package e2e
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -23,7 +20,7 @@ import (
 
 // Set of tests in which we check that operator is able to fail over a new
 // primary and bring back the replicas when we drain nodes
-var _ = Describe("E2E Drain Node", func() {
+var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() {
 	var nodesWithLabels []string
 
 	BeforeEach(func() {
@@ -49,7 +46,7 @@ var _ = Describe("E2E Drain Node", func() {
 	AfterEach(func() {
 		// Uncordon the cordoned nodes and remove the labels we added in the
 		// BeforeEach section
-		UncordonAllNodes()
+		uncordonAllNodes()
 		for _, node := range nodesWithLabels {
 			cmd := fmt.Sprintf("kubectl label node %v drain- ", node)
 			_, _, err := tests.Run(cmd)
@@ -65,9 +62,9 @@ var _ = Describe("E2E Drain Node", func() {
 		const clusterName = "cluster-drain-node"
 
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 
@@ -112,7 +109,7 @@ var _ = Describe("E2E Drain Node", func() {
 
 			// Load test data
 			oldPrimary := clusterName + "-1"
-			AssertTestDataCreation(namespace, clusterName)
+			AssertCreateTestData(namespace, clusterName, "test")
 
 			// We create a mapping between the pod names and the UIDs of
 			// their volumes. We do not expect the UIDs to change.
@@ -145,7 +142,7 @@ var _ = Describe("E2E Drain Node", func() {
 			})
 
 			By("uncordon nodes and check new pods use old pvcs", func() {
-				UncordonAllNodes()
+				uncordonAllNodes()
 				// Ensure evicted pods have restarted and are running.
 				// one of them could have become the new primary.
 				timeout := 300
@@ -170,7 +167,9 @@ var _ = Describe("E2E Drain Node", func() {
 			})
 
 			// Expect the (previously created) test data to be available
-			AssertTestDataExistence(namespace, clusterName)
+			primary, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertTestDataExpectedCount(namespace, primary.GetName(), "test", 2)
 			assertClusterStandbysAreStreaming(namespace, clusterName)
 		})
 
@@ -223,7 +222,7 @@ var _ = Describe("E2E Drain Node", func() {
 
 				// Load test data
 				oldPrimary := clusterName + "-1"
-				AssertTestDataCreation(namespace, clusterName)
+				AssertCreateTestData(namespace, clusterName, "test")
 
 				// We create a mapping between the pod names and the UIDs of
 				// their volumes. We do not expect the UIDs to change.
@@ -287,7 +286,10 @@ var _ = Describe("E2E Drain Node", func() {
 				})
 
 				// Expect the (previously created) test data to be available
-				AssertTestDataExistence(namespace, clusterName)
+
+				primary, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				AssertTestDataExpectedCount(namespace, primary.GetName(), "test", 2)
 				assertClusterStandbysAreStreaming(namespace, clusterName)
 			})
 		})
@@ -300,9 +302,9 @@ var _ = Describe("E2E Drain Node", func() {
 		const clusterName = "cluster-drain-node"
 
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
@@ -351,7 +353,7 @@ var _ = Describe("E2E Drain Node", func() {
 			})
 
 			// Load test data
-			AssertTestDataCreation(namespace, clusterName)
+			AssertCreateTestData(namespace, clusterName, "test")
 
 			// We uncordon a cordoned node. New pods can go there.
 			By("uncordon node for pod failover", func() {
@@ -389,9 +391,11 @@ var _ = Describe("E2E Drain Node", func() {
 			})
 
 			// Expect the (previously created) test data to be available
-			AssertTestDataExistence(namespace, clusterName)
+			primary, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertTestDataExpectedCount(namespace, primary.GetName(), "test", 2)
 			assertClusterStandbysAreStreaming(namespace, clusterName)
-			UncordonAllNodes()
+			uncordonAllNodes()
 		})
 	})
 })
@@ -441,42 +445,13 @@ func drainPrimaryNode(namespace string, clusterName string) []string {
 	return podNames
 }
 
-// assertClusterStandbysAreStreaming verifies that all the standbys of a
-// cluster have a wal receiver running.
-func assertClusterStandbysAreStreaming(namespace string, clusterName string) {
-	Eventually(func() error {
-		podList, err := env.GetClusterPodList(namespace, clusterName)
-		if err != nil {
-			return err
-		}
-
-		primary, err := env.GetClusterPrimary(namespace, clusterName)
-		if err != nil {
-			return err
-		}
-
-		for _, pod := range podList.Items {
-			// Primary should be ignored
-			if pod.GetName() == primary.GetName() {
-				continue
-			}
-
-			timeout := time.Second
-			out, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &timeout,
-				"psql", "-U", "postgres", "-tAc", "SELECT count(*) FROM pg_stat_wal_receiver")
-			if err != nil {
-				return err
-			}
-
-			value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
-			if atoiErr != nil {
-				return atoiErr
-			}
-			if value != 1 {
-				return fmt.Errorf("pod %v not streaming", pod.Name)
-			}
-		}
-
-		return nil
-	}, 60).ShouldNot(HaveOccurred())
+func uncordonAllNodes() {
+	nodeList, err := env.GetNodeList()
+	Expect(err).ToNot(HaveOccurred())
+	// uncordoning all nodes
+	for _, node := range nodeList.Items {
+		command := fmt.Sprintf("kubectl uncordon %v", node.Name)
+		_, _, err := tests.Run(command)
+		Expect(err).ToNot(HaveOccurred())
+	}
 }

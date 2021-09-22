@@ -34,9 +34,9 @@ var _ = Describe("Verify storage", func() {
 	defaultStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 

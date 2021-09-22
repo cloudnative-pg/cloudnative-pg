@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package sequential
+package e2e
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ import (
 
 // Set of tests for config map for the operator. It is useful to configure the operator globally to survive
 // the upgrades (especially in OLM installation like OpenShift).
-var _ = Describe("Config support", func() {
+var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() {
 	const clusterName = "configmap-support"
 	const sampleFile = fixturesDir + "/configmap-support/config-support.yaml"
 	const configMapFile = fixturesDir + "/configmap-support/configmap.yaml"
@@ -55,9 +55,9 @@ var _ = Describe("Config support", func() {
 		operatorNamespace = operatorDeployment.GetNamespace()
 	})
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().FullTestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {

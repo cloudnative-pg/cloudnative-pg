@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package performance
+package e2e
 
 import (
 	"fmt"
@@ -21,13 +21,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Fast failover", func() {
+var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() {
 	const (
-		sampleFile             = "./fixtures/fastfailover/cluster-fast-failover.yaml"
-		sampleFileSyncReplicas = "./fixtures/fastfailover/cluster-syncreplicas-fast-failover.yaml"
-		webTestFile            = "./fixtures/fastfailover/webtest.yaml"
-		webTestSyncReplicas    = "./fixtures/fastfailover/webtest-syncreplicas.yaml"
-		webTestJob             = "./fixtures/fastfailover/hey-job-webtest.yaml"
+		sampleFile             = fixturesDir + "/fastfailover/cluster-fast-failover.yaml"
+		sampleFileSyncReplicas = fixturesDir + "/fastfailover/cluster-syncreplicas-fast-failover.yaml"
+		webTestFile            = fixturesDir + "/fastfailover/webtest.yaml"
+		webTestSyncReplicas    = fixturesDir + "/fastfailover/webtest-syncreplicas.yaml"
+		webTestJob             = fixturesDir + "/fastfailover/hey-job-webtest.yaml"
 	)
 	var (
 		namespace       string
@@ -65,9 +65,9 @@ var _ = Describe("Fast failover", func() {
 	})
 
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().FullTestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 

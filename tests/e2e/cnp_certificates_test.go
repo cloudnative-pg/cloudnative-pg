@@ -58,9 +58,9 @@ var _ = Describe("Certificates", func() {
 		)
 		var namespace string
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
@@ -198,9 +198,9 @@ var _ = Describe("Certificates", func() {
 			clusterName = "postgresql-server-cert"
 		)
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
@@ -228,9 +228,9 @@ var _ = Describe("Certificates", func() {
 		)
 
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 
@@ -259,9 +259,9 @@ var _ = Describe("Certificates", func() {
 		)
 
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 

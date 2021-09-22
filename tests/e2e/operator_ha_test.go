@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package sequential
+package e2e
 
 import (
 	"encoding/json"
@@ -21,7 +21,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Operator High Availability", func() {
+var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisruptive, "no-openshift"), func() {
 	const namespace = "operator-ha-e2e"
 	const sampleFile = fixturesDir + "/operator-ha/operator-ha.yaml"
 	const clusterName = "operator-ha"
@@ -29,9 +29,9 @@ var _ = Describe("Operator High Availability", func() {
 	var oldLeaderPodName string
 
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().FullTestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 

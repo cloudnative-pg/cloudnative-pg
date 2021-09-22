@@ -102,9 +102,9 @@ var _ = Describe("Connection via services", func() {
 		const sampleFile = fixturesDir + "/secrets/cluster-auto-generated.yaml"
 		const clusterName = "postgresql-auto-generated"
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
@@ -151,9 +151,9 @@ var _ = Describe("Connection via services", func() {
 		const sampleFile = fixturesDir + "/secrets/cluster-user-supplied.yaml"
 		const clusterName = "postgresql-user-supplied"
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
