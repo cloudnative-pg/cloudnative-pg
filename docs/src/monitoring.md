@@ -124,6 +124,11 @@ cnp_collector_sync_replicas{value="observed"} 0
 # TYPE cnp_collector_up gauge
 cnp_collector_up 1
 
+# HELP cnp_collector_lo_pages Estimated number of pages in the pg_largeobject table
+# TYPE cnp_collector_lo_pages gauge
+cnp_collector_lo_pages{datname="app"} 0
+cnp_collector_lo_pages{datname="postgres"} 78
+
 # HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
 # TYPE go_gc_duration_seconds summary
 go_gc_duration_seconds{quantile="0"} 5.01e-05

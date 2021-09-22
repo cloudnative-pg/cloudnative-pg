@@ -384,6 +384,7 @@ kubernetes
 labelColumnName
 labelColumnValue
 labelSelector
+largeobject
 lastCheckTime
 lastScheduleTime
 latestGeneratedNode
