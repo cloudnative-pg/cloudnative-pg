@@ -247,15 +247,15 @@ func (b *BackupCommand) run(ctx context.Context) {
 			b.Cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
 
 			if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				oldCluster := &apiv1.Cluster{}
+				cluster := &apiv1.Cluster{}
 				err := b.Client.Get(ctx,
 					types.NamespacedName{Namespace: b.Cluster.GetNamespace(), Name: b.Cluster.GetName()},
-					oldCluster)
+					cluster)
 				if err != nil {
 					return err
 				}
-				oldCluster.Status = b.Cluster.Status
-				return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(oldCluster))
+				cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
+				return b.Client.Status().Update(ctx, cluster)
 			}); err != nil {
 				b.Log.Error(err, "Can't update first recoverability point")
 			}
