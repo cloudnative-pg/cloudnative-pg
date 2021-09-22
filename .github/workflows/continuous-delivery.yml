@@ -91,14 +91,21 @@ jobs:
       # Install kubebuilder that is a requirement to run tests
       -
         name: Install Kubebuilder
-        run: |
-          mkdir -p /tmp/kubebuilder
-          # The doc suggests using go.kubebuilder.io, but the redirects
-          # are currently not working there. We get the release directly
-          # from github.
-          kubebuilder_url="https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${{ env.KUBEBUILDER_VERSION }}/kubebuilder_${{ env.KUBEBUILDER_VERSION }}_$(go env GOOS)_$(go env GOARCH).tar.gz"
-          curl -sSL ${kubebuilder_url} | tar --strip-components=1 -xz -C /tmp/kubebuilder
-          sudo mv /tmp/kubebuilder /usr/local/
+        uses: nick-invision/retry@v2
+        with:
+          timeout_seconds: 30
+          max_attempts: 3
+          on_retry_command: |
+            # Clear-ups before retries
+            sudo rm -rf /tmp/kubebuilder/* /usr/local/kubebuilder
+          command: |
+            mkdir -p /tmp/kubebuilder
+            # The doc suggests using go.kubebuilder.io, but the redirects
+            # are currently not working there. We get the release directly
+            # from github.
+            kubebuilder_url="https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${{ env.KUBEBUILDER_VERSION }}/kubebuilder_${{ env.KUBEBUILDER_VERSION }}_$(go env GOOS)_$(go env GOARCH).tar.gz"
+            curl -sSL ${kubebuilder_url} | tar --strip-components=1 -xz -C /tmp/kubebuilder
+            sudo mv /tmp/kubebuilder /usr/local/
       -
         name: Run unit tests
         run:
@@ -381,10 +388,17 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Prepare the environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gettext-base
-          sudo hack/setup-cluster.sh prepare /usr/local/bin
+        uses: nick-invision/retry@v2
+        with:
+          timeout_seconds: 30
+          max_attempts: 3
+          on_retry_command: |
+            # Clear-ups before retries
+            rm -rf /usr/local/bin/kind /usr/local/bin/kubectl
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y gettext-base
+            sudo hack/setup-cluster.sh prepare /usr/local/bin
       -
         name: Run Kind End-to-End tests
         run:
@@ -449,13 +463,21 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Prepare the environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gettext-base
+        uses: nick-invision/retry@v2
+        with:
+          timeout_seconds: 30
+          max_attempts: 3
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y gettext-base
       -
         name:  Install ginkgo
-        run: |
-          go install github.com/onsi/ginkgo/ginkgo@a9b2e3398
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          command: |
+             go install github.com/onsi/ginkgo/ginkgo@a9b2e3398
       -
         name: Azure Login
         uses: azure/login@v1.3.0
@@ -468,7 +490,11 @@ jobs:
           version: v${{ env.K8S_VERSION }}
       -
         name: Create AKS cluster
-        run: |
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          command: |
             az extension add --name aks-preview
             az account set --subscription "Cloud Native Development"
             az aks create --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
@@ -495,38 +521,32 @@ jobs:
         # use rook to get the small PV we use in the tests.
         # It can still take a while to deploy rook.
         name: Set up Rook
-        run: |
-          STORAGECLASSNAME=default
-          GO111MODULE=on go get github.com/mikefarah/yq/v4
-          ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/cluster/examples/kubernetes/ceph
-          kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
-          kubectl apply -f ${ROOK_BASE_URL}/common.yaml
-          kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
-          curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
-            sed '/^ *#/d;/^ *$/d' | \
-            yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
-              .spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.storageClassName = \"${STORAGECLASSNAME}\" |
-              .spec.mon.volumeClaimTemplate.spec.storageClassName = \"${STORAGECLASSNAME}\" " - | \
-            kubectl apply -f -
-          ITER=0
-          MAX_ITER=120
-          while true; do
-            output=$( kubectl get deploy -n rook-ceph -l app=rook-ceph-osd --no-headers -o name )
-            if [[ $(wc -w <<< $output)  == 3 ]]; then
-              break
-            fi
-
-            (( ++ITER ))
-            if [[ ${ITER} -ge ${MAX_ITER} ]]; then
-              echo "Time out waiting for Rook OSDs deployments"
-              exit 1
-            fi
-            echo "$(wc -w <<< $output) out of 3 Rook OSDs deployments exist, waiting 10s (${ITER}/${MAX_ITER})."
-            sleep 10
-          done
-          echo "Waiting for Rook OSDs to be available"
-          kubectl wait deploy -n rook-ceph --for condition=available --timeout 480s -l app=rook-ceph-osd
-          kubectl apply -f ${ROOK_BASE_URL}/csi/rbd/storageclass.yaml
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 27
+          max_attempts: 1
+          command: |
+            STORAGECLASSNAME=default
+            GO111MODULE=on go get github.com/mikefarah/yq/v4
+            ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/cluster/examples/kubernetes/ceph
+            kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
+            kubectl apply -f ${ROOK_BASE_URL}/common.yaml
+            kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
+            curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
+              sed '/^ *#/d;/^ *$/d' | \
+              yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
+                .spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.storageClassName = \"${STORAGECLASSNAME}\" |
+                .spec.mon.volumeClaimTemplate.spec.storageClassName = \"${STORAGECLASSNAME}\" " - | \
+              kubectl apply -f -
+            while true; do
+              output=$( kubectl get deploy -n rook-ceph -l app=rook-ceph-osd --no-headers -o name )
+              if [[ $(wc -w <<< $output)  == 3 ]]; then
+                break
+              fi
+            done
+            echo "Waiting for Rook OSDs to be available"
+            kubectl wait deploy -n rook-ceph --for condition=available --timeout 480s -l app=rook-ceph-osd
+            kubectl apply -f ${ROOK_BASE_URL}/csi/rbd/storageclass.yaml
       -
         name: Run E2E tests
         run: hack/e2e/run-e2e.sh
@@ -592,13 +612,21 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Prepare the environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gettext-base
+        uses: nick-invision/retry@v2
+        with:
+          timeout_seconds: 30
+          max_attempts: 3
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y gettext-base
       -
         name:  Install ginkgo
-        run: |
-          go install github.com/onsi/ginkgo/ginkgo@a9b2e3398
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          command: |
+            go install github.com/onsi/ginkgo/ginkgo@a9b2e3398
       -
         name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -608,11 +636,15 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       -
         name: Install eksctl
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl -sL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" \
-            | tar xz -C $HOME/.local/bin
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          command: |
+            mkdir -p "$HOME/.local/bin"
+            curl -sL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" \
+              | tar xz -C $HOME/.local/bin
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
       -
         name: Configure EKS setup
         run: |
@@ -623,10 +655,14 @@ jobs:
           eksctl create cluster -f hack/e2e/eks-cluster.yaml
       -
         name: Setup log archiving via fluentd and insights
-        run: |
-          curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml \
-            | sed "s/{{cluster_name}}/${{ env.CLUSTER_NAME }}/;s/{{region_name}}/${{ env.AWS_REGION }}/" \
-            | kubectl apply -f -
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          command: |
+            curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml \
+              | sed "s/{{cluster_name}}/${{ env.CLUSTER_NAME }}/;s/{{region_name}}/${{ env.AWS_REGION }}/" \
+              | kubectl apply -f -
       -
         name: Run E2E tests
         run: hack/e2e/run-e2e.sh
@@ -697,13 +733,21 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Prepare the environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gettext-base
+        uses: nick-invision/retry@v2
+        with:
+          timeout_seconds: 30
+          max_attempts: 3
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y gettext-base
       -
-        name:  Install ginkgo
-        run: |
-          go install github.com/onsi/ginkgo/ginkgo@a9b2e3398
+        name: Install ginkgo
+        uses: nick-invision/retry@v2
+        with:
+          timeout_seconds: 30
+          max_attempts: 3
+          command: |
+             go install github.com/onsi/ginkgo/ginkgo@a9b2e3398
       -
         name: Set cluster name
         run: |
@@ -722,7 +766,12 @@ jobs:
           export_default_credentials: true
       -
         name: Install kubectl
-        run: gcloud components install --quiet kubectl
+        uses: nick-invision/retry@v2
+        with:
+          timeout_seconds: 30
+          max_attempts: 3
+          command: |
+           gcloud components install --quiet kubectl
       -
         name: Create GKE cluster
         run: |
@@ -825,8 +874,12 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name:  Install ginkgo
-        run: |
-          go install github.com/onsi/ginkgo/ginkgo@a9b2e3398
+        uses: nick-invision/retry@v2
+        with:
+          timeout_seconds: 30
+          max_attempts: 3
+          command: |
+             go install github.com/onsi/ginkgo/ginkgo@a9b2e3398
       -
         name:  Install Terraform
         uses: hashicorp/setup-terraform@v1
