@@ -27,9 +27,9 @@ var _ = Describe("Failover", func() {
 	const sampleFile = samplesDir + "/cluster-storage-class.yaml"
 	const clusterName = "postgresql-storage-class"
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {

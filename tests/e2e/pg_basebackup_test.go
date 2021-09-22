@@ -28,11 +28,11 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 	const checkQuery = "psql -U postgres app -tAc 'SELECT count(*) FROM to_bootstrap'"
 
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, srcClusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+"-src.log")
+				"out/"+CurrentSpecReport().LeafNodeText+"-src.log")
 			env.DumpClusterEnv(namespace, dstClusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+"-dst.log")
+				"out/"+CurrentSpecReport().LeafNodeText+"-dst.log")
 		}
 	})
 	AfterEach(func() {
@@ -96,11 +96,11 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
 	const checkQuery = "psql -U postgres app -tAc 'SELECT count(*) FROM to_bootstrap'"
 
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, srcClusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+"-src.log")
+				"out/"+CurrentSpecReport().LeafNodeText+"-src.log")
 			env.DumpClusterEnv(namespace, dstClusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+"-dst.log")
+				"out/"+CurrentSpecReport().LeafNodeText+"-dst.log")
 		}
 	})
 	AfterEach(func() {

@@ -276,9 +276,9 @@ var _ = Describe("Rolling updates", func() {
 		const sampleFile = fixturesDir + "/rolling_updates/cluster-three-instances.yaml"
 		const clusterName = "postgresql-three-instances"
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
@@ -302,9 +302,9 @@ var _ = Describe("Rolling updates", func() {
 		const sampleFile = fixturesDir + "/rolling_updates/cluster-single-instance.yaml"
 		const clusterName = "postgresql-single-instance"
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().TestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {

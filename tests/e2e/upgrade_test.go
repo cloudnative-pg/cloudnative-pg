@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package upgrade
+package e2e
 
 import (
 	"fmt"
@@ -42,39 +42,39 @@ We test the following:
 // TODO: this test contains duplicated code from the e2e tests. It should be
 // refactored. It also contains duplicated code within itself.
 
-var _ = Describe("Upgrade", func() {
-	const operatorUpgradeFile = "./fixtures/current-manifest.yaml"
+var _ = Describe("Upgrade", Label(tests.LabelUpgrade), func() {
+	const operatorUpgradeFile = fixturesDir + "/upgrade/current-manifest.yaml"
 
 	const namespace = "operator-upgrade"
-	const pgSecrets = "./fixtures/pgsecrets.yaml" //nolint:gosec
+	const pgSecrets = fixturesDir + "/upgrade/pgsecrets.yaml" //nolint:gosec
 
 	// This cluster is a v1a1 cluster created before the operator upgrade
 	const clusterName = "cluster-v1alpha1"
-	const sampleFile = "./fixtures/cluster-v1alpha1.yaml"
-	const updateConfFile = "./fixtures/conf-update.yaml"
+	const sampleFile = fixturesDir + "/upgrade/cluster-v1alpha1.yaml"
+	const updateConfFile = fixturesDir + "/upgrade/conf-update.yaml"
 
 	// This cluster is a v1a1 cluster created after the operator upgrade
 	const clusterName2 = "cluster2-v1alpha1"
-	const sampleFile2 = "./fixtures/cluster2-v1alpha1.yaml"
-	const updateConfFile2 = "./fixtures/conf-update2.yaml"
+	const sampleFile2 = fixturesDir + "/upgrade/cluster2-v1alpha1.yaml"
+	const updateConfFile2 = fixturesDir + "/upgrade/conf-update2.yaml"
 
-	const minioSecret = "./fixtures/minio-secret.yaml" //nolint:gosec
-	const minioPVCFile = "./fixtures/minio-pvc.yaml"
-	const minioDeploymentFile = "./fixtures/minio-deployment.yaml"
-	const serviceFile = "./fixtures/minio-service.yaml"
-	const clientFile = "./fixtures/minio-client.yaml"
+	const minioSecret = fixturesDir + "/upgrade/minio-secret.yaml" //nolint:gosec
+	const minioPVCFile = fixturesDir + "/upgrade/minio-pvc.yaml"
+	const minioDeploymentFile = fixturesDir + "/upgrade/minio-deployment.yaml"
+	const serviceFile = fixturesDir + "/upgrade/minio-service.yaml"
+	const clientFile = fixturesDir + "/upgrade/minio-client.yaml"
 	const minioClientName = "mc"
 	const backupName = "cluster-backup"
-	const backupFile = "./fixtures/backup-v1alpha1.yaml"
-	const restoreFile = "./fixtures/cluster-from-v1alpha1-restore.yaml"
-	const scheduledBackupFile = "./fixtures/scheduled-backup.yaml"
+	const backupFile = fixturesDir + "/upgrade/backup-v1alpha1.yaml"
+	const restoreFile = fixturesDir + "/upgrade/cluster-from-v1alpha1-restore.yaml"
+	const scheduledBackupFile = fixturesDir + "/upgrade/scheduled-backup.yaml"
 	const scheduledBackupName = "scheduled-backup"
 	const countBackupsScript = "sh -c 'mc find minio --name data.tar.gz | wc -l'"
 
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {
@@ -505,27 +505,3 @@ var _ = Describe("Upgrade", func() {
 		AssertScheduledBackupsAreScheduled()
 	})
 })
-
-func AssertClusterIsReady(namespace string, clusterName string, timeout int, env *tests.TestingEnvironment) {
-	By("having a Cluster with each instance in status ready", func() {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName,
-		}
-		// Eventually the number of ready instances should be equal to the
-		// amount of instances defined in the cluster
-		cluster := &apiv1.Cluster{}
-		// Set cluster to api alpha1v1 if api v1 return error
-		if err := env.Client.Get(env.Ctx, namespacedName, cluster); err != nil {
-			cluster := &apiv1alpha1.Cluster{}
-			err = env.Client.Get(env.Ctx, namespacedName, cluster)
-			Expect(err).ToNot(HaveOccurred())
-		}
-		Eventually(func() (int, error) {
-			podList, err := env.GetClusterPodList(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			readyInstances := utils.CountReadyPods(podList.Items)
-			return readyInstances, err
-		}, timeout).Should(BeEquivalentTo(cluster.Spec.Instances))
-	})
-}

@@ -78,22 +78,20 @@ var _ = Describe("Keypair generation", func() {
 		Expect(newCert.ExtKeyUsage).To(Equal(oldCert.ExtKeyUsage))
 	})
 
-	It("should be able to verify if a certificate will expire", func() {
-		When("it is expiring", func() {
-			notAfter := time.Now().Add(-10 * time.Hour)
-			notBefore := notAfter.Add(-90 * 24 * time.Hour)
-			ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", "namespace")
-			Expect(err).To(BeNil())
-			isExpiring, _, err := ca.IsExpiring()
-			Expect(isExpiring, err).To(BeTrue())
-		})
+	It("marks expiring certificate as expiring", func() {
+		notAfter := time.Now().Add(-10 * time.Hour)
+		notBefore := notAfter.Add(-90 * 24 * time.Hour)
+		ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", "namespace")
+		Expect(err).To(BeNil())
+		isExpiring, _, err := ca.IsExpiring()
+		Expect(isExpiring, err).To(BeTrue())
+	})
 
-		When("it's not expiring", func() {
-			ca, err := CreateRootCA("test", "namespace")
-			Expect(err).To(BeNil())
-			isExpiring, _, err := ca.IsExpiring()
-			Expect(isExpiring, err).To(BeFalse())
-		})
+	It("doesn't marks a valid certificate as expiring", func() {
+		ca, err := CreateRootCA("test", "namespace")
+		Expect(err).To(BeNil())
+		isExpiring, _, err := ca.IsExpiring()
+		Expect(isExpiring, err).To(BeFalse())
 	})
 
 	When("we have a CA generated", func() {

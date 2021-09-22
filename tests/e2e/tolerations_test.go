@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package sequential
+package e2e
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ import (
 
 // Set of tests in which we check that the operator is able to failover primary and brings back
 // replicas when we drain node
-var _ = Describe("E2E Tolerations Node", func() {
+var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive), func() {
 	var taintedNodes []string
 	namespace := "test-tolerations"
 	const sampleFile = fixturesDir + "/tolerations/cluster-tolerations.yaml"
@@ -25,9 +25,9 @@ var _ = Describe("E2E Tolerations Node", func() {
 	const tolerationKey = "test-tolerations"
 
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 

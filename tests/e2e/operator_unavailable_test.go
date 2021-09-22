@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package sequential
+package e2e
 
 import (
 	"fmt"
@@ -25,16 +25,16 @@ import (
 // Set of tests in which we test the concurrent disruption of both the primary
 // and the operator pods, asserting that the latter is able to perform a pending
 // failover once a new operator pod comes back available.
-var _ = Describe("Operator unavailable", func() {
+var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive), func() {
 	const clusterName = "operator-unavailable"
 	const sampleFile = fixturesDir + "/operator-unavailable/operator-unavailable.yaml"
 
 	Context("Scale down operator replicas to zero and delete primary", func() {
 		const namespace = "op-unavailable-e2e-zero-replicas"
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().FullTestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
@@ -49,7 +49,7 @@ var _ = Describe("Operator unavailable", func() {
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			AssertTestDataCreation(namespace, clusterName)
+			AssertCreateTestData(namespace, clusterName, "test")
 
 			operatorNamespace, err := env.GetOperatorNamespaceName()
 			Expect(err).ToNot(HaveOccurred())
@@ -137,16 +137,18 @@ var _ = Describe("Operator unavailable", func() {
 				}, timeout).Should(BeTrue())
 			})
 			// Expect the test data previously created to be available
-			AssertTestDataExistence(namespace, clusterName)
+			primary, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertTestDataExpectedCount(namespace, primary.GetName(), "test", 2)
 		})
 	})
 
 	Context("Delete primary and operator concurrently", func() {
 		const namespace = "op-unavailable-e2e-delete-operator"
 		JustAfterEach(func() {
-			if CurrentGinkgoTestDescription().Failed {
+			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentGinkgoTestDescription().FullTestText+".log")
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
@@ -162,7 +164,7 @@ var _ = Describe("Operator unavailable", func() {
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			AssertTestDataCreation(namespace, clusterName)
+			AssertCreateTestData(namespace, clusterName, "test")
 
 			operatorNamespace, err := env.GetOperatorNamespaceName()
 			Expect(err).ToNot(HaveOccurred())
@@ -235,7 +237,9 @@ var _ = Describe("Operator unavailable", func() {
 				}, timeout).Should(BeTrue())
 			})
 			// Expect the test data previously created to be available
-			AssertTestDataExistence(namespace, clusterName)
+			primary, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertTestDataExpectedCount(namespace, primary.GetName(), "test", 2)
 		})
 	})
 })

@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package performance
+package e2e
 
 import (
 	"fmt"
@@ -22,16 +22,16 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Fast switchover", func() {
+var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func() {
 	const namespace = "primary-switchover-time"
-	const sampleFile = "./fixtures/fastswitchover/cluster-fast-switchover.yaml"
-	const webTestFile = "./fixtures/fastswitchover/webtest.yaml"
-	const webTestJob = "./fixtures/fastswitchover/hey-job-webtest.yaml"
+	const sampleFile = fixturesDir + "/fastswitchover/cluster-fast-switchover.yaml"
+	const webTestFile = fixturesDir + "/fastswitchover/webtest.yaml"
+	const webTestJob = fixturesDir + "/fastswitchover/hey-job-webtest.yaml"
 	const clusterName = "cluster-fast-switchover"
 	JustAfterEach(func() {
-		if CurrentGinkgoTestDescription().Failed {
+		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentGinkgoTestDescription().TestText+".log")
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {
