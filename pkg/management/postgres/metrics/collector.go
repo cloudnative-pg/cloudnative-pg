@@ -23,6 +23,29 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics/histogram"
 )
 
+var defaultQueries = UserQueries{
+	"collector": UserQuery{
+		Query: "SELECT current_database() as datname, relpages as lo_pages " +
+			"FROM pg_class c JOIN pg_namespace n ON (n.oid = c.relnamespace) " +
+			"WHERE n.nspname = 'pg_catalog' AND c.relname = 'pg_largeobject';",
+		TargetDatabases: []string{"*"},
+		Metrics: []Mapping{
+			{
+				"datname": ColumnMapping{
+					Usage:       LABEL,
+					Description: "Name of the database",
+				},
+			},
+			{
+				"lo_pages": ColumnMapping{
+					Usage:       GAUGE,
+					Description: "Estimated number of pages in the pg_largeobject table",
+				},
+			},
+		},
+	},
+}
+
 // QueriesCollector is the implementation of PgCollector for a certain
 // collection of custom queries supplied by the user
 type QueriesCollector struct {
@@ -46,7 +69,7 @@ func (q QueriesCollector) Name() string {
 
 var isPathPattern = regexp.MustCompile(`[][*?]`)
 
-// Collect load data from the actual PostgreSQL instance
+// Collect loads data from the actual PostgreSQL instance
 func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 	// Reset before collecting
 	q.errorUserQueries.Reset()
@@ -63,7 +86,7 @@ func (q QueriesCollector) Collect(ch chan<- prometheus.Metric) error {
 	return nil
 }
 
-func (q QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error {
+func (q *QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error {
 	isPrimary, err := q.instance.IsPrimary()
 	if err != nil {
 		return err
@@ -115,6 +138,7 @@ func (q QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error 
 				q.reportUserQueryErrorMetric(name + ": " + err.Error())
 				continue
 			}
+
 			err = collector.collect(conn, ch)
 			if err != nil {
 				queryLogger.Error(err, "Error collecting user query",
@@ -254,7 +278,7 @@ func (q QueriesCollector) Describe(ch chan<- *prometheus.Desc) {
 	q.errorUserQueriesGauge.Describe(ch)
 }
 
-// NewQueriesCollector create a new PgCollector working over a set of custom queries
+// NewQueriesCollector creates a new PgCollector working over a set of custom queries
 // supplied by the user
 func NewQueriesCollector(name string, instance *postgres.Instance, defaultDBName string) *QueriesCollector {
 	return &QueriesCollector{
@@ -277,7 +301,7 @@ func NewQueriesCollector(name string, instance *postgres.Instance, defaultDBName
 	}
 }
 
-// ParseQueries parse a YAML file containing custom queries and add it
+// ParseQueries parses a YAML file containing custom queries and add it
 // to the set of gathered one
 func (q *QueriesCollector) ParseQueries(customQueries []byte) error {
 	var err error
@@ -295,6 +319,19 @@ func (q *QueriesCollector) ParseQueries(customQueries []byte) error {
 	return nil
 }
 
+// SetDefaultQueries injects some default queries
+func (q *QueriesCollector) SetDefaultQueries() {
+	if q == nil {
+		return
+	}
+
+	for name, query := range defaultQueries {
+		q.userQueries[name] = query
+		q.mappings[name], q.variableLabels[name] = query.ToMetricMap(
+			fmt.Sprintf("%v_%v", q.collectorName, name))
+	}
+}
+
 // QueryCollector is the implementation of PgCollector for a certain
 // custom query supplied by the user
 type QueryCollector struct {
@@ -304,8 +341,7 @@ type QueryCollector struct {
 	variableLabels VariableSet
 }
 
-// collect collects the result from query and writes it to the prometheus
-// infrastructure
+// collect retrieves metrics from query and exposes them to prometheus
 func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error {
 	tx, err := createMonitoringTx(conn)
 	if err != nil {

@@ -57,9 +57,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 	r.reconcileMetrics(cluster)
 
 	// Reconcile monitoring section
-	if cluster.Spec.Monitoring != nil {
-		r.reconcileMonitoringQueries(ctx, cluster)
-	}
+	r.reconcileMonitoringQueries(ctx, cluster)
 
 	// Reconcile replica role
 	if err := r.reconcileClusterRole(ctx, event, cluster); err != nil {
@@ -141,7 +139,9 @@ func (r *InstanceReconciler) getAllAccessibleDatabases(
 	ctx context.Context,
 	db *sql.DB,
 ) (databases []string, errors []error) {
-	tx, err := db.BeginTx(ctx, nil)
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{
+		ReadOnly: true,
+	})
 	if err != nil {
 		errors = append(errors, err)
 		return nil, errors
@@ -256,16 +256,21 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 
 	contextLogger.Info("Reconciling custom monitoring queries")
 
-	configuration := cluster.Spec.Monitoring
-
 	dbname := "postgres"
 	if cluster.ShouldCreateApplicationDatabase() {
 		dbname = cluster.Spec.Bootstrap.InitDB.Database
 	}
 
-	queries := metrics.NewQueriesCollector("cnp", r.instance, dbname)
+	queriesCollector := metrics.NewQueriesCollector("cnp", r.instance, dbname)
 
-	for _, reference := range configuration.CustomQueriesConfigMap {
+	queriesCollector.SetDefaultQueries()
+
+	if cluster.Spec.Monitoring == nil {
+		metricsserver.GetExporter().SetCustomQueries(queriesCollector)
+		return
+	}
+
+	for _, reference := range cluster.Spec.Monitoring.CustomQueriesConfigMap {
 		var configMap corev1.ConfigMap
 		err := r.GetClient().Get(
 			ctx,
@@ -289,7 +294,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			continue
 		}
 
-		err = queries.ParseQueries([]byte(data))
+		err = queriesCollector.ParseQueries([]byte(data))
 		if err != nil {
 			contextLogger.Info("Error while parsing custom queries in ConfigMap",
 				"reference", reference,
@@ -300,7 +305,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		}
 	}
 
-	for _, reference := range configuration.CustomQueriesSecret {
+	for _, reference := range cluster.Spec.Monitoring.CustomQueriesSecret {
 		var secret corev1.Secret
 		err := r.GetClient().Get(ctx, client.ObjectKey{Namespace: r.instance.Namespace, Name: reference.Name}, &secret)
 		if err != nil {
@@ -321,7 +326,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			continue
 		}
 
-		err = queries.ParseQueries(data)
+		err = queriesCollector.ParseQueries(data)
 		if err != nil {
 			contextLogger.Info("Error while parsing custom queries in Secret",
 				"reference", reference,
@@ -332,7 +337,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		}
 	}
 
-	metricsserver.GetExporter().SetCustomQueries(queries)
+	metricsserver.GetExporter().SetCustomQueries(queriesCollector)
 }
 
 // reconcileSecret is called when the PostgreSQL secrets are changes
