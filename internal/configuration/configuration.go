@@ -10,6 +10,7 @@ package configuration
 
 import (
 	"path"
+	"strings"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configparser"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
@@ -29,7 +30,8 @@ type Data struct {
 	WebhookCertDir string `json:"webhookCertDir" env:"WEBHOOK_CERT_DIR"`
 
 	// WatchNamespace is the namespace where the operator should watch and
-	// is configurable via environment variables of via the OpenShift console
+	// is configurable via environment variables in the OpenShift console.
+	// Multiple namespaces can be specified separated by comma
 	WatchNamespace string `json:"watchNamespace" env:"WATCH_NAMESPACE"`
 
 	// EnablePodDebugging enable debugging mode in new generated pods
@@ -94,6 +96,27 @@ func (config *Data) IsAnnotationInherited(name string) bool {
 // be inherited from the Cluster specification to the generated objects
 func (config *Data) IsLabelInherited(name string) bool {
 	return evaluateGlobPatterns(config.InheritedLabels, name)
+}
+
+// WatchedNamespaces get the list of additional watched namespaces.
+// The result is a list of namespaces specified in the WATCHED_NAMESPACE where
+// each namespace is separated by comma
+func (config *Data) WatchedNamespaces() []string {
+	return cleanNamespaceList(config.WatchNamespace)
+}
+
+func cleanNamespaceList(namespaces string) (result []string) {
+	unfilteredList := strings.Split(namespaces, ",")
+	result = make([]string, 0, len(unfilteredList))
+
+	for _, elem := range unfilteredList {
+		elem = strings.TrimSpace(elem)
+		if len(elem) != 0 {
+			result = append(result, elem)
+		}
+	}
+
+	return
 }
 
 func evaluateGlobPatterns(patterns []string, value string) (result bool) {

@@ -27,6 +27,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/multicache"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 	// +kubebuilder:scaffold:imports
@@ -92,7 +93,6 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 	setupLog.Info("Starting Cloud Native PostgreSQL Operator",
 		"version", versions.Version,
 		"build", versions.Info)
-	setupLog.Info("Listening for changes", "watchNamespace", configuration.Current.WatchNamespace)
 
 	managerOptions := ctrl.Options{
 		Scheme:             scheme,
@@ -100,9 +100,19 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 		Port:               port,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   LeaderElectionID,
-		Namespace:          configuration.Current.WatchNamespace,
 		CertDir:            defaultWebhookCertDir,
 	}
+
+	if configuration.Current.WatchNamespace != "" {
+		namespaces := configuration.Current.WatchedNamespaces()
+		managerOptions.NewCache = multicache.DelegatingMultiNamespacedCacheBuilder(
+			namespaces,
+			configuration.Current.OperatorNamespace)
+		setupLog.Info("Listening for changes", "watchNamespaces", namespaces)
+	} else {
+		setupLog.Info("Listening for changes on all namespaces")
+	}
+
 	if configuration.Current.WebhookCertDir != "" {
 		// If OLM will generate certificates for us, let's just
 		// use those
@@ -132,39 +142,7 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 		return err
 	}
 
-	// Read configurations
-	configData := make(map[string]string)
-	// First read the configmap if provided and store it in configData
-	if configMapName != "" {
-		configMapData, err := readConfigMap(ctx, configuration.Current.OperatorNamespace, configMapName)
-		if err != nil {
-			setupLog.Error(err, "unable to read ConfigMap",
-				"namespace", configuration.Current.OperatorNamespace,
-				"name", configMapName)
-		}
-		for k, v := range configMapData {
-			configData[k] = v
-		}
-	}
-
-	// Then read the secret if provided and store it in configData, overwriting configmap's values
-	if secretName != "" {
-		secretData, err := readSecret(ctx, configuration.Current.OperatorNamespace, secretName)
-		if err != nil {
-			setupLog.Error(err, "unable to read Secret",
-				"namespace", configuration.Current.OperatorNamespace,
-				"name", secretName)
-		}
-		for k, v := range secretData {
-			configData[k] = v
-		}
-	}
-
-	// Finally read the config if it was provided
-	if len(configData) > 0 {
-		configuration.Current.ReadConfigMap(configData)
-	}
-
+	loadConfiguration(ctx, configMapName, secretName)
 	setupLog.Info("Operator configuration loaded", "configuration", configuration.Current)
 
 	// Detect if we are running under a system that implements OpenShift Security Context Constraints
@@ -266,6 +244,42 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 	}
 
 	return nil
+}
+
+// loadConfiguration reads the configuration from the provided configmap and secret
+func loadConfiguration(ctx context.Context, configMapName string, secretName string) {
+	configData := make(map[string]string)
+
+	// First read the configmap if provided and store it in configData
+	if configMapName != "" {
+		configMapData, err := readConfigMap(ctx, configuration.Current.OperatorNamespace, configMapName)
+		if err != nil {
+			setupLog.Error(err, "unable to read ConfigMap",
+				"namespace", configuration.Current.OperatorNamespace,
+				"name", configMapName)
+		}
+		for k, v := range configMapData {
+			configData[k] = v
+		}
+	}
+
+	// Then read the secret if provided and store it in configData, overwriting configmap's values
+	if secretName != "" {
+		secretData, err := readSecret(ctx, configuration.Current.OperatorNamespace, secretName)
+		if err != nil {
+			setupLog.Error(err, "unable to read Secret",
+				"namespace", configuration.Current.OperatorNamespace,
+				"name", secretName)
+		}
+		for k, v := range secretData {
+			configData[k] = v
+		}
+	}
+
+	// Finally, read the config if it was provided
+	if len(configData) > 0 {
+		configuration.Current.ReadConfigMap(configData)
+	}
 }
 
 // readinessProbeHandler is used to implement the readiness probe handler

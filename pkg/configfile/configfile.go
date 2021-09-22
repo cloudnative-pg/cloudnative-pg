@@ -15,6 +15,7 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/stringset"
 )
 
 // UpdatePostgresConfigurationFile search and replace options in a Postgres configuration file.
@@ -36,7 +37,7 @@ func UpdateConfigurationContents(content string, options map[string]string) stri
 
 	// Change matching existing lines
 	resultContent := make([]string, 0, len(lines)+len(options))
-	foundKeys := NewStringSet()
+	foundKeys := stringset.New()
 	for _, line := range lines {
 		// Keep empty lines and comments
 		trimLine := strings.TrimSpace(line)

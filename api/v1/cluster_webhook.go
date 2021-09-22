@@ -24,9 +24,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configfile"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/stringset"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
@@ -733,7 +733,7 @@ func (r *Cluster) validateName() field.ErrorList {
 // Check if the external clusters list contains two servers with the same name
 func (r *Cluster) validateExternalClusters() field.ErrorList {
 	var result field.ErrorList
-	stringSet := configfile.NewStringSet()
+	stringSet := stringset.New()
 
 	for idx, externalCluster := range r.Spec.ExternalClusters {
 		path := field.NewPath("spec", "externalClusters").Index(idx)
