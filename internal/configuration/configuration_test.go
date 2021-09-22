@@ -60,4 +60,61 @@ var _ = Describe("Annotation and label inheritance", func() {
 		Expect(config.IsLabelInherited("prod.testing.com/two")).To(BeTrue())
 		Expect(config.IsLabelInherited("testing.testing.com/three")).To(BeFalse())
 	})
+
+	When("every namespace is watched", func() {
+		It("sets the watched namespaces to empty", func() {
+			config := Data{
+				WatchNamespace: "",
+			}
+			Expect(config.WatchedNamespaces()).To(HaveLen(0))
+
+			// Additional commas and spaces doesn't change the meaning
+			config = Data{
+				WatchNamespace: ",  ,,",
+			}
+			Expect(config.WatchedNamespaces()).To(HaveLen(0))
+		})
+	})
+
+	When("a single namespace is watched", func() {
+		It("sets the watched namespaces to that one", func() {
+			config := Data{
+				WatchNamespace: "pg",
+			}
+			Expect(config.WatchedNamespaces()).To(HaveLen(1))
+			Expect(config.WatchedNamespaces()[0]).To(Equal("pg"))
+
+			// Additional commas and spaces doesn't change the meaning
+			config = Data{
+				WatchNamespace: ",  ,pg, ",
+			}
+			Expect(config.WatchedNamespaces()).To(HaveLen(1))
+			Expect(config.WatchedNamespaces()[0]).To(Equal("pg"))
+		})
+	})
+
+	When("multiple namespaces are specified", func() {
+		It("sets the watched namespaces to the correct list", func() {
+			config := Data{
+				WatchNamespace: "pg,pg_staging,pg_prod",
+			}
+			Expect(config.WatchedNamespaces()).To(HaveLen(3))
+			Expect(config.WatchedNamespaces()).To(Equal([]string{
+				"pg",
+				"pg_staging",
+				"pg_prod",
+			}))
+
+			// Additional commas and spaces doesn't change the meaning
+			config = Data{
+				WatchNamespace: ",  ,pg ,pg_staging   ,  pg_prod, ",
+			}
+			Expect(config.WatchedNamespaces()).To(HaveLen(3))
+			Expect(config.WatchedNamespaces()).To(Equal([]string{
+				"pg",
+				"pg_staging",
+				"pg_prod",
+			}))
+		})
+	})
 })

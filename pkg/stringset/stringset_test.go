@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package configfile
+package stringset
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -13,11 +13,16 @@ import (
 
 var _ = Describe("String set", func() {
 	It("starts as an empty set", func() {
-		Expect(NewStringSet().Len()).To(Equal(0))
+		Expect(New().Len()).To(Equal(0))
+	})
+
+	It("starts with a list of strings", func() {
+		Expect(From([]string{"one", "two"}).Len()).To(Equal(2))
+		Expect(From([]string{"one", "two", "two"}).Len()).To(Equal(2))
 	})
 
 	It("store string keys", func() {
-		set := NewStringSet()
+		set := New()
 		Expect(set.Has("test")).To(BeFalse())
 		Expect(set.Has("test2")).To(BeFalse())
 
