@@ -27,3 +27,6 @@ builds:
   - ppc64le
   - s390x
   - arm64
+
+changelog:
+  skip: true
