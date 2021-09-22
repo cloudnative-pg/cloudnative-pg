@@ -1,0 +1,29 @@
+project_name: cnp
+
+env:
+  - GO111MODULE=on
+  - CGO_ENABLED=0
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+- id: manager
+  binary: manager
+  main: cmd/manager/main.go
+  gcflags:
+  - all=-trimpath={{.Env.GOPATH}};{{.Env.PWD}}
+  ldflags:
+  - -s
+  - -w
+  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion={{.Env.VERSION}}
+  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit={{.Env.COMMIT}}
+  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate={{.Env.DATE}}
+  goos:
+  - linux
+  goarch:
+  - amd64
+  - ppc64le
+  - s390x
+  - arm64
