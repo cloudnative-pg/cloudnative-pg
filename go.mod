@@ -11,7 +11,7 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/lib/pq v1.10.3
 	github.com/logrusorgru/aurora/v3 v3.0.0
-	github.com/onsi/ginkgo v1.16.5-0.20210915161835-f9c04debfda8
+	github.com/onsi/ginkgo v1.16.5-0.20210917200606-a9b2e3398fab
 	github.com/onsi/gomega v1.16.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/robfig/cron v1.2.0
