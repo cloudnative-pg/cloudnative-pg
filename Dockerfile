@@ -1,38 +1,7 @@
-# Build the manager binary
-FROM golang:1.16 as builder
-
-# We do not use root
-USER 1001
-
-# Copy the Go Modules manifests
-COPY --chown=1001 go.mod /workspace/go.mod
-COPY --chown=1001 go.sum /workspace/go.sum
-
-# Set the WORKDIR after the first COPY, otherwise the directory will be owned by root
-WORKDIR /workspace
-
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
-RUN go mod download
-
-# Copy the go source
-COPY --chown=1001 . /workspace
-
-ARG VERSION="dev"
-ARG COMMIT="none"
-ARG DATE="unknown"
-
-# Build
-RUN CGO_ENABLED=0 GOCACHE=/tmp/.gocache GO111MODULE=on go build -a -o manager -ldflags \
-    "-s -w \
-    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion=$VERSION \
-    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit=$COMMIT \
-    -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate=$DATE" \
-    ./cmd/manager
-
 # Use UBI Minimal image as base https://developers.redhat.com/products/rhel/ubi
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 ARG VERSION="dev"
+ARG TARGETARCH
 
 ENV SUMMARY="Cloud Native PostgreSQL Operator Container Image." \
     DESCRIPTION="This Docker image contains Cloud Native PostgreSQL Operator \
@@ -57,7 +26,7 @@ COPY licenses /licenses
 COPY LICENSE /licenses
 
 WORKDIR /
-COPY --from=builder /workspace/manager .
+COPY dist/manager_linux_${TARGETARCH}/manager .
 USER 1001
 
 ENTRYPOINT ["/manager"]
