@@ -119,6 +119,13 @@ var _ = Describe("Backup and restore", func() {
 				Eventually(func() (int, error) {
 					return countFilesOnMinio(namespace, "data.tar")
 				}, 30).Should(BeEquivalentTo(1))
+				Eventually(func() (string, error) {
+					cluster := &apiv1.Cluster{}
+					err := env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+						cluster)
+					return cluster.Status.FirstRecoverabilityPoint, err
+				}, 30).ShouldNot(BeEmpty())
 			})
 
 			// Restore backup in a new cluster
@@ -274,6 +281,13 @@ var _ = Describe("Backup and restore", func() {
 				Eventually(func() (int, error) {
 					return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
 				}, 30).Should(BeNumerically(">=", 1))
+				Eventually(func() (string, error) {
+					cluster := &apiv1.Cluster{}
+					err := env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+						cluster)
+					return cluster.Status.FirstRecoverabilityPoint, err
+				}, 30).ShouldNot(BeEmpty())
 			})
 
 			// Restore backup in a new cluster
@@ -533,6 +547,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				Eventually(func() (int, error) {
 					return countFilesOnMinio(namespace, "data.tar")
 				}, 30).Should(BeEquivalentTo(1))
+				Eventually(func() (string, error) {
+					cluster := &apiv1.Cluster{}
+					err := env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+						cluster)
+					return cluster.Status.FirstRecoverabilityPoint, err
+				}, 30).ShouldNot(BeEmpty())
 			})
 
 			// Restoring cluster using a recovery barman object store, which is defined
@@ -606,6 +627,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				Eventually(func() (int, error) {
 					return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
 				}, 30).Should(BeNumerically(">=", 1))
+				Eventually(func() (string, error) {
+					cluster := &apiv1.Cluster{}
+					err := env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+						cluster)
+					return cluster.Status.FirstRecoverabilityPoint, err
+				}, 30).ShouldNot(BeEmpty())
 			})
 
 			// Restoring cluster using a recovery barman object store, which is defined
@@ -1504,6 +1532,13 @@ func prepareClusterForPITROnMinio(
 		Eventually(func() (int, error) {
 			return countFilesOnMinio(namespace, "data.tar")
 		}, 30).Should(BeEquivalentTo(1))
+		Eventually(func() (string, error) {
+			cluster := &apiv1.Cluster{}
+			err := env.Client.Get(env.Ctx,
+				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+				cluster)
+			return cluster.Status.FirstRecoverabilityPoint, err
+		}, 30).ShouldNot(BeEmpty())
 	})
 
 	// Write a table and insert 2 entries on the "app" database
@@ -1547,6 +1582,13 @@ func prepareClusterForPITROnAzureBlob(
 		Eventually(func() (int, error) {
 			return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
 		}, 30).Should(BeEquivalentTo(1))
+		Eventually(func() (string, error) {
+			cluster := &apiv1.Cluster{}
+			err := env.Client.Get(env.Ctx,
+				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+				cluster)
+			return cluster.Status.FirstRecoverabilityPoint, err
+		}, 30).ShouldNot(BeEmpty())
 	})
 
 	// Write a table and insert 2 entries on the "app" database
@@ -1602,6 +1644,13 @@ func prepareClusterBackupOnAzurite(namespace, clusterName, clusterSampleFile, ba
 		Eventually(func() (int, error) {
 			return countFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
+		Eventually(func() (string, error) {
+			cluster := &apiv1.Cluster{}
+			err := env.Client.Get(env.Ctx,
+				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+				cluster)
+			return cluster.Status.FirstRecoverabilityPoint, err
+		}, 30).ShouldNot(BeEmpty())
 	})
 }
 
@@ -1619,6 +1668,13 @@ func prepareClusterForPITROnAzurite(
 		Eventually(func() (int, error) {
 			return countFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
+		Eventually(func() (string, error) {
+			cluster := &apiv1.Cluster{}
+			err := env.Client.Get(env.Ctx,
+				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+				cluster)
+			return cluster.Status.FirstRecoverabilityPoint, err
+		}, 30).ShouldNot(BeEmpty())
 	})
 
 	// Write a table and insert 2 entries on the "app" database
