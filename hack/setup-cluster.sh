@@ -462,7 +462,7 @@ main() {
     parsed_opts=$(getopt -o e:k:n:r -l "engine:,k8s-version:,nodes:,registry" -- "$@") || usage
   else
     # Original getopt is available
-    parsed_opts=$(getopt e:k:n:r -- "$@") || usage
+    parsed_opts=$(getopt e:k:n:r "$@") || usage
   fi
   eval "set -- $parsed_opts"
   for o; do
