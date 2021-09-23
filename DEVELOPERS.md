@@ -9,6 +9,7 @@ the `PATH` environment variable:
 - GNU Make
 - [Kind](https://kind.sigs.k8s.io/) v0.11.x or greater
 - [golangci-lint](https://github.com/golangci/golangci-lint)
+- [goreleaser](https://goreleaser.com/)
 
 In addition, check you have these already installed:
 
@@ -19,7 +20,7 @@ In addition, check you have these already installed:
 On Mac OS X, you can install the above components with [brew](https://brew.sh/):
 
 ``` bash
-brew install go kind golangci/tap/golangci-lint
+brew install go kind golangci/tap/golangci-lint goreleaser
 ```
 
 >**⚠️ Note:**

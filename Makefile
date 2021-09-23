@@ -108,9 +108,10 @@ generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 # Build the docker image
-docker-build: #test
-	docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION} --build-arg COMMIT=${COMMIT} \
-					--build-arg DATE=${DATE}
+docker-build:
+	GOOS=linux GOARCH=amd64 DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
+	  goreleaser build -f .goreleaser-multiarch.yml --skip-validate --rm-dist --single-target
+	docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION}
 
 # Push the docker image
 docker-push:
