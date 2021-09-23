@@ -125,6 +125,25 @@ func AssertCreateTestData(namespace, clusterName, tableName string) {
 	})
 }
 
+// AssertInsertTestData inserts additional data to primary pod and writes WAL
+func AssertInsertTestData(namespace, clusterName, tableName string) {
+	By("inserting additional data to primary", func() {
+		primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).NotTo(HaveOccurred())
+		commandTimeout := time.Second * 5
+		query := fmt.Sprintf("INSERT INTO %v VALUES (3), (4);", tableName)
+		_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Manually writing a new WAL
+		query = "SELECT pg_switch_wal()"
+		_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+	})
+}
+
 // AssertTestDataExpectedCount verifies that an expected amount of rows exist on the table
 func AssertTestDataExpectedCount(namespace, podName, tableName string, expectedValue int) {
 	By(fmt.Sprintf("verifying test data on pod %v", podName), func() {
@@ -138,11 +157,14 @@ func AssertTestDataExpectedCount(namespace, podName, tableName string, expectedV
 		query := fmt.Sprintf("select count(*) from %v", tableName)
 		commandTimeout := time.Second * 5
 		// The data previously created should be there
-		stdout, _, err := env.ExecCommand(env.Ctx, *Pod, "postgres",
-			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-		Expect(err).ToNot(HaveOccurred())
-		value, err := strconv.Atoi(strings.Trim(stdout, "\n"))
-		Expect(value, err).To(BeEquivalentTo(expectedValue))
+
+		Eventually(func() (int, error) {
+			stdout, _, err := env.ExecCommand(env.Ctx, *Pod, "postgres",
+				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+			Expect(err).ToNot(HaveOccurred())
+			value, err := strconv.Atoi(strings.Trim(stdout, "\n"))
+			return value, err
+		}, 300).Should(BeEquivalentTo(expectedValue))
 	})
 }
 

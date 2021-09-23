@@ -83,7 +83,7 @@ var _ = Describe("Backup and restore", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the credentials for minio", func() {
-				assertStorageCredentialsAreCreated(namespace, "minio", "minio123")
+				AssertStorageCredentialsAreCreated(namespace, "minio", "minio123")
 			})
 
 			By("setting up minio", func() {
@@ -110,7 +110,7 @@ var _ = Describe("Backup and restore", func() {
 			// Write a table and some data on the "app" database
 			AssertCreateTestData(namespace, clusterName, tableName)
 
-			assertArchiveWalOnMinio(namespace, clusterName)
+			AssertArchiveWalOnMinio(namespace, clusterName)
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
@@ -129,7 +129,7 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			// Restore backup in a new cluster
-			assertClusterRestore(namespace, clusterRestoreSampleFile)
+			AssertClusterRestore(namespace, clusterRestoreSampleFile)
 
 			AssertMetricsData(namespace, restoredClusterName, targetDBOne, targetDBTwo, targetDBSecret)
 		})
@@ -152,7 +152,7 @@ var _ = Describe("Backup and restore", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the credentials for minio", func() {
-				assertStorageCredentialsAreCreated(namespace, "minio", "minio123")
+				AssertStorageCredentialsAreCreated(namespace, "minio", "minio123")
 			})
 
 			By("setting up minio", func() {
@@ -168,13 +168,13 @@ var _ = Describe("Backup and restore", func() {
 			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
 
 			By("scheduling backups", func() {
-				assertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
+				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
 				Eventually(func() (int, error) {
 					return countFilesOnMinio(namespace, "data.tar")
 				}, 60).Should(BeNumerically(">=", 2))
 			})
 
-			assertSuspendScheduleBackups(namespace, scheduledBackupName)
+			AssertSuspendScheduleBackups(namespace, scheduledBackupName)
 		})
 
 		// Create a scheduled backup with the 'immediate' option enable. We expect the backup to be available
@@ -191,7 +191,7 @@ var _ = Describe("Backup and restore", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the credentials for minio", func() {
-				assertStorageCredentialsAreCreated(namespace, "minio", "minio123")
+				AssertStorageCredentialsAreCreated(namespace, "minio", "minio123")
 			})
 
 			By("setting up minio", func() {
@@ -206,9 +206,9 @@ var _ = Describe("Backup and restore", func() {
 
 			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
 
-			assertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
+			AssertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
 
-			// assertScheduledBackupsImmediate creates at least two backups, we should find
+			// AssertScheduledBackupsImmediate creates at least two backups, we should find
 			// their base backups
 			Eventually(func() (int, error) {
 				return countFilesOnMinio(namespace, "data.tar")
@@ -227,7 +227,7 @@ var _ = Describe("Backup and restore", func() {
 			err = createClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, currentTimeStamp)
 			Expect(err).NotTo(HaveOccurred())
 
-			assertClusterRestorePITR(namespace, restoredClusterName)
+			AssertClusterRestorePITR(namespace, restoredClusterName)
 		})
 	})
 	Context("using azure blobs as object storage", func() {
@@ -263,7 +263,7 @@ var _ = Describe("Backup and restore", func() {
 			// The credentials are retrieved from the environment variables, as we can't create
 			// a fixture for them
 			By("creating the Azure Blob Storage credentials", func() {
-				assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
+				AssertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
 			})
 
 			// Create the cluster
@@ -271,7 +271,7 @@ var _ = Describe("Backup and restore", func() {
 
 			// Write a table and some data on the "app" database
 			AssertCreateTestData(namespace, clusterName, tableName)
-			assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+			AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 			By("uploading a backup", func() {
 				// We create a backup
 				backupFile := fixturesDir + "/backup/azure_blob/backup-azure-blob.yaml"
@@ -291,7 +291,7 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			// Restore backup in a new cluster
-			assertClusterRestore(namespace, clusterRestoreSampleFile)
+			AssertClusterRestore(namespace, clusterRestoreSampleFile)
 		})
 
 		// We create a cluster, create a scheduled backup, patch it to suspend its
@@ -314,21 +314,21 @@ var _ = Describe("Backup and restore", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the Azure Blob Storage credentials", func() {
-				assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
+				AssertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
 			})
 
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			By("scheduling backups", func() {
-				assertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 480)
+				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 480)
 
-				// assertScheduledBackupsImmediate creates at least two backups, we should find
+				// AssertScheduledBackupsImmediate creates at least two backups, we should find
 				// their base backups
 				Eventually(func() (int, error) {
 					return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
 				}, 60).Should(BeNumerically(">=", 2))
 			})
-			assertSuspendScheduleBackups(namespace, scheduledBackupName)
+			AssertSuspendScheduleBackups(namespace, scheduledBackupName)
 		})
 
 		// Create a scheduled backup with the 'immediate' option enabled. We expect the backup to be available
@@ -346,11 +346,11 @@ var _ = Describe("Backup and restore", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the Azure Blob Storage credentials", func() {
-				assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
+				AssertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
 			})
 
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
-			assertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
+			AssertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
 
 			// Only one data.tar files should be present
 			Eventually(func() (int, error) {
@@ -378,13 +378,13 @@ var _ = Describe("Backup and restore", func() {
 				azStorageAccount,
 				azStorageKey)
 
-			assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+			AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 
 			err = createClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, currentTimeStamp)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Restore backup in a new cluster
-			assertClusterRestorePITR(namespace, restoredClusterName)
+			AssertClusterRestorePITR(namespace, restoredClusterName)
 		})
 	})
 
@@ -419,7 +419,7 @@ var _ = Describe("Backup and restore", func() {
 			prepareClusterBackupOnAzurite(namespace, clusterName, azuriteBlobSampleFile, backupFile)
 
 			// Restore backup in a new cluster
-			assertClusterRestore(namespace, clusterRestoreSampleFile)
+			AssertClusterRestore(namespace, clusterRestoreSampleFile)
 		})
 
 		// We create a cluster, create a scheduled backup, patch it to suspend its
@@ -436,13 +436,13 @@ var _ = Describe("Backup and restore", func() {
 			prepareClusterOnAzurite(namespace, clusterName, azuriteBlobSampleFile)
 
 			By("scheduling backups", func() {
-				assertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
+				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
 				Eventually(func() (int, error) {
 					return countFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 				}, 60).Should(BeNumerically(">=", 2))
 			})
 
-			assertSuspendScheduleBackups(namespace, scheduledBackupName)
+			AssertSuspendScheduleBackups(namespace, scheduledBackupName)
 		})
 
 		// Create a scheduled backup with the 'immediate' option enabled.
@@ -454,11 +454,12 @@ var _ = Describe("Backup and restore", func() {
 			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupImmediateSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
+			// Restore backup in a new cluster
 			prepareClusterOnAzurite(namespace, clusterName, azuriteBlobSampleFile)
 
-			assertScheduledBackupsImmediate(namespace, scheduledBackupImmediateSampleFile, scheduledBackupName)
+			AssertScheduledBackupsImmediate(namespace, scheduledBackupImmediateSampleFile, scheduledBackupName)
 
-			// assertScheduledBackupsImmediate creates at least two backups, we should find
+			// AssertScheduledBackupsImmediate creates at least two backups, we should find
 			// their base backups
 			Eventually(func() (int, error) {
 				return countFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
@@ -476,24 +477,26 @@ var _ = Describe("Backup and restore", func() {
 			err = createClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, currentTimeStamp)
 			Expect(err).NotTo(HaveOccurred())
 
-			assertClusterRestorePITR(namespace, restoredClusterName)
+			AssertClusterRestorePITR(namespace, restoredClusterName)
 		})
 	})
 })
 
 var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 	const (
-		fixturesBackupDir          = fixturesDir + "/backup/recovery_external_clusters/"
-		externalClusterFileMinio   = fixturesBackupDir + "external-clusters-minio-03.yaml"
-		sourceBackupFileMinio      = fixturesBackupDir + "backup-minio-02.yaml"
-		clusterSourceFileMinio     = fixturesBackupDir + "source-cluster-minio-01.yaml"
-		sourceBackupFileAzure      = fixturesBackupDir + "backup-azure-blob-02.yaml"
-		clusterSourceFileAzure     = fixturesBackupDir + "source-cluster-azure-blob-01.yaml"
-		externalClusterFileAzure   = fixturesBackupDir + "external-clusters-azure-blob-03.yaml"
-		clusterSourceFileAzurePITR = fixturesBackupDir + "source-cluster-azure-blob-pitr.yaml"
-		sourceBackupFileAzurePITR  = fixturesBackupDir + "backup-azure-blob-pitr.yaml"
-		externalClusterFileAzurite = fixturesBackupDir + "external-clusters-azurite-03.yaml"
-		backupFileAzurite          = fixturesBackupDir + "backup-azurite-02.yaml"
+		fixturesBackupDir               = fixturesDir + "/backup/recovery_external_clusters/"
+		externalClusterFileMinio        = fixturesBackupDir + "external-clusters-minio-03.yaml"
+		externalClusterFileMinioReplica = fixturesBackupDir + "external-clusters-minio-replica-04.yaml"
+		sourceBackupFileMinio           = fixturesBackupDir + "backup-minio-02.yaml"
+		clusterSourceFileMinio          = fixturesBackupDir + "source-cluster-minio-01.yaml"
+		sourceBackupFileAzure           = fixturesBackupDir + "backup-azure-blob-02.yaml"
+		clusterSourceFileAzure          = fixturesBackupDir + "source-cluster-azure-blob-01.yaml"
+		externalClusterFileAzure        = fixturesBackupDir + "external-clusters-azure-blob-03.yaml"
+		clusterSourceFileAzurePITR      = fixturesBackupDir + "source-cluster-azure-blob-pitr.yaml"
+		sourceBackupFileAzurePITR       = fixturesBackupDir + "backup-azure-blob-pitr.yaml"
+		externalClusterFileAzurite      = fixturesBackupDir + "external-clusters-azurite-03.yaml"
+		backupFileAzurite               = fixturesBackupDir + "backup-azurite-02.yaml"
+		tableName                       = "to_restore"
 	)
 
 	JustAfterEach(func() {
@@ -521,7 +524,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 			By("creating the credentials for minio", func() {
-				assertStorageCredentialsAreCreated(namespace, "minio", "minio123")
+				AssertStorageCredentialsAreCreated(namespace, "minio", "minio123")
 			})
 			By("setting up minio", func() {
 				installMinio(namespace)
@@ -539,7 +542,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			// Write a table and some data on the "app" database
 			AssertCreateTestData(namespace, clusterName, tableName)
 
-			assertArchiveWalOnMinio(namespace, clusterName)
+			AssertArchiveWalOnMinio(namespace, clusterName)
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
@@ -558,7 +561,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 			// Restoring cluster using a recovery barman object store, which is defined
 			// in the externalClusters section
-			assertClusterRestore(namespace, externalClusterFileMinio)
+			AssertClusterRestore(namespace, externalClusterFileMinio)
 
 			// verify test data on restored external cluster
 			primaryPodInfo, err := env.GetClusterPrimary(namespace, externalClusterName)
@@ -579,7 +582,54 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				namespace, externalClusterRestoreName, clusterName, currentTimeStamp)
 
 			Expect(err).NotTo(HaveOccurred())
-			assertClusterRestorePITR(namespace, externalClusterRestoreName)
+			AssertClusterRestorePITR(namespace, externalClusterRestoreName)
+		})
+		It("restore cluster from barman object using replica option in spec", func() {
+			namespace = "recovery-barman-object-replica-minio"
+			clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileMinio)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Create a cluster in a namespace we'll delete after the test
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			By("creating the credentials for minio", func() {
+				AssertStorageCredentialsAreCreated(namespace, "minio", "minio123")
+			})
+			By("setting up minio", func() {
+				installMinio(namespace)
+			})
+
+			// Create the minio client pod and wait for it to be ready.
+			// We'll use it to check if everything is archived correctly.
+			By("setting up minio client pod", func() {
+				installMinioClient(namespace)
+			})
+
+			// Create the Cluster
+			AssertCreateCluster(namespace, clusterName, clusterSourceFileMinio, env)
+
+			// Write a table and some data on the "app" database
+			AssertCreateTestData(namespace, clusterName, tableName)
+
+			AssertArchiveWalOnMinio(namespace, clusterName)
+
+			// There should be a backup resource and
+			By("backing up a cluster and verifying it exists on minio", func() {
+				executeBackup(namespace, sourceBackupFileMinio)
+				Eventually(func() (int, error) {
+					return countFilesOnMinio(namespace, "data.tar")
+				}, 30).Should(BeEquivalentTo(1))
+			})
+
+			// Replicating a cluster with asynchronous replication
+			AssertClusterAsyncReplica(namespace, clusterSourceFileMinio, externalClusterFileMinioReplica)
+			// verify test data on restored external cluster
+			externalClusterName, err := env.GetResourceNameFromYAML(externalClusterFileMinioReplica)
+			Expect(err).ToNot(HaveOccurred())
+
+			primaryPodInfo, err := env.GetClusterPrimary(namespace, externalClusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertTestDataExpectedCount(namespace, primaryPodInfo.GetName(), tableName, 4)
 		})
 	})
 
@@ -610,7 +660,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			// a fixture for them
 			By("creating the Azure Blob Storage credentials",
 				func() {
-					assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
+					AssertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
 				})
 
 			// Create the cluster
@@ -618,7 +668,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 			// Write a table and some data on the "app" database
 			AssertCreateTestData(namespace, clusterName, tableName)
-			assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+			AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 
 			By("backing up a cluster and verifying it exists on azure blob storage", func() {
 				// Create the backup
@@ -638,7 +688,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 			// Restoring cluster using a recovery barman object store, which is defined
 			// in the externalClusters section
-			assertClusterRestore(namespace, externalClusterFileAzure)
+			AssertClusterRestore(namespace, externalClusterFileAzure)
 
 			// verify test data on restored external cluster
 			primaryPodInfo, err := env.GetClusterPrimary(namespace, externalClusterName)
@@ -667,7 +717,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 			// Restoring cluster using a recovery barman object store, which is defined
 			// in the externalClusters section
-			assertClusterRestorePITR(namespace, externalClusterName)
+			AssertClusterRestorePITR(namespace, externalClusterName)
 		})
 	})
 
@@ -681,7 +731,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			prepareClusterBackupOnAzurite(namespace, clusterName, azuriteBlobSampleFile, backupFileAzurite)
 
 			// Restore backup in a new cluster
-			assertClusterRestore(namespace, externalClusterFileAzurite)
+			AssertClusterRestore(namespace, externalClusterFileAzurite)
 		})
 
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
@@ -698,12 +748,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				namespace, externalClusterRestoreName, clusterName, currentTimeStamp)
 			Expect(err).NotTo(HaveOccurred())
 
-			assertClusterRestorePITR(namespace, externalClusterRestoreName)
+			AssertClusterRestorePITR(namespace, externalClusterRestoreName)
 		})
 	})
 })
 
-func assertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string, timeout int) {
+func AssertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string, timeout int) {
 	_, _, err := tests.Run(fmt.Sprintf(
 		"kubectl apply -n %v -f %v",
 		namespace, backupYAMLPath))
@@ -732,7 +782,7 @@ func assertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string,
 	}, timeout).Should(BeNumerically(">=", 2))
 }
 
-func assertStorageCredentialsAreCreated(namespace string, id string, key string) {
+func AssertStorageCredentialsAreCreated(namespace string, id string, key string) {
 	_, _, err := tests.Run(fmt.Sprintf("kubectl create secret generic backup-storage-creds -n %v "+
 		"--from-literal=ID=%v "+
 		"--from-literal=KEY=%v",
@@ -740,7 +790,61 @@ func assertStorageCredentialsAreCreated(namespace string, id string, key string)
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func assertStorageCredentialsAreCreatedOnAzurite(namespace string) {
+func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile string) {
+	By("Async Replication into external cluster", func() {
+		restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
+		Expect(err).ToNot(HaveOccurred())
+		_, _, err = tests.Run(fmt.Sprintf(
+			"kubectl apply -n %v -f %v",
+			namespace, restoreClusterFile))
+		Expect(err).ToNot(HaveOccurred())
+
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, restoredClusterName, 800, env)
+
+		// Test data should be present on restored primary
+		primaryReplica := restoredClusterName + "-1"
+		postgresLogin := "psql -U postgres app -tAc "
+
+		// Assert that the initial data is there from the create function
+		cmd := postgresLogin + "'SELECT count(*) FROM to_restore'"
+		out, _, err := tests.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primaryReplica,
+			cmd))
+		Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
+
+		// Add additional data to the source cluster
+		sourceClusterName, err := env.GetResourceNameFromYAML(sourceClusterFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		AssertInsertTestData(namespace, sourceClusterName, "to_restore")
+
+		// Assert that the new data is replicated
+		cmd = postgresLogin + fmt.Sprintf("'SELECT count(*) FROM %v'", "to_restore")
+
+		Eventually(func() (string, error) {
+			out, _, err = tests.Run(fmt.Sprintf(
+				"kubectl exec -n %v %v -- %v",
+				namespace,
+				primaryReplica,
+				cmd))
+			return strings.Trim(out, "\n"), err
+		}, 300).Should(BeEquivalentTo("4"))
+
+		// Cascading replicas should be attached to primary replica
+		cmd = postgresLogin + "'SELECT count(*) FROM pg_stat_replication'"
+		out, _, err = tests.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primaryReplica,
+			cmd))
+		Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
+	})
+}
+
+func AssertStorageCredentialsAreCreatedOnAzurite(namespace string) {
 	// This is required by Azurite deployment
 	secretFile := fixturesDir + "/backup/azurite/azurite-secret.yaml"
 	_, _, err := tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
@@ -748,7 +852,7 @@ func assertStorageCredentialsAreCreatedOnAzurite(namespace string) {
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func assertClusterRestore(namespace string, restoreClusterFile string) {
+func AssertClusterRestore(namespace string, restoreClusterFile string) {
 	By("Restoring a backup in a new cluster", func() {
 		restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
 		Expect(err).ToNot(HaveOccurred())
@@ -789,6 +893,38 @@ func assertClusterRestore(namespace string, restoreClusterFile string) {
 			primary,
 			cmd))
 		Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
+	})
+}
+
+func AssertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupName string) {
+	By("scheduling immediate backups", func() {
+		var err error
+		// Create the ScheduledBackup
+		_, _, err = tests.Run(fmt.Sprintf(
+			"kubectl apply -n %v -f %v",
+			namespace, backupYAMLPath))
+		Expect(err).NotTo(HaveOccurred())
+
+		// We expect the scheduled backup to be scheduled after creation
+		scheduledBackupNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      scheduledBackupName,
+		}
+		Eventually(func() (*v1.Time, error) {
+			scheduledBackup := &apiv1.ScheduledBackup{}
+			err = env.Client.Get(env.Ctx,
+				scheduledBackupNamespacedName, scheduledBackup)
+			return scheduledBackup.Status.LastScheduleTime, err
+		}, 30).ShouldNot(BeNil())
+
+		// backup count should be 1 that is immediate one
+		Eventually(func() (int, error) {
+			currentBackupCount, err := getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
+			if err != nil {
+				return 0, err
+			}
+			return currentBackupCount, err
+		}, 60).Should(BeNumerically("==", 1))
 	})
 }
 
@@ -893,67 +1029,7 @@ func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupNam
 	return completed, nil
 }
 
-func getScheduledBackupBackups(namespace string, scheduledBackupName string) ([]apiv1.Backup, error) {
-	scheduledBackupNamespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      scheduledBackupName,
-	}
-	// Get all the backups that are children of the ScheduledBackup
-	scheduledBackup := &apiv1.ScheduledBackup{}
-	err := env.Client.Get(env.Ctx, scheduledBackupNamespacedName,
-		scheduledBackup)
-	backups := &apiv1.BackupList{}
-	if err != nil {
-		return nil, err
-	}
-	err = env.Client.List(env.Ctx, backups,
-		ctrlclient.InNamespace(namespace))
-	if err != nil {
-		return nil, err
-	}
-	ret := []apiv1.Backup{}
-
-	for _, backup := range backups.Items {
-		if strings.HasPrefix(backup.Name, scheduledBackup.Name+"-") {
-			ret = append(ret, backup)
-		}
-	}
-	return ret, nil
-}
-
-func assertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupName string) {
-	By("scheduling immediate backups", func() {
-		var err error
-		// Create the ScheduledBackup
-		_, _, err = tests.Run(fmt.Sprintf(
-			"kubectl apply -n %v -f %v",
-			namespace, backupYAMLPath))
-		Expect(err).NotTo(HaveOccurred())
-
-		// We expect the scheduled backup to be scheduled after creation
-		scheduledBackupNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      scheduledBackupName,
-		}
-		Eventually(func() (*v1.Time, error) {
-			scheduledBackup := &apiv1.ScheduledBackup{}
-			err = env.Client.Get(env.Ctx,
-				scheduledBackupNamespacedName, scheduledBackup)
-			return scheduledBackup.Status.LastScheduleTime, err
-		}, 30).ShouldNot(BeNil())
-
-		// backup count should be 1 that is immediate one
-		Eventually(func() (int, error) {
-			currentBackupCount, err := getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
-			if err != nil {
-				return 0, err
-			}
-			return currentBackupCount, err
-		}, 60).Should(BeNumerically("==", 1))
-	})
-}
-
-func assertSuspendScheduleBackups(namespace, scheduledBackupName string) {
+func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 	var completedBackupsCount int
 	var err error
 	By("suspending the scheduled backup", func() {
@@ -1015,6 +1091,136 @@ func assertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 	})
 }
 
+func AssertArchiveWalOnMinio(namespace, clusterName string) {
+	// Create a WAL on the primary and check if it arrives at minio, within a short time
+	By("archiving WALs and verifying they exist", func() {
+		primary := clusterName + "-1"
+		out, _, err := tests.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primary,
+			switchWalCmd))
+		Expect(err).ToNot(HaveOccurred())
+
+		latestWAL := strings.TrimSpace(out)
+		Eventually(func() (int, error) {
+			// WALs are compressed with gzip in the fixture
+			return countFilesOnMinio(namespace, latestWAL+".gz")
+		}, 30).Should(BeEquivalentTo(1))
+	})
+}
+
+func AssertClusterRestorePITR(namespace, clusterName string) {
+	primaryInfo := &corev1.Pod{}
+	var err error
+
+	By("restoring a backup cluster with PITR in a new cluster", func() {
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, clusterName, 800, env)
+
+		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Restored primary should be on timeline 2
+		query := "select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)"
+		stdOut, _, err := env.ExecCommand(env.Ctx, *primaryInfo, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Trim(stdOut, "\n"), err).To(Equal("00000002"))
+
+		// Restored standby should be attached to restored primary
+		query = "SELECT count(*) FROM pg_stat_replication"
+		stdOut, _, err = env.ExecCommand(env.Ctx, *primaryInfo, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Trim(stdOut, "\n"), err).To(BeEquivalentTo("2"))
+	})
+
+	By(fmt.Sprintf("after restored, 3rd entry should not be exists in table '%v'", tableName), func() {
+		// Only 2 entries should be present
+		AssertTestDataExpectedCount(namespace, primaryInfo.GetName(), tableName, 2)
+	})
+}
+
+func AssertArchiveWalOnAzurite(namespace, clusterName string) {
+	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
+	By("archiving WALs and verifying they exist", func() {
+		primary := clusterName + "-1"
+		out, _, err := tests.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primary,
+			switchWalCmd))
+		Expect(err).ToNot(HaveOccurred())
+
+		latestWAL := strings.TrimSpace(out)
+		// verifying on blob storage using az
+		// Define what file we are looking for in Azurite.
+		// Escapes are required since az expects forward slashes to be escaped
+		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
+		// verifying on blob storage using az
+		Eventually(func() (int, error) {
+			return countFilesOnAzuriteBlobStorage(namespace, clusterName, path)
+		}, 60).Should(BeEquivalentTo(1))
+	})
+}
+
+func AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey string) {
+	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage, within a short time
+	By("archiving WALs and verifying they exist", func() {
+		primary := clusterName + "-1"
+		out, _, err := tests.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primary,
+			switchWalCmd))
+		Expect(err).ToNot(HaveOccurred())
+
+		latestWAL := strings.TrimSpace(out)
+		// Define what file we are looking for in Azure.
+		// Escapes are required since az expects forward slashes to be escaped
+		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
+		// Verifying on blob storage using az
+		Eventually(func() (int, error) {
+			return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, path)
+		}, 30).Should(BeEquivalentTo(1))
+	})
+}
+
+func composeAzBlobListAzuriteCmd(clusterName string, path string) string {
+	return fmt.Sprintf("az storage blob list --container-name %v --query \"[?contains(@.name, \\`%v\\`)].name\" "+
+		"--connection-string $AZURE_CONNECTION_STRING",
+		clusterName, path)
+}
+
+func getScheduledBackupBackups(namespace string, scheduledBackupName string) ([]apiv1.Backup, error) {
+	scheduledBackupNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      scheduledBackupName,
+	}
+	// Get all the backups that are children of the ScheduledBackup
+	scheduledBackup := &apiv1.ScheduledBackup{}
+	err := env.Client.Get(env.Ctx, scheduledBackupNamespacedName,
+		scheduledBackup)
+	backups := &apiv1.BackupList{}
+	if err != nil {
+		return nil, err
+	}
+	err = env.Client.List(env.Ctx, backups,
+		ctrlclient.InNamespace(namespace))
+	if err != nil {
+		return nil, err
+	}
+	ret := []apiv1.Backup{}
+
+	for _, backup := range backups.Items {
+		if strings.HasPrefix(backup.Name, scheduledBackup.Name+"-") {
+			ret = append(ret, backup)
+		}
+	}
+	return ret, nil
+}
+
 func composeFindMinioCmd(path string, serviceName string) string {
 	return fmt.Sprintf("sh -c 'mc find %v --name %v | wc -l'", serviceName, path)
 }
@@ -1053,76 +1259,6 @@ func countFilesOnAzureBlobStorage(
 	var arr []string
 	err = json.Unmarshal([]byte(out), &arr)
 	return len(arr), err
-}
-
-func assertArchiveWalOnMinio(namespace, clusterName string) {
-	// Create a WAL on the primary and check if it arrives at minio, within a short time
-	By("archiving WALs and verifying they exist", func() {
-		primary := clusterName + "-1"
-		out, _, err := tests.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			namespace,
-			primary,
-			switchWalCmd))
-		Expect(err).ToNot(HaveOccurred())
-
-		latestWAL := strings.TrimSpace(out)
-		Eventually(func() (int, error) {
-			// WALs are compressed with gzip in the fixture
-			return countFilesOnMinio(namespace, latestWAL+".gz")
-		}, 30).Should(BeEquivalentTo(1))
-	})
-}
-
-func assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey string) {
-	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage, within a short time
-	By("archiving WALs and verifying they exist", func() {
-		primary := clusterName + "-1"
-		out, _, err := tests.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			namespace,
-			primary,
-			switchWalCmd))
-		Expect(err).ToNot(HaveOccurred())
-
-		latestWAL := strings.TrimSpace(out)
-		// Define what file we are looking for in Azure.
-		// Escapes are required since az expects forward slashes to be escaped
-		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
-		// Verifying on blob storage using az
-		Eventually(func() (int, error) {
-			return countFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, path)
-		}, 30).Should(BeEquivalentTo(1))
-	})
-}
-
-func assertArchiveWalOnAzurite(namespace, clusterName string) {
-	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
-	By("archiving WALs and verifying they exist", func() {
-		primary := clusterName + "-1"
-		out, _, err := tests.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			namespace,
-			primary,
-			switchWalCmd))
-		Expect(err).ToNot(HaveOccurred())
-
-		latestWAL := strings.TrimSpace(out)
-		// verifying on blob storage using az
-		// Define what file we are looking for in Azurite.
-		// Escapes are required since az expects forward slashes to be escaped
-		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
-		// verifying on blob storage using az
-		Eventually(func() (int, error) {
-			return countFilesOnAzuriteBlobStorage(namespace, clusterName, path)
-		}, 60).Should(BeEquivalentTo(1))
-	})
-}
-
-func composeAzBlobListAzuriteCmd(clusterName string, path string) string {
-	return fmt.Sprintf("az storage blob list --container-name %v --query \"[?contains(@.name, \\`%v\\`)].name\" "+
-		"--connection-string $AZURE_CONNECTION_STRING",
-		clusterName, path)
 }
 
 func countFilesOnAzuriteBlobStorage(
@@ -1434,38 +1570,6 @@ func createClusterFromExternalClusterBackupWithPITROnAzurite(
 	return env.Client.Create(env.Ctx, restoreCluster)
 }
 
-func assertClusterRestorePITR(namespace, clusterName string) {
-	primaryInfo := &corev1.Pod{}
-	var err error
-
-	By("restoring a backup cluster with PITR in a new cluster", func() {
-		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, clusterName, 800, env)
-
-		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Restored primary should be on timeline 2
-		query := "select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)"
-		stdOut, _, err := env.ExecCommand(env.Ctx, *primaryInfo, "postgres",
-			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(strings.Trim(stdOut, "\n"), err).To(Equal("00000002"))
-
-		// Restored standby should be attached to restored primary
-		query = "SELECT count(*) FROM pg_stat_replication"
-		stdOut, _, err = env.ExecCommand(env.Ctx, *primaryInfo, "postgres",
-			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(strings.Trim(stdOut, "\n"), err).To(BeEquivalentTo("2"))
-	})
-
-	By(fmt.Sprintf("after restored, 3rd entry should not be exists in table '%v'", tableName), func() {
-		// Only 2 entries should be present
-		AssertTestDataExpectedCount(namespace, primaryInfo.GetName(), tableName, 2)
-	})
-}
-
 // getCurrentTimeStamp getting current time stamp from postgres server
 func getCurrentTimeStamp(namespace, clusterName string) (string, error) {
 	primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
@@ -1510,7 +1614,7 @@ func prepareClusterForPITROnMinio(
 	Expect(err).ToNot(HaveOccurred())
 
 	By("creating the credentials for minio", func() {
-		assertStorageCredentialsAreCreated(namespace, "minio", "minio123")
+		AssertStorageCredentialsAreCreated(namespace, "minio", "minio123")
 	})
 
 	By("setting up minio", func() {
@@ -1553,7 +1657,7 @@ func prepareClusterForPITROnMinio(
 		err = insertRecordIntoTestTable(namespace, clusterName, tableName, 3)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	assertArchiveWalOnMinio(namespace, clusterName)
+	AssertArchiveWalOnMinio(namespace, clusterName)
 }
 
 func prepareClusterForPITROnAzureBlob(
@@ -1570,7 +1674,7 @@ func prepareClusterForPITROnAzureBlob(
 	// The credentials are retrieved from the environment variables, as we can't create
 	// a fixture for them
 	By("creating the Azure Blob Storage credentials", func() {
-		assertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
+		AssertStorageCredentialsAreCreated(namespace, azStorageAccount, azStorageKey)
 	})
 
 	// Create the cluster
@@ -1603,7 +1707,7 @@ func prepareClusterForPITROnAzureBlob(
 		err = insertRecordIntoTestTable(namespace, clusterName, tableName, 3)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	assertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+	AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 }
 
 func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
@@ -1612,7 +1716,7 @@ func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
 	Expect(err).ToNot(HaveOccurred())
 
 	By("creating the Azurite storage credentials", func() {
-		assertStorageCredentialsAreCreatedOnAzurite(namespace)
+		AssertStorageCredentialsAreCreatedOnAzurite(namespace)
 	})
 
 	By("setting up Azurite to hold the backups", func() {
@@ -1635,7 +1739,7 @@ func prepareClusterBackupOnAzurite(namespace, clusterName, clusterSampleFile, ba
 	prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile)
 	// Write a table and some data on the "app" database
 	AssertCreateTestData(namespace, clusterName, tableName)
-	assertArchiveWalOnAzurite(namespace, clusterName)
+	AssertArchiveWalOnAzurite(namespace, clusterName)
 
 	By("backing up a cluster and verifying it exists on azurite", func() {
 		// We create a Backup
@@ -1690,5 +1794,5 @@ func prepareClusterForPITROnAzurite(
 		err := insertRecordIntoTestTable(namespace, clusterName, tableName, 3)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	assertArchiveWalOnAzurite(namespace, clusterName)
+	AssertArchiveWalOnAzurite(namespace, clusterName)
 }
