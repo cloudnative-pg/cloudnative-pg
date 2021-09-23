@@ -473,6 +473,7 @@ func (instance *Instance) PgIsReady() error {
 	// We just use the environment variables we already have
 	// to pass the connection parameters
 	options := []string{
+		"-U", "postgres",
 		"-d", "postgres",
 		"-q",
 	}
