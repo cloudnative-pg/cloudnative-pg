@@ -492,7 +492,7 @@ jobs:
         name: Create AKS cluster
         uses: nick-invision/retry@v2
         with:
-          timeout_minutes: 3
+          timeout_minutes: 10
           max_attempts: 3
           command: |
             az extension add --name aks-preview
