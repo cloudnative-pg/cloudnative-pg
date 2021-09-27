@@ -125,5 +125,5 @@ export PATH=${ROOT_DIR}/bin/:${PATH}
 mkdir -p "${ROOT_DIR}/tests/e2e/out"
 # Create at most 4 testing nodes. Using -p instead of --nodes
 # would create CPUs-1 nodes and saturate the testing server
-ginkgo --nodes=4 --slow-spec-threshold=5m --label-filter "!(upgrade)" -v "${ROOT_DIR}/tests/e2e/..." || RC=$?
+ginkgo --nodes=4 --timeout 2h --slow-spec-threshold 5m --label-filter "!(upgrade)" -v "${ROOT_DIR}/tests/e2e/..." || RC=$?
 exit $RC
