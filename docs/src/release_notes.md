@@ -2,6 +2,30 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.9.0
+
+**Release date:** 27 September 2021
+
+Features:
+
+- Add Kubernetes 1.22 to the list of supported Kubernetes distributions, and
+  remove 1.16
+- Introduce support for the `--restore-target-wal` option in `pg_rewind`, in
+  order to fetch WAL files from the backup archive, if necessary (available
+  only with PostgreSQL 13+)
+- Expose a default metric for the Prometheus exporter that estimates the number
+  of pages in the `pg_catalog.pg_largeobject` table in each database
+- Enhance the performance of WAL archiving and fetching, through local in-memory
+  cache
+
+Fixes:
+
+- Explicitly set the `postgres` user when invoking `pg_isready` - required by
+  restricted SCC in OpenShift
+- Properly update the `FirstRecoverabilityPoint` in the status
+- Set `archive_mode = always` on the designated primary if backup is requested
+- Minor bug fixes
+
 ## Version 1.8.0
 
 **Release date:** 13 September 2021
