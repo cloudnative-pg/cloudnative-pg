@@ -55,12 +55,12 @@ class MajorVersionList(dict):
 # Kubernetes versions to use during the tests
 K8S = VersionList(
     [
-        "v1.21.1",
+        "v1.22.1",
+        "v1.21.2",
         "v1.20.7",
         "v1.19.11",
         "v1.18.19",
         "v1.17.17",
-        "v1.16.15",
     ]
 )
 

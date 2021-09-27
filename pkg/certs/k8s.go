@@ -381,7 +381,7 @@ func DumpSecretToDir(secret *v1.Secret, certDir string, basename string) error {
 // ones for a certain mutating webhook configuration
 func (pki PublicKeyInfrastructure) InjectPublicKeyIntoMutatingWebhook(
 	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret) error {
-	config, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
+	config, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
 		ctx, pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -391,7 +391,7 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoMutatingWebhook(
 		config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
 	}
 
-	_, err = client.AdmissionregistrationV1beta1().
+	_, err = client.AdmissionregistrationV1().
 		MutatingWebhookConfigurations().
 		Update(ctx, config, metav1.UpdateOptions{})
 	return err
@@ -401,7 +401,7 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoMutatingWebhook(
 // ones for a certain validating webhook configuration
 func (pki PublicKeyInfrastructure) InjectPublicKeyIntoValidatingWebhook(
 	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret) error {
-	config, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
+	config, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
 		ctx, pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -411,7 +411,7 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoValidatingWebhook(
 		config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
 	}
 
-	_, err = client.AdmissionregistrationV1beta1().
+	_, err = client.AdmissionregistrationV1().
 		ValidatingWebhookConfigurations().
 		Update(ctx, config, metav1.UpdateOptions{})
 	return err

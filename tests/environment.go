@@ -524,7 +524,7 @@ func (env TestingEnvironment) checkWebhookReady(namespace string) error {
 	ca := secret.Data["tls.crt"]
 
 	ctx := context.Background()
-	mutatingWebhookConfig, err := env.Interface.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
+	mutatingWebhookConfig, err := env.Interface.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
 		ctx, controller.MutatingWebhookConfigurationName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -537,7 +537,7 @@ func (env TestingEnvironment) checkWebhookReady(namespace string) error {
 		}
 	}
 
-	validatingWebhookConfig, err := env.Interface.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
+	validatingWebhookConfig, err := env.Interface.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
 		ctx, controller.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 	if err != nil {
 		return err

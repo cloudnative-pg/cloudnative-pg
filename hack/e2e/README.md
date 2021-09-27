@@ -37,7 +37,7 @@ All flags have corresponding environment variables labeled `(Env:...` in the bel
 |--------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
 | -r\|--registry                       | Enable local registry. (Env: `ENABLE_REGISTRY`)                                                                               |
 | -e\|--engine <CLUSTER_ENGINE>        | Use the provided ENGINE to run the cluster. Available options are 'kind' and 'k3d'. Default 'kind'. (Env: `CLUSTER_ENGINE`) |
-| -k\|--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.21.1`). (Env: `K8S_VERSION`)                                   |
+| -k\|--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.22.1`). (Env: `K8S_VERSION`)                                   |
 | -n\|--nodes <NODES>                  | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
 
 

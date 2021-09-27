@@ -13,7 +13,7 @@ import (
 	"path"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	fakeApiExtension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,24 +40,24 @@ var (
 		},
 	}
 
-	mutatingWebhookTemplate = v1beta1.MutatingWebhookConfiguration{
+	mutatingWebhookTemplate = admissionregistrationv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: pkiEnvironmentTemplate.MutatingWebhookConfigurationName,
 		},
-		Webhooks: []v1beta1.MutatingWebhook{
+		Webhooks: []admissionregistrationv1.MutatingWebhook{
 			{
-				ClientConfig: v1beta1.WebhookClientConfig{},
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{},
 			},
 		},
 	}
 
-	validatingWebhookTemplate = v1beta1.ValidatingWebhookConfiguration{
+	validatingWebhookTemplate = admissionregistrationv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: pkiEnvironmentTemplate.ValidatingWebhookConfigurationName,
 		},
-		Webhooks: []v1beta1.ValidatingWebhook{
+		Webhooks: []admissionregistrationv1.ValidatingWebhook{
 			{
-				ClientConfig: v1beta1.WebhookClientConfig{},
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{},
 			},
 		},
 	}
@@ -251,7 +251,7 @@ var _ = Describe("TLS certificates injection", func() {
 		err := pki.InjectPublicKeyIntoMutatingWebhook(context.TODO(), clientSet, webhookSecret)
 		Expect(err).To(BeNil())
 
-		updatedWebhook, err := clientSet.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
+		updatedWebhook, err := clientSet.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
 			context.TODO(), pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 
@@ -266,7 +266,7 @@ var _ = Describe("TLS certificates injection", func() {
 		err := pki.InjectPublicKeyIntoValidatingWebhook(context.TODO(), clientSet, webhookSecret)
 		Expect(err).To(BeNil())
 
-		updatedWebhook, err := clientSet.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
+		updatedWebhook, err := clientSet.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
 			context.TODO(), pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 
@@ -303,12 +303,12 @@ var _ = Describe("Webhook environment creation", func() {
 		Expect(webhookSecret.Namespace).To(Equal(pki.OperatorNamespace))
 		Expect(webhookSecret.Name).To(Equal(pki.SecretName))
 
-		updatedMutatingWebhook, err := clientSet.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Get(
+		updatedMutatingWebhook, err := clientSet.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
 			ctx, pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 		Expect(updatedMutatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 
-		updatedValidatingWebhook, err := clientSet.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Get(
+		updatedValidatingWebhook, err := clientSet.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
 			ctx, pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 		Expect(err).To(BeNil())
 		Expect(updatedValidatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))

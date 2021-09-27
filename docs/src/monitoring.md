@@ -145,7 +145,7 @@ go_goroutines 25
 
 # HELP go_info Information about the Go environment.
 # TYPE go_info gauge
-go_info{version="go1.16.7"} 1
+go_info{version="go1.17.1"} 1
 
 # HELP go_memstats_alloc_bytes Number of bytes allocated and still in use.
 # TYPE go_memstats_alloc_bytes gauge
