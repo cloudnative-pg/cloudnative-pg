@@ -13,6 +13,11 @@ You can use the image `quay.io/enterprisedb/postgresql` for this scope,
 as it is composed of a community PostgreSQL image and the latest
 `barman-cli-cloud` package.
 
+A backup is performed from a primary or a designated primary instance in a
+`Cluster` (please refer to
+[replica clusters](replication.md#replication-from-an-external-postgresql-cluster)
+for more information about designated primary instances).
+
 !!! Warning
     Cloud Native PostgreSQL does not currently manage the deletion of backup files 
     from the backup object store. The retention policy feature will be merged from 

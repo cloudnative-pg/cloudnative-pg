@@ -53,11 +53,26 @@ func (r *InstanceReconciler) WriteReplicaConfiguration(
 }
 
 func (r *InstanceReconciler) writeReplicaConfigurationForReplica() (changed bool, err error) {
+	// The "archive_mode" setting could be set to "always" in the "postgresql.auto.conf"
+	// if the server was a designated primary before. We need make sure to remove it
+	// and fall back on the value defined in "custom.conf" that is always "on".
+	changed, err = postgres.RemoveArchiveModeFromPostgresAutoConf(r.instance.PgData)
+	if err != nil {
+		return changed, err
+	}
+
 	return postgres.UpdateReplicaConfiguration(r.instance.PgData, r.instance.ClusterName, r.instance.PodName)
 }
 
 func (r *InstanceReconciler) writeReplicaConfigurationForDesignatedPrimary(
 	ctx context.Context, cluster *apiv1.Cluster) (changed bool, err error) {
+	// On designated primary, we want the "archive_mode" parameter set to "always",
+	// so we can archive WAL files as if this instance would be a primary.
+	changed, err = postgres.SetArchiveModeToAlwaysIntoPostgresAutoConf(r.instance.PgData)
+	if err != nil {
+		return changed, err
+	}
+
 	server, ok := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
 	if !ok {
 		return false, fmt.Errorf("missing external cluster")

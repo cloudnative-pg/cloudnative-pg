@@ -165,6 +165,10 @@ If the external cluster contains a `connectionParameters` section:
   option in the designated primary instance, so that a WAL receiver
   process is started to connect to the source cluster and receive data
 
+The created replica cluster can perform backups in a reserved object store from
+the designated primary, enabling symmetric architectures in a distributed
+fashion.
+
 You have full flexibility and freedom to decide your favourite
 distributed architecture for a PostgreSQL database, by choosing:
 
