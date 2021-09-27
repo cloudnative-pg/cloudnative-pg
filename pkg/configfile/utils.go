@@ -8,9 +8,9 @@ package configfile
 
 import "strings"
 
-// SplitLines split the passed content into lines, returning an empty slice
+// splitLines split the passed content into lines, returning an empty slice
 // when the content is empty
-func SplitLines(content string) []string {
+func splitLines(content string) []string {
 	content = strings.TrimSuffix(content, "\n")
 	if content != "" {
 		return strings.Split(content, "\n")

@@ -33,7 +33,7 @@ func UpdatePostgresConfigurationFile(fileName string, options map[string]string)
 // UpdateConfigurationContents search and replace options in a configuration file whose
 // content is passed
 func UpdateConfigurationContents(content string, options map[string]string) string {
-	lines := SplitLines(content)
+	lines := splitLines(content)
 
 	// Change matching existing lines
 	resultContent := make([]string, 0, len(lines)+len(options))
@@ -69,6 +69,34 @@ func UpdateConfigurationContents(content string, options map[string]string) stri
 		if !foundKeys.Has(key) {
 			resultContent = append(resultContent, key+" = "+pq.QuoteLiteral(value))
 		}
+	}
+
+	return strings.Join(resultContent, "\n") + "\n"
+}
+
+// RemoveOptionFromConfigurationContents deletes the lines containing the given option a configuration file whose
+// content is passed
+func RemoveOptionFromConfigurationContents(content string, option string) string {
+	resultContent := []string{}
+
+	for _, line := range splitLines(content) {
+		// Keep empty lines and comments
+		trimLine := strings.TrimSpace(line)
+		if len(trimLine) == 0 || trimLine[0] == '#' {
+			resultContent = append(resultContent, line)
+			continue
+		}
+
+		kv := strings.SplitN(trimLine, "=", 2)
+		key := strings.TrimSpace(kv[0])
+
+		// If we find a line containing the input option,
+		// we skip it
+		if key == option {
+			continue
+		}
+
+		resultContent = append(resultContent, line)
 	}
 
 	return strings.Join(resultContent, "\n") + "\n"
