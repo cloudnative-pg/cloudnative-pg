@@ -5,7 +5,7 @@
 As a CNP operator developer you need the following executables available in
 the `PATH` environment variable:
 
-- Go 1.16+ compiler
+- Go 1.17+ compiler
 - GNU Make
 - [Kind](https://kind.sigs.k8s.io/) v0.11.x or greater
 - [golangci-lint](https://github.com/golangci/golangci-lint)

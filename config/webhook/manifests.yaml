@@ -1,13 +1,13 @@
 
 ---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -27,7 +27,7 @@ webhooks:
     - backups
   sideEffects: None
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -47,7 +47,7 @@ webhooks:
     - clusters
   sideEffects: None
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -67,7 +67,7 @@ webhooks:
     - scheduledbackups
   sideEffects: None
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -87,7 +87,7 @@ webhooks:
     - backups
   sideEffects: None
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -107,7 +107,7 @@ webhooks:
     - clusters
   sideEffects: None
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -128,14 +128,14 @@ webhooks:
   sideEffects: None
 
 ---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -155,7 +155,7 @@ webhooks:
     - backups
   sideEffects: None
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -175,7 +175,7 @@ webhooks:
     - clusters
   sideEffects: None
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -195,7 +195,7 @@ webhooks:
     - scheduledbackups
   sideEffects: None
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -215,7 +215,7 @@ webhooks:
     - backups
   sideEffects: None
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service
@@ -235,7 +235,7 @@ webhooks:
     - clusters
   sideEffects: None
 - admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       name: webhook-service

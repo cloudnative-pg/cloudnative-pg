@@ -68,8 +68,8 @@ if ! which ginkgo &>/dev/null; then
   install_go_module "github.com/onsi/ginkgo/ginkgo@a9b2e3398"
 fi
 
-# Skip upgrade tests on v14
-if [[ "${POSTGRES_IMG}" =~ "14-beta" ]]; then
+# Skip upgrade tests on Postgres 14 or Kubernetes 1.22
+if [[ "${POSTGRES_IMG}" =~ "14-beta" ]] || [[ "${K8S_VERSION}" =~ ^v1\.22 ]]; then
   TEST_UPGRADE_TO_V1=false
 fi
 
@@ -88,10 +88,10 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
   cp -r "${ROOT_DIR}/config"/* "${CONFIG_TMP_DIR}"
   (
       cd "${CONFIG_TMP_DIR}/default"
-      "${KUSTOMIZE}" edit add patch manager_image_pull_secret.yaml
+      "${KUSTOMIZE}" edit add patch --path manager_image_pull_secret.yaml
       cd "${CONFIG_TMP_DIR}/manager"
       "${KUSTOMIZE}" edit set image "controller=${CONTROLLER_IMG}"
-      "${KUSTOMIZE}" edit add patch env_override.yaml
+      "${KUSTOMIZE}" edit add patch --path env_override.yaml
       "${KUSTOMIZE}" edit add configmap controller-manager-env "--from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMG}"
   )
   "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml"

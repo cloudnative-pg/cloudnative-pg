@@ -20,7 +20,7 @@ specific to Kubernetes and PostgreSQL.
 | [Operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)                                       | An *operator* is a custom resource that automates those steps that are normally performed by a human operator when managing one or more applications or given services. An operator assists Kubernetes in making sure that the resource's defined state always matches the observed one.                                                                                                                                                                                                                                                                                                                       |
 | [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/)                                                 | `kubectl` is the command-line tool used to manage a Kubernetes cluster.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
-Cloud Native PostgreSQL requires Kubernetes 1.16 or higher.
+Cloud Native PostgreSQL requires Kubernetes 1.17 or higher.
 
 ## PostgreSQL terminology
 
