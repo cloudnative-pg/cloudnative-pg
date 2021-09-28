@@ -4,7 +4,7 @@ History of user-visible changes for Cloud Native PostgreSQL.
 
 ## Version 1.9.0
 
-**Release date:** 27 September 2021
+**Release date:** 28 September 2021
 
 Features:
 
