@@ -32,7 +32,7 @@ func NewCmd() *cobra.Command {
 }
 
 func statusSubCommand() error {
-	resp, err := http.Get(url.Local(url.PathPgStatus))
+	resp, err := http.Get(url.Local(url.PathPgStatus, url.StatusPort))
 	if err != nil {
 		log.Error(err, "Error while requesting instance status")
 		return err

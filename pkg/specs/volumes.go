@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
@@ -71,7 +72,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		},
 		{
 			Name:      "scratch-data",
-			MountPath: "/controller",
+			MountPath: postgres.ScratchDataDirectory,
 		},
 	}
 

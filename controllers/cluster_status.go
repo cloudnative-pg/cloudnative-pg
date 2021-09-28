@@ -501,7 +501,7 @@ func ExtractInstancesStatus(
 func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) postgres.PostgresqlStatus {
 	var result postgres.PostgresqlStatus
 
-	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus)
+	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
 	if err != nil {
 		result.Error = err

@@ -349,12 +349,12 @@ func DumpSecretToDir(secret *v1.Secret, certDir string, basename string) error {
 		return err
 	}
 	if oldVersionExist {
-		oldVersion, err := fileutils.ReadFile(resourceFileName)
+		rawOldVersion, err := fileutils.ReadFile(resourceFileName)
 		if err != nil {
 			return err
 		}
 
-		if oldVersion == secret.ResourceVersion {
+		if string(rawOldVersion) == secret.ResourceVersion {
 			// No need to rewrite certificates, the content
 			// is just the same
 			return nil

@@ -52,7 +52,7 @@ var _ = Describe("update Postgres configuration files", func() {
 
 		finalContent, err := fileutils.ReadFile(testFile)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(finalContent).To(Equal(wantedContent))
+		Expect(string(finalContent)).To(Equal(wantedContent))
 	})
 
 	It("must work with missing files", func() {
@@ -67,7 +67,7 @@ var _ = Describe("update Postgres configuration files", func() {
 
 		finalContent, err := fileutils.ReadFile(testFile)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(finalContent).To(Equal(wantedContent))
+		Expect(string(finalContent)).To(Equal(wantedContent))
 	})
 })
 

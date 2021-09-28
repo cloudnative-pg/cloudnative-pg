@@ -10,13 +10,16 @@ package webserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
@@ -145,6 +148,58 @@ func requestBackup(typedClient client.Client, recorder record.EventRecorder, w h
 	_, _ = fmt.Fprint(w, "OK")
 }
 
+// This probe is for the instance status, including replication
+func serveCache(w http.ResponseWriter, r *http.Request) {
+	requestedObject := strings.TrimPrefix(r.URL.Path, url.PathCache)
+
+	log.Debug("Cached object request received")
+
+	var js []byte
+	switch requestedObject {
+	case cache.ClusterKey:
+		response, err := cache.LoadCluster()
+		if errors.Is(err, cache.ErrCacheMiss) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Error(err, "while loading cached cluster")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		js, err = json.Marshal(response)
+		if err != nil {
+			log.Error(err, "while unmarshalling cached cluster")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	case cache.WALRestoreKey, cache.WALArchiveKey:
+		response, err := cache.LoadEnv(requestedObject)
+		if errors.Is(err, cache.ErrCacheMiss) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Error(err, "while loading cached env")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		js, err = json.Marshal(response)
+		if err != nil {
+			log.Error(err, "while unmarshalling cached env")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	default:
+		log.Debug("Unsupported cached object type")
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(js)
+}
+
 // Setup configure the web server for a certain PostgreSQL instance, and
 // must be invoked before starting the real web server
 func Setup(serverInstance *postgres.Instance) {
@@ -153,6 +208,23 @@ func Setup(serverInstance *postgres.Instance) {
 
 // ListenAndServe starts a the web server handling probes
 func ListenAndServe() error {
+	serveMux := http.NewServeMux()
+	serveMux.HandleFunc(url.PathHealth, isServerHealthy)
+	serveMux.HandleFunc(url.PathReady, isServerReady)
+	serveMux.HandleFunc(url.PathPgStatus, pgStatus)
+
+	server = &http.Server{Addr: fmt.Sprintf(":%d", url.StatusPort), Handler: serveMux}
+	err := server.ListenAndServe()
+
+	if err == http.ErrServerClosed {
+		return nil
+	}
+
+	return err
+}
+
+// LocalListenAndServe starts a local-only-available web server handling probes
+func LocalListenAndServe() error {
 	if instance == nil {
 		return fmt.Errorf("web server is still not set up")
 	}
@@ -168,16 +240,14 @@ func ListenAndServe() error {
 	}
 
 	serveMux := http.NewServeMux()
-	serveMux.HandleFunc(url.PathHealth, isServerHealthy)
-	serveMux.HandleFunc(url.PathReady, isServerReady)
-	serveMux.HandleFunc(url.PathPgStatus, pgStatus)
+	serveMux.HandleFunc(url.PathCache, serveCache)
 	serveMux.HandleFunc(url.PathPgBackup,
 		func(w http.ResponseWriter, r *http.Request) {
 			requestBackup(typedClient, eventRecorder, w, r)
 		},
 	)
 
-	server = &http.Server{Addr: fmt.Sprintf(":%d", url.StatusPort), Handler: serveMux}
+	server = &http.Server{Addr: fmt.Sprintf("localhost:%d", url.LocalPort), Handler: serveMux}
 	err = server.ListenAndServe()
 
 	// The server has been shut down

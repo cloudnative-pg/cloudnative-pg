@@ -21,12 +21,12 @@ import (
 // UpdatePostgresConfigurationFile search and replace options in a Postgres configuration file.
 // If the configuration file doesn't exist, it will be written.
 func UpdatePostgresConfigurationFile(fileName string, options map[string]string) (changed bool, err error) {
-	currentContent, err := fileutils.ReadFile(fileName)
+	rawCurrentContent, err := fileutils.ReadFile(fileName)
 	if err != nil {
 		return false, fmt.Errorf("error while reading content of %v: %w", fileName, err)
 	}
 
-	updatedContent := UpdateConfigurationContents(currentContent, options)
+	updatedContent := UpdateConfigurationContents(string(rawCurrentContent), options)
 	return fileutils.WriteStringToFile(fileName, updatedContent)
 }
 
