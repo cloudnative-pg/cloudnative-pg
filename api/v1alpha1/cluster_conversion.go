@@ -294,7 +294,7 @@ func (src *BarmanObjectStoreConfiguration) ConvertTo(dst *v1.BarmanObjectStoreCo
 			dst.AzureCredentials.StorageSasToken.Name =
 				azureCredentials.StorageSasToken.Name
 			dst.AzureCredentials.StorageSasToken.Key =
-				azureCredentials.StorageKey.Key
+				azureCredentials.StorageSasToken.Key
 		}
 	}
 
