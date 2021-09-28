@@ -17,13 +17,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
+	cacheClient "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache/client"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-// NewCmd create the new cobra command
+// NewCmd creates the new cobra command
 func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
@@ -33,84 +34,12 @@ func NewCmd() *cobra.Command {
 		Use:           "wal-archive [name]",
 		SilenceErrors: true,
 		Args:          cobra.ExactArgs(1),
-		RunE: func(_cmd *cobra.Command, args []string) error {
-			ctx := context.Background()
-
-			walName := args[0]
-
-			typedClient, err := management.NewControllerRuntimeClient()
+		RunE: func(cobraCmd *cobra.Command, args []string) error {
+			err := run(namespace, clusterName, podName, args)
 			if err != nil {
-				log.Error(err, "Error while creating k8s client")
+				log.Error(err, "failed to run wal-archive command")
 				return err
 			}
-
-			var cluster apiv1.Cluster
-			err = typedClient.Get(ctx, client.ObjectKey{
-				Namespace: namespace,
-				Name:      clusterName,
-			}, &cluster)
-			if err != nil {
-				log.Error(err, "Error while getting the cluster status")
-				return err
-			}
-
-			if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
-				// Backup not configured, skipping WAL
-				log.Trace("Backup not configured, skipping WAL",
-					"walName", walName,
-					"pod", podName,
-					"cluster", clusterName,
-					"namespace", namespace,
-					"currentPrimary", cluster.Status.CurrentPrimary,
-					"targetPrimary", cluster.Status.TargetPrimary,
-				)
-				return nil
-			}
-
-			if cluster.Status.CurrentPrimary != podName {
-				// Nothing to be done here, since I'm not the primary server
-				return nil
-			}
-
-			options := barmanCloudWalArchiveOptions(cluster, clusterName, walName)
-
-			env, err := barman.EnvSetCloudCredentials(
-				ctx,
-				typedClient,
-				cluster.Namespace,
-				cluster.Spec.Backup.BarmanObjectStore,
-				os.Environ())
-			if err != nil {
-				log.Error(err, "Error while settings AWS environment variables",
-					"walName", walName,
-					"pod", podName,
-					"cluster", clusterName,
-					"namespace", namespace,
-					"currentPrimary", cluster.Status.CurrentPrimary,
-					"targetPrimary", cluster.Status.TargetPrimary,
-					"options", options)
-				return err
-			}
-
-			const barmanCloudWalArchiveName = "barman-cloud-wal-archive"
-			barmanCloudWalArchiveCmd := exec.Command(barmanCloudWalArchiveName, options...) // #nosec G204
-			barmanCloudWalArchiveCmd.Env = env
-			err = execlog.RunStreaming(barmanCloudWalArchiveCmd, barmanCloudWalArchiveName)
-			if err != nil {
-				log.Info("Error invoking "+barmanCloudWalArchiveName,
-					"error", err.Error(),
-					"walName", walName,
-					"pod", podName,
-					"cluster", clusterName,
-					"namespace", namespace,
-					"currentPrimary", cluster.Status.CurrentPrimary,
-					"targetPrimary", cluster.Status.TargetPrimary,
-					"options", options,
-					"exitCode", barmanCloudWalArchiveCmd.ProcessState.ExitCode(),
-				)
-				return fmt.Errorf("unexpected failure invoking %s: %w", barmanCloudWalArchiveName, err)
-			}
-
 			return nil
 		},
 	}
@@ -123,6 +52,72 @@ func NewCmd() *cobra.Command {
 		"the cluster and of the Pod in k8s")
 
 	return &cmd
+}
+
+func run(namespace, clusterName, podName string, args []string) error {
+	ctx := context.Background()
+
+	walName := args[0]
+
+	var cluster *apiv1.Cluster
+	var err error
+	var typedClient client.Client
+
+	typedClient, err = management.NewControllerRuntimeClient()
+	if err != nil {
+		log.Error(err, "Error while creating k8s client")
+		return err
+	}
+
+	cluster, err = cacheClient.GetCluster(ctx, typedClient, namespace, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+		// Backup not configured, skipping WAL
+		log.Trace("Backup not configured, skipping WAL archive",
+			"walName", walName,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary,
+		)
+		return nil
+	}
+
+	if cluster.Status.CurrentPrimary != podName {
+		// Nothing to be done here, since I'm not the primary server
+		return nil
+	}
+
+	options := barmanCloudWalArchiveOptions(*cluster, clusterName, walName)
+
+	env, err := cacheClient.GetEnv(ctx,
+		typedClient,
+		cluster.Namespace,
+		cluster.Spec.Backup.BarmanObjectStore,
+		cache.WALArchiveKey)
+	if err != nil {
+		return fmt.Errorf("failed to get envs: %w", err)
+	}
+
+	const barmanCloudWalArchiveName = "barman-cloud-wal-archive"
+	barmanCloudWalArchiveCmd := exec.Command(barmanCloudWalArchiveName, options...) // #nosec G204
+	barmanCloudWalArchiveCmd.Env = env
+
+	err = execlog.RunStreaming(barmanCloudWalArchiveCmd, barmanCloudWalArchiveName)
+
+	if err != nil {
+		log.Error(err, "Error invoking "+barmanCloudWalArchiveName,
+			"walName", walName,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary,
+			"options", options,
+			"exitCode", barmanCloudWalArchiveCmd.ProcessState.ExitCode(),
+		)
+		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCloudWalArchiveName, err)
+	}
+
+	return nil
 }
 
 func barmanCloudWalArchiveOptions(cluster apiv1.Cluster, clusterName string, walName string) []string {

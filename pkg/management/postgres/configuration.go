@@ -188,7 +188,7 @@ func RemoveArchiveModeFromPostgresAutoConf(pgData string) (changed bool, err err
 		return false, fmt.Errorf("error while reading content of %v: %w", targetFile, err)
 	}
 
-	updatedContent := configfile.RemoveOptionFromConfigurationContents(currentContent, "archive_mode")
+	updatedContent := configfile.RemoveOptionFromConfigurationContents(string(currentContent), "archive_mode")
 	return fileutils.WriteStringToFile(targetFile, updatedContent)
 }
 
@@ -204,7 +204,7 @@ func SetArchiveModeToAlwaysIntoPostgresAutoConf(pgData string) (changed bool, er
 		"archive_mode": "always",
 	}
 
-	updatedContent := configfile.UpdateConfigurationContents(currentContent, options)
+	updatedContent := configfile.UpdateConfigurationContents(string(currentContent), options)
 
 	return fileutils.WriteStringToFile(targetFile, updatedContent)
 }

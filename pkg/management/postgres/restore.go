@@ -446,9 +446,9 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 // cluster. This function also ensures that we can really connect
 // to this cluster using the password in the secrets
 func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
-	superUserPassword, err := fileutils.ReadFile(info.PasswordFile)
+	rawSuperUserPassword, err := fileutils.ReadFile(info.PasswordFile)
 	if err != nil {
-		return fmt.Errorf("cannot read superUserPassword file: %w", err)
+		return fmt.Errorf("cannot read rawSuperUserPassword file: %w", err)
 	}
 
 	instance := info.GetInstance()
@@ -475,7 +475,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 
 		_, err = db.Exec(fmt.Sprintf(
 			"ALTER USER postgres PASSWORD %v",
-			pq.QuoteLiteral(superUserPassword)))
+			pq.QuoteLiteral(string(rawSuperUserPassword))))
 		if err != nil {
 			return fmt.Errorf("ALTER USER postgres error: %w", err)
 		}

@@ -28,6 +28,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/multicache"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 	// +kubebuilder:scaffold:imports
@@ -63,7 +64,7 @@ const (
 	ValidatingWebhookConfigurationName = "postgresql-operator-validating-webhook-configuration"
 
 	// The name of the directory containing the TLS certificates
-	defaultWebhookCertDir = "/controller/certificates"
+	defaultWebhookCertDir = postgres.ScratchDataDirectory + "/certificates"
 
 	// LeaderElectionID The operator Leader Election ID
 	LeaderElectionID = "db9c8771.k8s.enterprisedb.io"

@@ -4,11 +4,12 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-// Package walrestore implement the wal-archive command
+// Package walrestore implement the walrestore command
 package walrestore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,13 +18,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
+	cacheClient "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache/client"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-// NewCmd create a new cobra command
+// ErrPrimaryServer is returned when the instance is the cluster's primary, therefore doesn't need wal-restore
+var ErrPrimaryServer = errors.New("avoiding restoring WAL on the primary server")
+
+// NewCmd creates a new cobra command
 func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
@@ -34,117 +39,11 @@ func NewCmd() *cobra.Command {
 		SilenceErrors: true,
 		Args:          cobra.ExactArgs(2),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
-			ctx := context.Background()
-
-			walName := args[0]
-			destinationPath := args[1]
-
-			typedClient, err := management.NewControllerRuntimeClient()
+			err := run(namespace, clusterName, podName, args)
 			if err != nil {
-				log.Error(err, "Error while creating k8s client")
+				log.Error(err, "failed to run wal-restore command")
 				return err
 			}
-
-			var cluster apiv1.Cluster
-			err = typedClient.Get(ctx, client.ObjectKey{
-				Namespace: namespace,
-				Name:      clusterName,
-			}, &cluster)
-			if err != nil {
-				log.Error(err, "Error while getting the cluster status")
-				return err
-			}
-
-			var barmanConfiguration *apiv1.BarmanObjectStoreConfiguration
-			recoverClusterName := clusterName
-
-			switch {
-			case !cluster.IsReplica() && cluster.Status.CurrentPrimary == podName:
-				// Why a request to restore a WAL file is arriving from the primary server?
-				// Something strange is happening here
-				log.Info("Received request to restore a WAL file on the current primary",
-					"walName", walName,
-					"pod", podName,
-					"cluster", clusterName,
-					"namespace", namespace,
-					"currentPrimary", cluster.Status.CurrentPrimary,
-					"targetPrimary", cluster.Status.TargetPrimary,
-				)
-				return fmt.Errorf("avoiding restoring WAL on the primary server")
-
-			case cluster.IsReplica() && cluster.Status.CurrentPrimary == podName:
-				// I am the designated primary. Let's use the recovery object store for this wal
-				sourceName := cluster.Spec.ReplicaCluster.Source
-				externalCluster, found := cluster.ExternalCluster(sourceName)
-				if !found {
-					log.Info("External cluster not found, cannot recover WAL",
-						"sourceName", sourceName)
-					return fmt.Errorf("external cluster not found: %v", sourceName)
-				}
-
-				barmanConfiguration = externalCluster.BarmanObjectStore
-				recoverClusterName = externalCluster.Name
-
-			default:
-				// I am a plain replica. Let's use the object store which we are using to
-				// back up this cluster
-				if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
-					barmanConfiguration = cluster.Spec.Backup.BarmanObjectStore
-				}
-			}
-
-			if barmanConfiguration == nil {
-				// Backup not configured, skipping WAL
-				log.Trace("Skipping WAL restore, there is no backup configuration",
-					"walName", walName,
-					"pod", podName,
-					"cluster", clusterName,
-					"namespace", namespace,
-					"currentPrimary", cluster.Status.CurrentPrimary,
-					"targetPrimary", cluster.Status.TargetPrimary,
-				)
-				return fmt.Errorf("backup not configured")
-			}
-
-			options := barmanCloudWalRestoreOptions(barmanConfiguration, recoverClusterName, walName, destinationPath)
-
-			env, err := barman.EnvSetCloudCredentials(
-				ctx,
-				typedClient,
-				namespace,
-				barmanConfiguration,
-				os.Environ())
-			if err != nil {
-				log.Error(err, "Error while settings AWS environment variables",
-					"walName", walName,
-					"pod", podName,
-					"cluster", clusterName,
-					"namespace", namespace,
-					"currentPrimary", cluster.Status.CurrentPrimary,
-					"targetPrimary", cluster.Status.TargetPrimary,
-					"options", options)
-				return err
-			}
-
-			const barmanCloudWalRestoreName = "barman-cloud-wal-restore"
-			barmanCloudWalRestoreCmd := exec.Command(barmanCloudWalRestoreName, options...) // #nosec G204
-			barmanCloudWalRestoreCmd.Env = env
-			err = execlog.RunStreaming(barmanCloudWalRestoreCmd, barmanCloudWalRestoreName)
-			if err != nil {
-				log.Info("Error invoking "+barmanCloudWalRestoreName,
-					"error", err.Error(),
-					"walName", walName,
-					"pod", podName,
-					"cluster", clusterName,
-					"namespace", namespace,
-					"currentPrimary", cluster.Status.CurrentPrimary,
-					"targetPrimary", cluster.Status.TargetPrimary,
-					"options", options,
-					"exitCode", barmanCloudWalRestoreCmd.ProcessState.ExitCode(),
-				)
-				return fmt.Errorf("unexpected failure invoking %s: %w", barmanCloudWalRestoreName, err)
-			}
-
 			return nil
 		},
 	}
@@ -157,6 +56,112 @@ func NewCmd() *cobra.Command {
 		"the cluster and of the Pod in k8s")
 
 	return &cmd
+}
+
+func run(namespace, clusterName, podName string, args []string) error {
+	ctx := context.Background()
+
+	walName := args[0]
+	destinationPath := args[1]
+
+	var cluster *apiv1.Cluster
+	var err error
+	var typedClient client.Client
+
+	typedClient, err = management.NewControllerRuntimeClient()
+	if err != nil {
+		log.Error(err, "Error while creating k8s client")
+		return err
+	}
+
+	cluster, err = cacheClient.GetCluster(ctx, typedClient, namespace, clusterName)
+	if err != nil {
+		return fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	recoverClusterName, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
+	if err != nil {
+		log.Error(err, "while getting recover configuration")
+		return err
+	}
+
+	if barmanConfiguration == nil {
+		// Backup not configured, skipping WAL
+		log.Trace("Skipping WAL restore, there is no backup configuration",
+			"walName", walName,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary,
+		)
+		return fmt.Errorf("backup not configured")
+	}
+
+	options := barmanCloudWalRestoreOptions(barmanConfiguration, recoverClusterName, walName, destinationPath)
+
+	env, err := cacheClient.GetEnv(ctx,
+		typedClient,
+		cluster.Namespace,
+		barmanConfiguration,
+		cache.WALRestoreKey)
+	if err != nil {
+		return fmt.Errorf("failed to get envs: %w", err)
+	}
+
+	const barmanCloudWalRestoreName = "barman-cloud-wal-restore"
+	barmanCloudWalRestoreCmd := exec.Command(barmanCloudWalRestoreName, options...) // #nosec G204
+	barmanCloudWalRestoreCmd.Env = env
+	err = execlog.RunStreaming(barmanCloudWalRestoreCmd, barmanCloudWalRestoreName)
+	if err != nil {
+		log.Info("Error invoking "+barmanCloudWalRestoreName,
+			"error", err.Error(),
+			"walName", walName,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary,
+			"options", options,
+			"exitCode", barmanCloudWalRestoreCmd.ProcessState.ExitCode(),
+		)
+		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCloudWalRestoreName, err)
+	}
+
+	return nil
+}
+
+// GetRecoverConfiguration get the appropriate recover Configuration for a given cluster
+func GetRecoverConfiguration(
+	cluster *apiv1.Cluster,
+	podName string,
+) (
+	string,
+	*apiv1.BarmanObjectStoreConfiguration,
+	error,
+) {
+	recoverClusterName := cluster.Name
+	var barmanConfiguration *apiv1.BarmanObjectStoreConfiguration
+
+	switch {
+	case !cluster.IsReplica() && cluster.Status.CurrentPrimary == podName:
+		// Why a request to restore a WAL file is arriving from the primary server?
+		// Something strange is happening here
+		return "", nil, ErrPrimaryServer
+
+	case cluster.IsReplica() && cluster.Status.CurrentPrimary == podName:
+		// I am the designated primary. Let's use the recovery object store for this wal
+		sourceName := cluster.Spec.ReplicaCluster.Source
+		externalCluster, found := cluster.ExternalCluster(sourceName)
+		if !found {
+			return "", nil, fmt.Errorf("external cluster not found: %v", sourceName)
+		}
+
+		barmanConfiguration = externalCluster.BarmanObjectStore
+		recoverClusterName = externalCluster.Name
+
+	default:
+		// I am a plain replica. Let's use the object store which we are using to
+		// back up this cluster
+		if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
+			barmanConfiguration = cluster.Spec.Backup.BarmanObjectStore
+		}
+	}
+	return recoverClusterName, barmanConfiguration, nil
 }
 
 func barmanCloudWalRestoreOptions(

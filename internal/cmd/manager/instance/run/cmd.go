@@ -188,6 +188,13 @@ func startWebServer(instance *postgres.Instance) error {
 	}()
 
 	go func() {
+		err := webserver.LocalListenAndServe()
+		if err != nil {
+			log.Error(err, "Error while starting the local server")
+		}
+	}()
+
+	go func() {
 		err := metricsserver.ListenAndServe()
 		if err != nil {
 			log.Error(err, "Error while starting the metrics server")

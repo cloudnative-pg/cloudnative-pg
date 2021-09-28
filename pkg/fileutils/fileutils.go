@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 )
 
 // AppendStringToFile append the content of the given string to the
@@ -105,30 +106,29 @@ func CopyFile(source, destination string) (err error) {
 // Returns an error status and a flag telling if the file has been
 // changed or not.
 func WriteStringToFile(fileName string, contents string) (changed bool, err error) {
-	return WriteFile(fileName, []byte(contents), 0o666)
+	return WriteFileAtomic(fileName, []byte(contents), 0o666)
 }
 
-// WriteFile replace the contents of a certain file
-// with a string. If the file doesn't exist, it's created.
+// WriteFileAtomic atomically replace the content of a file.
+// If the file doesn't exist, it's created.
 // Returns an error status and a flag telling if the file has been
 // changed or not.
-func WriteFile(fileName string, contents []byte, perm os.FileMode) (changed bool, err error) {
-	var exist bool
-	exist, err = FileExists(fileName)
+func WriteFileAtomic(fileName string, contents []byte, perm os.FileMode) (bool, error) {
+	exist, err := FileExists(fileName)
 	if err != nil {
-		return changed, err
+		return false, err
 	}
 	if exist {
 		var previousContents []byte
 		previousContents, err = ioutil.ReadFile(fileName) // #nosec
 		if err != nil {
 			err = fmt.Errorf("while reading previous file contents: %w", err)
-			return changed, err
+			return false, err
 		}
 
 		// If nothing changed return immediately
 		if bytes.Equal(previousContents, contents) {
-			return changed, err
+			return false, nil
 		}
 	}
 
@@ -137,46 +137,53 @@ func WriteFile(fileName string, contents []byte, perm os.FileMode) (changed bool
 		return false, err
 	}
 
-	changed = true
-
 	var out *os.File
-	out, err = os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm) // #nosec
+	fileNameTmp := fmt.Sprintf("%s_%v", fileName, time.Now().Unix())
+	out, err = os.OpenFile(fileNameTmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm) // #nosec
 	if err != nil {
-		return changed, err
+		return false, err
 	}
 	defer func() {
 		closeError := out.Close()
 		if err == nil && closeError != nil {
 			err = closeError
 		}
+		if exists, err := FileExists(fileNameTmp); exists || err != nil {
+			_ = os.Remove(fileNameTmp)
+		}
 	}()
 
 	_, err = out.Write(contents)
 	if err != nil {
-		return changed, err
+		return false, err
 	}
 
 	err = out.Sync()
-	return changed, err
+	if err != nil {
+		return false, err
+	}
+	err = os.Rename(fileNameTmp, fileName)
+
+	return err == nil, err
 }
 
-// ReadFile Read source file and output the content as string.
+// ReadFile reads source file and output the content as bytes.
 // If the file does not exist, it returns an empty string with no error.
-func ReadFile(fileName string) (string, error) {
+func ReadFile(fileName string) ([]byte, error) {
 	exists, err := FileExists(fileName)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !exists {
-		return "", nil
+		return nil, nil
 	}
 
 	content, err := ioutil.ReadFile(fileName) // #nosec
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(content), nil
+	return content, nil
 }
 
 // EnsurePgDataPerms ensure PGDATA has 0700 permissions, which are

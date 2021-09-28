@@ -25,7 +25,7 @@ func NewCmd() *cobra.Command {
 	cmd := cobra.Command{
 		Use: "backup [backup_name]",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			resp, err := http.Get(url.Local(url.PathPgBackup) + "?name=" + args[0])
+			resp, err := http.Get(url.Local(url.PathPgBackup, url.LocalPort) + "?name=" + args[0])
 			if err != nil {
 				log.Error(err, "Error while requesting backup")
 				return err

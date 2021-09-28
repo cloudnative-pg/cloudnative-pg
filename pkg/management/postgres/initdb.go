@@ -203,14 +203,14 @@ func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
 		return fmt.Errorf("while reading application password file: %w", err)
 	}
 	if status {
-		applicationPassword, err := fileutils.ReadFile(info.ApplicationPasswordFile)
+		rawApplicationPassword, err := fileutils.ReadFile(info.ApplicationPasswordFile)
 		if err != nil {
 			return fmt.Errorf("while reading application password file: %w", err)
 		}
 		_, err = db.Exec(fmt.Sprintf(
 			"ALTER USER %v PASSWORD %v",
 			pq.QuoteIdentifier(info.ApplicationUser),
-			pq.QuoteLiteral(applicationPassword)))
+			pq.QuoteLiteral(string(rawApplicationPassword))))
 		if err != nil {
 			return err
 		}

@@ -9,6 +9,7 @@ package controller
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -22,9 +23,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walrestore"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	postgresManagement "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
@@ -60,7 +64,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 	r.reconcileMonitoringQueries(ctx, cluster)
 
 	// Reconcile replica role
-	if err := r.reconcileClusterRole(ctx, event, cluster); err != nil {
+	if err = r.reconcileClusterRole(ctx, event, cluster); err != nil {
 		return err
 	}
 
@@ -75,6 +79,50 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 
 	// Reconcile PostgreSQL instance parameters
 	r.reconcileInstance(cluster)
+
+	// Populate the cache with the cluster
+	cache.Store(cache.ClusterKey, cluster)
+
+	// Populate the cache with the backup configuration
+	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
+		envArchive, err := barman.EnvSetCloudCredentials(
+			ctx,
+			r.GetClient(),
+			cluster.Namespace,
+			cluster.Spec.Backup.BarmanObjectStore,
+			os.Environ())
+		if err != nil {
+			log.Error(err, "while getting backup credentials")
+		} else {
+			cache.Store(cache.WALArchiveKey, envArchive)
+		}
+	} else {
+		cache.Delete(cache.WALArchiveKey)
+	}
+
+	// Populate the cache with the recover configuration
+	_, barmanConfiguration, err := walrestore.GetRecoverConfiguration(cluster, r.instance.PodName)
+	if err != nil {
+		if !errors.Is(err, walrestore.ErrPrimaryServer) {
+			log.Error(err, "while getting recover configuration")
+		}
+		barmanConfiguration = nil
+	}
+
+	if barmanConfiguration != nil {
+		envRestore, err := barman.EnvSetCloudCredentials(
+			ctx,
+			r.GetClient(),
+			cluster.Namespace,
+			barmanConfiguration,
+			os.Environ())
+		if err != nil {
+			log.Error(err, "while getting recover credentials")
+		}
+		cache.Store(cache.WALRestoreKey, envRestore)
+	} else {
+		cache.Delete(cache.WALRestoreKey)
+	}
 
 	// Reconcile secrets and cryptographic material
 	return r.reconcileSecrets(ctx, cluster)
@@ -482,7 +530,7 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 		return false, fmt.Errorf("missing %s field in Secret", corev1.TLSPrivateKeyKey)
 	}
 
-	certificateIsChanged, err := fileutils.WriteFile(certificateLocation, certificate, 0o600)
+	certificateIsChanged, err := fileutils.WriteFileAtomic(certificateLocation, certificate, 0o600)
 	if err != nil {
 		return false, fmt.Errorf("while writing server certificate: %w", err)
 	}
@@ -493,7 +541,7 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 			"secret", secret.Name)
 	}
 
-	privateKeyIsChanged, err := fileutils.WriteFile(privateKeyLocation, privateKey, 0o600)
+	privateKeyIsChanged, err := fileutils.WriteFileAtomic(privateKeyLocation, privateKey, 0o600)
 	if err != nil {
 		return false, fmt.Errorf("while writing server private key: %w", err)
 	}
@@ -518,7 +566,7 @@ func (r *InstanceReconciler) refreshCAFromSecret(
 		return false, fmt.Errorf("missing %s entry in Secret", certs.CACertKey)
 	}
 
-	changed, err := fileutils.WriteFile(destLocation, caCertificate, 0o600)
+	changed, err := fileutils.WriteFileAtomic(destLocation, caCertificate, 0o600)
 	if err != nil {
 		return false, fmt.Errorf("while writing server certificate: %w", err)
 	}
@@ -544,7 +592,7 @@ func (r *InstanceReconciler) refreshFileFromSecret(
 		return false, fmt.Errorf("missing %s entry in Secret", key)
 	}
 
-	changed, err := fileutils.WriteFile(destLocation, data, 0o600)
+	changed, err := fileutils.WriteFileAtomic(destLocation, data, 0o600)
 	if err != nil {
 		return false, fmt.Errorf("while writing file: %w", err)
 	}

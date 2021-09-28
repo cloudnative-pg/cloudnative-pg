@@ -41,8 +41,11 @@ host all all all md5
 	// operator to work correctly
 	blockedConfigurationParameter = "blocked"
 
+	// ScratchDataDirectory is the directory to be used for scratch data
+	ScratchDataDirectory = "/controller"
+
 	// CertificatesDir location to store the certificates
-	CertificatesDir = "/controller/certificates/"
+	CertificatesDir = ScratchDataDirectory + "/certificates/"
 
 	// ServerCertificateLocation is the location where the server certificate
 	// is stored
@@ -75,22 +78,22 @@ host all all all md5
 
 	// BackupTemporaryDirectory provides a path to backup temporary files
 	// needed in the recovery process
-	BackupTemporaryDirectory = "/controller/backup"
+	BackupTemporaryDirectory = ScratchDataDirectory + "/backup"
 
 	// RecoveryTemporaryDirectory provides a path to store temporary files
 	// needed in the recovery process
-	RecoveryTemporaryDirectory = "/controller/recovery"
+	RecoveryTemporaryDirectory = ScratchDataDirectory + "/recovery"
 
 	// SocketDirectory provides a path to store the Unix socket to be
 	// used by the PostgreSQL server
-	SocketDirectory = "/controller/run"
+	SocketDirectory = ScratchDataDirectory + "/run"
 
 	// ServerPort is the port where the postmaster process will be listening.
 	// It's also used in the naming of the Unix socket
 	ServerPort = 5432
 
 	// LogPath is the path of the folder used by the logging_collector
-	LogPath = "/controller/log"
+	LogPath = ScratchDataDirectory + "/log"
 
 	// LogFileName is the name of the file produced by the logging_collector,
 	// excluding the extension. The logging collector process will append
