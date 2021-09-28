@@ -25,6 +25,11 @@ jobs:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
       -
+        name: Install Go
+        uses: actions/setup-go@v2.1.3
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+      -
         name: Build meta
         id: build-meta
         run: |
