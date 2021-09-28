@@ -43,6 +43,22 @@ jobs:
           echo "::set-output name=version::${commit_version}"
           echo "::set-output name=commit::${commit_short}"
       -
+        name: Set GoReleaser environment
+        run: |
+          echo GOPATH=$(go env GOPATH) >> $GITHUB_ENV
+          echo PWD=$(pwd) >> $GITHUB_ENV
+      -
+        name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          distribution: goreleaser
+          version: latest
+          args: build -f .goreleaser-multiarch.yml --skip-validate --rm-dist
+        env:
+          DATE: ${{ steps.build-meta.outputs.date }}
+          COMMIT: ${{ steps.build-meta.outputs.commit }}
+          VERSION: ${{ steps.build-meta.outputs.version }}
+      -
         name: Docker meta
         id: docker-meta
         uses: docker/metadata-action@v3.3.0
@@ -51,8 +67,20 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
       -
+        name: Detect platforms
+        id: docker-platforms
+        run: |
+          # Available architecture on UBI8 are: linux/amd64, linux/arm64, linux/ppc64le, linux/s390x
+          # Keep in mind that adding more platforms (architectures) will increase the building
+          # time even if we use the ghcache for the building process.
+          platforms="linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
+          echo "::set-output name=platforms::${platforms}"
+      -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v1.2.0
+        with:
+          image: tonistiigi/binfmt:qemu-v6.1.0
+          platforms: ${{ steps.docker-platforms.outputs.platforms }}
       -
         name: Set up Docker Buildx
         id: buildx
@@ -88,14 +116,14 @@ jobs:
         name: Build and push
         uses: docker/build-push-action@v2.7.0
         with:
-          # Available architecture on UBI8 are: linux/amd64, linux/arm64, linux/ppc64le
-          platforms: linux/amd64
+          platforms: ${{ steps.docker-platforms.outputs.platforms }}
+          context: .
           push: true
           build-args: |
-            DATE=${{ steps.build-meta.outputs.date }}
-            COMMIT=${{ steps.build-meta.outputs.commit }}
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   release:
     runs-on: ubuntu-20.04
