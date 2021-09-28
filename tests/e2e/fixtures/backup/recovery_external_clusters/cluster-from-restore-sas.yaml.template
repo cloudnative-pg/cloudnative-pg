@@ -1,0 +1,26 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-restored-sas
+spec:
+  instances: 3
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    recovery:
+      source: clusterBackupSas
+
+  externalClusters:
+    - name: clusterBackupSas
+      barmanObjectStore:
+        serverName: pg-backup-azure-blob-sas
+        destinationPath: https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/pg-backup-azure-blob-sas/
+        azureCredentials:
+          storageAccount:
+            name: restore-storage-creds-sas
+            key: ID
+          storageSasToken:
+            name: restore-storage-creds-sas
+            key: KEY
