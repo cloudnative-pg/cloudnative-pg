@@ -42,7 +42,11 @@ func ReadSecretKeyRef(
 }
 
 // DumpSecretKeyRefToFile dumps a certain secret to a file inside a temporary folder
-// using 0600 as permission bits
+// using 0600 as permission bits.
+//
+// This function overlaps with the Kubernetes ability to mount a secret in a pod,
+// with the difference that we can change the attached secret without restarting the pod.
+// We also need to have more control over when the secret content is updated.
 func DumpSecretKeyRefToFile(
 	ctx context.Context, client ctrl.Client,
 	namespace string, serverName string, selector *corev1.SecretKeySelector) (string, error) {
