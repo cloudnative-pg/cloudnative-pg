@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -135,16 +136,21 @@ func StartBackup(
 	config := ctrl.GetConfigOrDie()
 	clientInterface := kubernetes.NewForConfigOrDie(config)
 
-	stdout, stderr, err := utils.ExecCommand(
-		ctx,
-		clientInterface,
-		config,
-		pod,
-		specs.PostgresContainerName,
-		nil,
-		"/controller/manager",
-		"backup",
-		backup.GetName())
+	var err error
+	var stdout, stderr string
+	err = retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
+		stdout, stderr, err = utils.ExecCommand(
+			ctx,
+			clientInterface,
+			config,
+			pod,
+			specs.PostgresContainerName,
+			nil,
+			"/controller/manager",
+			"backup",
+			backup.GetName())
+		return err
+	})
 	if err != nil {
 		log.FromContext(ctx).Error(err, "executing backup", "stdout", stdout, "stderr", stderr)
 		status := backup.GetStatus()
