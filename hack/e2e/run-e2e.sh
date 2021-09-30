@@ -69,7 +69,7 @@ if ! which ginkgo &>/dev/null; then
 fi
 
 # Skip upgrade tests on Postgres 14 or Kubernetes 1.22
-if [[ "${POSTGRES_IMG}" =~ "14-beta" ]] || [[ "${K8S_VERSION}" =~ ^v1\.22 ]]; then
+if [[ "${POSTGRES_IMG}" =~ "14" ]] || [[ "${K8S_VERSION}" =~ ^v1\.22 ]]; then
   TEST_UPGRADE_TO_V1=false
 fi
 
