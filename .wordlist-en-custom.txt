@@ -153,6 +153,7 @@ RTO
 RUNTIME
 ReadWriteOnce
 RedHat
+RedHat's
 ReplicaClusterConfiguration
 ReplicaSet
 ReplicationTLSSecret

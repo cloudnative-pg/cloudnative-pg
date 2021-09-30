@@ -2,9 +2,29 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.9.1
+
+**Release date:** 30 September 2021
+
+*This release is to celebrate the launch of
+[PostgreSQL 14](https://www.postgresql.org/about/news/postgresql-14-released-2318/)
+by making it the default major version when a new `Cluster` is created without
+defining a specific image name.*
+
+Fixes:
+
+- Fix issue causing `Error while getting barman endpoint CA secret` message to
+  appear in the logs of the primary pod, which prevented the backup to work
+  correctly
+- Properly retry requesting a new backup in case of temporary communication
+  issues with the instance manager
+
 ## Version 1.9.0
 
 **Release date:** 28 September 2021
+
+*Version 1.9.0 is not available on OpenShift due to delays with the
+release process and the subsequent release of version 1.9.1.*
 
 Features:
 

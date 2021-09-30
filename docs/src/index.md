@@ -37,6 +37,11 @@ OpenShift Container Platform is an open-source distribution of Kubernetes which 
 [maintained and commercially supported](https://access.redhat.com/support/policy/updates/openshift#ocp4)
 by Red Hat.
 
+!!! Important
+    Please take into account that some delay may occur when releasing Cloud
+    Native PostgreSQL on RedHat's OpenShift Container Platform, as the process is
+    not entirely under our control.
+
 Please refer to the
 ["Platform Compatibility"](https://www.enterprisedb.com/product-compatibility#cnp)
 page from the EDB website for a list of the currently supported Kubernetes distributions.
