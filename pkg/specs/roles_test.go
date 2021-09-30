@@ -186,11 +186,16 @@ var _ = Describe("Secrets", func() {
 							LocalObjectReference: apiv1.LocalObjectReference{Name: "test-access"},
 						},
 					},
+					EndpointCA: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{Name: "test-endpoint-ca-name"},
+						Key:                  "test-endpoint-ca-key",
+					},
 				},
 			},
 		}
 		secrets = backupSecrets(cluster, nil)
 		Expect(secrets[0]).To(BeEquivalentTo("test-secret"))
 		Expect(secrets[1]).To(BeEquivalentTo("test-access"))
+		Expect(secrets[2]).To(BeEquivalentTo("test-endpoint-ca-name"))
 	})
 })

@@ -187,6 +187,13 @@ func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 			azureCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.AzureCredentials)...)
 	}
 
+	// Secrets needed by Barman, if set
+	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
+		result = append(
+			result,
+			cluster.Spec.Backup.BarmanObjectStore.EndpointCA.Name)
+	}
+
 	if backupOrigin != nil {
 		result = append(
 			result,
