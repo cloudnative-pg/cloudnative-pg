@@ -46,9 +46,22 @@ Please refer to the
 ["Platform Compatibility"](https://www.enterprisedb.com/product-compatibility#cnp)
 page from the EDB website for a list of the currently supported Kubernetes distributions.
 
-## Supported PostgreSQL versions
+### Multiple architectures
 
-PostgreSQL 13, 12, 11 and 10 are currently supported.
+The Cloud Native PostgreSQL Operator container images support the multi-arch
+format for the following platforms: `linux/amd64`, `linux/arm64`,
+`linux/ppc64le`, `linux/s390x`.
+
+!!! Warning
+    Cloud Native PostgreSQL requires that all nodes in a Kubernetes cluster have the
+    same CPU architecture, thus a hybrid CPU architecture Kubernetes cluster is not
+    supported.
+
+## Supported Postgres versions
+
+The following versions of Postgres are currently supported:
+
+- PostgreSQL 13, 12, 11 and 10 (`linux/amd64`)
 
 ## Main features
 
@@ -77,6 +90,7 @@ PostgreSQL 13, 12, 11 and 10 are currently supported.
 * Standard output logging of PostgreSQL error messages in JSON format
 * Support for the `restricted` security context constraint (SCC) in Red Hat OpenShift
 * `cnp` plugin for `kubectl`
+* Multi-arch format container images
 
 ## About this guide
 
