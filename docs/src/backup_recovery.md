@@ -397,9 +397,8 @@ You can also schedule your backups periodically by creating a
 resource named `ScheduledBackup`. The latter is similar to a
 `Backup` but with an added field, called `schedule`.
 
-This field is a [Cron](https://en.wikipedia.org/wiki/Cron) schedule
-specification with a prepended field for seconds. This schedule format
-is the same used in Kubernetes CronJobs.
+This field is a *cron schedule* specification, which follows the same
+[format used in Kubernetes CronJobs](https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format).
 
 This is an example of a scheduled backup:
 
@@ -414,7 +413,20 @@ spec:
     name: pg-backup
 ```
 
-The proposed specification will schedule a backup every day at midnight.
+The above example will schedule a backup every day at midnight.
+
+!!! Hint
+    Backup frequency might impact your recovery time object (RTO) after a
+    disaster which requires a full or Point-In-Time recovery operation. Our
+    advice is that you regularly test your backups by recovering them, and then
+    measuring the time it takes to recover from scratch so that you can refine
+    your RTO predictability. Recovery time is influenced by the size of the
+    base backup and the amount of WAL files that need to fetched from the archive
+    and replayed during recovery (remember that WAL archiving is what enables
+    continuous backup in PostgreSQL!).
+    Based on our experience, a weekly base backup is more than enough for most
+    cases - while it is extremely rare to schedule backups more frequently than once
+    a day.
 
 ScheduledBackups can be suspended if needed by setting `.spec.suspend: true`,
 this will stop any new backup to be scheduled as long as the option is set to false.
