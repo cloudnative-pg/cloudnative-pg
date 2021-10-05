@@ -20,3 +20,9 @@ func ConvertToPostgresFormat(timestamp string) string {
 	}
 	return parsedTimestamp.Format("2006-01-02 15:04:05.000000Z07:00")
 }
+
+// GetCurrentTimestamp returns the current timestamp as a string in RFC3339 format
+func GetCurrentTimestamp() string {
+	t := time.Now()
+	return t.Format(time.RFC3339)
+}

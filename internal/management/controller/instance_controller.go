@@ -34,6 +34,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	pkgUtils "github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 // RetryUntilWalReceiverDown is the default retry configuration that is used
@@ -638,6 +639,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	// If it is already the current primary, everything is ok
 	if cluster.Status.CurrentPrimary != r.instance.PodName {
 		cluster.Status.CurrentPrimary = r.instance.PodName
+		cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
 		contextLogger.Info("Setting myself as the current primary")
 		return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 	}
@@ -662,6 +664,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(ctx context.Context, clu
 
 	oldCluster := cluster.DeepCopy()
 	cluster.Status.CurrentPrimary = r.instance.PodName
+	cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
 	return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 }
 

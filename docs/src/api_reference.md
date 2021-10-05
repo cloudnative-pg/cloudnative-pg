@@ -332,6 +332,8 @@ Name                            | Description                                   
 `certificates                   ` | The configuration for the CA and related certificates, initialized with defaults.                                                                                                  | [CertificatesStatus](#CertificatesStatus)            
 `firstRecoverabilityPoint       ` | The first recoverability point, stored as a date in RFC3339 format                                                                                                                 | string                                               
 `cloudNativePostgresqlCommitHash` | The commit hash number of which this operator running                                                                                                                              | string                                               
+`currentPrimaryTimestamp        ` | The timestamp when the last actual promotion to primary has occurred                                                                                                               | string                                               
+`targetPrimaryTimestamp         ` | The timestamp when the last request for a new primary has occurred                                                                                                                 | string                                               
 
 <a id='ConfigMapKeySelector'></a>
 
