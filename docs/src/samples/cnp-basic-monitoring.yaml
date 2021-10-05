@@ -28,7 +28,7 @@ data:
                    , COALESCE(application_name, '') AS application_name
                    , COUNT(*)
                    , COALESCE(EXTRACT (EPOCH FROM (max(now() - xact_start))), 0) AS max_tx_secs
-               FROM pg_stat_activity
+               FROM pg_catalog.pg_stat_activity
                GROUP BY datname, state, usename, application_name
            ) sa ON states.state = sa.state
            WHERE sa.usename IS NOT NULL
@@ -55,8 +55,8 @@ data:
     backends_waiting:
       query: |
        SELECT count(*) AS total
-       FROM pg_catalog.pg_locks         blocked_locks
-       JOIN pg_catalog.pg_locks         blocking_locks
+       FROM pg_catalog.pg_locks blocked_locks
+       JOIN pg_catalog.pg_locks blocking_locks
          ON blocking_locks.locktype = blocked_locks.locktype
          AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database
          AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation
@@ -78,10 +78,10 @@ data:
     pg_database:
       query: |
         SELECT datname
-          , pg_database_size(datname) AS size_bytes
+          , pg_catalog.pg_database_size(datname) AS size_bytes
           , age(datfrozenxid) AS xid_age
           , mxid_age(datminmxid) AS mxid_age
-        FROM pg_database
+        FROM pg_catalog.pg_database
       metrics:
         - datname:
             usage: "LABEL"
@@ -99,19 +99,19 @@ data:
     pg_postmaster:
       query: |
         SELECT EXTRACT(EPOCH FROM pg_postmaster_start_time) AS start_time
-        FROM pg_postmaster_start_time()
+        FROM pg_catalog.pg_postmaster_start_time()
       metrics:
         - start_time:
             usage: "GAUGE"
             description: "Time at which postgres started (based on epoch)"
 
     pg_replication:
-      query: "SELECT CASE WHEN NOT pg_is_in_recovery()
+      query: "SELECT CASE WHEN NOT pg_catalog.pg_is_in_recovery()
               THEN 0
-              ELSE GREATEST (0, 
-                EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))) 
-              END AS lag, 
-              pg_is_in_recovery() AS in_recovery"
+              ELSE GREATEST (0,
+                EXTRACT(EPOCH FROM (now() - pg_catalog.pg_last_xact_replay_timestamp())))
+              END AS lag,
+              pg_catalog.pg_is_in_recovery() AS in_recovery"
       metrics:
         - lag:
             usage: "GAUGE"
@@ -121,7 +121,7 @@ data:
             description: "Whether the instance is in recovery"
 
     pg_replication_slots:
-      query: "SELECT slot_name, database, active, pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) FROM pg_replication_slots"
+      query: "SELECT slot_name, database, active, pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), restart_lsn) FROM pg_catalog.pg_replication_slots"
       metrics:
         - slot_name:
             usage: "LABEL"
@@ -189,7 +189,7 @@ data:
           , buffers_backend
           , buffers_backend_fsync
           , buffers_alloc
-        FROM pg_stat_bgwriter
+        FROM pg_catalog.pg_stat_bgwriter
       metrics:
         - checkpoints_timed:
             usage: "COUNTER"
@@ -240,7 +240,7 @@ data:
           , deadlocks
           , blk_read_time
           , blk_write_time
-        FROM pg_stat_database
+        FROM pg_catalog.pg_stat_database
       metrics:
         - datname:
             usage: "LABEL"
@@ -292,7 +292,7 @@ data:
             description: "Time spent writing data file blocks by backends in this database, in milliseconds"
 
     pg_stat_database_conflicts:
-      query: "SELECT datname, confl_tablespace, confl_lock, confl_snapshot, confl_bufferpin, confl_deadlock FROM pg_stat_database_conflicts"
+      query: "SELECT datname, confl_tablespace, confl_lock, confl_snapshot, confl_bufferpin, confl_deadlock FROM pg_catalog.pg_stat_database_conflicts"
       metrics:
         - datname:
             usage: "LABEL"
@@ -313,9 +313,9 @@ data:
             usage: "COUNTER"
             description: "Number of queries in this database that have been canceled due to deadlocks"
 
-    # NOTE: currently this query is useless as it is done on the postgres database.
-    # TODO: Enhance to set the target database
     pg_stat_user_tables:
+      target_databases:
+        - "*"
       query: |
        SELECT
          current_database() datname,
@@ -341,7 +341,7 @@ data:
          analyze_count,
          autoanalyze_count
        FROM
-         pg_stat_user_tables
+         pg_catalog.pg_stat_user_tables
       metrics:
         - datname:
             usage: "LABEL"
@@ -417,14 +417,14 @@ data:
          , COALESCE(client_addr::text, '') AS client_addr
          , EXTRACT(EPOCH FROM backend_start) AS backend_start
          , COALESCE(age(backend_xmin), 0) AS backend_xmin_age
-         , pg_wal_lsn_diff(pg_current_wal_lsn(), sent_lsn) AS sent_diff_bytes
-         , pg_wal_lsn_diff(pg_current_wal_lsn(), write_lsn) AS write_diff_bytes
-         , pg_wal_lsn_diff(pg_current_wal_lsn(), flush_lsn) AS flush_diff_bytes
-         , COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn),0) AS replay_diff_bytes
+         , pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), sent_lsn) AS sent_diff_bytes
+         , pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), write_lsn) AS write_diff_bytes
+         , pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), flush_lsn) AS flush_diff_bytes
+         , COALESCE(pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), replay_lsn),0) AS replay_diff_bytes
          , COALESCE((EXTRACT(EPOCH FROM write_lag)),0)::float AS write_lag_seconds
          , COALESCE((EXTRACT(EPOCH FROM flush_lag)),0)::float AS flush_lag_seconds
          , COALESCE((EXTRACT(EPOCH FROM replay_lag)),0)::float AS replay_lag_seconds
-       FROM pg_stat_replication
+       FROM pg_catalog.pg_stat_replication
       metrics:
         - usename:
             usage: "LABEL"
@@ -463,10 +463,23 @@ data:
             usage: "GAUGE"
             description: "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written, flushed and applied it"
 
-    # NOTE: currently this query is useless as it is done on the postgres database.
-    # TODO: Enhance to set the target database
     pg_statio_user_tables:
-      query: "SELECT current_database() datname, schemaname, relname, heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit FROM pg_statio_user_tables"
+      target_databases:
+        - "*"
+      query: |
+        SELECT
+          current_database() datname
+          , schemaname
+          , relname
+          , heap_blks_read
+          , heap_blks_hit
+          , idx_blks_read
+          , idx_blks_hit
+          , toast_blks_read
+          , toast_blks_hit
+          , tidx_blks_read
+          , tidx_blks_hit
+        FROM pg_catalog.pg_statio_user_tables
       metrics:
         - datname:
             usage: "LABEL"
@@ -506,7 +519,7 @@ data:
       query: |
         SELECT name,
         CASE setting WHEN 'on' THEN '1' WHEN 'off' THEN '0' ELSE setting END AS setting
-        FROM pg_settings
+        FROM pg_catalog.pg_settings
         WHERE vartype IN ('integer', 'real', 'bool')
         ORDER BY 1
       metrics:
