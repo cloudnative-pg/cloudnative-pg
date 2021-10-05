@@ -9,6 +9,8 @@ package log
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
@@ -68,6 +70,7 @@ type Logger interface {
 	Debug(msg string, keysAndValues ...interface{})
 	Trace(msg string, keysAndValues ...interface{})
 
+	WithCaller() Logger
 	WithValues(keysAndValues ...interface{}) Logger
 	WithName(name string) Logger
 	getLogger() logr.Logger
@@ -100,6 +103,14 @@ func (l *logger) WithValues(keysAndValues ...interface{}) Logger {
 
 func (l *logger) WithName(name string) Logger {
 	return &logger{l.Logger.WithName(name)}
+}
+
+func (l *logger) WithCaller() Logger {
+	_, fileName, fileLine, ok := runtime.Caller(2)
+	if ok {
+		return l.WithValues("caller", fmt.Sprintf("%s:%d", fileName, fileLine))
+	}
+	return l
 }
 
 // Enabled exposes the same method from the logr.Logger interface using the default logger
@@ -144,7 +155,7 @@ func FromContext(ctx context.Context) Logger {
 	if ok {
 		l = l.WithValues("uuid", uuid)
 	}
-	return l
+	return l.WithCaller()
 }
 
 // IntoContext injects a logger into a context
