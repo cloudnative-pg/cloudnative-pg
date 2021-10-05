@@ -143,17 +143,21 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 		return err
 	}
 
-	loadConfiguration(ctx, configMapName, secretName)
+	err = loadConfiguration(ctx, configMapName, secretName)
+	if err != nil {
+		return err
+	}
+
 	setupLog.Info("Operator configuration loaded", "configuration", configuration.Current)
 
 	// Detect if we are running under a system that implements OpenShift Security Context Constraints
-	if err := utils.DetectSecurityContextConstraints(); err != nil {
+	if err = utils.DetectSecurityContextConstraints(); err != nil {
 		setupLog.Error(err, "unable to detect OpenShift Security Context Constraints presence")
 		return err
 	}
 
 	// Retrieve the Kubernetes cluster system UID
-	if err := utils.DetectKubeSystemUID(ctx, clientSet); err != nil {
+	if err = utils.DetectKubeSystemUID(ctx, clientSet); err != nil {
 		setupLog.Error(err, "unable to retrieve the Kubernetes cluster system UID")
 		return err
 	}
@@ -248,7 +252,7 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 }
 
 // loadConfiguration reads the configuration from the provided configmap and secret
-func loadConfiguration(ctx context.Context, configMapName string, secretName string) {
+func loadConfiguration(ctx context.Context, configMapName string, secretName string) error {
 	configData := make(map[string]string)
 
 	// First read the configmap if provided and store it in configData
@@ -258,6 +262,7 @@ func loadConfiguration(ctx context.Context, configMapName string, secretName str
 			setupLog.Error(err, "unable to read ConfigMap",
 				"namespace", configuration.Current.OperatorNamespace,
 				"name", configMapName)
+			return err
 		}
 		for k, v := range configMapData {
 			configData[k] = v
@@ -271,6 +276,7 @@ func loadConfiguration(ctx context.Context, configMapName string, secretName str
 			setupLog.Error(err, "unable to read Secret",
 				"namespace", configuration.Current.OperatorNamespace,
 				"name", secretName)
+			return err
 		}
 		for k, v := range secretData {
 			configData[k] = v
@@ -281,6 +287,8 @@ func loadConfiguration(ctx context.Context, configMapName string, secretName str
 	if len(configData) > 0 {
 		configuration.Current.ReadConfigMap(configData)
 	}
+
+	return nil
 }
 
 // readinessProbeHandler is used to implement the readiness probe handler
