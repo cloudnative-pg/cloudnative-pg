@@ -142,7 +142,12 @@ data:
           , failed_count
           , COALESCE(EXTRACT(EPOCH FROM (now() - last_archived_time)), -1) AS seconds_since_last_archival
           , COALESCE(EXTRACT(EPOCH FROM (now() - last_failed_time)), -1) AS seconds_since_last_failure
-        FROM pg_stat_archiver
+          , COALESCE(EXTRACT(EPOCH FROM last_archived_time), -1) AS last_archived_time
+          , COALESCE(EXTRACT(EPOCH FROM last_failed_time), -1) AS last_failed_time
+          , CAST(CAST('x'||pg_catalog.right(last_archived_wal, 16) AS pg_catalog.bit(64)) AS pg_catalog.int8) AS last_archived_wal_start_lsn
+          , CAST(CAST('x'||pg_catalog.right(last_failed_wal, 16) AS pg_catalog.bit(64)) AS pg_catalog.int8) AS last_failed_wal_start_lsn
+          , EXTRACT(EPOCH FROM stats_reset) AS stats_reset_time
+        FROM pg_catalog.pg_stat_archiver
       metrics:
         - archived_count:
             usage: "COUNTER"
@@ -156,6 +161,21 @@ data:
         - seconds_since_last_failure:
             usage: "GAUGE"
             description: "Seconds since the last failed archival operation"
+        - last_archived_time:
+            usage: "GAUGE"
+            description: "Epoch of the last time WAL archiving succeeded"
+        - last_failed_time:
+            usage: "GAUGE"
+            description: "Epoch of the last time WAL archiving failed"
+        - last_archived_wal_start_lsn:
+            usage: "GAUGE"
+            description: "Archived WAL start LSN"
+        - last_failed_wal_start_lsn:
+            usage: "GAUGE"
+            description: "Last failed WAL LSN"
+        - stats_reset_time:
+            usage: "GAUGE"
+            description: "Time at which these statistics were last reset"
 
     pg_stat_bgwriter:
       query: |
