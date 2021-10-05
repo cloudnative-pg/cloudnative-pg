@@ -190,6 +190,12 @@ type ClusterStatus struct {
 
 	// The commit hash number of which this operator running
 	CommitHash string `json:"cloudNativePostgresqlCommitHash,omitempty"`
+
+	// The timestamp of the current primary
+	CurrentPrimaryTimestamp string `json:"currentPrimaryTimestamp,omitempty"`
+
+	// The timestamp of the target primary
+	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`
 }
 
 // ReplicaClusterConfiguration encapsulates the configuration of a replica

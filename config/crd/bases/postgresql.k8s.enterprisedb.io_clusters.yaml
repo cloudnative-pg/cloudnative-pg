@@ -1848,6 +1848,10 @@ spec:
               currentPrimary:
                 description: Current primary instance
                 type: string
+              currentPrimaryTimestamp:
+                description: The timestamp when the last actual promotion to primary
+                  has occurred
+                type: string
               danglingPVC:
                 description: List of all the PVCs created by this cluster and still
                   available which are not attached to a Pod
@@ -1951,6 +1955,10 @@ spec:
               targetPrimary:
                 description: Target primary instance, this is different from the previous
                   one during a switchover or a failover
+                type: string
+              targetPrimaryTimestamp:
+                description: The timestamp when the last request for a new primary
+                  has occurred
                 type: string
               writeService:
                 description: Current write pod
@@ -3760,6 +3768,9 @@ spec:
               currentPrimary:
                 description: Current primary instance
                 type: string
+              currentPrimaryTimestamp:
+                description: The timestamp of the current primary
+                type: string
               danglingPVC:
                 description: List of all the PVCs created by this cluster and still
                   available which are not attached to a Pod
@@ -3857,6 +3868,9 @@ spec:
               targetPrimary:
                 description: Target primary instance, this is different from the previous
                   one during a switchover or a failover
+                type: string
+              targetPrimaryTimestamp:
+                description: The timestamp of the target primary
                 type: string
               writeService:
                 description: Current write pod
