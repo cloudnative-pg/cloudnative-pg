@@ -139,7 +139,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive), f
 			// Expect the test data previously created to be available
 			primary, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertTestDataExpectedCount(namespace, primary.GetName(), "test", 2)
+			AssertDataExpectedCount(namespace, primary.GetName(), "test", 2)
 		})
 	})
 
@@ -239,7 +239,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive), f
 			// Expect the test data previously created to be available
 			primary, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertTestDataExpectedCount(namespace, primary.GetName(), "test", 2)
+			AssertDataExpectedCount(namespace, primary.GetName(), "test", 2)
 		})
 	})
 })

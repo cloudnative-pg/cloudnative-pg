@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -87,13 +86,13 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			By("setting up minio", func() {
-				installMinio(namespace)
+				InstallMinio(namespace)
 			})
 
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
-				installMinioClient(namespace)
+				InstallMinioClient(namespace)
 			})
 
 			// Create ConfigMap and secrets to verify metrics for target database after backup restore
@@ -117,7 +116,7 @@ var _ = Describe("Backup and restore", func() {
 				executeBackup(namespace, backupFile)
 
 				Eventually(func() (int, error) {
-					return countFilesOnMinio(namespace, "data.tar")
+					return CountFilesOnMinio(namespace, "data.tar")
 				}, 30).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
 					cluster := &apiv1.Cluster{}
@@ -156,13 +155,13 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			By("setting up minio", func() {
-				installMinio(namespace)
+				InstallMinio(namespace)
 			})
 
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
-				installMinioClient(namespace)
+				InstallMinioClient(namespace)
 			})
 
 			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
@@ -170,7 +169,7 @@ var _ = Describe("Backup and restore", func() {
 			By("scheduling backups", func() {
 				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
 				Eventually(func() (int, error) {
-					return countFilesOnMinio(namespace, "data.tar")
+					return CountFilesOnMinio(namespace, "data.tar")
 				}, 60).Should(BeNumerically(">=", 2))
 			})
 
@@ -195,13 +194,13 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			By("setting up minio", func() {
-				installMinio(namespace)
+				InstallMinio(namespace)
 			})
 
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
-				installMinioClient(namespace)
+				InstallMinioClient(namespace)
 			})
 
 			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
@@ -211,7 +210,7 @@ var _ = Describe("Backup and restore", func() {
 			// AssertScheduledBackupsImmediate creates at least two backups, we should find
 			// their base backups
 			Eventually(func() (int, error) {
-				return countFilesOnMinio(namespace, "data.tar")
+				return CountFilesOnMinio(namespace, "data.tar")
 			}, 30).Should(BeNumerically("==", 1))
 		})
 
@@ -536,13 +535,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 			})
 			By("setting up minio", func() {
-				installMinio(namespace)
+				InstallMinio(namespace)
 			})
 
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
-				installMinioClient(namespace)
+				InstallMinioClient(namespace)
 			})
 
 			// Create the cluster
@@ -557,7 +556,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			By("backing up a cluster and verifying it exists on minio", func() {
 				executeBackup(namespace, sourceBackupFileMinio)
 				Eventually(func() (int, error) {
-					return countFilesOnMinio(namespace, "data.tar")
+					return CountFilesOnMinio(namespace, "data.tar")
 				}, 30).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
 					cluster := &apiv1.Cluster{}
@@ -575,7 +574,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			// verify test data on restored external cluster
 			primaryPodInfo, err := env.GetClusterPrimary(namespace, externalClusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertTestDataExpectedCount(namespace, primaryPodInfo.GetName(), tableName, 2)
+			AssertDataExpectedCount(namespace, primaryPodInfo.GetName(), tableName, 2)
 		})
 
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
@@ -606,13 +605,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 			})
 			By("setting up minio", func() {
-				installMinio(namespace)
+				InstallMinio(namespace)
 			})
 
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly.
 			By("setting up minio client pod", func() {
-				installMinioClient(namespace)
+				InstallMinioClient(namespace)
 			})
 
 			// Create the Cluster
@@ -627,7 +626,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			By("backing up a cluster and verifying it exists on minio", func() {
 				executeBackup(namespace, sourceBackupFileMinio)
 				Eventually(func() (int, error) {
-					return countFilesOnMinio(namespace, "data.tar")
+					return CountFilesOnMinio(namespace, "data.tar")
 				}, 30).Should(BeEquivalentTo(1))
 			})
 
@@ -639,7 +638,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 			primaryPodInfo, err := env.GetClusterPrimary(namespace, externalClusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertTestDataExpectedCount(namespace, primaryPodInfo.GetName(), tableName, 4)
+			AssertDataExpectedCount(namespace, primaryPodInfo.GetName(), tableName, 4)
 		})
 	})
 
@@ -902,14 +901,6 @@ func AssertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string,
 	}, timeout).Should(BeNumerically(">=", 2))
 }
 
-func AssertStorageCredentialsAreCreated(namespace string, name string, id string, key string) {
-	_, _, err := tests.Run(fmt.Sprintf("kubectl create secret generic %v -n %v "+
-		"--from-literal='ID=%v' "+
-		"--from-literal='KEY=%v'",
-		name, namespace, id, key))
-	Expect(err).ToNot(HaveOccurred())
-}
-
 func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile string) {
 	By("Async Replication into external cluster", func() {
 		restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
@@ -986,7 +977,7 @@ func AssertClusterRestore(namespace string, restoreClusterFile string) {
 
 		// Test data should be present on restored primary
 		primary := restoredClusterName + "-1"
-		AssertTestDataExpectedCount(namespace, primary, tableName, 2)
+		AssertDataExpectedCount(namespace, primary, tableName, 2)
 
 		// Restored primary should be on timeline 2
 		cmd := "psql -U postgres app -tAc 'select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)'"
@@ -1032,56 +1023,6 @@ func AssertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupN
 			return currentBackupCount, err
 		}, 60).Should(BeNumerically("==", 1))
 	})
-}
-
-func installMinio(namespace string) {
-	// Create a PVC-based deployment for the minio version
-	// minio/minio:RELEASE.2020-04-23T00-58-49Z
-	minioPVCFile := fixturesDir + "/backup/minio/minio-pvc.yaml"
-	minioDeploymentFile := fixturesDir +
-		"/backup/minio/minio-deployment.yaml"
-
-	_, _, err := tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-		namespace, minioPVCFile))
-	Expect(err).ToNot(HaveOccurred())
-	_, _, err = tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-		namespace, minioDeploymentFile))
-	Expect(err).ToNot(HaveOccurred())
-
-	// Wait for the minio pod to be ready
-	deploymentName := "minio"
-	deploymentNamespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      deploymentName,
-	}
-	Eventually(func() (int32, error) {
-		deployment := &appsv1.Deployment{}
-		err = env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
-		return deployment.Status.ReadyReplicas, err
-	}, 300).Should(BeEquivalentTo(1))
-
-	// Create a minio service
-	serviceFile := fixturesDir + "/backup/minio/minio-service.yaml"
-	_, _, err = tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-		namespace, serviceFile))
-	Expect(err).ToNot(HaveOccurred())
-}
-
-func installMinioClient(namespace string) {
-	clientFile := fixturesDir + "/backup/minio/minio-client.yaml"
-	_, _, err := tests.Run(fmt.Sprintf(
-		"kubectl apply -n %v -f %v",
-		namespace, clientFile))
-	Expect(err).ToNot(HaveOccurred())
-	mcNamespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      minioClientName,
-	}
-	Eventually(func() (bool, error) {
-		mc := &corev1.Pod{}
-		err = env.Client.Get(env.Ctx, mcNamespacedName, mc)
-		return utils.IsPodReady(*mc), err
-	}, 180).Should(BeTrue())
 }
 
 func executeBackup(namespace string, backupFile string) {
@@ -1197,25 +1138,6 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 	})
 }
 
-func AssertArchiveWalOnMinio(namespace, clusterName string) {
-	// Create a WAL on the primary and check if it arrives at minio, within a short time
-	By("archiving WALs and verifying they exist", func() {
-		primary := clusterName + "-1"
-		out, _, err := tests.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			namespace,
-			primary,
-			switchWalCmd))
-		Expect(err).ToNot(HaveOccurred())
-
-		latestWAL := strings.TrimSpace(out)
-		Eventually(func() (int, error) {
-			// WALs are compressed with gzip in the fixture
-			return countFilesOnMinio(namespace, latestWAL+".gz")
-		}, 30).Should(BeEquivalentTo(1))
-	})
-}
-
 func AssertClusterRestorePITR(namespace, clusterName string) {
 	primaryInfo := &corev1.Pod{}
 	var err error
@@ -1244,7 +1166,7 @@ func AssertClusterRestorePITR(namespace, clusterName string) {
 
 	By(fmt.Sprintf("after restored, 3rd entry should not be exists in table '%v'", tableName), func() {
 		// Only 2 entries should be present
-		AssertTestDataExpectedCount(namespace, primaryInfo.GetName(), tableName, 2)
+		AssertDataExpectedCount(namespace, primaryInfo.GetName(), tableName, 2)
 	})
 }
 
@@ -1329,20 +1251,6 @@ func getScheduledBackupBackups(namespace string, scheduledBackupName string) ([]
 
 func composeFindMinioCmd(path string, serviceName string) string {
 	return fmt.Sprintf("sh -c 'mc find %v --name %v | wc -l'", serviceName, path)
-}
-
-// Use the minioClient `minioClientName` in namespace `namespace` to count  the amount of files matching the `path`
-func countFilesOnMinio(namespace string, path string) (int, error) {
-	out, _, err := tests.RunUnchecked(fmt.Sprintf(
-		"kubectl exec -n %v %v -- %v",
-		namespace,
-		minioClientName,
-		composeFindMinioCmd(path, "minio")))
-	if err != nil {
-		return -1, err
-	}
-	value, err := strconv.Atoi(strings.Trim(out, "\n"))
-	return value, err
 }
 
 func composeAzBlobListCmd(azStorageAccount, azStorageKey, clusterName string, path string) string {
@@ -1694,23 +1602,6 @@ func getCurrentTimeStamp(namespace, clusterName string) (string, error) {
 	return currentTimeStamp, nil
 }
 
-// insertRecordIntoTestTable insert an entry entry into test table
-func insertRecordIntoTestTable(namespace, clusterName, tableName string, value int) error {
-	primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
-	if err != nil {
-		return err
-	}
-
-	query := fmt.Sprintf("INSERT INTO %v VALUES (%v);", tableName, value)
-	_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, "postgres",
-		&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func prepareClusterForPITROnMinio(
 	namespace,
 	clusterName,
@@ -1724,13 +1615,13 @@ func prepareClusterForPITROnMinio(
 	})
 
 	By("setting up minio", func() {
-		installMinio(namespace)
+		InstallMinio(namespace)
 	})
 
 	// Create the minio client pod and wait for it to be ready.
 	// We'll use it to check if everything is archived correctly
 	By("setting up minio client pod", func() {
-		installMinioClient(namespace)
+		InstallMinioClient(namespace)
 	})
 
 	// Create the cluster
@@ -1740,7 +1631,7 @@ func prepareClusterForPITROnMinio(
 		executeBackup(namespace, backupSampleFile)
 
 		Eventually(func() (int, error) {
-			return countFilesOnMinio(namespace, "data.tar")
+			return CountFilesOnMinio(namespace, "data.tar")
 		}, 30).Should(BeEquivalentTo(1))
 		Eventually(func() (string, error) {
 			cluster := &apiv1.Cluster{}
@@ -1760,7 +1651,7 @@ func prepareClusterForPITROnMinio(
 	})
 
 	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableName), func() {
-		err = insertRecordIntoTestTable(namespace, clusterName, tableName, 3)
+		err = insertRecordIntoTable(namespace, clusterName, tableName, 3)
 		Expect(err).ToNot(HaveOccurred())
 	})
 	AssertArchiveWalOnMinio(namespace, clusterName)
@@ -1808,7 +1699,7 @@ func prepareClusterForPITROnAzureBlob(
 	})
 
 	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableName), func() {
-		err = insertRecordIntoTestTable(namespace, clusterName, tableName, 3)
+		err = insertRecordIntoTable(namespace, clusterName, tableName, 3)
 		Expect(err).ToNot(HaveOccurred())
 	})
 	AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
@@ -1895,7 +1786,7 @@ func prepareClusterForPITROnAzurite(
 	})
 
 	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableName), func() {
-		err := insertRecordIntoTestTable(namespace, clusterName, tableName, 3)
+		err := insertRecordIntoTable(namespace, clusterName, tableName, 3)
 		Expect(err).ToNot(HaveOccurred())
 	})
 	AssertArchiveWalOnAzurite(namespace, clusterName)

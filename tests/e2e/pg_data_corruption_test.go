@@ -163,12 +163,12 @@ var _ = Describe("PGDATA Corruption", func() {
 				return strings.Trim(stdOut, "\n"), err
 			}, 60, 2).Should(BeEquivalentTo("t"))
 			// verify test data
-			AssertTestDataExpectedCount(namespace, newPodName, tableName, 2)
+			AssertDataExpectedCount(namespace, newPodName, tableName, 2)
 		})
 		// verify test data on new primary
 		newPrimaryPodInfo, err = env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		AssertTestDataExpectedCount(namespace, newPrimaryPodInfo.GetName(), tableName, 2)
+		AssertDataExpectedCount(namespace, newPrimaryPodInfo.GetName(), tableName, 2)
 		assertClusterStandbysAreStreaming(namespace, clusterName)
 	})
 })

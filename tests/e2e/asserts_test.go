@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -125,6 +126,23 @@ func AssertCreateTestData(namespace, clusterName, tableName string) {
 	})
 }
 
+// insertRecordIntoTable insert an entry entry into a table
+func insertRecordIntoTable(namespace, clusterName, tableName string, value int) error {
+	primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+	if err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf("INSERT INTO %v VALUES (%v);", tableName, value)
+	_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, "postgres",
+		&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // AssertInsertTestData inserts additional data to primary pod and writes WAL
 func AssertInsertTestData(namespace, clusterName, tableName string) {
 	By("inserting additional data to primary", func() {
@@ -144,8 +162,8 @@ func AssertInsertTestData(namespace, clusterName, tableName string) {
 	})
 }
 
-// AssertTestDataExpectedCount verifies that an expected amount of rows exist on the table
-func AssertTestDataExpectedCount(namespace, podName, tableName string, expectedValue int) {
+// AssertDataExpectedCount verifies that an expected amount of rows exist on the table
+func AssertDataExpectedCount(namespace, podName, tableName string, expectedValue int) {
 	By(fmt.Sprintf("verifying test data on pod %v", podName), func() {
 		newPodNamespacedName := types.NamespacedName{
 			Namespace: namespace,
@@ -335,5 +353,168 @@ func AssertNewPrimary(namespace string, clusterName string, oldprimary string) {
 		_, _, err = env.ExecCommand(env.Ctx, *pod, "postgres",
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		Expect(err).ToNot(HaveOccurred())
+	})
+}
+
+func AssertStorageCredentialsAreCreated(namespace string, name string, id string, key string) {
+	_, _, err := tests.Run(fmt.Sprintf("kubectl create secret generic %v -n %v "+
+		"--from-literal='ID=%v' "+
+		"--from-literal='KEY=%v'",
+		name, namespace, id, key))
+	Expect(err).ToNot(HaveOccurred())
+}
+
+// InstallMinio installs minio to verify the backup and archive walls
+func InstallMinio(namespace string) {
+	// Create a PVC-based deployment for the minio version
+	// minio/minio:RELEASE.2020-04-23T00-58-49Z
+	minioPVCFile := fixturesDir + "/backup/minio/minio-pvc.yaml"
+	minioDeploymentFile := fixturesDir +
+		"/backup/minio/minio-deployment.yaml"
+
+	_, _, err := tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+		namespace, minioPVCFile))
+	Expect(err).ToNot(HaveOccurred())
+	_, _, err = tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+		namespace, minioDeploymentFile))
+	Expect(err).ToNot(HaveOccurred())
+
+	// Wait for the minio pod to be ready
+	deploymentNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      "minio",
+	}
+	Eventually(func() (int32, error) {
+		deployment := &appsv1.Deployment{}
+		err = env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
+		return deployment.Status.ReadyReplicas, err
+	}, 300).Should(BeEquivalentTo(1))
+
+	// Create a minio service
+	_, _, err = tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+		namespace, fixturesDir+"/backup/minio/minio-service.yaml"))
+	Expect(err).ToNot(HaveOccurred())
+}
+
+// InstallMinioClient installs minio client to verify the backup and archive walls
+func InstallMinioClient(namespace string) {
+	clientFile := fixturesDir + "/backup/minio/minio-client.yaml"
+	_, _, err := tests.Run(fmt.Sprintf(
+		"kubectl apply -n %v -f %v",
+		namespace, clientFile))
+	Expect(err).ToNot(HaveOccurred())
+
+	mcNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      minioClientName,
+	}
+	Eventually(func() (bool, error) {
+		mc := &corev1.Pod{}
+		err = env.Client.Get(env.Ctx, mcNamespacedName, mc)
+		return utils.IsPodReady(*mc), err
+	}, 180).Should(BeTrue())
+}
+
+// AssertArchiveWalOnMinio to archive walls and verify that exists
+func AssertArchiveWalOnMinio(namespace, clusterName string) {
+	// Create a WAL on the primary and check if it arrives at minio, within a short time
+	By("archiving WALs and verifying they exist", func() {
+		primary := clusterName + "-1"
+		out, _, err := tests.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primary,
+			switchWalCmd))
+		Expect(err).ToNot(HaveOccurred())
+
+		latestWAL := strings.TrimSpace(out)
+		Eventually(func() (int, error) {
+			// WALs are compressed with gzip in the fixture
+			return CountFilesOnMinio(namespace, latestWAL+".gz")
+		}, 30).Should(BeEquivalentTo(1))
+	})
+}
+
+// CountFilesOnMinio uses the minioClient in the given `namespace` to count  the
+// amount of files matching the given `path`
+func CountFilesOnMinio(namespace string, path string) (value int, err error) {
+	var stdout string
+	stdout, _, err = tests.RunUnchecked(fmt.Sprintf(
+		"kubectl exec -n %v %v -- %v",
+		namespace,
+		minioClientName,
+		composeFindMinioCmd(path, "minio")))
+	if err != nil {
+		return -1, err
+	}
+	value, err = strconv.Atoi(strings.Trim(stdout, "\n"))
+	return value, err
+}
+
+func AssertReplicaModeCluster(
+	namespace,
+	srcClusterName,
+	srcClusterSample,
+	replicaClusterName,
+	replicaClusterSample,
+	checkQuery string) {
+	var primarySrcCluster, primaryReplicaCluster *corev1.Pod
+	var err error
+	commandTimeout = time.Second * 5
+
+	By("creating source cluster", func() {
+		// Create replica source cluster
+		AssertCreateCluster(namespace, srcClusterName, srcClusterSample, env)
+		// Get primary from source cluster
+		Eventually(func() error {
+			primarySrcCluster, err = env.GetClusterPrimary(namespace, srcClusterName)
+			return err
+		}, 5).Should(BeNil())
+	})
+
+	By("creating test data in source cluster", func() {
+		cmd := "CREATE TABLE test_replica AS VALUES (1), (2);"
+		_, _, err = env.ExecCommand(env.Ctx, *primarySrcCluster, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", cmd)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By("creating replica cluster", func() {
+		AssertCreateCluster(namespace, replicaClusterName, replicaClusterSample, env)
+		// Get primary from replica cluster
+		Eventually(func() error {
+			primaryReplicaCluster, err = env.GetClusterPrimary(namespace, replicaClusterName)
+			return err
+		}, 5).Should(BeNil())
+	})
+
+	By("verifying that replica cluster primary is in recovery mode", func() {
+		query := "select pg_is_in_recovery();"
+		Eventually(func() (string, error) {
+			stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, "postgres",
+				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+			return strings.Trim(stdOut, "\n"), err
+		}, 300, 15).Should(BeEquivalentTo("t"))
+	})
+
+	By("checking data have been copied correctly in replica cluster", func() {
+		Eventually(func() (string, error) {
+			stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, "postgres",
+				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", checkQuery)
+			return strings.Trim(stdOut, "\n"), err
+		}, 180, 10).Should(BeEquivalentTo("2"))
+	})
+
+	By("writing some new data to the source cluster", func() {
+		err := insertRecordIntoTable(namespace, srcClusterName, "test_replica", 3)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By("checking new data have been copied correctly in replica cluster", func() {
+		Eventually(func() (string, error) {
+			stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, "postgres",
+				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", checkQuery)
+			return strings.Trim(stdOut, "\n"), err
+		}, 180, 15).Should(BeEquivalentTo("3"))
 	})
 }

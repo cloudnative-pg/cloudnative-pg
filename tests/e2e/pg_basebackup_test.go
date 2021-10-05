@@ -63,12 +63,7 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 		})
 
 		By("writing some new data to the dst cluster", func() {
-			cmd := "psql -U postgres app -tAc 'INSERT INTO to_bootstrap VALUES (3);'"
-			_, _, err := tests.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				primaryDst,
-				cmd))
+			err := insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -131,12 +126,7 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
 		})
 
 		By("writing some new data to the dst cluster", func() {
-			cmd := "psql -U postgres app -tAc 'INSERT INTO to_bootstrap VALUES (3);'"
-			_, _, err := tests.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				primaryDst,
-				cmd))
+			err := insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
