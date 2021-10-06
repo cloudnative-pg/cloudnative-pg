@@ -79,8 +79,8 @@ data:
       query: |
         SELECT datname
           , pg_catalog.pg_database_size(datname) AS size_bytes
-          , age(datfrozenxid) AS xid_age
-          , mxid_age(datminmxid) AS mxid_age
+          , pg_catalog.age(datfrozenxid) AS xid_age
+          , pg_catalog.mxid_age(datminmxid) AS mxid_age
         FROM pg_catalog.pg_database
       metrics:
         - datname:
@@ -144,8 +144,8 @@ data:
           , COALESCE(EXTRACT(EPOCH FROM (now() - last_failed_time)), -1) AS seconds_since_last_failure
           , COALESCE(EXTRACT(EPOCH FROM last_archived_time), -1) AS last_archived_time
           , COALESCE(EXTRACT(EPOCH FROM last_failed_time), -1) AS last_failed_time
-          , CAST(CAST('x'||pg_catalog.right(last_archived_wal, 16) AS pg_catalog.bit(64)) AS pg_catalog.int8) AS last_archived_wal_start_lsn
-          , CAST(CAST('x'||pg_catalog.right(last_failed_wal, 16) AS pg_catalog.bit(64)) AS pg_catalog.int8) AS last_failed_wal_start_lsn
+          , COALESCE(CAST(CAST('x'||pg_catalog.right(pg_catalog.split_part(last_archived_wal, '.', 1), 16) AS pg_catalog.bit(64)) AS pg_catalog.int8), -1) AS last_archived_wal_start_lsn
+          , COALESCE(CAST(CAST('x'||pg_catalog.right(pg_catalog.split_part(last_failed_wal, '.', 1), 16) AS pg_catalog.bit(64)) AS pg_catalog.int8), -1) AS last_failed_wal_start_lsn
           , EXTRACT(EPOCH FROM stats_reset) AS stats_reset_time
         FROM pg_catalog.pg_stat_archiver
       metrics:
@@ -416,7 +416,7 @@ data:
          , COALESCE(application_name, '') AS application_name
          , COALESCE(client_addr::text, '') AS client_addr
          , EXTRACT(EPOCH FROM backend_start) AS backend_start
-         , COALESCE(age(backend_xmin), 0) AS backend_xmin_age
+         , COALESCE(pg_catalog.age(backend_xmin), 0) AS backend_xmin_age
          , pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), sent_lsn) AS sent_diff_bytes
          , pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), write_lsn) AS write_diff_bytes
          , pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), flush_lsn) AS flush_diff_bytes
