@@ -303,7 +303,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 ) {
 	contextLogger := log.FromContext(ctx)
 
-	contextLogger.Info("Reconciling custom monitoring queries")
+	contextLogger.Debug("Reconciling custom monitoring queries")
 
 	dbname := "postgres"
 	if cluster.ShouldCreateApplicationDatabase() {
