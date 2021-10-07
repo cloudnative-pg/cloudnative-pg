@@ -105,6 +105,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, r.Status().Update(ctx, &backup)
 	}
 
+	if !utils.IsPodReady(pod) {
+		contextLogger.Info("Not ready backup target, will retry in 30 seconds", "target", pod.Name)
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
 	r.Recorder.Eventf(&backup, "Normal", "Starting", "Started backup for cluster %v", clusterName)
 	contextLogger.Info("Starting backup",
 		"cluster", cluster.Name,
