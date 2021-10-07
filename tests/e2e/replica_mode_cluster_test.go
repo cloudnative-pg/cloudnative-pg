@@ -114,8 +114,8 @@ var _ = Describe("Replica Mode", func() {
 		})
 	})
 
-	Context("archive mode set to 'always' on designated primary", Focus, func() {
-		It("verify replica cluster can archive WALs from the designated primary", Focus, func() {
+	Context("archive mode set to 'always' on designated primary", func() {
+		It("verify replica cluster can archive WALs from the designated primary", func() {
 			const replicaClusterSample = fixturesDir + replicaModeClusterDir + "cluster-replica-archive-mode-always.yaml"
 
 			replicaNamespace = "replica-mode-archive"
