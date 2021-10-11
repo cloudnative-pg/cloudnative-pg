@@ -8,7 +8,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package status
 
 import (
-	"io"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -32,23 +32,43 @@ func NewCmd() *cobra.Command {
 }
 
 func statusSubCommand() error {
-	resp, err := http.Get(url.Local(url.PathPgStatus, url.StatusPort))
+	statusURL := url.Local(url.PathPgStatus, url.StatusPort)
+	resp, err := http.Get(statusURL) // nolint:gosec
 	if err != nil {
 		log.Error(err, "Error while requesting instance status")
 		return err
 	}
 
-	if resp.StatusCode != 200 {
-		bytes, _ := ioutil.ReadAll(resp.Body)
-		log.Info(
-			"Error while extracting status",
-			"statusCode", resp.StatusCode, "body", string(bytes))
-		_ = resp.Body.Close()
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			log.Error(err, "Can't close the connection",
+				"statusURL", statusURL,
+				"statusCode", resp.StatusCode,
+			)
+		}
+	}()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Error(err, "Error while reading status response body",
+			"statusURL", statusURL,
+			"statusCode", resp.StatusCode,
+		)
 		return err
 	}
 
-	_, err = io.Copy(os.Stdout, resp.Body)
-	_ = resp.Body.Close()
+	if resp.StatusCode != 200 {
+		log.Info(
+			"Error while extracting status",
+			"statusURL", statusURL,
+			"statusCode", resp.StatusCode,
+			"body", string(body),
+		)
+		return fmt.Errorf("invalid status code: %v", resp.StatusCode)
+	}
+
+	_, err = os.Stdout.Write(body)
 	if err != nil {
 		log.Error(err, "Error while showing status info")
 		return err

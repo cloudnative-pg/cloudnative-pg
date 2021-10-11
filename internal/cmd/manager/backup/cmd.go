@@ -9,7 +9,6 @@ package backup
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -25,24 +24,43 @@ func NewCmd() *cobra.Command {
 	cmd := cobra.Command{
 		Use: "backup [backup_name]",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			resp, err := http.Get(url.Local(url.PathPgBackup, url.LocalPort) + "?name=" + args[0])
+			backupURL := url.Local(url.PathPgBackup, url.LocalPort)
+			resp, err := http.Get(backupURL + "?name=" + args[0])
 			if err != nil {
 				log.Error(err, "Error while requesting backup")
 				return err
 			}
 
+			defer func() {
+				err := resp.Body.Close()
+				if err != nil {
+					log.Error(err, "Can't close the connection",
+						"backupURL", backupURL,
+						"statusCode", resp.StatusCode,
+					)
+				}
+			}()
+
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				log.Error(err, "Error while reading backup response body",
+					"backupURL", backupURL,
+					"statusCode", resp.StatusCode,
+				)
+				return err
+			}
+
 			if resp.StatusCode != 200 {
-				bytes, _ := ioutil.ReadAll(resp.Body)
 				log.Info(
 					"Error while requesting backup",
+					"backupURL", backupURL,
 					"statusCode", resp.StatusCode,
-					"body", string(bytes))
-				_ = resp.Body.Close()
+					"body", string(body),
+				)
 				return fmt.Errorf("invalid status code: %v", resp.StatusCode)
 			}
 
-			_, err = io.Copy(os.Stderr, resp.Body)
-			_ = resp.Body.Close()
+			_, err = os.Stderr.Write(body)
 			if err != nil {
 				log.Error(err, "Error while starting a backup")
 				return err

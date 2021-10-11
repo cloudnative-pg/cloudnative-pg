@@ -34,7 +34,7 @@ func GetCluster(ctx context.Context,
 	var cluster *apiv1.Cluster
 	cached := true
 
-	cluster, err := GetClusterFromCacheEndpoint()
+	cluster, err := getClusterFromCacheEndpoint()
 	if errors.Is(err, cache.ErrCacheMiss) {
 		cached = false
 	} else if err != nil {
@@ -69,7 +69,7 @@ func GetEnv(ctx context.Context,
 	var env []string
 	cached := true
 
-	env, err := GetEnvFromCacheEndpoint(key)
+	env, err := getEnvFromCacheEndpoint(key)
 	if errors.Is(err, cache.ErrCacheMiss) {
 		cached = false
 	} else if err != nil {
@@ -93,28 +93,16 @@ func GetEnv(ctx context.Context,
 	return env, nil
 }
 
-// GetClusterFromCacheEndpoint retrieves the cluster from the cache
-func GetClusterFromCacheEndpoint() (*apiv1.Cluster, error) {
-	r, err := http.Get(url.Local(url.PathCache+cache.ClusterKey, url.LocalPort))
-	if err != nil {
-		return nil, err
-	}
-
-	if r.StatusCode != http.StatusOK {
-		_, _ = ioutil.ReadAll(r.Body)
-		_ = r.Body.Close()
-		return nil, cache.ErrCacheMiss
-	}
-	defer func() {
-		_ = r.Body.Close()
-	}()
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return nil, err
-	}
-
+// getClusterFromCacheEndpoint retrieves the cluster from the cache
+func getClusterFromCacheEndpoint() (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
-	err = json.Unmarshal(body, &cluster)
+
+	bytes, err := getFromCache(cache.ClusterKey)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(bytes, &cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -122,31 +110,41 @@ func GetClusterFromCacheEndpoint() (*apiv1.Cluster, error) {
 	return &cluster, nil
 }
 
-// GetEnvFromCacheEndpoint retrieves the list of environment variables from the 'cachePath' file
-func GetEnvFromCacheEndpoint(c string) ([]string, error) {
-	r, err := http.Get(url.Local(url.PathCache+c, url.LocalPort))
-	if err != nil {
-		return nil, err
-	}
-
-	if r.StatusCode != http.StatusOK {
-		_, _ = ioutil.ReadAll(r.Body)
-		_ = r.Body.Close()
-		return nil, cache.ErrCacheMiss
-	}
-	defer func() {
-		_ = r.Body.Close()
-	}()
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return nil, err
-	}
-
+// getEnvFromCacheEndpoint retrieves the list of environment variables from the 'cachePath' file
+func getEnvFromCacheEndpoint(c string) ([]string, error) {
 	var env []string
-	err = json.Unmarshal(body, &env)
+
+	bytes, err := getFromCache(c)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(bytes, &env)
 	if err != nil {
 		return nil, err
 	}
 
 	return env, nil
+}
+
+func getFromCache(urlPath string) ([]byte, error) {
+	resp, err := http.Get(url.Local(url.PathCache+urlPath, url.LocalPort))
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, cache.ErrCacheMiss
+	}
+
+	bytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes, nil
 }
