@@ -290,7 +290,7 @@ func (r *ClusterReconciler) getStatusFromInstances(
 		return postgres.PostgresqlStatusList{}
 	}
 
-	status := ExtractInstancesStatus(ctx, filteredPods)
+	status := extractInstancesStatus(ctx, filteredPods)
 	sort.Sort(&status)
 	for idx := range status.Items {
 		if status.Items[idx].Error != nil {

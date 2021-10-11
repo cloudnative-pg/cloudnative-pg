@@ -480,10 +480,10 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	return nil
 }
 
-// ExtractInstancesStatus extracts the status of the underlying PostgreSQL instance from
+// extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
 // the requested Pod, via the instance manager. In case of failure, errors are passed
 // in the result list
-func ExtractInstancesStatus(
+func extractInstancesStatus(
 	ctx context.Context,
 	filteredPods []corev1.Pod,
 ) postgres.PostgresqlStatusList {
@@ -494,6 +494,7 @@ func ExtractInstancesStatus(
 		instanceStatus.IsReady = utils.IsPodReady(filteredPods[idx])
 		instanceStatus.Node = filteredPods[idx].Spec.NodeName
 		instanceStatus.Pod = filteredPods[idx]
+
 		result.Items = append(result.Items, instanceStatus)
 	}
 	return result
@@ -516,11 +517,12 @@ func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) postgre
 		return result
 	}
 
-	if resp.StatusCode != 200 {
-		bytes, _ := ioutil.ReadAll(resp.Body)
-		result.Error = fmt.Errorf("%v - %v", resp.StatusCode, string(bytes))
-		_ = resp.Body.Close()
-	}
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil && result.Error == nil {
+			result.Error = err
+		}
+	}()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -528,13 +530,12 @@ func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) postgre
 		return result
 	}
 
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		result.Error = err
+	if resp.StatusCode != 200 {
+		result.Error = fmt.Errorf("error status code: %d, body: %s", resp.StatusCode, string(body))
 		return result
 	}
 
-	err = resp.Body.Close()
+	err = json.Unmarshal(body, &result)
 	if err != nil {
 		result.Error = err
 		return result
