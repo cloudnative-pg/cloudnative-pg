@@ -51,10 +51,12 @@ type uuidKey struct{}
 // Logger wraps a logr.Logger, hiding parts of its APIs
 type logger struct {
 	logr.Logger
+
+	printCaller bool
 }
 
 // Log is the logger that will be used in this package
-var log = &logger{ctrl.Log}
+var log = &logger{Logger: ctrl.Log}
 
 // GetLogger returns the default logger
 func GetLogger() Logger {
@@ -81,6 +83,19 @@ func SetLogger(logr logr.Logger) {
 	log.Logger = logr
 }
 
+func (l *logger) enrich() logr.Logger {
+	cl := l.getLogger()
+
+	if l.printCaller {
+		_, fileName, fileLine, ok := runtime.Caller(2)
+		if ok {
+			cl = l.WithValues("caller", fmt.Sprintf("%s:%d", fileName, fileLine)).getLogger()
+		}
+	}
+
+	return cl
+}
+
 func (l *logger) getLogger() logr.Logger {
 	return l.Logger
 }
@@ -89,28 +104,32 @@ func (l *logger) Enabled() bool {
 	return l.Logger.Enabled()
 }
 
+func (l *logger) Error(err error, msg string, keysAndValues ...interface{}) {
+	l.enrich().V(int(-ErrorLevel)).Error(err, msg, keysAndValues...)
+}
+
+func (l *logger) Info(msg string, keysAndValues ...interface{}) {
+	l.enrich().V(int(-InfoLevel)).Info(msg, keysAndValues...)
+}
+
 func (l *logger) Debug(msg string, keysAndValues ...interface{}) {
-	l.Logger.V(int(-DebugLevel)).Info(msg, keysAndValues...)
+	l.enrich().V(int(-DebugLevel)).Info(msg, keysAndValues...)
 }
 
 func (l *logger) Trace(msg string, keysAndValues ...interface{}) {
-	l.Logger.V(int(-TraceLevel)).Info(msg, keysAndValues...)
+	l.enrich().V(int(-TraceLevel)).Info(msg, keysAndValues...)
 }
 
 func (l *logger) WithValues(keysAndValues ...interface{}) Logger {
-	return &logger{l.Logger.WithValues(keysAndValues...)}
+	return &logger{Logger: l.Logger.WithValues(keysAndValues...), printCaller: l.printCaller}
 }
 
 func (l *logger) WithName(name string) Logger {
-	return &logger{l.Logger.WithName(name)}
+	return &logger{Logger: l.Logger.WithName(name), printCaller: l.printCaller}
 }
 
-func (l *logger) WithCaller() Logger {
-	_, fileName, fileLine, ok := runtime.Caller(2)
-	if ok {
-		return l.WithValues("caller", fmt.Sprintf("%s:%d", fileName, fileLine))
-	}
-	return l
+func (l logger) WithCaller() Logger {
+	return &logger{Logger: l.Logger, printCaller: true}
 }
 
 // Enabled exposes the same method from the logr.Logger interface using the default logger
@@ -148,14 +167,24 @@ func WithName(name string) Logger {
 	return log.WithName(name)
 }
 
+// WithCaller exposes the same method from logr.Logger interface using the default logger
+func WithCaller() Logger {
+	return log.WithCaller()
+}
+
 // FromContext builds a logger with some additional information stored in the context
 func FromContext(ctx context.Context) Logger {
-	var l Logger = &logger{ctrlLog.FromContext(ctx)}
+	l, ok := ctx.Value(logger{}).(Logger)
+	if !ok {
+		l = &logger{Logger: ctrlLog.FromContext(ctx)}
+	}
+
 	uuid, ok := ctx.Value(uuidKey{}).(uuid.UUID)
 	if ok {
 		l = l.WithValues("uuid", uuid)
 	}
-	return l.WithCaller()
+
+	return l
 }
 
 // IntoContext injects a logger into a context
@@ -177,5 +206,6 @@ func SetupLogger(ctx context.Context) (Logger, context.Context) {
 	if newCtx, err := AddUUID(ctx); err == nil {
 		ctx = newCtx
 	}
-	return FromContext(ctx), IntoContext(ctx, &logger{logr.FromContext(ctx)})
+
+	return FromContext(ctx), IntoContext(ctx, &logger{Logger: logr.FromContext(ctx)})
 }
