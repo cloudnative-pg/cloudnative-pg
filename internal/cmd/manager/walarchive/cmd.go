@@ -28,14 +28,13 @@ import (
 func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
-	var podName string
 
 	cmd := cobra.Command{
 		Use:           "wal-archive [name]",
 		SilenceErrors: true,
 		Args:          cobra.ExactArgs(1),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
-			err := run(namespace, clusterName, podName, args)
+			err := run(namespace, clusterName, args)
 			if err != nil {
 				log.Error(err, "failed to run wal-archive command")
 				return err
@@ -46,15 +45,13 @@ func NewCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
 		"current cluster in k8s")
-	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of the "+
-		"current pod in k8s")
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and of the Pod in k8s")
 
 	return &cmd
 }
 
-func run(namespace, clusterName, podName string, args []string) error {
+func run(namespace, clusterName string, args []string) error {
 	ctx := context.Background()
 
 	walName := args[0]
@@ -71,6 +68,7 @@ func run(namespace, clusterName, podName string, args []string) error {
 
 	cluster, err = cacheClient.GetCluster(ctx, typedClient, namespace, clusterName)
 	if err != nil {
+		log.Error(err, "Error while getting cluster from cache")
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
@@ -84,11 +82,6 @@ func run(namespace, clusterName, podName string, args []string) error {
 		return nil
 	}
 
-	if cluster.Status.CurrentPrimary != podName {
-		// Nothing to be done here, since I'm not the primary server
-		return nil
-	}
-
 	options := barmanCloudWalArchiveOptions(*cluster, clusterName, walName)
 
 	env, err := cacheClient.GetEnv(ctx,
@@ -97,6 +90,7 @@ func run(namespace, clusterName, podName string, args []string) error {
 		cluster.Spec.Backup.BarmanObjectStore,
 		cache.WALArchiveKey)
 	if err != nil {
+		log.Error(err, "Error while getting environment from cache")
 		return fmt.Errorf("failed to get envs: %w", err)
 	}
 
@@ -105,7 +99,6 @@ func run(namespace, clusterName, podName string, args []string) error {
 	barmanCloudWalArchiveCmd.Env = env
 
 	err = execlog.RunStreaming(barmanCloudWalArchiveCmd, barmanCloudWalArchiveName)
-
 	if err != nil {
 		log.Error(err, "Error invoking "+barmanCloudWalArchiveName,
 			"walName", walName,
