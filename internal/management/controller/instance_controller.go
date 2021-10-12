@@ -755,7 +755,7 @@ func (r *InstanceReconciler) configureInstancePermissions() error {
 		return fmt.Errorf("while getting a connection to the instance: %w", err)
 	}
 
-	log.Info("Verifying connection to DB")
+	log.Debug("Verifying connection to DB")
 	err = r.instance.WaitForSuperuserConnectionAvailable()
 	if err != nil {
 		log.Error(err, "DB not available")
