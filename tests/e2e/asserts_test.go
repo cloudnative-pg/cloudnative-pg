@@ -127,39 +127,14 @@ func AssertCreateTestData(namespace, clusterName, tableName string) {
 }
 
 // insertRecordIntoTable insert an entry entry into a table
-func insertRecordIntoTable(namespace, clusterName, tableName string, value int) error {
+func insertRecordIntoTable(namespace, clusterName, tableName string, value int) {
 	primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
-	if err != nil {
-		return err
-	}
+	Expect(err).NotTo(HaveOccurred())
 
 	query := fmt.Sprintf("INSERT INTO %v VALUES (%v);", tableName, value)
 	_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, "postgres",
 		&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// AssertInsertTestData inserts additional data to primary pod and writes WAL
-func AssertInsertTestData(namespace, clusterName, tableName string) {
-	By("inserting additional data to primary", func() {
-		primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
-		Expect(err).NotTo(HaveOccurred())
-		commandTimeout := time.Second * 5
-		query := fmt.Sprintf("INSERT INTO %v VALUES (3), (4);", tableName)
-		_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, "postgres",
-			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Manually writing a new WAL
-		query = "SELECT pg_switch_wal()"
-		_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, "postgres",
-			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-		Expect(err).ToNot(HaveOccurred())
-	})
+	Expect(err).ToNot(HaveOccurred())
 }
 
 // AssertDataExpectedCount verifies that an expected amount of rows exist on the table
@@ -506,8 +481,7 @@ func AssertReplicaModeCluster(
 	})
 
 	By("writing some new data to the source cluster", func() {
-		err := insertRecordIntoTable(namespace, srcClusterName, "test_replica", 3)
-		Expect(err).ToNot(HaveOccurred())
+		insertRecordIntoTable(namespace, srcClusterName, "test_replica", 3)
 	})
 
 	By("checking new data have been copied correctly in replica cluster", func() {
