@@ -104,8 +104,7 @@ var _ = Describe("Replica Mode", func() {
 			})
 
 			By("writing some new data to the source cluster", func() {
-				err := insertRecordIntoTable(replicaNamespace, srcClusterName, "test_replica", 4)
-				Expect(err).ToNot(HaveOccurred())
+				insertRecordIntoTable(replicaNamespace, srcClusterName, "test_replica", 4)
 			})
 
 			By("verifying that replica cluster was not modified", func() {

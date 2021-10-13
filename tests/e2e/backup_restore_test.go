@@ -632,13 +632,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 			// Replicating a cluster with asynchronous replication
 			AssertClusterAsyncReplica(namespace, clusterSourceFileMinio, externalClusterFileMinioReplica)
-			// verify test data on restored external cluster
-			externalClusterName, err := env.GetResourceNameFromYAML(externalClusterFileMinioReplica)
-			Expect(err).ToNot(HaveOccurred())
-
-			primaryPodInfo, err := env.GetClusterPrimary(namespace, externalClusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCount(namespace, primaryPodInfo.GetName(), tableName, 4)
 		})
 	})
 
@@ -930,19 +923,10 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile 
 		sourceClusterName, err := env.GetResourceNameFromYAML(sourceClusterFile)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertInsertTestData(namespace, sourceClusterName, "to_restore")
+		insertRecordIntoTable(namespace, sourceClusterName, "to_restore", 3)
+		AssertArchiveWalOnMinio(namespace, sourceClusterName)
 
-		// Assert that the new data is replicated
-		cmd = postgresLogin + fmt.Sprintf("'SELECT count(*) FROM %v'", "to_restore")
-
-		Eventually(func() (string, error) {
-			out, _, err = tests.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				primaryReplica,
-				cmd))
-			return strings.Trim(out, "\n"), err
-		}, 300).Should(BeEquivalentTo("4"))
+		AssertDataExpectedCount(namespace, primaryReplica, tableName, 3)
 
 		// Cascading replicas should be attached to primary replica
 		cmd = postgresLogin + "'SELECT count(*) FROM pg_stat_replication'"
@@ -1651,8 +1635,7 @@ func prepareClusterForPITROnMinio(
 	})
 
 	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableName), func() {
-		err = insertRecordIntoTable(namespace, clusterName, tableName, 3)
-		Expect(err).ToNot(HaveOccurred())
+		insertRecordIntoTable(namespace, clusterName, tableName, 3)
 	})
 	AssertArchiveWalOnMinio(namespace, clusterName)
 }
@@ -1699,8 +1682,7 @@ func prepareClusterForPITROnAzureBlob(
 	})
 
 	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableName), func() {
-		err = insertRecordIntoTable(namespace, clusterName, tableName, 3)
-		Expect(err).ToNot(HaveOccurred())
+		insertRecordIntoTable(namespace, clusterName, tableName, 3)
 	})
 	AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 }
@@ -1786,8 +1768,7 @@ func prepareClusterForPITROnAzurite(
 	})
 
 	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableName), func() {
-		err := insertRecordIntoTable(namespace, clusterName, tableName, 3)
-		Expect(err).ToNot(HaveOccurred())
+		insertRecordIntoTable(namespace, clusterName, tableName, 3)
 	})
 	AssertArchiveWalOnAzurite(namespace, clusterName)
 }

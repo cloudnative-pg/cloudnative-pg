@@ -63,8 +63,7 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 		})
 
 		By("writing some new data to the dst cluster", func() {
-			err := insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3)
-			Expect(err).ToNot(HaveOccurred())
+			insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3)
 		})
 
 		By("checking the src cluster was not modified", func() {
@@ -126,8 +125,7 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
 		})
 
 		By("writing some new data to the dst cluster", func() {
-			err := insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3)
-			Expect(err).ToNot(HaveOccurred())
+			insertRecordIntoTable(namespace, dstClusterName, "to_bootstrap", 3)
 		})
 
 		By("checking the src cluster was not modified", func() {
