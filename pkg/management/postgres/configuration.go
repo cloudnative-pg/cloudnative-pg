@@ -124,8 +124,10 @@ func configureRecoveryConfFile(pgData string, primaryConnInfo string) (changed b
 	targetFile := path.Join(pgData, "recovery.conf")
 
 	options := map[string]string{
-		"standby_mode":             "on",
-		"restore_command":          "/controller/manager wal-restore %f %p",
+		"standby_mode": "on",
+		"restore_command": fmt.Sprintf(
+			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
+			postgres.LogPath, postgres.LogFileName),
 		"recovery_target_timeline": "latest",
 	}
 
@@ -150,7 +152,9 @@ func configurePostgresAutoConfFile(pgData string, primaryConnInfo string) (chang
 	targetFile := path.Join(pgData, "postgresql.auto.conf")
 
 	options := map[string]string{
-		"restore_command":          "/controller/manager wal-restore %f %p",
+		"restore_command": fmt.Sprintf(
+			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
+			postgres.LogPath, postgres.LogFileName),
 		"recovery_target_timeline": "latest",
 	}
 

@@ -25,8 +25,12 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-// ErrPrimaryServer is returned when the instance is the cluster's primary, therefore doesn't need wal-restore
-var ErrPrimaryServer = errors.New("avoiding restoring WAL on the primary server")
+var (
+	// ErrPrimaryServer is returned when the instance is the cluster's primary, therefore doesn't need wal-restore
+	ErrPrimaryServer = errors.New("avoiding restoring WAL on the primary server")
+	// ErrNoBackupConfigured is returned when no backup is configured
+	ErrNoBackupConfigured = errors.New("backup not configured")
+)
 
 // NewCmd creates a new cobra command
 func NewCmd() *cobra.Command {
@@ -39,9 +43,14 @@ func NewCmd() *cobra.Command {
 		SilenceErrors: true,
 		Args:          cobra.ExactArgs(2),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
-			err := run(namespace, clusterName, podName, args)
+			contextLog := log.WithName("wal-restore")
+			err := run(contextLog, namespace, clusterName, podName, args)
 			if err != nil {
-				log.Error(err, "failed to run wal-restore command")
+				if errors.Is(err, ErrNoBackupConfigured) {
+					contextLog.Info("tried restoring WALs, but no backup was configured")
+				} else {
+					contextLog.Error(err, "failed to run wal-restore command")
+				}
 				return err
 			}
 			return nil
@@ -58,7 +67,7 @@ func NewCmd() *cobra.Command {
 	return &cmd
 }
 
-func run(namespace, clusterName, podName string, args []string) error {
+func run(contextLog log.Logger, namespace, clusterName, podName string, args []string) error {
 	ctx := context.Background()
 
 	walName := args[0]
@@ -70,7 +79,7 @@ func run(namespace, clusterName, podName string, args []string) error {
 
 	typedClient, err = management.NewControllerRuntimeClient()
 	if err != nil {
-		log.Error(err, "Error while creating k8s client")
+		contextLog.Error(err, "Error while creating k8s client")
 		return err
 	}
 
@@ -81,18 +90,18 @@ func run(namespace, clusterName, podName string, args []string) error {
 
 	recoverClusterName, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
 	if err != nil {
-		log.Error(err, "while getting recover configuration")
+		contextLog.Error(err, "while getting recover configuration")
 		return err
 	}
 
 	if barmanConfiguration == nil {
 		// Backup not configured, skipping WAL
-		log.Trace("Skipping WAL restore, there is no backup configuration",
+		contextLog.Trace("Skipping WAL restore, there is no backup configuration",
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
 		)
-		return fmt.Errorf("backup not configured")
+		return ErrNoBackupConfigured
 	}
 
 	options := barmanCloudWalRestoreOptions(barmanConfiguration, recoverClusterName, walName, destinationPath)
@@ -111,7 +120,7 @@ func run(namespace, clusterName, podName string, args []string) error {
 	barmanCloudWalRestoreCmd.Env = env
 	err = execlog.RunStreaming(barmanCloudWalRestoreCmd, barmanCloudWalRestoreName)
 	if err != nil {
-		log.Info("Error invoking "+barmanCloudWalRestoreName,
+		contextLog.Info("Error invoking "+barmanCloudWalRestoreName,
 			"error", err.Error(),
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,

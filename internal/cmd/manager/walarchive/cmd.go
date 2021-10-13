@@ -34,9 +34,10 @@ func NewCmd() *cobra.Command {
 		SilenceErrors: true,
 		Args:          cobra.ExactArgs(1),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
-			err := run(namespace, clusterName, args)
+			contextLog := log.WithName("wal-archive")
+			err := run(contextLog, namespace, clusterName, args)
 			if err != nil {
-				log.Error(err, "failed to run wal-archive command")
+				contextLog.Error(err, "failed to run wal-archive command")
 				return err
 			}
 			return nil
@@ -51,7 +52,7 @@ func NewCmd() *cobra.Command {
 	return &cmd
 }
 
-func run(namespace, clusterName string, args []string) error {
+func run(contextLog log.Logger, namespace, clusterName string, args []string) error {
 	ctx := context.Background()
 
 	walName := args[0]
@@ -62,19 +63,19 @@ func run(namespace, clusterName string, args []string) error {
 
 	typedClient, err = management.NewControllerRuntimeClient()
 	if err != nil {
-		log.Error(err, "Error while creating k8s client")
+		contextLog.Error(err, "Error while creating k8s client")
 		return err
 	}
 
 	cluster, err = cacheClient.GetCluster(ctx, typedClient, namespace, clusterName)
 	if err != nil {
-		log.Error(err, "Error while getting cluster from cache")
+		contextLog.Error(err, "Error while getting cluster from cache")
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		// Backup not configured, skipping WAL
-		log.Trace("Backup not configured, skipping WAL archive",
+		contextLog.Trace("Backup not configured, skipping WAL archive",
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
@@ -90,7 +91,7 @@ func run(namespace, clusterName string, args []string) error {
 		cluster.Spec.Backup.BarmanObjectStore,
 		cache.WALArchiveKey)
 	if err != nil {
-		log.Error(err, "Error while getting environment from cache")
+		contextLog.Error(err, "Error while getting environment from cache")
 		return fmt.Errorf("failed to get envs: %w", err)
 	}
 
@@ -100,7 +101,7 @@ func run(namespace, clusterName string, args []string) error {
 
 	err = execlog.RunStreaming(barmanCloudWalArchiveCmd, barmanCloudWalArchiveName)
 	if err != nil {
-		log.Error(err, "Error invoking "+barmanCloudWalArchiveName,
+		contextLog.Error(err, "Error invoking "+barmanCloudWalArchiveName,
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
