@@ -9,6 +9,8 @@ package manager
 
 import (
 	"flag"
+	"fmt"
+	"os"
 
 	"github.com/spf13/pflag"
 	"go.uber.org/zap/zapcore"
@@ -25,13 +27,18 @@ type Flags struct {
 	zapOptions zap.Options
 }
 
-var logLevel string
+var (
+	logLevel       string
+	logDestination string
+)
 
 // AddFlags binds manager configuration flags to a given flagset
 func (l *Flags) AddFlags(flags *pflag.FlagSet) {
 	loggingFlagSet := &flag.FlagSet{}
 	loggingFlagSet.StringVar(&logLevel, "log-level", "info",
 		"the desired log level, one of error, info, debug and trace")
+	loggingFlagSet.StringVar(&logDestination, "log-destination", "",
+		"where the log stream will be written")
 	l.zapOptions.BindFlags(loggingFlagSet)
 	flags.AddGoFlagSet(loggingFlagSet)
 }
@@ -39,12 +46,13 @@ func (l *Flags) AddFlags(flags *pflag.FlagSet) {
 // ConfigureLogging configure the logging honoring the flags
 // passed from the user
 func (l *Flags) ConfigureLogging() {
-	logger := zap.New(zap.UseFlagOptions(&l.zapOptions), customLevel)
+	logger := zap.New(zap.UseFlagOptions(&l.zapOptions), customLevel, customDestination)
 	switch logLevel {
 	case mlog.ErrorLevelString, mlog.InfoLevelString, mlog.DebugLevelString, mlog.TraceLevelString:
 	default:
 		logger.Info("Invalid log level, defaulting", "level", logLevel, "default", mlog.DefaultLevel)
 	}
+
 	ctrl.SetLogger(logger)
 	klog.SetLogger(logger)
 	mlog.SetLogger(logger)
@@ -87,4 +95,17 @@ func customLevel(in *zap.Options) {
 			enc.AppendString(getLogLevelString(l))
 		}
 	})
+}
+
+func customDestination(in *zap.Options) {
+	if logDestination == "" {
+		return
+	}
+
+	logStream, err := os.OpenFile(logDestination, os.O_RDWR|os.O_CREATE, 0o666) //#nosec
+	if err != nil {
+		panic(fmt.Sprintf("Cannot open log destination %v: %v", logDestination, err))
+	}
+
+	in.DestWriter = logStream
 }

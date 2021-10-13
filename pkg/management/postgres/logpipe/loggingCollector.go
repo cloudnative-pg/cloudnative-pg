@@ -36,7 +36,17 @@ func Start() error {
 		record:          NewPgAuditLoggingDecorator(),
 		fieldsValidator: LogFieldValidator,
 	}
-	return p.start()
+	if err := p.start(); err != nil {
+		return err
+	}
+
+	textLogging := newRawLogFile(filepath.Join(postgres.LogPath, postgres.LogFileName))
+	if err := textLogging.start(); err != nil {
+		return err
+	}
+
+	jsonLogging := newJSONLineLogPipe(filepath.Join(postgres.LogPath, postgres.LogFileName+".json"))
+	return jsonLogging.start()
 }
 
 // LogFieldValidator checks if the provided number of fields is valid or not for logging_collector logs
