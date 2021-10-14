@@ -166,15 +166,17 @@ All logs that are produced by the operator and its instances are in JSON
 format, with `logger` set accordingly to the process that produced them.
 Therefore, all the possible `logger` values are the following ones:
 
-- `barman-cloud-wal-archive`
-- `barman-cloud-wal-restore`
-- `initdb`
-- `pg_basebackup`
-- `pg_controldata`
-- `pg_ctl`
-- `pg_rewind`
-- `pgaudit`
-- `postgres`
+- `barman-cloud-wal-archive`: from `barman-cloud-wal-archive` directly
+- `barman-cloud-wal-restore`: from `barman-cloud-wal-restore` directly
+- `initdb`: from running `initdb`
+- `pg_basebackup`: from running `pg_basebackup`
+- `pg_controldata`: from running `pg_controldata`
+- `pg_ctl`: from running any `pg_ctl` subcommand
+- `pg_rewind`: from running `pg_rewind`
+- `pgaudit`: from PGAudit extension
+- `postgres`: from the `postgres` instance (having `msg` different than `record`)
+- `wal-archive`: from the `wal-archive` subcommand of the instance manager
+- `wal-restore`: from the `wal-restore` subcommand of the instance manager
 
 Except for `postgres` that has the aforementioned structures,
 all other possible values just have `msg` set to the escaped message that is
