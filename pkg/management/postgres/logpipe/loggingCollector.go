@@ -40,7 +40,7 @@ func Start() error {
 		return err
 	}
 
-	textLogging := newRawLogFile(filepath.Join(postgres.LogPath, postgres.LogFileName))
+	textLogging := newRawLogFile(filepath.Join(postgres.LogPath, postgres.LogFileName), LoggingCollectorRecordName)
 	if err := textLogging.start(); err != nil {
 		return err
 	}

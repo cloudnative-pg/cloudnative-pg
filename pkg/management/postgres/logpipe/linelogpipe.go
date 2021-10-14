@@ -42,8 +42,8 @@ func newJSONLineLogPipe(fileName string) *lineLogPipe {
 // from a process logging raw strings to a file and redirecting its content to stdout in JSON format.
 // The goroutine is started just once for a given file.
 // All successive calls, that are referencing the same filename, will just check its existence
-func newRawLogFile(fileName string) *lineLogPipe {
-	logger := log.WithValues("source", fileName)
+func newRawLogFile(fileName, name string) *lineLogPipe {
+	logger := log.WithName(name).WithValues("source", fileName)
 
 	return &lineLogPipe{
 		fileName: fileName,
