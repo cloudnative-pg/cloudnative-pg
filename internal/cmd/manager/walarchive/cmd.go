@@ -75,7 +75,7 @@ func run(contextLog log.Logger, namespace, clusterName string, args []string) er
 
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		// Backup not configured, skipping WAL
-		contextLog.Trace("Backup not configured, skipping WAL archive",
+		contextLog.Info("Backup not configured, skip WAL archiving",
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
@@ -96,6 +96,14 @@ func run(contextLog log.Logger, namespace, clusterName string, args []string) er
 	}
 
 	const barmanCloudWalArchiveName = "barman-cloud-wal-archive"
+
+	contextLog.Trace("Executing "+barmanCloudWalArchiveName,
+		"walName", walName,
+		"currentPrimary", cluster.Status.CurrentPrimary,
+		"targetPrimary", cluster.Status.TargetPrimary,
+		"options", options,
+	)
+
 	barmanCloudWalArchiveCmd := exec.Command(barmanCloudWalArchiveName, options...) // #nosec G204
 	barmanCloudWalArchiveCmd.Env = env
 
@@ -110,6 +118,12 @@ func run(contextLog log.Logger, namespace, clusterName string, args []string) er
 		)
 		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCloudWalArchiveName, err)
 	}
+
+	contextLog.Info("Archived WAL file",
+		"walName", walName,
+		"currentPrimary", cluster.Status.CurrentPrimary,
+		"targetPrimary", cluster.Status.TargetPrimary,
+	)
 
 	return nil
 }
