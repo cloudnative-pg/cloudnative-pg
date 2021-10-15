@@ -9,6 +9,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,6 +18,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -144,33 +146,53 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		return err
 	}
 
-	walArchivingWorking := false
-	for {
+	retryUntilWalArchiveWorking := wait.Backoff{
+		Duration: 60 * time.Second,
+		Steps:    10,
+	}
+
+	walError := errors.New("wal-archive not working")
+
+	err = retry.OnError(retryUntilWalArchiveWorking, func(err error) bool {
+		return errors.Is(err, walError)
+	}, func() error {
 		row := db.QueryRow("SELECT COALESCE(last_archived_time,'-infinity') > " +
-			"COALESCE(last_failed_time, '-infinity') AS is_archiving FROM pg_stat_archiver;")
+			"COALESCE(last_failed_time, '-infinity') AS is_archiving, last_failed_time IS NOT NULL " +
+			"FROM pg_stat_archiver")
 
-		if err := row.Scan(&walArchivingWorking); err != nil {
-			log.Error(err, "can't get wal archiving status")
-		}
-		if walArchivingWorking && err == nil {
-			log.Info("wal archiving is working, will retry proceed with the backup")
-			if b.Backup.GetStatus().Phase != apiv1.BackupPhaseRunning {
-				b.Backup.GetStatus().Phase = apiv1.BackupPhaseRunning
-				err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
-				if err != nil {
-					log.Error(err, "can't set backup as wal archiving failing")
-				}
-			}
-			break
+		var walArchivingWorking, lastFailedTimePresent bool
+
+		if err := row.Scan(&walArchivingWorking, &lastFailedTimePresent); err != nil {
+			log.Error(err, "can't get WAL archiving status")
+			return err
 		}
 
+		switch {
+		case walArchivingWorking:
+			log.Info("WAL archiving is working, will retry proceed with the backup")
+			return nil
+
+		case !walArchivingWorking && !lastFailedTimePresent:
+			log.Info("Waiting for the first WAL file to be archived")
+			return walError
+
+		default:
+			log.Info("WAL archiving is not working, will retry in one minute")
+			return walError
+		}
+	})
+	if err != nil {
+		log.Info("WAL archiving is not working")
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
+		return UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
+	}
+
+	if b.Backup.GetStatus().Phase != apiv1.BackupPhaseRunning {
+		b.Backup.GetStatus().Phase = apiv1.BackupPhaseRunning
 		err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
 		if err != nil {
-			log.Error(err, "can't set backup as wal archiving failing")
+			log.Error(err, "can't set backup as WAL archiving failing")
 		}
-		log.Info("wal archiving is not working, will retry in one minute")
-		time.Sleep(time.Minute * 1)
 	}
 
 	b.Env, err = barman.EnvSetCloudCredentials(
