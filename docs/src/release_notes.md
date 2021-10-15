@@ -2,6 +2,23 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.9.2
+
+**Release date:** 15 October 2021
+
+Features:
+
+- Enhance JSON log with two new loggers: `wal-archive` for PostgreSQL's
+  `archive_command`, and `wal-restore` for `restore_command` in a standby
+
+Fixes:
+
+- Enable WAL archiving during the standby promotion (prevented `.history` files
+  from being archived)
+- Pass the `--cloud-provider` option to Barman Cloud tools only when using
+  Barman 2.13 or higher to avoid errors with older operands
+- Wait for the pod of the primary to be ready before triggering a backup
+
 ## Version 1.9.1
 
 **Release date:** 30 September 2021
