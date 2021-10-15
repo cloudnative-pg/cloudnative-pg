@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/blang/semver"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -31,6 +32,8 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
+
+const barmanCloudBackupName = "barman-cloud-backup"
 
 // BackupCommand represent a backup command that is being executed
 type BackupCommand struct {
@@ -63,7 +66,13 @@ func NewBackupCommand(
 // getBarmanCloudBackupOptions extract the list of command line options to be used with
 // barman-cloud-backup
 func (b *BackupCommand) getBarmanCloudBackupOptions(
-	configuration *apiv1.BarmanObjectStoreConfiguration, serverName string) []string {
+	configuration *apiv1.BarmanObjectStoreConfiguration, serverName string, version *semver.Version,
+) ([]string, error) {
+	var barmanCloudVersionGE213 bool
+	if version != nil {
+		barmanCloudVersionGE213 = version.GE(semver.Version{Major: 2, Minor: 13})
+	}
+
 	options := []string{
 		"--user", "postgres",
 	}
@@ -102,19 +111,21 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 			"--endpoint-url",
 			configuration.EndpointURL)
 	}
-
-	if configuration.S3Credentials != nil {
-		options = append(
-			options,
-			"--cloud-provider",
-			"aws-s3")
-	}
-
-	if configuration.AzureCredentials != nil {
-		options = append(
-			options,
-			"--cloud-provider",
-			"azure-blob-storage")
+	if barmanCloudVersionGE213 {
+		if configuration.S3Credentials != nil {
+			options = append(
+				options,
+				"--cloud-provider",
+				"aws-s3")
+		}
+		if configuration.AzureCredentials != nil {
+			options = append(
+				options,
+				"--cloud-provider",
+				"azure-blob-storage")
+		}
+	} else if configuration.AzureCredentials != nil {
+		return nil, fmt.Errorf("barman >= 2.13 is required to use Azure object storage, current: %v", version)
 	}
 
 	options = append(
@@ -122,7 +133,7 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 		configuration.DestinationPath,
 		serverName)
 
-	return options
+	return options, nil
 }
 
 // Start initiates a backup for this instance using
@@ -217,8 +228,15 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 func (b *BackupCommand) run(ctx context.Context) {
 	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
-	options := b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName)
-
+	version, err := barman.GetBarmanCloudVersion(barmanCloudBackupName)
+	if err != nil {
+		b.Log.Error(err, "while getting barman-cloud-backup version")
+	}
+	options, err := b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName, version)
+	if err != nil {
+		b.Log.Error(err, "while getting barman-cloud-backup options")
+		return
+	}
 	b.Log.Info("Backup started", "options", options)
 
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
@@ -228,11 +246,10 @@ func (b *BackupCommand) run(ctx context.Context) {
 		return
 	}
 
-	const barmanCloudBackupName = "barman-cloud-backup"
 	cmd := exec.Command(barmanCloudBackupName, options...) // #nosec G204
 	cmd.Env = b.Env
 	cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
-	err := execlog.RunStreaming(cmd, barmanCloudBackupName)
+	err = execlog.RunStreaming(cmd, barmanCloudBackupName)
 	if err != nil {
 		// Set the status to failed and exit
 		b.Log.Error(err, "Backup failed")
