@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/blang/semver"
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -20,9 +21,12 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
 	cacheClient "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache/client"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
+
+const barmanCloudWalArchiveName = "barman-cloud-wal-archive"
 
 // NewCmd creates the new cobra command
 func NewCmd() *cobra.Command {
@@ -82,8 +86,16 @@ func run(contextLog log.Logger, namespace, clusterName string, args []string) er
 		)
 		return nil
 	}
+	version, err := barman.GetBarmanCloudVersion(barmanCloudWalArchiveName)
+	if err != nil {
+		contextLog.Error(err, "while getting barman-cloud-wal-archive version")
+	}
 
-	options := barmanCloudWalArchiveOptions(*cluster, clusterName, walName)
+	options, err := barmanCloudWalArchiveOptions(*cluster, clusterName, walName, version)
+	if err != nil {
+		contextLog.Error(err, "while getting barman-cloud-wal-archive options")
+		return err
+	}
 
 	env, err := cacheClient.GetEnv(ctx,
 		typedClient,
@@ -94,8 +106,6 @@ func run(contextLog log.Logger, namespace, clusterName string, args []string) er
 		contextLog.Error(err, "Error while getting environment from cache")
 		return fmt.Errorf("failed to get envs: %w", err)
 	}
-
-	const barmanCloudWalArchiveName = "barman-cloud-wal-archive"
 
 	contextLog.Trace("Executing "+barmanCloudWalArchiveName,
 		"walName", walName,
@@ -128,7 +138,16 @@ func run(contextLog log.Logger, namespace, clusterName string, args []string) er
 	return nil
 }
 
-func barmanCloudWalArchiveOptions(cluster apiv1.Cluster, clusterName string, walName string) []string {
+func barmanCloudWalArchiveOptions(
+	cluster apiv1.Cluster,
+	clusterName string,
+	walName string,
+	version *semver.Version,
+) ([]string, error) {
+	var barmanCloudVersionGE213 bool
+	if version != nil {
+		barmanCloudVersionGE213 = version.GE(semver.Version{Major: 2, Minor: 13})
+	}
 	configuration := cluster.Spec.Backup.BarmanObjectStore
 
 	var options []string
@@ -151,18 +170,24 @@ func barmanCloudWalArchiveOptions(cluster apiv1.Cluster, clusterName string, wal
 			"--endpoint-url",
 			configuration.EndpointURL)
 	}
-	if configuration.S3Credentials != nil {
-		options = append(
-			options,
-			"--cloud-provider",
-			"aws-s3")
+
+	if barmanCloudVersionGE213 {
+		if configuration.S3Credentials != nil {
+			options = append(
+				options,
+				"--cloud-provider",
+				"aws-s3")
+		}
+		if configuration.AzureCredentials != nil {
+			options = append(
+				options,
+				"--cloud-provider",
+				"azure-blob-storage")
+		}
+	} else if configuration.AzureCredentials != nil {
+		return nil, fmt.Errorf("barman >= 2.13 is required to use Azure object storage, current: %v", version)
 	}
-	if configuration.AzureCredentials != nil {
-		options = append(
-			options,
-			"--cloud-provider",
-			"azure-blob-storage")
-	}
+
 	serverName := clusterName
 	if len(configuration.ServerName) != 0 {
 		serverName = configuration.ServerName
@@ -172,5 +197,5 @@ func barmanCloudWalArchiveOptions(cluster apiv1.Cluster, clusterName string, wal
 		configuration.DestinationPath,
 		serverName,
 		walName)
-	return options
+	return options, nil
 }

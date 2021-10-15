@@ -31,9 +31,12 @@ package barman
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os/exec"
 	"sort"
 	"time"
+
+	"github.com/blang/semver"
 
 	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/catalog"
@@ -45,7 +48,10 @@ var barmanLog = log.WithName("barman")
 
 // barmanTimeLayout is the format that is being used to parse
 // the backupInfo from barman-cloud-backup-list
-const barmanTimeLayout = "Mon Jan 2 15:04:05 2006"
+const (
+	barmanTimeLayout          = "Mon Jan 2 15:04:05 2006"
+	barmanCloudBackupListName = "barman-cloud-backup-list"
+)
 
 // ParseBarmanCloudBackupList parses the output of barman-cloud-backup-list
 func ParseBarmanCloudBackupList(output string) (*catalog.Catalog, error) {
@@ -82,6 +88,14 @@ func GetBackupList(
 	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
 	serverName string,
 	env []string) (*catalog.Catalog, error) {
+	version, err := GetBarmanCloudVersion(barmanCloudBackupListName)
+	if err != nil {
+		log.Error(err, "while getting barman-cloud-wal-archive version")
+	}
+	var barmanCloudVersionGE213 bool
+	if version != nil {
+		barmanCloudVersionGE213 = version.GE(semver.Version{Major: 2, Minor: 13})
+	}
 	var stdoutBuffer bytes.Buffer
 	var stderrBuffer bytes.Buffer
 	options := []string{"--format", "json"}
@@ -91,25 +105,32 @@ func GetBackupList(
 	if barmanConfiguration.Data != nil && barmanConfiguration.Data.Encryption != "" {
 		options = append(options, "-e", string(barmanConfiguration.Data.Encryption))
 	}
-	if barmanConfiguration.S3Credentials != nil {
-		options = append(
-			options,
-			"--cloud-provider",
-			"aws-s3")
-	}
-	if barmanConfiguration.AzureCredentials != nil {
-		options = append(
-			options,
-			"--cloud-provider",
-			"azure-blob-storage")
+
+	if barmanCloudVersionGE213 {
+		if barmanConfiguration.S3Credentials != nil {
+			options = append(
+				options,
+				"--cloud-provider",
+				"aws-s3")
+		}
+		if barmanConfiguration.AzureCredentials != nil {
+			options = append(
+				options,
+				"--cloud-provider",
+				"azure-blob-storage")
+		}
+	} else if barmanConfiguration.AzureCredentials != nil {
+		err = fmt.Errorf("barman >= 2.13 is required to use Azure object storage, current: %v", version)
+		log.Error(err, "Barman version unsupported")
+		return nil, err
 	}
 	options = append(options, barmanConfiguration.DestinationPath, serverName)
 
-	cmd := exec.Command("barman-cloud-backup-list", options...) // #nosec G204
+	cmd := exec.Command(barmanCloudBackupListName, options...) // #nosec G204
 	cmd.Env = env
 	cmd.Stdout = &stdoutBuffer
 	cmd.Stderr = &stderrBuffer
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		barmanLog.Error(err,
 			"Can't extract backup id using barman-cloud-backup-list",

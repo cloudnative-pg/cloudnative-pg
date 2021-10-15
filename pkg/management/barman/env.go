@@ -9,7 +9,10 @@ package barman
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"regexp"
 
+	"github.com/blang/semver"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -157,4 +160,26 @@ func envSetAzureCredentials(
 	}
 
 	return env, nil
+}
+
+var barmanCloudVersionRegex = regexp.MustCompile("barman-cloud.* (?P<Version>.*)")
+
+// GetBarmanCloudVersion retrieves a barman-cloud subcommand version, e.g. barman-cloud-backup, barman-cloud-wal-archive
+func GetBarmanCloudVersion(command string) (*semver.Version, error) {
+	cmd := exec.Command(command, "--version") // #nosec G204
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("while checking %s version: %w", command, err)
+	}
+	if cmd.ProcessState.ExitCode() != 0 {
+		return nil, fmt.Errorf("exit code different from zero checking %s version", command)
+	}
+
+	matches := barmanCloudVersionRegex.FindStringSubmatch(string(out))
+	version, err := semver.ParseTolerant(matches[1])
+	if err != nil {
+		return nil, fmt.Errorf("while parsing %s version: %w", command, err)
+	}
+
+	return &version, err
 }

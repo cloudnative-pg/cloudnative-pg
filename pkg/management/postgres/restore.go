@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blang/semver"
 	"github.com/lib/pq"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -47,6 +48,8 @@ var (
 		Steps: math.MaxInt32,
 	}
 )
+
+const barmanCloudRestoreName = "barman-cloud-restore"
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore(ctx context.Context) error {
@@ -103,6 +106,15 @@ func (info InitInfo) Restore(ctx context.Context) error {
 // restoreDataDir restores PGDATA from an existing backup
 func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	var options []string
+
+	var barmanCloudVersionGE213 bool
+	version, err := barman.GetBarmanCloudVersion(barmanCloudRestoreName)
+	if err != nil {
+		log.Error(err, "while getting ")
+	} else {
+		barmanCloudVersionGE213 = version.GE(semver.Version{Major: 2, Minor: 13})
+	}
+
 	if backup.Status.EndpointURL != "" {
 		options = append(options, "--endpoint-url", backup.Status.EndpointURL)
 	}
@@ -112,27 +124,30 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	options = append(options, backup.Status.DestinationPath)
 	options = append(options, backup.Status.ServerName)
 	options = append(options, backup.Status.BackupID)
-	if backup.Status.S3Credentials != nil {
-		options = append(
-			options,
-			"--cloud-provider",
-			"aws-s3")
-	}
-	if backup.Status.AzureCredentials != nil {
-		options = append(
-			options,
-			"--cloud-provider",
-			"azure-blob-storage")
+	if barmanCloudVersionGE213 {
+		if backup.Status.S3Credentials != nil {
+			options = append(
+				options,
+				"--cloud-provider",
+				"aws-s3")
+		}
+		if backup.Status.AzureCredentials != nil {
+			options = append(
+				options,
+				"--cloud-provider",
+				"azure-blob-storage")
+		}
+	} else if backup.Status.AzureCredentials != nil {
+		return fmt.Errorf("barman >= 2.13 is required to use Azure object storage, current: %v", version)
 	}
 	options = append(options, info.PgData)
 
 	log.Info("Starting barman-cloud-restore",
 		"options", options)
 
-	const barmanCloudRestoreName = "barman-cloud-restore"
 	cmd := exec.Command(barmanCloudRestoreName, options...) // #nosec G204
 	cmd.Env = env
-	err := execlog.RunStreaming(cmd, barmanCloudRestoreName)
+	err = execlog.RunStreaming(cmd, barmanCloudRestoreName)
 	if err != nil {
 		log.Error(err, "Can't restore backup")
 		return err
@@ -283,7 +298,18 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		return fmt.Errorf("cannot detect major version: %w", err)
 	}
 
-	cmd := []string{"barman-cloud-wal-restore"}
+	const barmanCloudWalRestoreName = "barman-cloud-wal-restore"
+
+	version, err := barman.GetBarmanCloudVersion(barmanCloudWalRestoreName)
+	if err != nil {
+		log.Error(err, "while getting barman-cloud-wal-archive version")
+	}
+	var barmanCloudVersionGE213 bool
+	if version != nil {
+		barmanCloudVersionGE213 = version.GE(semver.Version{Major: 2, Minor: 13})
+	}
+
+	cmd := []string{barmanCloudWalRestoreName}
 	if backup.Status.Encryption != "" {
 		cmd = append(cmd, "-e", backup.Status.Encryption)
 	}
@@ -292,17 +318,21 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 	}
 	cmd = append(cmd, backup.Status.DestinationPath)
 	cmd = append(cmd, backup.Spec.Cluster.Name)
-	if backup.Status.S3Credentials != nil {
-		cmd = append(
-			cmd,
-			"--cloud-provider",
-			"aws-s3")
-	}
-	if backup.Status.AzureCredentials != nil {
-		cmd = append(
-			cmd,
-			"--cloud-provider",
-			"azure-blob-storage")
+	if barmanCloudVersionGE213 {
+		if backup.Status.S3Credentials != nil {
+			cmd = append(
+				cmd,
+				"--cloud-provider",
+				"aws-s3")
+		}
+		if backup.Status.AzureCredentials != nil {
+			cmd = append(
+				cmd,
+				"--cloud-provider",
+				"azure-blob-storage")
+		}
+	} else if backup.Status.AzureCredentials != nil {
+		return fmt.Errorf("barman >= 2.13 is required to use Azure object storage, current: %v", version)
 	}
 	cmd = append(cmd, "%f", "%p")
 
