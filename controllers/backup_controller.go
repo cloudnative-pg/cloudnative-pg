@@ -61,7 +61,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	if len(backup.Status.Phase) != 0 {
+	if len(backup.Status.Phase) != 0 && backup.Status.Phase != apiv1.BackupPhasePending {
 		// Nothing to do here
 		return ctrl.Result{}, nil
 	}
@@ -97,7 +97,10 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if apierrs.IsNotFound(err) {
 			r.Recorder.Eventf(&backup, "Warning", "FindingPod",
 				"Couldn't find target pod %s, will retry in 30 seconds", cluster.Status.TargetPrimary)
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+			contextLogger.Info("Couldn't find target pod, will retry in 30 seconds", "target",
+				cluster.Status.TargetPrimary)
+			backup.Status.Phase = apiv1.BackupPhasePending
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Update(ctx, &backup)
 		}
 		backup.Status.SetAsFailed(fmt.Errorf("while getting pod: %w", err))
 		r.Recorder.Eventf(&backup, "Warning", "FindingPod", "Error getting target pod: %s",
@@ -107,10 +110,14 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	if !utils.IsPodReady(pod) {
 		contextLogger.Info("Not ready backup target, will retry in 30 seconds", "target", pod.Name)
-		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		backup.Status.Phase = apiv1.BackupPhasePending
+		r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
+			cluster.Status.TargetPrimary)
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Update(ctx, &backup)
 	}
 
-	r.Recorder.Eventf(&backup, "Normal", "Starting", "Started backup for cluster %v", clusterName)
+	r.Recorder.Eventf(&backup, "Normal", "Starting", "Started backup for cluster %v",
+		clusterName)
 	contextLogger.Info("Starting backup",
 		"cluster", cluster.Name,
 		"pod", pod.Name)
