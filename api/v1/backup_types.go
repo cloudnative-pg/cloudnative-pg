@@ -15,6 +15,9 @@ import (
 type BackupPhase string
 
 const (
+	// BackupPhasePending means that the backup is still waiting to be started
+	BackupPhasePending = "pending"
+
 	// BackupPhaseStarted means that the backup is now running
 	BackupPhaseStarted = "started"
 
