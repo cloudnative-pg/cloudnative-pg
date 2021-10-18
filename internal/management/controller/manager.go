@@ -13,10 +13,9 @@ import (
 	"fmt"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/client-go/dynamic"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -30,10 +29,9 @@ import (
 // the one of this PostgreSQL instance. Also the configuration in the
 // ConfigMap is applied when needed
 type InstanceReconciler struct {
-	client          ctrl.Client
-	dynamicClient   dynamic.Interface
-	instance        *postgres.Instance
-	watchCollection *WatchCollection
+	client       ctrl.WithWatch
+	instance     *postgres.Instance
+	clusterWatch watch.Interface
 
 	secretVersions  map[string]string
 	extensionStatus map[string]bool
@@ -50,15 +48,9 @@ func NewInstanceReconciler(instance *postgres.Instance) (*InstanceReconciler, er
 	// `controller-runtime` 0.8.0 don't have that feature. `0.9.0` will have
 	// a generic interface over watches, so let's wait for it.
 
-	dynamicClient, err := management.NewDynamicClient()
-	if err != nil {
-		return nil, err
-	}
-
 	return &InstanceReconciler{
 		instance:        instance,
 		client:          client,
-		dynamicClient:   dynamicClient,
 		secretVersions:  make(map[string]string),
 		extensionStatus: make(map[string]bool),
 	}, nil
@@ -91,22 +83,16 @@ func (r *InstanceReconciler) watch(ctx context.Context) error {
 
 	// This is an example of how to watch a certain object
 	// https://github.com/kubernetes/kubernetes/issues/43299
-	clusterWatch, err := r.dynamicClient.
-		Resource(apiv1.ClusterGVK).
-		Namespace(r.instance.Namespace).
-		Watch(ctx, metav1.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName).String(),
-		})
+	r.clusterWatch, err = r.client.Watch(ctx, &apiv1.ClusterList{}, &ctrl.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName),
+		Namespace:     r.instance.Namespace,
+	})
 	if err != nil {
 		return fmt.Errorf("error watching cluster: %w", err)
 	}
-
-	r.watchCollection = NewWatchCollection(
-		clusterWatch,
-	)
 	defer r.Stop()
 
-	for event := range r.watchCollection.ResultChan() {
+	for event := range r.clusterWatch.ResultChan() {
 		receivedEvent := event
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return r.Reconcile(ctx, &receivedEvent)
@@ -121,8 +107,8 @@ func (r *InstanceReconciler) watch(ctx context.Context) error {
 
 // Stop stops the controller
 func (r *InstanceReconciler) Stop() {
-	if r.watchCollection != nil {
-		r.watchCollection.Stop()
+	if r.clusterWatch != nil {
+		r.clusterWatch.Stop()
 	}
 }
 

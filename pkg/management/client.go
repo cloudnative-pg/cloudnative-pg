@@ -11,7 +11,6 @@ package management
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -32,13 +31,13 @@ func init() {
 
 // NewControllerRuntimeClient creates a new typed K8s client where
 // the PostgreSQL CRD has already been registered
-func NewControllerRuntimeClient() (client.Client, error) {
+func NewControllerRuntimeClient() (client.WithWatch, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	return client.New(config, client.Options{
+	return client.NewWithWatch(config, client.Options{
 		Scheme: Scheme,
 		Mapper: nil,
 	})
@@ -53,16 +52,6 @@ func newClientGoClient() (kubernetes.Interface, error) {
 	}
 
 	return kubernetes.NewForConfig(config)
-}
-
-// NewDynamicClient creates a new dynamic kubernetes interface
-func NewDynamicClient() (dynamic.Interface, error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return dynamic.NewForConfig(config)
 }
 
 // NewEventRecorder creates a new event recorder

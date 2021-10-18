@@ -59,9 +59,9 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 		"eventType", event.Type,
 		"type", event.Object.GetObjectKind().GroupVersionKind())
 
-	cluster, err := utils.ObjectToCluster(event.Object)
-	if err != nil {
-		return fmt.Errorf("error decoding cluster resource: %w", err)
+	cluster, ok := event.Object.(*apiv1.Cluster)
+	if !ok {
+		return fmt.Errorf("error decoding cluster resource")
 	}
 
 	r.reconcileMetrics(cluster)
@@ -70,16 +70,16 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 	r.reconcileMonitoringQueries(ctx, cluster)
 
 	// Reconcile replica role
-	if err = r.reconcileClusterRole(ctx, event, cluster); err != nil {
+	if err := r.reconcileClusterRole(ctx, event, cluster); err != nil {
 		return err
 	}
 
 	// Reconcile PostgreSQL configuration
-	if err = r.reconcileConfiguration(ctx, cluster); err != nil {
+	if err := r.reconcileConfiguration(ctx, cluster); err != nil {
 		return fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
 	}
 
-	if err = r.reconcileDatabases(ctx, cluster); err != nil {
+	if err := r.reconcileDatabases(ctx, cluster); err != nil {
 		return fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
 
