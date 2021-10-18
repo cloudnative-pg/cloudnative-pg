@@ -31,7 +31,8 @@ const (
 	// the hash of the Pooler Specification
 	PgbouncerPoolerSpecHash = specs.MetadataNamespace + "/poolerSpecHash"
 
-	pgbouncerNameLabel = specs.MetadataNamespace + "/poolerName"
+	// PgbouncerNameLabel is the label of the pgbouncer pod used by default
+	PgbouncerNameLabel = specs.MetadataNamespace + "/poolerName"
 
 	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
 	DefaultPgbouncerImage = "quay.io/enterprisedb/pgbouncer:1.16.0-1"
@@ -50,7 +51,7 @@ func Deployment(pooler *apiv1.Pooler,
 
 	podTemplate := podspec.NewFrom(pooler.Spec.Template).
 		WithAnnotation(PgbouncerConfigVersionAnnotation, configuration.ResourceVersion).
-		WithLabel(pgbouncerNameLabel, pooler.Name).
+		WithLabel(PgbouncerNameLabel, pooler.Name).
 		WithVolume(&corev1.Volume{
 			Name: "ca",
 			VolumeSource: corev1.VolumeSource{
@@ -148,7 +149,7 @@ func Deployment(pooler *apiv1.Pooler,
 			Replicas: &pooler.Spec.Instances,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					pgbouncerNameLabel: pooler.Name,
+					PgbouncerNameLabel: pooler.Name,
 				},
 			},
 			Template: corev1.PodTemplateSpec{

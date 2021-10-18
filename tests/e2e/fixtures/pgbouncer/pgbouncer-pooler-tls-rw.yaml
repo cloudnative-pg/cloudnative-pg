@@ -1,0 +1,12 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Pooler
+metadata:
+  name: pooler-connection-tls-rw
+spec:
+  cluster:
+    name: cluster-pgbouncer
+
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: session

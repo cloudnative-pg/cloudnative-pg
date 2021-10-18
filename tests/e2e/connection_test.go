@@ -8,8 +8,6 @@ package e2e
 
 import (
 	"fmt"
-	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -26,43 +24,6 @@ var _ = Describe("Connection via services", func() {
 	// We test custom db name and user
 	const appDBName = "appdb"
 	const appDBUser = "appuser"
-
-	AssertVerifyWrites := func(
-		connectingPod *corev1.Pod,
-		service string,
-		appDBName string,
-		appDBUser string,
-		appDBPass string,
-		isReplica bool) {
-		By(fmt.Sprintf("Verifying %v service correctly manages writes", service),
-			func() {
-				timeout := time.Second * 2
-
-				dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
-					service, appDBUser, appDBName, appDBPass)
-
-				// Expect to be connected to a replica
-				stdout, _, err := env.ExecCommand(env.Ctx, *connectingPod, "postgres", &timeout,
-					"psql", dsn, "-tAc", "select pg_is_in_recovery()")
-				value := strings.Trim(stdout, "\n")
-				if isReplica {
-					Expect(value, err).To(Equal("t"))
-				} else {
-					Expect(value, err).To(Equal("f"))
-				}
-
-				// Expect to be in a read-only transaction
-				_, _, err = env.ExecCommand(env.Ctx, *connectingPod, "postgres", &timeout,
-					"psql", dsn, "-tAc", "CREATE TABLE table1(var1 text);")
-				if isReplica {
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).Should(
-						ContainSubstring("cannot execute CREATE TABLE in a read-only transaction"))
-				} else {
-					Expect(err).ToNot(HaveOccurred())
-				}
-			})
-	}
 
 	AssertServices := func(namespace string,
 		clusterName string,
@@ -93,8 +54,8 @@ var _ = Describe("Connection via services", func() {
 			AssertConnection(service, appDBUser, appDBName, appPassword, *pod, 10, env)
 		}
 
-		AssertVerifyWrites(pod, roService, appDBName, appDBUser, appPassword, true)
-		AssertVerifyWrites(pod, rwService, appDBName, appDBUser, appPassword, false)
+		AssertWritesToReplicaFails(pod, roService, appDBName, appDBUser, appPassword)
+		AssertWritesToPrimarySucceeds(pod, rwService, appDBName, appDBUser, appPassword)
 	}
 
 	Context("Auto-generated passwords", func() {
