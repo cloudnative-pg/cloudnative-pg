@@ -4,12 +4,12 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-// Package barman contain the utilities to interact with barman-cloud.
+// Package barman contains the utilities to interact with barman-cloud.
 //
-// This package is able to download the backup catalog given an object store
-// and to find the required backup to recreate a cluster given a certain point
-// in time. It can also find the latest successful backup, and this is useful
-// to recovery from the last consistent state.
+// This package is able to download the backup catalog, given an object store,
+// and to find the required backup to recreate a cluster, given a certain point
+// in time. It can also delete backups according to barman object store configuration and retention policies,
+// and find the latest successful backup. This is useful to recovery from the last consistent state.
 //
 // A backup catalog is represented by the Catalog structure, and can be
 // created using the NewCatalog function or by downloading it from an

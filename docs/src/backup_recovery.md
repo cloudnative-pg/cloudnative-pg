@@ -18,12 +18,6 @@ A backup is performed from a primary or a designated primary instance in a
 [replica clusters](replication.md#replication-from-an-external-postgresql-cluster)
 for more information about designated primary instances).
 
-!!! Warning
-    Cloud Native PostgreSQL does not currently manage the deletion of backup files 
-    from the backup object store. The retention policy feature will be merged from 
-    Barman to Barman Cloud in the future. For the time being, it is your responsibility 
-    to configure retention policies directly on the object store. 
-
 ## Cloud provider support
 
 You can archive the backup files in any service that is supported
@@ -537,3 +531,42 @@ You can optionally specify a `recoveryTarget` to perform a point in time
 recovery. If left unspecified, the recovery will continue up to the latest
 available WAL on the default target timeline (`current` for PostgreSQL up to
 11, `latest` for version 12 and above).
+
+## Retention policies
+
+Cloud Native PostgreSQL can manage the automated deletion of backup files from the backup object store, using **retention policies** based on recovery window.
+
+Internally, the retention policy feature uses `barman-cloud-backup-delete`
+with `--retention-policy “RECOVERY WINDOW OF {{ retention policy value }} {{ retention policy unit }}”`.
+
+For example, you can define your backups with a retention policy of 30 days as
+follows:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "<destination path here>"
+      s3Credentials:
+        accessKeyId:
+          name: aws-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: aws-creds
+          key: ACCESS_SECRET_KEY
+    retentionPolicy: "30d"
+```
+
+!!! Note "There's more ..."
+    The **recovery window retention policy** is focused on the concept of
+    *Point of Recoverability* (`PoR`), a moving point in time determined by
+    `current time - recovery window`. The *first valid backup* is the first
+    available backup before `PoR` (in reverse chronological order).
+    Cloud Native PostgreSQL must ensure that we can recover the cluster at
+    any point in time between `PoR` and the latest successfully archived WAL
+    file, starting from the first valid backup. Base backups that are older
+    than the first valid backup will be marked as *obsolete* and permanently
+    removed after the next backup is completed.

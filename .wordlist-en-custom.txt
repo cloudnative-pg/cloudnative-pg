@@ -81,6 +81,7 @@ Fluentd
 Francesco
 GC
 GCE
+GCS
 GID
 GKE
 GPL
@@ -174,6 +175,7 @@ ReplicaClusterConfiguration
 ReplicaSet
 ReplicationTLSSecret
 ResourceRequirements
+RetentionPolicy
 RoleBinding
 RollingUpdateStatus
 SAS
@@ -206,6 +208,7 @@ TLS
 TOC
 TopologyKey
 UID
+Uncomment
 VLDB
 VM
 VMs
@@ -247,6 +250,7 @@ autovacuum
 aws
 az
 azureCredentials
+azurite
 ba
 backend
 backends
@@ -298,6 +302,7 @@ configmaps
 configs
 conn
 connectionParameters
+connectionString
 containerPort
 coreos
 corev
@@ -368,6 +373,7 @@ goroutines
 gosec
 gzip
 hba
+hdr
 healthz
 horikyota
 hostPort
@@ -535,7 +541,9 @@ replicationTLSSecret
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resourcerequirements
+retentionPolicy
 reusePVC
+robfig
 rollingupdatestatus
 rollout
 runonserver
@@ -543,6 +551,7 @@ runtime
 rw
 sSfL
 sa
+sas
 scalability
 scalable
 sccs
@@ -553,6 +562,7 @@ scheduledbackupspec
 scheduledbackupstatus
 sdk
 secretAccessKey
+secretKeyRef
 secretName
 secretkeyselector
 securego
@@ -626,6 +636,7 @@ usename
 usernamepassword
 usr
 utils
+valueFrom
 virtualized
 virtualxid
 volumeMode

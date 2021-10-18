@@ -269,7 +269,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 	// Extracting latest backup using barman-cloud-backup-list
 	backupList, err := barman.GetBackupList(b.Cluster.Spec.Backup.BarmanObjectStore, backupStatus.ServerName, b.Env)
 	if err != nil || backupList.Len() == 0 {
-		// Proper logging already happened inside getBackupList
+		// Proper logging already happened inside GetBackupList
 		return
 	}
 
@@ -277,6 +277,25 @@ func (b *BackupCommand) run(ctx context.Context) {
 	b.updateCompletedBackupStatus(backupList)
 	if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 		b.Log.Error(err, "Can't set backup status as completed")
+	}
+
+	// For the retention policy we need Barman >= 2.14
+	barmanCloudVersionGE214 := false
+	if version != nil {
+		barmanCloudVersionGE214 = version.GE(semver.Version{Major: 2, Minor: 14})
+	}
+	// Delete backups per policy
+	if b.Cluster.Spec.Backup.RetentionPolicy != "" && barmanCloudVersionGE214 {
+		b.Log.Info("Applying backup retention policy",
+			"retentionPolicy", b.Cluster.Spec.Backup.RetentionPolicy)
+		err = barman.DeleteBackupsByPolicy(b.Cluster.Spec.Backup, backupStatus.ServerName, b.Env)
+		if err != nil {
+			// Proper logging already happened inside DeleteBackupsByPolicy
+			b.Recorder.Event(b.Cluster, "Warning", "RetentionPolicyFailed", "Retention policy failed")
+			return
+		}
+	} else if b.Cluster.Spec.Backup.RetentionPolicy != "" && !barmanCloudVersionGE214 {
+		b.Log.Info("The retention policy was detected but the current barman version is lower than 2.14")
 	}
 
 	// Set the first recoverability point

@@ -950,6 +950,17 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 		))
 	}
 
+	if r.Spec.Backup.RetentionPolicy != "" {
+		_, err := utils.ParsePolicy(r.Spec.Backup.RetentionPolicy)
+		if err != nil {
+			allErrors = append(allErrors, field.Invalid(
+				field.NewPath("spec", "retentionPolicy"),
+				r.Spec.Backup.RetentionPolicy,
+				"not a valid retention policy",
+			))
+		}
+	}
+
 	return allErrors
 }
 

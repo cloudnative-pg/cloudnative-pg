@@ -1470,3 +1470,52 @@ var _ = Describe("Validation changes", func() {
 		Expect(err).To(BeNil())
 	})
 })
+
+var _ = Describe("Backup validation", func() {
+	It("complain if there's no credentials", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{},
+				},
+			},
+		}
+		err := cluster.validateBackupConfiguration()
+		Expect(len(err)).To(Equal(1))
+	})
+
+	It("doesn't complain if given policy is not provided", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{},
+			},
+		}
+		err := cluster.validateBackupConfiguration()
+		Expect(err).To(BeNil())
+	})
+
+	It("doesn't complain if given policy is valid", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					RetentionPolicy: "90d",
+				},
+			},
+		}
+		err := cluster.validateBackupConfiguration()
+		Expect(err).To(BeNil())
+	})
+
+	It("complain if a given policy is not valid", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{},
+					RetentionPolicy:   "09",
+				},
+			},
+		}
+		err := cluster.validateBackupConfiguration()
+		Expect(len(err)).To(Equal(2))
+	})
+})

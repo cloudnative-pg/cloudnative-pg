@@ -115,9 +115,10 @@ Name     | Description                                                          
 
 BackupConfiguration defines how the backup of the cluster are taken. Currently the only supported backup method is barmanObjectStore. For details and examples refer to the Backup and Recovery section of the documentation
 
-Name              | Description                                       | Type                                                              
------------------ | ------------------------------------------------- | ------------------------------------------------------------------
-`barmanObjectStore` | The configuration for the barman-cloud tool suite | [*BarmanObjectStoreConfiguration](#BarmanObjectStoreConfiguration)
+Name              | Description                                                                                                                                                                                                                | Type                                                              
+----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------
+`barmanObjectStore` | The configuration for the barman-cloud tool suite                                                                                                                                                                          | [*BarmanObjectStoreConfiguration](#BarmanObjectStoreConfiguration)
+`retentionPolicy  ` | RetentionPolicy is the retention policy to be used for backups and WALs (i.e. '60d'). The retention policy is expressed in the form of `XXu` where `XX` is a positive integer and `u` is in `[dwm]` - days, weeks, months. | string                                                            
 
 <a id='BackupList'></a>
 

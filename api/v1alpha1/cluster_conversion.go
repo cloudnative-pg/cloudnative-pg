@@ -95,6 +95,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 			dst.Spec.Backup.BarmanObjectStore = &v1.BarmanObjectStoreConfiguration{}
 			src.Spec.Backup.BarmanObjectStore.ConvertTo(dst.Spec.Backup.BarmanObjectStore)
 		}
+		dst.Spec.Backup.RetentionPolicy = src.Spec.Backup.RetentionPolicy
 	}
 
 	// spec.nodeMaintenanceWindow
@@ -428,6 +429,7 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 			dst.Spec.Backup.BarmanObjectStore = &BarmanObjectStoreConfiguration{}
 			dst.Spec.Backup.BarmanObjectStore.ConvertFrom(src.Spec.Backup.BarmanObjectStore)
 		}
+		dst.Spec.Backup.RetentionPolicy = src.Spec.Backup.RetentionPolicy
 	}
 
 	// spec.nodeMaintenanceWindow
