@@ -19,9 +19,12 @@ import (
 )
 
 const (
-	pipeKey = "pipe"
-	stdout  = "stdout"
-	stderr  = "stderr"
+	// PipeKey is the key for the pipe the log refers to
+	PipeKey = "pipe"
+	// StdOut is the PipeKey value for stdout
+	StdOut = "stdout"
+	// StdErr is the PipeKey value for stderr
+	StdErr = "stderr"
 )
 
 // RunStreaming executes the command redirecting its stdout and stderr to the logger.
@@ -39,42 +42,14 @@ func RunStreaming(cmd *exec.Cmd, cmdName string) (err error) {
 func RunStreamingNoWait(cmd *exec.Cmd, cmdName string) (err error) {
 	logger := log.WithName(cmdName)
 
-	stdoutPipeRead, stdoutPipeWrite, err := os.Pipe()
-	if err != nil {
-		return err
+	stdoutWriter := &LogWriter{
+		Logger: logger.WithValues(PipeKey, StdOut),
+	}
+	stderrWriter := &LogWriter{
+		Logger: logger.WithValues(PipeKey, StdErr),
 	}
 
-	stderrPipeRead, stderrPipeWrite, err := os.Pipe()
-	if err != nil {
-		return err
-	}
-
-	cmd.Stdout = stdoutPipeWrite
-	cmd.Stderr = stderrPipeWrite
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
-
-	err = stdoutPipeWrite.Close()
-	if err != nil {
-		return err
-	}
-
-	err = stderrPipeWrite.Close()
-	if err != nil {
-		return err
-	}
-
-	go copyPipe(&LogWriter{
-		Logger: logger.WithValues(pipeKey, stdout),
-	}, stdoutPipeRead, logger)
-
-	go copyPipe(&LogWriter{
-		Logger: logger.WithValues(pipeKey, stderr),
-	}, stderrPipeRead, logger)
-
-	return nil
+	return RunStreamingNoWaitWithWriter(cmd, cmdName, stdoutWriter, stderrWriter)
 }
 
 // copyPipe is an internal function used to copy the content of a io.Reader
@@ -115,12 +90,56 @@ func RunBuffering(cmd *exec.Cmd, cmdName string) (err error) {
 
 	// Log stdout/stderr regardless of error status
 	if s := stdoutBuffer.String(); len(s) > 0 {
-		logger.WithValues(pipeKey, stdout).Info(s)
+		logger.WithValues(PipeKey, StdOut).Info(s)
 	}
 
 	if s := stderrBuffer.String(); len(s) > 0 {
-		logger.WithValues(pipeKey, stderr).Info(s)
+		logger.WithValues(PipeKey, StdErr).Info(s)
 	}
 
 	return err
+}
+
+// RunStreamingNoWaitWithWriter executes the command redirecting its stdout and stderr to the corresponding writers.
+// This function does not wait for command to terminate.
+func RunStreamingNoWaitWithWriter(
+	cmd *exec.Cmd,
+	cmdName string,
+	stdoutWriter io.Writer,
+	stderrWriter io.Writer,
+) (err error) {
+	logger := log.WithName(cmdName)
+
+	stdoutPipeRead, stdoutPipeWrite, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+
+	stderrPipeRead, stderrPipeWrite, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+
+	cmd.Stdout = stdoutPipeWrite
+	cmd.Stderr = stderrPipeWrite
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	err = stdoutPipeWrite.Close()
+	if err != nil {
+		return err
+	}
+
+	err = stderrPipeWrite.Close()
+	if err != nil {
+		return err
+	}
+
+	go copyPipe(stdoutWriter, stdoutPipeRead, logger)
+
+	go copyPipe(stderrWriter, stderrPipeRead, logger)
+
+	return nil
 }

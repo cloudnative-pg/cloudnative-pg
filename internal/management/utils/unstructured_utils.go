@@ -61,3 +61,21 @@ func ObjectToCluster(runtimeObject runtime.Object) (*apiv1.Cluster, error) {
 
 	return &cluster, nil
 }
+
+// ObjectToPooler convert an unstructured object to a Pooler object
+func ObjectToPooler(runtimeObject runtime.Object) (*apiv1.Pooler, error) {
+	object, err := objectToUnstructured(runtimeObject)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"decoding runtime.Object data from watch: %w",
+			err)
+	}
+
+	var pooler apiv1.Pooler
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, &pooler)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding Cluster resource: %w", err)
+	}
+
+	return &pooler, nil
+}

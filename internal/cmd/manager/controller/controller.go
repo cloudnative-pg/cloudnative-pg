@@ -197,6 +197,14 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 		return err
 	}
 
+	if err = (&controllers.PoolerReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
+		return err
+	}
+
 	if err = (&apiv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster", "version", "v1alpha1")
 		return err
@@ -224,6 +232,11 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 
 	if err = (&apiv1.ScheduledBackup{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "ScheduledBackup", "version", "v1")
+		return err
+	}
+
+	if err = (&apiv1.Pooler{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "Pooler", "version", "v1")
 		return err
 	}
 

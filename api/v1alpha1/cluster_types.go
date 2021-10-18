@@ -196,6 +196,20 @@ type ClusterStatus struct {
 
 	// The timestamp of the target primary
 	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`
+
+	// The integration needed by poolers referencing the cluster
+	PoolerIntegrations *PoolerIntegrations `json:"poolerIntegrations,omitempty"`
+}
+
+// PoolerIntegrations encapsulates the needed integrations for the poolers referencing the cluster
+type PoolerIntegrations struct {
+	PgBouncerIntegration PgbouncerIntegrationStatus `json:"pgBouncerIntegration,omitempty"`
+}
+
+// PgbouncerIntegrationStatus encapsulates the needed integrations for the pgbouncer poolers referencing the cluster
+type PgbouncerIntegrationStatus struct {
+	// Secrets is the list of secrets that have to be created to enable the integration with PgBouncer pooler
+	Secrets []string `json:"secrets,omitempty"`
 }
 
 // ReplicaClusterConfiguration encapsulates the configuration of a replica

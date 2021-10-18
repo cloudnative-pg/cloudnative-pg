@@ -36,9 +36,10 @@ import (
 )
 
 const (
-	podOwnerKey = ".metadata.controller"
-	pvcOwnerKey = ".metadata.controller"
-	jobOwnerKey = ".metadata.controller"
+	podOwnerKey      = ".metadata.controller"
+	pvcOwnerKey      = ".metadata.controller"
+	jobOwnerKey      = ".metadata.controller"
+	poolerClusterKey = ".spec.cluster.name"
 )
 
 var (
@@ -383,6 +384,10 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			builder.WithPredicates(secretsPredicate),
 		).
 		Watches(
+			&source.Kind{Type: &apiv1.Pooler{}},
+			handler.EnqueueRequestsFromMapFunc(r.mapPoolersToClusters(ctx)),
+		).
+		Watches(
 			&source.Kind{Type: &corev1.Node{}},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters(ctx)),
 			builder.WithPredicates(nodesPredicate),
@@ -441,6 +446,22 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		return err
 	}
 
+	// Create a new indexed field on Poolers. This field will be used to easily
+	// find all the Poolers pointing to a cluster.
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Pooler{},
+		poolerClusterKey, func(rawObj client.Object) []string {
+			pooler := rawObj.(*apiv1.Pooler)
+			if pooler.Spec.Cluster.Name == "" {
+				return nil
+			}
+
+			return []string{pooler.Spec.Cluster.Name}
+		}); err != nil {
+		return err
+	}
+
 	// Create a new indexed field on Jobs.
 	return mgr.GetFieldIndexer().IndexField(
 		ctx,
@@ -492,6 +513,26 @@ func (r *ClusterReconciler) mapSecretsToClusters(ctx context.Context) handler.Ma
 		}
 		// build requests for cluster referring the secret
 		return filterClustersUsingSecret(clusters, secret)
+	}
+}
+
+// mapPoolersToClusters returns a function mapping pooler events watched to cluster reconcile requests
+func (r *ClusterReconciler) mapPoolersToClusters(ctx context.Context) handler.MapFunc {
+	return func(obj client.Object) []reconcile.Request {
+		pooler, ok := obj.(*apiv1.Pooler)
+		if !ok || pooler.Spec.Cluster.Name == "" {
+			return nil
+		}
+		var cluster apiv1.Cluster
+		clusterNamespacedName := types.NamespacedName{Namespace: pooler.Namespace, Name: pooler.Spec.Cluster.Name}
+		// get all the clusters handled by the operator in the secret namespaces
+		err := r.Get(ctx, clusterNamespacedName, &cluster)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "while getting cluster for pooler", "pooler", pooler)
+			return nil
+		}
+		// build requests for cluster referring the secret
+		return []reconcile.Request{{NamespacedName: clusterNamespacedName}}
 	}
 }
 

@@ -24,7 +24,9 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
@@ -95,6 +97,11 @@ func (r *ClusterReconciler) reconcilePostgresSecrets(ctx context.Context, cluste
 	}
 
 	err = r.reconcileAppUserSecret(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
+	err = r.reconcilePoolerSecrets(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -170,6 +177,43 @@ func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster 
 
 		if err := r.Create(ctx, appSecret); err != nil {
 			if !apierrs.IsAlreadyExists(err) {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster *apiv1.Cluster) error {
+	if cluster.Status.PoolerIntegrations == nil {
+		return nil
+	}
+
+	if len(cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets) > 0 {
+		var clientCaSecret corev1.Secret
+
+		err := r.Get(ctx, client.ObjectKey{Namespace: cluster.GetNamespace(), Name: cluster.GetClientCASecretName()},
+			&clientCaSecret)
+		if err != nil {
+			return err
+		}
+
+		for _, secretName := range cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets {
+			replicationSecretName := client.ObjectKey{
+				Namespace: cluster.GetNamespace(),
+				Name:      secretName,
+			}
+			err = r.ensureLeafCertificate(
+				ctx,
+				cluster,
+				replicationSecretName,
+				postgres.PGBouncerPoolerUserName,
+				&clientCaSecret,
+				certs.CertTypeClient,
+				nil,
+				map[string]string{specs.WatchedLabelName: "true"})
+			if err != nil {
 				return err
 			}
 		}

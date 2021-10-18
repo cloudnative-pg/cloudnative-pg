@@ -180,6 +180,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-postgresql-k8s-enterprisedb-io-v1-pooler
+  failurePolicy: Fail
+  name: vpooler.kb.io
+  rules:
+  - apiGroups:
+    - postgresql.k8s.enterprisedb.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - poolers
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-postgresql-k8s-enterprisedb-io-v1-scheduledbackup
   failurePolicy: Fail
   name: vscheduledbackup.kb.io

@@ -73,6 +73,7 @@ func (r *ClusterReconciler) setupPostgresPKI(ctx context.Context, cluster *apiv1
 		apiv1.StreamingReplicationUser,
 		clientCaSecret,
 		certs.CertTypeClient,
+		nil,
 		nil)
 	if err != nil {
 		return fmt.Errorf("generating server certificate: %w", err)
@@ -246,7 +247,7 @@ func (r *ClusterReconciler) ensureServerLeafCertificate(
 ) error {
 	// If not specified generate/renew
 	if cluster.Spec.Certificates == nil || cluster.Spec.Certificates.ServerTLSSecret == "" {
-		return r.ensureLeafCertificate(ctx, cluster, secretName, commonName, caSecret, usage, altDNSNames)
+		return r.ensureLeafCertificate(ctx, cluster, secretName, commonName, caSecret, usage, altDNSNames, nil)
 	}
 
 	var serverSecret v1.Secret
@@ -283,6 +284,7 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 	caSecret *v1.Secret,
 	usage certs.CertType,
 	altDNSNames []string,
+	additionalLabels map[string]string,
 ) error {
 	var secret v1.Secret
 	err := r.Get(ctx, secretName, &secret)
@@ -296,6 +298,12 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 	}
 
 	utils.SetAsOwnedBy(&serverSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+	for k, v := range additionalLabels {
+		if serverSecret.Annotations == nil {
+			serverSecret.Labels = make(map[string]string)
+		}
+		serverSecret.Labels[k] = v
+	}
 	return r.Create(ctx, serverSecret)
 }
 

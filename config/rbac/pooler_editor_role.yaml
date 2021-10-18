@@ -1,0 +1,24 @@
+# permissions for end users to edit poolers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pooler-editor-role
+rules:
+- apiGroups:
+  - postgresql.k8s.enterprisedb.io
+  resources:
+  - poolers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.k8s.enterprisedb.io
+  resources:
+  - poolers/status
+  verbs:
+  - get

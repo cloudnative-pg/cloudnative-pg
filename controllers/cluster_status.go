@@ -229,6 +229,12 @@ func (r *ClusterReconciler) updateResourceStatus(
 	// on this cluster
 	cluster.Status.CommitHash = versions.Info.Commit
 
+	if poolerIntegrations, err := r.getPoolerIntegrationsNeeded(ctx, cluster); err == nil {
+		cluster.Status.PoolerIntegrations = poolerIntegrations
+	} else {
+		log.Error(err, "while checking pooler integrations were needed, ignored")
+	}
+
 	// refresh expiration dates of certifications
 	if err := r.refreshCertsExpirations(ctx, cluster); err != nil {
 		return err
@@ -255,6 +261,88 @@ func SetClusterOwnerAnnotationsAndLabels(obj *v1.ObjectMeta, cluster *apiv1.Clus
 	utils.SetOperatorVersion(obj, versions.Version)
 	utils.InheritAnnotations(obj, cluster.Annotations, configuration.Current)
 	utils.InheritLabels(obj, cluster.Labels, configuration.Current)
+}
+
+// getPoolerIntegrationsNeeded returns a struct with all the pooler integrations needed
+func (r *ClusterReconciler) getPoolerIntegrationsNeeded(ctx context.Context,
+	cluster *apiv1.Cluster,
+) (*apiv1.PoolerIntegrations, error) {
+	var poolers apiv1.PoolerList
+
+	err := r.List(ctx, &poolers,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingFields{poolerClusterKey: cluster.Name})
+	if err != nil {
+		return nil, fmt.Errorf("while getting poolers for cluster %s: %w", cluster.Name, err)
+	}
+
+	pgbouncerPoolerIntegrations, err := r.getPgbouncerIntegrationStatus(ctx, cluster, poolers)
+	if err != nil {
+		return nil, fmt.Errorf("while getting integration status for pgbouncer poolers in cluster %s: %w",
+			cluster.Name, err)
+	}
+
+	return &apiv1.PoolerIntegrations{
+		PgBouncerIntegration: pgbouncerPoolerIntegrations,
+	}, nil
+}
+
+// getPgbouncerIntegrationStatus gets the status of the pgbouncer integration
+func (r *ClusterReconciler) getPgbouncerIntegrationStatus(
+	ctx context.Context, cluster *apiv1.Cluster, poolers apiv1.PoolerList,
+) (apiv1.PgbouncerIntegrationStatus, error) {
+	poolersIntegrations := apiv1.PgbouncerIntegrationStatus{}
+	for _, pooler := range poolers.Items {
+		// We are dealing with pgbouncer integration
+		if pooler.Spec.PgBouncer == nil {
+			continue
+		}
+
+		// The integrated poolers are the ones whose permissions are directly
+		// managed by the instance manager.
+		//
+		// For this to be done the user needs to avoid setting an authQuery
+		// and an authQuerySecret manually on the pooler: this would mean
+		// that the user intend to manually manage them.
+		//
+		// If this happens, we declare the pooler automatically integrated
+		// in the following two cases:
+		//
+		// 1. the secret still doesn't exist (we will create it in the
+		//    operator reconciliation loop)
+		// 2. the secret exists and has been created by the operator
+		//    (owned by the Cluster)
+
+		// We skip secrets which were directly setup by the user with
+		// the authQuery and authQuerySecret parameters inside the
+		// pooler
+		if pooler.Spec.PgBouncer.AuthQuery != "" {
+			continue
+		}
+
+		if pooler.Spec.PgBouncer.AuthQuerySecret != nil && pooler.Spec.PgBouncer.AuthQuerySecret.Name != "" {
+			continue
+		}
+
+		// Check the secret existence and ownership
+		authQuerySecret := corev1.Secret{}
+		err := r.Get(ctx, client.ObjectKey{
+			Namespace: cluster.Namespace, Name: pooler.GetAuthQuerySecretName(),
+		}, &authQuerySecret)
+		if err != nil {
+			if apierrs.IsNotFound(err) {
+				poolersIntegrations.Secrets =
+					append(poolersIntegrations.Secrets, pooler.GetAuthQuerySecretName())
+			} else {
+				return apiv1.PgbouncerIntegrationStatus{}, fmt.Errorf("while getting secret for pooler integration")
+			}
+		} else if owner, ok := isOwnedByCluster(&authQuerySecret); ok && owner == cluster.Name {
+			poolersIntegrations.Secrets =
+				append(poolersIntegrations.Secrets, pooler.GetAuthQuerySecretName())
+		}
+	}
+
+	return poolersIntegrations, nil
 }
 
 // refreshCertExpiration check the expiration date of all the certificates used by the cluster

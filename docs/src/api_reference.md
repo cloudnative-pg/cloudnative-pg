@@ -42,6 +42,15 @@ Below you will find a description of the defined resources:
 - [LocalObjectReference](#LocalObjectReference)
 - [MonitoringConfiguration](#MonitoringConfiguration)
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
+- [PgBouncerSpec](#PgBouncerSpec)
+- [PgbouncerIntegrationStatus](#PgbouncerIntegrationStatus)
+- [PodMeta](#PodMeta)
+- [PodTemplateSpec](#PodTemplateSpec)
+- [Pooler](#Pooler)
+- [PoolerIntegrations](#PoolerIntegrations)
+- [PoolerList](#PoolerList)
+- [PoolerSpec](#PoolerSpec)
+- [PoolerStatus](#PoolerStatus)
 - [PostgresConfiguration](#PostgresConfiguration)
 - [RecoveryTarget](#RecoveryTarget)
 - [ReplicaClusterConfiguration](#ReplicaClusterConfiguration)
@@ -334,6 +343,7 @@ Name                            | Description                                   
 `cloudNativePostgresqlCommitHash` | The commit hash number of which this operator running                                                                                                                              | string                                               
 `currentPrimaryTimestamp        ` | The timestamp when the last actual promotion to primary has occurred                                                                                                               | string                                               
 `targetPrimaryTimestamp         ` | The timestamp when the last request for a new primary has occurred                                                                                                                 | string                                               
+`poolerIntegrations             ` | The integration needed by poolers referencing the cluster                                                                                                                          | [*PoolerIntegrations](#PoolerIntegrations)           
 
 <a id='ConfigMapKeySelector'></a>
 
@@ -417,6 +427,113 @@ Name       | Description                                                        
 ---------- | ------------------------------------------------------------------------------------------ | -----
 `inProgress` | Is there a node maintenance activity in progress?                                          - *mandatory*  | bool 
 `reusePVC  ` | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere) - *mandatory*  | *bool
+
+<a id='PgBouncerSpec'></a>
+
+## PgBouncerSpec
+
+PgBouncerSpec defines how to configure PgBouncer
+
+Name            | Description                                                                                                                                                                                                                                                                       | Type                                          
+--------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------
+`poolMode       ` | The pool mode                                                                                                                                                                                                                                                                     - *mandatory*  | PgBouncerPoolMode                             
+`authQuerySecret` | The credentials of the user that need to be used for the authentication query. In case it is specified, also an AuthQuery (e.g. "SELECT usename, passwd FROM pg_shadow WHERE usename=$1") has to be specified and no automatic CNP Cluster integration will be triggered.         | [*LocalObjectReference](#LocalObjectReference)
+`authQuery      ` | The query that will be used to download the hash of the password of a certain user. Default: "SELECT usename, passwd FROM user_search($1)". In case it is specified, also an AuthQuerySecret has to be specified and no automatic CNP Cluster integration will be triggered.      | string                                        
+`parameters     ` | Additional parameters to be passed to PgBouncer - please check the CNP documentation for a list of options you can configure                                                                                                                                                      | map[string]string                             
+`paused         ` | When set to `true`, PgBouncer will disconnect from the PostgreSQL server, first waiting for all queries to complete, and pause all new client connections until this value is set to `false` (default). Internally, the operator calls PgBouncer's `PAUSE` and `RESUME` commands. | *bool                                         
+
+<a id='PgbouncerIntegrationStatus'></a>
+
+## PgbouncerIntegrationStatus
+
+PgbouncerIntegrationStatus encapsulates the needed integration for the pgbouncer poolers referencing the cluster
+
+Name    | Description            | Type    
+------- |  | --------
+`secrets` |  | []string
+
+<a id='PodMeta'></a>
+
+## PodMeta
+
+PodMeta is a structure similar to the metav1.ObjectMeta, but still parseable by controller-gen to create a suitable CRD for the user. The comment of PodTemplateSpec has an explanation of why we are not using the core data types.
+
+Name        | Description                                                                                                                                                                                                                                                                        | Type             
+----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------
+`labels     ` | Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels                                                          | map[string]string
+`annotations` | Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations | map[string]string
+
+<a id='PodTemplateSpec'></a>
+
+## PodTemplateSpec
+
+PodTemplateSpec is a structure allowing the user to set a template for Pod generation.
+
+Unfortunately we can't use the corev1.PodTemplateSpec type because the generated CRD won't have the field for the metadata section.
+
+References: https://github.com/kubernetes-sigs/controller-tools/issues/385 https://github.com/kubernetes-sigs/controller-tools/issues/448 https://github.com/prometheus-operator/prometheus-operator/issues/3041
+
+Name     | Description                                                                                                                                                      | Type               
+-------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------
+`metadata` | Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata                              | [PodMeta](#PodMeta)
+`spec    ` | Specification of the desired behavior of the pod. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | corev1.PodSpec     
+
+<a id='Pooler'></a>
+
+## Pooler
+
+Pooler is the Schema for the poolers API
+
+Name     | Description            | Type                                                                                                        
+-------- |  | ------------------------------------------------------------------------------------------------------------
+`metadata` |  | [metav1.ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#objectmeta-v1-meta)
+`spec    ` |  | [PoolerSpec](#PoolerSpec)                                                                                   
+`status  ` |  | [PoolerStatus](#PoolerStatus)                                                                               
+
+<a id='PoolerIntegrations'></a>
+
+## PoolerIntegrations
+
+PoolerIntegrations encapsulates the needed integration for the poolers referencing the cluster
+
+Name                 | Description            | Type                                                     
+-------------------- |  | ---------------------------------------------------------
+`pgBouncerIntegration` |  | [PgbouncerIntegrationStatus](#PgbouncerIntegrationStatus)
+
+<a id='PoolerList'></a>
+
+## PoolerList
+
+PoolerList contains a list of Pooler
+
+Name     | Description            | Type                                                                                                    
+-------- |  | --------------------------------------------------------------------------------------------------------
+`metadata` |  | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#listmeta-v1-meta)
+`items   ` |  - *mandatory*  | [[]Pooler](#Pooler)                                                                                     
+
+<a id='PoolerSpec'></a>
+
+## PoolerSpec
+
+PoolerSpec defines the desired state of Pooler
+
+Name      | Description                                                      | Type                                         
+--------- | ---------------------------------------------------------------- | ---------------------------------------------
+`cluster  ` | This is a reference to the cluster on which the pooler will work - *mandatory*  | [LocalObjectReference](#LocalObjectReference)
+`type     ` | Which instances we must forward traffic to?                      - *mandatory*  | PoolerType                                   
+`instances` | The number of replicas we want                                   - *mandatory*  | int32                                        
+`template ` | The template of the Pod to be created                            | [*PodTemplateSpec](#PodTemplateSpec)         
+`pgbouncer` | The PgBouncer configuration                                      - *mandatory*  | [*PgBouncerSpec](#PgBouncerSpec)             
+
+<a id='PoolerStatus'></a>
+
+## PoolerStatus
+
+PoolerStatus defines the observed state of Pooler
+
+Name                  | Description                               | Type  
+--------------------- | ----------------------------------------- | ------
+`configResourceVersion` | The resource version of the config object - *mandatory*  | string
 
 <a id='PostgresConfiguration'></a>
 

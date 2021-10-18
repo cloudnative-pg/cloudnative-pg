@@ -23,29 +23,6 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics/histogram"
 )
 
-var defaultQueries = UserQueries{
-	"collector": UserQuery{
-		Query: "SELECT current_database() as datname, relpages as lo_pages " +
-			"FROM pg_class c JOIN pg_namespace n ON (n.oid = c.relnamespace) " +
-			"WHERE n.nspname = 'pg_catalog' AND c.relname = 'pg_largeobject';",
-		TargetDatabases: []string{"*"},
-		Metrics: []Mapping{
-			{
-				"datname": ColumnMapping{
-					Usage:       LABEL,
-					Description: "Name of the database",
-				},
-			},
-			{
-				"lo_pages": ColumnMapping{
-					Usage:       GAUGE,
-					Description: "Estimated number of pages in the pg_largeobject table",
-				},
-			},
-		},
-	},
-}
-
 // QueriesCollector is the implementation of PgCollector for a certain
 // collection of custom queries supplied by the user
 type QueriesCollector struct {
@@ -280,7 +257,11 @@ func (q QueriesCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // NewQueriesCollector creates a new PgCollector working over a set of custom queries
 // supplied by the user
-func NewQueriesCollector(name string, instance *postgres.Instance, defaultDBName string) *QueriesCollector {
+func NewQueriesCollector(
+	name string,
+	instance *postgres.Instance,
+	defaultDBName string,
+) *QueriesCollector {
 	return &QueriesCollector{
 		collectorName:  name,
 		instance:       instance,
@@ -319,8 +300,8 @@ func (q *QueriesCollector) ParseQueries(customQueries []byte) error {
 	return nil
 }
 
-// SetDefaultQueries injects some default queries
-func (q *QueriesCollector) SetDefaultQueries() {
+// InjectUserQueries injects the passed queries
+func (q *QueriesCollector) InjectUserQueries(defaultQueries UserQueries) {
 	if q == nil {
 		return
 	}

@@ -25,11 +25,21 @@ var (
 		Resource: "clusters",
 	}
 
+	// PoolerGVK is the triple to reach Pooler resources in k8s
+	PoolerGVK = schema.GroupVersionResource{
+		Group:    GroupVersion.Group,
+		Version:  GroupVersion.Version,
+		Resource: "poolers",
+	}
+
 	// ClusterKind is the kind name of Clusters
 	ClusterKind = "Cluster"
 
 	// BackupKind is the kind name of Backups
 	BackupKind = "Backup"
+
+	// PoolerKind is the kind name of Poolers
+	PoolerKind = "Pooler"
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}

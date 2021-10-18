@@ -17,14 +17,14 @@ import (
 
 var (
 	isUsefulConfigMap = func(object client.Object) bool {
-		return isOwnedOrSatisfiesPredicate(object, func(object client.Object) bool {
+		return isOwnedByClusterOrSatisfiesPredicate(object, func(object client.Object) bool {
 			_, ok := object.(*corev1.ConfigMap)
 			return ok && hasReloadLabelSet(object)
 		})
 	}
 
-	isUsefulSecret = func(object client.Object) bool {
-		return isOwnedOrSatisfiesPredicate(object, func(object client.Object) bool {
+	isUsefulClusterSecret = func(object client.Object) bool {
+		return isOwnedByClusterOrSatisfiesPredicate(object, func(object client.Object) bool {
 			_, ok := object.(*corev1.Secret)
 			return ok && hasReloadLabelSet(object)
 		})
@@ -47,16 +47,16 @@ var (
 
 	secretsPredicate = predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			return isUsefulSecret(e.Object)
+			return isUsefulClusterSecret(e.Object)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return isUsefulSecret(e.Object)
+			return isUsefulClusterSecret(e.Object)
 		},
 		GenericFunc: func(e event.GenericEvent) bool {
-			return isUsefulSecret(e.Object)
+			return isUsefulClusterSecret(e.Object)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return isUsefulSecret(e.ObjectNew)
+			return isUsefulClusterSecret(e.ObjectNew)
 		},
 	}
 
@@ -78,11 +78,19 @@ var (
 	}
 )
 
-func isOwnedOrSatisfiesPredicate(
+func isOwnedByClusterOrSatisfiesPredicate(
 	object client.Object,
 	predicate func(client.Object) bool,
 ) bool {
 	_, owned := isOwnedByCluster(object)
+	return owned || predicate(object)
+}
+
+func isOwnedByPoolerOrSatisfiesPredicate(
+	object client.Object,
+	predicate func(client.Object) bool,
+) bool {
+	_, owned := isOwnedByPooler(object)
 	return owned || predicate(object)
 }
 

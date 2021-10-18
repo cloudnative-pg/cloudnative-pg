@@ -171,6 +171,11 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 	dst.Status.CommitHash = src.Status.CommitHash
 	dst.Status.CurrentPrimaryTimestamp = src.Status.CurrentPrimaryTimestamp
 	dst.Status.TargetPrimaryTimestamp = src.Status.TargetPrimaryTimestamp
+	if src.Status.PoolerIntegrations != nil {
+		dst.Status.PoolerIntegrations = &v1.PoolerIntegrations{PgBouncerIntegration: v1.PgbouncerIntegrationStatus{
+			Secrets: src.Status.PoolerIntegrations.PgBouncerIntegration.Secrets,
+		}}
+	}
 	dst.Status.SecretsResourceVersion.SuperuserSecretVersion =
 		src.Status.SecretsResourceVersion.SuperuserSecretVersion
 	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =
@@ -474,6 +479,11 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Status.CommitHash = src.Status.CommitHash
 	dst.Status.CurrentPrimaryTimestamp = src.Status.CurrentPrimaryTimestamp
 	dst.Status.TargetPrimaryTimestamp = src.Status.TargetPrimaryTimestamp
+	if src.Status.PoolerIntegrations != nil {
+		dst.Status.PoolerIntegrations = &PoolerIntegrations{PgBouncerIntegration: PgbouncerIntegrationStatus{
+			Secrets: src.Status.PoolerIntegrations.PgBouncerIntegration.Secrets,
+		}}
+	}
 	dst.Status.SecretsResourceVersion.SuperuserSecretVersion =
 		src.Status.SecretsResourceVersion.SuperuserSecretVersion
 	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =

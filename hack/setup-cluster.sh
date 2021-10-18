@@ -87,6 +87,9 @@ kubeadmConfigPatchesJSON6902:
       - op: add
         path: /apiServer/certSANs/-
         value: docker
+      - op: add
+        path: /apiServer/extraArgs/enable-admission-plugins
+        value: OwnerReferencesPermissionEnforcement
 nodes:
 - role: control-plane
 EOF

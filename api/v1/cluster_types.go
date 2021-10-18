@@ -77,6 +77,9 @@ const (
 
 	// PodAntiAffinityTypePreferred is the label for preferred anti-affinity type
 	PodAntiAffinityTypePreferred = "preferred"
+
+	// DefaultPgBouncerPoolerSecretSuffix is the suffix for the default pgbouncer Pooler secret
+	DefaultPgBouncerPoolerSecretSuffix = "-pooler"
 )
 
 // ClusterSpec defines the desired state of Cluster
@@ -300,6 +303,19 @@ type ClusterStatus struct {
 
 	// The timestamp when the last request for a new primary has occurred
 	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`
+
+	// The integration needed by poolers referencing the cluster
+	PoolerIntegrations *PoolerIntegrations `json:"poolerIntegrations,omitempty"`
+}
+
+// PoolerIntegrations encapsulates the needed integration for the poolers referencing the cluster
+type PoolerIntegrations struct {
+	PgBouncerIntegration PgbouncerIntegrationStatus `json:"pgBouncerIntegration,omitempty"`
+}
+
+// PgbouncerIntegrationStatus encapsulates the needed integration for the pgbouncer poolers referencing the cluster
+type PgbouncerIntegrationStatus struct {
+	Secrets []string `json:"secrets,omitempty"`
 }
 
 // ReplicaClusterConfiguration encapsulates the configuration of a replica
