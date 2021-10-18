@@ -456,6 +456,14 @@ const (
 type BackupConfiguration struct {
 	// The configuration for the barman-cloud tool suite
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
+
+	// RetentionPolicy is the retention policy to be used for backups
+	// and WALs (i.e. '60d'). The retention policy is expressed in the form
+	// of `XXu` where `XX` is a positive integer and `u` is in `[dwm]` -
+	// days, weeks, months.
+	// +kubebuilder:validation:Pattern=^[1-9][0-9]*[dwm]$
+	// +optional
+	RetentionPolicy string `json:"retentionPolicy,omitempty"`
 }
 
 // BarmanObjectStoreConfiguration contains the backup configuration

@@ -939,6 +939,13 @@ spec:
                     required:
                     - destinationPath
                     type: object
+                  retentionPolicy:
+                    description: RetentionPolicy is the retention policy to be used
+                      for backups and WALs (i.e. '60d'). The retention policy is expressed
+                      in the form of `XXu` where `XX` is a positive integer and `u`
+                      is in `[dwm]` - days, weeks, months.
+                    pattern: ^[1-9][0-9]*[dwm]$
+                    type: string
                 type: object
               bootstrap:
                 description: Instructions to bootstrap this cluster
@@ -2893,6 +2900,13 @@ spec:
                     required:
                     - destinationPath
                     type: object
+                  retentionPolicy:
+                    description: RetentionPolicy is the retention policy to be used
+                      for backups and WALs (i.e. '60d'). The retention policy is expressed
+                      in the form of `XXu` where `XX` is a positive integer and `u`
+                      is in `[dwm]` - days, weeks, months.
+                    pattern: ^[1-9][0-9]*[dwm]$
+                    type: string
                 type: object
               bootstrap:
                 description: Instructions to bootstrap this cluster

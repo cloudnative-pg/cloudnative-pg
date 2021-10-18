@@ -108,9 +108,9 @@ generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 # Build the docker image
-docker-build:
+docker-build: go-releaser
 	GOOS=linux GOARCH=amd64 DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
-	  goreleaser build -f .goreleaser-multiarch.yml --skip-validate --rm-dist --single-target
+	  $(GO_RELEASER) build -f .goreleaser-multiarch.yml --skip-validate --rm-dist --single-target
 	DOCKER_BUILDKIT=1 docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION}
 
 # Push the docker image
@@ -161,6 +161,11 @@ k8s-api-docgen: ## Download k8s-api-docgen locally if necessary.
 GO_LICENSES = $(shell pwd)/bin/go-licenses
 go-licenses: ## Download go-licenses locally if necessary.
 	$(call go-get-tool,$(GO_LICENSES),github.com/google/go-licenses)
+
+GO_RELEASER = $(shell pwd)/bin/goreleaser
+go-releaser: ## Download go-releaser locally if necessary.
+	$(call go-get-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser)
+
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

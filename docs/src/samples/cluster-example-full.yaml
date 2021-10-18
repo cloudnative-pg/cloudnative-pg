@@ -90,6 +90,7 @@ spec:
         encryption: AES256
         immediateCheckpoint: false
         jobs: 2
+    retentionPolicy: "30d"
 
   resources:
     requests:
