@@ -19,6 +19,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -49,25 +50,7 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
-	// Create or patch the primary PDB
-	err = r.createOrPatchOwnedPodDisruptionBudget(ctx,
-		cluster,
-		specs.BuildPrimaryPodDisruptionBudget(cluster),
-	)
-	if err != nil {
-		return err
-	}
-
-	// The PDB should not be enforced if we are inside a maintenance
-	// windows and we chose to don't allocate more space.
-	if cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled() {
-		err = r.deleteClusterPodDisruptionBudget(ctx, cluster)
-	} else {
-		err = r.createOrPatchOwnedPodDisruptionBudget(ctx,
-			cluster,
-			specs.BuildReplicasPodDisruptionBudget(cluster),
-		)
-	}
+	err = r.reconcilePodDisruptionBudget(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -88,6 +71,45 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 	}
 
 	return nil
+}
+
+func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
+	// The PDB should not be enforced if we are inside a maintenance
+	// window, and we chose to avoid allocating more storage space.
+	if cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled() {
+		if err := r.deleteReplicasPodDisruptionBudget(ctx, cluster); err != nil {
+			return err
+		}
+
+		if cluster.Spec.Instances == 1 {
+			// If this a single-instance cluster, we need to delete
+			// the PodDisruptionBudget for the primary node too
+			// otherwise the user won't be able to drain the workloads
+			// from the underlying node.
+			return r.deletePrimaryPodDisruptionBudget(ctx, cluster)
+		}
+
+		// Make sure that if the cluster was scaled down and scaled up
+		// we create the primary PDB even if we're under a maintenance window
+		return r.createOrPatchOwnedPodDisruptionBudget(ctx,
+			cluster,
+			specs.BuildPrimaryPodDisruptionBudget(cluster),
+		)
+	}
+
+	// Reconcile the primary PDB
+	err := r.createOrPatchOwnedPodDisruptionBudget(ctx,
+		cluster,
+		specs.BuildPrimaryPodDisruptionBudget(cluster),
+	)
+	if err != nil {
+		return err
+	}
+
+	return r.createOrPatchOwnedPodDisruptionBudget(ctx,
+		cluster,
+		specs.BuildReplicasPodDisruptionBudget(cluster),
+	)
 }
 
 func (r *ClusterReconciler) reconcilePostgresSecrets(ctx context.Context, cluster *apiv1.Cluster) error {
@@ -306,11 +328,28 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 	return nil
 }
 
-// deleteClusterPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
-func (r *ClusterReconciler) deleteClusterPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
+// deleteReplicasPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
+func (r *ClusterReconciler) deletePrimaryPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
+	return r.deletePodDisruptionBudget(
+		ctx,
+		cluster,
+		client.ObjectKey{Name: cluster.Name + apiv1.PrimaryPodDisruptionBudgetSuffix, Namespace: cluster.Namespace})
+}
+
+// deleteReplicasPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
+func (r *ClusterReconciler) deleteReplicasPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
+	return r.deletePodDisruptionBudget(ctx, cluster, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace})
+}
+
+// deleteReplicasPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
+func (r *ClusterReconciler) deletePodDisruptionBudget(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	key types.NamespacedName,
+) error {
 	// If we have a PDB, we need to delete it
 	var targetPdb v1beta1.PodDisruptionBudget
-	err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &targetPdb)
+	err := r.Get(ctx, key, &targetPdb)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("unable to retrieve PodDisruptionBudget: %w", err)
@@ -318,7 +357,10 @@ func (r *ClusterReconciler) deleteClusterPodDisruptionBudget(ctx context.Context
 		return nil
 	}
 
-	r.Recorder.Event(cluster, "Normal", "DeletingPodDisruptionBudget", "Deleting Pod Disruption Budget")
+	r.Recorder.Event(cluster,
+		"Normal",
+		"DeletingPodDisruptionBudget",
+		"Deleting Pod Disruption Budget "+key.Name)
 
 	err = r.Delete(ctx, &targetPdb)
 	if err != nil {

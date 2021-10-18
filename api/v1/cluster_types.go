@@ -17,6 +17,10 @@ import (
 )
 
 const (
+	// PrimaryPodDisruptionBudgetSuffix is the suffix appended to the cluster name
+	// to get the name of the PDB used for the cluster primary
+	PrimaryPodDisruptionBudgetSuffix = "-primary"
+
 	// ReplicationSecretSuffix is the suffix appended to the cluster name to
 	// get the name of the generated replication secret for PostgreSQL
 	ReplicationSecretSuffix = "-replication" // #nosec

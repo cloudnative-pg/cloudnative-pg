@@ -52,7 +52,7 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1beta1.PodD
 
 	return &policyv1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.Name + "-primary",
+			Name:      cluster.Name + apiv1.PrimaryPodDisruptionBudgetSuffix,
 			Namespace: cluster.Namespace,
 		},
 		Spec: policyv1beta1.PodDisruptionBudgetSpec{
