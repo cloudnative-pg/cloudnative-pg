@@ -11,13 +11,11 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
@@ -264,12 +262,11 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 // until the switchover is completed
 func (r *InstanceReconciler) waitForSwitchoverToBeCompleted(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx)
-	switchoverWatch, err := r.dynamicClient.
-		Resource(apiv1.ClusterGVK).
-		Namespace(r.instance.Namespace).
-		Watch(ctx, metav1.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName).String(),
-		})
+
+	switchoverWatch, err := r.client.Watch(ctx, &apiv1.ClusterList{}, &client.ListOptions{
+		Namespace:     r.instance.Namespace,
+		FieldSelector: fields.OneTermEqualSelector("metadata.name", r.instance.ClusterName),
+	})
 	if err != nil {
 		return err
 	}
@@ -283,9 +280,10 @@ func (r *InstanceReconciler) waitForSwitchoverToBeCompleted(ctx context.Context)
 			return fmt.Errorf("watch expired while waiting for switchover to complete")
 		}
 
-		cluster, err := utils.ObjectToCluster(event.Object)
-		if err != nil {
-			return fmt.Errorf("error while decoding runtime.Object data from watch: %w", err)
+		var cluster *apiv1.Cluster
+		cluster, ok = event.Object.(*apiv1.Cluster)
+		if !ok {
+			return fmt.Errorf("error while decoding runtime.Object data from watch")
 		}
 
 		targetPrimary := cluster.Status.TargetPrimary

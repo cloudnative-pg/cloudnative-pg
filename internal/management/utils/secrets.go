@@ -4,6 +4,8 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
+// Package utils contains uncategorized utilities only used
+// by the instance manager of PostgreSQL and PgBouncer
 package utils
 
 import (

@@ -13,17 +13,13 @@ import (
 	"fmt"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
@@ -32,12 +28,11 @@ import (
 // the one of this PostgreSQL instance. Also the configuration in the
 // ConfigMap is applied when needed
 type PgBouncerReconciler struct {
-	client          ctrl.Client
-	dynamicClient   dynamic.Interface
-	watchCollection *controller.WatchCollection
-	instance        PgBouncerInstanceInterface
-	namespace       string
-	poolerName      string
+	client      ctrl.WithWatch
+	poolerWatch watch.Interface
+	instance    PgBouncerInstanceInterface
+	namespace   string
+	poolerName  string
 }
 
 // NewPgBouncerReconciler creates a new pgbouncer reconciler
@@ -47,21 +42,11 @@ func NewPgBouncerReconciler(poolerName string, namespace string) (*PgBouncerReco
 		return nil, err
 	}
 
-	// Unfortunately we need a dynamic client to watch over Clusters, because
-	// `controller-runtime` 0.8.0 don't have that feature. `0.9.0` will have
-	// a generic interface over watches, so let's wait for it.
-
-	dynamicClient, err := management.NewDynamicClient()
-	if err != nil {
-		return nil, err
-	}
-
 	return &PgBouncerReconciler{
-		client:        client,
-		dynamicClient: dynamicClient,
-		instance:      NewPgBouncerInstance(),
-		poolerName:    poolerName,
-		namespace:     namespace,
+		client:     client,
+		instance:   NewPgBouncerInstance(),
+		poolerName: poolerName,
+		namespace:  namespace,
 	}, nil
 }
 
@@ -87,27 +72,16 @@ func (r *PgBouncerReconciler) Run(ctx context.Context) {
 func (r *PgBouncerReconciler) watch(ctx context.Context) error {
 	var err error
 
-	// 1. Prepare the set of watches for objects we are interested in
-	//    keeping synchronized with the instance status
-
-	// This is an example of how to watch a certain object
-	// https://github.com/kubernetes/kubernetes/issues/43299
-	poolerWatch, err := r.dynamicClient.
-		Resource(apiv1.PoolerGVK).
-		Namespace(r.namespace).
-		Watch(ctx, metav1.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector("metadata.name", r.poolerName).String(),
-		})
+	r.poolerWatch, err = r.client.Watch(ctx, &apiv1.PoolerList{}, &ctrl.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector("metadata.name", r.poolerName),
+		Namespace:     r.namespace,
+	})
 	if err != nil {
 		return fmt.Errorf("error watching pooler: %w", err)
 	}
-
-	r.watchCollection = controller.NewWatchCollection(
-		poolerWatch,
-	)
 	defer r.Stop()
 
-	for event := range r.watchCollection.ResultChan() {
+	for event := range r.poolerWatch.ResultChan() {
 		receivedEvent := event
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			return r.Reconcile(ctx, &receivedEvent)
@@ -121,8 +95,8 @@ func (r *PgBouncerReconciler) watch(ctx context.Context) error {
 
 // Stop stops the controller
 func (r *PgBouncerReconciler) Stop() {
-	if r.watchCollection != nil {
-		r.watchCollection.Stop()
+	if r.poolerWatch != nil {
+		r.poolerWatch.Stop()
 	}
 }
 
@@ -139,9 +113,9 @@ func (r *PgBouncerReconciler) Reconcile(ctx context.Context, event *watch.Event)
 		"eventType", event.Type,
 		"type", event.Object.GetObjectKind().GroupVersionKind())
 
-	pooler, err := utils.ObjectToPooler(event.Object)
-	if err != nil {
-		return fmt.Errorf("error decoding cluster resource: %w", err)
+	pooler, ok := event.Object.(*apiv1.Pooler)
+	if !ok {
+		return fmt.Errorf("error decoding pooler resource")
 	}
 
 	return r.reconcilePause(pooler)
