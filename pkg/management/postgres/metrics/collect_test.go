@@ -18,9 +18,6 @@ var _ = Describe("Set default queries", func() {
 		Expect(q.userQueries).To(BeEmpty())
 		Expect(q.mappings).To(BeEmpty())
 		Expect(q.variableLabels).To(BeEmpty())
-
-		defaultQueries = nil
-		q.SetDefaultQueries()
 		Expect(q.userQueries).To(BeEmpty())
 		Expect(q.mappings).To(BeEmpty())
 		Expect(q.variableLabels).To(BeEmpty())
@@ -31,7 +28,7 @@ var _ = Describe("Set default queries", func() {
 		Expect(q.mappings).To(BeEmpty())
 		Expect(q.variableLabels).To(BeEmpty())
 
-		defaultQueries = UserQueries{
+		defaultQueries := UserQueries{
 			"collector": UserQuery{
 				Query: "SELECT FROM unit_tests",
 				Metrics: []Mapping{
@@ -45,7 +42,7 @@ var _ = Describe("Set default queries", func() {
 			},
 		}
 
-		q.SetDefaultQueries()
+		q.InjectUserQueries(defaultQueries)
 		Expect(len(q.userQueries)).To(BeEquivalentTo(1))
 		Expect(len(q.mappings)).To(BeEquivalentTo(1))
 		Expect(q.mappings["collector"]["test"].Name).To(BeEquivalentTo("test"))

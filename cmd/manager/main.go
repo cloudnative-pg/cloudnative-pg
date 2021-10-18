@@ -16,6 +16,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/bootstrap"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/controller"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/pgbouncer"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walarchive"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walrestore"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/versions"
@@ -43,6 +44,7 @@ func main() {
 	cmd.AddCommand(walarchive.NewCmd())
 	cmd.AddCommand(walrestore.NewCmd())
 	cmd.AddCommand(versions.NewCmd())
+	cmd.AddCommand(pgbouncer.NewCmd())
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)

@@ -401,6 +401,17 @@ The operator allows administrators to control and manage resource usage by
 the cluster's pods, through the `resources` section of the manifest. In
 particular `requests` and `limits` values can be set for both CPU and RAM.
 
+### Connection pooling with PgBouncer
+
+Cloud Native PostgreSQL provides native support for connection pooling with
+[PgBouncer](connection_pooling.md), one of the most popular open source
+connection poolers for PostgreSQL. From an architectural point of view, the
+native implementation of a PgBouncer connection pooler introduces a new layer
+to access the database which optimizes the query flow towards the instances
+and makes the usage of the underlying PostgreSQL resources more efficient.
+Instead of connecting directly to a PostgreSQL service, applications can now
+connect to the PgBouncer service and start reusing any existing connection.
+
 ## Level 4 - Deep Insights
 
 Capability level 4 is about **observability**: in particular, monitoring,

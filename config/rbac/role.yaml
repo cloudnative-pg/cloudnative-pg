@@ -97,7 +97,17 @@ rules:
   - delete
   - get
   - list
+  - patch
+  - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - ""
   resources:
@@ -145,6 +155,18 @@ rules:
   - get
   - list
   - update
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - batch
   resources:
@@ -218,6 +240,33 @@ rules:
   - postgresql.k8s.enterprisedb.io
   resources:
   - clusters/status
+  verbs:
+  - get
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.k8s.enterprisedb.io
+  resources:
+  - poolers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.k8s.enterprisedb.io
+  resources:
+  - poolers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - postgresql.k8s.enterprisedb.io
+  resources:
+  - poolers/status
   verbs:
   - get
   - patch

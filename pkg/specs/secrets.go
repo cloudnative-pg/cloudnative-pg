@@ -28,6 +28,9 @@ func CreateSecret(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			Labels: map[string]string{
+				WatchedLabelName: "true",
+			},
 		},
 		Type: corev1.SecretTypeBasicAuth,
 		StringData: map[string]string{

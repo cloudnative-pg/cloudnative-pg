@@ -288,9 +288,10 @@ func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
 	if instance.pool == nil {
 		socketDir := GetSocketDir()
 		dsn := fmt.Sprintf(
-			"host=%s port=%v user=postgres sslmode=disable",
+			"host=%s port=%v user=%v sslmode=disable",
 			socketDir,
-			GetServerPort())
+			GetServerPort(),
+			"postgres")
 
 		instance.pool = pool.NewConnectionPool(dsn)
 	}

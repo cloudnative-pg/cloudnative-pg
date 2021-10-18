@@ -37,6 +37,11 @@ import (
 	pkgUtils "github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
+const (
+	userSearchFunctionName = "user_search"
+	userSearchFunction     = "SELECT usename, passwd FROM pg_shadow WHERE usename=$1;"
+)
+
 // RetryUntilWalReceiverDown is the default retry configuration that is used
 // to wait for the WAL receiver process to be down
 var RetryUntilWalReceiverDown = wait.Backoff{
@@ -152,11 +157,6 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 		}
 	}
 
-	if !extensionStatusChanged {
-		// Nothing to do now, the list of extensions isn't changed
-		return nil
-	}
-
 	databases, errors := r.getAllAccessibleDatabases(ctx, db)
 	for _, databaseName := range databases {
 		db, err := r.instance.ConnectionPool().Connection(databaseName)
@@ -165,10 +165,15 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 				fmt.Errorf("could not connect to database %s: %w", databaseName, err))
 			continue
 		}
-		if err = r.reconcileExtensions(ctx, db, cluster.Spec.PostgresConfiguration.Parameters); err != nil {
+		if extensionStatusChanged {
+			if err = r.reconcileExtensions(ctx, db, cluster.Spec.PostgresConfiguration.Parameters); err != nil {
+				errors = append(errors,
+					fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))
+			}
+		}
+		if err = r.reconcilePoolers(ctx, db, databaseName, cluster.Status.PoolerIntegrations); err != nil {
 			errors = append(errors,
 				fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))
-			continue
 		}
 	}
 	if errors != nil {
@@ -227,9 +232,9 @@ func (r *InstanceReconciler) reconcileExtensions(
 	for _, extension := range postgres.ManagedExtensions {
 		extensionIsUsed := extension.IsUsed(userSettings)
 		if !extension.SkipCreateExtension && extensionIsUsed {
-			_, err = db.Exec(fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s", extension.Name))
+			_, err = tx.Exec(fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s", extension.Name))
 		} else {
-			_, err = db.Exec(fmt.Sprintf("DROP EXTENSION IF EXISTS %s", extension.Name))
+			_, err = tx.Exec(fmt.Sprintf("DROP EXTENSION IF EXISTS %s", extension.Name))
 		}
 		if err != nil {
 			break
@@ -241,6 +246,81 @@ func (r *InstanceReconciler) reconcileExtensions(
 	}
 
 	return tx.Commit()
+}
+
+// ReconcileExtensions reconciles the expected extensions for this
+// PostgreSQL instance
+func (r *InstanceReconciler) reconcilePoolers(
+	ctx context.Context, db *sql.DB, dbName string, integrations *apiv1.PoolerIntegrations) (err error) {
+	if len(integrations.PgBouncerIntegration.Secrets) == 0 {
+		return
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// This is a no-op when the transaction is committed
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.Exec("SET LOCAL synchronous_commit TO local")
+	if err != nil {
+		return err
+	}
+
+	var existsRole bool
+	row := tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = '%s'",
+		postgres.PGBouncerPoolerUserName))
+	err = row.Scan(&existsRole)
+	if err != nil {
+		return err
+	}
+	if !existsRole {
+		_, err := tx.Exec(fmt.Sprintf("CREATE ROLE %s WITH LOGIN", postgres.PGBouncerPoolerUserName))
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", dbName, postgres.PGBouncerPoolerUserName))
+		if err != nil {
+			return err
+		}
+	}
+
+	var existsFunction bool
+	row = tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_proc WHERE proname='%s' and prosrc='%s'",
+		userSearchFunctionName,
+		userSearchFunction))
+	err = row.Scan(&existsFunction)
+	if err != nil {
+		return err
+	}
+	if !existsFunction {
+		_, err = tx.Exec(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s(uname TEXT) "+
+			"RETURNS TABLE (usename name, passwd text) "+
+			"as '%s' "+
+			"LANGUAGE sql SECURITY DEFINER",
+			userSearchFunctionName,
+			userSearchFunction))
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(fmt.Sprintf("REVOKE ALL ON FUNCTION %s(text) FROM public;", userSearchFunctionName))
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(fmt.Sprintf("GRANT EXECUTE ON FUNCTION %s(text) TO %s",
+			userSearchFunctionName,
+			postgres.PGBouncerPoolerUserName))
+		if err != nil {
+			return err
+		}
+	}
+
+	if !existsRole || !existsFunction {
+		return tx.Commit()
+	}
+	return nil
 }
 
 // reconcileClusterRole applies the role written in the cluster status to this instance
@@ -311,8 +391,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	}
 
 	queriesCollector := metrics.NewQueriesCollector("cnp", r.instance, dbname)
-
-	queriesCollector.SetDefaultQueries()
+	queriesCollector.InjectUserQueries(metricsserver.DefaultQueries)
 
 	if cluster.Spec.Monitoring == nil {
 		metricsserver.GetExporter().SetCustomQueries(queriesCollector)

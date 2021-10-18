@@ -63,6 +63,12 @@ export GPG_AGENT_INFO=~/.gnupg/S.gpg-agent::1
 export GPG_TTY=$(tty)
 ```
 
+You also need to set:
+
+```
+export GOPATH="${HOME}/go"
+```
+
 ### Setting your docker engine
 
 Please allow a reasonable amount of memory for Docker.

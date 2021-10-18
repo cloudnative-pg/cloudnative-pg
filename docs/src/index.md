@@ -85,6 +85,7 @@ The following versions of Postgres are currently supported:
 * Replica clusters for PostgreSQL deployments across multiple Kubernetes
   clusters, enabling private, public, hybrid, and multi-cloud architectures
 * Support for Synchronous Replicas
+* Connection pooling with PgBouncer
 * Support for node affinity via `nodeSelector`
 * Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)
 * Standard output logging of PostgreSQL error messages in JSON format

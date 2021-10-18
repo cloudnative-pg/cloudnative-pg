@@ -32,6 +32,7 @@ nav:
   - logging.md
   - certificates.md
   - ssl_connections.md
+  - connection_pooling.md
   - kubernetes_upgrade.md
   - expose_pg_services.md
   - cnp-plugin.md

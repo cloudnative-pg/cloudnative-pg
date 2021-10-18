@@ -4,8 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-// Package metrics enables to expose a set of metrics and collectors on a given postgres instance
-package metrics
+package metricsserver
 
 import (
 	"database/sql"
@@ -20,9 +19,34 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	m "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
 	postgresconf "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
+
+// DefaultQueries is the set of default queries for postgresql
+var DefaultQueries = m.UserQueries{
+	"collector": m.UserQuery{
+		Query: "SELECT current_database() as datname, relpages as lo_pages " +
+			"FROM pg_class c JOIN pg_namespace n ON (n.oid = c.relnamespace) " +
+			"WHERE n.nspname = 'pg_catalog' AND c.relname = 'pg_largeobject';",
+		TargetDatabases: []string{"*"},
+		Metrics: []m.Mapping{
+			{
+				"datname": m.ColumnMapping{
+					Usage:       m.LABEL,
+					Description: "Name of the database",
+				},
+			},
+			{
+				"lo_pages": m.ColumnMapping{
+					Usage:       m.GAUGE,
+					Description: "Estimated number of pages in the pg_largeobject table",
+				},
+			},
+		},
+	},
+}
 
 // PrometheusNamespace is the namespace to be used for all custom metrics exposed by instances
 // or the operator
@@ -37,7 +61,7 @@ var walSegmentSize *int
 type Exporter struct {
 	instance *postgres.Instance
 	Metrics  *metrics
-	queries  *QueriesCollector
+	queries  *m.QueriesCollector
 }
 
 // metrics here are related to the exporter itself, which is instrumented to
@@ -340,6 +364,6 @@ type PgCollector interface {
 }
 
 // SetCustomQueries sets the custom queries from the passed content
-func (e *Exporter) SetCustomQueries(queries *QueriesCollector) {
+func (e *Exporter) SetCustomQueries(queries *m.QueriesCollector) {
 	e.queries = queries
 }

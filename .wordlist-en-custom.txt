@@ -6,9 +6,12 @@ AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
 Anand
+AuthQuery
+AuthQuerySecret
 Autoscaler
 AzureCredentials
 Azurite
+BDR
 BackupConfiguration
 BackupList
 BackupPhase
@@ -17,7 +20,6 @@ BackupStatus
 BarmanObjectStoreConfiguration
 Bartolini
 Battiato
-BDR
 BootstrapConfiguration
 BootstrapInitDB
 BootstrapPgBaseBackup
@@ -87,6 +89,7 @@ Gi
 Golang
 GolangCI
 Grafana
+HH
 IfNotPresent
 InfoSec
 JSON
@@ -132,13 +135,26 @@ PVCs
 Patroni
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
+PgBouncer's
+PgBouncerPoolMode
+PgBouncerSpec
+PgbouncerIntegrationStatus
 Philippe
 PodAffinity
 PodAntiAffinity
 PodAntiAffinityType
 PodDisruptionBudget
+PodMeta
 PodMonitor
+PodSpec
 PodStatus
+PodTemplateSpec
+Pooler
+PoolerIntegrations
+PoolerList
+PoolerSpec
+PoolerStatus
+PoolerType
 Postgres
 PostgresConfiguration
 PrimaryUpdateStrategy
@@ -200,6 +216,7 @@ WALs
 Wadle
 WalBackupConfiguration
 YXBw
+YYYY
 accessKeyId
 accessModes
 adc
@@ -274,10 +291,12 @@ commandOutput
 conf
 config
 config's
+configMap
 configmap
 configmapkeyselector
 configmaps
 configs
+conn
 connectionParameters
 containerPort
 coreos
@@ -309,6 +328,7 @@ ddl
 de
 declaratively
 defaultMode
+defaultPoolSize
 destinationPath
 dev
 devel
@@ -332,6 +352,7 @@ externalClusters
 facto
 failover
 fastpath
+fd
 ffd
 filesystem
 fio
@@ -409,6 +430,7 @@ malcolm
 mallocs
 matchExpressions
 matchLabels
+maxClientConnections
 maxSyncReplicas
 mcache
 md
@@ -450,6 +472,8 @@ openshift
 operatorframework
 operatorgroups
 operatorhub
+parseable
+passwd
 pc
 pdf
 persistentvolumeclaim
@@ -459,6 +483,7 @@ pgaudit
 pgbarman
 pgbasebackup
 pgbench
+pgbouncer
 pgdata
 pgpass
 pgstatstatements
@@ -472,6 +497,9 @@ podAntiAffinity
 podAntiAffinityType
 podMetricsEndpoints
 podmonitor
+poolMode
+pooler
+poolers
 pos
 postInitSQL
 postgres
@@ -492,6 +520,7 @@ pvc
 pvcCount
 pvcTemplate
 quantile
+queryable
 quickstart
 rbac
 readService
@@ -548,6 +577,7 @@ sslrootcert
 sso
 startDelay
 startedAt
+stderr
 stdout
 stopDelay
 stoppedAt

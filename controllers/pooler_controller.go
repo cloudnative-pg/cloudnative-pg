@@ -1,0 +1,171 @@
+/*
+This file is part of Cloud Native PostgreSQL.
+
+Copyright (C) 2019-2021 EnterpriseDB Corporation.
+*/
+
+package controllers
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+)
+
+// PoolerReconciler reconciles a Pooler object
+type PoolerReconciler struct {
+	client.Client
+	Scheme *runtime.Scheme
+}
+
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=poolers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=poolers/status,verbs=get;update;patch;watch
+// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=poolers/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;watch;delete;patch
+// +kubebuilder:rbac:groups="",resources=secrets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="",resources=services,verbs=get;create;delete;update;patch;list;watch
+// +kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;create;delete;update;patch;list;watch
+
+// Reconcile implements the main reconciliation loop for pooler objects
+func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	contextLogger, ctx := log.SetupLogger(ctx)
+
+	var pooler apiv1.Pooler
+	if err := r.Get(ctx, req.NamespacedName, &pooler); err != nil {
+		// This also happens when you delete a Pooler resource in k8s. If
+		// that's the case, let's just wait for the Kubernetes garbage collector
+		// to remove all the Pods of the cluster.
+		if apierrs.IsNotFound(err) {
+			contextLogger.Info("Resource has been deleted")
+			return ctrl.Result{}, nil
+		}
+
+		// This is a real error, maybe the RBAC configuration is wrong?
+		return ctrl.Result{}, fmt.Errorf("cannot get the pooler resource: %w", err)
+	}
+
+	resources, err := r.getManagedResources(ctx, &pooler)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("while getting managed resources: %w", err)
+	}
+
+	if resources.Cluster == nil {
+		contextLogger.Info("Cluster not found, will retry in 30 seconds", "cluster", pooler.Spec.Cluster.Name)
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	// Update the status of this resource
+	if err := r.updateResourceStatus(ctx, &pooler, resources); err != nil {
+		return ctrl.Result{}, fmt.Errorf("while updating resource status: %w", err)
+	}
+
+	if resources.AuthUserSecret == nil {
+		contextLogger.Info("AuthUserSecret not found, waiting 30 seconds", "secret", pooler.GetAuthQuerySecretName())
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	if err = r.updateObjects(ctx, &pooler, resources); err != nil {
+		return ctrl.Result{}, fmt.Errorf("while updating managed objects: %w", err)
+	}
+
+	return ctrl.Result{}, nil
+}
+
+// SetupWithManager setup this controller inside the controller manager
+func (r *PoolerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&apiv1.Pooler{}).
+		Owns(&v1.Deployment{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.ServiceAccount{}).
+		Owns(&rbacv1.Role{}).
+		Owns(&rbacv1.RoleBinding{}).
+		Watches(
+			&source.Kind{Type: &corev1.Secret{}},
+			handler.EnqueueRequestsFromMapFunc(r.mapSecretToPooler(ctx)),
+			builder.WithPredicates(secretsPoolerPredicate),
+		).
+		Complete(r)
+}
+
+// isOwnedByPooler checks that an object is owned by a pooler and returns
+// the owner name
+func isOwnedByPooler(obj client.Object) (string, bool) {
+	owner := metav1.GetControllerOf(obj)
+	if owner == nil {
+		return "", false
+	}
+
+	if owner.Kind != apiv1.PoolerKind {
+		return "", false
+	}
+
+	if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
+		return "", false
+	}
+	return owner.Name, true
+}
+
+// mapSecretToPooler returns a function mapping secrets events to the poolers using them
+func (r *PoolerReconciler) mapSecretToPooler(ctx context.Context) handler.MapFunc {
+	return func(obj client.Object) (result []reconcile.Request) {
+		secret, ok := obj.(*corev1.Secret)
+		if !ok {
+			return nil
+		}
+
+		var poolers apiv1.PoolerList
+
+		// get all the clusters handled by the operator in the configmap namespace
+		if err := r.List(ctx, &poolers,
+			client.InNamespace(secret.Namespace),
+		); err != nil {
+			log.FromContext(ctx).Error(err, "while getting pooler list for secret",
+				"namespace", secret.Namespace, "secret", secret.Name)
+			return nil
+		}
+
+		// filter the cluster list preserving only the ones which are using
+		// the passed secret
+		filteredPoolersList := getPoolersUsingSecret(poolers, secret)
+		result = make([]reconcile.Request, len(filteredPoolersList))
+		for idx, value := range filteredPoolersList {
+			result[idx] = reconcile.Request{NamespacedName: value}
+		}
+
+		return
+	}
+}
+
+// getPoolersUsingSecret get a list of poolers which are using the passed secret
+func getPoolersUsingSecret(poolers apiv1.PoolerList, secret *corev1.Secret) (requests []types.NamespacedName) {
+	for _, pooler := range poolers.Items {
+		if pooler.Spec.PgBouncer != nil && pooler.GetAuthQuerySecretName() == secret.Name {
+			requests = append(requests,
+				types.NamespacedName{
+					Name:      pooler.Name,
+					Namespace: pooler.Namespace,
+				},
+			)
+			continue
+		}
+	}
+	return requests
+}

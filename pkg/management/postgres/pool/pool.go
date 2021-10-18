@@ -60,7 +60,7 @@ func (pool *ConnectionPool) ShutdownConnections() {
 // Unix domain socket to a database with a certain name
 func (pool *ConnectionPool) newConnection(dbname string) (*sql.DB, error) {
 	dsn := fmt.Sprintf(
-		"%s dbname=%s user=postgres sslmode=disable", pool.baseConnectionString, dbname)
+		"%s dbname=%s", pool.baseConnectionString, dbname)
 	db, err := sql.Open(
 		"postgres",
 		dsn)

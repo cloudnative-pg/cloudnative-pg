@@ -1899,6 +1899,19 @@ spec:
               phaseReason:
                 description: Reason for the current phase
                 type: string
+              poolerIntegrations:
+                description: The integration needed by poolers referencing the cluster
+                properties:
+                  pgBouncerIntegration:
+                    description: PgbouncerIntegrationStatus encapsulates the needed
+                      integration for the pgbouncer poolers referencing the cluster
+                    properties:
+                      secrets:
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                type: object
               pvcCount:
                 description: How many PVCs have been created by this cluster
                 format: int32
@@ -3814,6 +3827,21 @@ spec:
               phaseReason:
                 description: Reason for the current phase
                 type: string
+              poolerIntegrations:
+                description: The integration needed by poolers referencing the cluster
+                properties:
+                  pgBouncerIntegration:
+                    description: PgbouncerIntegrationStatus encapsulates the needed
+                      integrations for the pgbouncer poolers referencing the cluster
+                    properties:
+                      secrets:
+                        description: Secrets is the list of secrets that have to be
+                          created to enable the integration with PgBouncer pooler
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                type: object
               pvcCount:
                 description: How many PVCs have been created by this cluster
                 format: int32

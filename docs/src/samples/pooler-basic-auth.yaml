@@ -1,0 +1,15 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+
+  instances: 1
+  type: rw
+  pgbouncer:
+    poolMode: session
+    authQuerySecret:
+      name: cluster-example-superuser
+    authQuery: SELECT usename, passwd FROM pg_shadow WHERE usename=$1

@@ -15,8 +15,11 @@ const (
 	// LocalPort is the port for only available from Postgres.
 	LocalPort int = 8010
 
-	// MetricsPort is the port for HTTP requests
-	MetricsPort int = 9187
+	// PostgresMetricsPort is the port for the exporter of PostgreSQL related metrics (HTTP)
+	PostgresMetricsPort int = 9187
+
+	// PgBouncerMetricsPort is the port for the exporter of PgBouncer related metrics (HTTP)
+	PgBouncerMetricsPort int = 9127
 
 	// PathHealth is the URL path for Health State
 	PathHealth string = "/healthz"

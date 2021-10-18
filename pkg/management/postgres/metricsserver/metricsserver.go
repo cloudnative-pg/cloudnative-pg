@@ -17,7 +17,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 )
 
@@ -33,7 +32,7 @@ var (
 
 	// exporter is the exporter for predefined queries and for
 	// custom ones
-	exporter *metrics.Exporter
+	exporter *Exporter
 )
 
 // Setup configure the web statusServer for a certain PostgreSQL instance, and
@@ -43,7 +42,7 @@ func Setup(serverInstance *postgres.Instance) error {
 
 	// create the exporter and serve it on the /metrics endpoint
 	registry = prometheus.NewRegistry()
-	exporter = metrics.NewExporter(instance)
+	exporter = NewExporter(instance)
 	if err := registry.Register(exporter); err != nil {
 		return fmt.Errorf("while registering PostgreSQL exporters: %w", err)
 	}
@@ -63,7 +62,7 @@ func ListenAndServe() error {
 	serveMux := http.NewServeMux()
 	serveMux.Handle(url.PathMetrics, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 
-	server = &http.Server{Addr: fmt.Sprintf(":%d", url.MetricsPort), Handler: serveMux}
+	server = &http.Server{Addr: fmt.Sprintf(":%d", url.PostgresMetricsPort), Handler: serveMux}
 	err := server.ListenAndServe()
 
 	// The metricsServer has been shut down
@@ -76,7 +75,7 @@ func ListenAndServe() error {
 
 // GetExporter get the exporter used for metrics. If the web statusServer still
 // has not started, the exporter is nil
-func GetExporter() *metrics.Exporter {
+func GetExporter() *Exporter {
 	return exporter
 }
 

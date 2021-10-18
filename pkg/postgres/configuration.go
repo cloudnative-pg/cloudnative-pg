@@ -23,6 +23,7 @@ local all all peer map=local
 # Require client certificate authentication for the streaming_replica user
 hostssl postgres streaming_replica all cert
 hostssl replication streaming_replica all cert
+hostssl all cnp_pooler_pgbouncer all cert
 `
 
 	// hbaFooter is the footer of generated pg_hba.conf.
@@ -109,6 +110,9 @@ host all all all md5
 
 	// SynchronousStandbyNames is the postgresql parameter key for synchronous standbys
 	SynchronousStandbyNames = "synchronous_standby_names"
+
+	// PGBouncerPoolerUserName is the name of the role to be used for
+	PGBouncerPoolerUserName = "cnp_pooler_pgbouncer"
 )
 
 // MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange

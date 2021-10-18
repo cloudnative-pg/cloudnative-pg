@@ -31,6 +31,11 @@ Kubernetes cluster, with the following specifications:
     information about how Cloud Native PostgreSQL relies on PostgreSQL replication,
     including synchronous settings.
 
+!!! Seealso "Connection Pooling"
+    Please refer to the ["Connection Pooling" section](connection_pooling.md) for
+    information about how to take advantage of PgBouncer as a connection pooler,
+    and create an access layer between your applications and the PostgreSQL clusters.
+
 ## Read-write workloads
 
 Applications can decide to connect to the PostgreSQL instance elected as

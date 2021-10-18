@@ -75,7 +75,7 @@ type Logger interface {
 	WithCaller() Logger
 	WithValues(keysAndValues ...interface{}) Logger
 	WithName(name string) Logger
-	getLogger() logr.Logger
+	GetLogger() logr.Logger
 }
 
 // SetLogger will set the backing logr implementation for instance manager.
@@ -84,19 +84,19 @@ func SetLogger(logr logr.Logger) {
 }
 
 func (l *logger) enrich() logr.Logger {
-	cl := l.getLogger()
+	cl := l.GetLogger()
 
 	if l.printCaller {
 		_, fileName, fileLine, ok := runtime.Caller(2)
 		if ok {
-			cl = l.WithValues("caller", fmt.Sprintf("%s:%d", fileName, fileLine)).getLogger()
+			cl = l.WithValues("caller", fmt.Sprintf("%s:%d", fileName, fileLine)).GetLogger()
 		}
 	}
 
 	return cl
 }
 
-func (l *logger) getLogger() logr.Logger {
+func (l *logger) GetLogger() logr.Logger {
 	return l.Logger
 }
 
@@ -189,7 +189,7 @@ func FromContext(ctx context.Context) Logger {
 
 // IntoContext injects a logger into a context
 func IntoContext(ctx context.Context, log Logger) context.Context {
-	return ctrlLog.IntoContext(ctx, log.getLogger())
+	return ctrlLog.IntoContext(ctx, log.GetLogger())
 }
 
 // AddUUID wraps a given context to inject a new uuid
