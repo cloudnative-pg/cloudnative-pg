@@ -492,3 +492,57 @@ func AssertReplicaModeCluster(
 		}, 180, 15).Should(BeEquivalentTo("3"))
 	})
 }
+
+func AssertWritesToReplicaFails(
+	connectingPod *corev1.Pod,
+	service string,
+	appDBName string,
+	appDBUser string,
+	appDBPass string) {
+	By(fmt.Sprintf("Verifying %v service doesn't allow writes", service),
+		func() {
+			timeout := time.Second * 2
+
+			dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
+				service, appDBUser, appDBName, appDBPass)
+
+			// Expect to be connected to a replica
+			stdout, _, err := env.ExecCommand(env.Ctx, *connectingPod, "postgres", &timeout,
+				"psql", dsn, "-tAc", "select pg_is_in_recovery()")
+			value := strings.Trim(stdout, "\n")
+			Expect(value, err).To(Equal("t"))
+
+			// Expect to be in a read-only transaction
+			_, _, err = env.ExecCommand(env.Ctx, *connectingPod, "postgres", &timeout,
+				"psql", dsn, "-tAc", "CREATE TABLE table1(var1 text);")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).Should(
+				ContainSubstring("cannot execute CREATE TABLE in a read-only transaction"))
+		})
+}
+
+func AssertWritesToPrimarySucceeds(
+	connectingPod *corev1.Pod,
+	service string,
+	appDBName string,
+	appDBUser string,
+	appDBPass string) {
+	By(fmt.Sprintf("Verifying %v service correctly manages writes", service),
+		func() {
+			timeout := time.Second * 2
+
+			dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
+				service, appDBUser, appDBName, appDBPass)
+
+			// Expect to be connected to a primary
+			stdout, _, err := env.ExecCommand(env.Ctx, *connectingPod, "postgres", &timeout,
+				"psql", dsn, "-tAc", "select pg_is_in_recovery()")
+			value := strings.Trim(stdout, "\n")
+			Expect(value, err).To(Equal("f"))
+
+			// Expect to be able to write
+			_, _, err = env.ExecCommand(env.Ctx, *connectingPod, "postgres", &timeout,
+				"psql", dsn, "-tAc", "CREATE TABLE table1(var1 text);")
+			Expect(err).ToNot(HaveOccurred())
+		})
+}

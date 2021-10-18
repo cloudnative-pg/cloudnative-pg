@@ -33,7 +33,7 @@ func Service(pooler *apiv1.Pooler) *corev1.Service {
 				},
 			},
 			Selector: map[string]string{
-				pgbouncerNameLabel: pooler.Name,
+				PgbouncerNameLabel: pooler.Name,
 			},
 		},
 	}

@@ -598,6 +598,8 @@ func (env TestingEnvironment) GetResourceNamespacedNameFromYAML(path string) (ty
 		return types.NamespacedName{Namespace: o.GetNamespace(), Name: o.GetName()}, nil
 	case *apiv1.Cluster:
 		return types.NamespacedName{Namespace: o.GetNamespace(), Name: o.GetName()}, nil
+	case *apiv1.Pooler:
+		return types.NamespacedName{Namespace: o.GetNamespace(), Name: o.GetName()}, nil
 	default:
 		return types.NamespacedName{}, fmt.Errorf("unknown resource type: %T", o)
 	}
