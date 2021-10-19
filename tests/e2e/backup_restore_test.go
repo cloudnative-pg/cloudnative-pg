@@ -131,6 +131,21 @@ var _ = Describe("Backup and restore", func() {
 			AssertClusterRestore(namespace, clusterRestoreSampleFile)
 
 			AssertMetricsData(namespace, restoredClusterName, targetDBOne, targetDBTwo, targetDBSecret)
+
+			previous := 0
+
+			By("checking the previous number of .history files in minio", func() {
+				previous, err = CountFilesOnMinio(namespace, "*.history.gz")
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			AssertSwitchOver(namespace, clusterName, env)
+
+			By("checking the number of .history after switchover", func() {
+				Eventually(func() (int, error) {
+					return CountFilesOnMinio(namespace, "*.history.gz")
+				}, 60).Should(BeNumerically(">", previous))
+			})
 		})
 
 		// We create a cluster and a scheduled backup, then it is patched to suspend its
