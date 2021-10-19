@@ -144,6 +144,7 @@ type PoolerStatus struct {
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
 // +kubebuilder:printcolumn:name="Type",type="string",JSONPath=".spec.type"
+// +kubebuilder:subresource:scale:specpath=.spec.instances,statuspath=.status.instances
 
 // Pooler is the Schema for the poolers API
 type Pooler struct {
