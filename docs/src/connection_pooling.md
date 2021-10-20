@@ -69,6 +69,21 @@ same name of the pooler containing the configuration files used with PgBouncer.
     in the API reference.
 
 
+## Pooler resource lifecycle
+
+`Pooler` resources are not `Cluster`-managed resources. You are supposed to
+create poolers manually when they are needed. Additionally, you can deploy
+multiple poolers per PostgreSQL Cluster.
+
+What is important to note is that the lifecycles of the `Cluster` and the
+`Pooler` resources are currently independent: the deletion of the `Cluster`
+doesn't imply the automatic deletion of the `Pooler`, and viceversa.
+
+!!! Important
+    Now that you know how a `Pooler` works, you have full freedom in terms of
+    possible architectures: you can have clusters without poolers, clusters with
+    a single pooler, or clusters with several poolers (i.e. one per application).
+
 ## Security
 
 Any PgBouncer pooler is transparently integrated with Cloud Native PostgreSQL
