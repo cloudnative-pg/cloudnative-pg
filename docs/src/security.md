@@ -136,6 +136,15 @@ operand          | 5432         | PostgreSQL instance | `postgresql`        |  o
 The current implementation of Cloud Native PostgreSQL automatically creates
 passwords and `.pgpass` files for the `postgres` superuser and the database owner.
 
+As far as encryption of password is concerned, Cloud Native PostgreSQL follows
+the default behavior of PostgreSQL: starting from PostgreSQL 14,
+`password_encryption` is by default set to `scram-sha-256`, while on earlier
+versions it is set to `md5`.
+
+!!! Important
+    Please refer to the ["Password authentication"](https://www.postgresql.org/docs/current/auth-password.html)
+    section in the PostgreSQL documentation for details.
+
 You can disable management of the `postgres` user password via secrets by setting
 `enableSuperuserAccess` to `false`.
 

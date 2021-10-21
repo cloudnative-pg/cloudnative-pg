@@ -38,8 +38,22 @@ listen_addresses = '*'
 include custom.conf
 ```
 
-The `custom.conf` file will contain the user-defined settings. Refer to the
-PostgreSQL documentation for [more information on the available parameters](https://www.postgresql.org/docs/current/runtime-config.html).
+The `custom.conf` file will contain the user-defined settings in the
+`postgresql` section, as in the following example:
+
+```yaml
+  # ...
+  postgresql:
+    parameters:
+      shared_buffers: "1GB"
+  # ...
+```
+
+!!! Seealso "PostgreSQL GUCs: Grand Unified Configuration"
+    Refer to the PostgreSQL documentation for
+    [more information on the available parameters](https://www.postgresql.org/docs/current/runtime-config.html),
+    also known as GUC (Grand Unified Configuration).
+
 The content of `custom.conf` is automatically generated and maintained by the
 operator by applying the following sections in this order:
 
