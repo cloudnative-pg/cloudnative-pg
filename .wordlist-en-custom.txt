@@ -85,6 +85,8 @@ GCS
 GID
 GKE
 GPL
+GUC
+GUCs
 Gabriele
 Gi
 Golang
@@ -303,6 +305,7 @@ configs
 conn
 connectionParameters
 connectionString
+conninfo
 containerPort
 coreos
 corev
@@ -315,6 +318,7 @@ creds
 cron
 crt
 cryptographic
+csvlog
 ctl
 currentPrimary
 customQueriesConfigMap
