@@ -231,7 +231,15 @@ func AssertOperatorPodUnchanged(expectedOperatorPodName string) {
 
 // AssertOperatorIsReady verifies that the operator is ready
 func AssertOperatorIsReady() {
-	Eventually(env.IsOperatorReady, 120).Should(BeTrue(), "Operator pod is not ready")
+	Eventually(func() (bool, error) {
+		ready, err := env.IsOperatorReady()
+		if ready && err == nil {
+			return true, nil
+		}
+		// Waiting a bit to avoid overloading the API server
+		time.Sleep(1 * time.Second)
+		return ready, err
+	}, 120).Should(BeTrue(), "Operator pod is not ready")
 }
 
 // AssertCreateTestData create test data on primary pod
