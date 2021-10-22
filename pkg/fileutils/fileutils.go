@@ -218,7 +218,7 @@ func EnsureParentDirectoryExist(fileName string) error {
 // it doesn't exist will create it using 0700 as permissions bits
 func EnsureDirectoryExist(destinationDir string) error {
 	if _, err := os.Stat(destinationDir); os.IsNotExist(err) {
-		err = os.Mkdir(destinationDir, 0o700)
+		err = os.MkdirAll(destinationDir, 0o700)
 		if err != nil {
 			return err
 		}

@@ -6935,11 +6935,54 @@ spec:
           status:
             description: PoolerStatus defines the observed state of Pooler
             properties:
-              configResourceVersion:
+              secrets:
                 description: The resource version of the config object
-                type: string
-            required:
-            - configResourceVersion
+                properties:
+                  clientCA:
+                    description: The client CA secret version
+                    properties:
+                      name:
+                        description: The name of the secret
+                        type: string
+                      version:
+                        description: The ResourceVersion of the secret
+                        type: string
+                    type: object
+                  pgBouncerSecrets:
+                    description: The version of the secrets used by PgBouncer
+                    properties:
+                      authQuery:
+                        description: The auth query secret version
+                        properties:
+                          name:
+                            description: The name of the secret
+                            type: string
+                          version:
+                            description: The ResourceVersion of the secret
+                            type: string
+                        type: object
+                    type: object
+                  serverCA:
+                    description: The server CA secret version
+                    properties:
+                      name:
+                        description: The name of the secret
+                        type: string
+                      version:
+                        description: The ResourceVersion of the secret
+                        type: string
+                    type: object
+                  serverTLS:
+                    description: The server TLS secret version
+                    properties:
+                      name:
+                        description: The name of the secret
+                        type: string
+                      version:
+                        description: The ResourceVersion of the secret
+                        type: string
+                    type: object
+                type: object
             type: object
         type: object
     served: true

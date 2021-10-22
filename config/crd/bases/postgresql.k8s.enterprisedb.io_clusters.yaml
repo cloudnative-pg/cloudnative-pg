@@ -1910,7 +1910,7 @@ spec:
                 description: The integration needed by poolers referencing the cluster
                 properties:
                   pgBouncerIntegration:
-                    description: PgbouncerIntegrationStatus encapsulates the needed
+                    description: PgBouncerIntegrationStatus encapsulates the needed
                       integration for the pgbouncer poolers referencing the cluster
                     properties:
                       secrets:

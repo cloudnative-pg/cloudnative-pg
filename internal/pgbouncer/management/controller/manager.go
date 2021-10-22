@@ -13,40 +13,42 @@ import (
 	"fmt"
 	"time"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/config"
 )
 
 // PgBouncerReconciler can reconcile the status of the PostgreSQL cluster with
 // the one of this PostgreSQL instance. Also the configuration in the
 // ConfigMap is applied when needed
 type PgBouncerReconciler struct {
-	client      ctrl.WithWatch
-	poolerWatch watch.Interface
-	instance    PgBouncerInstanceInterface
-	namespace   string
-	poolerName  string
+	client               ctrl.WithWatch
+	poolerWatch          watch.Interface
+	instance             PgBouncerInstanceInterface
+	poolerNamespacedName types.NamespacedName
 }
 
 // NewPgBouncerReconciler creates a new pgbouncer reconciler
-func NewPgBouncerReconciler(poolerName string, namespace string) (*PgBouncerReconciler, error) {
+func NewPgBouncerReconciler(poolerNamespacedName types.NamespacedName) (*PgBouncerReconciler, error) {
 	client, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return nil, err
 	}
 
 	return &PgBouncerReconciler{
-		client:     client,
-		instance:   NewPgBouncerInstance(),
-		poolerName: poolerName,
-		namespace:  namespace,
+		client:               client,
+		instance:             NewPgBouncerInstance(),
+		poolerNamespacedName: poolerNamespacedName,
 	}, nil
 }
 
@@ -73,8 +75,8 @@ func (r *PgBouncerReconciler) watch(ctx context.Context) error {
 	var err error
 
 	r.poolerWatch, err = r.client.Watch(ctx, &apiv1.PoolerList{}, &ctrl.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector("metadata.name", r.poolerName),
-		Namespace:     r.namespace,
+		FieldSelector: fields.OneTermEqualSelector("metadata.name", r.poolerNamespacedName.Name),
+		Namespace:     r.poolerNamespacedName.Namespace,
 	})
 	if err != nil {
 		return fmt.Errorf("error watching pooler: %w", err)
@@ -118,10 +120,17 @@ func (r *PgBouncerReconciler) Reconcile(ctx context.Context, event *watch.Event)
 		return fmt.Errorf("error decoding pooler resource")
 	}
 
-	return r.reconcilePause(pooler)
+	err := r.synchronizeConfig(ctx, pooler)
+	if err != nil {
+		return fmt.Errorf("while reconciling configuration: %w", err)
+	}
+
+	return r.synchronizePause(pooler)
 }
 
-func (r *PgBouncerReconciler) reconcilePause(pooler *apiv1.Pooler) error {
+// synchronizePause ensure that the pause flag inside the Pooler
+// specification matches the PgBouncer status
+func (r *PgBouncerReconciler) synchronizePause(pooler *apiv1.Pooler) error {
 	isPaused := r.instance.Paused()
 	shouldBePaused := pooler.Spec.PgBouncer.IsPaused()
 	if shouldBePaused && !isPaused {
@@ -134,5 +143,85 @@ func (r *PgBouncerReconciler) reconcilePause(pooler *apiv1.Pooler) error {
 			return fmt.Errorf("while resuming instance: %w", err)
 		}
 	}
+	return nil
+}
+
+// synchronizeConfig ensure that the configuration derived from
+// the pooler specification matches the one loaded in PgBouncer
+func (r *PgBouncerReconciler) synchronizeConfig(ctx context.Context, pooler *apiv1.Pooler) error {
+	var (
+		configurationChanged bool
+		err                  error
+	)
+
+	if configurationChanged, err = r.writePgBouncerConfig(ctx, pooler); err != nil {
+		return fmt.Errorf("while writing PgBouncer configuration: %w", err)
+	}
+
+	if !configurationChanged {
+		return nil
+	}
+
+	if err = r.instance.Reload(); err != nil {
+		return fmt.Errorf("while reloading configuration due to change: %w", err)
+	}
+
+	return nil
+}
+
+// writePgBouncerConfig writes the PgBouncer configuration files given the Pooler
+// specification, returning a boolean flag indicating if the configuration has
+// changed or not
+func (r *PgBouncerReconciler) writePgBouncerConfig(ctx context.Context, pooler *apiv1.Pooler) (bool, error) {
+	var (
+		secrets     *config.Secrets
+		configFiles config.ConfigurationFiles
+
+		err error
+	)
+
+	// If this is the first reconciliation loop the API server may
+	// not have applied the RBAC rules created by the controller.
+	// In this case we still don't have the permissions to read
+	// the secrets we require.
+	// This is why we are retrying the loading of the secrets.
+	if err := retry.OnError(retry.DefaultBackoff, apierrs.IsForbidden, func() error {
+		secrets, err = getSecrets(ctx, r.GetClient(), pooler)
+		return err
+	}); err != nil {
+		return false, fmt.Errorf("while reading secrets: %w", err)
+	}
+
+	if configFiles, err = config.BuildConfigurationFiles(pooler, secrets); err != nil {
+		return false, fmt.Errorf("while generating pgbouncer configuration: %w", err)
+	}
+
+	return refreshConfigurationFiles(configFiles)
+}
+
+// Init ensures that all PgBouncer requirement are met.
+//
+// In detail:
+// 1. create the pgbouncer configuration and the required secrets
+// 2. ensure that every needed folder is existent
+func (r *PgBouncerReconciler) Init(ctx context.Context) error {
+	var pooler apiv1.Pooler
+
+	// Get the pooler from the API Server
+	if err := r.GetClient().Get(ctx, r.poolerNamespacedName, &pooler); err != nil {
+		return fmt.Errorf("while getting pooler for the first time: %w", err)
+	}
+
+	// Write the startup configuration for PgBouncer
+	if _, err := r.writePgBouncerConfig(ctx, &pooler); err != nil {
+		return err
+	}
+
+	// Ensure we have the directory to store the controlling socket
+	if err := fileutils.EnsureDirectoryExist(config.PgBouncerSocketDir); err != nil {
+		log.Error(err, "while checking socket directory existed", "dir", config.PgBouncerSocketDir)
+		return err
+	}
+
 	return nil
 }

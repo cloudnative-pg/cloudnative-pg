@@ -18,8 +18,9 @@ import (
 // NewCmd creates the "instance" command
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "pgbouncer",
-		Short: "pgbouncer management subfeatures",
+		Use:           "pgbouncer",
+		Short:         "pgbouncer management subfeatures",
+		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("missing subcommand")
 		},

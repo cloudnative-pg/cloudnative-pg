@@ -71,21 +71,20 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	// Update the status of this resource
-	if err := r.updateResourceStatus(ctx, &pooler, resources); err != nil {
-		return ctrl.Result{}, fmt.Errorf("while updating resource status: %w", err)
-	}
-
 	if resources.AuthUserSecret == nil {
 		contextLogger.Info("AuthUserSecret not found, waiting 30 seconds", "secret", pooler.GetAuthQuerySecretName())
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	if err = r.updateObjects(ctx, &pooler, resources); err != nil {
-		return ctrl.Result{}, fmt.Errorf("while updating managed objects: %w", err)
+	if err := r.updatePoolerStatus(ctx, &pooler, resources); err != nil {
+		if apierrs.IsConflict(err) {
+			// Requeue a reconciliation loop since the resource
+			// changed while we were synchronizing it
+			return ctrl.Result{Requeue: true}, nil
+		}
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, r.updateOwnedObjects(ctx, &pooler, resources)
 }
 
 // SetupWithManager setup this controller inside the controller manager

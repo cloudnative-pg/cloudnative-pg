@@ -21,9 +21,6 @@ import (
 // poolerManagedResources contains all the resources that are going to be
 // synchronized by the Pooler controller
 type poolerManagedResources struct {
-	// This is the configmap generated with the pgbouncer configuration
-	Configuration *corev1.Secret
-
 	// This is the secret that is being used to authenticate
 	// the auth_query connection
 	AuthUserSecret *corev1.Secret
@@ -49,13 +46,6 @@ type poolerManagedResources struct {
 func (r *PoolerReconciler) getManagedResources(ctx context.Context,
 	pooler *apiv1.Pooler) (result *poolerManagedResources, err error) {
 	result = &poolerManagedResources{}
-
-	// Get the config
-	result.Configuration, err = getSecretOrNil(
-		ctx, r.Client, client.ObjectKey{Name: pooler.Name, Namespace: pooler.Namespace})
-	if err != nil {
-		return nil, err
-	}
 
 	// Get the auth query secret if any
 	result.AuthUserSecret, err = getSecretOrNil(

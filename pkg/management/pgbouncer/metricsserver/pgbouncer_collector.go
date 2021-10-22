@@ -15,8 +15,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/config"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/pool"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
 )
 
 // PrometheusNamespace is the namespace to be used for all custom metrics exposed by instances
@@ -139,9 +139,9 @@ func (e *Exporter) ConnectionPool() *pool.ConnectionPool {
 	if e.pool == nil {
 		dsn := fmt.Sprintf(
 			"host=%s port=%v user=%s sslmode=disable",
-			pgbouncer.PgBouncerSocketDir,
-			pgbouncer.PgBouncerPort,
-			pgbouncer.PgBouncerAdminUser,
+			config.PgBouncerSocketDir,
+			config.PgBouncerPort,
+			config.PgBouncerAdminUser,
 		)
 
 		e.pool = pool.NewConnectionPool(dsn)

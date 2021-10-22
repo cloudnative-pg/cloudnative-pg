@@ -20,16 +20,12 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils/hash"
 )
 
-// updateObjects ensure that we have the required objects
-func (r *PoolerReconciler) updateObjects(
+// updateOwnedObjects ensure that we have the required objects
+func (r *PoolerReconciler) updateOwnedObjects(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
 	resources *poolerManagedResources,
 ) error {
-	if err := r.updateSecret(ctx, pooler, resources); err != nil {
-		return err
-	}
-
 	if err := r.updateDeployment(ctx, pooler, resources); err != nil {
 		return err
 	}
@@ -42,56 +38,6 @@ func (r *PoolerReconciler) updateObjects(
 }
 
 //nolint:dupl
-// updateLB update the pgbouncer configuration
-func (r *PoolerReconciler) updateSecret(
-	ctx context.Context,
-	pooler *apiv1.Pooler,
-	resources *poolerManagedResources,
-) error {
-	contextLog := log.FromContext(ctx)
-
-	secret, err := pgbouncer.Secret(pooler, resources.AuthUserSecret)
-	if err != nil {
-		return err
-	}
-
-	switch {
-	case resources.Configuration == nil:
-		// Create a new configmap
-		if err := ctrl.SetControllerReference(pooler, secret, r.Scheme); err != nil {
-			return err
-		}
-
-		contextLog.Info("Creating configuration")
-		err := r.Create(ctx, secret)
-		if err != nil && !apierrs.IsAlreadyExists(err) {
-			return err
-		}
-		resources.Configuration = secret
-		return nil
-
-	case resources.Configuration != nil:
-		updatedSecret := *resources.Configuration
-		updatedSecret.Data = secret.Data
-
-		if reflect.DeepEqual(updatedSecret.Data, resources.Configuration.Data) {
-			// Everything fine, the two config maps are exactly the same
-			return nil
-		}
-
-		log.Info("Updating configuration")
-		err := r.Patch(ctx, &updatedSecret, client.MergeFrom(resources.Configuration))
-		if err != nil {
-			return err
-		}
-
-		resources.Configuration = &updatedSecret
-	}
-
-	return nil
-}
-
-//nolint:dupl
 // updateDeployment update the deployment or create it when needed
 func (r *PoolerReconciler) updateDeployment(
 	ctx context.Context,
@@ -100,7 +46,7 @@ func (r *PoolerReconciler) updateDeployment(
 ) error {
 	contextLog := log.FromContext(ctx)
 
-	deployment, err := pgbouncer.Deployment(pooler, resources.Configuration, resources.Cluster)
+	deployment, err := pgbouncer.Deployment(pooler, resources.Cluster)
 	if err != nil {
 		return err
 	}
@@ -135,6 +81,9 @@ func (r *PoolerReconciler) updateDeployment(
 
 		updatedDeployment := resources.Deployment.DeepCopy()
 		updatedDeployment.Spec = deployment.Spec
+		if updatedDeployment.Annotations == nil {
+			updatedDeployment.Annotations = make(map[string]string)
+		}
 		updatedDeployment.Annotations[pgbouncer.PgbouncerPoolerSpecHash] = updatedVersion
 
 		log.Info("Updating deployment")
@@ -211,9 +160,9 @@ func (r *PoolerReconciler) updateRBAC(
 		}
 		resources.Role = role
 	} else if !reflect.DeepEqual(role.Rules, resources.Role.Rules) {
-		err := r.Patch(ctx, role, client.MergeFrom(resources.Role))
 		contextLog.Info("Updating role")
-		if err != nil {
+		resources.Role.Rules = role.Rules
+		if err := r.Update(ctx, resources.Role); err != nil {
 			return err
 		}
 	}

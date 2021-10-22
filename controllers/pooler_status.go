@@ -13,21 +13,47 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
-// updateResourceStatus fill the status of the pooler
-func (r *PoolerReconciler) updateResourceStatus(
+// updatePoolerStatus sets the status of the pooler and writes it inside kubernetes
+func (r *PoolerReconciler) updatePoolerStatus(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
 	resources *poolerManagedResources,
 ) error {
-	existingPoolerStatus := pooler.Status
+	updatedStatus := pooler.Status.DeepCopy()
 
-	if resources.Configuration != nil {
-		pooler.Status.ConfigResourceVersion = resources.Configuration.ResourceVersion
-	} else {
-		pooler.Status.ConfigResourceVersion = ""
+	if updatedStatus.Secrets == nil {
+		updatedStatus.Secrets = &apiv1.PoolerSecrets{}
 	}
 
-	if !reflect.DeepEqual(existingPoolerStatus, pooler.Status) {
+	if updatedStatus.Secrets.PgBouncerSecrets == nil {
+		updatedStatus.Secrets.PgBouncerSecrets = &apiv1.PgBouncerSecrets{}
+	}
+
+	if resources.AuthUserSecret != nil {
+		updatedStatus.Secrets.PgBouncerSecrets.AuthQuery = apiv1.SecretVersion{
+			Name:    resources.AuthUserSecret.Name,
+			Version: resources.AuthUserSecret.ResourceVersion,
+		}
+	}
+
+	if cluster := resources.Cluster; cluster != nil {
+		updatedStatus.Secrets.ServerTLS = apiv1.SecretVersion{
+			Name:    cluster.GetServerTLSSecretName(),
+			Version: cluster.Status.SecretsResourceVersion.ServerSecretVersion,
+		}
+		updatedStatus.Secrets.ServerCA = apiv1.SecretVersion{
+			Name:    cluster.GetServerCASecretName(),
+			Version: cluster.Status.SecretsResourceVersion.ServerCASecretVersion,
+		}
+		updatedStatus.Secrets.ClientCA = apiv1.SecretVersion{
+			Name:    cluster.GetClientCASecretName(),
+			Version: cluster.Status.SecretsResourceVersion.ClientCASecretVersion,
+		}
+	}
+
+	// then update the status if anything changed
+	if !reflect.DeepEqual(pooler.Status, updatedStatus) {
+		pooler.Status = *updatedStatus
 		return r.Status().Update(ctx, pooler)
 	}
 

@@ -290,8 +290,8 @@ func (r *ClusterReconciler) getPoolerIntegrationsNeeded(ctx context.Context,
 // getPgbouncerIntegrationStatus gets the status of the pgbouncer integration
 func (r *ClusterReconciler) getPgbouncerIntegrationStatus(
 	ctx context.Context, cluster *apiv1.Cluster, poolers apiv1.PoolerList,
-) (apiv1.PgbouncerIntegrationStatus, error) {
-	poolersIntegrations := apiv1.PgbouncerIntegrationStatus{}
+) (apiv1.PgBouncerIntegrationStatus, error) {
+	poolersIntegrations := apiv1.PgBouncerIntegrationStatus{}
 	for _, pooler := range poolers.Items {
 		// We are dealing with pgbouncer integration
 		if pooler.Spec.PgBouncer == nil {
@@ -334,7 +334,7 @@ func (r *ClusterReconciler) getPgbouncerIntegrationStatus(
 				poolersIntegrations.Secrets =
 					append(poolersIntegrations.Secrets, pooler.GetAuthQuerySecretName())
 			} else {
-				return apiv1.PgbouncerIntegrationStatus{}, fmt.Errorf("while getting secret for pooler integration")
+				return apiv1.PgBouncerIntegrationStatus{}, fmt.Errorf("while getting secret for pooler integration")
 			}
 		} else if owner, ok := isOwnedByCluster(&authQuerySecret); ok && owner == cluster.Name {
 			poolersIntegrations.Secrets =

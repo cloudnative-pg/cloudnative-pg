@@ -314,11 +314,11 @@ type ClusterStatus struct {
 
 // PoolerIntegrations encapsulates the needed integration for the poolers referencing the cluster
 type PoolerIntegrations struct {
-	PgBouncerIntegration PgbouncerIntegrationStatus `json:"pgBouncerIntegration,omitempty"`
+	PgBouncerIntegration PgBouncerIntegrationStatus `json:"pgBouncerIntegration,omitempty"`
 }
 
-// PgbouncerIntegrationStatus encapsulates the needed integration for the pgbouncer poolers referencing the cluster
-type PgbouncerIntegrationStatus struct {
+// PgBouncerIntegrationStatus encapsulates the needed integration for the pgbouncer poolers referencing the cluster
+type PgBouncerIntegrationStatus struct {
 	Secrets []string `json:"secrets,omitempty"`
 }
 
@@ -1167,7 +1167,10 @@ func (cluster *Cluster) GetClusterAltDNSNames() []string {
 	return append(defaultAltDNSNames, cluster.Spec.Certificates.ServerAltDNSNames...)
 }
 
-// UsesSecret checks whether a given secret is used by a Cluster
+// UsesSecret checks whether a given secret is used by a Cluster.
+//
+// This function is also used to discover the set of clusters that
+// should be reconciled when a certain secret changes.
 func (cluster *Cluster) UsesSecret(secret string) bool {
 	if _, ok := cluster.Status.SecretsResourceVersion.Metrics[secret]; ok {
 		return true
@@ -1182,9 +1185,19 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 		certificates.ServerTLSSecret:
 		return true
 	}
+
 	if cluster.Spec.Backup.IsBarmanEndpointCASet() && cluster.Spec.Backup.BarmanObjectStore.EndpointCA.Name == secret {
 		return true
 	}
+
+	if cluster.Status.PoolerIntegrations != nil {
+		for _, pgBouncerSecretName := range cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets {
+			if pgBouncerSecretName == secret {
+				return true
+			}
+		}
+	}
+
 	return false
 }
 

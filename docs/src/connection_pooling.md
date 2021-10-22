@@ -190,6 +190,13 @@ ones directly set by PgBouncer:
 - [`stats_period`](https://www.pgbouncer.org/config.html#stats_period)
 - [`verbose`](https://www.pgbouncer.org/config.html#verbose)
 
+Customizations of the PgBouncer configuration are written
+declaratively in the `.spec.pgbouncer.parameters` map.
+
+The operator reacts to the changes in the Pooler specification,
+and every PgBouncer instance reloads the updated configuration
+without disrupting the service.
+
 ## Monitoring
 
 The PgBouncer implementation of the `Pooler` comes with a default
@@ -270,5 +277,3 @@ users.
     use cases, while leaving room for the future implementation of a separate
     operator for PgBouncer to complete the gamma with more advanced and customized
     scenarios.
-
-Currently, any configuration change requires a complete rollout of all PgBouncer pods.

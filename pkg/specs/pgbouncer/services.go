@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	pgBouncerConfig "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/config"
 )
 
 // Service create the specification for the service of
@@ -28,8 +29,8 @@ func Service(pooler *apiv1.Pooler) *corev1.Service {
 				{
 					Name:       "pgbouncer",
 					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromInt(PgBouncerPort),
-					Port:       PgBouncerPort,
+					TargetPort: intstr.FromInt(pgBouncerConfig.PgBouncerPort),
+					Port:       pgBouncerConfig.PgBouncerPort,
 				},
 			},
 			Selector: map[string]string{

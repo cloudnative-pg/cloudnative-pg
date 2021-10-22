@@ -42,13 +42,15 @@ Below you will find a description of the defined resources:
 - [LocalObjectReference](#LocalObjectReference)
 - [MonitoringConfiguration](#MonitoringConfiguration)
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
+- [PgBouncerIntegrationStatus](#PgBouncerIntegrationStatus)
+- [PgBouncerSecrets](#PgBouncerSecrets)
 - [PgBouncerSpec](#PgBouncerSpec)
-- [PgbouncerIntegrationStatus](#PgbouncerIntegrationStatus)
 - [PodMeta](#PodMeta)
 - [PodTemplateSpec](#PodTemplateSpec)
 - [Pooler](#Pooler)
 - [PoolerIntegrations](#PoolerIntegrations)
 - [PoolerList](#PoolerList)
+- [PoolerSecrets](#PoolerSecrets)
 - [PoolerSpec](#PoolerSpec)
 - [PoolerStatus](#PoolerStatus)
 - [PostgresConfiguration](#PostgresConfiguration)
@@ -61,6 +63,7 @@ Below you will find a description of the defined resources:
 - [ScheduledBackupSpec](#ScheduledBackupSpec)
 - [ScheduledBackupStatus](#ScheduledBackupStatus)
 - [SecretKeySelector](#SecretKeySelector)
+- [SecretVersion](#SecretVersion)
 - [SecretsResourceVersion](#SecretsResourceVersion)
 - [StorageConfiguration](#StorageConfiguration)
 - [WalBackupConfiguration](#WalBackupConfiguration)
@@ -429,6 +432,26 @@ Name       | Description                                                        
 `inProgress` | Is there a node maintenance activity in progress?                                          - *mandatory*  | bool 
 `reusePVC  ` | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere) - *mandatory*  | *bool
 
+<a id='PgBouncerIntegrationStatus'></a>
+
+## PgBouncerIntegrationStatus
+
+PgBouncerIntegrationStatus encapsulates the needed integration for the pgbouncer poolers referencing the cluster
+
+Name    | Description            | Type    
+------- |  | --------
+`secrets` |  | []string
+
+<a id='PgBouncerSecrets'></a>
+
+## PgBouncerSecrets
+
+PgBouncerSecrets contains the versions of the secrets used by pgbouncer
+
+Name      | Description                   | Type                           
+--------- | ----------------------------- | -------------------------------
+`authQuery` | The auth query secret version | [SecretVersion](#SecretVersion)
+
 <a id='PgBouncerSpec'></a>
 
 ## PgBouncerSpec
@@ -442,16 +465,6 @@ Name            | Description                                                   
 `authQuery      ` | The query that will be used to download the hash of the password of a certain user. Default: "SELECT usename, passwd FROM user_search($1)". In case it is specified, also an AuthQuerySecret has to be specified and no automatic CNP Cluster integration will be triggered.      | string                                        
 `parameters     ` | Additional parameters to be passed to PgBouncer - please check the CNP documentation for a list of options you can configure                                                                                                                                                      | map[string]string                             
 `paused         ` | When set to `true`, PgBouncer will disconnect from the PostgreSQL server, first waiting for all queries to complete, and pause all new client connections until this value is set to `false` (default). Internally, the operator calls PgBouncer's `PAUSE` and `RESUME` commands. | *bool                                         
-
-<a id='PgbouncerIntegrationStatus'></a>
-
-## PgbouncerIntegrationStatus
-
-PgbouncerIntegrationStatus encapsulates the needed integration for the pgbouncer poolers referencing the cluster
-
-Name    | Description            | Type    
-------- |  | --------
-`secrets` |  | []string
 
 <a id='PodMeta'></a>
 
@@ -499,7 +512,7 @@ PoolerIntegrations encapsulates the needed integration for the poolers referenci
 
 Name                 | Description            | Type                                                     
 -------------------- |  | ---------------------------------------------------------
-`pgBouncerIntegration` |  | [PgbouncerIntegrationStatus](#PgbouncerIntegrationStatus)
+`pgBouncerIntegration` |  | [PgBouncerIntegrationStatus](#PgBouncerIntegrationStatus)
 
 <a id='PoolerList'></a>
 
@@ -511,6 +524,19 @@ Name     | Description            | Type
 -------- |  | --------------------------------------------------------------------------------------------------------
 `metadata` |  | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#listmeta-v1-meta)
 `items   ` |  - *mandatory*  | [[]Pooler](#Pooler)                                                                                     
+
+<a id='PoolerSecrets'></a>
+
+## PoolerSecrets
+
+PoolerSecrets contains the versions of all the secrets used
+
+Name             | Description                                  | Type                                  
+---------------- | -------------------------------------------- | --------------------------------------
+`serverTLS       ` | The server TLS secret version                | [SecretVersion](#SecretVersion)       
+`serverCA        ` | The server CA secret version                 | [SecretVersion](#SecretVersion)       
+`clientCA        ` | The client CA secret version                 | [SecretVersion](#SecretVersion)       
+`pgBouncerSecrets` | The version of the secrets used by PgBouncer | [*PgBouncerSecrets](#PgBouncerSecrets)
 
 <a id='PoolerSpec'></a>
 
@@ -532,9 +558,9 @@ Name      | Description                                                      | T
 
 PoolerStatus defines the observed state of Pooler
 
-Name                  | Description                               | Type  
---------------------- | ----------------------------------------- | ------
-`configResourceVersion` | The resource version of the config object - *mandatory*  | string
+Name    | Description                               | Type                            
+------- | ----------------------------------------- | --------------------------------
+`secrets` | The resource version of the config object | [*PoolerSecrets](#PoolerSecrets)
 
 <a id='PostgresConfiguration'></a>
 
@@ -655,6 +681,17 @@ SecretKeySelector contains enough information to let you locate the key of a Sec
 Name  | Description       | Type  
 --- | ----------------- | ------
 `key` | The key to select - *mandatory*  | string
+
+<a id='SecretVersion'></a>
+
+## SecretVersion
+
+SecretVersion contains a secret name and its ResourceVersion
+
+Name    | Description                       | Type  
+------- | --------------------------------- | ------
+`name   ` | The name of the secret            | string
+`version` | The ResourceVersion of the secret | string
 
 <a id='SecretsResourceVersion'></a>
 
