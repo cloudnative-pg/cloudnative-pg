@@ -17,15 +17,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Update user password", func() {
-	const namespace = "cluster-update-user-password"
-	const sampleFile = fixturesDir + "/base/cluster-basic.yaml"
-	const clusterName = "cluster-basic"
+	const (
+		namespace   = "cluster-update-user-password"
+		sampleFile  = fixturesDir + "/base/cluster-basic.yaml"
+		clusterName = "cluster-basic"
+		level       = tests.Low
+	)
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {

@@ -31,12 +31,17 @@ const (
 
 var (
 	env                     *tests.TestingEnvironment
+	testLevelEnv            *tests.TestEnvLevel
 	expectedOperatorPodName string
 )
 
 var _ = BeforeSuite(func() {
 	var err error
 	env, err = tests.NewTestingEnvironment()
+	if err != nil {
+		panic(err)
+	}
+	testLevelEnv, err = tests.TestLevel()
 	if err != nil {
 		panic(err)
 	}

@@ -20,9 +20,18 @@ import (
 var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive), func() {
 	var taintedNodes []string
 	namespace := "test-tolerations"
-	const sampleFile = fixturesDir + "/tolerations/cluster-tolerations.yaml"
-	const clusterName = "cluster-tolerations"
-	const tolerationKey = "test-tolerations"
+	const (
+		sampleFile    = fixturesDir + "/tolerations/cluster-tolerations.yaml"
+		clusterName   = "cluster-tolerations"
+		tolerationKey = "test-tolerations"
+		level         = tests.Lowest
+	)
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {

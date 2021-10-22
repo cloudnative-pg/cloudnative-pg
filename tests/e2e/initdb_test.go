@@ -21,7 +21,14 @@ import (
 var _ = Describe("InitDB settings", func() {
 	const (
 		fixturesCertificatesDir = fixturesDir + "/initdb"
+		level                   = tests.Medium
 	)
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	Context("initdb custom post-init SQL scripts", func() {
 		const (

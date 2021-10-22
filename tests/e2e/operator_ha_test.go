@@ -22,11 +22,20 @@ import (
 )
 
 var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisruptive, "no-openshift"), func() {
-	const namespace = "operator-ha-e2e"
-	const sampleFile = fixturesDir + "/operator-ha/operator-ha.yaml"
-	const clusterName = "operator-ha"
+	const (
+		namespace   = "operator-ha-e2e"
+		sampleFile  = fixturesDir + "/operator-ha/operator-ha.yaml"
+		clusterName = "operator-ha"
+		level       = tests.Lowest
+	)
 	var operatorPodNames []string
 	var oldLeaderPodName string
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {

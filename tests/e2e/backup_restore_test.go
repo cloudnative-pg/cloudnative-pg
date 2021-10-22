@@ -39,6 +39,13 @@ var namespace, clusterName, azStorageAccount, azStorageKey, currentTimeStamp str
 var commandTimeout = time.Second * 5
 
 var _ = Describe("Backup and restore", func() {
+	const level = tests.High
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
@@ -250,7 +257,12 @@ var _ = Describe("Backup and restore", func() {
 		// and that means that we must use different cluster names otherwise
 		// we risk mixing WALs and backups
 
+		const azureContextLevel = tests.Medium
 		BeforeEach(func() {
+			if testLevelEnv.Depth < int(azureContextLevel) {
+				Skip("Test depth is lower than the amount requested for this test")
+			}
+
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
 			if !isAKS {
@@ -519,7 +531,14 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 		sourceBackupFileAzureSAS        = fixturesBackupDir + "backup-azure-blob-sas.yaml"
 		clusterSourceFileAzurePITRSAS   = fixturesBackupDir + "source-cluster-azure-blob-pitr-sas.yaml"
 		sourceBackupFileAzurePITRSAS    = fixturesBackupDir + "backup-azure-blob-pitr-sas.yaml"
+		level                           = tests.High
 	)
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
@@ -651,7 +670,11 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 	})
 
 	Context("using azure blobs as object storage", func() {
+		const azureContextLevel = tests.Medium
 		BeforeEach(func() {
+			if testLevelEnv.Depth < int(azureContextLevel) {
+				Skip("Test depth is lower than the amount requested for this test")
+			}
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
 			if !isAKS {

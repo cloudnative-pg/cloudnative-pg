@@ -47,7 +47,13 @@ var _ = Describe("Certificates", func() {
 		sampleAppFileUserSuppliedCertClient = fixturesCertificatesDir + "/03-app-pod-user-supplied-client-cert-secrets.yaml"
 		sampleUserSuppliedCertClientServer  = fixturesCertificatesDir + "/04-app-pod-user-supplied-client-" +
 			"server-cert-secrets.yaml"
+		level = tests.Low
 	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	Context("Operator managed mode", func() {
 		const (

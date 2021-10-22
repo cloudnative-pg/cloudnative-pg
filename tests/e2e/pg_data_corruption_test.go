@@ -28,7 +28,14 @@ var _ = Describe("PGDATA Corruption", func() {
 		namespace   = "pg-data-corruption"
 		sampleFile  = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml"
 		clusterName = "cluster-pg-data-corruption"
+		level       = tests.Medium
 	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,

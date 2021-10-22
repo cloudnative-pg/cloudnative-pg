@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,6 +47,47 @@ import (
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
+
+// Level - Define test importance. Each test should define its own importance
+// level, and compare it with the test depth used to run the suite to choose
+// if the test can be skipped.
+type Level int
+
+// Declare constants for each level
+const (
+	Highest Level = iota
+	High
+	Medium
+	Low
+	Lowest
+)
+
+// testDepthEnvVarName is the environment variable we expect the user to set
+// to change the default test depth level
+const testDepthEnvVarName = "TEST_DEPTH"
+
+// By default we run tests with at least a medium level of importance
+const defaultTestDepth = int(Medium)
+
+// TestEnvLevel struct for operator testing
+type TestEnvLevel struct {
+	*TestingEnvironment
+	Depth int
+}
+
+// TestLevel creates the environment for testing
+func TestLevel() (*TestEnvLevel, error) {
+	env, err := NewTestingEnvironment()
+	if err != nil {
+		return nil, err
+	}
+	if depthEnv, exists := os.LookupEnv(testDepthEnvVarName); exists {
+		depth, err := strconv.Atoi(depthEnv)
+		return &TestEnvLevel{env, depth}, err
+	}
+
+	return &TestEnvLevel{env, defaultTestDepth}, err
+}
 
 // TestingEnvironment struct for operator testing
 type TestingEnvironment struct {

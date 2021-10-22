@@ -30,7 +30,14 @@ var _ = Describe("Metrics", func() {
 		clusterMetricsFile      = fixturesDir + "/metrics/cluster-metrics.yaml"
 		clusterMetricsDBFile    = fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml"
 		customQueriesSampleFile = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
+		level                   = tests.Low
 	)
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	// Cluster identifiers
 	var namespace, metricsClusterName string

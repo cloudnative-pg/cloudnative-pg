@@ -24,7 +24,14 @@ var _ = Describe("Replica Mode", func() {
 		srcClusterName        = "cluster-replica-src"
 		srcClusterSample      = fixturesDir + replicaModeClusterDir + srcClusterName + ".yaml"
 		checkQuery            = "SELECT count(*) FROM test_replica"
+		level                 = tests.Medium
 	)
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	// Setting variables
 	var replicaClusterName, replicaNamespace string

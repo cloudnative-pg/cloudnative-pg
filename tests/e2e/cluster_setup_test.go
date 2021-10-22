@@ -14,15 +14,24 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Cluster setup", func() {
-	const namespace = "cluster-storageclass-e2e"
-	const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
-	const clusterName = "postgresql-storage-class"
+	const (
+		namespace   = "cluster-storageclass-e2e"
+		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml"
+		clusterName = "postgresql-storage-class"
+		level       = tests.Highest
+	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,

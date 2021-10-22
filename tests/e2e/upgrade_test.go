@@ -43,33 +43,40 @@ We test the following:
 // refactored. It also contains duplicated code within itself.
 
 var _ = Describe("Upgrade", Label(tests.LabelUpgrade), func() {
-	const operatorUpgradeFile = fixturesDir + "/upgrade/current-manifest.yaml"
+	const (
+		operatorUpgradeFile = fixturesDir + "/upgrade/current-manifest.yaml"
+		namespace           = "operator-upgrade"
+		pgSecrets           = fixturesDir + "/upgrade/pgsecrets.yaml" //nolint:gosec
 
-	const namespace = "operator-upgrade"
-	const pgSecrets = fixturesDir + "/upgrade/pgsecrets.yaml" //nolint:gosec
+		// This cluster is a v1a1 cluster created before the operator upgrade
+		clusterName    = "cluster-v1alpha1"
+		sampleFile     = fixturesDir + "/upgrade/cluster-v1alpha1.yaml"
+		updateConfFile = fixturesDir + "/upgrade/conf-update.yaml"
 
-	// This cluster is a v1a1 cluster created before the operator upgrade
-	const clusterName = "cluster-v1alpha1"
-	const sampleFile = fixturesDir + "/upgrade/cluster-v1alpha1.yaml"
-	const updateConfFile = fixturesDir + "/upgrade/conf-update.yaml"
+		// This cluster is a v1a1 cluster created after the operator upgrade
+		clusterName2        = "cluster2-v1alpha1"
+		sampleFile2         = fixturesDir + "/upgrade/cluster2-v1alpha1.yaml"
+		updateConfFile2     = fixturesDir + "/upgrade/conf-update2.yaml"
+		minioSecret         = fixturesDir + "/upgrade/minio-secret.yaml" //nolint:gosec
+		minioPVCFile        = fixturesDir + "/upgrade/minio-pvc.yaml"
+		minioDeploymentFile = fixturesDir + "/upgrade/minio-deployment.yaml"
+		serviceFile         = fixturesDir + "/upgrade/minio-service.yaml"
+		clientFile          = fixturesDir + "/upgrade/minio-client.yaml"
+		minioClientName     = "mc"
+		backupName          = "cluster-backup"
+		backupFile          = fixturesDir + "/upgrade/backup-v1alpha1.yaml"
+		restoreFile         = fixturesDir + "/upgrade/cluster-from-v1alpha1-restore.yaml"
+		scheduledBackupFile = fixturesDir + "/upgrade/scheduled-backup.yaml"
+		scheduledBackupName = "scheduled-backup"
+		countBackupsScript  = "sh -c 'mc find minio --name data.tar.gz | wc -l'"
+		level               = tests.Lowest
+	)
 
-	// This cluster is a v1a1 cluster created after the operator upgrade
-	const clusterName2 = "cluster2-v1alpha1"
-	const sampleFile2 = fixturesDir + "/upgrade/cluster2-v1alpha1.yaml"
-	const updateConfFile2 = fixturesDir + "/upgrade/conf-update2.yaml"
-
-	const minioSecret = fixturesDir + "/upgrade/minio-secret.yaml" //nolint:gosec
-	const minioPVCFile = fixturesDir + "/upgrade/minio-pvc.yaml"
-	const minioDeploymentFile = fixturesDir + "/upgrade/minio-deployment.yaml"
-	const serviceFile = fixturesDir + "/upgrade/minio-service.yaml"
-	const clientFile = fixturesDir + "/upgrade/minio-client.yaml"
-	const minioClientName = "mc"
-	const backupName = "cluster-backup"
-	const backupFile = fixturesDir + "/upgrade/backup-v1alpha1.yaml"
-	const restoreFile = fixturesDir + "/upgrade/cluster-from-v1alpha1-restore.yaml"
-	const scheduledBackupFile = fixturesDir + "/upgrade/scheduled-backup.yaml"
-	const scheduledBackupName = "scheduled-backup"
-	const countBackupsScript = "sh -c 'mc find minio --name data.tar.gz | wc -l'"
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {

@@ -22,8 +22,12 @@ import (
 // primary and bring back the replicas when we drain nodes
 var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() {
 	var nodesWithLabels []string
+	const level = tests.Lowest
 
 	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
 		nodes, _ := env.GetNodeList()
 		// We label three nodes where we could run the workloads, and ignore
 		// the others. The pods of the clusters created in this test run only

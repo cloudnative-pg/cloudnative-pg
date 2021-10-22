@@ -23,12 +23,15 @@ import (
 // Set of tests for config map for the operator. It is useful to configure the operator globally to survive
 // the upgrades (especially in OLM installation like OpenShift).
 var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() {
-	const clusterName = "configmap-support"
-	const sampleFile = fixturesDir + "/configmap-support/config-support.yaml"
-	const configMapFile = fixturesDir + "/configmap-support/configmap.yaml"
-	const secretFile = fixturesDir + "/configmap-support/secret.yaml"
-	const configName = "postgresql-operator-controller-manager-config"
-	const namespace = "configmap-support-e2e"
+	const (
+		clusterName   = "configmap-support"
+		sampleFile    = fixturesDir + "/configmap-support/config-support.yaml"
+		configMapFile = fixturesDir + "/configmap-support/configmap.yaml"
+		secretFile    = fixturesDir + "/configmap-support/secret.yaml"
+		configName    = "postgresql-operator-controller-manager-config"
+		namespace     = "configmap-support-e2e"
+		level         = tests.Low
+	)
 	var operatorNamespace string
 	var err error
 
@@ -49,6 +52,10 @@ var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() 
 	}
 
 	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+
 		operatorDeployment, err := env.GetOperatorDeployment()
 		Expect(err).ToNot(HaveOccurred())
 
