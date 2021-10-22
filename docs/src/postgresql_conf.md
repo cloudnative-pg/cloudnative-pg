@@ -294,7 +294,7 @@ hostssl replication streaming_replica all cert
 
 <user defined rules>
 
-host all all all md5 # (or scram-sha-256 for PostgreSQL version >= 14)
+host all all all scram-sha-256 # (or md5 for PostgreSQL version <= 13)
 ```
 
 Refer to the PostgreSQL documentation for [more information on `pg_hba.conf`](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html).
