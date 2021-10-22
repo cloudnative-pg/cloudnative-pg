@@ -1006,10 +1006,12 @@ spec:
                         - name
                         type: object
                       walSegmentSize:
-                        description: 'The value to be passed as option `--wal-segsize`
-                          for initdb (default: empty string, resulting in PostgreSQL
-                          default: 16MB)'
-                        type: string
+                        description: 'The value in megabytes (1 to 1024) to be passed
+                          to the `--wal-segsize` option for initdb (default: empty,
+                          resulting in PostgreSQL default: 16MB)'
+                        maximum: 1024
+                        minimum: 1
+                        type: integer
                     type: object
                   pg_basebackup:
                     description: Bootstrap the cluster taking a physical backup of
@@ -2991,10 +2993,12 @@ spec:
                         - name
                         type: object
                       walSegmentSize:
-                        description: 'The value to be passed as option `--wal-segsize`
-                          for initdb (default: empty string, resulting in PostgreSQL
-                          default: 16MB)'
-                        type: string
+                        description: 'The value in megabytes (1 to 1024) to be passed
+                          to the `--wal-segsize` option for initdb (default: empty,
+                          resulting in PostgreSQL default: 16MB)'
+                        maximum: 1024
+                        minimum: 1
+                        type: integer
                     type: object
                   pg_basebackup:
                     description: Bootstrap the cluster taking a physical backup of
