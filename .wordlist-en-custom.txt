@@ -139,9 +139,11 @@ Patroni
 PersistentVolumeClaim
 PersistentVolumeClaimSpec
 PgBouncer's
+PgBouncerIntegrationStatus
 PgBouncerPoolMode
+PgBouncerSecrets
+PgBouncerSecretsVersions
 PgBouncerSpec
-PgbouncerIntegrationStatus
 Philippe
 PodAffinity
 PodAntiAffinity
@@ -155,6 +157,8 @@ PodTemplateSpec
 Pooler
 PoolerIntegrations
 PoolerList
+PoolerSecrets
+PoolerSecretsVersions
 PoolerSpec
 PoolerStatus
 PoolerType
@@ -177,6 +181,7 @@ ReplicaClusterConfiguration
 ReplicaSet
 ReplicationTLSSecret
 ResourceRequirements
+ResourceVersion
 RetentionPolicy
 RoleBinding
 RollingUpdateStatus
@@ -196,6 +201,7 @@ ScheduledBackupStatus
 ScheduledBackups
 Scorsolini
 SecretKeySelector
+SecretVersion
 SecretsResourceVersion
 Seealso
 ServerCASecret

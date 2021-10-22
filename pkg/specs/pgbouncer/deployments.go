@@ -15,18 +15,14 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	config "github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	pgBouncerConfig "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/config"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/podspec"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils/hash"
 )
 
 const (
-	// PgbouncerConfigVersionAnnotation is the annotation added to the deployment to tell
-	// the resource version of the relative pgbouncer configuration
-	PgbouncerConfigVersionAnnotation = specs.MetadataNamespace + "/configVersion"
-
 	// PgbouncerPoolerSpecHash is the annotation added to the deployment to tell
 	// the hash of the Pooler Specification
 	PgbouncerPoolerSpecHash = specs.MetadataNamespace + "/poolerSpecHash"
@@ -41,30 +37,15 @@ const (
 // Deployment create the deployment of pgbouncer, given
 // the configurations we have in the pooler specifications
 func Deployment(pooler *apiv1.Pooler,
-	configuration *corev1.Secret,
 	cluster *apiv1.Cluster,
 ) (*appsv1.Deployment, error) {
-	poolerHash, err := hash.ComputeHash(pooler.Spec)
-	if err != nil {
-		return nil, err
-	}
-
 	podTemplate := podspec.NewFrom(pooler.Spec.Template).
-		WithAnnotation(PgbouncerConfigVersionAnnotation, configuration.ResourceVersion).
 		WithLabel(PgbouncerNameLabel, pooler.Name).
 		WithVolume(&corev1.Volume{
 			Name: "ca",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: cluster.GetServerCASecretName(),
-				},
-			},
-		}).
-		WithVolume(&corev1.Volume{
-			Name: "auth-user",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: pooler.GetAuthQuerySecretName(),
 				},
 			},
 		}).
@@ -76,39 +57,15 @@ func Deployment(pooler *apiv1.Pooler,
 				},
 			},
 		}).
-		WithVolume(&corev1.Volume{
-			Name: "config",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: pooler.Name,
-				},
-			},
-		}).
 		WithContainerImage("pgbouncer", DefaultPgbouncerImage, false).
 		WithContainerCommand("pgbouncer", []string{
 			"/controller/manager",
 			"pgbouncer",
 			"run",
 		}, false).
-		WithContainerVolumeMount("pgbouncer", &corev1.VolumeMount{
-			Name:      "ca",
-			MountPath: "/secret/ca",
-		}, true).
-		WithContainerVolumeMount("pgbouncer", &corev1.VolumeMount{
-			Name:      "auth-user",
-			MountPath: "/secret/authUser",
-		}, true).
-		WithContainerVolumeMount("pgbouncer", &corev1.VolumeMount{
-			Name:      "server-tls",
-			MountPath: "/secret/server-tls",
-		}, true).
-		WithContainerVolumeMount("pgbouncer", &corev1.VolumeMount{
-			Name:      "config",
-			MountPath: "/config",
-		}, true).
 		WithContainerPort("pgbouncer", &corev1.ContainerPort{
 			Name:          "pgbouncer",
-			ContainerPort: PgBouncerPort,
+			ContainerPort: pgBouncerConfig.PgBouncerPort,
 		}).
 		WithContainerPort("pgbouncer", &corev1.ContainerPort{
 			Name:          "metrics",
@@ -141,9 +98,6 @@ func Deployment(pooler *apiv1.Pooler,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pooler.Name,
 			Namespace: pooler.Namespace,
-			Annotations: map[string]string{
-				PgbouncerPoolerSpecHash: poolerHash,
-			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &pooler.Spec.Instances,

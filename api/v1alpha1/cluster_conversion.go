@@ -173,7 +173,7 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 	dst.Status.CurrentPrimaryTimestamp = src.Status.CurrentPrimaryTimestamp
 	dst.Status.TargetPrimaryTimestamp = src.Status.TargetPrimaryTimestamp
 	if src.Status.PoolerIntegrations != nil {
-		dst.Status.PoolerIntegrations = &v1.PoolerIntegrations{PgBouncerIntegration: v1.PgbouncerIntegrationStatus{
+		dst.Status.PoolerIntegrations = &v1.PoolerIntegrations{PgBouncerIntegration: v1.PgBouncerIntegrationStatus{
 			Secrets: src.Status.PoolerIntegrations.PgBouncerIntegration.Secrets,
 		}}
 	}

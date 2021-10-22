@@ -136,7 +136,38 @@ func (in PgBouncerSpec) IsPaused() bool {
 // PoolerStatus defines the observed state of Pooler
 type PoolerStatus struct {
 	// The resource version of the config object
-	ConfigResourceVersion string `json:"configResourceVersion"`
+	Secrets *PoolerSecrets `json:"secrets,omitempty"`
+}
+
+// PoolerSecrets contains the versions of all the secrets used
+type PoolerSecrets struct {
+	// The server TLS secret version
+	ServerTLS SecretVersion `json:"serverTLS,omitempty"`
+
+	// The server CA secret version
+	ServerCA SecretVersion `json:"serverCA,omitempty"`
+
+	// The client CA secret version
+	ClientCA SecretVersion `json:"clientCA,omitempty"`
+
+	// The version of the secrets used by PgBouncer
+	PgBouncerSecrets *PgBouncerSecrets `json:"pgBouncerSecrets,omitempty"`
+}
+
+// PgBouncerSecrets contains the versions of the secrets used
+// by pgbouncer
+type PgBouncerSecrets struct {
+	// The auth query secret version
+	AuthQuery SecretVersion `json:"authQuery,omitempty"`
+}
+
+// SecretVersion contains a secret name and its ResourceVersion
+type SecretVersion struct {
+	// The name of the secret
+	Name string `json:"name,omitempty"`
+
+	// The ResourceVersion of the secret
+	Version string `json:"version,omitempty"`
 }
 
 // +kubebuilder:object:root=true

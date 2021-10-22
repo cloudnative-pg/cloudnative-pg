@@ -14,8 +14,8 @@ import (
 
 	"k8s.io/client-go/util/retry"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/config"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/pool"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
 )
 
 // PgBouncerInstanceInterface the public interface for a PgBouncer instance,
@@ -24,15 +24,16 @@ type PgBouncerInstanceInterface interface {
 	Paused() bool
 	Pause() error
 	Resume() error
+	Reload() error
 }
 
 // NewPgBouncerInstance initializes a new pgBouncerInstance
 func NewPgBouncerInstance() PgBouncerInstanceInterface {
 	dsn := fmt.Sprintf(
 		"host=%s port=%v user=%s sslmode=disable",
-		pgbouncer.PgBouncerSocketDir,
-		pgbouncer.PgBouncerPort,
-		pgbouncer.PgBouncerAdminUser,
+		config.PgBouncerSocketDir,
+		config.PgBouncerPort,
+		config.PgBouncerAdminUser,
 	)
 
 	return &pgBouncerInstance{
@@ -112,6 +113,23 @@ func (p *pgBouncerInstance) Resume() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.paused = false
+
+	return nil
+}
+
+// Reload issues a RELOAD command to the PgBouncer instance, returning any error
+func (p *pgBouncerInstance) Reload() error {
+	// First step: connect to the pgbouncer administrative database
+	db, err := p.pool.Connection("pgbouncer")
+	if err != nil {
+		return fmt.Errorf("while connecting to pgbouncer database locally: %w", err)
+	}
+
+	// Second step: resume pgbouncer
+	_, err = db.Exec("RELOAD")
+	if err != nil {
+		return fmt.Errorf("while reloading configuration: %w", err)
+	}
 
 	return nil
 }

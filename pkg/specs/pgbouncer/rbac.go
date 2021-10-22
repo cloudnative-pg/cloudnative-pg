@@ -24,6 +24,21 @@ func ServiceAccount(pooler *apiv1.Pooler) *corev1.ServiceAccount {
 
 // Role creates a role for a given pooler
 func Role(pooler *apiv1.Pooler) *v1.Role {
+	secretNames := []string{pooler.GetAuthQuerySecretName()}
+	if pooler.Status.Secrets != nil {
+		if pooler.Status.Secrets.ServerCA.Name != "" {
+			secretNames = append(secretNames, pooler.Status.Secrets.ServerCA.Name)
+		}
+
+		if pooler.Status.Secrets.ServerTLS.Name != "" {
+			secretNames = append(secretNames, pooler.Status.Secrets.ServerTLS.Name)
+		}
+
+		if pooler.Status.Secrets.ClientCA.Name != "" {
+			secretNames = append(secretNames, pooler.Status.Secrets.ClientCA.Name)
+		}
+	}
+
 	return &v1.Role{ObjectMeta: metav1.ObjectMeta{
 		Name: pooler.Name, Namespace: pooler.Namespace,
 	}, Rules: []v1.PolicyRule{
@@ -58,6 +73,19 @@ func Role(pooler *apiv1.Pooler) *v1.Role {
 			ResourceNames: []string{
 				pooler.Name,
 			},
+		},
+		{
+			APIGroups: []string{
+				"",
+			},
+			Resources: []string{
+				"secrets",
+			},
+			Verbs: []string{
+				"get",
+				"watch",
+			},
+			ResourceNames: secretNames,
 		},
 	}}
 }

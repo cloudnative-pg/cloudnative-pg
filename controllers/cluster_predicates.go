@@ -86,14 +86,6 @@ func isOwnedByClusterOrSatisfiesPredicate(
 	return owned || predicate(object)
 }
 
-func isOwnedByPoolerOrSatisfiesPredicate(
-	object client.Object,
-	predicate func(client.Object) bool,
-) bool {
-	_, owned := isOwnedByPooler(object)
-	return owned || predicate(object)
-}
-
 func hasReloadLabelSet(obj client.Object) bool {
 	_, hasLabel := obj.GetLabels()[specs.WatchedLabelName]
 	return hasLabel

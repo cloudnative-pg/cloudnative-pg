@@ -9,35 +9,75 @@ package run
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/pgbouncer/management/controller"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/config"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/metricsserver"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 // NewCmd creates the "instance run" subcommand
 func NewCmd() *cobra.Command {
+	var (
+		poolerNamespacedName types.NamespacedName
+
+		errorMissingPoolerNamespacedName = fmt.Errorf("missing pooler name or namespace")
+	)
+
+	const (
+		poolerNameEnvVar      = "POOLER_NAME"
+		poolerNamespaceEnvVar = "NAMESPACE"
+	)
+
 	cmd := &cobra.Command{
-		Use: "run",
+		Use:           "run",
+		SilenceErrors: true,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if poolerNamespacedName.Name == "" || poolerNamespacedName.Namespace == "" {
+				log.Info(
+					"pooler object key not set",
+					"poolerNamespacedName", poolerNamespacedName)
+				return errorMissingPoolerNamespacedName
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runSubCommand(cmd.Context())
+			if err := runSubCommand(cmd.Context(), poolerNamespacedName); err != nil {
+				log.Error(err, "Error while running manager")
+				return err
+			}
+			return nil
 		},
 	}
+
+	cmd.Flags().StringVar(
+		&poolerNamespacedName.Name,
+		"pooler-name",
+		os.Getenv(poolerNameEnvVar),
+		"The name of the Pooler in k8s, used to generate configuration and refresh pgbouncer when needed. "+
+			"Defaults to the value of the POOLER_NAME environment variable")
+	cmd.Flags().StringVar(
+		&poolerNamespacedName.Namespace,
+		"namespace",
+		os.Getenv(poolerNamespaceEnvVar),
+		"The namespace of the cluster and of the Pod in k8s. "+
+			"Defaults to the value of the NAMESPACE environment variable")
 
 	return cmd
 }
 
-func runSubCommand(ctx context.Context) error {
+func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedName) error {
 	var err error
 
 	log.Info("Starting Cloud Native PostgreSQL PgBouncer Instance Manager",
@@ -45,24 +85,23 @@ func runSubCommand(ctx context.Context) error {
 		"build", versions.Info)
 
 	if err = startWebServer(); err != nil {
-		log.Error(err, "Error while starting the web server")
-		return err
+		return fmt.Errorf("while starting the web server: %w", err)
 	}
 
-	reconciler, err := controller.NewPgBouncerReconciler(os.Getenv("POOLER_NAME"), os.Getenv("NAMESPACE"))
+	reconciler, err := controller.NewPgBouncerReconciler(poolerNamespacedName)
 	if err != nil {
-		log.Error(err, "Error while initializing new Reconciler")
-		return err
+		return fmt.Errorf("while initializing the new reconciler: %w", err)
 	}
 
-	err = fileutils.EnsureDirectoryExist(pgbouncer.PgBouncerSocketDir)
+	err = reconciler.Init(ctx)
 	if err != nil {
-		log.Error(err, "while checking socket directory existed", "dir", pgbouncer.PgBouncerSocketDir)
+		return fmt.Errorf("while initializing reconciler: %w", err)
 	}
-	// Print the content of PostgreSQL control data, for debugging and tracing
+
+	// Start PgBouncer with the generated configuration
 	const pgBouncerCommandName = "/usr/bin/pgbouncer"
-	pgBouncerCmd := exec.Command(pgBouncerCommandName, "/config/pgbouncer.ini")
-	pgBouncerCmd.Env = os.Environ()
+	pgBouncerIni := filepath.Join(config.ConfigsDir, config.PgBouncerIniFileName)
+	pgBouncerCmd := exec.Command(pgBouncerCommandName, pgBouncerIni) //nolint:gosec
 	stdoutWriter := &execlog.LogWriter{
 		Logger: log.WithValues(execlog.PipeKey, execlog.StdOut),
 	}
@@ -71,17 +110,14 @@ func runSubCommand(ctx context.Context) error {
 	}
 	err = execlog.RunStreamingNoWaitWithWriter(pgBouncerCmd, pgBouncerCommandName, stdoutWriter, stderrWriter)
 	if err != nil {
-		log.Error(err, "Error running Pg Bouncer")
-		return err
+		return fmt.Errorf("running pgbouncer: %w", err)
 	}
 
 	startReconciler(ctx, reconciler)
-
 	registerSignalHandler(reconciler, pgBouncerCmd)
 
 	if err = pgBouncerCmd.Wait(); err != nil {
-		log.Error(err, "pgbouncer exited with errors")
-		return err
+		return fmt.Errorf("pgbouncer exited with errors: %w", err)
 	}
 
 	return nil
