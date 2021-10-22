@@ -174,10 +174,44 @@ relies on the superuser to reconcile the cluster with the desired status.
     to the cluster.
 
 The actual PostgreSQL data directory is created via an invocation of the
-`initdb` PostgreSQL command. If you need to add custom options to that
-command (i.e., to change the locale used for the template databases or to
-add data checksums), you can add them to the `options` section like in
-the following example:
+`initdb` PostgreSQL command. If you need to add custom options to that command
+(i.e., to change the `locale` used for the template databases or to add data
+checksums), you can use the following parameters:
+
+dataChecksums
+:   When `dataChecksums` is set to `true`, CNP invokes the `-k` option in
+    `initdb` to enable checksums on data pages and help detect corruption by the
+    I/O system - that would otherwise be silent (default: `false`).
+
+encoding
+:   When `encoding` set to a value, CNP passes it to the `--encoding` option in `initdb`,
+    which selects the encoding of the template database (default: `UTF8`).
+
+localeCollate
+:   When `localeCollate` is set to a value, CNP passes it to the `--lc-collate`
+    option in `initdb`. This option controls the collation order (`LC_COLLATE`
+    subcategory), as defined in ["Locale Support"](https://www.postgresql.org/docs/current/locale.html)
+    from the PostgreSQL documentation (default: `C`).
+
+localeCType
+:   When `localeCType` is set to a value, CNP passes it to the `--lc-ctype` option in
+    `initdb`. This option controls the collation order (`LC_CTYPE` subcategory), as
+    defined in ["Locale Support"](https://www.postgresql.org/docs/current/locale.html)
+    from the PostgreSQL documentation (default: `C`).
+
+walSegmentSize
+:   When `walSegmentSize` is set to a value, CNP passes it to the `--wal-segsize`
+    option in `initdb` (default: not set - defined by PostgreSQL as 16 megabytes).
+
+!!! Note
+    The only two locale options that Cloud Native PostgreSQL implements during
+    the `initdb` bootstrap refer to the `LC_COLLATE` and `LC_TYPE` subcategories.
+    The remaining locale subcategories can be configured directly in the PostgreSQL
+    configuration, using the `lc_messages`, `lc_monetary`, `lc_numeric`, and
+    `lc_time` parameters.
+
+The following example enables data checksums and sets the default encoding to
+`LATIN1`:
 
 ```yaml
 apiVersion: postgresql.k8s.enterprisedb.io/v1
@@ -191,14 +225,19 @@ spec:
     initdb:
       database: app
       owner: app
-      options:
-      - "-k"
-      - "--locale=en_US"
+      dataChecksums: true
+      encoding: 'LATIN1'
   storage:
     size: 1Gi
 ```
 
-The user can also specify a custom list of queries that will be executed
+Cloud Native PostgreSQL supports another way to customize the behaviour of the
+`initdb` invocation, using the `options` subsection. However, given that there
+are options that can break the behaviour of the operator (such as `--auth` or
+`-d`), this technique is deprecated and will be removed from future versions of
+the API.
+
+You can also specify a custom list of queries that will be executed
 once, just after the database is created and configured. These queries will
 be executed as the *superuser* (`postgres`), connected to the `postgres`
 database:
@@ -215,9 +254,9 @@ spec:
     initdb:
       database: app
       owner: app
-      options:
-      - "-k"
-      - "--locale=en_US"
+      dataChecksums: true
+      localeCollate: 'en_US'
+      localeCType: 'en_US'
       postInitSQL:
         - CREATE ROLE angus
         - CREATE ROLE malcolm

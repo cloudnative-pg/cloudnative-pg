@@ -40,6 +40,11 @@ const (
 	// TraceLevel is the trace level priority
 	TraceLevel zapcore.Level = -4
 
+	// WarningLevelString is the string representation of the warning level
+	WarningLevelString = "warning"
+	// WarningLevel is the warning level priority
+	WarningLevel = zapcore.WarnLevel
+
 	// DefaultLevelString is the string representation of the default level
 	DefaultLevelString = InfoLevelString
 	// DefaultLevel is the default logging level
@@ -68,6 +73,7 @@ type Logger interface {
 	Enabled() bool
 
 	Error(err error, msg string, keysAndValues ...interface{})
+	Warning(msg string, keysAndValues ...interface{})
 	Info(msg string, keysAndValues ...interface{})
 	Debug(msg string, keysAndValues ...interface{})
 	Trace(msg string, keysAndValues ...interface{})
@@ -75,6 +81,7 @@ type Logger interface {
 	WithCaller() Logger
 	WithValues(keysAndValues ...interface{}) Logger
 	WithName(name string) Logger
+
 	GetLogger() logr.Logger
 }
 
@@ -112,6 +119,10 @@ func (l *logger) Info(msg string, keysAndValues ...interface{}) {
 	l.enrich().V(int(-InfoLevel)).Info(msg, keysAndValues...)
 }
 
+func (l *logger) Warning(msg string, keysAndValues ...interface{}) {
+	l.enrich().V(int(-WarningLevel)).Info(msg, keysAndValues...)
+}
+
 func (l *logger) Debug(msg string, keysAndValues ...interface{}) {
 	l.enrich().V(int(-DebugLevel)).Info(msg, keysAndValues...)
 }
@@ -145,6 +156,11 @@ func Error(err error, msg string, keysAndValues ...interface{}) {
 // Info exposes the same method from the logr.Logger interface using the default logger
 func Info(msg string, keysAndValues ...interface{}) {
 	log.Info(msg, keysAndValues...)
+}
+
+// Warning exposes the same method from the logr.Logger interface using the default logger
+func Warning(msg string, keysAndValues ...interface{}) {
+	log.Warning(msg, keysAndValues...)
 }
 
 // Debug exposes the same method from the logr.Logger interface using the default logger

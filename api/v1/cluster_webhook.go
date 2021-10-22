@@ -58,22 +58,9 @@ func (r *Cluster) Default() {
 		r.Spec.Bootstrap = &BootstrapConfiguration{}
 	}
 
-	if r.Spec.Bootstrap.InitDB == nil &&
-		r.Spec.Bootstrap.Recovery == nil &&
-		r.Spec.Bootstrap.PgBaseBackup == nil {
-		r.Spec.Bootstrap.InitDB = &BootstrapInitDB{
-			Database: "app",
-			Owner:    "app",
-		}
-	}
-
-	if r.Spec.Bootstrap.InitDB != nil {
-		if r.Spec.Bootstrap.InitDB.Database == "" {
-			r.Spec.Bootstrap.InitDB.Database = "app"
-		}
-		if r.Spec.Bootstrap.InitDB.Owner == "" {
-			r.Spec.Bootstrap.InitDB.Owner = r.Spec.Bootstrap.InitDB.Database
-		}
+	// Defaulting initDB if no other boostrap method was passed
+	if r.Spec.Bootstrap.Recovery == nil && r.Spec.Bootstrap.PgBaseBackup == nil {
+		r.defaultInitDB()
 	}
 
 	// Defaulting the pod anti-affinity type if podAntiAffinity
@@ -93,6 +80,32 @@ func (r *Cluster) Default() {
 
 	if r.Spec.LogLevel == "" {
 		r.Spec.LogLevel = log.InfoLevelString
+	}
+}
+
+// defaultInitDB enriches the initDB with defaults if not all the required arguments were passed
+func (r *Cluster) defaultInitDB() {
+	if r.Spec.Bootstrap.InitDB == nil {
+		r.Spec.Bootstrap.InitDB = &BootstrapInitDB{
+			Database: "app",
+			Owner:    "app",
+		}
+	}
+
+	if r.Spec.Bootstrap.InitDB.Database == "" {
+		r.Spec.Bootstrap.InitDB.Database = "app"
+	}
+	if r.Spec.Bootstrap.InitDB.Owner == "" {
+		r.Spec.Bootstrap.InitDB.Owner = r.Spec.Bootstrap.InitDB.Database
+	}
+	if r.Spec.Bootstrap.InitDB.Encoding == "" {
+		r.Spec.Bootstrap.InitDB.Encoding = "UTF8"
+	}
+	if r.Spec.Bootstrap.InitDB.LocaleCollate == "" {
+		r.Spec.Bootstrap.InitDB.LocaleCollate = "C"
+	}
+	if r.Spec.Bootstrap.InitDB.LocaleCType == "" {
+		r.Spec.Bootstrap.InitDB.LocaleCType = "C"
 	}
 }
 

@@ -48,7 +48,12 @@ func (l *Flags) AddFlags(flags *pflag.FlagSet) {
 func (l *Flags) ConfigureLogging() {
 	logger := zap.New(zap.UseFlagOptions(&l.zapOptions), customLevel, customDestination)
 	switch logLevel {
-	case mlog.ErrorLevelString, mlog.InfoLevelString, mlog.DebugLevelString, mlog.TraceLevelString:
+	case mlog.ErrorLevelString,
+		mlog.WarningLevelString,
+		mlog.InfoLevelString,
+		mlog.DebugLevelString,
+		mlog.TraceLevelString:
+		break
 	default:
 		logger.Info("Invalid log level, defaulting", "level", logLevel, "default", mlog.DefaultLevel)
 	}
@@ -62,6 +67,8 @@ func getLogLevel(l string) zapcore.Level {
 	switch l {
 	case mlog.ErrorLevelString:
 		return mlog.ErrorLevel
+	case mlog.WarningLevelString:
+		return mlog.WarningLevel
 	case mlog.InfoLevelString:
 		return mlog.InfoLevel
 	case mlog.DebugLevelString:
@@ -77,6 +84,8 @@ func getLogLevelString(l zapcore.Level) string {
 	switch l {
 	case mlog.ErrorLevel:
 		return mlog.ErrorLevelString
+	case mlog.WarningLevel:
+		return mlog.WarningLevelString
 	case mlog.InfoLevel:
 		return mlog.InfoLevelString
 	case mlog.DebugLevel:

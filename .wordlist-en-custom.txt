@@ -333,6 +333,7 @@ customizable
 cutover
 cyber
 danglingPVC
+dataChecksums
 databackupconfiguration
 datacenters
 datallowconn
@@ -437,6 +438,8 @@ linters
 linux
 listmeta
 liveness
+localeCType
+localeCollate
 localobjectreference
 locktype
 lookups
@@ -653,6 +656,7 @@ virtualxid
 volumeMode
 volumeMounts
 wal
+walSegmentSize
 walbackupconfiguration
 walkthrough
 walsender

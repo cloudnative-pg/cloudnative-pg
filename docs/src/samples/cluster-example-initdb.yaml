@@ -12,8 +12,9 @@ spec:
       postInitSQL:
         - create table numbers (i integer)
         - insert into numbers (select generate_series(1,10000))
-      options:
-      - "-k"
-      - "--locale=en_ZA.utf8"
+      dataChecksums: true
+      encoding: 'UTF8'
+      localeCollate: 'en_AU.UTF-8'
+      localeCType: 'en_AU.UTF-8'
   storage:
     size: 1Gi

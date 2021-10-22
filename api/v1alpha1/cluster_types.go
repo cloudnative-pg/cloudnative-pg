@@ -349,9 +349,28 @@ type BootstrapInitDB struct {
 	// +optional
 	Secret *LocalObjectReference `json:"secret,omitempty"`
 
-	// The list of options that must be passed to initdb
-	// when creating the cluster
+	// The list of options that must be passed to initdb when creating the cluster.
+	// Deprecated: This could lead to inconsistent configurations,
+	// please use the explicit provided parameters instead.
+	// If defined, explicit values will be ignored.
 	Options []string `json:"options,omitempty"`
+
+	// Whether the `-k` option should be passed to initdb,
+	// enabling checksums on data pages (default: `false`)
+	DataChecksums *bool `json:"dataChecksums,omitempty"`
+
+	// The value to be passed as option `--encoding` for initdb (default:`UTF8`)
+	Encoding string `json:"encoding,omitempty"`
+
+	// The value to be passed as option `--lc-collate` for initdb (default:`C`)
+	LocaleCollate string `json:"localeCollate,omitempty"`
+
+	// The value to be passed as option `--lc-ctype` for initdb (default:`C`)
+	LocaleCType string `json:"localeCType,omitempty"`
+
+	// The value to be passed as option `--wal-segsize` for initdb
+	// (default: empty string, resulting in PostgreSQL default: 16MB)
+	WalSegmentSize string `json:"walSegmentSize,omitempty"`
 
 	// List of SQL queries to be executed as a superuser immediately
 	// after the cluster has been created - to be used with extreme care

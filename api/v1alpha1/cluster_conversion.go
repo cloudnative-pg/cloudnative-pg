@@ -210,6 +210,11 @@ func (src *BootstrapConfiguration) ConvertTo(dstSpec *v1.BootstrapConfiguration)
 		dstSpec.InitDB.Database = srcInitDB.Database
 		dstSpec.InitDB.Owner = srcInitDB.Owner
 		dstSpec.InitDB.Options = srcInitDB.Options
+		dstSpec.InitDB.DataChecksums = srcInitDB.DataChecksums
+		dstSpec.InitDB.Encoding = srcInitDB.Encoding
+		dstSpec.InitDB.LocaleCollate = srcInitDB.LocaleCollate
+		dstSpec.InitDB.LocaleCType = srcInitDB.LocaleCType
+		dstSpec.InitDB.WalSegmentSize = srcInitDB.WalSegmentSize
 		dstSpec.InitDB.PostInitSQL = srcInitDB.PostInitSQL
 	}
 
@@ -598,6 +603,11 @@ func (dst *BootstrapConfiguration) ConvertFrom(srcSpec *v1.BootstrapConfiguratio
 		dst.InitDB.Database = srcInitDB.Database
 		dst.InitDB.Owner = srcInitDB.Owner
 		dst.InitDB.Options = srcInitDB.Options
+		dst.InitDB.DataChecksums = srcInitDB.DataChecksums
+		dst.InitDB.Encoding = srcInitDB.Encoding
+		dst.InitDB.LocaleCollate = srcInitDB.LocaleCollate
+		dst.InitDB.LocaleCType = srcInitDB.LocaleCType
+		dst.InitDB.WalSegmentSize = srcInitDB.WalSegmentSize
 		dst.InitDB.PostInitSQL = srcInitDB.PostInitSQL
 	}
 

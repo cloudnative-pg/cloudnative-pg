@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
@@ -31,17 +32,14 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 	}
 
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.InitDB != nil {
+		initCommand = append(initCommand, buildInitDBFlags(cluster)...)
+	}
+
+	if cluster.Spec.Bootstrap.InitDB.PostInitSQL != nil {
 		initCommand = append(
 			initCommand,
-			"--initdb-flags",
-			shellquote.Join(cluster.Spec.Bootstrap.InitDB.Options...))
-
-		if cluster.Spec.Bootstrap.InitDB.PostInitSQL != nil {
-			initCommand = append(
-				initCommand,
-				"--post-init-sql",
-				shellquote.Join(cluster.Spec.Bootstrap.InitDB.PostInitSQL...))
-		}
+			"--post-init-sql",
+			shellquote.Join(cluster.Spec.Bootstrap.InitDB.PostInitSQL...))
 	}
 
 	if cluster.ShouldCreateApplicationDatabase() {
@@ -52,6 +50,48 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 	}
 
 	return createPrimaryJob(cluster, nodeSerial, "initdb", initCommand)
+}
+
+func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
+	config := cluster.Spec.Bootstrap.InitDB
+	var options []string
+	// Kept for backward compatibility.
+	// If set we will ignore all the explicit parameters.
+	if len(config.Options) > 0 { //nolint:staticcheck
+		log.Warning("initdb.options is deprecated, consider migrating to initdb explicit configuration. "+
+			"Ignoring explicit configurations if present",
+			"cluster", cluster.Name,
+			"namespace", cluster.Namespace)
+
+		options = append(options, config.Options...)
+		initCommand = append(
+			initCommand,
+			"--initdb-flags",
+			shellquote.Join(options...))
+		return initCommand
+	}
+	if config.DataChecksums != nil &&
+		*config.DataChecksums {
+		options = append(options, "-k")
+	}
+	if encoding := config.Encoding; encoding != "" {
+		options = append(options, fmt.Sprintf("--encoding=%s", encoding))
+	}
+	if localeCollate := config.LocaleCollate; localeCollate != "" {
+		options = append(options, fmt.Sprintf("--lc-collate=%s", localeCollate))
+	}
+	if localeCType := config.LocaleCType; localeCType != "" {
+		options = append(options, fmt.Sprintf("--lc-ctype=%s", localeCType))
+	}
+	if walSegmentSize := config.WalSegmentSize; walSegmentSize != "" {
+		options = append(options, fmt.Sprintf("--wal-segmentsize=%s", walSegmentSize))
+	}
+	initCommand = append(
+		initCommand,
+		"--initdb-flags",
+		shellquote.Join(options...))
+
+	return initCommand
 }
 
 // CreatePrimaryJobViaRecovery creates a new primary instance in a Pod
