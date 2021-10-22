@@ -51,7 +51,10 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cl
 		return false, err
 	}
 
-	postgresHBA := cluster.CreatePostgresqlHBA()
+	postgresHBA, err := cluster.CreatePostgresqlHBA()
+	if err != nil {
+		return false, err
+	}
 
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
 		instance.PgData,

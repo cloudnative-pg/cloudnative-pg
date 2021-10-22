@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
@@ -937,6 +938,19 @@ func (cluster *Cluster) GetImageName() string {
 	}
 
 	return configuration.Current.PostgresImageName
+}
+
+// GetPostgresqlVersion gets the PostgreSQL image version detecting it from the
+// image name.
+// Example:
+//
+// quay.io/enterprisedb/postgresql:14.0 corresponds to version 140000
+// quay.io/enterprisedb/postgresql:13.2 corresponds to version 130002
+// quay.io/enterprisedb/postgresql:9.6.3 corresponds to version 90603
+func (cluster *Cluster) GetPostgresqlVersion() (int, error) {
+	image := cluster.GetImageName()
+	tag := utils.GetImageTag(image)
+	return postgres.GetPostgresVersionFromTag(tag)
 }
 
 // GetImagePullSecret get the name of the pull secret to use

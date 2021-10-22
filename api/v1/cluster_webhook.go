@@ -82,9 +82,7 @@ func (r *Cluster) Default() {
 		r.Spec.Affinity.PodAntiAffinityType = PodAntiAffinityTypePreferred
 	}
 
-	imageName := r.GetImageName()
-	tag := utils.GetImageTag(imageName)
-	psqlVersion, err := postgres.GetPostgresVersionFromTag(tag)
+	psqlVersion, err := r.GetPostgresqlVersion()
 	if err == nil {
 		// The validation error will be already raised by the
 		// validateImageName function
@@ -467,9 +465,7 @@ func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
 		}
 	}
 
-	imageName := r.GetImageName()
-	tag := utils.GetImageTag(imageName)
-	psqlVersion, err := postgres.GetPostgresVersionFromTag(tag)
+	psqlVersion, err := r.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
