@@ -33,7 +33,6 @@ type CloneInfo struct {
 func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
-	var pwFile string
 	var pgData string
 
 	cmd := &cobra.Command{
@@ -46,10 +45,9 @@ func NewCmd() *cobra.Command {
 
 			env := CloneInfo{
 				info: &postgres.InitInfo{
-					PgData:       pgData,
-					PasswordFile: pwFile,
-					ClusterName:  clusterName,
-					Namespace:    namespace,
+					ClusterName: clusterName,
+					Namespace:   namespace,
+					PgData:      pgData,
 				},
 				client: client,
 			}
@@ -67,8 +65,6 @@ func NewCmd() *cobra.Command {
 		"current cluster in k8s, used to coordinate switchover and failover")
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and of the Pod in k8s")
-	cmd.Flags().StringVar(&pwFile, "pw-file", "",
-		"The file containing the PostgreSQL superuser password to use during the init phase")
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
 
 	return cmd

@@ -21,10 +21,9 @@ import (
 
 // NewCmd creates the "restore" subcommand
 func NewCmd() *cobra.Command {
-	var pwFile string
-	var pgData string
 	var clusterName string
 	var namespace string
+	var pgData string
 	var recoveryTarget string
 
 	cmd := &cobra.Command{
@@ -34,10 +33,9 @@ func NewCmd() *cobra.Command {
 			ctx := context.Background()
 
 			info := postgres.InitInfo{
-				PgData:         pgData,
-				PasswordFile:   pwFile,
 				ClusterName:    clusterName,
 				Namespace:      namespace,
+				PgData:         pgData,
 				RecoveryTarget: recoveryTarget,
 			}
 
@@ -45,13 +43,11 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&pwFile, "pw-file", "",
-		"The file containing the PostgreSQL superuser password to use during the init phase")
-	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
 	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
 		"current cluster in k8s, used to coordinate switchover and failover")
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and the Pod in k8s")
+	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
 	cmd.Flags().StringVar(&recoveryTarget, "target", "", "The recovery target in the form of "+
 		"PostgreSQL options")
 

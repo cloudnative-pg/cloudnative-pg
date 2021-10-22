@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/blang/semver"
-	"github.com/lib/pq"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -476,11 +475,6 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 // cluster. This function also ensures that we can really connect
 // to this cluster using the password in the secrets
 func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
-	rawSuperUserPassword, err := fileutils.ReadFile(info.PasswordFile)
-	if err != nil {
-		return fmt.Errorf("cannot read rawSuperUserPassword file: %w", err)
-	}
-
 	instance := info.GetInstance()
 	instance.Env = env
 
@@ -501,13 +495,6 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 		err = waitUntilRecoveryFinishes(db)
 		if err != nil {
 			return fmt.Errorf("while waiting for PostgreSQL to stop recovery mode: %w", err)
-		}
-
-		_, err = db.Exec(fmt.Sprintf(
-			"ALTER USER postgres PASSWORD %v",
-			pq.QuoteLiteral(string(rawSuperUserPassword))))
-		if err != nil {
-			return fmt.Errorf("ALTER USER postgres error: %w", err)
 		}
 
 		return nil
