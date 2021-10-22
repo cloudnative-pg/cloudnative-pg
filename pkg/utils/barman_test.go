@@ -13,9 +13,10 @@ import (
 
 var _ = Describe("parsing policy", func() {
 	It("must properly parse a correct policy", func() {
-		res, err := ParsePolicy("30w")
-		Expect(res).To(BeEquivalentTo("RECOVERY WINDOW OF 30 WEEKS"))
-		Expect(err).To(BeNil())
+		Expect(ParsePolicy("30w")).To(BeEquivalentTo("RECOVERY WINDOW OF 30 WEEKS"))
+		Expect(ParsePolicy("10w")).To(BeEquivalentTo("RECOVERY WINDOW OF 10 WEEKS"))
+		Expect(ParsePolicy("7w")).To(BeEquivalentTo("RECOVERY WINDOW OF 7 WEEKS"))
+		Expect(ParsePolicy("7d")).To(BeEquivalentTo("RECOVERY WINDOW OF 7 DAYS"))
 	})
 
 	It("must complain with a wrong policy", func() {

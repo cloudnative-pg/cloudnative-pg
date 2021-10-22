@@ -55,3 +55,4 @@ spec:
           compression: gzip
         data:
           immediateCheckpoint: true
+    retentionPolicy: "30d"

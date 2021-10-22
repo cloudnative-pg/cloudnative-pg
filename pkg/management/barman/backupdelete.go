@@ -20,7 +20,7 @@ func DeleteBackupsByPolicy(backupConfig *v1.BackupConfiguration, serverName stri
 	var stdoutBuffer bytes.Buffer
 	var stderrBuffer bytes.Buffer
 	barmanConfiguration := backupConfig.BarmanObjectStore
-	options := []string{"--format", "json"}
+	var options []string
 	if barmanConfiguration.EndpointURL != "" {
 		options = append(options, "--endpoint-url", barmanConfiguration.EndpointURL)
 	}
