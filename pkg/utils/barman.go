@@ -11,13 +11,13 @@ import (
 	"regexp"
 )
 
-var regexPolicy = regexp.MustCompile(`([1-9][0-9]+)([dwm])$`)
+var regexPolicy = regexp.MustCompile(`([1-9][0-9]*)([dwm])$`)
 
 // ParsePolicy ensure that the policy string follows the
 // rules required by Barman
 func ParsePolicy(policy string) (string, error) {
 	unitName := map[string]string{
-		"d": "DAY",
+		"d": "DAYS",
 		"w": "WEEKS",
 		"m": "MONTHS",
 	}
