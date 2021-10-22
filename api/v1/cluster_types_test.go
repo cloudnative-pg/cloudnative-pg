@@ -474,3 +474,31 @@ var _ = Describe("A config map resource version", func() {
 		Expect(found).To(BeTrue())
 	})
 })
+
+var _ = Describe("PostgreSQL version detection", func() {
+	tests := []struct {
+		imageName       string
+		postgresVersion int
+	}{
+		{
+			"quay.io/enterprisedb/postgresql:14.0",
+			140000,
+		},
+		{
+			"quay.io/enterprisedb/postgresql:13.2",
+			130002,
+		},
+		{
+			"quay.io/enterprisedb/postgresql:9.6.3",
+			90603,
+		},
+	}
+
+	It("correctly extract PostgreSQL versions", func() {
+		cluster := Cluster{}
+		for _, test := range tests {
+			cluster.Spec.ImageName = test.imageName
+			Expect(cluster.GetPostgresqlVersion()).To(Equal(test.postgresVersion))
+		}
+	})
+})

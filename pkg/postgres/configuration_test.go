@@ -145,9 +145,15 @@ var _ = Describe("pg_hba.conf generation", func() {
 		"two",
 		"three",
 	}
-	It("insert the spec configuration between an header and a footer", func() {
-		hbaContent := CreateHBARules(specRules)
-		Expect(hbaContent).To(ContainSubstring("two\n"))
+
+	It("insert the spec configuration between an header and a footer when the version can not be parsed", func() {
+		Expect(CreateHBARules(specRules, "md5")).To(
+			ContainSubstring("\ntwo\n"))
+	})
+
+	It("really use the passed default authentication method", func() {
+		Expect(CreateHBARules(specRules, "this-one")).To(
+			ContainSubstring("\nhost all all all this-one\n"))
 	})
 })
 

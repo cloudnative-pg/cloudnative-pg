@@ -273,8 +273,16 @@ hostssl replication streaming_replica all cert
 Default rules:
 
 ```text
-host all all all md5
+host all all all <default-authentication-method>
 ```
+
+From PostgreSQL 14 the default value of the `password_encryption`
+database parameter is set to `scram-sha-256`. Because of that,
+the default authentication method is `scram-sha-256` from this
+PostgreSQL version.
+
+PostgreSQL 13 and older will use `md5` as the default authentication
+method.
 
 The resulting `pg_hba.conf` will look like this:
 
@@ -286,7 +294,7 @@ hostssl replication streaming_replica all cert
 
 <user defined rules>
 
-host all all all md5
+host all all all md5 # (or scram-sha-256 for PostgreSQL version >= 14)
 ```
 
 Refer to the PostgreSQL documentation for [more information on `pg_hba.conf`](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html).

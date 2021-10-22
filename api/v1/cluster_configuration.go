@@ -18,9 +18,7 @@ import (
 // used for this cluster and return it and its sha256 checksum
 func (cluster *Cluster) CreatePostgresqlConfiguration() (string, string, error) {
 	// Extract the PostgreSQL major version
-	imageName := cluster.GetImageName()
-	tag := utils.GetImageTag(imageName)
-	fromVersion, err := postgres.GetPostgresVersionFromTag(tag)
+	fromVersion, err := cluster.GetPostgresqlVersion()
 	if err != nil {
 		return "", "", err
 	}
@@ -88,6 +86,25 @@ func (cluster *Cluster) GetSyncReplicasNumber() (syncReplicas int) {
 }
 
 // CreatePostgresqlHBA creates the HBA rules for this cluster
-func (cluster *Cluster) CreatePostgresqlHBA() string {
-	return postgres.CreateHBARules(cluster.Spec.PostgresConfiguration.PgHBA)
+func (cluster *Cluster) CreatePostgresqlHBA() (string, error) {
+	version, err := cluster.GetPostgresqlVersion()
+	if err != nil {
+		return "", err
+	}
+
+	// From PostgreSQL 14 we default to SCRAM-SHA-256
+	// authentication as the default `password_encryption`
+	// is set to `scram-sha-256` and this is the most
+	// secure authentication method available.
+	//
+	// See:
+	// https://www.postgresql.org/docs/14/release-14.html
+	defaultAuthenticationMethod := "scram-sha-256"
+	if version < 140000 {
+		defaultAuthenticationMethod = "md5"
+	}
+
+	return postgres.CreateHBARules(
+		cluster.Spec.PostgresConfiguration.PgHBA,
+		defaultAuthenticationMethod)
 }

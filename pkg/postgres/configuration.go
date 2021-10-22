@@ -7,16 +7,18 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"sort"
 	"strings"
+	"text/template"
 )
 
 const (
-	// hbaHeader is the header of generated pg_hba.conf.
-	// The content provided by the user is inserted after this text
-	hbaHeader = `
+	// hbaTemplateString is the template used to generate the pg_hba.conf
+	// configuration file
+	hbaTemplateString = `
 # Grant local access
 local all all peer map=local
 
@@ -24,14 +26,15 @@ local all all peer map=local
 hostssl postgres streaming_replica all cert
 hostssl replication streaming_replica all cert
 hostssl all cnp_pooler_pgbouncer all cert
+
+{{ range $rule := .UserRules }}
+{{ $rule -}}
+{{ end }}
+
+# Otherwise use the default authentication method
+host all all all {{.DefaultAuthenticationMethod}}
 `
 
-	// hbaFooter is the footer of generated pg_hba.conf.
-	// The content provided by the user is inserted before this text
-	hbaFooter = `
-# Otherwise use md5 authentication
-host all all all md5
-`
 	// fixedConfigurationParameter are the configuration parameters
 	// whose value is managed by the operator and should not be changed
 	// by the user
@@ -114,6 +117,9 @@ host all all all md5
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnp_pooler_pgbouncer"
 )
+
+// hbaTemplate is the template used to create the HBA configuration
+var hbaTemplate = template.Must(template.New("pg_hba.conf").Parse(hbaTemplateString))
 
 // MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
 const MajorVersionRangeUnlimited = 0
@@ -356,16 +362,21 @@ var (
 
 // CreateHBARules will create the content of pg_hba.conf file given
 // the rules set by the cluster spec
-func CreateHBARules(hba []string) string {
-	var hbaContent []string
-	hbaContent = append(hbaContent, strings.TrimSpace(hbaHeader), "")
-	if len(hba) > 0 {
-		hbaContent = append(hbaContent, hba...)
-		hbaContent = append(hbaContent, "")
-	}
-	hbaContent = append(hbaContent, strings.TrimSpace(hbaFooter), "")
+func CreateHBARules(hba []string, defaultAuthenticationMethod string) (string, error) {
+	var hbaContent bytes.Buffer
 
-	return strings.Join(hbaContent, "\n")
+	templateData := struct {
+		UserRules                   []string
+		DefaultAuthenticationMethod string
+	}{
+		UserRules:                   hba,
+		DefaultAuthenticationMethod: defaultAuthenticationMethod,
+	}
+	if err := hbaTemplate.Execute(&hbaContent, templateData); err != nil {
+		return "", err
+	}
+
+	return hbaContent.String(), nil
 }
 
 // PgConfiguration wraps configuration parameters with some checks
