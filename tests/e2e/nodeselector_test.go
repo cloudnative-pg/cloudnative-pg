@@ -20,6 +20,14 @@ import (
 )
 
 var _ = Describe("nodeSelector", func() {
+	const level = tests.Low
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
 	Context("The label doesn't exists", func() {
 		const namespace = "nodeselector-e2e-missing-label"
 		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-not-exists.yaml"

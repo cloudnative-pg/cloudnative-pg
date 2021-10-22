@@ -22,8 +22,17 @@ import (
 // -ro and -r services, using both the application user and the superuser one
 var _ = Describe("Connection via services", func() {
 	// We test custom db name and user
-	const appDBName = "appdb"
-	const appDBUser = "appuser"
+	const (
+		appDBName = "appdb"
+		appDBUser = "appuser"
+		level     = tests.Highest
+	)
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	AssertServices := func(namespace string,
 		clusterName string,

@@ -28,8 +28,13 @@ var _ = Describe("PGBouncer Connections", func() {
 		poolerCertificateRWSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-tls-rw.yaml"
 		poolerBasicAuthROSampleFile   = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-ro.yaml"
 		poolerCertificateROSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-tls-ro.yaml"
+		level                         = tests.Low
 	)
-
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,

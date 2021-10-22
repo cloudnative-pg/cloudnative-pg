@@ -25,6 +25,12 @@ import (
 )
 
 var _ = Describe("Rolling updates", func() {
+	const level = tests.Medium
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 	// gatherClusterInfo returns the current lists of pods, pod UIDs and pvc UIDs in a given cluster
 	gatherClusterInfo := func(namespace string, clusterName string) ([]string, []types.UID, []types.UID, error) {
 		var podNames []string

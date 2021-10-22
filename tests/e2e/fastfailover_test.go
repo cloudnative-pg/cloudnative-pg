@@ -28,6 +28,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 		webTestFile            = fixturesDir + "/fastfailover/webtest.yaml"
 		webTestSyncReplicas    = fixturesDir + "/fastfailover/webtest-syncreplicas.yaml"
 		webTestJob             = fixturesDir + "/fastfailover/hey-job-webtest.yaml"
+		level                  = tests.Highest
 	)
 	var (
 		namespace       string
@@ -37,6 +38,9 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 	)
 
 	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
 		// Sometimes on AKS the promotion itself takes more than 10 seconds.
 		// Nothing to be done operator side, we raise the timeout to avoid
 		// failures in the test.

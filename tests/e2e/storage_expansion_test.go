@@ -26,7 +26,13 @@ var _ = Describe("Verify storage", func() {
 	const (
 		sampleFile  = fixturesDir + "/storage_expansion/cluster-storage-expansion.yaml"
 		clusterName = "storage-expansion"
+		level       = tests.Lowest
 	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 	// Initializing a global namespace variable to be used in each test case
 	var namespace string
 	// Gathering default storage class requires to check whether the value

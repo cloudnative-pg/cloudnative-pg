@@ -17,15 +17,20 @@ import (
 )
 
 var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
-	const namespace = "cluster-pg-basebackup-basic-auth"
-
-	const srcCluster = fixturesDir + "/pg_basebackup/cluster-src.yaml"
-	const srcClusterName = "pg-basebackup-src"
-
-	const dstCluster = fixturesDir + "/pg_basebackup/cluster-dst-basic-auth.yaml"
-	const dstClusterName = "pg-basebackup-dst-basic-auth"
-
-	const checkQuery = "psql -U postgres app -tAc 'SELECT count(*) FROM to_bootstrap'"
+	const (
+		namespace      = "cluster-pg-basebackup-basic-auth"
+		srcCluster     = fixturesDir + "/pg_basebackup/cluster-src.yaml"
+		srcClusterName = "pg-basebackup-src"
+		dstCluster     = fixturesDir + "/pg_basebackup/cluster-dst-basic-auth.yaml"
+		dstClusterName = "pg-basebackup-dst-basic-auth"
+		checkQuery     = "psql -U postgres app -tAc 'SELECT count(*) FROM to_bootstrap'"
+		level          = tests.High
+	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {

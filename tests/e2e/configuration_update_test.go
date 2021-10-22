@@ -21,9 +21,19 @@ import (
 )
 
 var _ = Describe("Configuration update", func() {
-	const namespace = "cluster-update-config-e2e"
-	const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
-	const clusterName = "postgresql-storage-class"
+	const (
+		clusterName = "postgresql-storage-class"
+		namespace   = "cluster-update-config-e2e"
+		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml"
+		level       = tests.High
+	)
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,

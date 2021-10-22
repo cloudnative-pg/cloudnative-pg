@@ -23,11 +23,19 @@ import (
 )
 
 var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func() {
-	const namespace = "primary-switchover-time"
-	const sampleFile = fixturesDir + "/fastswitchover/cluster-fast-switchover.yaml"
-	const webTestFile = fixturesDir + "/fastswitchover/webtest.yaml"
-	const webTestJob = fixturesDir + "/fastswitchover/hey-job-webtest.yaml"
-	const clusterName = "cluster-fast-switchover"
+	const (
+		namespace   = "primary-switchover-time"
+		sampleFile  = fixturesDir + "/fastswitchover/cluster-fast-switchover.yaml"
+		webTestFile = fixturesDir + "/fastswitchover/webtest.yaml"
+		webTestJob  = fixturesDir + "/fastswitchover/hey-job-webtest.yaml"
+		clusterName = "cluster-fast-switchover"
+		level       = tests.Highest
+	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,

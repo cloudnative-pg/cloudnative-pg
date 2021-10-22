@@ -26,8 +26,17 @@ import (
 // and the operator pods, asserting that the latter is able to perform a pending
 // failover once a new operator pod comes back available.
 var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive), func() {
-	const clusterName = "operator-unavailable"
-	const sampleFile = fixturesDir + "/operator-unavailable/operator-unavailable.yaml"
+	const (
+		clusterName = "operator-unavailable"
+		sampleFile  = fixturesDir + "/operator-unavailable/operator-unavailable.yaml"
+		level       = tests.Medium
+	)
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 
 	Context("Scale down operator replicas to zero and delete primary", func() {
 		const namespace = "op-unavailable-e2e-zero-replicas"

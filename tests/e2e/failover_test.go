@@ -17,15 +17,24 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Failover", func() {
-	const namespace = "failover-e2e"
-	const sampleFile = samplesDir + "/cluster-storage-class.yaml"
-	const clusterName = "postgresql-storage-class"
+	const (
+		namespace   = "failover-e2e"
+		sampleFile  = samplesDir + "/cluster-storage-class.yaml"
+		clusterName = "postgresql-storage-class"
+		level       = tests.Medium
+	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,

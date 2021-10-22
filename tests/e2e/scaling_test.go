@@ -16,9 +16,18 @@ import (
 )
 
 var _ = Describe("Cluster scale up and down", func() {
-	const namespace = "cluster-scale-e2e-storage-class"
-	const sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
-	const clusterName = "postgresql-storage-class"
+	const (
+		namespace   = "cluster-scale-e2e-storage-class"
+		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml"
+		clusterName = "postgresql-storage-class"
+		level       = tests.Lowest
+	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,

@@ -355,6 +355,7 @@ jobs:
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
     runs-on: ubuntu-20.04
     env:
+      TEST_DEPTH: 4
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
@@ -440,6 +441,7 @@ jobs:
         ${{ fromJSON(needs.generate-jobs.outputs.aksMatrix) }}
     runs-on: ubuntu-20.04
     env:
+      TEST_DEPTH: 4
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
@@ -588,6 +590,7 @@ jobs:
          ${{ fromJSON(needs.generate-jobs.outputs.eksMatrix) }}
     runs-on: ubuntu-20.04
     env:
+      TEST_DEPTH: 4
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
@@ -713,6 +716,7 @@ jobs:
         ${{ fromJSON(needs.generate-jobs.outputs.gkeMatrix) }}
     runs-on: ubuntu-20.04
     env:
+      TEST_DEPTH: 4
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
@@ -846,6 +850,7 @@ jobs:
           ${{ fromJSON(needs.generate-jobs.outputs.rkeMatrix) }}
       runs-on: ubuntu-20.04
       env:
+        TEST_DEPTH: 4
         POSTGRES_IMG: "${{ matrix.postgres_img }}"
         E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
 
