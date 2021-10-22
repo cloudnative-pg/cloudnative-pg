@@ -953,13 +953,32 @@ spec:
                   initdb:
                     description: Bootstrap the cluster via initdb
                     properties:
+                      dataChecksums:
+                        description: 'Whether the `-k` option should be passed to
+                          initdb, enabling checksums on data pages (default: `false`)'
+                        type: boolean
                       database:
                         description: 'Name of the database used by the application.
                           Default: `app`.'
                         type: string
+                      encoding:
+                        description: The value to be passed as option `--encoding`
+                          for initdb (default:`UTF8`)
+                        type: string
+                      localeCType:
+                        description: The value to be passed as option `--lc-ctype`
+                          for initdb (default:`C`)
+                        type: string
+                      localeCollate:
+                        description: The value to be passed as option `--lc-collate`
+                          for initdb (default:`C`)
+                        type: string
                       options:
-                        description: The list of options that must be passed to initdb
-                          when creating the cluster
+                        description: 'The list of options that must be passed to initdb
+                          when creating the cluster. Deprecated: This could lead to
+                          inconsistent configurations, please use the explicit provided
+                          parameters instead. If defined, explicit values will be
+                          ignored.'
                         items:
                           type: string
                         type: array
@@ -986,6 +1005,11 @@ spec:
                         required:
                         - name
                         type: object
+                      walSegmentSize:
+                        description: 'The value to be passed as option `--wal-segsize`
+                          for initdb (default: empty string, resulting in PostgreSQL
+                          default: 16MB)'
+                        type: string
                     type: object
                   pg_basebackup:
                     description: Bootstrap the cluster taking a physical backup of
@@ -2914,13 +2938,32 @@ spec:
                   initdb:
                     description: Bootstrap the cluster via initdb
                     properties:
+                      dataChecksums:
+                        description: 'Whether the `-k` option should be passed to
+                          initdb, enabling checksums on data pages (default: `false`)'
+                        type: boolean
                       database:
                         description: 'Name of the database used by the application.
                           Default: `app`.'
                         type: string
+                      encoding:
+                        description: The value to be passed as option `--encoding`
+                          for initdb (default:`UTF8`)
+                        type: string
+                      localeCType:
+                        description: The value to be passed as option `--lc-ctype`
+                          for initdb (default:`C`)
+                        type: string
+                      localeCollate:
+                        description: The value to be passed as option `--lc-collate`
+                          for initdb (default:`C`)
+                        type: string
                       options:
-                        description: The list of options that must be passed to initdb
-                          when creating the cluster
+                        description: 'The list of options that must be passed to initdb
+                          when creating the cluster. Deprecated: This could lead to
+                          inconsistent configurations, please use the explicit provided
+                          parameters instead. If defined, explicit values will be
+                          ignored.'
                         items:
                           type: string
                         type: array
@@ -2947,6 +2990,11 @@ spec:
                         required:
                         - name
                         type: object
+                      walSegmentSize:
+                        description: 'The value to be passed as option `--wal-segsize`
+                          for initdb (default: empty string, resulting in PostgreSQL
+                          default: 16MB)'
+                        type: string
                     type: object
                   pg_basebackup:
                     description: Bootstrap the cluster taking a physical backup of

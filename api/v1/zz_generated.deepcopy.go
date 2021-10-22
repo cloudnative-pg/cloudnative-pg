@@ -307,6 +307,11 @@ func (in *BootstrapInitDB) DeepCopyInto(out *BootstrapInitDB) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.DataChecksums != nil {
+		in, out := &in.DataChecksums, &out.DataChecksums
+		*out = new(bool)
+		**out = **in
+	}
 	if in.PostInitSQL != nil {
 		in, out := &in.PostInitSQL, &out.PostInitSQL
 		*out = make([]string, len(*in))

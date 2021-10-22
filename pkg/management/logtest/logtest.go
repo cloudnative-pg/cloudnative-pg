@@ -20,6 +20,9 @@ const (
 	// LogLevelError is the error log level
 	LogLevelError = LogLevel("ERROR")
 
+	// LogLevelWarning is the error log level
+	LogLevelWarning = LogLevel("WARNING")
+
 	// LogLevelDebug is the debug log level
 	LogLevelDebug = LogLevel("DEBUG")
 
@@ -96,7 +99,7 @@ func (s SpyLogger) GetLogger() logr.Logger {
 }
 
 // Enabled implements the log.Logger interface
-func (s SpyLogger) Enabled() bool {
+func (s *SpyLogger) Enabled() bool {
 	return true
 }
 
@@ -105,26 +108,31 @@ func (s *SpyLogger) Error(err error, msg string, keysAndValues ...interface{}) {
 	s.AddRecord(NewRecord(s.Name, LogLevelError, msg, err, keysAndValues...))
 }
 
+// Warning implements the log.Logger interface
+func (s *SpyLogger) Warning(msg string, keysAndValues ...interface{}) {
+	s.AddRecord(NewRecord(s.Name, LogLevelWarning, msg, nil, keysAndValues...))
+}
+
 // Info implements the log.Logger interface
-func (s SpyLogger) Info(msg string, keysAndValues ...interface{}) {
+func (s *SpyLogger) Info(msg string, keysAndValues ...interface{}) {
 	s.AddRecord(NewRecord(s.Name, LogLevelInfo, msg, nil, keysAndValues...))
 }
 
 // Debug implements the log.Logger interface
-func (s SpyLogger) Debug(msg string, keysAndValues ...interface{}) {
+func (s *SpyLogger) Debug(msg string, keysAndValues ...interface{}) {
 	s.AddRecord(NewRecord(s.Name, LogLevelDebug, msg, nil, keysAndValues...))
 }
 
 // Trace implements the log.Logger interface
-func (s SpyLogger) Trace(msg string, keysAndValues ...interface{}) {
+func (s *SpyLogger) Trace(msg string, keysAndValues ...interface{}) {
 	s.AddRecord(NewRecord(s.Name, LogLevelTrace, msg, nil, keysAndValues...))
 }
 
 // WithValues implements the log.Logger interface
-func (s SpyLogger) WithValues(keysAndValues ...interface{}) log.Logger {
+func (s *SpyLogger) WithValues(keysAndValues ...interface{}) log.Logger {
 	result := &SpyLogger{
 		Name:      s.Name,
-		EventSink: &s,
+		EventSink: s,
 	}
 
 	result.Attributes = make(map[string]interface{})

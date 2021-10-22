@@ -15,7 +15,7 @@ Each log entry has the following fields:
 ## Operator log
 
 A log level can be specified in the cluster spec with the option `logLevel` and
-can be set to any of `error`, `info`(default), `debug` or `trace`.
+can be set to any of `error`, `warning`, `info`(default), `debug` or `trace`.
 
 At the moment, the log level can only be set when an instance starts and can not be
 changed at runtime. If the value is changed in the cluster spec after the cluster
