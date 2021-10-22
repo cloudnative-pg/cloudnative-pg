@@ -29,17 +29,11 @@ type InitInfo struct {
 	// The data directory where to generate the new cluster
 	PgData string
 
-	// The name of the file containing the superuser password
-	PasswordFile string
-
 	// The name of the database to be generated for the applications
 	ApplicationDatabase string
 
 	// The name of the role to be generated for the applications
 	ApplicationUser string
-
-	// The password of the role to be generated for the applications
-	ApplicationPasswordFile string
 
 	// The parent node, used to fill primary_conninfo
 	ParentNode string
@@ -88,26 +82,6 @@ const (
 
 // VerifyConfiguration verify if the passed configuration is OK and returns an error otherwise
 func (info InitInfo) VerifyConfiguration() error {
-	if info.PasswordFile != "" {
-		passwordFileExists, err := fileutils.FileExists(info.PasswordFile)
-		if err != nil {
-			return err
-		}
-		if !passwordFileExists {
-			return fmt.Errorf("superuser password file doesn't exist (%v)", info.PasswordFile)
-		}
-	}
-
-	if info.ApplicationPasswordFile != "" {
-		applicationPasswordFileExists, err := fileutils.FileExists(info.ApplicationPasswordFile)
-		if err != nil {
-			return err
-		}
-		if !applicationPasswordFileExists {
-			return fmt.Errorf("application user's password file doesn't exist (%v)", info.PasswordFile)
-		}
-	}
-
 	pgdataExists, err := fileutils.FileExists(info.PgData)
 	if err != nil {
 		return err
@@ -136,13 +110,6 @@ func (info InitInfo) CreateDataDirectory() error {
 
 	// Add custom initdb options from the user
 	options = append(options, info.InitDBOptions...)
-
-	if info.PasswordFile != "" {
-		options = append(options,
-			"--pwfile",
-			info.PasswordFile,
-		)
-	}
 
 	log.Info("Creating new data directory",
 		"pgdata", info.PgData,
@@ -196,24 +163,6 @@ func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
 		pq.QuoteIdentifier(info.ApplicationUser)))
 	if err != nil {
 		return err
-	}
-
-	status, err := fileutils.FileExists(info.ApplicationPasswordFile)
-	if err != nil {
-		return fmt.Errorf("while reading application password file: %w", err)
-	}
-	if status {
-		rawApplicationPassword, err := fileutils.ReadFile(info.ApplicationPasswordFile)
-		if err != nil {
-			return fmt.Errorf("while reading application password file: %w", err)
-		}
-		_, err = db.Exec(fmt.Sprintf(
-			"ALTER USER %v PASSWORD %v",
-			pq.QuoteIdentifier(info.ApplicationUser),
-			pq.QuoteLiteral(string(rawApplicationPassword))))
-		if err != nil {
-			return err
-		}
 	}
 
 	if info.ApplicationDatabase != "" {

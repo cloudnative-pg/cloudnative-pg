@@ -27,10 +27,6 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 		"--parent-node", cluster.GetServiceReadWriteName(),
 	}
 
-	if cluster.GetEnableSuperuserAccess() {
-		initCommand = append(initCommand, "--pw-file", "/etc/superuser-secret/password")
-	}
-
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.InitDB != nil {
 		initCommand = append(initCommand, buildInitDBFlags(cluster)...)
 	}
@@ -45,8 +41,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 	if cluster.ShouldCreateApplicationDatabase() {
 		initCommand = append(initCommand,
 			"--app-db-name", cluster.Spec.Bootstrap.InitDB.Database,
-			"--app-user", cluster.Spec.Bootstrap.InitDB.Owner,
-			"--app-pw-file", "/etc/app-secret/password")
+			"--app-user", cluster.Spec.Bootstrap.InitDB.Owner)
 	}
 
 	return createPrimaryJob(cluster, nodeSerial, "initdb", initCommand)
@@ -102,10 +97,6 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32) *batch
 		"restore",
 	}
 
-	if cluster.GetEnableSuperuserAccess() {
-		initCommand = append(initCommand, "--pw-file", "/etc/superuser-secret/password")
-	}
-
 	if cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
 		initCommand = append(initCommand,
 			"--target",
@@ -121,10 +112,6 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int32) *b
 		"/controller/manager",
 		"instance",
 		"pgbasebackup",
-	}
-
-	if cluster.GetEnableSuperuserAccess() {
-		initCommand = append(initCommand, "--pw-file", "/etc/superuser-secret/password")
 	}
 
 	return createPrimaryJob(cluster, nodeSerial, "pgbasebackup", initCommand)

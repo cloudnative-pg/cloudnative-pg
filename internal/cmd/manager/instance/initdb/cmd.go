@@ -21,16 +21,14 @@ import (
 
 // NewCmd generates the "init" subcommand
 func NewCmd() *cobra.Command {
-	var pwFile string
 	var appDBName string
 	var appUser string
-	var appPwFile string
-	var pgData string
-	var parentNode string
-	var podName string
 	var clusterName string
-	var namespace string
 	var initDBFlagsString string
+	var namespace string
+	var parentNode string
+	var pgData string
+	var podName string
 	var postInitSQLStr string
 
 	cmd := &cobra.Command{
@@ -49,43 +47,37 @@ func NewCmd() *cobra.Command {
 			}
 
 			info := postgres.InitInfo{
-				PgData:                  pgData,
-				PasswordFile:            pwFile,
-				ApplicationDatabase:     appDBName,
-				ApplicationUser:         appUser,
-				ApplicationPasswordFile: appPwFile,
-				ParentNode:              parentNode,
-				ClusterName:             clusterName,
-				Namespace:               namespace,
-				InitDBOptions:           initDBFlags,
-				PodName:                 podName,
-				PostInitSQL:             postInitSQL,
+				ApplicationDatabase: appDBName,
+				ApplicationUser:     appUser,
+				ClusterName:         clusterName,
+				InitDBOptions:       initDBFlags,
+				Namespace:           namespace,
+				ParentNode:          parentNode,
+				PgData:              pgData,
+				PodName:             podName,
+				PostInitSQL:         postInitSQL,
 			}
 
 			return initSubCommand(info)
 		},
 	}
 
-	cmd.Flags().StringVar(&pwFile, "pw-file", "",
-		"The file containing the PostgreSQL superuser password to be used during the init phase")
 	cmd.Flags().StringVar(&appDBName, "app-db-name", "app",
 		"The name of the application containing the database")
 	cmd.Flags().StringVar(&appUser, "app-user", "app",
 		"The name of the application user")
-	cmd.Flags().StringVar(&appPwFile, "app-pw-file", "",
-		"The file that stores the password for the application user")
-	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
-	cmd.Flags().StringVar(&parentNode, "parent-node", "", "The origin node")
 	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
 		"current cluster in k8s, used to coordinate switchover and failover")
-	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
-		"the cluster and of the Pod in k8s")
 	cmd.Flags().StringVar(&initDBFlagsString, "initdb-flags", "", "The list of flags to be passed "+
 		"to initdb while creating the initial database")
+	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
+		"the cluster and the pod in k8s")
+	cmd.Flags().StringVar(&parentNode, "parent-node", "", "The origin node")
+	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
+	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The pod name to "+
+		"be checked against the cluster state")
 	cmd.Flags().StringVar(&postInitSQLStr, "post-init-sql", "", "The list of SQL queries to be "+
 		"executed to configure the new instance")
-	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
-		"be checked against the cluster state")
 
 	return cmd
 }
