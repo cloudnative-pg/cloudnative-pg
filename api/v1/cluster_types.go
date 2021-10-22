@@ -512,9 +512,11 @@ type BootstrapInitDB struct {
 	// The value to be passed as option `--lc-ctype` for initdb (default:`C`)
 	LocaleCType string `json:"localeCType,omitempty"`
 
-	// The value to be passed as option `--wal-segsize` for initdb
-	// (default: empty string, resulting in PostgreSQL default: 16MB)
-	WalSegmentSize string `json:"walSegmentSize,omitempty"`
+	// The value in megabytes (1 to 1024) to be passed to the `--wal-segsize`
+	// option for initdb (default: empty, resulting in PostgreSQL default: 16MB)
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=1024
+	WalSegmentSize int `json:"walSegmentSize,omitempty"`
 
 	// List of SQL queries to be executed as a superuser immediately
 	// after the cluster has been created - to be used with extreme care

@@ -78,8 +78,8 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 	if localeCType := config.LocaleCType; localeCType != "" {
 		options = append(options, fmt.Sprintf("--lc-ctype=%s", localeCType))
 	}
-	if walSegmentSize := config.WalSegmentSize; walSegmentSize != "" {
-		options = append(options, fmt.Sprintf("--wal-segmentsize=%s", walSegmentSize))
+	if walSegmentSize := config.WalSegmentSize; walSegmentSize != 0 {
+		options = append(options, fmt.Sprintf("--wal-segsize=%v", walSegmentSize))
 	}
 	initCommand = append(
 		initCommand,
