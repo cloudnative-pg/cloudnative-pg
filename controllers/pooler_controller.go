@@ -18,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,7 +33,8 @@ import (
 // PoolerReconciler reconciles a Pooler object
 type PoolerReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=poolers,verbs=get;list;watch;create;update;patch;delete
@@ -61,6 +63,22 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, fmt.Errorf("cannot get the pooler resource: %w", err)
 	}
 
+	// We make sure that there isn't a cluster with the same name as the pooler
+	conflictingCluster, err := getClusterOrNil(ctx, r.Client, req.NamespacedName)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("while getting cluster resource: %w", err)
+	}
+
+	if conflictingCluster != nil {
+		r.Recorder.Event(
+			&pooler,
+			"Warning",
+			"NameClash",
+			"Name clash between Pooler and Cluster detected, resource reconciliation skipped")
+		return ctrl.Result{}, nil
+	}
+
+	// Get the set of resources we directly manage and their status
 	resources, err := r.getManagedResources(ctx, &pooler)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("while getting managed resources: %w", err)
@@ -76,6 +94,8 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
+	// Update the status of the Pooler resource given what we read
+	// from the controlled resources
 	if err := r.updatePoolerStatus(ctx, &pooler, resources); err != nil {
 		if apierrs.IsConflict(err) {
 			// Requeue a reconciliation loop since the resource
@@ -84,6 +104,7 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
+	// Take the required actions to align the spec with the collected status
 	return ctrl.Result{}, r.updateOwnedObjects(ctx, &pooler, resources)
 }
 

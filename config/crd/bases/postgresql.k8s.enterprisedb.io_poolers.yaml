@@ -47,8 +47,9 @@ spec:
             description: PoolerSpec defines the desired state of Pooler
             properties:
               cluster:
-                description: This is a reference to the cluster on which the pooler
-                  will work
+                description: This is the cluster reference on which the Pooler will
+                  work. Pooler name should never match with any cluster name within
+                  the same namespace.
                 properties:
                   name:
                     description: Name of the referent.

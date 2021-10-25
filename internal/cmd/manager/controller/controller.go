@@ -198,8 +198,9 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 	}
 
 	if err = (&controllers.PoolerReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("cloud-native-postgresql-pooler"),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err

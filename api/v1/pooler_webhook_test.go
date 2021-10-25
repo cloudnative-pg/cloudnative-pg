@@ -7,6 +7,8 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package v1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -71,6 +73,21 @@ var _ = Describe("Pooler validation", func() {
 		}
 		Expect(pooler.validateCluster()).NotTo(BeEmpty())
 	})
+
+	It("doesn't allow to have a pooler with the same name of the cluster", func() {
+		pooler := Pooler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: PoolerSpec{
+				Cluster: LocalObjectReference{
+					Name: "test",
+				},
+			},
+		}
+		Expect(pooler.validateCluster()).NotTo(BeEmpty())
+	})
+
 	It("doesn't complain when specifying a cluster name", func() {
 		pooler := Pooler{
 			Spec: PoolerSpec{

@@ -43,6 +43,9 @@ spec:
       default_pool_size: "10"
 ```
 
+!!! Important
+    Pooler name should never match with any Cluster name within the same namespace.
+
 This creates a new `Pooler` resource called `pooler-example-rw` (the name is
 arbitrary) that is strictly associated with the Postgres `Cluster` resource called
 `cluster-example` and pointing to the primary, identified by the read/write
