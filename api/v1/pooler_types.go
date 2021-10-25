@@ -41,7 +41,8 @@ const (
 
 // PoolerSpec defines the desired state of Pooler
 type PoolerSpec struct {
-	// This is a reference to the cluster on which the pooler will work
+	// This is the cluster reference on which the Pooler will work.
+	// Pooler name should never match with any cluster name within the same namespace.
 	Cluster LocalObjectReference `json:"cluster"`
 
 	// Which instances we must forward traffic to?

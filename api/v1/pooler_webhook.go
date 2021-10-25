@@ -142,6 +142,12 @@ func (r *Pooler) validateCluster() field.ErrorList {
 				field.NewPath("spec", "cluster", "name"),
 				"", "must specify a cluster name"))
 	}
+	if r.Spec.Cluster.Name == r.Name {
+		result = append(result,
+			field.Invalid(
+				field.NewPath("metadata", "name"),
+				r.Name, "the pooler resource cannot have the same name of a cluster"))
+	}
 	return result
 }
 

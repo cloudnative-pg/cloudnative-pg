@@ -549,13 +549,13 @@ Name             | Description                                  | Type
 
 PoolerSpec defines the desired state of Pooler
 
-Name      | Description                                                      | Type                                         
---------- | ---------------------------------------------------------------- | ---------------------------------------------
-`cluster  ` | This is a reference to the cluster on which the pooler will work - *mandatory*  | [LocalObjectReference](#LocalObjectReference)
-`type     ` | Which instances we must forward traffic to?                      - *mandatory*  | PoolerType                                   
-`instances` | The number of replicas we want                                   - *mandatory*  | int32                                        
-`template ` | The template of the Pod to be created                            | [*PodTemplateSpec](#PodTemplateSpec)         
-`pgbouncer` | The PgBouncer configuration                                      - *mandatory*  | [*PgBouncerSpec](#PgBouncerSpec)             
+Name      | Description                                                                                                                                  | Type                                         
+--------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------
+`cluster  ` | This is the cluster reference on which the Pooler will work. Pooler name should never match with any cluster name within the same namespace. - *mandatory*  | [LocalObjectReference](#LocalObjectReference)
+`type     ` | Which instances we must forward traffic to?                                                                                                  - *mandatory*  | PoolerType                                   
+`instances` | The number of replicas we want                                                                                                               - *mandatory*  | int32                                        
+`template ` | The template of the Pod to be created                                                                                                        | [*PodTemplateSpec](#PodTemplateSpec)         
+`pgbouncer` | The PgBouncer configuration                                                                                                                  - *mandatory*  | [*PgBouncerSpec](#PgBouncerSpec)             
 
 <a id='PoolerStatus'></a>
 
