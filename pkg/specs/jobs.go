@@ -16,6 +16,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
@@ -103,7 +104,53 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32) *batch
 			cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
 	}
 
-	return createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
+	job := createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
+
+	addBarmanEndpointCA(cluster, job)
+
+	return job
+}
+
+func addBarmanEndpointCA(cluster apiv1.Cluster, job *batchv1.Job) {
+	var secretName, secretKey string
+	if cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA != nil {
+		secretName = cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA.Name
+		secretKey = cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA.Key
+	} else if cluster.Spec.Bootstrap.Recovery.Source != "" {
+		externalCluster, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
+		if ok && externalCluster.BarmanObjectStore != nil && externalCluster.BarmanObjectStore.EndpointCA != nil {
+			secretName = externalCluster.BarmanObjectStore.EndpointCA.Name
+			secretKey = externalCluster.BarmanObjectStore.EndpointCA.Key
+		}
+	}
+	if secretName != "" && secretKey != "" {
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: "barman-endpoint-ca",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: secretName,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  secretKey,
+							Path: postgres.BarmanEndpointCACertificateLocation,
+						},
+					},
+				},
+			},
+		})
+
+		job.Spec.Template.Spec.Containers[0].VolumeMounts =
+			append(job.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+				Name:      "barman-endpoint-ca",
+				MountPath: postgres.BarmanEndpointCACertificateLocation,
+				SubPath:   postgres.BarmanEndpointCACertificateFileName,
+			},
+			)
+		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			Name:  "AWS_CA_BUNDLE",
+			Value: postgres.BarmanEndpointCACertificateLocation,
+		})
+	}
 }
 
 // CreatePrimaryJobViaPgBaseBackup creates a new primary instance in a Pod

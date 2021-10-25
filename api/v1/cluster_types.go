@@ -531,7 +531,7 @@ type BootstrapInitDB struct {
 // Refer to the Bootstrap page of the documentation for more information.
 type BootstrapRecovery struct {
 	// The backup we need to restore
-	Backup *LocalObjectReference `json:"backup,omitempty"`
+	Backup *BackupSource `json:"backup,omitempty"`
 
 	// The external cluster whose backup we will restore. This is also
 	// used as the name of the folder under which the backup is stored,
@@ -545,6 +545,16 @@ type BootstrapRecovery struct {
 	// as expected by PostgreSQL (i.e., timestamp, transaction Id, LSN, ...).
 	// More info: https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET
 	RecoveryTarget *RecoveryTarget `json:"recoveryTarget,omitempty"`
+}
+
+// BackupSource contains the backup we need to restore from, plus some
+// information that could be needed to correctly restore it.
+type BackupSource struct {
+	LocalObjectReference `json:",inline"`
+	// EndpointCA store the CA bundle of the barman endpoint.
+	// Useful when using self-signed certificates to avoid
+	// errors with certificate issuer and barman-cloud-wal-archive
+	EndpointCA *SecretKeySelector `json:"endpointCA,omitempty"`
 }
 
 // BootstrapPgBaseBackup contains the configuration required to take

@@ -232,7 +232,7 @@ func (src *BootstrapConfiguration) ConvertTo(dstSpec *v1.BootstrapConfiguration)
 
 	// spec.bootstrap.recovery.backup
 	if src.Recovery != nil && src.Recovery.Backup != nil {
-		dstSpec.Recovery.Backup = &v1.LocalObjectReference{}
+		dstSpec.Recovery.Backup = &v1.BackupSource{}
 		dstSpec.Recovery.Backup.Name = src.Recovery.Backup.Name
 	}
 

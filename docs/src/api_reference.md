@@ -22,6 +22,7 @@ Below you will find a description of the defined resources:
 - [Backup](#Backup)
 - [BackupConfiguration](#BackupConfiguration)
 - [BackupList](#BackupList)
+- [BackupSource](#BackupSource)
 - [BackupSpec](#BackupSpec)
 - [BackupStatus](#BackupStatus)
 - [BarmanObjectStoreConfiguration](#BarmanObjectStoreConfiguration)
@@ -134,6 +135,16 @@ Name     | Description                                                          
 `metadata` | Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#listmeta-v1-meta)
 `items   ` | List of backups                                                                                                                    - *mandatory*  | [[]Backup](#Backup)                                                                                     
 
+<a id='BackupSource'></a>
+
+## BackupSource
+
+BackupSource contains the backup we need to restore from, plus some information that could be needed to correctly restore it.
+
+Name       | Description                                                                                                                                                            | Type                                    
+---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------
+`endpointCA` | EndpointCA store the CA bundle of the barman endpoint. Useful when using self-signed certificates to avoid errors with certificate issuer and barman-cloud-wal-archive | [*SecretKeySelector](#SecretKeySelector)
+
 <a id='BackupSpec'></a>
 
 ## BackupSpec
@@ -234,11 +245,11 @@ Name   | Description                                                       | Typ
 
 BootstrapRecovery contains the configuration required to restore the backup with the specified name and, after having changed the password with the one chosen for the superuser, will use it to bootstrap a full cluster cloning all the instances from the restored primary. Refer to the Bootstrap page of the documentation for more information.
 
-Name           | Description                                                                                                                                                                                                                                                                                                                                                                                                                                             | Type                                          
--------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------
-`backup        ` | The backup we need to restore                                                                                                                                                                                                                                                                                                                                                                                                                           | [*LocalObjectReference](#LocalObjectReference)
-`source        ` | The external cluster whose backup we will restore. This is also used as the name of the folder under which the backup is stored, so it must be set to the name of the source cluster                                                                                                                                                                                                                                                                    | string                                        
-`recoveryTarget` | By default, the recovery process applies all the available WAL files in the archive (full recovery). However, you can also end the recovery as soon as a consistent state is reached or recover to a point-in-time (PITR) by specifying a `RecoveryTarget` object, as expected by PostgreSQL (i.e., timestamp, transaction Id, LSN, ...). More info: https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET | [*RecoveryTarget](#RecoveryTarget)            
+Name           | Description                                                                                                                                                                                                                                                                                                                                                                                                                                             | Type                              
+-------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------
+`backup        ` | The backup we need to restore                                                                                                                                                                                                                                                                                                                                                                                                                           | [*BackupSource](#BackupSource)    
+`source        ` | The external cluster whose backup we will restore. This is also used as the name of the folder under which the backup is stored, so it must be set to the name of the source cluster                                                                                                                                                                                                                                                                    | string                            
+`recoveryTarget` | By default, the recovery process applies all the available WAL files in the archive (full recovery). However, you can also end the recovery as soon as a consistent state is reached or recover to a point-in-time (PITR) by specifying a `RecoveryTarget` object, as expected by PostgreSQL (i.e., timestamp, transaction Id, LSN, ...). More info: https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET | [*RecoveryTarget](#RecoveryTarget)
 
 <a id='CertificatesConfiguration'></a>
 
