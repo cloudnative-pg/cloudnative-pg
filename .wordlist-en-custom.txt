@@ -15,6 +15,7 @@ BDR
 BackupConfiguration
 BackupList
 BackupPhase
+BackupSource
 BackupSpec
 BackupStatus
 BarmanObjectStoreConfiguration

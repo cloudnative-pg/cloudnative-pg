@@ -1389,8 +1389,10 @@ func createClusterFromBackupUsingPITR(namespace, clusterName, backupFilePath, ta
 
 			Bootstrap: &apiv1.BootstrapConfiguration{
 				Recovery: &apiv1.BootstrapRecovery{
-					Backup: &apiv1.LocalObjectReference{
-						Name: backupName,
+					Backup: &apiv1.BackupSource{
+						LocalObjectReference: apiv1.LocalObjectReference{
+							Name: backupName,
+						},
 					},
 					RecoveryTarget: &apiv1.RecoveryTarget{
 						TargetTime: targetTime,

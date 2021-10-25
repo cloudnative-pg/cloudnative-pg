@@ -1031,6 +1031,21 @@ spec:
                       backup:
                         description: The backup we need to restore
                         properties:
+                          endpointCA:
+                            description: EndpointCA store the CA bundle of the barman
+                              endpoint. Useful when using self-signed certificates
+                              to avoid errors with certificate issuer and barman-cloud-wal-archive
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
                           name:
                             description: Name of the referent.
                             type: string

@@ -78,7 +78,11 @@ host all all all {{.DefaultAuthenticationMethod}}
 
 	// BarmanEndpointCACertificateLocation is the location where the barman endpoint
 	// CA certificate is stored
-	BarmanEndpointCACertificateLocation = CertificatesDir + "barman-ca.crt"
+	BarmanEndpointCACertificateLocation = CertificatesDir + BarmanEndpointCACertificateFileName
+
+	// BarmanEndpointCACertificateFileName is the name of the file in which the barman endpoint
+	// CA certificate is stored
+	BarmanEndpointCACertificateFileName = "barman-ca.crt"
 
 	// BackupTemporaryDirectory provides a path to backup temporary files
 	// needed in the recovery process

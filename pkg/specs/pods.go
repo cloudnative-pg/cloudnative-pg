@@ -100,13 +100,6 @@ func createEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []core
 		},
 	}
 
-	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
-		envVar = append(envVar, corev1.EnvVar{
-			Name:  "AWS_CA_BUNDLE",
-			Value: postgres.BarmanEndpointCACertificateLocation,
-		})
-	}
-
 	return envVar
 }
 
@@ -189,6 +182,13 @@ func createPostgresContainers(
 	}
 
 	addManagerLoggingOptions(cluster, &containers[0])
+
+	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
+		containers[0].Env = append(containers[0].Env, corev1.EnvVar{
+			Name:  "AWS_CA_BUNDLE",
+			Value: postgres.BarmanEndpointCACertificateLocation,
+		})
+	}
 
 	return containers
 }
