@@ -180,7 +180,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 
 		switch {
 		case walArchivingWorking:
-			log.Info("WAL archiving is working, will retry proceed with the backup")
+			log.Info("WAL archiving is working, proceeding with the backup")
 			return nil
 
 		case !walArchivingWorking && !lastFailedTimePresent:
