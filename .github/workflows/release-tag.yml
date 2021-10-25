@@ -14,7 +14,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2.3.5
       -
         name: Temporarily disable "include administrators" branch protection
         if: ${{ always() && github.ref == 'refs/heads/main' }}
