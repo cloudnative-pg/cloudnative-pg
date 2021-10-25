@@ -74,6 +74,7 @@ spec:
             name: scratch-data
         securityContext:
           readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
       volumes:
         - name: scratch-data
           emptyDir: {}
