@@ -11,9 +11,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
@@ -23,7 +25,11 @@ func NewCmd() *cobra.Command {
 		Use:   "wal-archive-queue",
 		Short: "Lists all .ready wal files in " + specs.PgWalArchiveStatusPath,
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
-			return run()
+			if err := run(); err != nil {
+				log.Error(err, "Error while extracting the list of .ready files")
+			}
+
+			return nil
 		},
 	}
 
@@ -36,12 +42,14 @@ func run() error {
 		return err
 	}
 
-	fmt.Printf("Ready wal files in \"%s\":\n", specs.PgWalArchiveStatusPath)
 	for _, file := range files {
-		fileName := file.Name()
-		if filepath.Ext(fileName) != ".ready" {
+		fileNameWithExtension := file.Name()
+		fileExtension := filepath.Ext(fileNameWithExtension)
+		if fileExtension != ".ready" {
 			continue
 		}
+
+		fileName := strings.TrimSuffix(fileNameWithExtension, fileExtension)
 		fmt.Println(fileName)
 	}
 	return nil
