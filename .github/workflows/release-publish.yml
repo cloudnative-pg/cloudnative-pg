@@ -20,7 +20,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2.3.5
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
@@ -137,7 +137,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2.3.5
       -
         name: Get tag
         run: |
@@ -165,7 +165,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2.3.5
         with:
           fetch-depth: 0
       -
