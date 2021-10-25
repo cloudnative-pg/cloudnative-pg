@@ -200,6 +200,12 @@ The operator reacts to the changes in the Pooler specification,
 and every PgBouncer instance reloads the updated configuration
 without disrupting the service.
 
+!!! Warning
+    Every PgBouncer pod will have the same configuration, aligned
+    with the parameters in the specification. A mistake in these
+    parameters could disrupt the operability of the **whole Pooler**.
+    The operator **does not** validate the value of any option.
+
 ## Monitoring
 
 The PgBouncer implementation of the `Pooler` comes with a default
