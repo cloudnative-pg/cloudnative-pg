@@ -124,6 +124,10 @@ cnp_collector_sync_replicas{value="observed"} 0
 # TYPE cnp_collector_up gauge
 cnp_collector_up 1
 
+# HELP cnp_collector_postgres_version Postgres version
+# TYPE cnp_collector_postgres_version gauge
+cnp_collector_postgres_version{full="13.4.0"} 13.4
+
 # HELP cnp_collector_lo_pages Estimated number of pages in the pg_largeobject table
 # TYPE cnp_collector_lo_pages gauge
 cnp_collector_lo_pages{datname="app"} 0
@@ -247,6 +251,13 @@ go_memstats_sys_bytes 7.6891144e+07
 # TYPE go_threads gauge
 go_threads 18
 ```
+
+!!! Note
+    `cnp_collector_postgres_version` is a GaugeVec metric containing
+    the `Major.Minor` version of PostgreSQL. The full semantic version
+    `Major.Minor.Patch` can be found inside one of its label field
+    named `full`.
+
 ### User defined metrics
 
 This feature is currently in *beta* state and the format is inspired by the

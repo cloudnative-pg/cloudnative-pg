@@ -151,7 +151,7 @@ func newMetrics() *metrics {
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "postgres_version",
-			Help:      "Prints semantic version of the postgreSQL instance",
+			Help:      "Postgres version",
 		}, []string{"full"}),
 		PgWALDirectory: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
