@@ -382,7 +382,6 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	cluster *apiv1.Cluster,
 ) {
 	contextLogger := log.FromContext(ctx)
-
 	contextLogger.Debug("Reconciling custom monitoring queries")
 
 	dbname := "postgres"
@@ -407,8 +406,6 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		if err != nil {
 			contextLogger.Info("Unable to get configMap containing custom monitoring queries",
 				"reference", reference,
-				"clusterName", r.instance.ClusterName,
-				"namespace", r.instance.Namespace,
 				"error", err.Error())
 			continue
 		}
@@ -416,9 +413,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		data, ok := configMap.Data[reference.Key]
 		if !ok {
 			contextLogger.Info("Missing key in configMap",
-				"reference", reference,
-				"clusterName", r.instance.ClusterName,
-				"namespace", r.instance.Namespace)
+				"reference", reference)
 			continue
 		}
 
@@ -426,8 +421,6 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		if err != nil {
 			contextLogger.Info("Error while parsing custom queries in ConfigMap",
 				"reference", reference,
-				"clusterName", r.instance.ClusterName,
-				"namespace", r.instance.Namespace,
 				"error", err.Error())
 			continue
 		}
@@ -439,8 +432,6 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		if err != nil {
 			contextLogger.Info("Unable to get secret containing custom monitoring queries",
 				"reference", reference,
-				"clusterName", r.instance.ClusterName,
-				"namespace", r.instance.Namespace,
 				"error", err.Error())
 			continue
 		}
@@ -448,9 +439,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		data, ok := secret.Data[reference.Key]
 		if !ok {
 			contextLogger.Info("Missing key in secret",
-				"reference", reference,
-				"clusterName", r.instance.ClusterName,
-				"namespace", r.instance.Namespace)
+				"reference", reference)
 			continue
 		}
 
@@ -458,8 +447,6 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		if err != nil {
 			contextLogger.Info("Error while parsing custom queries in Secret",
 				"reference", reference,
-				"clusterName", r.instance.ClusterName,
-				"namespace", r.instance.Namespace,
 				"error", err.Error())
 			continue
 		}

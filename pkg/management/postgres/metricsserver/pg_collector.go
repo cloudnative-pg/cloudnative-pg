@@ -77,6 +77,7 @@ type metrics struct {
 	ReplicaCluster     prometheus.Gauge
 	PgWALArchiveStatus *prometheus.GaugeVec
 	PgWALDirectory     *prometheus.GaugeVec
+	PgVersion          *prometheus.GaugeVec
 }
 
 // NewExporter creates an exporter
@@ -146,6 +147,12 @@ func newMetrics() *metrics {
 			Help: fmt.Sprintf("Number of WAL segments in the '%s' directory (ready, done)",
 				specs.PgWalArchiveStatusPath),
 		}, []string{"value"}),
+		PgVersion: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "postgres_version",
+			Help:      "Prints semantic version of the postgreSQL instance",
+		}, []string{"full"}),
 		PgWALDirectory: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
@@ -169,6 +176,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.Metrics.ReplicaCluster.Desc()
 	e.Metrics.PgWALArchiveStatus.Describe(ch)
 	e.Metrics.PgWALDirectory.Describe(ch)
+	e.Metrics.PgVersion.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -190,6 +198,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ch <- e.Metrics.ReplicaCluster
 	e.Metrics.PgWALArchiveStatus.Collect(ch)
 	e.Metrics.PgWALDirectory.Collect(ch)
+	e.Metrics.PgVersion.Collect(ch)
 }
 
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
@@ -258,6 +267,31 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PgWALStats").Inc()
 		e.Metrics.PgWALDirectory.Reset()
 	}
+
+	if err := collectPGVersion(e); err != nil {
+		log.Error(err, "while collecting PGVersion metrics")
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PGVersion").Inc()
+		e.Metrics.PgVersion.Reset()
+	}
+}
+
+func collectPGVersion(e *Exporter) error {
+	semanticVersion, err := e.instance.GetPgVersion()
+	if err != nil {
+		return err
+	}
+
+	majorMinor := fmt.Sprintf("%d.%d", semanticVersion.Major, semanticVersion.Minor)
+	version, err := strconv.ParseFloat(majorMinor, 64)
+	if err != nil {
+		return err
+	}
+
+	majorMinorPatch := fmt.Sprintf("%s.%d", majorMinor, semanticVersion.Patch)
+	e.Metrics.PgVersion.WithLabelValues(majorMinorPatch).Set(version)
+
+	return nil
 }
 
 func collectPGWalArchiveMetric(exporter *Exporter) error {
