@@ -277,7 +277,7 @@ func AssertDataExpectedCount(namespace, podName, tableName string, expectedValue
 		err := env.Client.Get(env.Ctx, newPodNamespacedName, Pod)
 		Expect(err).ToNot(HaveOccurred())
 		query := fmt.Sprintf("select count(*) from %v", tableName)
-		commandTimeout := time.Second * 5
+		commandTimeout := time.Second * 10
 		// The data previously created should be there
 
 		Eventually(func() (int, error) {
