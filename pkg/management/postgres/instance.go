@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/blang/semver"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
@@ -81,6 +82,9 @@ type Instance struct {
 
 	// PgCtlTimeoutForPromotion specifies the maximum number of seconds to wait when waiting for promotion to complete
 	PgCtlTimeoutForPromotion int32
+
+	// pgVersion is the PostgreSQL version
+	pgVersion *semver.Version
 }
 
 // RetryUntilServerAvailable is the default retry configuration that is used
@@ -281,6 +285,34 @@ func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 // GetTemplateDB gets a connection to the template user db "template1" on this instance
 func (instance *Instance) GetTemplateDB() (*sql.DB, error) {
 	return instance.ConnectionPool().Connection("template1")
+}
+
+// GetPgVersion queries the postgres instance to know the current version, parses it and memoize it for future uses
+func (instance *Instance) GetPgVersion() (semver.Version, error) {
+	// Better not to recompute what we already have
+	if instance.pgVersion != nil {
+		return *instance.pgVersion, nil
+	}
+
+	db, err := instance.GetSuperUserDB()
+	if err != nil {
+		return semver.Version{}, err
+	}
+
+	var versionString string
+	row := db.QueryRow("SHOW server_version")
+	err = row.Scan(&versionString)
+	if err != nil {
+		return semver.Version{}, err
+	}
+
+	parsedVersion, err := semver.ParseTolerant(versionString)
+	if err != nil {
+		return semver.Version{}, err
+	}
+
+	instance.pgVersion = &parsedVersion
+	return *instance.pgVersion, nil
 }
 
 // ConnectionPool gets or initializes the connection pool for this instance
