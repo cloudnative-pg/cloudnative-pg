@@ -35,6 +35,12 @@ import (
 
 const barmanCloudBackupName = "barman-cloud-backup"
 
+// We wait up to 10 minutes to have a WAL archived correctly
+var retryUntilWalArchiveWorking = wait.Backoff{
+	Duration: 60 * time.Second,
+	Steps:    10,
+}
+
 // BackupCommand represent a backup command that is being executed
 type BackupCommand struct {
 	Cluster  *apiv1.Cluster
@@ -136,16 +142,8 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 	return options, nil
 }
 
-// Start initiates a backup for this instance using
-// barman-cloud-backup
-func (b *BackupCommand) Start(ctx context.Context) error {
-	b.setupBackupStatus()
-
-	err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
-	if err != nil {
-		return fmt.Errorf("can't set backup as running: %v", err)
-	}
-
+// waitForWalArchiveWorking retry until the wal archiving is working or the timeout occur
+func waitForWalArchiveWorking() error {
 	db, err := sql.Open(
 		"postgres",
 		fmt.Sprintf("host=%s port=%v dbname=postgres user=postgres sslmode=disable",
@@ -156,15 +154,16 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		log.Error(err, "can not open postgres database")
 		return err
 	}
-
-	retryUntilWalArchiveWorking := wait.Backoff{
-		Duration: 60 * time.Second,
-		Steps:    10,
-	}
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Error(err, "Error while closing connection")
+		}
+	}()
 
 	walError := errors.New("wal-archive not working")
 
-	err = retry.OnError(retryUntilWalArchiveWorking, func(err error) bool {
+	return retry.OnError(retryUntilWalArchiveWorking, func(err error) bool {
 		return errors.Is(err, walError)
 	}, func() error {
 		row := db.QueryRow("SELECT COALESCE(last_archived_time,'-infinity') > " +
@@ -192,6 +191,19 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 			return walError
 		}
 	})
+}
+
+// Start initiates a backup for this instance using
+// barman-cloud-backup
+func (b *BackupCommand) Start(ctx context.Context) error {
+	b.setupBackupStatus()
+
+	err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
+	if err != nil {
+		return fmt.Errorf("can't set backup as running: %v", err)
+	}
+
+	err = waitForWalArchiveWorking()
 	if err != nil {
 		log.Info("WAL archiving is not working")
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
