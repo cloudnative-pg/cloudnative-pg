@@ -111,7 +111,8 @@ data:
               ELSE GREATEST (0,
                 EXTRACT(EPOCH FROM (now() - pg_catalog.pg_last_xact_replay_timestamp())))
               END AS lag,
-              pg_catalog.pg_is_in_recovery() AS in_recovery"
+              pg_catalog.pg_is_in_recovery() AS in_recovery,
+              EXISTS (TABLE pg_stat_wal_receiver) AS is_wal_receiver_up"
       metrics:
         - lag:
             usage: "GAUGE"
@@ -119,6 +120,9 @@ data:
         - in_recovery:
             usage: "GAUGE"
             description: "Whether the instance is in recovery"
+        - is_wal_receiver_up:
+            usage: "GAUGE"
+            description: "Whether the instance wal_receiver is up"
 
     pg_replication_slots:
       query: "SELECT slot_name, database, active, pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), restart_lsn) FROM pg_catalog.pg_replication_slots"
