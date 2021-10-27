@@ -315,7 +315,8 @@ data:
               ELSE GREATEST (0,
                 EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())))
               END AS lag,
-              pg_is_in_recovery() AS in_recovery"
+              pg_is_in_recovery() AS in_recovery,
+              EXISTS (TABLE pg_stat_wal_receiver) AS is_wal_receiver_up"
       metrics:
         - lag:
             usage: "GAUGE"
@@ -323,6 +324,9 @@ data:
         - in_recovery:
             usage: "GAUGE"
             description: "Whether the instance is in recovery"
+        - is_wal_receiver_up:
+            usage: "GAUGE"
+            description: "Whether the instance wal_receiver is up"
 ```
 
 A list of basic monitoring queries can be found in the [`cnp-basic-monitoring.yaml` file](
@@ -478,7 +482,9 @@ cnp_pg_replication_in_recovery 0
 # HELP cnp_pg_replication_lag Replication lag behind primary in seconds
 # TYPE cnp_pg_replication_lag gauge
 cnp_pg_replication_lag 0
-
+# HELP cnp_pg_replication_is_wal_receiver_up Whether the instance wal_receiver is up
+# TYPE cnp_pg_replication_is_wal_receiver_up gauge
+cnp_pg_replication_is_wal_receiver_up 0
 ```
 
 ### Differences with the Prometheus Postgres exporter

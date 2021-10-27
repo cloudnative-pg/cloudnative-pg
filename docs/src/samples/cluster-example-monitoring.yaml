@@ -31,7 +31,8 @@ data:
               ELSE GREATEST (0, 
                 EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))) 
               END AS lag, 
-              pg_is_in_recovery() AS in_recovery"
+              pg_is_in_recovery() AS in_recovery,
+              EXISTS (TABLE pg_stat_wal_receiver) AS is_wal_receiver_up"
       metrics:
         - lag:
             usage: "GAUGE"
@@ -39,7 +40,9 @@ data:
         - in_recovery:
             usage: "GAUGE"
             description: "Whether the instance is in recovery"
-
+        - is_wal_receiver_up:
+            usage: "GAUGE"
+            description: "Whether the instance wal_receiver is up"
 
     pg_postmaster:
       query: "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()"
