@@ -7,6 +7,8 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package e2e
 
 import (
+	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -56,11 +58,11 @@ var _ = Describe("PGBouncer Connections", func() {
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("setting up read write type pgbouncer pooler", func() {
-			assertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthRWSampleFile)
+			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthRWSampleFile, 1)
 		})
 
 		By("setting up read only type pgbouncer pooler", func() {
-			assertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthROSampleFile)
+			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthROSampleFile, 1)
 		})
 
 		By("verifying read and write connections using pgbouncer service", func() {
@@ -84,11 +86,11 @@ var _ = Describe("PGBouncer Connections", func() {
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("setting up read write type pgbouncer pooler", func() {
-			assertPgBouncerPoolerIsSetUp(namespace, poolerCertificateRWSampleFile)
+			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateRWSampleFile, 1)
 		})
 
 		By("setting up read only type pgbouncer pooler", func() {
-			assertPgBouncerPoolerIsSetUp(namespace, poolerCertificateROSampleFile)
+			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateROSampleFile, 1)
 		})
 
 		By("verifying read and write connections using pgbouncer service", func() {
@@ -103,30 +105,57 @@ var _ = Describe("PGBouncer Connections", func() {
 	})
 })
 
-func assertPgBouncerPoolerIsSetUp(namespace, poolerSampleFile string) {
-	_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + poolerSampleFile)
+func createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerYamlFilePath string, expectedInstanceCount int) {
+	_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
 
 	Eventually(func() (int32, error) {
-		deployment, err := getPgBouncerDeployment(namespace, poolerSampleFile)
+		deployment, err := getPGBouncerDeployment(namespace, poolerYamlFilePath)
 		return deployment.Status.ReadyReplicas, err
-	}, 300).Should(BeEquivalentTo(1))
+	}, 300).Should(BeEquivalentTo(expectedInstanceCount))
 
 	// check pooler pod is up and running
+	assertPGBouncerPodsAreReady(namespace, poolerYamlFilePath, expectedInstanceCount)
+}
+
+// assertPGBouncerPodsAreReady verifies if PGBouncer pooler pods are ready
+func assertPGBouncerPodsAreReady(namespace, poolerYamlFilePath string, expectedPodCount int) {
 	Eventually(func() (bool, error) {
-		podList, err := getPGBouncerPodList(namespace, poolerSampleFile)
+		podList, err := getPGBouncerPodList(namespace, poolerYamlFilePath)
 		if err != nil {
 			return false, err
 		}
-		if len(podList.Items) == 1 {
-			return utils.IsPodActive(podList.Items[0]) && utils.IsPodReady(podList.Items[0]), err
+
+		podItemsCount := len(podList.Items)
+		if podItemsCount != expectedPodCount {
+			return false, fmt.Errorf("expected pgBouncer pods count match passed expected instance count. "+
+				"Got: %v, Expected: %v", podItemsCount, expectedPodCount)
 		}
-		return false, err
+
+		activeAndReadyPodCount := 0
+		for _, item := range podList.Items {
+			if utils.IsPodActive(item) && utils.IsPodReady(item) {
+				activeAndReadyPodCount++
+			}
+			continue
+		}
+
+		if activeAndReadyPodCount != expectedPodCount {
+			return false, fmt.Errorf("expected pgBouncer pods to be all active and ready. Got: %v, Expected: %v",
+				activeAndReadyPodCount, expectedPodCount)
+		}
+
+		return true, nil
 	}, 90).Should(BeTrue())
 }
 
-func assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName, poolerSampleFile string, poolerRW bool) {
-	poolerServiceName, err := env.GetResourceNameFromYAML(poolerSampleFile)
+func assertReadWriteConnectionUsingPgBouncerService(
+	namespace,
+	clusterName,
+	poolerYamlFilePath string,
+	isPoolerRW bool,
+) {
+	poolerServiceName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
 	podName := clusterName + "-1"
 	pod := &corev1.Pod{}
@@ -151,7 +180,7 @@ func assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName, pool
 
 	// verify that, if pooler type setup read write then it will allow both read and
 	// write operations or if pooler type setup read only then it will allow only read operations
-	if poolerRW {
+	if isPoolerRW {
 		AssertWritesToPrimarySucceeds(pod, poolerServiceName, "app", "app",
 			generatedAppUserPassword)
 	} else {
@@ -161,8 +190,8 @@ func assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName, pool
 }
 
 // getPGBouncerPodList gather the pgbouncer pod list
-func getPGBouncerPodList(namespace, poolerSampleFile string) (*corev1.PodList, error) {
-	poolerName, err := env.GetResourceNameFromYAML(poolerSampleFile)
+func getPGBouncerPodList(namespace, poolerYamlFilePath string) (*corev1.PodList, error) {
+	poolerName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
 
 	podList := &corev1.PodList{}
@@ -174,9 +203,9 @@ func getPGBouncerPodList(namespace, poolerSampleFile string) (*corev1.PodList, e
 	return podList, err
 }
 
-// getPgBouncerDeployment gather the pgbouncer deployment info
-func getPgBouncerDeployment(namespace, poolerSampleFile string) (*appsv1.Deployment, error) {
-	poolerName, err := env.GetResourceNameFromYAML(poolerSampleFile)
+// getPGBouncerDeployment gather the pgbouncer deployment info
+func getPGBouncerDeployment(namespace, poolerYamlFilePath string) (*appsv1.Deployment, error) {
+	poolerName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
 	// Wait for the deployment to be ready
 	deploymentNamespacedName := types.NamespacedName{
