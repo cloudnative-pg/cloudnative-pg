@@ -263,6 +263,15 @@ service defined in the `Pooler`.
     For further information, please refer to the
     [`PAUSE` section in the PgBouncer documentation](https://www.pgbouncer.org/usage.html#pause-db).
 
+!!! Important
+    In future versions, the switchover operation will be fully integrated
+    with the PgBouncer pooler, and take advantage of the `PAUSE`/`RESUME`
+    features to reduce the perceived downtime by client applications.
+    At the moment, you can achieve the same results by setting the `paused`
+    attribute to `true`, then issuing the switchover command through the
+    [`cnp` plugin](cnp-plugin.md#promote), and finally restoring the `paused`
+    attribute to `false`.
+
 ## Limitations
 
 ### Single PostgreSQL cluster
@@ -286,3 +295,4 @@ users.
     use cases, while leaving room for the future implementation of a separate
     operator for PgBouncer to complete the gamma with more advanced and customized
     scenarios.
+
