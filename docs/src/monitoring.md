@@ -128,6 +128,10 @@ cnp_collector_up 1
 # TYPE cnp_collector_postgres_version gauge
 cnp_collector_postgres_version{full="13.4.0"} 13.4
 
+# HELP cnp_collector_first_recoverability_point The first point of recoverability for the cluster as a unix timestamp
+# TYPE cnp_collector_first_recoverability_point gauge
+cnp_collector_first_recoverability_point 1.63238406e+09
+
 # HELP cnp_collector_lo_pages Estimated number of pages in the pg_largeobject table
 # TYPE cnp_collector_lo_pages gauge
 cnp_collector_lo_pages{datname="app"} 0

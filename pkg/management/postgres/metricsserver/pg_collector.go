@@ -8,6 +8,7 @@ package metricsserver
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	m "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
@@ -67,17 +69,18 @@ type Exporter struct {
 // metrics here are related to the exporter itself, which is instrumented to
 // expose them
 type metrics struct {
-	CollectionsTotal   prometheus.Counter
-	PgCollectionErrors *prometheus.CounterVec
-	Error              prometheus.Gauge
-	PostgreSQLUp       prometheus.Gauge
-	CollectionDuration *prometheus.GaugeVec
-	SwitchoverRequired prometheus.Gauge
-	SyncReplicas       *prometheus.GaugeVec
-	ReplicaCluster     prometheus.Gauge
-	PgWALArchiveStatus *prometheus.GaugeVec
-	PgWALDirectory     *prometheus.GaugeVec
-	PgVersion          *prometheus.GaugeVec
+	CollectionsTotal         prometheus.Counter
+	PgCollectionErrors       *prometheus.CounterVec
+	Error                    prometheus.Gauge
+	PostgreSQLUp             prometheus.Gauge
+	CollectionDuration       *prometheus.GaugeVec
+	SwitchoverRequired       prometheus.Gauge
+	SyncReplicas             *prometheus.GaugeVec
+	ReplicaCluster           prometheus.Gauge
+	PgWALArchiveStatus       *prometheus.GaugeVec
+	PgWALDirectory           *prometheus.GaugeVec
+	PgVersion                *prometheus.GaugeVec
+	FirstRecoverabilityPoint prometheus.Gauge
 }
 
 // NewExporter creates an exporter
@@ -161,6 +164,12 @@ func newMetrics() *metrics {
 				" computed as (wal_segment_size * count)",
 				specs.PgWalPath),
 		}, []string{"value"}),
+		FirstRecoverabilityPoint: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "first_recoverability_point",
+			Help:      "The first point of recoverability for the cluster as a unix timestamp",
+		}),
 	}
 }
 
@@ -177,6 +186,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.PgWALArchiveStatus.Describe(ch)
 	e.Metrics.PgWALDirectory.Describe(ch)
 	e.Metrics.PgVersion.Describe(ch)
+	e.Metrics.FirstRecoverabilityPoint.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -199,6 +209,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.Metrics.PgWALArchiveStatus.Collect(ch)
 	e.Metrics.PgWALDirectory.Collect(ch)
 	e.Metrics.PgVersion.Collect(ch)
+	e.Metrics.FirstRecoverabilityPoint.Collect(ch)
 }
 
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
@@ -241,17 +252,13 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		log.Error(err, "unable to get if primary")
 	}
 
+	// metrics collected only on primary server
 	if isPrimary {
 		// getting required synchronous standby number from postgres itself
-		nStandbys, err := getSynchronousStandbysNumber(db)
-		if err != nil {
-			log.Error(err, "unable to collect metrics")
-			e.Metrics.Error.Set(1)
-			e.Metrics.PgCollectionErrors.WithLabelValues("Collect.SynchronousStandbys").Inc()
-			e.Metrics.SyncReplicas.WithLabelValues("observed").Set(-1)
-		} else {
-			e.Metrics.SyncReplicas.WithLabelValues("observed").Set(float64(nStandbys))
-		}
+		e.collectFromPrimarySynchronousStandbysNumber(db)
+
+		// getting the first point of recoverability
+		e.collectFromPrimaryFirstPointOnTimeRecovery()
 	}
 
 	if err := collectPGWalArchiveMetric(e); err != nil {
@@ -274,6 +281,63 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PGVersion").Inc()
 		e.Metrics.PgVersion.Reset()
 	}
+}
+
+func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
+	const errorLabel = "Collect.FirstRecoverabilityPoint"
+
+	cluster, err := cache.LoadCluster()
+	// there isn't a cached object yet
+	if errors.Is(err, cache.ErrCacheMiss) {
+		return
+	}
+	// programmatic error, we should report that
+	if err != nil {
+		log.Error(err, "error while retrieving cluster cache object")
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues(errorLabel).Inc()
+		// if there is a programmatic error in the cache we should reset any potential data because it cannot be
+		// trusted as still valid
+		e.Metrics.FirstRecoverabilityPoint.Set(0)
+		return
+	}
+
+	ts := cluster.Status.FirstRecoverabilityPoint
+	// means no First recoverability point yet
+	if ts == "" {
+		return
+	}
+
+	parsedTS, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		log.Error(err, "while collecting parsing first recoverability point timestamp")
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues(errorLabel).Inc()
+		// if we cannot parse FirstRecoverabilityPoint we should reset the potential existing value because it cannot be
+		// trusted as still valid
+		e.Metrics.FirstRecoverabilityPoint.Set(0)
+		return
+	}
+
+	// The Prometheus best practice documentation refers to
+	// exposing timestamps using the relative Unix timestamp
+	// number. See:
+	// https://prometheus.io/docs/practices/instrumentation/#timestamps-not-time-since
+	log.Info("pippo", "times", parsedTS.Unix())
+	e.Metrics.FirstRecoverabilityPoint.Set(float64(parsedTS.Unix()))
+}
+
+func (e *Exporter) collectFromPrimarySynchronousStandbysNumber(db *sql.DB) {
+	nStandbys, err := getSynchronousStandbysNumber(db)
+	if err != nil {
+		log.Error(err, "unable to collect metrics")
+		e.Metrics.Error.Set(1)
+		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.SynchronousStandbys").Inc()
+		e.Metrics.SyncReplicas.WithLabelValues("observed").Set(-1)
+		return
+	}
+
+	e.Metrics.SyncReplicas.WithLabelValues("observed").Set(float64(nStandbys))
 }
 
 func collectPGVersion(e *Exporter) error {
