@@ -320,7 +320,9 @@ data:
                 EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())))
               END AS lag,
               pg_is_in_recovery() AS in_recovery,
-              EXISTS (TABLE pg_stat_wal_receiver) AS is_wal_receiver_up"
+              EXISTS (TABLE pg_stat_wal_receiver) AS is_wal_receiver_up,
+              (SELECT count(*) FROM pg_stat_replication) AS streaming_replicas"
+
       metrics:
         - lag:
             usage: "GAUGE"
@@ -331,6 +333,9 @@ data:
         - is_wal_receiver_up:
             usage: "GAUGE"
             description: "Whether the instance wal_receiver is up"
+        - streaming_replicas:
+            usage: "GAUGE"
+            description: "Number of streaming replicas connected to the instance"
 ```
 
 A list of basic monitoring queries can be found in the [`cnp-basic-monitoring.yaml` file](
@@ -486,6 +491,9 @@ cnp_pg_replication_in_recovery 0
 # HELP cnp_pg_replication_lag Replication lag behind primary in seconds
 # TYPE cnp_pg_replication_lag gauge
 cnp_pg_replication_lag 0
+# HELP cnp_pg_replication_streaming_replicas Number of streaming replicas connected to the instance
+# TYPE cnp_pg_replication_streaming_replicas gauge
+cnp_pg_replication_streaming_replicas 2
 # HELP cnp_pg_replication_is_wal_receiver_up Whether the instance wal_receiver is up
 # TYPE cnp_pg_replication_is_wal_receiver_up gauge
 cnp_pg_replication_is_wal_receiver_up 0
