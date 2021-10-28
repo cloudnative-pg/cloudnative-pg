@@ -201,10 +201,8 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 	files[filepath.Join(ConfigsDir, PgBouncerHBAConfFileName)] = pgbouncerHBA.Bytes()
 
 	// The required crypto-material
-	// NOTE: we are using the same CA public key for both the clients and the server
-	// to be "transparent" from the client point of view
 	files[serverTLSCAPath] = secrets.ServerCA.Data[certs.CACertKey]
-	files[clientTLSCAPath] = secrets.ServerCA.Data[certs.CACertKey]
+	files[clientTLSCAPath] = secrets.ClientCA.Data[certs.CACertKey]
 	files[clientTLSCertPath] = secrets.Client.Data[certs.TLSCertKey]
 	files[clientTLSKeyPath] = secrets.Client.Data[certs.TLSPrivateKeyKey]
 
