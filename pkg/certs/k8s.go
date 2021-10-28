@@ -164,35 +164,26 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 		return err
 	}
 
-	err = DumpSecretToDir(webhookSecret, pki.CertDir, "apiserver")
-	if err != nil {
+	if err := DumpSecretToDir(webhookSecret, pki.CertDir, "apiserver"); err != nil {
 		return err
 	}
 
-	err = pki.InjectPublicKeyIntoMutatingWebhook(
+	if err := pki.InjectPublicKeyIntoMutatingWebhook(
 		ctx,
 		client,
-		webhookSecret)
-	if err != nil && apierrors.IsNotFound(err) {
-		pkiLog.Info("mutating pki configuration not found, cannot inject public key",
-			"name", pki.MutatingWebhookConfigurationName)
-	} else if err != nil {
+		webhookSecret); err != nil {
 		return err
 	}
 
-	err = pki.InjectPublicKeyIntoValidatingWebhook(
+	if err := pki.InjectPublicKeyIntoValidatingWebhook(
 		ctx,
 		client,
-		webhookSecret)
-	if err != nil && apierrors.IsNotFound(err) {
-		pkiLog.Info("validating pki configuration not found, cannot inject public key",
-			"name", pki.ValidatingWebhookConfigurationName)
-	} else if err != nil {
+		webhookSecret); err != nil {
 		return err
 	}
 
 	for _, name := range pki.CustomResourceDefinitionsName {
-		if err = pki.InjectPublicKeyIntoCRD(ctx, apiClient, name, webhookSecret); err != nil {
+		if err := pki.InjectPublicKeyIntoCRD(ctx, apiClient, name, webhookSecret); err != nil {
 			return err
 		}
 	}

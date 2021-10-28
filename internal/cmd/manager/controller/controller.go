@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
@@ -344,7 +345,9 @@ func setupPKI(ctx context.Context, certDir string) error {
 			"scheduledbackups.postgresql.k8s.enterprisedb.io",
 		},
 	}
-	err := pkiConfig.Setup(ctx, clientSet, apiClientSet)
+	err := retry.OnError(retry.DefaultRetry, apierrs.IsNotFound, func() error {
+		return pkiConfig.Setup(ctx, clientSet, apiClientSet)
+	})
 	if err != nil {
 		return err
 	}
