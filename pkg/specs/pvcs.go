@@ -19,6 +19,18 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
 
+const (
+	// PVCStatusAnnotationName is an annotation that shows the current status of the PVC.
+	// The status can be "initializing" or "ready"
+	PVCStatusAnnotationName = MetadataNamespace + "/pvcStatus"
+
+	// PVCStatusInitializing is the annotation value for PVC initializing status
+	PVCStatusInitializing = "initializing"
+
+	// PVCStatusReady is the annotation value for PVC ready status
+	PVCStatusReady = "ready"
+)
+
 // ErrorInvalidSize is raised when the size specified by the
 // user is not valid and can't be specified in a PVC declaration
 var ErrorInvalidSize = fmt.Errorf("invalid storage size")
@@ -50,6 +62,7 @@ func CreatePVC(
 			Namespace: namespace,
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(int(nodeSerial)),
+				PVCStatusAnnotationName:     PVCStatusInitializing,
 			},
 		},
 	}
@@ -131,10 +144,17 @@ func DetectPVCs(
 			// We have found a Job corresponding to this PVC, so we
 			// are initializing it or the initialization is just completed
 			result.Initializing = append(result.Initializing, pvc.Name)
-		} else {
-			// This PVC has not a Job nor a Pod using it, it's dangling
-			result.Dangling = append(result.Dangling, pvc.Name)
+			continue
 		}
+
+		if pvc.Annotations[PVCStatusAnnotationName] != PVCStatusReady {
+			// This PVC has not a Job nor a Pod using it, but it is not marked as PVCStatusReady
+			// we need to ignore it here
+			continue
+		}
+
+		// This PVC has not a Job nor a Pod using it, it's dangling
+		result.Dangling = append(result.Dangling, pvc.Name)
 	}
 
 	return result

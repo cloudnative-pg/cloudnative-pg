@@ -154,6 +154,29 @@ func (r *ClusterReconciler) getManagedJobs(
 	return childJobs, nil
 }
 
+// Set the PvcStatusAnnotation to Ready for a PVC
+func (r *ClusterReconciler) pvcSetStatusReady(
+	ctx context.Context,
+	pvc corev1.PersistentVolumeClaim,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
+		return nil
+	}
+
+	contextLogger.Info("Marking PVC as ready", "pvcName", pvc.Name)
+
+	oldPvc := pvc.DeepCopy()
+
+	if pvc.Annotations == nil {
+		pvc.Annotations = make(map[string]string, 1)
+	}
+	pvc.Annotations[specs.PVCStatusAnnotationName] = specs.PVCStatusReady
+
+	return r.Patch(ctx, &pvc, client.MergeFrom(oldPvc))
+}
+
 func (r *ClusterReconciler) updateResourceStatus(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
