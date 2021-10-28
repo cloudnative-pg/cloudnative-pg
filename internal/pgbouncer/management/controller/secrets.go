@@ -62,8 +62,8 @@ func getSecrets(ctx context.Context, client ctrl.Client, pooler *apiv1.Pooler) (
 
 	return &config.Secrets{
 		AuthQuery: &authQuerySecret,
+		ServerCA:  &serverCASecret,
 		Client:    &serverCertSecret,
 		ClientCA:  &clientCASecret,
-		ServerCA:  &clientCASecret,
 	}, nil
 }
