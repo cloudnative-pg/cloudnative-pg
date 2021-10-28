@@ -820,12 +820,23 @@ func (r *ClusterReconciler) joinReplicaInstance(
 }
 
 // reconcilePVCs reattaches a dangling PVC
-func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cluster) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+
+	if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
+		// A pod is not ready, let's retry
+		contextLogger.Debug("Waiting for node to be ready before attaching PVCs")
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
 
 	pvcToReattach := electPvcToReattach(cluster)
 	if pvcToReattach == "" {
-		return nil
+		// This should never happen. This function should be invoked
+		// only when there is something to reattach.
+		contextLogger.Debug("Impossible to elect a PVC to reattach",
+			"danglingPVCs", cluster.Status.DanglingPVC,
+			"initializingPVCs", cluster.Status.InitializingPVC)
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	if len(cluster.Status.DanglingPVC) > 0 {
@@ -837,19 +848,26 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 				"specInstances", cluster.Spec.Instances,
 				"maintenanceWindow", cluster.Spec.NodeMaintenanceWindow,
 				"danglingPVCs", cluster.Status.DanglingPVC)
-			return r.removeDanglingPVCs(ctx, cluster)
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, r.removeDanglingPVCs(ctx, cluster)
 		}
 	}
 
 	pvc := corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, client.ObjectKey{Name: pvcToReattach, Namespace: cluster.Namespace}, &pvc)
 	if err != nil {
-		return fmt.Errorf("error while reattaching PVC: %v", err)
+		return ctrl.Result{}, fmt.Errorf("error while reattaching PVC: %v", err)
+	}
+
+	// Selected PVC in this point must be ready.
+	// Let's make sure the annotation is properly set.
+	err = r.pvcSetStatusReady(ctx, pvc)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	nodeSerial, err := specs.GetNodeSerial(pvc.ObjectMeta)
 	if err != nil {
-		return fmt.Errorf("cannot detect serial from PVC %v: %v", pvc.Name, err)
+		return ctrl.Result{}, fmt.Errorf("cannot detect serial from PVC %v: %v", pvc.Name, err)
 	}
 
 	pod := specs.PodWithExistingStorage(*cluster, int32(nodeSerial))
@@ -867,7 +885,7 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 		"pvc", pvc.Name)
 
 	if err := ctrl.SetControllerReference(cluster, pod, r.Scheme); err != nil {
-		return fmt.Errorf("unable to set the owner reference for the Pod: %w", err)
+		return ctrl.Result{}, fmt.Errorf("unable to set the owner reference for the Pod: %w", err)
 	}
 
 	utils.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
@@ -879,13 +897,14 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
 			contextLogger.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
-			return nil
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 
-		return fmt.Errorf("unable to create Pod: %w", err)
+		return ctrl.Result{}, fmt.Errorf("unable to create Pod: %w", err)
 	}
 
-	return nil
+	// Do another reconcile cycle after handling a dangling PVC
+	return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 }
 
 // electPvcToReattach chooses a PVC between the initializing and the dangling ones that should be reattached

@@ -274,18 +274,14 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 	// Work on the PVCs we currently have
 	pvcNeedingMaintenance := len(cluster.Status.DanglingPVC) + len(cluster.Status.InitializingPVC)
 	if pvcNeedingMaintenance > 0 {
-		if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
-			// A pod is not ready, let's retry
-			contextLogger.Debug("Waiting for node to be ready before attaching PVCs")
-			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
-		}
+		return r.reconcilePVCs(ctx, cluster)
+	}
 
-		if err := r.reconcilePVCs(ctx, cluster); err != nil {
+	// Make sure that all the PVCs are marked as ready
+	for _, pvc := range resources.pvcs.Items {
+		if err := r.pvcSetStatusReady(ctx, pvc); err != nil {
 			return ctrl.Result{}, err
 		}
-
-		// Do another reconcile cycle after handling a dangling PVC
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	// We have these cases now:
