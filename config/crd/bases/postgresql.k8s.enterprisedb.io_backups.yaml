@@ -159,6 +159,17 @@ spec:
               error:
                 description: The detected error
                 type: string
+              instanceID:
+                description: Information to identify the instance where the backup
+                  has been taken from
+                properties:
+                  ContainerID:
+                    description: The container ID
+                    type: string
+                  podName:
+                    description: The pod name
+                    type: string
+                type: object
               phase:
                 description: The last backup status
                 type: string
@@ -357,6 +368,17 @@ spec:
               error:
                 description: The detected error
                 type: string
+              instanceID:
+                description: Information to identify the instance the backup has been
+                  taken from
+                properties:
+                  ContainerID:
+                    description: The container ID
+                    type: string
+                  podName:
+                    description: The pod name
+                    type: string
+                type: object
               phase:
                 description: The last backup status
                 type: string

@@ -96,6 +96,17 @@ type BackupStatus struct {
 
 	// The backup command output in case of error
 	CommandError string `json:"commandError,omitempty"`
+
+	// Information to identify the instance where the backup has been taken from
+	InstanceID *InstanceID `json:"instanceID,omitempty"`
+}
+
+// InstanceID contains the information to identify an instance
+type InstanceID struct {
+	// The pod name
+	PodName string `json:"podName,omitempty"`
+	// The container ID
+	ContainerID string `json:"ContainerID,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -185,7 +185,7 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cloud-native-postgresql-backup"),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
 	}
