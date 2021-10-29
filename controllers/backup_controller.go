@@ -14,11 +14,18 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
@@ -26,6 +33,10 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
+
+// backupPhase indicates the path inside the Backup kind
+// where the phase can be located
+const backupPhase = ".status.phase"
 
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
@@ -66,7 +77,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	// We need to start a backup
 	clusterName := backup.Spec.Cluster.Name
 	var cluster apiv1.Cluster
 	if err := r.Get(ctx, client.ObjectKey{
@@ -85,7 +95,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	r.Recorder.Eventf(&backup, "Normal", "FindingCluster", "Found cluster %v", clusterName)
+	contextLogger.Debug("Found cluster for backup", "cluster", clusterName)
 
 	// Detect the pod where a backup will be executed
 	var pod corev1.Pod
@@ -107,6 +117,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			cluster.Status.TargetPrimary)
 		return ctrl.Result{}, r.Status().Update(ctx, &backup)
 	}
+	contextLogger.Debug("Found pod for backup", "pod", pod.Name)
 
 	if !utils.IsPodReady(pod) {
 		contextLogger.Info("Not ready backup target, will retry in 30 seconds", "target", pod.Name)
@@ -116,8 +127,39 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, r.Status().Update(ctx, &backup)
 	}
 
-	r.Recorder.Eventf(&backup, "Normal", "Starting", "Started backup for cluster %v",
-		clusterName)
+	if backup.Status.Phase != "" && backup.Status.InstanceID != nil {
+		// Detect the pod where a backup will be executed
+		var pod corev1.Pod
+		err = r.Get(ctx, client.ObjectKey{
+			Namespace: backup.Namespace,
+			Name:      backup.Status.InstanceID.PodName,
+		}, &pod)
+		// we found the pod
+		if err == nil &&
+			// the pod is actually the target primary,
+			// we don't care whether it's the current one as running the backup on the new primary would
+			// still be the correct thing to do
+			backup.Status.InstanceID.PodName == cluster.Status.TargetPrimary &&
+			// the pod was not restarted since when we started the backup
+			backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID &&
+			// the pod is active
+			utils.IsPodActive(pod) {
+			contextLogger.Info("Backup is already running on",
+				"cluster", cluster.Name,
+				"pod", pod.Name,
+				"started at", backup.Status.StartedAt)
+
+			// Nothing to do here
+			return ctrl.Result{}, nil
+		}
+		// We need to restart the backup as the previously selected instance doesn't look healthy
+		r.Recorder.Eventf(&backup, "Normal", "ReStarting",
+			"Restarted backup for cluster %v on instance %v", clusterName, pod.Name)
+	} else {
+		// We need to start a backup
+		r.Recorder.Eventf(&backup, "Normal", "Starting", "Starting backup for cluster %v", clusterName)
+	}
+
 	contextLogger.Info("Starting backup",
 		"cluster", cluster.Name,
 		"pod", pod.Name)
@@ -140,7 +182,9 @@ func StartBackup(
 	pod corev1.Pod,
 ) error {
 	// This backup has been started
-	backup.GetStatus().Phase = apiv1.BackupPhaseStarted
+	status := backup.GetStatus()
+	status.Phase = apiv1.BackupPhaseStarted
+	status.InstanceID = &apiv1.InstanceID{PodName: pod.Name, ContainerID: pod.Status.ContainerStatuses[0].ContainerID}
 	if err := postgres.UpdateBackupStatusAndRetry(ctx, client, backup); err != nil {
 		backup.GetStatus().SetAsFailed(fmt.Errorf("can't update backup: %w", err))
 		return err
@@ -176,8 +220,84 @@ func StartBackup(
 }
 
 // SetupWithManager sets up this controller given a controller manager
-func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Backup{},
+		backupPhase, func(rawObj client.Object) []string {
+			return []string{string(rawObj.(*apiv1.Backup).Status.Phase)}
+		}); err != nil {
+		return err
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Backup{}).
+		Watches(&source.Kind{Type: &apiv1.Cluster{}},
+			handler.EnqueueRequestsFromMapFunc(r.mapClustersToBackup(ctx)),
+			builder.WithPredicates(clustersWithBackupPredicate),
+		).
 		Complete(r)
+}
+
+func (r *BackupReconciler) mapClustersToBackup(ctx context.Context) handler.MapFunc {
+	return func(obj client.Object) []reconcile.Request {
+		cluster, ok := obj.(*apiv1.Cluster)
+		if !ok {
+			return nil
+		}
+		var backups apiv1.BackupList
+		err := r.Client.List(ctx, &backups,
+			client.MatchingFields{
+				backupPhase: apiv1.BackupPhaseRunning,
+			},
+			client.InNamespace(cluster.GetNamespace()))
+		if err != nil {
+			log.FromContext(ctx).Error(err, "while getting running backups for cluster", "cluster", cluster.GetName())
+		}
+		var requests []reconcile.Request
+		for _, backup := range backups.Items {
+			if backup.Spec.Cluster.Name == cluster.ClusterName {
+				continue
+			}
+			requests = append(requests,
+				reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      backup.Name,
+						Namespace: backup.Namespace,
+					},
+				},
+			)
+		}
+		return requests
+	}
+}
+
+var clustersWithBackupPredicate = predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool {
+		cluster, ok := e.Object.(*apiv1.Cluster)
+		if !ok {
+			return false
+		}
+		return cluster.Spec.Backup != nil
+	},
+	DeleteFunc: func(e event.DeleteEvent) bool {
+		cluster, ok := e.Object.(*apiv1.Cluster)
+		if !ok {
+			return false
+		}
+		return cluster.Spec.Backup != nil
+	},
+	GenericFunc: func(e event.GenericEvent) bool {
+		cluster, ok := e.Object.(*apiv1.Cluster)
+		if !ok {
+			return false
+		}
+		return cluster.Spec.Backup != nil
+	},
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		cluster, ok := e.ObjectNew.(*apiv1.Cluster)
+		if !ok {
+			return false
+		}
+		return cluster.Spec.Backup != nil
+	},
 }

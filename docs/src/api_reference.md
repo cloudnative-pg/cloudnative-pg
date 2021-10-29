@@ -40,6 +40,7 @@ Below you will find a description of the defined resources:
 - [ConfigMapResourceVersion](#ConfigMapResourceVersion)
 - [DataBackupConfiguration](#DataBackupConfiguration)
 - [ExternalCluster](#ExternalCluster)
+- [InstanceID](#InstanceID)
 - [LocalObjectReference](#LocalObjectReference)
 - [MonitoringConfiguration](#MonitoringConfiguration)
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
@@ -180,6 +181,7 @@ Name             | Description                                                  
 `error           ` | The detected error                                                                                                                                     | string                                                                                           
 `commandOutput   ` | Unused. Retained for compatibility with old versions.                                                                                                  | string                                                                                           
 `commandError    ` | The backup command output in case of error                                                                                                             | string                                                                                           
+`instanceID      ` | Information to identify the instance where the backup has been taken from                                                                              | [*InstanceID](#InstanceID)                                                                       
 
 <a id='BarmanObjectStoreConfiguration'></a>
 
@@ -413,6 +415,17 @@ Name                 | Description                                              
 `sslRootCert         ` | The reference to an SSL CA public key to be used to connect to this instance | [*corev1.SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#secretkeyselector-v1-core)
 `password            ` | The reference to the password to be used to connect to the server            | [*corev1.SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#secretkeyselector-v1-core)
 `barmanObjectStore   ` | The configuration for the barman-cloud tool suite                            | [*BarmanObjectStoreConfiguration](#BarmanObjectStoreConfiguration)                                                         
+
+<a id='InstanceID'></a>
+
+## InstanceID
+
+InstanceID contains the information to identify an instance
+
+Name        | Description      | Type  
+----------- | ---------------- | ------
+`podName    ` | The pod name     | string
+`ContainerID` | The container ID | string
 
 <a id='LocalObjectReference'></a>
 

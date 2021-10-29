@@ -38,6 +38,12 @@ func (src *Backup) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive
 	dst.Status.EndWal = src.Status.EndWal
 	dst.Status.BeginLSN = src.Status.BeginLSN
 	dst.Status.EndLSN = src.Status.EndLSN
+	if src.Status.InstanceID != nil {
+		dst.Status.InstanceID = &v1.InstanceID{
+			PodName:     src.Status.InstanceID.PodName,
+			ContainerID: src.Status.InstanceID.ContainerID,
+		}
+	}
 
 	// status.s3Credentials
 	if src.Status.S3Credentials != nil {
@@ -108,6 +114,12 @@ func (dst *Backup) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 	dst.Status.EndWal = src.Status.EndWal
 	dst.Status.BeginLSN = src.Status.BeginLSN
 	dst.Status.EndLSN = src.Status.EndLSN
+	if src.Status.InstanceID != nil {
+		dst.Status.InstanceID = &InstanceID{
+			PodName:     src.Status.InstanceID.PodName,
+			ContainerID: src.Status.InstanceID.ContainerID,
+		}
+	}
 
 	// status.s3Credentials
 	if src.Status.S3Credentials != nil {
