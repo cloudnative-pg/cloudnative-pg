@@ -1,8 +1,8 @@
 # Example of PostgreSQL cluster
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
-  name: cluster2-v1alpha1
+  name: cluster2
 spec:
   instances: 3
   imageName: "${POSTGRES_IMG}"
@@ -35,7 +35,7 @@ spec:
 
   backup:
     barmanObjectStore:
-      destinationPath: s3://cluster2-v1alpha1-full-backup/
+      destinationPath: s3://cluster2-full-backup/
       endpointURL: http://minio-service:9000
       s3Credentials:
         accessKeyId:

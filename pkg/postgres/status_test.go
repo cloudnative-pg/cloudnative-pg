@@ -59,7 +59,7 @@ var _ = Describe("PostgreSQL status", func() {
 		},
 	}
 
-	It("check for errors in the Pod status", func() {
+	It("checks for errors in the Pod status", func() {
 		greenList := PostgresqlStatusList{
 			Items: []PostgresqlStatus{
 				{
@@ -78,6 +78,27 @@ var _ = Describe("PostgreSQL status", func() {
 
 		Expect(list.IsComplete()).To(BeFalse())
 		Expect(greenList.IsComplete()).To(BeTrue())
+	})
+
+	It("checks for pods on which we are upgrading the instance manager", func() {
+		podList := PostgresqlStatusList{
+			Items: []PostgresqlStatus{
+				{
+					Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
+					IsPrimary:   false,
+					ReceivedLsn: "1/21",
+					IsReady:     true,
+				},
+				{
+					Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+					IsPrimary: true,
+					IsReady:   true,
+				},
+			},
+		}
+		Expect(podList.ArePodsUpgradingInstanceManager()).To(BeFalse())
+		podList.Items[0].IsInstanceManagerUpgrading = true
+		Expect(podList.ArePodsUpgradingInstanceManager()).To(BeTrue())
 	})
 
 	Describe("when sorted", func() {

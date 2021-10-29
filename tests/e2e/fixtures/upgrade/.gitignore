@@ -1,6 +1,6 @@
-cluster-from-v1alpha1-restore.yaml
-cluster-v1alpha1.yaml
-cluster2-v1alpha1.yaml
+cluster-restore.yaml
+cluster1.yaml
+cluster2.yaml
 conf-update.yaml
 conf-update2.yaml
 current-manifest.yaml

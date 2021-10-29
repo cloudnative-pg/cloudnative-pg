@@ -65,21 +65,13 @@ if notinpath "${go_bin}"; then
 fi
 
 if ! which ginkgo &>/dev/null; then
-  install_go_module "github.com/onsi/ginkgo/ginkgo@a9b2e3398"
-fi
-
-# Skip upgrade tests on Postgres 14 or Kubernetes 1.22
-if [[ "${POSTGRES_IMG}" =~ "14" ]] || [[ "${K8S_VERSION}" =~ ^v1\.22 ]]; then
-  TEST_UPGRADE_TO_V1=false
+  install_go_module "github.com/onsi/ginkgo/ginkgo@6e68f79684d4"
 fi
 
 # To run all ginkgo test suite, store return code for individual ginkgo suite and
 # after completion the run it will exit on any of the failure
 RC=0
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
-  # Install a version of the operator using v1alpha1
-  kubectl apply -f "${ROOT_DIR}/releases/postgresql-operator-0.7.0.yaml"
-
   # Generate a manifest for the operator after the api upgrade
   # TODO: this is almost a "make deploy". Refactor.
   make manifests kustomize
@@ -95,12 +87,6 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
       "${KUSTOMIZE}" edit add configmap controller-manager-env "--from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMG}"
   )
   "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml"
-
-  # Wait for the v1alpha1 operator (0.7.0) to be up and running
-  kubectl wait --for=condition=Available --timeout=2m \
-    -n postgresql-operator-system deployments \
-    postgresql-operator-controller-manager
-
   # Run the upgrade tests
   mkdir -p "${ROOT_DIR}/tests/e2e/out"
   # Unset DEBUG to prevent k8s from spamming messages

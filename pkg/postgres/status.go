@@ -25,6 +25,11 @@ type PostgresqlStatus struct {
 	// status of a Pod
 	Error   error `json:"-"`
 	IsReady bool  `json:"isReady"`
+
+	// Status of the instance manager
+	ExecutableHash             string `json:"executableHash"`
+	IsInstanceManagerUpgrading bool   `json:"isInstanceManagerUpgrading"`
+	InstanceArch               string `json:"instanceArch"`
 }
 
 // PostgresqlStatusList is a list of PostgreSQL instances status, useful to
@@ -43,7 +48,7 @@ func (list *PostgresqlStatusList) Swap(i, j int) {
 	list.Items[i], list.Items[j] = list.Items[j], list.Items[i]
 }
 
-// Less compare two elements. Primary instances always go first, ordered by their Pod
+// Less compares two elements. Primary instances always go first, ordered by their Pod
 // name (split brain?), and secondaries always go by their replication status with
 // the more updated one coming as first
 func (list *PostgresqlStatusList) Less(i, j int) bool {
@@ -91,7 +96,7 @@ func (list *PostgresqlStatusList) Less(i, j int) bool {
 	return list.Items[i].Pod.Name < list.Items[j].Pod.Name
 }
 
-// AreWalReceiversDown check if every WAL receiver of the cluster is down
+// AreWalReceiversDown checks if every WAL receiver of the cluster is down
 func (list PostgresqlStatusList) AreWalReceiversDown() bool {
 	for idx := range list.Items {
 		if list.Items[idx].IsWalReceiverActive {
@@ -113,7 +118,7 @@ func (list PostgresqlStatusList) IsPodReporting(podname string) bool {
 	return false
 }
 
-// IsComplete check the PostgreSQL status list for Pods which
+// IsComplete checks the PostgreSQL status list for Pods which
 // contain errors. Returns true if everything is green and
 // false otherwise
 func (list PostgresqlStatusList) IsComplete() bool {
@@ -124,4 +129,15 @@ func (list PostgresqlStatusList) IsComplete() bool {
 	}
 
 	return true
+}
+
+// ArePodsUpgradingInstanceManager checks if there pods on which we are upgrading the instance manager
+func (list PostgresqlStatusList) ArePodsUpgradingInstanceManager() bool {
+	for _, item := range list.Items {
+		if item.IsInstanceManagerUpgrading {
+			return true
+		}
+	}
+
+	return false
 }

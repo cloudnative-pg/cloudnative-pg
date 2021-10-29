@@ -36,15 +36,6 @@ var _ = Describe("Pod upgrade", func() {
 		Expect(newImage).NotTo(BeEmpty())
 	})
 
-	It("checks when the image name of the operator is different", func() {
-		pod := specs.PodWithExistingStorage(cluster, 1)
-		pod.Spec.InitContainers[0].Image = pod.Spec.InitContainers[0].Image + ".1"
-		oldImage, newImage, err := isPodNeedingUpgradedImage(&cluster, *pod)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(oldImage).NotTo(BeEmpty())
-		Expect(newImage).NotTo(BeEmpty())
-	})
-
 	It("checks when a restart has been scheduled on the cluster", func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		clusterRestart := cluster
@@ -67,5 +58,23 @@ var _ = Describe("Pod upgrade", func() {
 				PendingRestart: true,
 			})).
 			To(BeTrue())
+	})
+
+	It("checks when a rollout is being needed for any reason", func() {
+		pod := specs.PodWithExistingStorage(cluster, 1)
+		status := postgres.PostgresqlStatus{Pod: *pod, PendingRestart: true}
+		needRollout, reason := IsPodNeedingRollout(status, &cluster)
+		Expect(needRollout).To(BeFalse())
+		Expect(reason).To(BeEmpty())
+
+		status.IsReady = true
+		needRollout, reason = IsPodNeedingRollout(status, &cluster)
+		Expect(needRollout).To(BeTrue())
+		Expect(reason).To(BeEmpty())
+
+		status.ExecutableHash = "test_hash"
+		needRollout, reason = IsPodNeedingRollout(status, &cluster)
+		Expect(needRollout).To(BeTrue())
+		Expect(reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
 	})
 })

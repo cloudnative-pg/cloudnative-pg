@@ -17,4 +17,7 @@ const (
 
 	// LabelUpgrade is the string for labelling upgrade tests
 	LabelUpgrade = "upgrade"
+
+	// LabelNoOpenshift is the string for labelling tests that don't run on Openshift
+	LabelNoOpenshift = "no-openshift"
 )

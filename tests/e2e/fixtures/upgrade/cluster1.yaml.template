@@ -1,7 +1,7 @@
-apiVersion: postgresql.k8s.enterprisedb.io/v1alpha1
+apiVersion: postgresql.k8s.enterprisedb.io/v1
 kind: Cluster
 metadata:
-  name: cluster-v1alpha1
+  name: cluster1
 spec:
   instances: 3
   imageName: "${POSTGRES_IMG}"
@@ -34,7 +34,7 @@ spec:
 
   backup:
     barmanObjectStore:
-      destinationPath: s3://cluster-v1alpha1-full-backup/
+      destinationPath: s3://cluster-full-backup/
       endpointURL: http://minio-service:9000
       s3Credentials:
         accessKeyId:

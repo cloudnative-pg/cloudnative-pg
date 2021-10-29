@@ -1,8 +1,7 @@
 apiVersion: postgresql.k8s.enterprisedb.io/v1
-kind: ScheduledBackup
+kind: Backup
 metadata:
-  name: scheduled-backup
+  name: cluster-backup
 spec:
-  schedule: "*/30 * * * * *"
   cluster:
     name: cluster1

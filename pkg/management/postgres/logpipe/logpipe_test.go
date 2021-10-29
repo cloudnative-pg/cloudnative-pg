@@ -7,6 +7,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package logpipe
 
 import (
+	"context"
 	"errors"
 	"io/ioutil"
 	"os"
@@ -29,6 +30,8 @@ func (writer *SpyRecordWriter) Write(record NamedRecord) {
 
 var _ = Describe("CSV file reader", func() {
 	When("given CSV logs from logging_collector", func() {
+		ctx := context.TODO()
+
 		It("can read multiple CSV lines", func() {
 			f, err := os.Open("testdata/two_lines.csv")
 			defer func() {
@@ -41,7 +44,7 @@ var _ = Describe("CSV file reader", func() {
 				record:          &LoggingRecord{},
 				fieldsValidator: LogFieldValidator,
 			}
-			Expect(p.streamLogFromCSVFile(f, &spy)).To(Succeed())
+			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
 			Expect(len(spy.records)).To(Equal(2))
 		})
 
@@ -57,7 +60,7 @@ var _ = Describe("CSV file reader", func() {
 				record:          &LoggingRecord{},
 				fieldsValidator: LogFieldValidator,
 			}
-			Expect(p.streamLogFromCSVFile(f, &spy)).To(Succeed())
+			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
 			Expect(len(spy.records)).To(Equal(2))
 		})
 
@@ -73,7 +76,7 @@ var _ = Describe("CSV file reader", func() {
 				record:          &LoggingRecord{},
 				fieldsValidator: LogFieldValidator,
 			}
-			Expect(p.streamLogFromCSVFile(f, &spy)).To(Succeed())
+			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
 			Expect(len(spy.records)).To(Equal(2))
 		})
 
@@ -89,7 +92,7 @@ var _ = Describe("CSV file reader", func() {
 				record:          NewPgAuditLoggingDecorator(),
 				fieldsValidator: LogFieldValidator,
 			}
-			Expect(p.streamLogFromCSVFile(f, &spy)).To(Succeed())
+			Expect(p.streamLogFromCSVFile(ctx, f, &spy)).To(Succeed())
 			Expect(len(spy.records)).To(Equal(2))
 		})
 
@@ -107,7 +110,7 @@ var _ = Describe("CSV file reader", func() {
 					record:          &LoggingRecord{},
 					fieldsValidator: LogFieldValidator,
 				}
-				err := p.streamLogFromCSVFile(reader, &spy)
+				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
 				Expect(len(spy.records)).To(Equal(0))
 
@@ -125,7 +128,7 @@ var _ = Describe("CSV file reader", func() {
 					record:          &LoggingRecord{},
 					fieldsValidator: LogFieldValidator,
 				}
-				err := p.streamLogFromCSVFile(reader, &spy)
+				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
 				Expect(len(spy.records)).To(Equal(0))
 
@@ -143,7 +146,7 @@ var _ = Describe("CSV file reader", func() {
 					record:          &LoggingRecord{},
 					fieldsValidator: LogFieldValidator,
 				}
-				err := p.streamLogFromCSVFile(reader, &spy)
+				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
 				Expect(len(spy.records)).To(Equal(0))
 
@@ -161,7 +164,7 @@ var _ = Describe("CSV file reader", func() {
 					record:          &LoggingRecord{},
 					fieldsValidator: LogFieldValidator,
 				}
-				err := p.streamLogFromCSVFile(reader, &spy)
+				err := p.streamLogFromCSVFile(ctx, reader, &spy)
 				Expect(err).Should(HaveOccurred())
 				Expect(len(spy.records)).To(Equal(1))
 
@@ -177,7 +180,7 @@ var _ = Describe("CSV file reader", func() {
 				record:          &LoggingRecord{},
 				fieldsValidator: LogFieldValidator,
 			}
-			Expect(p.streamLogFromCSVFile(strings.NewReader(""), &spy)).To(Succeed())
+			Expect(p.streamLogFromCSVFile(ctx, strings.NewReader(""), &spy)).To(Succeed())
 			Expect(len(spy.records)).To(Equal(0))
 		})
 	})

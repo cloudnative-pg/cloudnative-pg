@@ -14,16 +14,20 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/executablehash"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
@@ -31,6 +35,15 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
+
+// StatusRequestRetry is the default backoff used to query the instance manager
+// for the status of each PostgreSQL instance.
+var StatusRequestRetry = wait.Backoff{
+	Steps:    5,
+	Duration: 10 * time.Millisecond,
+	Factor:   5.0,
+	Jitter:   0.1,
+}
 
 // managedResources contains the resources that are created a cluster
 // and need to be managed by the controller
@@ -258,6 +271,15 @@ func (r *ClusterReconciler) updateResourceStatus(
 		log.Error(err, "while checking pooler integrations were needed, ignored")
 	}
 
+	// Set the current hash code of the operator binary inside the status.
+	// This is used by the instance manager to validate if a certain binary is
+	// valid or not
+	var err error
+	cluster.Status.OperatorHash, err = executablehash.Get()
+	if err != nil {
+		return err
+	}
+
 	// refresh expiration dates of certifications
 	if err := r.refreshCertsExpirations(ctx, cluster); err != nil {
 		return err
@@ -275,6 +297,19 @@ func (r *ClusterReconciler) updateResourceStatus(
 		return r.Status().Update(ctx, cluster)
 	}
 	return nil
+}
+
+// updateOnlineUpdateEnabled updates the `OnlineUpdateEnabled` value in the cluster status
+func (r *ClusterReconciler) updateOnlineUpdateEnabled(
+	ctx context.Context, cluster *apiv1.Cluster, onlineUpdateEnabled bool,
+) error {
+	// do nothing if onlineUpdateEnabled have not changed
+	if cluster.Status.OnlineUpdateEnabled == onlineUpdateEnabled {
+		return nil
+	}
+
+	cluster.Status.OnlineUpdateEnabled = onlineUpdateEnabled
+	return r.Status().Update(ctx, cluster)
 }
 
 // SetClusterOwnerAnnotationsAndLabels sets the cluster as owner of the passed object and then
@@ -611,8 +646,27 @@ func extractInstancesStatus(
 	return result
 }
 
-// getReplicaStatusFromPodViaHTTP retrieves the status of PostgreSQL pods via an HTTP request with GET method.
-func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) postgres.PostgresqlStatus {
+// getReplicaStatusFromPodViaHTTP retrieves the status of PostgreSQL pod via HTTP, retrying
+// the request if some error is encountered
+func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) (result postgres.PostgresqlStatus) {
+	isErrorRetryable := func(err error) bool {
+		log.FromContext(ctx).Info("Error while requesting the status of an instance, retrying",
+			"pod", pod.Name,
+			"error", err)
+		return true
+	}
+
+	err := retry.OnError(StatusRequestRetry, isErrorRetryable, func() error {
+		result = rawReplicaStatusRequest(ctx, pod)
+		return result.Error
+	})
+	result.Error = err
+
+	return result
+}
+
+// rawReplicaStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.
+func rawReplicaStatusRequest(ctx context.Context, pod corev1.Pod) postgres.PostgresqlStatus {
 	var result postgres.PostgresqlStatus
 
 	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus, url.StatusPort)

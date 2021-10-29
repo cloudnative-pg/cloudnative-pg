@@ -130,6 +130,7 @@ NodeSelector
 OCP
 OU
 ObjectMeta
+OnlineUpdateEnabled
 OpenShift
 Openshift
 OperatorHub

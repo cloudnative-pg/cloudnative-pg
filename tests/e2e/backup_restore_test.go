@@ -903,35 +903,6 @@ func assertROSASTokenUnableToWrite(containerName string, id string, key string) 
 	Expect(err).To(HaveOccurred())
 }
 
-func AssertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string, timeout int) {
-	_, _, err := tests.Run(fmt.Sprintf(
-		"kubectl apply -n %v -f %v",
-		namespace, backupYAMLPath))
-	Expect(err).NotTo(HaveOccurred())
-
-	scheduledBackupName, err := env.GetResourceNameFromYAML(backupYAMLPath)
-	Expect(err).NotTo(HaveOccurred())
-
-	// We expect the scheduled backup to be scheduled before a
-	// timeout
-	scheduledBackupNamespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      scheduledBackupName,
-	}
-
-	Eventually(func() (*v1.Time, error) {
-		scheduledBackup := &apiv1.ScheduledBackup{}
-		err := env.Client.Get(env.Ctx,
-			scheduledBackupNamespacedName, scheduledBackup)
-		return scheduledBackup.Status.LastScheduleTime, err
-	}, timeout).ShouldNot(BeNil())
-
-	// Within a few minutes we should have at least two backups
-	Eventually(func() (int, error) {
-		return getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
-	}, timeout).Should(BeNumerically(">=", 2))
-}
-
 func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile string) {
 	By("Async Replication into external cluster", func() {
 		restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
@@ -1083,21 +1054,6 @@ func executeBackup(namespace string, backupFile string) {
 	Expect(backupStatus.EndWal).NotTo(BeEmpty())
 }
 
-func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupName string) (int, error) {
-	backups, err := getScheduledBackupBackups(namespace, scheduledBackupName)
-	if err != nil {
-		return -1, err
-	}
-	completed := 0
-	for _, backup := range backups {
-		if strings.HasPrefix(backup.Name, scheduledBackupName+"-") &&
-			backup.Status.Phase == apiv1.BackupPhaseCompleted {
-			completed++
-		}
-	}
-	return completed, nil
-}
-
 func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 	var completedBackupsCount int
 	var err error
@@ -1241,34 +1197,6 @@ func composeAzBlobListAzuriteCmd(clusterName string, path string) string {
 	return fmt.Sprintf("az storage blob list --container-name %v --query \"[?contains(@.name, \\`%v\\`)].name\" "+
 		"--connection-string $AZURE_CONNECTION_STRING",
 		clusterName, path)
-}
-
-func getScheduledBackupBackups(namespace string, scheduledBackupName string) ([]apiv1.Backup, error) {
-	scheduledBackupNamespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      scheduledBackupName,
-	}
-	// Get all the backups that are children of the ScheduledBackup
-	scheduledBackup := &apiv1.ScheduledBackup{}
-	err := env.Client.Get(env.Ctx, scheduledBackupNamespacedName,
-		scheduledBackup)
-	backups := &apiv1.BackupList{}
-	if err != nil {
-		return nil, err
-	}
-	err = env.Client.List(env.Ctx, backups,
-		ctrlclient.InNamespace(namespace))
-	if err != nil {
-		return nil, err
-	}
-	ret := []apiv1.Backup{}
-
-	for _, backup := range backups.Items {
-		if strings.HasPrefix(backup.Name, scheduledBackup.Name+"-") {
-			ret = append(ret, backup)
-		}
-	}
-	return ret, nil
 }
 
 func composeFindMinioCmd(path string, serviceName string) string {

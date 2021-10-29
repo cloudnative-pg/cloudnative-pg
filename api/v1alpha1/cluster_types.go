@@ -199,6 +199,12 @@ type ClusterStatus struct {
 
 	// The integration needed by poolers referencing the cluster
 	PoolerIntegrations *PoolerIntegrations `json:"poolerIntegrations,omitempty"`
+
+	// The hash of the binary of the operator
+	OperatorHash string `json:"cloudNativePostgresqlOperatorHash,omitempty"`
+
+	// OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster
+	OnlineUpdateEnabled bool `json:"onlineUpdateEnabled,omitempty"`
 }
 
 // PoolerIntegrations encapsulates the needed integrations for the poolers referencing the cluster

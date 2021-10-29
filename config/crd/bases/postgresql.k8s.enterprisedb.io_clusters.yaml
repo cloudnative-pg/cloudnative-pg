@@ -1880,6 +1880,9 @@ spec:
               cloudNativePostgresqlCommitHash:
                 description: The commit hash number of which this operator running
                 type: string
+              cloudNativePostgresqlOperatorHash:
+                description: The hash of the binary of the operator
+                type: string
               configMapResourceVersion:
                 description: The list of resource versions of the configmaps, managed
                   by the operator. Every change here is done in the interest of the
@@ -1941,6 +1944,10 @@ spec:
                   clashing)
                 format: int32
                 type: integer
+              onlineUpdateEnabled:
+                description: OnlineUpdateEnabled shows if the online upgrade is enabled
+                  inside the cluster
+                type: boolean
               phase:
                 description: Current phase of the cluster
                 type: string
@@ -3848,6 +3855,9 @@ spec:
               cloudNativePostgresqlCommitHash:
                 description: The commit hash number of which this operator running
                 type: string
+              cloudNativePostgresqlOperatorHash:
+                description: The hash of the binary of the operator
+                type: string
               configMapResourceVersion:
                 description: The list of resource versions of the configmaps managed
                   by the operator. Every change here is done in the interest of the
@@ -3902,6 +3912,10 @@ spec:
                   clashing)
                 format: int32
                 type: integer
+              onlineUpdateEnabled:
+                description: OnlineUpdateEnabled shows if the online upgrade is enabled
+                  inside the cluster
+                type: boolean
               phase:
                 description: Current phase of the cluster
                 type: string
