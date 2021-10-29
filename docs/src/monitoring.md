@@ -122,11 +122,11 @@ cnp_collector_sync_replicas{value="observed"} 0
 
 # HELP cnp_collector_up 1 if PostgreSQL is up, 0 otherwise.
 # TYPE cnp_collector_up gauge
-cnp_collector_up 1
+cnp_collector_up{cluster="cluster-example"} 1
 
 # HELP cnp_collector_postgres_version Postgres version
 # TYPE cnp_collector_postgres_version gauge
-cnp_collector_postgres_version{full="13.4.0"} 13.4
+cnp_collector_postgres_version{cluster="cluster-example",full="13.4.0"} 13.4
 
 # HELP cnp_collector_first_recoverability_point The first point of recoverability for the cluster as a unix timestamp
 # TYPE cnp_collector_first_recoverability_point gauge
