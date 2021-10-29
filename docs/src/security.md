@@ -162,7 +162,7 @@ By default, every replica is automatically configured to connect in **physical
 async streaming replication** with the current primary instance, with a special
 user called `streaming_replica`. The connection between nodes is **encrypted**
 and authentication is via **TLS client certificates** (please refer to the
-["Client TLS/SSL Connections"](ssl_connections.md#Client TLS/SSL Connections) page
+["Client TLS/SSL Connections"](ssl_connections.md#"Client TLS/SSL Connections") page
 for details).
 
 Currently, the operator allows administrators to add `pg_hba.conf` lines directly in the manifest
