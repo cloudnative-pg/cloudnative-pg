@@ -72,7 +72,7 @@ type metrics struct {
 	CollectionsTotal         prometheus.Counter
 	PgCollectionErrors       *prometheus.CounterVec
 	Error                    prometheus.Gauge
-	PostgreSQLUp             prometheus.Gauge
+	PostgreSQLUp             *prometheus.GaugeVec
 	CollectionDuration       *prometheus.GaugeVec
 	SwitchoverRequired       prometheus.Gauge
 	SyncReplicas             *prometheus.GaugeVec
@@ -113,12 +113,12 @@ func newMetrics() *metrics {
 			Name:      "last_collection_error",
 			Help:      "1 if the last collection ended with error, 0 otherwise.",
 		}),
-		PostgreSQLUp: prometheus.NewGauge(prometheus.GaugeOpts{
+		PostgreSQLUp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "up",
 			Help:      "1 if PostgreSQL is up, 0 otherwise.",
-		}),
+		}, []string{"cluster"}),
 		CollectionDuration: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
@@ -155,7 +155,7 @@ func newMetrics() *metrics {
 			Subsystem: subsystem,
 			Name:      "postgres_version",
 			Help:      "Postgres version",
-		}, []string{"full"}),
+		}, []string{"full", "cluster"}),
 		PgWALDirectory: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
@@ -178,7 +178,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.Metrics.CollectionsTotal.Desc()
 	ch <- e.Metrics.Error.Desc()
 	e.Metrics.PgCollectionErrors.Describe(ch)
-	ch <- e.Metrics.PostgreSQLUp.Desc()
+	e.Metrics.PostgreSQLUp.Describe(ch)
 	ch <- e.Metrics.SwitchoverRequired.Desc()
 	e.Metrics.CollectionDuration.Describe(ch)
 	e.Metrics.SyncReplicas.Describe(ch)
@@ -201,7 +201,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ch <- e.Metrics.CollectionsTotal
 	ch <- e.Metrics.Error
 	e.Metrics.PgCollectionErrors.Collect(ch)
-	ch <- e.Metrics.PostgreSQLUp
+	e.Metrics.PostgreSQLUp.Collect(ch)
 	ch <- e.Metrics.SwitchoverRequired
 	e.Metrics.CollectionDuration.Collect(ch)
 	e.Metrics.SyncReplicas.Collect(ch)
@@ -225,13 +225,13 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	// First, let's check the connection. No need to proceed if this fails.
 	if err := db.Ping(); err != nil {
 		log.Error(err, "Error pinging PostgreSQL")
-		e.Metrics.PostgreSQLUp.Set(0)
+		e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.ClusterName).Set(0)
 		e.Metrics.Error.Set(1)
 		e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 		return
 	}
 
-	e.Metrics.PostgreSQLUp.Set(1)
+	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.ClusterName).Set(1)
 	e.Metrics.Error.Set(0)
 	e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 
@@ -353,7 +353,7 @@ func collectPGVersion(e *Exporter) error {
 	}
 
 	majorMinorPatch := fmt.Sprintf("%s.%d", majorMinor, semanticVersion.Patch)
-	e.Metrics.PgVersion.WithLabelValues(majorMinorPatch).Set(version)
+	e.Metrics.PgVersion.WithLabelValues(majorMinorPatch, e.instance.ClusterName).Set(version)
 
 	return nil
 }
