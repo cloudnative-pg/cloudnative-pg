@@ -42,6 +42,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/controller"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
@@ -400,40 +401,40 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 	cluster := &apiv1.Cluster{}
 	_ = env.Client.Get(env.Ctx, namespacedName, cluster)
 	out, _ := json.MarshalIndent(cluster, "", "    ")
-	fmt.Fprintf(w, "Dumping %v/%v cluster\n", namespace, clusterName)
-	fmt.Fprintln(w, string(out))
+	_, _ = fmt.Fprintf(w, "Dumping %v/%v cluster\n", namespace, clusterName)
+	_, _ = fmt.Fprintln(w, string(out))
 
 	podList, _ := env.GetPodList(namespace)
 	for _, pod := range podList.Items {
 		out, _ := json.MarshalIndent(pod, "", "    ")
-		fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)
-		fmt.Fprintln(w, string(out))
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)
+		_, _ = fmt.Fprintln(w, string(out))
 	}
 
 	pvcList, _ := env.GetPVCList(namespace)
 	for _, pvc := range pvcList.Items {
 		out, _ := json.MarshalIndent(pvc, "", "    ")
-		fmt.Fprintf(w, "Dumping %v/%v PVC\n", namespace, pvc.Name)
-		fmt.Fprintln(w, string(out))
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v PVC\n", namespace, pvc.Name)
+		_, _ = fmt.Fprintln(w, string(out))
 	}
 
 	jobList, _ := env.GetJobList(namespace)
 	for _, job := range jobList.Items {
 		out, _ := json.MarshalIndent(job, "", "    ")
-		fmt.Fprintf(w, "Dumping %v/%v job\n", namespace, job.Name)
-		fmt.Fprintln(w, string(out))
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v job\n", namespace, job.Name)
+		_, _ = fmt.Fprintln(w, string(out))
 	}
 
 	eventList, _ := env.GetEventList(namespace)
 	out, _ = json.MarshalIndent(eventList.Items, "", "    ")
-	fmt.Fprintf(w, "Dumping events for namespace %v\n", namespace)
-	fmt.Fprintln(w, string(out))
+	_, _ = fmt.Fprintf(w, "Dumping events for namespace %v\n", namespace)
+	_, _ = fmt.Fprintln(w, string(out))
 
 	serviceAccountList, _ := env.GetServiceAccountList(namespace)
 	for _, sa := range serviceAccountList.Items {
 		out, _ := json.MarshalIndent(sa, "", "    ")
-		fmt.Fprintf(w, "Dumping %v/%v serviceaccount\n", namespace, sa.Name)
-		fmt.Fprintln(w, string(out))
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v serviceaccount\n", namespace, sa.Name)
+		_, _ = fmt.Fprintln(w, string(out))
 	}
 
 	suffixes := []string{"-r", "-rw", "-any"}
@@ -445,8 +446,8 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 		endpoint := &corev1.Endpoints{}
 		_ = env.Client.Get(env.Ctx, namespacedName, endpoint)
 		out, _ := json.MarshalIndent(endpoint, "", "    ")
-		fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
-		fmt.Fprintln(w, string(out))
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
+		_, _ = fmt.Fprintln(w, string(out))
 	}
 	err = w.Flush()
 	if err != nil {
@@ -683,4 +684,80 @@ func (env TestingEnvironment) GetResourceNamespaceFromYAML(path string) (string,
 		return "", err
 	}
 	return namespacedName.Namespace, err
+}
+
+// GetPoolerList gathers the current list of poolers in a namespace
+func (env TestingEnvironment) GetPoolerList(namespace string) (*apiv1.PoolerList, error) {
+	poolerList := &apiv1.PoolerList{}
+
+	err := env.Client.List(
+		env.Ctx, poolerList, client.InNamespace(namespace))
+
+	return poolerList, err
+}
+
+// DumpPoolerResourcesInfo logs the JSON for the pooler resources in a namespace, its pods, deployment,
+// services and endpoints
+func (env TestingEnvironment) DumpPoolerResourcesInfo(namespace, currentTestName string) {
+	poolerList, err := env.GetPoolerList(namespace)
+	if err != nil {
+		return
+	}
+	if len(poolerList.Items) > 0 {
+		for _, pooler := range poolerList.Items {
+			// it will create a filename along with pooler name and currentTest name
+			fileName := "out/" + fmt.Sprintf("%v-%v.log", currentTestName, pooler.GetName())
+			f, err := os.Create(fileName)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			w := bufio.NewWriter(f)
+
+			// dump pooler info
+			out, _ := json.MarshalIndent(pooler, "", "    ")
+			_, _ = fmt.Fprintf(w, "Dumping %v/%v pooler\n", namespace, pooler.Name)
+			_, _ = fmt.Fprintln(w, string(out))
+
+			// pooler name used as resources name like Service, Deployment, EndPoints name info
+			poolerName := pooler.GetName()
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      poolerName,
+			}
+
+			// dump pooler endpoints info
+			endpoint := &corev1.Endpoints{}
+			_ = env.Client.Get(env.Ctx, namespacedName, endpoint)
+			out, _ = json.MarshalIndent(endpoint, "", "    ")
+			_, _ = fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
+			_, _ = fmt.Fprintln(w, string(out))
+
+			// dump pooler service info
+			service := &corev1.Service{}
+			_ = env.Client.Get(env.Ctx, namespacedName, service)
+			out, _ = json.MarshalIndent(service, "", "    ")
+			_, _ = fmt.Fprintf(w, "Dumping %v/%v service\n", namespace, service.Name)
+			_, _ = fmt.Fprintln(w, string(out))
+
+			// dump pooler pods info
+			podList := &corev1.PodList{}
+			_ = env.Client.List(env.Ctx, podList, client.InNamespace(namespace),
+				client.MatchingLabels{pgbouncer.PgbouncerNameLabel: poolerName})
+			for _, pod := range podList.Items {
+				out, _ = json.MarshalIndent(pod, "", "    ")
+				_, _ = fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)
+				_, _ = fmt.Fprintln(w, string(out))
+			}
+
+			// dump deployment info
+			deployment := &appsv1.Deployment{}
+			_ = env.Client.Get(env.Ctx, namespacedName, deployment)
+			out, _ = json.MarshalIndent(deployment, "", "    ")
+			_, _ = fmt.Fprintf(w, "Dumping %v/%v deployment\n", namespace, deployment.Name)
+			_, _ = fmt.Fprintln(w, string(out))
+		}
+	} else {
+		return
+	}
 }
