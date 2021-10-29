@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/blang/semver"
 	"github.com/spf13/cobra"
@@ -49,15 +50,18 @@ func NewCmd() *cobra.Command {
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			contextLog := log.WithName("wal-restore")
 			err := run(contextLog, namespace, clusterName, podName, args)
-			if err != nil {
-				if errors.Is(err, ErrNoBackupConfigured) {
-					contextLog.Info("tried restoring WALs, but no backup was configured")
-				} else {
-					contextLog.Error(err, "failed to run wal-restore command")
-				}
-				return err
+			if err == nil {
+				return nil
 			}
-			return nil
+
+			if errors.Is(err, ErrNoBackupConfigured) {
+				contextLog.Info("tried restoring WALs, but no backup was configured")
+			} else {
+				contextLog.Error(err, "failed to run wal-restore command")
+			}
+			contextLog.Info("There was an error in the previous wal-restore command. Waiting 100 ms before retrying.")
+			time.Sleep(100 * time.Millisecond)
+			return err
 		},
 	}
 
