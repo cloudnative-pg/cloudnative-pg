@@ -41,6 +41,7 @@ var _ = Describe("PGBouncer Connections", func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpPoolerResourcesInfo(namespace, CurrentSpecReport().LeafNodeText)
 		}
 	})
 	AfterEach(func() {
@@ -105,12 +106,97 @@ var _ = Describe("PGBouncer Connections", func() {
 	})
 })
 
+var _ = Describe("PgBouncer Pooler Resources", func() {
+	const (
+		sampleFile                  = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml"
+		poolerBasicAuthRWSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-rw.yaml"
+		poolerBasicAuthROSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-ro.yaml"
+		level                       = tests.Low
+	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpPoolerResourcesInfo(namespace, CurrentSpecReport().LeafNodeText)
+		}
+	})
+	AfterEach(func() {
+		err := env.DeleteNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should recreate after deleting pgbouncer pod", func() {
+		// Create a cluster in a namespace we'll delete after the test
+		namespace = "pgbouncer-pod-delete"
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+		By("setting up read write type pgbouncer pooler", func() {
+			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthRWSampleFile, 1)
+		})
+		By("setting up read only type pgbouncer pooler", func() {
+			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthROSampleFile, 1)
+		})
+
+		assertPodIsRecreated(namespace, poolerBasicAuthRWSampleFile)
+		By("verifying pgbouncer read write service connections after deleting pod", func() {
+			assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				poolerBasicAuthRWSampleFile, true)
+		})
+
+		assertPodIsRecreated(namespace, poolerBasicAuthROSampleFile)
+		By("verifying pgbouncer read only service connections after pod deleting", func() {
+			assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				poolerBasicAuthROSampleFile, false)
+		})
+	})
+	It("should recreate after deleting pgbouncer deployment", func() {
+		// Create a cluster in a namespace we'll delete after the test
+		namespace = "pgbouncer-deployment-delete"
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+		By("setting up read write type pgbouncer pooler", func() {
+			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthRWSampleFile, 1)
+		})
+		By("setting up read only type pgbouncer pooler", func() {
+			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthROSampleFile, 1)
+		})
+
+		assertDeploymentIsRecreated(namespace, poolerBasicAuthRWSampleFile)
+		By("verifying pgbouncer read write service connections after deleting deployment", func() {
+			// verify read and write connections after pgbouncer deployment deletion
+			assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				poolerBasicAuthRWSampleFile, true)
+		})
+
+		assertDeploymentIsRecreated(namespace, poolerBasicAuthROSampleFile)
+		By("verifying pgbouncer read only service connections after deleting deployment", func() {
+			// verify read and write connections after pgbouncer deployment deletion
+			assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				poolerBasicAuthROSampleFile, false)
+		})
+	})
+})
+
 func createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerYamlFilePath string, expectedInstanceCount int) {
 	_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
 
 	Eventually(func() (int32, error) {
 		deployment, err := getPGBouncerDeployment(namespace, poolerYamlFilePath)
+
 		return deployment.Status.ReadyReplicas, err
 	}, 300).Should(BeEquivalentTo(expectedInstanceCount))
 
@@ -176,7 +262,7 @@ func assertReadWriteConnectionUsingPgBouncerService(
 	err = env.Client.Get(env.Ctx, appSecretNamespacedName, appSecret)
 	Expect(err).ToNot(HaveOccurred())
 	generatedAppUserPassword := string(appSecret.Data["password"])
-	AssertConnection(poolerServiceName, "app", "app", generatedAppUserPassword, *pod, 120, env)
+	AssertConnection(poolerServiceName, "app", "app", generatedAppUserPassword, *pod, 180, env)
 
 	// verify that, if pooler type setup read write then it will allow both read and
 	// write operations or if pooler type setup read only then it will allow only read operations
@@ -220,4 +306,82 @@ func getPGBouncerDeployment(namespace, poolerYamlFilePath string) (*appsv1.Deplo
 	}
 
 	return deployment, nil
+}
+
+func assertPodIsRecreated(namespace, poolerSampleFile string) {
+	var podNameBeforeDelete string
+	poolerName, err := env.GetResourceNameFromYAML(poolerSampleFile)
+	Expect(err).ToNot(HaveOccurred())
+
+	By(fmt.Sprintf("deleting pooler '%s' pod", poolerName), func() {
+		// gather pgbouncer pod name before deleting
+		podList, err := getPGBouncerPodList(namespace, poolerSampleFile)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(len(podList.Items)).Should(BeEquivalentTo(1))
+		podNameBeforeDelete = podList.Items[0].GetName()
+
+		// deleting pgbouncer pod
+		cmd := fmt.Sprintf("kubectl delete pod %s -n %s", podNameBeforeDelete, namespace)
+		_, _, err = tests.Run(cmd)
+		Expect(err).ToNot(HaveOccurred())
+	})
+	By(fmt.Sprintf("verifying pooler '%s' pod has recreated", poolerName), func() {
+		// New pod should be created
+		Eventually(func() (bool, error) {
+			podList, err := getPGBouncerPodList(namespace, poolerSampleFile)
+			if err != nil {
+				return false, err
+			}
+			if len(podList.Items) == 1 {
+				if utils.IsPodActive(podList.Items[0]) && utils.IsPodReady(podList.Items[0]) {
+					if !(podNameBeforeDelete == podList.Items[0].GetName()) {
+						return true, err
+					}
+				}
+			}
+			return false, err
+		}, 120).Should(BeTrue())
+	})
+}
+
+func assertDeploymentIsRecreated(namespace, poolerSampleFile string) {
+	var deploymentUID types.UID
+	deploymentInfo, err := getPGBouncerDeployment(namespace, poolerSampleFile)
+	Expect(err).ToNot(HaveOccurred())
+	deploymentName := deploymentInfo.GetName()
+
+	By(fmt.Sprintf("deleting pgbouncer '%s' deployment", deploymentName), func() {
+		// gather pgbouncer deployment info before delete
+		deploymentUID = deploymentInfo.UID
+		// deleting pgbouncer deployment
+		cmd := fmt.Sprintf("kubectl delete deployment %s -n %s", deploymentName, namespace)
+		_, _, err = tests.Run(cmd)
+		Expect(err).ToNot(HaveOccurred())
+	})
+	By(fmt.Sprintf("verifying new deployment '%s' has recreated", deploymentName), func() {
+		// new deployment will be created and ready replicas should be one
+		Eventually(func() (int32, error) {
+			deployment, err := getPGBouncerDeployment(namespace, poolerSampleFile)
+			return deployment.Status.ReadyReplicas, err
+		}, 300).Should(BeEquivalentTo(1))
+
+		// new deployment UID will be different from old one
+		deploymentInfo, err = getPGBouncerDeployment(namespace, poolerSampleFile)
+		Expect(err).ToNot(HaveOccurred())
+		newDeploymentUID := deploymentInfo.UID
+		Expect(newDeploymentUID).ToNot(BeEquivalentTo(deploymentUID))
+	})
+	By(fmt.Sprintf("newly created pod has up and running after deleting '%s' deployment", deploymentName), func() {
+		// check pgbouncer pod will be up and running
+		Eventually(func() (bool, error) {
+			podList, err := getPGBouncerPodList(namespace, poolerSampleFile)
+			if err != nil {
+				return false, err
+			}
+			if len(podList.Items) == 1 {
+				return utils.IsPodActive(podList.Items[0]) && utils.IsPodReady(podList.Items[0]), err
+			}
+			return false, nil
+		}, 120).Should(BeTrue())
+	})
 }
