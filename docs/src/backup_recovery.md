@@ -3,8 +3,9 @@
 The operator can orchestrate a continuous backup infrastructure
 that is based on the [Barman](https://pgbarman.org) tool. Instead
 of using the classical architecture with a Barman server, which
-backup many PostgreSQL instances, the operator will use the
-`barman-cloud-wal-archive` and `barman-cloud-backup` tools.
+backs up many PostgreSQL instances, the operator relies on the
+`barman-cloud-wal-archive`, `barman-cloud-backup`, `barman-cloud-backup-list`,
+and `barman-cloud-backup-delete` tools.
 As a result, base backups will be *tarballs*. Both base backups and WAL files
 can be compressed and encrypted.
 
@@ -12,6 +13,11 @@ For this, it is required an image with `barman-cli-cloud` installed.
 You can use the image `quay.io/enterprisedb/postgresql` for this scope,
 as it is composed of a community PostgreSQL image and the latest
 `barman-cli-cloud` package.
+
+!!! Important
+    Always ensure that you are running the latest version of the operands
+    in your system to take advantage of the improvements introduced in
+    Barman cloud (as well as improve the security aspects of your cluster).
 
 A backup is performed from a primary or a designated primary instance in a
 `Cluster` (please refer to
@@ -454,6 +460,7 @@ will use it unless you override it in the cluster configuration.
 
 ## Recovery
 
+Cluster restores are not performed "in-place" on an existing cluster.
 You can use the data uploaded to the object storage to bootstrap a
 new cluster from a backup. The operator will orchestrate the recovery
 process using the `barman-cloud-restore` tool.
