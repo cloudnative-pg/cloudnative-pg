@@ -23,11 +23,11 @@ require (
 	github.com/thoas/go-funk v0.9.1
 	go.uber.org/zap v1.19.1
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
-	k8s.io/api v0.22.2
-	k8s.io/apiextensions-apiserver v0.22.2
-	k8s.io/apimachinery v0.22.2
+	k8s.io/api v0.22.3
+	k8s.io/apiextensions-apiserver v0.22.3
+	k8s.io/apimachinery v0.22.3
 	k8s.io/cli-runtime v0.22.2
-	k8s.io/client-go v0.22.2
+	k8s.io/client-go v0.22.3
 	k8s.io/klog/v2 v2.10.0
 	sigs.k8s.io/controller-runtime v0.10.2
 	sigs.k8s.io/yaml v1.3.0
@@ -95,7 +95,7 @@ require (
 	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	k8s.io/component-base v0.22.2 // indirect
+	k8s.io/component-base v0.22.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e // indirect
 	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a // indirect
 	sigs.k8s.io/kustomize/api v0.8.11 // indirect
