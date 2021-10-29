@@ -483,7 +483,7 @@ jobs:
             go install github.com/onsi/ginkgo/ginkgo@6e68f79684d4
       -
         name: Azure Login
-        uses: azure/login@v1.3.0
+        uses: azure/login@v1.4.0
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
