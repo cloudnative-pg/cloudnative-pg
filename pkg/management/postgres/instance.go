@@ -85,6 +85,9 @@ type Instance struct {
 
 	// pgVersion is the PostgreSQL version
 	pgVersion *semver.Version
+
+	// InstanceManagerIsUpgrading tells is there is an instance manager upgrade in process
+	InstanceManagerIsUpgrading bool
 }
 
 // RetryUntilServerAvailable is the default retry configuration that is used
@@ -236,9 +239,27 @@ func (instance *Instance) Reload() error {
 	return nil
 }
 
-// Run this instance returning an exec.Cmd structure
+// Run this instance returning an OS process needed
 // to control the instance execution
-func (instance Instance) Run() (*exec.Cmd, error) {
+func (instance Instance) Run() (*os.Process, error) {
+	process, err := instance.CheckForExistingPostmaster()
+	if err != nil {
+		return nil, err
+	}
+
+	// We have already a postmaster running, let's use this
+	//
+	// NOTE: following this path the instance manager has no way
+	// to reattach the process stdout/stderr. This should not do
+	// any harm because PostgreSQL stops writing on stdout/stderr
+	// when the logging collector starts.
+	if process != nil {
+		return process, nil
+	}
+
+	// We don't have a postmaster running and we need to create
+	// one.
+
 	socketDir := GetSocketDir()
 	if err := fileutils.EnsureDirectoryExist(socketDir); err != nil {
 		return nil, fmt.Errorf("while creating socket directory: %w", err)
@@ -253,12 +274,12 @@ func (instance Instance) Run() (*exec.Cmd, error) {
 	postgresCmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
-	err := execlog.RunStreamingNoWait(postgresCmd, postgresName)
+	err = execlog.RunStreamingNoWait(postgresCmd, postgresName)
 	if err != nil {
 		return nil, err
 	}
 
-	return postgresCmd, nil
+	return postgresCmd.Process, nil
 }
 
 // WithActiveInstance execute the internal function while this

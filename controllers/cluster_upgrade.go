@@ -8,14 +8,21 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	neturl "net/url"
 
 	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/executablehash"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
@@ -83,11 +90,19 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 }
 
 // IsPodNeedingRollout checks whether a given postgres instance has to be rolled out for any reason,
-// returning if it does need to and a human readable string explaining the reason for it
+// returning if it does need to and a human-readable string explaining the reason for it
 func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluster) (bool, string) {
 	if !status.IsReady {
 		return false, ""
 	}
+
+	// check if the pod is reporting his instance manager version
+	if status.ExecutableHash == "" {
+		// this is an old instance manager and we need to replace it with one supporting
+		// the online operator upgrade feature
+		return true, ""
+	}
+
 	// check if the pod requires an image upgrade
 	oldImage, newImage, err := isPodNeedingUpgradedImage(cluster, status.Pod)
 	if err != nil {
@@ -97,6 +112,19 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	if newImage != "" {
 		return true, fmt.Sprintf("the instance is using an old image: %s -> %s",
 			oldImage, newImage)
+	}
+
+	if !configuration.Current.EnableInstanceManagerInplaceUpdates {
+		oldImage, newImage, err = isPodNeedingUpgradedInitContainerImage(status.Pod)
+		if err != nil {
+			log.Error(err, "while checking if init container image could be upgraded")
+			return false, ""
+		}
+
+		if newImage != "" {
+			return true, fmt.Sprintf("the instance is using an old init container image: %s -> %s",
+				oldImage, newImage)
+		}
 	}
 
 	// check if pod needs to be restarted because of some config requiring it
@@ -116,19 +144,9 @@ func isPodNeedingUpgradedImage(
 		return "", "", err
 	}
 
-	opCurrentImageName, err := specs.GetBootstrapControllerImageName(pod)
-	if err != nil {
-		return "", "", err
-	}
-
 	if pgCurrentImageName != targetImageName {
 		// We need to apply a different PostgreSQL version
 		return pgCurrentImageName, targetImageName, nil
-	}
-
-	if opCurrentImageName != configuration.Current.OperatorImageName {
-		// We need to apply a different version of the instance manager
-		return opCurrentImageName, configuration.Current.OperatorImageName, nil
 	}
 
 	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
@@ -138,6 +156,23 @@ func isPodNeedingUpgradedImage(
 
 	if !canUpgradeImage {
 		return "", "", nil
+	}
+
+	return "", "", nil
+}
+
+// isPodNeedingUpgradedInitContainerImage checks whether an image in init container has to be changed
+func isPodNeedingUpgradedInitContainerImage(
+	pod v1.Pod,
+) (oldImage string, targetImage string, err error) {
+	opCurrentImageName, err := specs.GetBootstrapControllerImageName(pod)
+	if err != nil {
+		return "", "", err
+	}
+
+	if opCurrentImageName != configuration.Current.OperatorImageName {
+		// We need to apply a different version of the instance manager
+		return opCurrentImageName, configuration.Current.OperatorImageName, nil
 	}
 
 	return "", "", nil
@@ -180,4 +215,119 @@ func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *apiv1.Clust
 	}
 
 	return nil
+}
+
+// upgradeInstanceManager upgrades the instance managers of the Pod running in this cluster
+func (r *ClusterReconciler) upgradeInstanceManager(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	podList *postgres.PostgresqlStatusList,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	// If we have an instance manager which is not reporting its hash code
+	// we could have:
+	//
+	// 1. an instance manager which doesn't support automatic update
+	// 2. an instance manager which isn't working
+	//
+	// In both ways, we are skipping this automatic update and we rely
+	// on the rollout strategy
+	for i := len(podList.Items) - 1; i >= 0; i-- {
+		postgresqlStatus := podList.Items[i]
+		instanceManagerHash := postgresqlStatus.ExecutableHash
+
+		if instanceManagerHash == "" {
+			contextLogger.Debug("Detected a non reporting instance manager, proceeding with rolling update",
+				"pod", postgresqlStatus.Pod.Name)
+			// We continue in the synchronization loop, leading
+			// to a rollout of the new instance manager
+			return nil
+		}
+	}
+
+	operatorHash, err := executablehash.Get()
+	if err != nil {
+		return err
+	}
+
+	// We start upgrading the instance managers we have
+	for i := len(podList.Items) - 1; i >= 0; i-- {
+		postgresqlStatus := podList.Items[i]
+		instanceManagerHash := postgresqlStatus.ExecutableHash
+		instanceManagerIsUpgrading := postgresqlStatus.IsInstanceManagerUpgrading
+		if instanceManagerHash != "" && instanceManagerHash != operatorHash && !instanceManagerIsUpgrading {
+			// We need to upgrade this Pod
+			contextLogger.Info("Upgrading instance manager",
+				"pod", postgresqlStatus.Pod.Name,
+				"oldVersion", postgresqlStatus.ExecutableHash)
+			err = upgradeInstanceManagerOnPod(ctx, postgresqlStatus.Pod)
+			if err != nil {
+				enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
+					postgresqlStatus.Pod.Name,
+					operatorHash[:6],
+					err)
+
+				r.Recorder.Event(cluster, "Warning", "InstanceManagerUpgradeFailed",
+					fmt.Sprintf("Error %s", enrichedError))
+				return enrichedError
+			}
+
+			message := fmt.Sprintf("Instance manager has been upgraded on %s (hash: %s)",
+				postgresqlStatus.Pod.Name,
+				operatorHash[:6])
+
+			r.Recorder.Event(cluster, "Normal", "InstanceManagerUpgraded", message)
+			contextLogger.Info(message)
+		}
+	}
+
+	return nil
+}
+
+// upgradeInstanceManagerOnPod upgrades an instance manager of a Pod via an HTTP PUT request.
+func upgradeInstanceManagerOnPod(ctx context.Context, pod v1.Pod) error {
+	binaryFileStream, err := executablehash.Stream()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = binaryFileStream.Close()
+	}()
+
+	updateURL := url.Build(pod.Status.PodIP, url.PathUpdate, url.StatusPort)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, updateURL, nil)
+	req.Body = binaryFileStream
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		if errors.Is(err.(*neturl.Error).Err, io.EOF) {
+			// This is perfectly fine as the instance manager will
+			// synchronously update and this call won't return.
+			return nil
+		}
+
+		return err
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		// This should not happen. See previous block.
+		return nil
+	}
+
+	var body []byte
+	body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
+
+	return fmt.Errorf(string(body))
 }

@@ -36,6 +36,9 @@ const (
 	// PathMetrics is the URL path for Metrics
 	PathMetrics string = "/metrics"
 
+	// PathUpdate is the URL path for the instance manager update function
+	PathUpdate string = "/update"
+
 	// PathCache is the URL path for cached resources
 	PathCache string = "/cache/"
 

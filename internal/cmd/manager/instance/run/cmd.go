@@ -156,15 +156,16 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	postgresCommand, err := instance.Run()
+	postgresProcess, err := instance.Run()
 	if err != nil {
 		log.Error(err, "Unable to start PostgreSQL up")
 		return err
 	}
 
-	registerSignalHandler(reconciler, postgresCommand)
+	registerSignalHandler(reconciler, postgresProcess)
 
-	if err = postgresCommand.Wait(); err != nil {
+	state, err := postgresProcess.Wait()
+	if err != nil && !state.Success() {
 		log.Error(err, "PostgreSQL exited with errors")
 		return err
 	}
@@ -211,7 +212,7 @@ func startReconciler(ctx context.Context, reconciler *controller.InstanceReconci
 
 // registerSignalHandler handles signals from k8s, notifying postgres as
 // needed
-func registerSignalHandler(reconciler *controller.InstanceReconciler, postgresCommand *exec.Cmd) {
+func registerSignalHandler(reconciler *controller.InstanceReconciler, postgresProcess *os.Process) {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
@@ -237,9 +238,9 @@ func registerSignalHandler(reconciler *controller.InstanceReconciler, postgresCo
 		log.Info("Shutting down controller")
 		reconciler.Stop()
 
-		if postgresCommand != nil {
+		if postgresProcess != nil {
 			log.Info("Shutting down PostgreSQL instance")
-			err := postgresCommand.Process.Signal(syscall.SIGINT)
+			err := postgresProcess.Signal(syscall.SIGINT)
 			if err != nil {
 				log.Error(err, "Unable to send SIGINT to PostgreSQL instance")
 			}

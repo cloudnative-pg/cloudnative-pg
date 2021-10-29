@@ -23,6 +23,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/upgrade"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 )
 
@@ -148,6 +149,33 @@ func requestBackup(typedClient client.Client, recorder record.EventRecorder, w h
 	_, _ = fmt.Fprint(w, "OK")
 }
 
+// updateInstanceManager replace the instance with one in the
+// new binary
+func updateInstanceManager(typedClient client.Client, w http.ResponseWriter, r *http.Request) {
+	// No need to handle this request if it is not a put
+	if r.Method != http.MethodPut {
+		http.Error(w, "wrong method used", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// No need to do anything if we are already upgrading
+	if instance.InstanceManagerIsUpgrading {
+		http.Error(w, "instance manager is already upgrading", http.StatusTeapot)
+		return
+	}
+
+	err := upgrade.FromReader(typedClient, instance, r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Unfortunately this point, if everything is right, will not be reached.
+	// At this stage we are running the new version of the instance manager
+	// and not the old one.
+	_, _ = fmt.Fprint(w, "OK")
+}
+
 // This probe is for the instance status, including replication
 func serveCache(w http.ResponseWriter, r *http.Request) {
 	requestedObject := strings.TrimPrefix(r.URL.Path, url.PathCache)
@@ -208,13 +236,23 @@ func Setup(serverInstance *postgres.Instance) {
 
 // ListenAndServe starts a the web server handling probes
 func ListenAndServe() error {
+	typedClient, err := management.NewControllerRuntimeClient()
+	if err != nil {
+		return fmt.Errorf("creating controller-runtine client: %v", err)
+	}
+
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc(url.PathHealth, isServerHealthy)
 	serveMux.HandleFunc(url.PathReady, isServerReady)
 	serveMux.HandleFunc(url.PathPgStatus, pgStatus)
+	serveMux.HandleFunc(url.PathUpdate,
+		func(w http.ResponseWriter, r *http.Request) {
+			updateInstanceManager(typedClient, w, r)
+		},
+	)
 
 	server = &http.Server{Addr: fmt.Sprintf(":%d", url.StatusPort), Handler: serveMux}
-	err := server.ListenAndServe()
+	err = server.ListenAndServe()
 
 	if err == http.ErrServerClosed {
 		return nil

@@ -177,6 +177,8 @@ func (src *Cluster) ConvertTo(dstRaw conversion.Hub) error { //nolint:revive,goc
 			Secrets: src.Status.PoolerIntegrations.PgBouncerIntegration.Secrets,
 		}}
 	}
+	dst.Status.OperatorHash = src.Status.OperatorHash
+	dst.Status.OnlineUpdateEnabled = src.Status.OnlineUpdateEnabled
 	dst.Status.SecretsResourceVersion.SuperuserSecretVersion =
 		src.Status.SecretsResourceVersion.SuperuserSecretVersion
 	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =
@@ -491,6 +493,8 @@ func (dst *Cluster) ConvertFrom(srcRaw conversion.Hub) error { //nolint:revive
 			Secrets: src.Status.PoolerIntegrations.PgBouncerIntegration.Secrets,
 		}}
 	}
+	dst.Status.OperatorHash = src.Status.OperatorHash
+	dst.Status.OnlineUpdateEnabled = src.Status.OnlineUpdateEnabled
 	dst.Status.SecretsResourceVersion.SuperuserSecretVersion =
 		src.Status.SecretsResourceVersion.SuperuserSecretVersion
 	dst.Status.SecretsResourceVersion.ReplicationSecretVersion =

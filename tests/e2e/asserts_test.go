@@ -16,11 +16,12 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
@@ -182,10 +183,6 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 		// amount of instances defined in the cluster
 		cluster := &apiv1.Cluster{}
 		err := env.Client.Get(env.Ctx, namespacedName, cluster)
-		if err != nil {
-			cluster := &apiv1alpha1.Cluster{}
-			err = env.Client.Get(env.Ctx, namespacedName, cluster)
-		}
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(func() (int, error) {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -537,6 +534,78 @@ func AssertArchiveWalOnMinio(namespace, clusterName string) {
 			return CountFilesOnMinio(namespace, latestWAL+".gz")
 		}, 30).Should(BeEquivalentTo(1))
 	})
+}
+
+func AssertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string, timeout int) {
+	_, _, err := tests.Run(fmt.Sprintf(
+		"kubectl apply -n %v -f %v",
+		namespace, backupYAMLPath))
+	Expect(err).NotTo(HaveOccurred())
+
+	scheduledBackupName, err := env.GetResourceNameFromYAML(backupYAMLPath)
+	Expect(err).NotTo(HaveOccurred())
+
+	// We expect the scheduled backup to be scheduled before a
+	// timeout
+	scheduledBackupNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      scheduledBackupName,
+	}
+
+	Eventually(func() (*v1.Time, error) {
+		scheduledBackup := &apiv1.ScheduledBackup{}
+		err := env.Client.Get(env.Ctx,
+			scheduledBackupNamespacedName, scheduledBackup)
+		return scheduledBackup.Status.LastScheduleTime, err
+	}, timeout).ShouldNot(BeNil())
+
+	// Within a few minutes we should have at least two backups
+	Eventually(func() (int, error) {
+		return getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
+	}, timeout).Should(BeNumerically(">=", 2))
+}
+
+func getScheduledBackupBackups(namespace string, scheduledBackupName string) ([]apiv1.Backup, error) {
+	scheduledBackupNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      scheduledBackupName,
+	}
+	// Get all the backups that are children of the ScheduledBackup
+	scheduledBackup := &apiv1.ScheduledBackup{}
+	err := env.Client.Get(env.Ctx, scheduledBackupNamespacedName,
+		scheduledBackup)
+	backups := &apiv1.BackupList{}
+	if err != nil {
+		return nil, err
+	}
+	err = env.Client.List(env.Ctx, backups,
+		ctrlclient.InNamespace(namespace))
+	if err != nil {
+		return nil, err
+	}
+	ret := []apiv1.Backup{}
+
+	for _, backup := range backups.Items {
+		if strings.HasPrefix(backup.Name, scheduledBackup.Name+"-") {
+			ret = append(ret, backup)
+		}
+	}
+	return ret, nil
+}
+
+func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupName string) (int, error) {
+	backups, err := getScheduledBackupBackups(namespace, scheduledBackupName)
+	if err != nil {
+		return -1, err
+	}
+	completed := 0
+	for _, backup := range backups {
+		if strings.HasPrefix(backup.Name, scheduledBackupName+"-") &&
+			backup.Status.Phase == apiv1.BackupPhaseCompleted {
+			completed++
+		}
+	}
+	return completed, nil
 }
 
 // CountFilesOnMinio uses the minioClient in the given `namespace` to count  the

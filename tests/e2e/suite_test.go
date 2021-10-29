@@ -7,7 +7,6 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package e2e
 
 import (
-	"regexp"
 	"testing"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
@@ -47,27 +45,17 @@ var _ = BeforeSuite(func() {
 	}
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
-	_ = apiv1alpha1.AddToScheme(env.Scheme)
-	// +kubebuilder:scaffold:scheme
-
-	// AssertOperatorIsReady can't work with v1alpha1,
-	// let's ignore it if we're upgrading
-	// TODO: remove this when removing the upgrade test
-	deployment, err := env.GetOperatorDeployment()
-	Expect(err).NotTo(HaveOccurred())
-	image := deployment.Spec.Template.Spec.Containers[0].Image
-	re := regexp.MustCompile(`v0\.7\.0`)
-
-	if !(re.MatchString(image)) {
-		// Check operator pod should be running
-		AssertOperatorIsReady()
-	}
 })
 
 var _ = BeforeEach(func() {
-	operatorPod, err := env.GetOperatorPod()
-	Expect(err).NotTo(HaveOccurred())
-	expectedOperatorPodName = operatorPod.GetName()
+	labelsForTestsBreakingTheOperator := []string{"upgrade", "disruptive"}
+	breakingLabelsInCurrentTest := funk.Join(CurrentSpecReport().Labels(),
+		labelsForTestsBreakingTheOperator, funk.InnerJoin)
+	if len(breakingLabelsInCurrentTest.([]string)) == 0 {
+		operatorPod, err := env.GetOperatorPod()
+		Expect(err).NotTo(HaveOccurred())
+		expectedOperatorPodName = operatorPod.GetName()
+	}
 })
 
 func TestE2ESuite(t *testing.T) {

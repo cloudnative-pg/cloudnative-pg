@@ -9,6 +9,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package logpipe
 
 import (
+	"context"
 	"encoding/csv"
 	"errors"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"regexp"
 	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
@@ -32,6 +34,23 @@ var tagRegex = regexp.MustCompile(`(?s)(?P<Tag>^[a-zA-Z]+): (?P<Record>.*)$`)
 
 var consumedLogFiles sync.Map
 
+var (
+	pipeContext   context.Context
+	pipeCancel    context.CancelFunc
+	pipeWaitGroup sync.WaitGroup
+)
+
+func init() {
+	pipeContext, pipeCancel = context.WithCancel(context.Background())
+}
+
+// Stop cancels every log reading process and blocks until the log reading processes
+// is stopped
+func Stop() {
+	pipeCancel()
+	pipeWaitGroup.Wait()
+}
+
 // FieldsValidator is a function validating the number of fields
 // for a specific log line to be parsed
 type FieldsValidator func(int) *ErrFieldCountExtended
@@ -44,22 +63,32 @@ func (p *logPipe) start() error {
 	_, alreadyStarted := consumedLogFiles.LoadOrStore(p.fileName, true)
 
 	if !alreadyStarted {
+		pipeWaitGroup.Add(1)
 		go func() {
+			defer pipeWaitGroup.Done()
+
 			for {
+				// If the context has been cancelled, let's avoid starting reading
+				// again from the log file
+				if pipeContext.Err() != nil {
+					return
+				}
+
+				filenameLog := log.WithValues("fileName", p.fileName)
+
 				// check if the directory exists
 				if err := fileutils.EnsureDirectoryExist(filepath.Dir(p.fileName)); err != nil {
-					log.WithValues("fileName", p.fileName).Error(err,
-						"Error checking if the directory exists")
+					filenameLog.Error(err, "Error checking if the directory exists")
 					continue
 				}
 
 				if err := fileutils.CreateFifo(p.fileName); err != nil {
-					log.WithValues("fileName", p.fileName).Error(err, "Error creating log FIFO")
+					filenameLog.Error(err, "Error creating log FIFO")
 					continue
 				}
 
-				if err := p.collectLogsFromFile(); err != nil {
-					log.WithValues("fileName", p.fileName).Error(err, "Error consuming log stream")
+				if err := p.collectLogsFromFile(pipeContext); err != nil {
+					filenameLog.Error(err, "Error consuming log stream")
 				}
 			}
 		}()
@@ -70,7 +99,7 @@ func (p *logPipe) start() error {
 
 // collectLogsFromFile opens (blocking) the FIFO file, then starts reading the csv file line by line
 // until the end of the file or an error.
-func (p *logPipe) collectLogsFromFile() error {
+func (p *logPipe) collectLogsFromFile(ctx context.Context) error {
 	defer func() {
 		if condition := recover(); condition != nil {
 			log.Info("Recover from panic condition while collecting PostgreSQL logs",
@@ -90,14 +119,29 @@ func (p *logPipe) collectLogsFromFile() error {
 		}
 	}()
 
-	return p.streamLogFromCSVFile(f, &LogRecordWriter{})
+	// Ensure we terminate our read operations when
+	// the cancellation signal happened
+	go func() {
+		<-ctx.Done()
+
+		log.Info("Terminating log reading process", "fileName", p.fileName)
+		err := f.SetDeadline(time.Now())
+		if err != nil {
+			log.Error(err,
+				"Error while setting the deadline for log reading. The instance manager may not refresh "+
+					"until a new log line is read",
+				"fileName", p.fileName)
+		}
+	}()
+
+	return p.streamLogFromCSVFile(ctx, f, &LogRecordWriter{})
 }
 
 // streamLogFromCSVFile is a function reading csv lines from an io.Reader and
 // writing them to the passed RecordWriter. This function can return
 // ErrFieldCountExtended which enrich the csv.ErrFieldCount with the
 // decoded invalid line
-func (p *logPipe) streamLogFromCSVFile(inputFile io.Reader, writer RecordWriter) error {
+func (p *logPipe) streamLogFromCSVFile(ctx context.Context, inputFile io.Reader, writer RecordWriter) error {
 	var (
 		content []string
 		err     error
@@ -113,6 +157,11 @@ func (p *logPipe) streamLogFromCSVFile(inputFile io.Reader, writer RecordWriter)
 			return nil
 		}
 
+		// If the read timed out probably the channel has been cancelled
+		if ctx.Err() != nil {
+			return nil
+		}
+
 		return err
 	}
 
@@ -125,6 +174,12 @@ func (p *logPipe) streamLogFromCSVFile(inputFile io.Reader, writer RecordWriter)
 
 reader:
 	for {
+		// If the context has been cancelled, let's avoid reading another
+		// line
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		if content, err = reader.Read(); err != nil {
 			switch {
 			// If we have an invalid number of fields we enrich the
@@ -139,6 +194,10 @@ reader:
 			// If the stream is finished, we are done
 			case errors.Is(err, io.EOF):
 				break reader
+
+			case ctx.Err() != nil:
+				break reader
+
 			default:
 				return err
 			}

@@ -10,6 +10,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -30,6 +31,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
@@ -151,6 +153,32 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Get the replication status
 	instancesStatus := r.getStatusFromInstances(ctx, resources.pods)
 
+	// Verify the architecture of all the instances and update the OnlineUpdateEnabled
+	// field in the status
+	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
+	isArchitectureConsistent := r.checkPodsArchitecture(ctx, &instancesStatus)
+	if !isArchitectureConsistent && onlineUpdateEnabled {
+		contextLogger.Info("Architecture mismatch detected, disabling instance manager online updates")
+		onlineUpdateEnabled = false
+	}
+
+	// We have already updated the status in updateResourceStatus call,
+	// so we need to issue an extra update when the OnlineUpdateEnabled changes.
+	// It's okay because it should not change often.
+	//
+	// We cannot merge this code with updateResourceStatus because
+	// it needs to run after retrieving the status from the pods,
+	// which is a time-expensive operation.
+	if err = r.updateOnlineUpdateEnabled(ctx, &cluster, onlineUpdateEnabled); err != nil {
+		if apierrs.IsConflict(err) {
+			// Requeue a new reconciliation cycle, as in this point we need
+			// to quickly react the changes
+			return ctrl.Result{Requeue: true}, nil
+		}
+
+		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
+	}
+
 	// Update the target primary name from the Pods status.
 	// This means issuing a failover or switchover when needed.
 	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, &cluster, instancesStatus, resources)
@@ -171,8 +199,19 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
+	// Updates all the objects managed by the controller
+	return r.reconcileResources(ctx, req, &cluster, resources, instancesStatus)
+}
+
+// reconcileResources updates all the objects managed by the controller
+func (r *ClusterReconciler) reconcileResources(
+	ctx context.Context, req ctrl.Request, cluster *apiv1.Cluster,
+	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
+) (ctrl.Result, error) {
+	contextLogger, ctx := log.SetupLogger(ctx)
+
 	// Update the labels for the -rw service to work correctly
-	if err = r.updateLabelsOnPods(ctx, &cluster, resources.pods); err != nil {
+	if err := r.updateLabelsOnPods(ctx, cluster, resources.pods); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update labels on pods: %w", err)
 	}
 
@@ -188,7 +227,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Reconcile PVC resource requirements
-	if err = r.ReconcilePVCs(ctx, &cluster, resources); err != nil {
+	if err := r.ReconcilePVCs(ctx, cluster, resources); err != nil {
 		if apierrs.IsConflict(err) {
 			return ctrl.Result{Requeue: true}, nil
 		}
@@ -196,16 +235,44 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Reconcile Pods
-	if res, err := r.ReconcilePods(ctx, req, &cluster, resources, instancesStatus); err != nil {
+	if res, err := r.ReconcilePods(ctx, req, cluster, resources, instancesStatus); err != nil {
 		return res, err
 	}
 
 	if len(resources.pods.Items) > 0 && resources.noPodsAreAlive() {
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx, &cluster, apiv1.PhaseUnrecoverable,
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable,
 			"No pods are active, the cluster needs manual intervention ")
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// checkPodsArchitecture checks whether the architecture of the instances is consistent with the runtime one
+func (r *ClusterReconciler) checkPodsArchitecture(ctx context.Context, status *postgres.PostgresqlStatusList) bool {
+	contextLogger := log.FromContext(ctx)
+	isConsistent := true
+
+	for _, podStatus := range status.Items {
+		switch podStatus.InstanceArch {
+		case goruntime.GOARCH:
+			// architecture matches, everything ok for this pod
+
+		case "":
+			// an empty podStatus.InstanceArch should be due to an old version of the instance manager
+			contextLogger.Info("ignoring empty architecture from the instance",
+				"pod", podStatus.Pod.Name)
+
+		default:
+			contextLogger.Info("Warning: mismatch architecture between controller and instances. "+
+				"This is an unsupported configuration.",
+				"controllerArch", goruntime.GOARCH,
+				"instanceArch", podStatus.InstanceArch,
+				"pod", podStatus.Pod.Name)
+			isConsistent = false
+		}
+	}
+
+	return isConsistent
 }
 
 // ReconcilePVCs align the PVCs that are backing our cluster with the user specifications
@@ -332,6 +399,27 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request,
 		!instancesStatus.IsComplete() {
 		contextLogger.Debug("Waiting for Pods to be ready")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
+	return r.handleRollingUpdate(ctx, cluster, resources, instancesStatus)
+}
+
+func (r *ClusterReconciler) handleRollingUpdate(ctx context.Context, cluster *apiv1.Cluster,
+	resources *managedResources, instancesStatus postgres.PostgresqlStatusList) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	// Stop acting here if there are Pods that are waiting for
+	// an instance manager upgrade
+	if instancesStatus.ArePodsUpgradingInstanceManager() {
+		contextLogger.Debug("Waiting for Pods to complete instance manager upgrade")
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
+	// Execute online update, if enabled
+	if cluster.Status.OnlineUpdateEnabled {
+		if err := r.upgradeInstanceManager(ctx, cluster, &instancesStatus); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// If we need to rollout a restart of any instance, this is the right moment

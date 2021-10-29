@@ -8,10 +8,12 @@ package postgres
 
 import (
 	"errors"
+	"runtime"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/executablehash"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
@@ -77,6 +79,15 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	result.InstanceArch = runtime.GOARCH
+
+	result.ExecutableHash, err = executablehash.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	result.IsInstanceManagerUpgrading = instance.InstanceManagerIsUpgrading
 
 	return &result, nil
 }

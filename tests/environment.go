@@ -157,6 +157,26 @@ func (env TestingEnvironment) DeleteNamespace(name string, opts ...client.Delete
 	return env.Client.Delete(env.Ctx, u, opts...)
 }
 
+// DeleteNamespaceAndWait deletes a namespace if existent and returns when deletion is completed
+func (env TestingEnvironment) DeleteNamespaceAndWait(name string, opts ...client.DeleteOption) error {
+	// Exit immediately if if the namespace is listed in PreserveNamespaces
+	for _, v := range env.PreserveNamespaces {
+		if v == name {
+			return nil
+		}
+	}
+
+	u := &unstructured.Unstructured{}
+	u.SetName(name)
+	u.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "Namespace",
+	})
+
+	return env.Client.Delete(env.Ctx, u, opts...)
+}
+
 // DeletePod deletes a pod if existent
 func (env TestingEnvironment) DeletePod(namespace string, name string, opts ...client.DeleteOption) error {
 	u := &unstructured.Unstructured{}
