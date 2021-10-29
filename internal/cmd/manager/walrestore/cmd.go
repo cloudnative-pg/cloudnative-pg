@@ -59,7 +59,7 @@ func NewCmd() *cobra.Command {
 			} else {
 				contextLog.Error(err, "failed to run wal-restore command")
 			}
-			contextLog.Info("There was an error in the previous wal-restore command. Waiting 100 ms before retrying.")
+			contextLog.Debug("There was an error in the previous wal-restore command. Waiting 100 ms before retrying.")
 			time.Sleep(100 * time.Millisecond)
 			return err
 		},
