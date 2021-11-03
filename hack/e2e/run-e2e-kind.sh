@@ -19,7 +19,7 @@ E2E_DIR="${HACK_DIR}/e2e"
 
 export PRESERVE_CLUSTER=${PRESERVE_CLUSTER:-false}
 export BUILD_IMAGE=${BUILD_IMAGE:-false}
-export K8S_VERSION=${K8S_VERSION:-v1.21.1}
+export K8S_VERSION=${K8S_VERSION:-v1.22.2}
 export CLUSTER_ENGINE=kind
 export CLUSTER_NAME=pg-operator-e2e-${K8S_VERSION//./-}
 export LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
