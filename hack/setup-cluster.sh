@@ -14,7 +14,7 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
-K8S_VERSION=${K8S_VERSION:-v1.22.1}
+K8S_VERSION=${K8S_VERSION:-v1.22.2}
 KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 ENGINE=${CLUSTER_ENGINE:-kind}
 ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
@@ -355,7 +355,7 @@ Options:
 
     -k|--k8s-version
         <K8S_VERSION>     Use the specified kubernetes full version number
-                          (e.g., v1.21.1). Env: K8S_VERSION
+                          (e.g., v1.22.2). Env: K8S_VERSION
 
     -n|--nodes
         <NODES>           Create a cluster with the required number of nodes.
