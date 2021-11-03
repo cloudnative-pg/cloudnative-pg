@@ -44,6 +44,36 @@ jobs:
           paths_ignore: '["README.md", "docs/**"]'
           do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
 
+  docs-changes:
+    name: Validate if docs has changed
+    needs: duplicate_runs
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+    runs-on: ubuntu-20.04
+    outputs:
+      docs-changed: ${{ steps.filter.outputs.docs-changed }}
+      code-changed: ${{ steps.filter.outputs.code-changed }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2.3.5
+
+    - name: Check for changes
+      uses: dorny/paths-filter@v2.10.2
+      id: filter
+      with:
+        filters: |
+          docs-changed:
+            - '**/*.md'
+            - 'docs/**'
+            - '**/*.txt'
+          code-changed:
+            - '**/*.go'
+            - '**/*.sh'
+            - '**/*.py'
+            - '**/*.yml'
+            - 'config/**'
+            - '**/*.template'
+            - '**/*.json'
+
   golangci:
     name: Run linters
     needs: duplicate_runs
@@ -172,7 +202,8 @@ jobs:
       - apidoc
       - crd
       - duplicate_runs
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+      - docs-changes
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && needs.docs-changes.outputs.code-changed == 'true' }}
     runs-on: ubuntu-20.04
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
@@ -300,8 +331,9 @@ jobs:
       - tests
       - apidoc
       - crd
+      - docs-changes
       - duplicate_runs
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && github.event.sender.login != 'cnp-autobot' }}
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && github.event.sender.login != 'cnp-autobot' && needs.docs-changes.outputs.code-changed == 'true' }}
     runs-on: ubuntu-20.04
     steps:
       - name: Repository Dispatch
