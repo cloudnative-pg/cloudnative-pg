@@ -278,19 +278,6 @@ func (b *BackupCommand) run(ctx context.Context) {
 	backupStatus.SetAsCompleted()
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
 
-	// Extracting latest backup using barman-cloud-backup-list
-	backupList, err := barman.GetBackupList(b.Cluster.Spec.Backup.BarmanObjectStore, backupStatus.ServerName, b.Env)
-	if err != nil || backupList.Len() == 0 {
-		// Proper logging already happened inside GetBackupList
-		return
-	}
-
-	// Update status
-	b.updateCompletedBackupStatus(backupList)
-	if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
-		b.Log.Error(err, "Can't set backup status as completed")
-	}
-
 	// For the retention policy we need Barman >= 2.14
 	barmanCloudVersionGE214 := false
 	if version != nil {
@@ -304,31 +291,30 @@ func (b *BackupCommand) run(ctx context.Context) {
 		if err != nil {
 			// Proper logging already happened inside DeleteBackupsByPolicy
 			b.Recorder.Event(b.Cluster, "Warning", "RetentionPolicyFailed", "Retention policy failed")
-			return
 		}
 	} else if b.Cluster.Spec.Backup.RetentionPolicy != "" && !barmanCloudVersionGE214 {
 		b.Log.Info("The retention policy was detected but the current barman version is lower than 2.14")
 	}
 
+	// Extracting the latest backup using barman-cloud-backup-list
+	backupList, err := barman.GetBackupList(b.Cluster.Spec.Backup.BarmanObjectStore, backupStatus.ServerName, b.Env)
+	if err != nil || backupList.Len() == 0 {
+		// Proper logging already happened inside GetBackupList
+		return
+	}
+
+	// Update backup status to match with the latest completed backup
+	b.updateCompletedBackupStatus(backupList)
+	if err = UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
+		b.Log.Error(err, "Can't set backup status as completed")
+	}
+
 	// Set the first recoverability point
 	if ts := backupList.FirstRecoverabilityPoint(); ts != nil {
 		firstRecoverabilityPoint := ts.Format(time.RFC3339)
-		if b.Cluster.Status.FirstRecoverabilityPoint != firstRecoverabilityPoint {
-			b.Cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
-
-			if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				cluster := &apiv1.Cluster{}
-				err := b.Client.Get(ctx,
-					types.NamespacedName{Namespace: b.Cluster.GetNamespace(), Name: b.Cluster.GetName()},
-					cluster)
-				if err != nil {
-					return err
-				}
-				cluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
-				return b.Client.Status().Update(ctx, cluster)
-			}); err != nil {
-				b.Log.Error(err, "Can't update first recoverability point")
-			}
+		err = b.setClusterFirstRecoverabilityPoint(ctx, firstRecoverabilityPoint)
+		if err != nil {
+			b.Log.Error(err, "Can't update the first recoverability point")
 		}
 	}
 }
@@ -346,8 +332,31 @@ func UpdateBackupStatusAndRetry(
 		if err != nil {
 			return err
 		}
+
 		newBackup.Status = backup.Status
-		return cli.Status().Update(ctx, backup)
+		return cli.Status().Update(ctx, newBackup)
+	})
+}
+
+// setClusterFirstRecoverabilityPoint sets the firstRecoverabilityPoint value in the status
+func (b *BackupCommand) setClusterFirstRecoverabilityPoint(
+	ctx context.Context,
+	firstRecoverabilityPoint string,
+) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if b.Cluster.Status.FirstRecoverabilityPoint == firstRecoverabilityPoint {
+			return nil
+		}
+
+		newCluster := &apiv1.Cluster{}
+		namespacedName := types.NamespacedName{Namespace: b.Cluster.GetNamespace(), Name: b.Cluster.GetName()}
+		err := b.Client.Get(ctx, namespacedName, newCluster)
+		if err != nil {
+			return err
+		}
+
+		newCluster.Status.FirstRecoverabilityPoint = firstRecoverabilityPoint
+		return b.Client.Status().Update(ctx, newCluster)
 	})
 }
 
