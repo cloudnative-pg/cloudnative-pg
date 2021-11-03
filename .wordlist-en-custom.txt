@@ -311,6 +311,7 @@ configmap
 configmapkeyselector
 configmaps
 configs
+configurability
 conn
 connectionParameters
 connectionString
@@ -353,6 +354,7 @@ dev
 devel
 devsecops
 dl
+dns
 dockle
 dod
 domainbetakubernetesiozone
@@ -454,6 +456,7 @@ matchExpressions
 matchLabels
 maxClientConnections
 maxSyncReplicas
+maxwait
 mcache
 md
 mem
@@ -552,8 +555,10 @@ readyInstances
 recoverability
 recoveryTarget
 recoverytarget
+recv
 redhat
 replicationTLSSecret
+req
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resourcerequirements
@@ -620,6 +625,7 @@ subresource
 substatement
 sudo
 superuserSecret
+sv
 svc
 switchovers
 sys
