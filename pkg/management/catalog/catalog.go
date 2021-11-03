@@ -42,11 +42,12 @@ func (catalog *Catalog) FirstRecoverabilityPoint() *time.Time {
 	}
 
 	// Skip errored backups and return the first valid one
-
 	for i := 0; i < len(catalog.List); i++ {
-		if !catalog.List[i].BeginTime.IsZero() && !catalog.List[i].EndTime.IsZero() {
-			return &catalog.List[0].BeginTime
+		if catalog.List[i].BeginTime.IsZero() || catalog.List[i].EndTime.IsZero() {
+			continue
 		}
+
+		return &catalog.List[i].EndTime
 	}
 
 	return nil

@@ -41,7 +41,7 @@ var _ = Describe("Backup catalog", func() {
 
 	It("can detect the first recoverability point", func() {
 		Expect(*catalog.FirstRecoverabilityPoint()).To(
-			Equal(time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC)))
+			Equal(time.Date(2021, 1, 1, 12, 30, 0, 0, time.UTC)))
 	})
 
 	It("can get the latest backupinfo", func() {
