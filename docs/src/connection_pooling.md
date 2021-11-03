@@ -225,6 +225,170 @@ PgBouncer through the following command:
 kubectl exec -ti <PGBOUNCER_POD> -- curl 127.0.0.1:9187/metrics
 ```
 
+An example of the output for `cnp_pgbouncer` metrics:
+
+```text
+# HELP cnp_pgbouncer_collection_duration_seconds Collection time duration in seconds
+# TYPE cnp_pgbouncer_collection_duration_seconds gauge
+cnp_pgbouncer_collection_duration_seconds{collector="Collect.up"} 0.002443168
+
+# HELP cnp_pgbouncer_collections_total Total number of times PostgreSQL was accessed for metrics.
+# TYPE cnp_pgbouncer_collections_total counter
+cnp_pgbouncer_collections_total 1
+
+# HELP cnp_pgbouncer_last_collection_error 1 if the last collection ended with error, 0 otherwise.
+# TYPE cnp_pgbouncer_last_collection_error gauge
+cnp_pgbouncer_last_collection_error 0
+
+# HELP cnp_pgbouncer_lists_databases Count of databases.
+# TYPE cnp_pgbouncer_lists_databases gauge
+cnp_pgbouncer_lists_databases 1
+
+# HELP cnp_pgbouncer_lists_dns_names Count of DNS names in the cache.
+# TYPE cnp_pgbouncer_lists_dns_names gauge
+cnp_pgbouncer_lists_dns_names 0
+
+# HELP cnp_pgbouncer_lists_dns_pending Not used.
+# TYPE cnp_pgbouncer_lists_dns_pending gauge
+cnp_pgbouncer_lists_dns_pending 0
+
+# HELP cnp_pgbouncer_lists_dns_queries Count of in-flight DNS queries.
+# TYPE cnp_pgbouncer_lists_dns_queries gauge
+cnp_pgbouncer_lists_dns_queries 0
+
+# HELP cnp_pgbouncer_lists_dns_zones Count of DNS zones in the cache.
+# TYPE cnp_pgbouncer_lists_dns_zones gauge
+cnp_pgbouncer_lists_dns_zones 0
+
+# HELP cnp_pgbouncer_lists_free_clients Count of free clients.
+# TYPE cnp_pgbouncer_lists_free_clients gauge
+cnp_pgbouncer_lists_free_clients 49
+
+# HELP cnp_pgbouncer_lists_free_servers Count of free servers.
+# TYPE cnp_pgbouncer_lists_free_servers gauge
+cnp_pgbouncer_lists_free_servers 0
+
+# HELP cnp_pgbouncer_lists_login_clients Count of clients in login state.
+# TYPE cnp_pgbouncer_lists_login_clients gauge
+cnp_pgbouncer_lists_login_clients 0
+
+# HELP cnp_pgbouncer_lists_pools Count of pools.
+# TYPE cnp_pgbouncer_lists_pools gauge
+cnp_pgbouncer_lists_pools 1
+
+# HELP cnp_pgbouncer_lists_used_clients Count of used clients.
+# TYPE cnp_pgbouncer_lists_used_clients gauge
+cnp_pgbouncer_lists_used_clients 1
+
+# HELP cnp_pgbouncer_lists_used_servers Count of used servers.
+# TYPE cnp_pgbouncer_lists_used_servers gauge
+cnp_pgbouncer_lists_used_servers 0
+
+# HELP cnp_pgbouncer_lists_users Count of users.
+# TYPE cnp_pgbouncer_lists_users gauge
+cnp_pgbouncer_lists_users 2
+
+# HELP cnp_pgbouncer_pools_cl_active Client connections that are linked to server connection and can process queries.
+# TYPE cnp_pgbouncer_pools_cl_active gauge
+cnp_pgbouncer_pools_cl_active{database="pgbouncer",user="pgbouncer"} 1
+
+# HELP cnp_pgbouncer_pools_cl_cancel_req Client connections that have not forwarded query cancellations to the server yet.
+# TYPE cnp_pgbouncer_pools_cl_cancel_req gauge
+cnp_pgbouncer_pools_cl_cancel_req{database="pgbouncer",user="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_pools_cl_waiting Client connections that have sent queries but have not yet got a server connection.
+# TYPE cnp_pgbouncer_pools_cl_waiting gauge
+cnp_pgbouncer_pools_cl_waiting{database="pgbouncer",user="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_pools_maxwait How long the first (oldest) client in the queue has waited, in seconds. If this starts increasing, then the current pool of servers does not handle requests quickly enough. The reason may be either an overloaded server or just too small of a pool_size setting.
+# TYPE cnp_pgbouncer_pools_maxwait gauge
+cnp_pgbouncer_pools_maxwait{database="pgbouncer",user="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_pools_maxwait_us Microsecond part of the maximum waiting time.
+# TYPE cnp_pgbouncer_pools_maxwait_us gauge
+cnp_pgbouncer_pools_maxwait_us{database="pgbouncer",user="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_pools_pool_mode The pooling mode in use. 1 for session, 2 for transaction, 3 for statement, -1 if unknown
+# TYPE cnp_pgbouncer_pools_pool_mode gauge
+cnp_pgbouncer_pools_pool_mode{database="pgbouncer",user="pgbouncer"} 3
+
+# HELP cnp_pgbouncer_pools_sv_active Server connections that are linked to a client.
+# TYPE cnp_pgbouncer_pools_sv_active gauge
+cnp_pgbouncer_pools_sv_active{database="pgbouncer",user="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_pools_sv_idle Server connections that are unused and immediately usable for client queries.
+# TYPE cnp_pgbouncer_pools_sv_idle gauge
+cnp_pgbouncer_pools_sv_idle{database="pgbouncer",user="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_pools_sv_login Server connections currently in the process of logging in.
+# TYPE cnp_pgbouncer_pools_sv_login gauge
+cnp_pgbouncer_pools_sv_login{database="pgbouncer",user="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_pools_sv_tested Server connections that are currently running either server_reset_query or server_check_query.
+# TYPE cnp_pgbouncer_pools_sv_tested gauge
+cnp_pgbouncer_pools_sv_tested{database="pgbouncer",user="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_pools_sv_used Server connections that have been idle for more than server_check_delay, so they need server_check_query to run on them before they can be used again.
+# TYPE cnp_pgbouncer_pools_sv_used gauge
+cnp_pgbouncer_pools_sv_used{database="pgbouncer",user="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_stats_avg_query_count Average queries per second in last stat period.
+# TYPE cnp_pgbouncer_stats_avg_query_count gauge
+cnp_pgbouncer_stats_avg_query_count{database="pgbouncer"} 1
+
+# HELP cnp_pgbouncer_stats_avg_query_time Average query duration, in microseconds.
+# TYPE cnp_pgbouncer_stats_avg_query_time gauge
+cnp_pgbouncer_stats_avg_query_time{database="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_stats_avg_recv Average received (from clients) bytes per second.
+# TYPE cnp_pgbouncer_stats_avg_recv gauge
+cnp_pgbouncer_stats_avg_recv{database="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_stats_avg_sent Average sent (to clients) bytes per second.
+# TYPE cnp_pgbouncer_stats_avg_sent gauge
+cnp_pgbouncer_stats_avg_sent{database="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_stats_avg_wait_time Time spent by clients waiting for a server, in microseconds (average per second).
+# TYPE cnp_pgbouncer_stats_avg_wait_time gauge
+cnp_pgbouncer_stats_avg_wait_time{database="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_stats_avg_xact_count Average transactions per second in last stat period.
+# TYPE cnp_pgbouncer_stats_avg_xact_count gauge
+cnp_pgbouncer_stats_avg_xact_count{database="pgbouncer"} 1
+
+# HELP cnp_pgbouncer_stats_avg_xact_time Average transaction duration, in microseconds.
+# TYPE cnp_pgbouncer_stats_avg_xact_time gauge
+cnp_pgbouncer_stats_avg_xact_time{database="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_stats_total_query_count Total number of SQL queries pooled by pgbouncer.
+# TYPE cnp_pgbouncer_stats_total_query_count gauge
+cnp_pgbouncer_stats_total_query_count{database="pgbouncer"} 3
+
+# HELP cnp_pgbouncer_stats_total_query_time Total number of microseconds spent by pgbouncer when actively connected to PostgreSQL, executing queries.
+# TYPE cnp_pgbouncer_stats_total_query_time gauge
+cnp_pgbouncer_stats_total_query_time{database="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_stats_total_received Total volume in bytes of network traffic received by pgbouncer.
+# TYPE cnp_pgbouncer_stats_total_received gauge
+cnp_pgbouncer_stats_total_received{database="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_stats_total_sent Total volume in bytes of network traffic sent by pgbouncer.
+# TYPE cnp_pgbouncer_stats_total_sent gauge
+cnp_pgbouncer_stats_total_sent{database="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_stats_total_wait_time Time spent by clients waiting for a server, in microseconds.
+# TYPE cnp_pgbouncer_stats_total_wait_time gauge
+cnp_pgbouncer_stats_total_wait_time{database="pgbouncer"} 0
+
+# HELP cnp_pgbouncer_stats_total_xact_count Total number of SQL transactions pooled by pgbouncer.
+# TYPE cnp_pgbouncer_stats_total_xact_count gauge
+cnp_pgbouncer_stats_total_xact_count{database="pgbouncer"} 3
+
+# HELP cnp_pgbouncer_stats_total_xact_time Total number of microseconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries.
+# TYPE cnp_pgbouncer_stats_total_xact_time gauge
+cnp_pgbouncer_stats_total_xact_time{database="pgbouncer"} 0
+```
+
 ## Logging
 
 Logs are directly sent to standard output, in JSON format, like in the

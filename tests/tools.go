@@ -19,6 +19,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// PodCommandResult contains the pod a command has been run and the output of the command
+type PodCommandResult struct {
+	Pod    corev1.Pod
+	Output string
+}
+
 // RunUnchecked executes a command and process the information
 //nolint:unparam,gosec
 func RunUnchecked(command string) (stdout string, stderr string, err error) {
@@ -58,4 +64,28 @@ func FirstEndpointIP(endpoint *corev1.Endpoints) string {
 		return ""
 	}
 	return endpoint.Subsets[0].Addresses[0].IP
+}
+
+// RunOnPodList executes a command on a list of pod and returns the outputs
+func RunOnPodList(namespace, command string, podList *corev1.PodList) ([]PodCommandResult, error) {
+	podCommandResults := make([]PodCommandResult, 0, len(podList.Items))
+	for _, pod := range podList.Items {
+		podName := pod.GetName()
+
+		out, _, err := Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			podName,
+			command))
+		if err != nil {
+			return nil, err
+		}
+
+		podCommandResults = append(podCommandResults, PodCommandResult{
+			Pod:    pod,
+			Output: out,
+		})
+	}
+
+	return podCommandResults, nil
 }
