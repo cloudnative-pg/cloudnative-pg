@@ -28,7 +28,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
+	barmanCredentials "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/credentials"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	postgresManagement "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
@@ -91,7 +91,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 
 	// Populate the cache with the backup configuration
 	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
-		envArchive, err := barman.EnvSetCloudCredentials(
+		envArchive, err := barmanCredentials.EnvSetCloudCredentials(
 			ctx,
 			r.GetClient(),
 			cluster.Namespace,
@@ -116,7 +116,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 	}
 
 	if barmanConfiguration != nil {
-		envRestore, err := barman.EnvSetCloudCredentials(
+		envRestore, err := barmanCredentials.EnvSetCloudCredentials(
 			ctx,
 			r.GetClient(),
 			cluster.Namespace,

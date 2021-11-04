@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/blang/semver"
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -22,11 +21,10 @@ import (
 	cacheClient "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache/client"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
+	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
-
-const barmanCloudWalArchiveName = "barman-cloud-wal-archive"
 
 // NewCmd creates the new cobra command
 func NewCmd() *cobra.Command {
@@ -86,12 +84,8 @@ func run(contextLog log.Logger, namespace, clusterName string, args []string) er
 		)
 		return nil
 	}
-	version, err := barman.GetBarmanCloudVersion(barmanCloudWalArchiveName)
-	if err != nil {
-		contextLog.Error(err, "while getting barman-cloud-wal-archive version")
-	}
 
-	options, err := barmanCloudWalArchiveOptions(*cluster, clusterName, walName, version)
+	options, err := barmanCloudWalArchiveOptions(*cluster, clusterName, walName)
 	if err != nil {
 		contextLog.Error(err, "while getting barman-cloud-wal-archive options")
 		return err
@@ -107,26 +101,26 @@ func run(contextLog log.Logger, namespace, clusterName string, args []string) er
 		return fmt.Errorf("failed to get envs: %w", err)
 	}
 
-	contextLog.Trace("Executing "+barmanCloudWalArchiveName,
+	contextLog.Trace("Executing "+barmanCapabilities.BarmanCloudWalArchive,
 		"walName", walName,
 		"currentPrimary", cluster.Status.CurrentPrimary,
 		"targetPrimary", cluster.Status.TargetPrimary,
 		"options", options,
 	)
 
-	barmanCloudWalArchiveCmd := exec.Command(barmanCloudWalArchiveName, options...) // #nosec G204
+	barmanCloudWalArchiveCmd := exec.Command(barmanCapabilities.BarmanCloudWalArchive, options...) // #nosec G204
 	barmanCloudWalArchiveCmd.Env = env
 
-	err = execlog.RunStreaming(barmanCloudWalArchiveCmd, barmanCloudWalArchiveName)
+	err = execlog.RunStreaming(barmanCloudWalArchiveCmd, barmanCapabilities.BarmanCloudWalArchive)
 	if err != nil {
-		contextLog.Error(err, "Error invoking "+barmanCloudWalArchiveName,
+		contextLog.Error(err, "Error invoking "+barmanCapabilities.BarmanCloudWalArchive,
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
 			"options", options,
 			"exitCode", barmanCloudWalArchiveCmd.ProcessState.ExitCode(),
 		)
-		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCloudWalArchiveName, err)
+		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCapabilities.BarmanCloudWalArchive, err)
 	}
 
 	contextLog.Info("Archived WAL file",
@@ -142,12 +136,7 @@ func barmanCloudWalArchiveOptions(
 	cluster apiv1.Cluster,
 	clusterName string,
 	walName string,
-	version *semver.Version,
 ) ([]string, error) {
-	var barmanCloudVersionGE213 bool
-	if version != nil {
-		barmanCloudVersionGE213 = version.GE(semver.Version{Major: 2, Minor: 13})
-	}
 	configuration := cluster.Spec.Backup.BarmanObjectStore
 
 	var options []string
@@ -171,21 +160,9 @@ func barmanCloudWalArchiveOptions(
 			configuration.EndpointURL)
 	}
 
-	if barmanCloudVersionGE213 {
-		if configuration.S3Credentials != nil {
-			options = append(
-				options,
-				"--cloud-provider",
-				"aws-s3")
-		}
-		if configuration.AzureCredentials != nil {
-			options = append(
-				options,
-				"--cloud-provider",
-				"azure-blob-storage")
-		}
-	} else if configuration.AzureCredentials != nil {
-		return nil, fmt.Errorf("barman >= 2.13 is required to use Azure object storage, current: %v", version)
+	options, err := barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
+	if err != nil {
+		return nil, err
 	}
 
 	serverName := clusterName

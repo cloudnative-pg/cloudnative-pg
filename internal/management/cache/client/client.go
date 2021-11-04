@@ -21,7 +21,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
+	barmanCredentials "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/credentials"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 )
 
@@ -80,7 +80,7 @@ func GetEnv(ctx context.Context,
 		return env, nil
 	}
 
-	env, err = barman.EnvSetCloudCredentials(
+	env, err = barmanCredentials.EnvSetCloudCredentials(
 		ctx,
 		typedClient,
 		namespace,

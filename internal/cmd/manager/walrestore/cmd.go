@@ -15,7 +15,6 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/blang/semver"
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -24,6 +23,7 @@ import (
 	cacheClient "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache/client"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
+	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
@@ -34,8 +34,6 @@ var (
 	// ErrNoBackupConfigured is returned when no backup is configured
 	ErrNoBackupConfigured = errors.New("backup not configured")
 )
-
-const barmanCloudWalRestoreName = "barman-cloud-wal-restore"
 
 // NewCmd creates a new cobra command
 func NewCmd() *cobra.Command {
@@ -111,15 +109,11 @@ func run(contextLog log.Logger, namespace, clusterName, podName string, args []s
 		)
 		return ErrNoBackupConfigured
 	}
-	version, err := barman.GetBarmanCloudVersion(barmanCloudWalRestoreName)
-	if err != nil {
-		contextLog.Error(err, "while getting barman-cloud-wal-restore version")
-	}
 
 	options, err := barmanCloudWalRestoreOptions(
-		barmanConfiguration, recoverClusterName, walName, destinationPath, version)
+		barmanConfiguration, recoverClusterName, walName, destinationPath)
 	if err != nil {
-		contextLog.Error(err, "while getting barman-cloud-wal-restore version")
+		contextLog.Error(err, "while getting barman-cloud-wal-restore options")
 		return err
 	}
 
@@ -132,11 +126,11 @@ func run(contextLog log.Logger, namespace, clusterName, podName string, args []s
 		return fmt.Errorf("failed to get envs: %w", err)
 	}
 
-	barmanCloudWalRestoreCmd := exec.Command(barmanCloudWalRestoreName, options...) // #nosec G204
+	barmanCloudWalRestoreCmd := exec.Command(barmanCapabilities.BarmanCloudWalRestore, options...) // #nosec G204
 	barmanCloudWalRestoreCmd.Env = env
-	err = execlog.RunStreaming(barmanCloudWalRestoreCmd, barmanCloudWalRestoreName)
+	err = execlog.RunStreaming(barmanCloudWalRestoreCmd, barmanCapabilities.BarmanCloudWalRestore)
 	if err != nil {
-		contextLog.Info("Error invoking "+barmanCloudWalRestoreName,
+		contextLog.Info("Error invoking "+barmanCapabilities.BarmanCloudWalRestore,
 			"error", err.Error(),
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
@@ -144,7 +138,7 @@ func run(contextLog log.Logger, namespace, clusterName, podName string, args []s
 			"options", options,
 			"exitCode", barmanCloudWalRestoreCmd.ProcessState.ExitCode(),
 		)
-		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCloudWalRestoreName, err)
+		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCapabilities.BarmanCloudWalRestore, err)
 	}
 
 	return nil
@@ -194,14 +188,8 @@ func barmanCloudWalRestoreOptions(
 	clusterName string,
 	walName string,
 	destinationPath string,
-	version *semver.Version,
 ) ([]string, error) {
 	var options []string
-
-	var barmanCloudVersionGE213 bool
-	if version != nil {
-		barmanCloudVersionGE213 = version.GE(semver.Version{Major: 2, Minor: 13})
-	}
 	if configuration.Wal != nil {
 		if len(configuration.Wal.Encryption) != 0 {
 			options = append(
@@ -218,21 +206,9 @@ func barmanCloudWalRestoreOptions(
 			configuration.EndpointURL)
 	}
 
-	if barmanCloudVersionGE213 {
-		if configuration.S3Credentials != nil {
-			options = append(
-				options,
-				"--cloud-provider",
-				"aws-s3")
-		}
-		if configuration.AzureCredentials != nil {
-			options = append(
-				options,
-				"--cloud-provider",
-				"azure-blob-storage")
-		}
-	} else if configuration.AzureCredentials != nil {
-		return nil, fmt.Errorf("barman >= 2.13 is required to use Azure object storage, current: %v", version)
+	options, err := barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
+	if err != nil {
+		return nil, err
 	}
 
 	serverName := clusterName
