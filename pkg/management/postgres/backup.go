@@ -16,7 +16,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/blang/semver"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -27,13 +26,13 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
+	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
+	barmanCredentials "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/credentials"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/catalog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
-
-const barmanCloudBackupName = "barman-cloud-backup"
 
 // We wait up to 10 minutes to have a WAL archived correctly
 var retryUntilWalArchiveWorking = wait.Backoff{
@@ -72,13 +71,9 @@ func NewBackupCommand(
 // getBarmanCloudBackupOptions extract the list of command line options to be used with
 // barman-cloud-backup
 func (b *BackupCommand) getBarmanCloudBackupOptions(
-	configuration *apiv1.BarmanObjectStoreConfiguration, serverName string, version *semver.Version,
+	configuration *apiv1.BarmanObjectStoreConfiguration,
+	serverName string,
 ) ([]string, error) {
-	var barmanCloudVersionGE213 bool
-	if version != nil {
-		barmanCloudVersionGE213 = version.GE(semver.Version{Major: 2, Minor: 13})
-	}
-
 	options := []string{
 		"--user", "postgres",
 	}
@@ -117,21 +112,10 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 			"--endpoint-url",
 			configuration.EndpointURL)
 	}
-	if barmanCloudVersionGE213 {
-		if configuration.S3Credentials != nil {
-			options = append(
-				options,
-				"--cloud-provider",
-				"aws-s3")
-		}
-		if configuration.AzureCredentials != nil {
-			options = append(
-				options,
-				"--cloud-provider",
-				"azure-blob-storage")
-		}
-	} else if configuration.AzureCredentials != nil {
-		return nil, fmt.Errorf("barman >= 2.13 is required to use Azure object storage, current: %v", version)
+
+	options, err := barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
+	if err != nil {
+		return nil, err
 	}
 
 	options = append(
@@ -218,7 +202,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		}
 	}
 
-	b.Env, err = barman.EnvSetCloudCredentials(
+	b.Env, err = barmanCredentials.EnvSetCloudCredentials(
 		ctx,
 		b.Client,
 		b.Cluster.Namespace,
@@ -240,11 +224,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 func (b *BackupCommand) run(ctx context.Context) {
 	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
-	version, err := barman.GetBarmanCloudVersion(barmanCloudBackupName)
-	if err != nil {
-		b.Log.Error(err, "while getting barman-cloud-backup version")
-	}
-	options, err := b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName, version)
+	options, err := b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName)
 	if err != nil {
 		b.Log.Error(err, "while getting barman-cloud-backup options")
 		return
@@ -258,10 +238,10 @@ func (b *BackupCommand) run(ctx context.Context) {
 		return
 	}
 
-	cmd := exec.Command(barmanCloudBackupName, options...) // #nosec G204
+	cmd := exec.Command(barmanCapabilities.BarmanCloudBackup, options...) // #nosec G204
 	cmd.Env = b.Env
 	cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
-	err = execlog.RunStreaming(cmd, barmanCloudBackupName)
+	err = execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup)
 	if err != nil {
 		// Set the status to failed and exit
 		b.Log.Error(err, "Backup failed")
@@ -278,28 +258,29 @@ func (b *BackupCommand) run(ctx context.Context) {
 	backupStatus.SetAsCompleted()
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
 
-	// For the retention policy we need Barman >= 2.14
-	barmanCloudVersionGE214 := false
-	if version != nil {
-		barmanCloudVersionGE214 = version.GE(semver.Version{Major: 2, Minor: 14})
-	}
 	// Delete backups per policy
-	if b.Cluster.Spec.Backup.RetentionPolicy != "" && barmanCloudVersionGE214 {
+	if b.Cluster.Spec.Backup.RetentionPolicy != "" {
 		b.Log.Info("Applying backup retention policy",
 			"retentionPolicy", b.Cluster.Spec.Backup.RetentionPolicy)
 		err = barman.DeleteBackupsByPolicy(b.Cluster.Spec.Backup, backupStatus.ServerName, b.Env)
 		if err != nil {
 			// Proper logging already happened inside DeleteBackupsByPolicy
 			b.Recorder.Event(b.Cluster, "Warning", "RetentionPolicyFailed", "Retention policy failed")
+			// We do not want to return here, we must go on to set the fist recoverability point
 		}
-	} else if b.Cluster.Spec.Backup.RetentionPolicy != "" && !barmanCloudVersionGE214 {
-		b.Log.Info("The retention policy was detected but the current barman version is lower than 2.14")
 	}
 
 	// Extracting the latest backup using barman-cloud-backup-list
 	backupList, err := barman.GetBackupList(b.Cluster.Spec.Backup.BarmanObjectStore, backupStatus.ServerName, b.Env)
-	if err != nil || backupList.Len() == 0 {
+	if err != nil {
 		// Proper logging already happened inside GetBackupList
+		return
+	}
+
+	// We have just made a new backup, if the backup list is empty
+	// something is going wrong in the cloud storage
+	if backupList.Len() == 0 {
+		b.Log.Error(nil, "Can't set backup status as completed: empty backup list")
 		return
 	}
 
