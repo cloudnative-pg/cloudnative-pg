@@ -14,6 +14,9 @@ on:
       limit:
         description: 'Limit to the specified engines list (local, eks, aks, gke, rke)'
         required: false
+      test_level:
+        description: 'Test level (0-4)'
+        required: false
   schedule:
     - cron:  '0 1 * * *'
 
@@ -344,6 +347,7 @@ jobs:
           event-type: cnp-trigger
           client-payload: '{"upstream_commit": "${{ github.event.pull_request.head.sha || github.sha }}"}'
 
+
   generate-jobs:
     name: Generate jobs for E2E tests
     needs:
@@ -376,18 +380,44 @@ jobs:
             -m '${{ github.event.inputs.depth || github.event_name }}' \
             -l '${{ github.event.inputs.limit }}'
 
+  evaluate-test-level:
+    name: Evaluate test level
+    needs:
+      - generate-jobs
+    runs-on: ubuntu-20.04
+    outputs:
+      testLevel: ${{ steps.evaluate-test-level.outputs.testLevel }}
+    steps:
+      - name: evaluate test level
+        id: evaluate-test-level
+        run: |
+          declare -A events
+          events=([push]=0 [pull_request]=2 [main]=3 [schedule]=4)
+          test_level_from_input="${{ github.event.inputs.test_level }}"
+          if [ -n "${test_level_from_input}" ]
+          then
+            echo "::set-output name=testLevel::${test_level_from_input}"
+            exit 0
+          fi
+          test_level_generated="${{ github.event.inputs.depth || github.event_name }}"
+          if [ -n "${test_level_generated}" ]
+          then
+            echo "::set-output name=testLevel::${events[${test_level_generated}]}"
+          fi
+
   e2e-local:
     name: Run E2E on local executors
     if: ${{ needs.generate-jobs.outputs.localEnabled == 'true' && needs.duplicate_runs.outputs.should_skip != 'true' }}
     needs:
       - generate-jobs
       - duplicate_runs
+      - evaluate-test-level
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
     runs-on: ubuntu-20.04
     env:
-      TEST_DEPTH: 4
+      TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
@@ -466,6 +496,7 @@ jobs:
     needs:
       - generate-jobs
       - duplicate_runs
+      - evaluate-test-level
     strategy:
       fail-fast: false
       max-parallel: 15
@@ -473,7 +504,7 @@ jobs:
         ${{ fromJSON(needs.generate-jobs.outputs.aksMatrix) }}
     runs-on: ubuntu-20.04
     env:
-      TEST_DEPTH: 4
+      TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
@@ -613,13 +644,14 @@ jobs:
     needs:
       - generate-jobs
       - duplicate_runs
+      - evaluate-test-level
     strategy:
       fail-fast: false
       matrix:
          ${{ fromJSON(needs.generate-jobs.outputs.eksMatrix) }}
     runs-on: ubuntu-20.04
     env:
-      TEST_DEPTH: 4
+      TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
@@ -738,6 +770,7 @@ jobs:
     needs:
       - generate-jobs
       - duplicate_runs
+      - evaluate-test-level
     strategy:
       fail-fast: false
       max-parallel: 10
@@ -745,7 +778,7 @@ jobs:
         ${{ fromJSON(needs.generate-jobs.outputs.gkeMatrix) }}
     runs-on: ubuntu-20.04
     env:
-      TEST_DEPTH: 4
+      TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
@@ -873,13 +906,14 @@ jobs:
       needs:
         - generate-jobs
         - duplicate_runs
+        - evaluate-test-level
       strategy:
         fail-fast: false
         matrix:
           ${{ fromJSON(needs.generate-jobs.outputs.rkeMatrix) }}
       runs-on: ubuntu-20.04
       env:
-        TEST_DEPTH: 4
+        TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
         POSTGRES_IMG: "${{ matrix.postgres_img }}"
         E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
 
