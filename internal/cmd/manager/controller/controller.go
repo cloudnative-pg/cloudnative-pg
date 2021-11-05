@@ -23,7 +23,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/controllers"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
@@ -78,7 +77,6 @@ const (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
-	_ = apiv1alpha1.AddToScheme(scheme)
 	_ = apiv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
@@ -207,28 +205,13 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 		return err
 	}
 
-	if err = (&apiv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster", "version", "v1alpha1")
-		return err
-	}
-
 	if err = (&apiv1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster", "version", "v1")
 		return err
 	}
 
-	if err = (&apiv1alpha1.Backup{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Backup", "version", "v1alpha1")
-		return err
-	}
-
 	if err = (&apiv1.Backup{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Backup", "version", "v1")
-		return err
-	}
-
-	if err = (&apiv1alpha1.ScheduledBackup{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ScheduledBackup", "version", "v1alpha1")
 		return err
 	}
 

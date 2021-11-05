@@ -105,7 +105,4 @@ issues:
       - stylecheck
       text: "ST1016:"
       path: api/
-    - linters:
-      - dupl
-      path: api/v1alpha1/.*_webhook\.go
   exclude-use-default: false

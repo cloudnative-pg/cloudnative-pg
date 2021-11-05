@@ -134,12 +134,6 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 	return &backup
 }
 
-// Hub marks this type as a conversion hub.
-func (*ScheduledBackup) Hub() {
-	// This function is empty because we only
-	// want to implement the conversion.Hub interface
-}
-
 func init() {
 	SchemeBuilder.Register(&ScheduledBackup{}, &ScheduledBackupList{})
 }

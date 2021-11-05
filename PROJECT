@@ -3,15 +3,6 @@ repo: github.com/EnterpriseDB/cloud-native-postgresql
 resources:
 - group: postgresql
   kind: Cluster
-  version: v1alpha1
-- group: postgresql
-  kind: Backup
-  version: v1alpha1
-- group: postgresql
-  kind: ScheduledBackup
-  version: v1alpha1
-- group: postgresql
-  kind: Cluster
   version: v1
 - group: postgresql
   kind: Backup
