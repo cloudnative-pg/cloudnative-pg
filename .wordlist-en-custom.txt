@@ -94,6 +94,7 @@ Golang
 GolangCI
 Grafana
 HH
+INPLACE
 IfNotPresent
 InfoSec
 InstanceID

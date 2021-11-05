@@ -127,10 +127,12 @@ installations, or using the native package manager of the used distribution
 (please follow the instructions in the above sections).
 
 The second step is automatically executed after having updated the controller,
-triggering a rolling update of every deployed PostgreSQL instance to use the
-new instance manager. If the `primaryUpdateStrategy` is set to `supervised`,
-users need to complete the rolling update by manually promoting a new instance
-through the `cnp` plugin for `kubectl`.
+by default triggering a rolling update of every deployed PostgreSQL instance to
+use the new instance manager. The rolling update procedure culminates with a
+switchover, which is controlled by the `primaryUpdateStrategy` option, by
+default set to `unsupervised`. When set to `supervised`, users need to complete
+the rolling update by manually promoting a new instance through the `cnp`
+plugin for `kubectl`.
 
 !!! Seealso "Rolling updates"
     This process is discussed in-depth on the [Rolling Updates](rolling_update.md) page.
@@ -139,6 +141,43 @@ through the `cnp` plugin for `kubectl`.
     In case `primaryUpdateStrategy` is set to the default value of `unsupervised`,
     an upgrade of the operator will trigger a switchover on your PostgreSQL cluster,
     causing a (normally negligible) downtime.
+
+Since version 1.10.0, the rolling update behavior can be replaced with in-place
+updates of the instance manager. The latter don't require a restart of the
+PostgreSQL instance and, as a result, a switchover in the cluster.
+This behavior, which is disabled by default, is described below.
+
+### In-place updates of the instance manager
+
+By default, Cloud Native PostgreSQL issues a rolling update of the cluster
+every time the operator is updated. The new instance manager shipped with the
+operator is added to each PostgreSQL pod via an init container.
+
+However, this behavior can be changed via configuration to enable in-place
+updates of the instance manager, which is the PID 1 process that keeps the
+container alive.
+
+Internally, any instance manager from version 1.10 of Cloud Native PostgreSQL
+supports injection of a new executable that will replace the existing one,
+once the integrity verification phase is completed, as well as graceful
+termination of all the internal processes. When the new instance manager
+restarts using the new binary, it adopts the already running *postmaster*.
+
+As a result, the PostgreSQL process is unaffected by the update, refraining
+from the need to perform a switchover. The other side of the coin, is that
+the Pod is changed after the start, breaking the pure concept of immutability.
+
+You can enable this feature by setting the `ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES`
+environment variable to `'true'` in the
+[operator configuration](operator_conf.md#available-options).
+
+The in-place upgrade process will not change the init container image inside the
+Pods. Therefore, the Pod definition will not reflect the current version of the
+operator.
+
+!!! Important
+    This feature requires that all pods (operators and operands) run on the
+    same platform/architecture (for example, all `linux/amd64`).
 
 ### Compatibility among versions
 
