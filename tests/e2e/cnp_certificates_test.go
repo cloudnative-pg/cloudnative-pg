@@ -11,6 +11,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -85,7 +86,7 @@ var _ = Describe("Certificates", func() {
 
 			AssertDBConnectionFromAppPod(namespace, clusterName, sampleAppFile, appPod)
 
-			AssertCertificatesSecrets(namespace, clusterName, caSecName, tlsSecName, certs.CertTypeServer)
+			createAndAssertCertificatesSecrets(namespace, clusterName, caSecName, tlsSecName, certs.CertTypeServer, false)
 
 			By("switching to user-supplied server certificates", func() {
 				// Updating defaults certificates entries with user provided certificates,
@@ -124,7 +125,8 @@ var _ = Describe("Certificates", func() {
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Create certificates secret for client
-			AssertCertificatesSecrets(namespace, clusterName, caSecNameClient, tlsSecNameClient, certs.CertTypeClient)
+			createAndAssertCertificatesSecrets(namespace, clusterName, caSecNameClient, tlsSecNameClient,
+				certs.CertTypeClient, false)
 
 			By("switching to user-supplied client certificates", func() {
 				// Updating defaults certificates entries with user provided certificates,
@@ -162,9 +164,10 @@ var _ = Describe("Certificates", func() {
 			// Create cluster
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			// Create certificates secret for server
-			AssertCertificatesSecrets(namespace, clusterName, caSecName, tlsSecName, certs.CertTypeServer)
+			createAndAssertCertificatesSecrets(namespace, clusterName, caSecName, tlsSecName, certs.CertTypeServer, false)
 			// Create certificates secret for client
-			AssertCertificatesSecrets(namespace, clusterName, caSecNameClient, tlsSecNameClient, certs.CertTypeClient)
+			createAndAssertCertificatesSecrets(namespace, clusterName, caSecNameClient, tlsSecNameClient,
+				certs.CertTypeClient, false)
 
 			By("switching to user-supplied server and client certificates", func() {
 				// Updating defaults certificates entries with user provided certificates,
@@ -219,7 +222,7 @@ var _ = Describe("Certificates", func() {
 			// Create a cluster in a namespace that will be deleted after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCertificatesSecrets(namespace, clusterName, caSecName, tlsSecName, certs.CertTypeServer)
+			createAndAssertCertificatesSecrets(namespace, clusterName, caSecName, tlsSecName, certs.CertTypeServer, false)
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			AssertClientCertificatesSecretsUsingCnpPlugin(namespace, clusterName)
 			AssertDBConnectionFromAppPod(namespace, clusterName, sampleAppFileUserSuppliedCert, appPodUserSuppliedCert)
@@ -251,7 +254,8 @@ var _ = Describe("Certificates", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create certificates secret for client
-			AssertCertificatesSecrets(namespace, clusterName, caSecNameClient, tlsSecNameClient, certs.CertTypeClient)
+			createAndAssertCertificatesSecrets(namespace, clusterName, caSecNameClient, tlsSecNameClient,
+				certs.CertTypeClient, false)
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			AssertDBConnectionFromAppPod(namespace, clusterName, sampleAppFileUserSuppliedCertClient, appPodUserSuppliedCert)
 		})
@@ -282,34 +286,26 @@ var _ = Describe("Certificates", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create certificates secret for server
-			AssertCertificatesSecrets(namespace, clusterName, caSecName, tlsSecName, certs.CertTypeServer)
+			createAndAssertCertificatesSecrets(namespace, clusterName, caSecName, tlsSecName, certs.CertTypeServer, false)
 
 			// Create certificates secret for client
-			AssertCertificatesSecrets(namespace, clusterName, caSecNameClient, tlsSecNameClient, certs.CertTypeClient)
+			createAndAssertCertificatesSecrets(namespace, clusterName, caSecNameClient, tlsSecNameClient,
+				certs.CertTypeClient, false)
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			AssertDBConnectionFromAppPod(namespace, clusterName, sampleUserSuppliedCertClientServer, appPodUserSuppliedCert)
 		})
 	})
 })
 
-func AssertCertificatesSecrets(namespace, clusterName, caSecName, tlsSecName, certType string) {
-	// creating root CA certificates
-	cluster := &apiv1.Cluster{}
-	cluster.Namespace = namespace
-	cluster.Name = clusterName
-	secret := &corev1.Secret{}
-	err := env.Client.Get(env.Ctx, client.ObjectKey{Namespace: namespace, Name: caSecName}, secret)
-	Expect(err).To(HaveOccurred())
+func createAndAssertCertificatesSecrets(
+	namespace, clusterName, caSecName, tlsSecName, certType string, includeCAPrivateKey bool) {
+	cluster, caPair := createSecretCA(namespace, clusterName, caSecName, includeCAPrivateKey)
 
-	caPair, err := certs.CreateRootCA(cluster.Name, namespace)
-	Expect(err).ToNot(HaveOccurred())
+	assertCACertificateCreation(namespace, certType, caPair, cluster, tlsSecName)
+}
 
-	caSecret := caPair.GenerateCASecret(namespace, caSecName)
-	// delete the key from the CA, as it is not needed in this case
-	delete(caSecret.Data, certs.CAPrivateKeyKey)
-	err = env.Client.Create(env.Ctx, caSecret)
-	Expect(err).ToNot(HaveOccurred())
-
+func assertCACertificateCreation(namespace string, certType string, caPair *certs.KeyPair,
+	cluster *apiv1.Cluster, tlsSecName string) {
 	if certType == certs.CertTypeServer {
 		By("creating server TLS certificate", func() {
 			serverPair, err := caPair.CreateAndSignPair(cluster.GetServiceReadWriteName(), certs.CertTypeServer,
@@ -340,6 +336,29 @@ func AssertCertificatesSecrets(namespace, clusterName, caSecName, tlsSecName, ce
 			Expect(err).ToNot(HaveOccurred())
 		})
 	}
+}
+
+func createSecretCA(namespace string, clusterName string, caSecName string, includeCAPrivateKey bool) (
+	*apiv1.Cluster, *certs.KeyPair) {
+	// creating root CA certificates
+	cluster := &apiv1.Cluster{}
+	cluster.Namespace = namespace
+	cluster.Name = clusterName
+	secret := &corev1.Secret{}
+	err := env.Client.Get(env.Ctx, client.ObjectKey{Namespace: namespace, Name: caSecName}, secret)
+	Expect(apierrors.IsNotFound(err)).To(BeTrue())
+
+	caPair, err := certs.CreateRootCA(cluster.Name, namespace)
+	Expect(err).ToNot(HaveOccurred())
+
+	caSecret := caPair.GenerateCASecret(namespace, caSecName)
+	// delete the key from the CA, as it is not needed in this case
+	if !includeCAPrivateKey {
+		delete(caSecret.Data, certs.CAPrivateKeyKey)
+	}
+	err = env.Client.Create(env.Ctx, caSecret)
+	Expect(err).ToNot(HaveOccurred())
+	return cluster, caPair
 }
 
 func AssertClientCertificatesSecretsUsingCnpPlugin(namespace, clusterName string) {
