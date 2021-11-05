@@ -137,9 +137,10 @@ func isOwnedByPooler(obj client.Object) (string, bool) {
 		return "", false
 	}
 
-	if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
+	if owner.APIVersion != apiGVString {
 		return "", false
 	}
+
 	return owner.Name, true
 }
 

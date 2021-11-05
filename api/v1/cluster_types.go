@@ -961,12 +961,6 @@ type ConfigMapResourceVersion struct {
 	Metrics map[string]string `json:"metrics,omitempty"`
 }
 
-// Hub marks this type as a conversion hub.
-func (*Cluster) Hub() {
-	// This function is empty because we only
-	// want to implement the conversion.Hub interface
-}
-
 // GetImageName get the name of the image that should be used
 // to create the pods
 func (cluster *Cluster) GetImageName() string {

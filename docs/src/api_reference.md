@@ -470,7 +470,7 @@ Name       | Description                                                        
 PgBouncerIntegrationStatus encapsulates the needed integration for the pgbouncer poolers referencing the cluster
 
 Name    | Description            | Type    
-------- | --- | --------
+------- |  | --------
 `secrets` |  | []string
 
 <a id='PgBouncerSecrets'></a>
@@ -530,7 +530,7 @@ Name     | Description                                                          
 Pooler is the Schema for the poolers API
 
 Name     | Description            | Type                                                                                                        
--------- | --- | ------------------------------------------------------------------------------------------------------------
+-------- |  | ------------------------------------------------------------------------------------------------------------
 `metadata` |  | [metav1.ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#objectmeta-v1-meta)
 `spec    ` |  | [PoolerSpec](#PoolerSpec)                                                                                   
 `status  ` |  | [PoolerStatus](#PoolerStatus)                                                                               
@@ -542,7 +542,7 @@ Name     | Description            | Type
 PoolerIntegrations encapsulates the needed integration for the poolers referencing the cluster
 
 Name                 | Description            | Type                                                     
--------------------- | --- | ---------------------------------------------------------
+-------------------- |  | ---------------------------------------------------------
 `pgBouncerIntegration` |  | [PgBouncerIntegrationStatus](#PgBouncerIntegrationStatus)
 
 <a id='PoolerList'></a>
@@ -552,7 +552,7 @@ Name                 | Description            | Type
 PoolerList contains a list of Pooler
 
 Name     | Description            | Type                                                                                                    
--------- | --- | --------------------------------------------------------------------------------------------------------
+-------- |  | --------------------------------------------------------------------------------------------------------
 `metadata` |  | [metav1.ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#listmeta-v1-meta)
 `items   ` |  - *mandatory*  | [[]Pooler](#Pooler)                                                                                     
 

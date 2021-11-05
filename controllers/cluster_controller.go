@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	apiv1alpha1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1alpha1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
@@ -44,10 +43,7 @@ const (
 	poolerClusterKey = ".spec.cluster.name"
 )
 
-var (
-	apiGVString         = apiv1.GroupVersion.String()
-	apiv1alpha1GVString = apiv1alpha1.GroupVersion.String()
-)
+var apiGVString = apiv1.GroupVersion.String()
 
 // ClusterReconciler reconciles a Cluster objects
 type ClusterReconciler struct {
@@ -573,9 +569,10 @@ func isOwnedByCluster(obj client.Object) (string, bool) {
 		return "", false
 	}
 
-	if owner.APIVersion != apiGVString && owner.APIVersion != apiv1alpha1GVString {
+	if owner.APIVersion != apiGVString {
 		return "", false
 	}
+
 	return owner.Name, true
 }
 
