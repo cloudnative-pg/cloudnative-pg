@@ -9,12 +9,10 @@ package restore
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
@@ -55,20 +53,8 @@ func NewCmd() *cobra.Command {
 }
 
 func restoreSubCommand(ctx context.Context, info postgres.InitInfo) error {
-	status, err := fileutils.FileExists(info.PgData)
+	err := info.VerifyPGData()
 	if err != nil {
-		log.Error(err, "Error while checking for an existent PGData")
-		return err
-	}
-	if status {
-		log.Info("PGData already exists, can't restore over an existing folder")
-		return fmt.Errorf("pgdata already existent")
-	}
-
-	err = info.VerifyConfiguration()
-	if err != nil {
-		log.Error(err, "Configuration not valid",
-			"info", info)
 		return err
 	}
 

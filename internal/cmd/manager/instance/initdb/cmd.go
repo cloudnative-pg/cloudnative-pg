@@ -8,13 +8,11 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package initdb
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/kballard/go-shellquote"
 	"github.com/spf13/cobra"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
@@ -83,20 +81,8 @@ func NewCmd() *cobra.Command {
 }
 
 func initSubCommand(info postgres.InitInfo) error {
-	status, err := fileutils.FileExists(info.PgData)
+	err := info.VerifyPGData()
 	if err != nil {
-		log.Error(err, "Error while checking for an existent PGData")
-		return err
-	}
-	if status {
-		log.Info("PGData already exists, no need to init")
-		return fmt.Errorf("PGData already exists")
-	}
-
-	err = info.VerifyConfiguration()
-	if err != nil {
-		log.Error(err, "Configuration not valid",
-			"info", info)
 		return err
 	}
 
