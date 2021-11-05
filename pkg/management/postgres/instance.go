@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"syscall"
 	"time"
@@ -49,6 +50,12 @@ var (
 
 	// ErrNoConnectionEstablished postgres is alive, but rejecting connections
 	ErrNoConnectionEstablished = fmt.Errorf("could not establish connection")
+
+	// In a version string we need only the initial sequence of digits and dots
+	versionRegex = regexp.MustCompile(`^[\d.]+`)
+
+	// ErrMalformedServerVersion the version string is not recognised
+	ErrMalformedServerVersion = fmt.Errorf("unrecognized server version")
 )
 
 // Instance represent a PostgreSQL instance to be executed
@@ -327,13 +334,24 @@ func (instance *Instance) GetPgVersion() (semver.Version, error) {
 		return semver.Version{}, err
 	}
 
-	parsedVersion, err := semver.ParseTolerant(versionString)
-	if err != nil {
-		return semver.Version{}, err
+	return instance.parseVersion(versionString)
+}
+
+// Version could contain more characters than just the version tag,
+// e.g. `13.4 (Debian 13.4-4.pgdg100+1)`.
+// Therefore, we extract the initial sequence of digits and dots, then we parse it
+func (instance *Instance) parseVersion(version string) (semver.Version, error) {
+	if versionRegex.MatchString(version) {
+		parsedVersion, err := semver.ParseTolerant(versionRegex.FindStringSubmatch(version)[0])
+		if err != nil {
+			return semver.Version{}, err
+		}
+
+		instance.pgVersion = &parsedVersion
+		return *instance.pgVersion, nil
 	}
 
-	instance.pgVersion = &parsedVersion
-	return *instance.pgVersion, nil
+	return semver.Version{}, ErrMalformedServerVersion
 }
 
 // ConnectionPool gets or initializes the connection pool for this instance
