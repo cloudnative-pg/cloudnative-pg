@@ -15,22 +15,6 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
-// JoinInfo contains the information needed to bootstrap a new
-// PostgreSQL replica
-type JoinInfo struct {
-	// The cluster name to join
-	ClusterName string
-
-	// The generated node name
-	PodName string
-
-	// Where the new instance must be written
-	PgData string
-
-	// The full hostname of the parent node
-	ParentNode string
-}
-
 // ClonePgData clones an existing server, given its connection string,
 // to a certain data directory
 func ClonePgData(connectionString, targetPgData string) error {
@@ -71,7 +55,7 @@ func ClonePgData(connectionString, targetPgData string) error {
 }
 
 // Join creates a new instance joined to an existing PostgreSQL cluster
-func (info JoinInfo) Join() error {
+func (info InitInfo) Join() error {
 	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
 
 	err := ClonePgData(primaryConnInfo, info.PgData)

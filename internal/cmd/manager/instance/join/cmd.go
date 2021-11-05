@@ -9,7 +9,6 @@ package join
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -17,7 +16,6 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
@@ -43,7 +41,7 @@ func NewCmd() *cobra.Command {
 			instance.PodName = podName
 			instance.ClusterName = clusterName
 
-			info := postgres.JoinInfo{
+			info := postgres.InitInfo{
 				PgData:     pgData,
 				ParentNode: parentNode,
 				PodName:    podName,
@@ -65,15 +63,10 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postgres.JoinInfo) error {
-	status, err := fileutils.FileExists(info.PgData)
+func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postgres.InitInfo) error {
+	err := info.VerifyPGData()
 	if err != nil {
-		log.Error(err, "Error while checking for an existent PGData")
 		return err
-	}
-	if status {
-		log.Info("PGData already exists, no need to init")
-		return fmt.Errorf("pgdata already existent")
 	}
 
 	// Let's download the crypto material from the cluster

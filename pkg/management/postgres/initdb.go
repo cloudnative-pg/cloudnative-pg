@@ -23,8 +23,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
-// InitInfo contains all the info needed to bootstrap a new PostgreSQL:O
-// instance
+// InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
 type InitInfo struct {
 	// The data directory where to generate the new cluster
 	PgData string
@@ -80,20 +79,22 @@ const (
 	initdbName = "initdb"
 )
 
-// VerifyConfiguration verify if the passed configuration is OK and returns an error otherwise
-func (info InitInfo) VerifyConfiguration() error {
+// VerifyPGData verifies if the passed configuration is OK, otherwise it returns an error
+func (info InitInfo) VerifyPGData() error {
 	pgdataExists, err := fileutils.FileExists(info.PgData)
 	if err != nil {
+		log.Error(err, "Error while checking for an existing PGData")
 		return err
 	}
 	if pgdataExists {
+		log.Info("PGData already exists, can't overwrite")
 		return fmt.Errorf("PGData directories already exist")
 	}
 
 	return nil
 }
 
-// CreateDataDirectory create a new data directory given the configuration
+// CreateDataDirectory creates a new data directory given the configuration
 func (info InitInfo) CreateDataDirectory() error {
 	// Invoke initdb to generate a data directory
 	options := []string{
@@ -186,7 +187,7 @@ func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
 	return nil
 }
 
-// Bootstrap create and configure this new PostgreSQL instance
+// Bootstrap creates and configures this new PostgreSQL instance
 func (info InitInfo) Bootstrap() error {
 	err := info.CreateDataDirectory()
 	if err != nil {
