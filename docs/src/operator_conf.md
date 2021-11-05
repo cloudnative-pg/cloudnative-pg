@@ -31,15 +31,14 @@ is located in the same namespace of the operator deployment and with
 
 ## Available options
 
-The operator looks for the following environment variables to be defined in the config map:
+The operator looks for the following environment variables to be defined in the `ConfigMap`/`Secret`:
 
 Name | Description
 ---- | -----------
 `INHERITED_ANNOTATIONS` | list of annotation names that, when defined in a `Cluster` metadata, will be inherited by all the generated resources, including pods
 `INHERITED_LABELS` | list of label names that, when defined in a `Cluster` metadata, will be inherited by all the generated resources, including pods
 `PULL_SECRET_NAME` | name of an additional pull secret to be defined in the operator's namespace and to be used to download images
-
-By default, the above variables are not set.
+`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES` | when set to `true`, enables in-place updates of the instance manager after an update of the operator, avoiding rolling updates of the cluster (default `false`) |
 
 Values in `INHERITED_ANNOTATIONS` and `INHERITED_LABELS` support path-like wildcards. For example, the value `example.com/*` will match
 both the value `example.com/one` and `example.com/two`.
@@ -48,7 +47,9 @@ both the value `example.com/one` and `example.com/two`.
 
 The example below customizes the behavior of the operator, by defining
 the label/annotation names to be inherited by the resources created by
-any `Cluster` object that is deployed at a later time.
+any `Cluster` object that is deployed at a later time, and by enabling
+[in-place updates for the instance
+manager](installation_upgrade.md#in-place-updates-of-the-instance-manager).
 
 ```yaml
 apiVersion: v1
@@ -59,13 +60,16 @@ metadata:
 data:
   INHERITED_ANNOTATIONS: categories
   INHERITED_LABELS: environment, workload, app
+  ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
 ```
 
 ## Defining an operator secret
 
 The example below customizes the behavior of the operator, by defining
 the label/annotation names to be inherited by the resources created by
-any `Cluster` object that is deployed at a later time.
+any `Cluster` object that is deployed at a later time, and by enabling
+[in-place updates for the instance
+manager](installation_upgrade.md#in-place-updates-of-the-instance-manager).
 
 ```yaml
 apiVersion: v1
@@ -77,6 +81,7 @@ type: Opaque
 stringData:
   INHERITED_ANNOTATIONS: categories
   INHERITED_LABELS: environment, workload, app
+  ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
 ```
 
 ## Restarting the operator to reload configs

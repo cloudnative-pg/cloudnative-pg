@@ -228,6 +228,10 @@ You can upgrade the operator seamlessly as a new deployment. A change in the
 operator does not require a change in the operand - thanks to the instance
 manager's injection. The operator can manage older versions of the operand.
 
+Cloud Native PostgreSQL also supports [in-place updates of the instance manager](installation_upgrade.md#in-place-updates-of-the-instance-manager)
+following an upgrade of the operator: in-place updates do not require a rolling
+update - and subsequent switchover - of the cluster.
+
 ### Upgrade of the managed workload
 
 The operand can be upgraded using a declarative configuration approach as

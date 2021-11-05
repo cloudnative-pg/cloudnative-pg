@@ -10,11 +10,11 @@ Rolling upgrades are started when:
 
 - the user changes the `imageName` attribute of the cluster specification;
 
-- after the operator is updated, to ensure the Pods run the latest instance
-  manager;
+- a change in the PostgreSQL configuration requires a restart to be
+  applied;
 
-- when a change in the PostgreSQL configuration requires a restart to be
-  applied.
+- after the operator is updated, to ensure the Pods run the latest instance
+  manager (unless [in-place updates are enabled](installation_upgrade.md#in-place-updates-of-the-instance-manager)).
 
 The operator starts upgrading all the replicas, one Pod at a time, starting
 from the one with the highest serial.
