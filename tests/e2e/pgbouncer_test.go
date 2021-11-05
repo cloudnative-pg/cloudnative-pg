@@ -12,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
@@ -85,6 +86,53 @@ var _ = Describe("PGBouncer Connections", func() {
 		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+		By("setting up read write type pgbouncer pooler", func() {
+			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateRWSampleFile, 1)
+		})
+
+		By("setting up read only type pgbouncer pooler", func() {
+			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateROSampleFile, 1)
+		})
+
+		By("verifying read and write connections using pgbouncer service", func() {
+			assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				poolerCertificateRWSampleFile, true)
+		})
+
+		By("verifying read connections using pgbouncer service", func() {
+			assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
+				poolerCertificateROSampleFile, false)
+		})
+	})
+
+	It("can connect to Postgres via pgbouncer against a cluster with separate client and server CA", func() {
+		const (
+			folderPath                    = fixturesDir + "/pgbouncer/pgbouncer_separate_client_server_ca/"
+			sampleFileWithCertificate     = folderPath + "cluster-user-supplied-client-server-certificates.yaml"
+			poolerCertificateROSampleFile = folderPath + "pgbouncer-pooler-tls-ro.yaml"
+			poolerCertificateRWSampleFile = folderPath + "pgbouncer-pooler-tls-rw.yaml"
+			caSecName                     = "my-postgresql-server-ca"
+			tlsSecName                    = "my-postgresql-server"
+			tlsSecNameClient              = "my-postgresql-client"
+			caSecNameClient               = "my-postgresql-client-ca"
+		)
+		// Create a cluster in a namespace that will be deleted after the test
+		namespace = "pgbouncer-separate-certificates"
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		clusterName, err = env.GetResourceNameFromYAML(sampleFileWithCertificate)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Create certificates secret for server
+		createAndAssertCertificatesSecrets(namespace, clusterName,
+			caSecName, tlsSecName, certs.CertTypeServer, true)
+
+		// Create certificates secret for client
+		createAndAssertCertificatesSecrets(namespace, clusterName,
+			caSecNameClient, tlsSecNameClient, certs.CertTypeClient, true)
+
+		AssertCreateCluster(namespace, clusterName, sampleFileWithCertificate, env)
 
 		By("setting up read write type pgbouncer pooler", func() {
 			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerCertificateRWSampleFile, 1)
