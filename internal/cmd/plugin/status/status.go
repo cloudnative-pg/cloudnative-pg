@@ -206,6 +206,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 	status := tabby.New()
 	fmt.Println(aurora.Green("Instances status"))
 	status.AddHeader(
+		"Manager Version",
 		"Pod name",
 		"Current LSN",
 		"Received LSN",
@@ -219,6 +220,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 	for _, instance := range instanceStatus.Items {
 		if instance.Error != nil {
 			status.AddLine(
+				'-',
 				instance.Pod.Name,
 				"-",
 				"-",
@@ -231,6 +233,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 				instance.Error.Error())
 		} else {
 			status.AddLine(
+				instance.InstanceManagerVersion,
 				instance.Pod.Name,
 				instance.CurrentLsn,
 				instance.ReceivedLsn,

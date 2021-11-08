@@ -29,6 +29,7 @@ type PostgresqlStatus struct {
 	// Status of the instance manager
 	ExecutableHash             string `json:"executableHash"`
 	IsInstanceManagerUpgrading bool   `json:"isInstanceManagerUpgrading"`
+	InstanceManagerVersion     string `json:"instanceManagerVersion"`
 	InstanceArch               string `json:"instanceArch"`
 }
 

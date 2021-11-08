@@ -15,6 +15,7 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/executablehash"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
 // IsServerHealthy check if the instance is healthy
@@ -49,7 +50,8 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	}
 
 	result := postgres.PostgresqlStatus{
-		Pod: corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
+		Pod:                    corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
+		InstanceManagerVersion: versions.Version,
 	}
 
 	row := superUserDB.QueryRow(
