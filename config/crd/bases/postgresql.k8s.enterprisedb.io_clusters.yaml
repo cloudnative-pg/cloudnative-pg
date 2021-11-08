@@ -1150,6 +1150,7 @@ spec:
                 description: Description of this PostgreSQL cluster
                 type: string
               enableSuperuserAccess:
+                default: true
                 description: When this option is enabled, the operator will use the
                   `SuperuserSecret` to update the `postgres` user password (if the
                   secret is not present, the operator will automatically create one).
@@ -1449,6 +1450,7 @@ spec:
                   and digests for deterministic and repeatable deployments (`<image>:<tag>@sha256:<digestValue>`)
                 type: string
               imagePullPolicy:
+                default: IfNotPresent
                 description: 'Image pull policy. One of `Always`, `Never` or `IfNotPresent`.
                   If not defined, it defaults to `IfNotPresent`. Cannot be updated.
                   More info: https://kubernetes.io/docs/concepts/containers/images#updating-images'
@@ -1468,25 +1470,36 @@ spec:
                   type: object
                 type: array
               instances:
+                default: 1
                 description: Number of instances required in the cluster
                 format: int32
                 minimum: 1
                 type: integer
               logLevel:
+                default: info
                 description: 'The instances'' log level, one of the following values:
                   error, info (default), debug, trace'
+                enum:
+                - error
+                - info
+                - debug
+                - trace
                 type: string
               maxSyncReplicas:
+                default: 0
                 description: The target value for the synchronous replication quorum,
                   that can be decreased if the number of ready standbys is lower than
                   this. Undefined or 0 disable synchronous replication.
                 format: int32
+                minimum: 0
                 type: integer
               minSyncReplicas:
+                default: 0
                 description: Minimum number of instances required in synchronous replication
                   with the primary. Undefined or 0 allow writes to complete when no
                   standby is available.
                 format: int32
+                minimum: 0
                 type: integer
               monitoring:
                 description: The configuration of the monitoring infrastructure of
@@ -1531,9 +1544,11 @@ spec:
                 description: Define a maintenance window for the Kubernetes nodes
                 properties:
                   inProgress:
+                    default: false
                     description: Is there a node maintenance activity in progress?
                     type: boolean
                   reusePVC:
+                    default: true
                     description: Reuse the existing PVC (wait for the node to come
                       up again) or not (recreate it elsewhere)
                     type: boolean
@@ -1541,11 +1556,13 @@ spec:
                 - inProgress
                 type: object
               postgresGID:
+                default: 26
                 description: The GID of the `postgres` user inside the image, defaults
                   to `26`
                 format: int64
                 type: integer
               postgresUID:
+                default: 26
                 description: The UID of the `postgres` user inside the image, defaults
                   to `26`
                 format: int64
@@ -1577,10 +1594,14 @@ spec:
                     type: array
                 type: object
               primaryUpdateStrategy:
+                default: unsupervised
                 description: 'Strategy to follow to upgrade the primary server during
                   a rolling update procedure, after all replicas have been successfully
                   updated: it can be automated (`unsupervised` - default) or manual
                   (`supervised`)'
+                enum:
+                - unsupervised
+                - supervised
                 type: string
               replica:
                 description: Replica cluster configuration
@@ -1627,11 +1648,13 @@ spec:
                     type: object
                 type: object
               startDelay:
+                default: 30
                 description: The time in seconds that is allowed for a PostgreSQL
                   instance to successfully start up (default 30)
                 format: int32
                 type: integer
               stopDelay:
+                default: 30
                 description: The time in seconds that is allowed for a PostgreSQL
                   instance node to gracefully shutdown (default 30)
                 format: int32
@@ -1801,6 +1824,7 @@ spec:
                         type: string
                     type: object
                   resizeInUseVolumes:
+                    default: true
                     description: Resize existent PVCs, defaults to true
                     type: boolean
                   size:

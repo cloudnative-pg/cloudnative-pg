@@ -103,26 +103,34 @@ type ClusterSpec struct {
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
 	// +optional
+	// +kubebuilder:default:=IfNotPresent
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// The UID of the `postgres` user inside the image, defaults to `26`
+	// +kubebuilder:default:=26
 	PostgresUID int64 `json:"postgresUID,omitempty"`
 
 	// The GID of the `postgres` user inside the image, defaults to `26`
+	// +kubebuilder:default:=26
 	PostgresGID int64 `json:"postgresGID,omitempty"`
 
 	// Number of instances required in the cluster
 	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default:=1
 	Instances int32 `json:"instances"`
 
 	// Minimum number of instances required in synchronous replication with the
 	// primary. Undefined or 0 allow writes to complete when no standby is
 	// available.
+	// +kubebuilder:default:=0
+	// +kubebuilder:validation:Minimum=0
 	MinSyncReplicas int32 `json:"minSyncReplicas,omitempty"`
 
 	// The target value for the synchronous replication quorum, that can be
 	// decreased if the number of ready standbys is lower than this.
 	// Undefined or 0 disable synchronous replication.
+	// +kubebuilder:default:=0
+	// +kubebuilder:validation:Minimum=0
 	MaxSyncReplicas int32 `json:"maxSyncReplicas,omitempty"`
 
 	// Configuration of the PostgreSQL server
@@ -148,6 +156,7 @@ type ClusterSpec struct {
 	// option is disabled, the operator will ignore the `SuperuserSecret` content, delete
 	// it when automatically created, and then blank the password of the `postgres`
 	// user by setting it to `NULL`. Enabled by default.
+	// +kubebuilder:default:=true
 	EnableSuperuserAccess *bool `json:"enableSuperuserAccess,omitempty"`
 
 	// The configuration for the CA and related certificates
@@ -163,10 +172,12 @@ type ClusterSpec struct {
 
 	// The time in seconds that is allowed for a PostgreSQL instance to
 	// successfully start up (default 30)
+	// +kubebuilder:default:=30
 	MaxStartDelay int32 `json:"startDelay,omitempty"`
 
 	// The time in seconds that is allowed for a PostgreSQL instance node to
 	// gracefully shutdown (default 30)
+	// +kubebuilder:default:=30
 	MaxStopDelay int32 `json:"stopDelay,omitempty"`
 
 	// Affinity/Anti-affinity rules for Pods
@@ -182,6 +193,8 @@ type ClusterSpec struct {
 	// Strategy to follow to upgrade the primary server during a rolling
 	// update procedure, after all replicas have been successfully updated:
 	// it can be automated (`unsupervised` - default) or manual (`supervised`)
+	// +kubebuilder:default:=unsupervised
+	// +kubebuilder:validation:Enum:=unsupervised;supervised
 	PrimaryUpdateStrategy PrimaryUpdateStrategy `json:"primaryUpdateStrategy,omitempty"`
 
 	// The configuration to be used for backups
@@ -197,6 +210,8 @@ type ClusterSpec struct {
 	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
 
 	// The instances' log level, one of the following values: error, info (default), debug, trace
+	// +kubebuilder:default:=info
+	// +kubebuilder:validation:Enum:=error;info;debug;trace
 	LogLevel string `json:"logLevel,omitempty"`
 }
 
@@ -367,11 +382,13 @@ const (
 // from being freely moved across nodes.
 type NodeMaintenanceWindow struct {
 	// Is there a node maintenance activity in progress?
+	// +kubebuilder:default:=false
 	InProgress bool `json:"inProgress"`
 
 	// Reuse the existing PVC (wait for the node to come
 	// up again) or not (recreate it elsewhere)
 	// +optional
+	// +kubebuilder:default:=true
 	ReusePVC *bool `json:"reusePVC"`
 }
 
@@ -619,6 +636,7 @@ type StorageConfiguration struct {
 
 	// Resize existent PVCs, defaults to true
 	// +optional
+	// +kubebuilder:default:=true
 	ResizeInUseVolumes *bool `json:"resizeInUseVolumes,omitempty"`
 
 	// Template to be used to generate the Persistent Volume Claim
