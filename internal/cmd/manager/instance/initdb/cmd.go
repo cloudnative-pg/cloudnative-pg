@@ -28,6 +28,7 @@ func NewCmd() *cobra.Command {
 	var pgData string
 	var podName string
 	var postInitSQLStr string
+	var postInitTemplateSQLStr string
 
 	cmd := &cobra.Command{
 		Use: "init [options]",
@@ -44,6 +45,12 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
+			postInitTemplateSQL, err := shellquote.Split(postInitTemplateSQLStr)
+			if err != nil {
+				log.Error(err, "Error while parsing post init template SQL queries")
+				return err
+			}
+
 			info := postgres.InitInfo{
 				ApplicationDatabase: appDBName,
 				ApplicationUser:     appUser,
@@ -54,6 +61,7 @@ func NewCmd() *cobra.Command {
 				PgData:              pgData,
 				PodName:             podName,
 				PostInitSQL:         postInitSQL,
+				PostInitTemplateSQL: postInitTemplateSQL,
 			}
 
 			return initSubCommand(info)
@@ -76,6 +84,8 @@ func NewCmd() *cobra.Command {
 		"be checked against the cluster state")
 	cmd.Flags().StringVar(&postInitSQLStr, "post-init-sql", "", "The list of SQL queries to be "+
 		"executed to configure the new instance")
+	cmd.Flags().StringVar(&postInitTemplateSQLStr, "post-init-template-sql", "", "The list of SQL queries to be "+
+		"executed inside template1 database to configure the new instance")
 
 	return cmd
 }

@@ -10,7 +10,6 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
-	"database/sql"
 	"fmt"
 	"os/exec"
 	"path"
@@ -51,8 +50,12 @@ type InitInfo struct {
 	InitDBOptions []string
 
 	// The list of queries to be executed just after having
-	// configured a new database
+	// configured a new instance
 	PostInitSQL []string
+
+	// The list of queries to be executed inside the template1
+	// database just after having configured a new instance
+	PostInitTemplateSQL []string
 
 	// The recovery target options, only applicable for the
 	// recovery bootstrap type
@@ -155,30 +158,51 @@ func (info InitInfo) GetInstance() Instance {
 }
 
 // ConfigureNewInstance creates the expected users and databases in a new
-// PostgreSQL instance
-func (info InitInfo) ConfigureNewInstance(db *sql.DB) error {
+// PostgreSQL instance. If any error occurs, we return it
+func (info InitInfo) ConfigureNewInstance(instance Instance) error {
 	log.Info("Configuring new PostgreSQL instance")
 
-	_, err := db.Exec(fmt.Sprintf(
+	dbSuperUser, err := instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("while getting superuser database: %w", err)
+	}
+
+	_, err = dbSuperUser.Exec(fmt.Sprintf(
 		"CREATE USER %v",
 		pq.QuoteIdentifier(info.ApplicationUser)))
 	if err != nil {
 		return err
 	}
 
-	if info.ApplicationDatabase != "" {
-		_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
-			pq.QuoteIdentifier(info.ApplicationDatabase),
-			pq.QuoteIdentifier(info.ApplicationUser)))
+	// Execute the custom set of init queries
+	log.Info("Executing post-init SQL instructions")
+	for _, sqlQuery := range info.PostInitSQL {
+		_, err = dbSuperUser.Exec(sqlQuery)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Execute the custom set of init queries
-	log.Info("Executing post init SQL instructions")
-	for _, sqlQuery := range info.PostInitSQL {
-		_, err = db.Exec(sqlQuery)
+	if len(info.PostInitTemplateSQL) != 0 {
+		dbTemplate, err := instance.GetTemplateDB()
+		if err != nil {
+			return fmt.Errorf("while getting template database: %w", err)
+		}
+		// Execute the custom set of init queries
+		log.Info("Executing post-init template SQL instructions")
+		for _, sqlQuery := range info.PostInitTemplateSQL {
+			log.Debug("Executing post-init template query", "sqlQuery", sqlQuery)
+			_, err = dbTemplate.Exec(sqlQuery)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if info.ApplicationDatabase != "" {
+		_, err = dbSuperUser.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
+			pq.QuoteIdentifier(info.ApplicationDatabase),
+			pq.QuoteIdentifier(info.ApplicationUser)))
 		if err != nil {
 			return err
 		}
@@ -210,12 +234,7 @@ func (info InitInfo) Bootstrap() error {
 	}
 
 	return instance.WithActiveInstance(func() error {
-		superUserDB, err := instance.GetSuperUserDB()
-		if err != nil {
-			return fmt.Errorf("while creating superuser: %w", err)
-		}
-
-		err = info.ConfigureNewInstance(superUserDB)
+		err = info.ConfigureNewInstance(instance)
 		if err != nil {
 			return fmt.Errorf("while configuring new instance: %w", err)
 		}

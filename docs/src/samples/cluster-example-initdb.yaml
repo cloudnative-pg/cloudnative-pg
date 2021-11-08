@@ -12,6 +12,8 @@ spec:
       postInitSQL:
         - create table numbers (i integer)
         - insert into numbers (select generate_series(1,10000))
+      postInitTemplateSQL:
+        - create extension intarray
       dataChecksums: true
       encoding: 'UTF8'
       localeCollate: 'en_AU.UTF-8'

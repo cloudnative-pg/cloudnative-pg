@@ -528,6 +528,11 @@ type BootstrapInitDB struct {
 	// after the cluster has been created - to be used with extreme care
 	// (by default empty)
 	PostInitSQL []string `json:"postInitSQL,omitempty"`
+
+	// List of SQL queries to be executed as a superuser in the `template1`
+	// after the cluster has been created - to be used with extreme care
+	// (by default empty)
+	PostInitTemplateSQL []string `json:"postInitTemplateSQL,omitempty"`
 }
 
 // BootstrapRecovery contains the configuration required to restore
