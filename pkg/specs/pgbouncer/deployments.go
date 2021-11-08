@@ -31,7 +31,7 @@ const (
 	PgbouncerNameLabel = specs.MetadataNamespace + "/poolerName"
 
 	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
-	DefaultPgbouncerImage = "quay.io/enterprisedb/pgbouncer:1.16.0-1"
+	DefaultPgbouncerImage = "quay.io/enterprisedb/pgbouncer:1.16.0"
 )
 
 // Deployment create the deployment of pgbouncer, given
