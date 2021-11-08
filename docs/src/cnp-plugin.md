@@ -39,11 +39,11 @@ Instances:         3
 Ready instances:   3
 
 Instances status
-Pod name           Current LSN  Received LSN  Replay LSN  System ID            Primary  Replicating  Replay paused  Pending restart
---------           -----------  ------------  ----------  ---------            -------  -----------  -------------  ---------------
-cluster-example-1  0/6000060                              6927251808674721812  ✓        ✗            ✗              ✗
-cluster-example-2               0/6000060     0/6000060   6927251808674721812  ✗        ✓            ✗              ✗
-cluster-example-3               0/6000060     0/6000060   6927251808674721812  ✗        ✓            ✗              ✗
+Manager Version  Pod name           Current LSN  Received LSN  Replay LSN  System ID            Primary  Replicating  Replay paused  Pending restart  Status
+---------------  --------           -----------  ------------  ----------  ---------            -------  -----------  -------------  ---------------  ------
+1.10.0           cluster-example-1  0/5000060                              7027078108164751389  ✓        ✗            ✗              ✗                OK
+1.10.0           cluster-example-2               0/5000060     0/5000060   7027078108164751389  ✗        ✓            ✗              ✗                OK
+1.10.0           cluster-example-3               0/5000060     0/5000060   7027078108164751389  ✗        ✓            ✗              ✗                OK
 
 ```
 
@@ -63,45 +63,57 @@ Instances:         3
 Ready instances:   3
 
 PostgreSQL Configuration
-archive_command = '/controller/manager wal-archive %p'
+archive_command = '/controller/manager wal-archive --log-destination /controller/log/postgres.json %p'
 archive_mode = 'on'
 archive_timeout = '5min'
+cluster_name = 'cluster-example'
 full_page_writes = 'on'
 hot_standby = 'true'
 listen_addresses = '*'
-logging_collector = 'off'
+log_destination = 'csvlog'
+log_directory = '/controller/log'
+log_filename = 'postgres'
+log_rotation_age = '0'
+log_rotation_size = '0'
+log_truncate_on_rotation = 'false'
+logging_collector = 'on'
 max_parallel_workers = '32'
 max_replication_slots = '32'
 max_worker_processes = '32'
 port = '5432'
+shared_preload_libraries = ''
 ssl = 'on'
 ssl_ca_file = '/controller/certificates/client-ca.crt'
 ssl_cert_file = '/controller/certificates/server.crt'
 ssl_key_file = '/controller/certificates/server.key'
-unix_socket_directories = '/var/run/postgresql'
+unix_socket_directories = '/controller/run'
 wal_keep_size = '512MB'
 wal_level = 'logical'
 wal_log_hints = 'on'
-
+cnp.config_sha256 = '407239112913e96626722395d549abc78b2cf9b767471e1c8eac6f33132e789c'
 
 PostgreSQL HBA Rules
+
 # Grant local access
-local all all peer
+local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
 hostssl postgres streaming_replica all cert
 hostssl replication streaming_replica all cert
+hostssl all cnp_pooler_pgbouncer all cert
 
-# Otherwise use md5 authentication
+
+
+# Otherwise use the default authentication method
 host all all all md5
 
 
 Instances status
-Pod name           Current LSN  Received LSN  Replay LSN  System ID            Primary  Replicating  Replay paused  Pending restart
---------           -----------  ------------  ----------  ---------            -------  -----------  -------------  ---------------
-cluster-example-1  0/6000060                              6927251808674721812  ✓        ✗            ✗              ✗
-cluster-example-2               0/6000060     0/6000060   6927251808674721812  ✗        ✓            ✗              ✗
-cluster-example-3               0/6000060     0/6000060   6927251808674721812  ✗        ✓            ✗              ✗
+Manager Version  Pod name           Current LSN  Received LSN  Replay LSN  System ID            Primary  Replicating  Replay paused  Pending restart  Status
+---------------  --------           -----------  ------------  ----------  ---------            -------  -----------  -------------  ---------------  ------
+1.10.0           cluster-example-1  0/5000060                              7027078108164751389  ✓        ✗            ✗              ✗                OK
+1.10.0           cluster-example-2               0/5000060     0/5000060   7027078108164751389  ✗        ✓            ✗              ✗                OK
+1.10.0           cluster-example-3               0/5000060     0/5000060   7027078108164751389  ✗        ✓            ✗              ✗                OK
 ```
 
 The command also supports output in `yaml` and `json` format.
