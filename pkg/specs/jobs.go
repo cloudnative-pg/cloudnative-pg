@@ -39,6 +39,13 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1
 			shellquote.Join(cluster.Spec.Bootstrap.InitDB.PostInitSQL...))
 	}
 
+	if cluster.Spec.Bootstrap.InitDB.PostInitTemplateSQL != nil {
+		initCommand = append(
+			initCommand,
+			"--post-init-template-sql",
+			shellquote.Join(cluster.Spec.Bootstrap.InitDB.PostInitTemplateSQL...))
+	}
+
 	if cluster.ShouldCreateApplicationDatabase() {
 		initCommand = append(initCommand,
 			"--app-db-name", cluster.Spec.Bootstrap.InitDB.Database,

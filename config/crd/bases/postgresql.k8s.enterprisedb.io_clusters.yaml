@@ -994,6 +994,13 @@ spec:
                         items:
                           type: string
                         type: array
+                      postInitTemplateSQL:
+                        description: List of SQL queries to be executed as a superuser
+                          in the `template1` after the cluster has been created -
+                          to be used with extreme care (by default empty)
+                        items:
+                          type: string
+                        type: array
                       secret:
                         description: Name of the secret containing the initial credentials
                           for the owner of the user database. If empty a new secret

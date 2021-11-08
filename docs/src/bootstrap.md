@@ -265,8 +265,9 @@ spec:
 ```
 
 !!! Warning
-    Please use the `postInitSQL` option with extreme care as queries
-    are run as a superuser and can disrupt the entire cluster.
+    Please use the `postInitSQL` and `postInitTemplateSQL` options with extreme care,
+    as queries are run as a superuser and can disrupt the entire cluster.
+    An error in any of those queries interrupts the bootstrap phase, leaving the cluster incomplete.
 
 ## Bootstrap from another cluster
 
