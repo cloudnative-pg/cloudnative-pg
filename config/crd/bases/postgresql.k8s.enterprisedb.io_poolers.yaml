@@ -58,6 +58,7 @@ spec:
                 - name
                 type: object
               instances:
+                default: 1
                 description: The number of replicas we want
                 format: int32
                 type: integer

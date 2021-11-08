@@ -49,6 +49,7 @@ type PoolerSpec struct {
 	Type PoolerType `json:"type"`
 
 	// The number of replicas we want
+	// +kubebuilder:default:=1
 	Instances int32 `json:"instances"`
 
 	// The template of the Pod to be created
