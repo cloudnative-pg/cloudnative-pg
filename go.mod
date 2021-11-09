@@ -14,7 +14,7 @@ require (
 	github.com/lib/pq v1.10.4
 	github.com/logrusorgru/aurora/v3 v3.0.0
 	github.com/onsi/ginkgo v1.16.6-0.20211022041942-6e68f79684d4
-	github.com/onsi/gomega v1.16.0
+	github.com/onsi/gomega v1.17.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.2.0
