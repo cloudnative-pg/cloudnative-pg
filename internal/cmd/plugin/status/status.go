@@ -66,6 +66,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 			nonFatalError = err
 		}
 	}
+	status.printBackupStatus()
 	status.printInstancesStatus()
 
 	if nonFatalError != nil {
@@ -163,6 +164,17 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 			fmt.Println(aurora.Red("Switchover in progress"))
 		}
 	}
+	var primaryInstanceStatus *postgres.PostgresqlStatus
+	for idx, instance := range fullStatus.InstanceStatus.Items {
+		if instance.IsPrimary && instance.Pod.Name == primaryInstance {
+			primaryInstanceStatus = &fullStatus.InstanceStatus.Items[idx]
+		}
+	}
+	if primaryInstanceStatus != nil {
+		summary.AddLine("Current Timeline:", primaryInstanceStatus.TimeLineID)
+		summary.AddLine("Current WAL file:", primaryInstanceStatus.CurrentWAL)
+	}
+
 	summary.Print()
 	fmt.Println()
 }
@@ -198,6 +210,55 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 	fmt.Println()
 
 	return nil
+}
+
+func (fullStatus *PostgresqlStatus) printBackupStatus() {
+	cluster := fullStatus.Cluster
+
+	fmt.Println(aurora.Green("Continuous Backup status"))
+	if cluster.Spec.Backup == nil {
+		fmt.Println(aurora.Yellow("Not configured"))
+		fmt.Println()
+		return
+	}
+	status := tabby.New()
+	FPoR := cluster.Status.FirstRecoverabilityPoint
+	if FPoR == "" {
+		FPoR = "Not Available"
+	}
+	status.AddLine("First Point of Recoverability:", FPoR)
+
+	var primaryInstanceStatus *postgres.PostgresqlStatus
+	for idx, instanceStatus := range fullStatus.InstanceStatus.Items {
+		if instanceStatus.IsPrimary {
+			primaryInstanceStatus = &fullStatus.InstanceStatus.Items[idx]
+		}
+	}
+	if primaryInstanceStatus == nil {
+		status.AddLine("No Primary instance found")
+		return
+	}
+	status.AddLine("Working WAL archiving:",
+		getWalArchivingStatus(primaryInstanceStatus.IsArchivingWAL, primaryInstanceStatus.LastFailedWAL))
+	status.AddLine("Last Archived WAL:", primaryInstanceStatus.LastArchivedWAL,
+		" @ ", primaryInstanceStatus.LastArchivedWALTime)
+	if primaryInstanceStatus.LastFailedWAL != "" {
+		status.AddLine("Last Failed WAL:", primaryInstanceStatus.LastFailedWAL,
+			" @ ", primaryInstanceStatus.LastFailedWALTime)
+	}
+	status.Print()
+	fmt.Println()
+}
+
+func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
+	switch {
+	case isArchivingWAL:
+		return aurora.Green("OK").String()
+	case lastFailedWAL != "":
+		return aurora.Red("Failing").String()
+	default:
+		return aurora.Yellow("Starting Up").String()
+	}
 }
 
 func (fullStatus *PostgresqlStatus) printInstancesStatus() {

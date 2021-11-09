@@ -21,6 +21,26 @@ type PostgresqlStatus struct {
 	Node                string     `json:"node"`
 	Pod                 corev1.Pod `json:"pod"`
 
+	// WAL Status
+	// SELECT
+	//		last_archived_wal,
+	// 		last_archived_time,
+	// 		last_failed_wal,
+	// 		last_failed_time,
+	// 		COALESCE(last_archived_time,'-infinity') > COALESCE(last_failed_time, '-infinity') AS is_archiving,
+	// 		pg_walfile_name(pg_current_wal_lsn()) as current_wal
+	// FROM pg_stat_archiver;
+	LastArchivedWAL     string `json:"lastArchivedWAL,omitempty"`
+	LastArchivedWALTime string `json:"lastArchivedWALTime,omitempty"`
+	LastFailedWAL       string `json:"lastFailedWAL,omitempty"`
+	LastFailedWALTime   string `json:"lastFailedWALTime,omitempty"`
+	IsArchivingWAL      bool   `json:"isArchivingWAL,omitempty"`
+	CurrentWAL          string `json:"currentWAL,omitempty"`
+
+	// The current timeline ID
+	// SELECT timeline_id FROM pg_control_checkpoint()
+	TimeLineID int `json:"timeLineID,omitempty"`
+
 	// This field is set when there is an error while extracting the
 	// status of a Pod
 	Error   error `json:"-"`

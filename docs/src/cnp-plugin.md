@@ -37,6 +37,13 @@ PostgreSQL Image:  quay.io/enterprisedb/postgresql:13
 Primary instance:  cluster-example-1
 Instances:         3
 Ready instances:   3
+Current Timeline:  2
+Current WAL file:  00000002000000000000000A
+
+Continuous Backup status
+First Point of Recoverability:  2021-11-09T13:36:43Z
+Working WAL archiving:          OK
+Last Archived WAL:              00000002000000000000000A   @   2021-11-09T13:47:28.354645Z
 
 Instances status
 Manager Version  Pod name           Current LSN  Received LSN  Replay LSN  System ID            Primary  Replicating  Replay paused  Pending restart  Status
@@ -61,6 +68,8 @@ PostgreSQL Image:  quay.io/enterprisedb/postgresql:13
 Primary instance:  cluster-example-1
 Instances:         3
 Ready instances:   3
+Current Timeline:  2
+Current WAL file:  00000002000000000000000A
 
 PostgreSQL Configuration
 archive_command = '/controller/manager wal-archive --log-destination /controller/log/postgres.json %p'
@@ -107,6 +116,10 @@ hostssl all cnp_pooler_pgbouncer all cert
 # Otherwise use the default authentication method
 host all all all md5
 
+Continuous Backup status
+First Point of Recoverability:  2021-11-09T13:36:43Z
+Working WAL archiving:          OK
+Last Archived WAL:              00000002000000000000000A   @   2021-11-09T13:47:28.354645Z
 
 Instances status
 Manager Version  Pod name           Current LSN  Received LSN  Replay LSN  System ID            Primary  Replicating  Replay paused  Pending restart  Status

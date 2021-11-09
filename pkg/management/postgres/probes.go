@@ -115,7 +115,30 @@ func (instance *Instance) fillWalStatusPrimary(result *postgres.PostgresqlStatus
 
 	row := superUserDB.QueryRow(
 		"SELECT pg_current_wal_lsn()")
-	return row.Scan(&result.CurrentLsn)
+	err = row.Scan(&result.CurrentLsn)
+	if err != nil {
+		return err
+	}
+
+	row = superUserDB.QueryRow(
+		"SELECT " +
+			"COALESCE(last_archived_wal, '') , " +
+			"COALESCE(last_archived_time,'-infinity'), " +
+			"COALESCE(last_failed_wal, ''), " +
+			"COALESCE(last_failed_time, '-infinity'), " +
+			"COALESCE(last_archived_time,'-infinity') > COALESCE(last_failed_time, '-infinity') AS is_archiving," +
+			"pg_walfile_name(pg_current_wal_lsn()) as current_wal, " +
+			"(SELECT timeline_id FROM pg_control_checkpoint()) as timeline_id " +
+			"FROM pg_stat_archiver;")
+	err = row.Scan(&result.LastArchivedWAL,
+		&result.LastArchivedWALTime,
+		&result.LastFailedWAL,
+		&result.LastFailedWALTime,
+		&result.IsArchivingWAL,
+		&result.CurrentWAL,
+		&result.TimeLineID,
+	)
+	return err
 }
 
 // fillWalStatusReplica get WAL information for replica servers
