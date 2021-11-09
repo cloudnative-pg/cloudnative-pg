@@ -523,6 +523,7 @@ podAntiAffinity
 podAntiAffinityType
 podMetricsEndpoints
 podmonitor
+podName
 poolMode
 pooler
 poolers
