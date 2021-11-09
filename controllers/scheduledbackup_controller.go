@@ -23,6 +23,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 const (
@@ -182,6 +183,7 @@ func createBackup(
 	if metadata.Labels == nil {
 		metadata.Labels = make(map[string]string)
 	}
+	metadata.Labels[utils.ClusterLabelName] = scheduledBackup.Spec.Cluster.Name
 	metadata.Labels[ImmediateBackupLabelName] = strconv.FormatBool(immediate)
 	metadata.Labels[ParentScheduledBackupLabelName] = scheduledBackup.GetName()
 

@@ -1002,10 +1002,15 @@ func AssertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupN
 		}
 		Eventually(func() (*v1.Time, error) {
 			scheduledBackup := &apiv1.ScheduledBackup{}
-			err = env.Client.Get(env.Ctx,
-				scheduledBackupNamespacedName, scheduledBackup)
+			err = env.Client.Get(env.Ctx, scheduledBackupNamespacedName, scheduledBackup)
 			return scheduledBackup.Status.LastScheduleTime, err
 		}, 30).ShouldNot(BeNil())
+
+		Eventually(func() bool {
+			scheduledBackup := &apiv1.ScheduledBackup{}
+			err = env.Client.Get(env.Ctx, scheduledBackupNamespacedName, scheduledBackup)
+			return scheduledBackup.Labels[utils.ClusterLabelName] == scheduledBackup.Spec.Cluster.Name
+		}, 30).ShouldNot(BeTrue())
 
 		// backup count should be 1 that is immediate one
 		Eventually(func() (int, error) {
@@ -1072,6 +1077,12 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 			err = env.Client.Get(env.Ctx, scheduledBackupNamespacedName, scheduledBackup)
 			return *scheduledBackup.Spec.Suspend
 		}, 30).Should(BeTrue())
+
+		Eventually(func() bool {
+			scheduledBackup := &apiv1.ScheduledBackup{}
+			err = env.Client.Get(env.Ctx, scheduledBackupNamespacedName, scheduledBackup)
+			return scheduledBackup.Labels[utils.ClusterLabelName] == scheduledBackup.Spec.Cluster.Name
+		}, 30).ShouldNot(BeTrue())
 	})
 	By("waiting for ongoing backup to complete", func() {
 		Eventually(func() (bool, error) {

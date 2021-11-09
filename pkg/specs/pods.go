@@ -51,7 +51,11 @@ const (
 	WatchedLabelName = MetadataNamespace + "/reload"
 
 	// ClusterLabelName label is applied to Pods to link them to the owning
-	// cluster
+	// cluster.
+	//
+	// Deprecated.
+	//
+	// utils.ClusterLabelName should be used instead where possible.
 	ClusterLabelName = "postgresql"
 
 	// PostgresContainerName is the name of the container executing PostgreSQL
@@ -300,7 +304,8 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				ClusterLabelName: cluster.Name,
+				ClusterLabelName:       cluster.Name,
+				utils.ClusterLabelName: cluster.Name,
 			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(int(nodeSerial)),
