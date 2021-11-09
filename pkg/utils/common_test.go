@@ -59,3 +59,25 @@ var _ = Describe("Label management", func() {
 		Expect(pod.Labels).To(Equal(map[string]string{"alpha": "1", "beta": "2"}))
 	})
 })
+
+var _ = Describe("Label cluster name management", func() {
+	pod := corev1.Pod{}
+	podTwo := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				"test": "toast",
+			},
+		},
+	}
+
+	It("must label empty objects", func() {
+		LabelClusterName(&pod.ObjectMeta, "test-label")
+		Expect(pod.ObjectMeta.Labels[ClusterLabelName]).To(Equal("test-label"))
+	})
+
+	It("must not forget existing labels", func() {
+		LabelClusterName(&podTwo.ObjectMeta, "test-label")
+		Expect(podTwo.ObjectMeta.Labels[ClusterLabelName]).To(Equal("test-label"))
+		Expect(podTwo.ObjectMeta.Labels["test"]).To(Equal("toast"))
+	})
+})

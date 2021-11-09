@@ -13,12 +13,24 @@ import (
 )
 
 const (
+	// ClusterLabelName is the name of cluster which the backup CR belongs to
+	ClusterLabelName = "k8s.enterprisedb.io/cluster"
+
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
 	OperatorVersionAnnotationName = "k8s.enterprisedb.io/operatorVersion"
 )
 
-// SetOperatorVersion set inside a a certain object metadata the annotation
+// LabelClusterName labels the object with the cluster name
+func LabelClusterName(object *metav1.ObjectMeta, name string) {
+	if object.Labels == nil {
+		object.Labels = make(map[string]string)
+	}
+
+	object.Labels[ClusterLabelName] = name
+}
+
+// SetOperatorVersion set inside a certain object metadata the annotation
 // containing the version of the operator that generated the object
 func SetOperatorVersion(object *metav1.ObjectMeta, version string) {
 	if object.Annotations == nil {
