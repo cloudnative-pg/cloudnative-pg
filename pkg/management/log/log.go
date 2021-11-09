@@ -10,6 +10,7 @@ package log
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 
 	"github.com/go-logr/logr"
@@ -98,6 +99,10 @@ func (l *logger) enrich() logr.Logger {
 		if ok {
 			cl = l.WithValues("caller", fmt.Sprintf("%s:%d", fileName, fileLine)).GetLogger()
 		}
+	}
+
+	if podName := os.Getenv("POD_NAME"); podName != "" {
+		cl = cl.WithValues("logging_podName", podName)
 	}
 
 	return cl

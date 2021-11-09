@@ -11,6 +11,7 @@ Each log entry has the following fields:
 - `msg`: the actual message or the keyword `record` in case the message is parsed in JSON format
 - `record`: the actual record (with structure that varies depending on the
   `logger` type)
+- `logging_podName`: the pod where the log was created generated
 
 ## Operator log
 
@@ -57,7 +58,8 @@ to `postgres` and the structure described in the following example:
     "location": "",
     "application_name": "",
     "backend_type": "startup"
-  }
+  },
+  "logging_podName": "cluster-example-1",
 }
 ```
 
@@ -152,7 +154,8 @@ See the example below:
       "statement": "SELECT pg_current_wal_lsn()",
       "parameter": "<none>"
     }
-  }
+  },
+  "logging_podName": "cluster-example-1",
 }
 ```
 

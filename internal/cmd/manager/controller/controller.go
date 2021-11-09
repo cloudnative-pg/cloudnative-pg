@@ -38,11 +38,11 @@ var (
 	scheme   = runtime.NewScheme()
 	setupLog = log.WithName("setup")
 
-	// clientset is the kubernetes client used during
+	// clientSet is the kubernetes client used during
 	// the initialization of the operator
 	clientSet *kubernetes.Clientset
 
-	// apiClientset is the kubernetes client set with
+	// apiClientSet is the kubernetes client set with
 	// support for the apiextensions that is used
 	// during the initialization of the operator
 	apiClientSet *apiextensionsclientset.Clientset
