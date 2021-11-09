@@ -631,7 +631,6 @@ jobs:
         if: always()
         uses: azure/CLI@v1
         with:
-          azcliversion: 2.29.2
           inlineScript: |
             az account set --subscription "Cloud Native Development"
             az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y \
