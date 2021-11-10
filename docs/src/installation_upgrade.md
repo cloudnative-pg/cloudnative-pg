@@ -114,7 +114,7 @@ selected installation method.
 !!! Important
     Please carefully read the [release notes](release_notes.md)
     before performing an upgrade as some versions might require
-    extraordinary measures.
+    extra steps.
 
 Upgrading Cloud Native PostgreSQL operator is a two-step process:
 
@@ -181,13 +181,27 @@ operator.
 
 ### Compatibility among versions
 
-We strive to maintain compatibility between different operator versions, but in
-some cases, this might not be possible.
-Every version of the operator is compatible with the previous one, unless
-[release notes](release_notes.md) state the opposite.
-The release notes page indeed contains a detailed list of the changes introduced
-in every released version of the Cloud Native PostgreSQL Operator, and it must
-be read before upgrading to a newer version of the software.
+Cloud Native PostgreSQL follows semantic versioning. Every release of the
+operator within the same API version is compatible with the previous one.
+The current API version is v1, corresponding to versions 1.x.y of the operator.
+
+In addition to new features, new versions of the operator contain bug fixes and
+stability enhancements. Because of this, **we strongly encourage users to upgrade
+to the latest version of the operator**, as each version is released in order to
+maintain the most secure and stable Postgres environment.
+
+Cloud Native PostgreSQL currently releases new versions of the operator at
+least monthly. If you are unable to apply updates as each version becomes
+available, we recommend upgrading through each version in sequential order to
+come current periodically and not skipping versions.
+
+!!! Important
+    In 2022, EDB plans an LTS release for Cloud Native PostgreSQL in
+    environments where frequent online updates are not possible.
+
+The [release notes](release_notes.md) page contains a detailed list of the
+changes introduced in every released version of Cloud Native PostgreSQL,
+and it must be read before upgrading to a newer version of the software.
 
 Most versions are directly upgradable and in that case, applying the newer
 manifest for plain Kubernetes installations or using the native package
@@ -195,32 +209,5 @@ manager of the chosen distribution is enough.
 
 When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
-only the operator itself. Please consult the release notes for
-detailed information on how to upgrade to any released version.
+only the operator itself.
 
-#### Upgrading to version 1.4.0
-
-If you have installed the operator on Kubernetes using the distributed YAML manifest
-you must delete the operator controller deployment before installing the
-1.4.0 manifest with the following command:
-
-```bash
-kubectl delete deployments \
-  -n postgresql-operator-system \
-  postgresql-operator-controller-manager
-```
-
-!!! Important
-    Removing the operator controller deployment will not delete or remove any
-    of your deployed PostgreSQL clusters.
-
-!!! Warning
-    Remember to install the new version of the operator after having performed
-    the above command. Otherwise, your PostgreSQL clusters will keep running
-    without an operator and, as such, without any self-healing and high-availability
-    capabilities.
-
-!!! Note
-    In case you deployed the operator in a different namespace than the default
-    (`postgresql-operator-system`), you need to use the correct namespace for
-    the `-n` option in the above command.

@@ -215,7 +215,7 @@ kubectl get pod -l k8s.enterprisedb.io/clusterName=<CLUSTER> \
 ```
 
 The latter is important to understand where your pods are distributed - very
-useful if you are using [affinity/anti-affinity rules and/or tolerations](affinity.md).
+useful if you are using [affinity/anti-affinity rules and/or tolerations](scheduling.md).
 
 ## Some common issues
 
