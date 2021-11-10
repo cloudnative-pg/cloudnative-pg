@@ -102,7 +102,7 @@ func (l *logger) enrich() logr.Logger {
 	}
 
 	if podName := os.Getenv("POD_NAME"); podName != "" {
-		cl = cl.WithValues("logging_podName", podName)
+		cl = cl.WithValues("logging_pod", podName)
 	}
 
 	return cl
