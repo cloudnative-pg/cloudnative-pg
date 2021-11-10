@@ -42,36 +42,57 @@ endif
 
 all: build
 
-# Run tests
-test: generate fmt vet manifests
+##@ General
+
+# The help target prints out all targets with their descriptions organized
+# beneath their categories. The categories are represented by '##@' and the
+# target descriptions by '##'. The awk commands is responsible for reading the
+# entire set of makefiles included in this invocation, looking for lines of the
+# file as xyz: ## something, and then pretty-format the target and help. Then,
+# if there's a line with ##@ something, that gets pretty-printed as a category.
+# More info on the usage of ANSI control characters for terminal formatting:
+# https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_parameters
+# More info on the awk command:
+# http://linuxcommand.org/lc3_adv_awk.php
+
+help: ## Display this help.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+##@ Development
+
+test: generate fmt vet manifests ## Run tests.
 	go test ./api/... ./cmd/... ./controllers/... ./internal/... ./pkg/... -coverprofile cover.out
 
-# Run e2e tests locally using kind
-e2e-test-kind:
+e2e-test-kind: ## Run e2e tests locally using kind.
 	hack/e2e/run-e2e-kind.sh
 
-e2e-test-k3d:
+e2e-test-k3d: ## Run e2e tests locally using k3d.
 	hack/e2e/run-e2e-k3d.sh
 
-# Build binaries
-build: generate fmt vet
+##@ Build
+build: generate fmt vet ## Build binaries.
 	go build -o bin/manager -ldflags ${LDFLAGS} ./cmd/manager
 	go build -o bin/kubectl-cnp -ldflags ${LDFLAGS} ./cmd/kubectl-cnp
 
-# Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet manifests
+run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config.
 	go run ./cmd/manager
 
-# Install CRDs into a cluster
-install: manifests kustomize
+docker-build: go-releaser ## Build the docker image.
+	GOOS=linux GOARCH=amd64 DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
+	  $(GO_RELEASER) build -f .goreleaser-multiarch.yml --skip-validate --rm-dist --single-target
+	DOCKER_BUILDKIT=1 docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION}
+
+docker-push: ## Push the docker image.
+	docker push ${CONTROLLER_IMG}
+
+##@ Deployment
+install: manifests kustomize ## Install CRDs into a cluster.
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
-# Uninstall CRDs from a cluster
-uninstall: manifests kustomize
+uninstall: manifests kustomize ## Uninstall CRDs from a cluster.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests kustomize
+deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config.
 	set -e ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
 	cp -r config/* $$CONFIG_TMP_DIR ;\
@@ -87,39 +108,40 @@ deploy: manifests kustomize
 	$(KUSTOMIZE) build $$CONFIG_TMP_DIR/default | kubectl apply -f - ;\
 	rm -fr $$CONFIG_TMP_DIR
 
-# Generate manifests e.g. CRD, RBAC etc.
-manifests: controller-gen
+manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-# Run go fmt against code
-fmt:
-	go fmt ./...
-
-# Run go vet against code
-vet:
-	go vet ./...
-
-# Run the linter
-lint:
-	golangci-lint run
-
-# Generate code
-generate: controller-gen
+generate: controller-gen ## Generate code.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-# Build the docker image
-docker-build: go-releaser
-	GOOS=linux GOARCH=amd64 DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
-	  $(GO_RELEASER) build -f .goreleaser-multiarch.yml --skip-validate --rm-dist --single-target
-	DOCKER_BUILDKIT=1 docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION}
+##@ Formatters and Linters
 
-# Push the docker image
-docker-push:
-	docker push ${CONTROLLER_IMG}
+fmt: ## Run go fmt against code.
+	go fmt ./...
 
-# Generate the licenses folder
-.PHONY: licenses
-licenses: go-licenses
+vet: ## Run go vet against code.
+	go vet ./...
+
+lint: ## Run the linter.
+	golangci-lint run
+
+shellcheck: ## Shellcheck for the hack directory.
+	@{ \
+	set -e ;\
+	find -name '*.sh' -exec shellcheck -a -S style {} + ;\
+	}
+
+spellcheck: ## Runs the spellcheck on the project.
+	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:0.14.0
+
+woke: # Runs the woke checks on project.
+	docker run --rm -v $(PWD):/src -w /src getwoke/woke:0.9 woke -c .woke.yaml
+
+checks: generate manifests apidoc fmt spellcheck woke vet lint ## Runs all the checks on the project.
+
+##@ Documentation
+
+licenses: go-licenses ## Generate the licenses folder.
 	# The following statement is expected to fail because our license is unrecognised
 	GOPRIVATE="https://github.com/EnterpriseDB/*" $(GO_LICENSES) \
 		save github.com/EnterpriseDB/cloud-native-postgresql \
@@ -127,8 +149,7 @@ licenses: go-licenses
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete
 
-# Update the API Reference section of the documentation
-apidoc: k8s-api-docgen
+apidoc: k8s-api-docgen ## Update the API Reference section of the documentation.
 	set -e ;\
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
 	echo $$CONFIG_TMP_DIR ;\
@@ -139,12 +160,7 @@ apidoc: k8s-api-docgen
 	  api/v1/*_types.go ;\
 	cp $${CONFIG_TMP_DIR}/api_reference.md docs/src/api_reference.md
 
-# Shellcheck for the hack directory
-shellcheck:
-	@{ \
-	set -e ;\
-	find -name '*.sh' -exec shellcheck -a -S style {} + ;\
-	}
+##@ Tools
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
@@ -180,11 +196,3 @@ GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
 rm -rf $$TMP_DIR ;\
 }
 endef
-
-spellcheck:
-	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:0.14.0
-
-woke:
-	docker run --rm -v $(PWD):/src -w /src getwoke/woke:0.9 woke -c .woke.yaml
-
-checks: generate manifests apidoc fmt spellcheck woke vet lint
