@@ -36,6 +36,7 @@ nav:
   - kubernetes_upgrade.md
   - expose_pg_services.md
   - cnp-plugin.md
+  - troubleshooting.md
   - e2e.md
   - container_images.md
   - operator_capability_levels.md
