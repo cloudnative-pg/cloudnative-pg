@@ -38,6 +38,7 @@ Canovai
 Cecchi
 CertificatesConfiguration
 CertificatesStatus
+Certmanager
 ClientCASecret
 ClientCertsCASecret
 ClientReplicationSecret
@@ -98,6 +99,7 @@ INPLACE
 IfNotPresent
 InfoSec
 InstanceID
+Istio
 JSON
 Jitendra
 LPV
@@ -137,6 +139,7 @@ Openshift
 OperatorHub
 PGAudit
 PGDATA
+PODNAME
 PV
 PVCs
 Patroni
@@ -222,6 +225,7 @@ TopologyKey
 UID
 Uncomment
 VLDB
+VOLNAME
 VM
 VMs
 Valerio
@@ -288,15 +292,18 @@ bzip
 cGFzc
 cb
 ce
+cheatsheet
 checksums
 chmod
 cisecurity
+claimRef
 clair
 classid
 cli
 clientCASecret
 clusterBackup
 clusterlist
+clusterName
 clusterspec
 clusterstatus
 cnp
@@ -325,6 +332,7 @@ cp
 cpu
 crc
 createuser
+creationTimestamp
 creds
 cron
 crt
@@ -478,6 +486,7 @@ myResourceGroup
 namespace
 namespaces
 natively
+newers
 nextScheduleTime
 nginx
 nodeMaintenanceWindow
@@ -543,6 +552,7 @@ programmatically
 prometheus
 provisioner
 psql
+pv
 pvc
 pvcCount
 pvcTemplate
@@ -613,10 +623,12 @@ startDelay
 startedAt
 stderr
 stdout
+stedolan
 stopDelay
 stoppedAt
 storageAccount
 storageClass
+storageclasses
 storageClassName
 storageKey
 storageSasToken
