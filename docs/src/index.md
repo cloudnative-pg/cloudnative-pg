@@ -61,7 +61,7 @@ format for the following platforms: `linux/amd64`, `linux/arm64`,
 
 The following versions of Postgres are currently supported:
 
-- PostgreSQL 13, 12, 11 and 10 (`linux/amd64`)
+- PostgreSQL 14, 13, 12, 11 and 10 (`linux/amd64`)
 
 ## Main features
 
@@ -77,10 +77,12 @@ The following versions of Postgres are currently supported:
 * Definition of the *read-only* service, to connect your applications to any of the instances for reading workloads
 * Support for Local Persistent Volumes with PVC templates
 * Reuse of Persistent Volumes storage in Pods
-* Rolling updates for PostgreSQL minor versions and operator upgrades
+* Rolling updates for PostgreSQL minor versions
+* In-place or rolling updates for operator upgrades
 * TLS connections and client certificate authentication
 * Support for custom TLS certificates (including integration with cert-manager)
 * Continuous backup to an S3 compatible object store
+* Backup retention policies (based on recovery window)
 * Full recovery and Point-In-Time recovery from an S3 compatible object store backup
 * Replica clusters for PostgreSQL deployments across multiple Kubernetes
   clusters, enabling private, public, hybrid, and multi-cloud architectures
