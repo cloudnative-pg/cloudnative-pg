@@ -59,7 +59,7 @@ to `postgres` and the structure described in the following example:
     "application_name": "",
     "backend_type": "startup"
   },
-  "logging_podName": "cluster-example-1",
+  "logging_pod": "cluster-example-1",
 }
 ```
 
@@ -155,7 +155,7 @@ See the example below:
       "parameter": "<none>"
     }
   },
-  "logging_podName": "cluster-example-1",
+  "logging_pod": "cluster-example-1",
 }
 ```
 
