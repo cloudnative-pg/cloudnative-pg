@@ -239,7 +239,7 @@ Some of the possible causes for this are:
 
 - No nodes are matching the `nodeSelector`
 - Tolerations are not correctly configured to match the nodes' taints
-- No nodes are available at all: this cloud also be related to
+- No nodes are available at all: this could also be related to
   `cluster-autoscaler` hitting some limits, or having some temporary issues
 
 In this case, it could also be useful to check events in the namespace:
