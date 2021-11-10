@@ -104,6 +104,7 @@ JSON
 Jitendra
 LPV
 LSN
+LTS
 Lifecycle
 Linode
 ListMeta
