@@ -2,6 +2,69 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.10.0
+
+**Release date:** 11 November 2021
+
+Features:
+
+- **Connection Pooling with PgBouncer**: introduce the `Pooler` resource and
+  controller to automatically manage a PgBouncer deployment to be used as a
+  connection pooler for a local PostgreSQL `Cluster`. The feature includes TLS
+  client/server connections, password authentication, High Availability, pod
+  templates support, configuration of key PgBouncer parameters, `PAUSE`/`RESUME`,
+  logging in JSON format, Prometheus exporter for stats, pools, and lists
+- **Backup Retention Policies**: support definition of recovery window retention
+  policies for backups (e.g. ‘30d’ to ensure a recovery window of 30 days)
+- **In-Place updates of the operator**: introduce an in-place online update of the
+  instance manager, which removes the need to perform a rolling update of the
+  entire cluster following an update of the operator. By default this option is
+  disabled (please refer to the
+  [documentation for more detailed information](installation_upgrade.md#in-place-updates-of-the-instance-manager))
+- Limit the list of options that can be customized in the `initdb` bootstrap
+  method to `dataChecksums`, `encoding`,  `localeCollate`, `localeCType`,
+  `walSegmentSize`. This makes the `options` array obsolete and planned to be
+  removed in the v2 API
+- Introduce the `postInitTemplateSQL` option as part of the `initdb` bootstrap
+  method to specify a list of SQL queries to be executed on the `template1`
+  database as a superuser immediately after the cluster has been created. This
+  feature allows you to include default objects in all application databases
+  created in the cluster
+- New default metrics added to the instance Prometheus exporter: Postgres
+  version, cluster name, and first point of recoverability according to the
+  backup catalog
+- Retry taking a backup after a failure
+- Build awareness about Barman Cloud capabilities in order to prevent the
+  operator from invoking recently introduced features (such as retention
+  policies, or Azure Blob Container storage) that are not present in operand
+  images that are not frequently updated
+- Integrate the output of the `status` command of the `cnp` plugin with information
+  about the backup
+- Introduce a new annotation that reports the status of a PVC (being
+  initialized or ready)
+- Set the cluster name in the `k8s.enterprisedb.io/cluster` label for every
+  object generated in a `Cluster`, including `Backup` objects
+- Drop support for deprecated API version
+  `postgresql.k8s.enterprisedb.io/v1alpha1` on the `Cluster`, `Backup`, and
+  `ScheduledBackup` kinds
+- Set default operand image to PostgreSQL 14.1
+
+Security:
+
+- Set allowPrivilegeEscalation to `false` for the operator containers
+  securityContext
+
+Fixes:
+
+- Disable primary PodDisruptionBudget during maintenance in single-instance
+  clusters
+- Use the correct certificate certification authority (CA) during recovery
+  operations
+- Prevent Postgres connection leaking when checking WAL archiving status before
+  taking a backup
+- Let WAL archive/restore sleep for 100ms following transient errors that would
+  flood logs otherwise
+
 ## Version 1.9.2
 
 **Release date:** 15 October 2021
