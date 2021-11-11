@@ -502,3 +502,37 @@ var _ = Describe("PostgreSQL version detection", func() {
 		}
 	})
 })
+
+var _ = Describe("Default Metrics", func() {
+	It("correctly says default metrics are not disabled when no monitoring is passed", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Spec: ClusterSpec{},
+		}
+		Expect(cluster.Spec.Monitoring.AreDefaultQueriesDisabled()).To(BeFalse())
+	})
+
+	It("correctly says default metrics are not disabled when explicitly not disabled", func() {
+		f := false
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Spec: ClusterSpec{Monitoring: &MonitoringConfiguration{DisableDefaultQueries: &f}},
+		}
+		Expect(cluster.Spec.Monitoring.AreDefaultQueriesDisabled()).To(BeFalse())
+	})
+
+	It("correctly says default metrics are disabled when explicitly disabled", func() {
+		t := true
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clustername",
+			},
+			Spec: ClusterSpec{Monitoring: &MonitoringConfiguration{DisableDefaultQueries: &t}},
+		}
+		Expect(cluster.Spec.Monitoring.AreDefaultQueriesDisabled()).To(BeTrue())
+	})
+})

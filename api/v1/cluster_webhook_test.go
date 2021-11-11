@@ -1519,3 +1519,47 @@ var _ = Describe("Backup validation", func() {
 		Expect(len(err)).To(Equal(2))
 	})
 })
+
+var _ = Describe("Default monitoring queries", func() {
+	It("correctly set the default monitoring queries configmap when none is already specified", func() {
+		cluster := &Cluster{Spec: ClusterSpec{Monitoring: &MonitoringConfiguration{}}}
+		cluster.defaultMonitoringQueries("test")
+		Expect(cluster.Spec.Monitoring).NotTo(BeNil())
+		Expect(cluster.Spec.Monitoring.CustomQueriesConfigMap).NotTo(BeEmpty())
+		Expect(cluster.Spec.Monitoring.CustomQueriesConfigMap).
+			To(ContainElement(ConfigMapKeySelector{
+				LocalObjectReference: LocalObjectReference{Name: "test"},
+				Key:                  DefaultMonitoringConfigMapKey,
+			}))
+	})
+	It("correctly set the default monitoring queries configmap when other metrics are already specified", func() {
+		cluster := &Cluster{Spec: ClusterSpec{Monitoring: &MonitoringConfiguration{
+			CustomQueriesConfigMap: []ConfigMapKeySelector{
+				{
+					LocalObjectReference: LocalObjectReference{Name: "test2"},
+					Key:                  "test2",
+				},
+			},
+			CustomQueriesSecret: []SecretKeySelector{
+				{
+					LocalObjectReference: LocalObjectReference{Name: "test3"},
+					Key:                  "test3",
+				},
+			},
+		}}}
+		originalCluster := cluster.DeepCopy()
+		cluster.defaultMonitoringQueries("test")
+		Expect(cluster.Spec.Monitoring).NotTo(BeNil())
+		Expect(cluster.Spec.Monitoring.CustomQueriesConfigMap).NotTo(BeEmpty())
+		Expect(cluster.Spec.Monitoring.CustomQueriesSecret).NotTo(BeEmpty())
+		Expect(cluster.Spec.Monitoring.CustomQueriesConfigMap).
+			To(ContainElement(ConfigMapKeySelector{
+				LocalObjectReference: LocalObjectReference{Name: "test"},
+				Key:                  DefaultMonitoringConfigMapKey,
+			}))
+		Expect(cluster.Spec.Monitoring.CustomQueriesSecret).
+			To(BeEquivalentTo(originalCluster.Spec.Monitoring.CustomQueriesSecret))
+		Expect(cluster.Spec.Monitoring.CustomQueriesConfigMap).
+			To(ContainElements(originalCluster.Spec.Monitoring.CustomQueriesConfigMap))
+	})
+})

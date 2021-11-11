@@ -1,5 +1,7 @@
 resources:
 - manager.yaml
+#- default-monitoring.yaml
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 vars:
@@ -17,3 +19,10 @@ vars:
       apiVersion: apps/v1
     fieldref:
       fieldpath: metadata.name
+#  - name: DEFAULT_MONITORING_CONFIGMAP
+#    objref:
+#      kind: ConfigMap
+#      name: default-monitoring
+#      apiVersion: v1
+#    fieldref:
+#      fieldpath: metadata.name

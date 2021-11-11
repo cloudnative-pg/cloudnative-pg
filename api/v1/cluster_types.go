@@ -864,11 +864,19 @@ type AzureCredentials struct {
 // MonitoringConfiguration is the type containing all the monitoring
 // configuration for a certain cluster
 type MonitoringConfiguration struct {
+	// Whether the default queries should be injected. Default: false.
+	DisableDefaultQueries *bool `json:"disableDefaultQueries,omitempty"`
+
 	// The list of config maps containing the custom queries
 	CustomQueriesConfigMap []ConfigMapKeySelector `json:"customQueriesConfigMap,omitempty"`
 
 	// The list of secrets containing the custom queries
 	CustomQueriesSecret []SecretKeySelector `json:"customQueriesSecret,omitempty"`
+}
+
+// AreDefaultQueriesDisabled checks whether default monitoring queries should be disabled
+func (m *MonitoringConfiguration) AreDefaultQueriesDisabled() bool {
+	return m != nil && m.DisableDefaultQueries != nil && *m.DisableDefaultQueries
 }
 
 // ExternalCluster represents the connection parameters to an
