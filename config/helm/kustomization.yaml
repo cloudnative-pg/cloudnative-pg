@@ -1,0 +1,5 @@
+resources:
+- ../crd
+commonAnnotations:
+  "helm.sh/resource-policy": keep
+
