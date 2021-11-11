@@ -23,7 +23,7 @@ var configurationLog = log.WithName("configuration")
 const DefaultOperatorPullSecretName = "postgresql-operator-pull-secret" // #nosec
 
 // Data is the struct containing the configuration of the operator.
-// Usually the operator code will used the "Current" configuration.
+// Usually the operator code will use the "Current" configuration.
 type Data struct {
 	// WebhookCertDir is the directory where the certificates for the webhooks
 	// need to written. This is different between plain Kubernetes and OpenShift
@@ -63,6 +63,10 @@ type Data struct {
 	// EnableInstanceManagerInplaceUpdates enables the instance manager to apply inplace updates,
 	// replacing the executable in a pod without restarting
 	EnableInstanceManagerInplaceUpdates bool `json:"enableInstanceManagerInplaceUpdates" env:"ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES"` //nolint
+
+	// MonitoringQueriesConfigmap is the name of the configmap in the operator namespace which contain
+	// the monitoring queries. The queries will be read from the data key: "queries".
+	MonitoringQueriesConfigmap string `json:"monitoringQueriesConfigmap" env:"MONITORING_QUERIES_CONFIGMAP"`
 }
 
 // Current is the configuration used by the operator

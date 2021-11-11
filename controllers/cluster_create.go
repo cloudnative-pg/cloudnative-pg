@@ -70,6 +70,13 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
+	if configuration.Current.MonitoringQueriesConfigmap != "" && !cluster.Spec.Monitoring.AreDefaultQueriesDisabled() {
+		err = r.createOrPatchDefaultMetrics(ctx, cluster)
+	}
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -549,6 +556,82 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 	patchedRole.Rules = generatedRole.Rules
 	if err := r.Patch(ctx, &patchedRole, client.MergeFrom(&role)); err != nil {
 		return fmt.Errorf("while patching role: %w", err)
+	}
+
+	return nil
+}
+
+// createOrPatchDefaultMetrics ensures that the required configmap containing default monitoring queries exists and
+// contains the latest queries
+func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	// we extract the operator configMap that needs to be cloned in the namespace where the cluster lives
+	var sourceConfigmap corev1.ConfigMap
+	if err := r.Get(ctx,
+		client.ObjectKey{
+			Name:      configuration.Current.MonitoringQueriesConfigmap,
+			Namespace: configuration.Current.OperatorNamespace,
+		}, &sourceConfigmap); err != nil {
+		if apierrs.IsNotFound(err) {
+			contextLogger.Error(err, "while trying to get default metrics configMap")
+			return nil
+		}
+		return err
+	}
+
+	if _, ok := sourceConfigmap.Data[apiv1.DefaultMonitoringConfigMapKey]; !ok {
+		contextLogger.Warning("key not found while checking default metrics configMap", "key",
+			apiv1.DefaultMonitoringConfigMapKey)
+		return nil
+	}
+
+	// we clone the configmap in the cluster namespace
+	var targetConfigMap corev1.ConfigMap
+	if err := r.Get(ctx,
+		client.ObjectKey{
+			Name:      configuration.Current.MonitoringQueriesConfigmap,
+			Namespace: cluster.Namespace,
+		}, &targetConfigMap); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return err
+		}
+		// if the configMap does not exist we create it
+		newConfigMap := corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      configuration.Current.MonitoringQueriesConfigmap,
+				Namespace: cluster.Namespace,
+				Labels: map[string]string{
+					specs.WatchedLabelName: "true",
+				},
+			},
+			Data: map[string]string{
+				apiv1.DefaultMonitoringConfigMapKey: sourceConfigmap.Data[apiv1.DefaultMonitoringConfigMapKey],
+			},
+		}
+		utils.SetOperatorVersion(&newConfigMap.ObjectMeta, versions.Version)
+		return r.Create(ctx, &newConfigMap)
+	}
+
+	// we check that we own the existing configmap
+	if _, ok := targetConfigMap.Annotations[utils.OperatorVersionAnnotationName]; !ok {
+		contextLogger.Warning("A configmap with the same name as the one the operator would have created for "+
+			"default metrics already exists, without the required annotation",
+			"configmap", targetConfigMap.Name, "annotation", utils.OperatorVersionAnnotationName)
+		return nil
+	}
+
+	if reflect.DeepEqual(sourceConfigmap.Data, targetConfigMap.Data) {
+		// Everything fine, the two secrets are exactly the same
+		return nil
+	}
+
+	// The configuration changed, and we need the patch the secret we have
+	patchedConfigMap := targetConfigMap.DeepCopy()
+	utils.SetOperatorVersion(&patchedConfigMap.ObjectMeta, versions.Version)
+	patchedConfigMap.Data = sourceConfigmap.Data
+	if err := r.Patch(ctx, patchedConfigMap, client.MergeFrom(&targetConfigMap)); err != nil {
+		return fmt.Errorf("while patching default monitoring queries: %w", err)
 	}
 
 	return nil

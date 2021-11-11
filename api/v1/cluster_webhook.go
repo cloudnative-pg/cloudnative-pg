@@ -30,6 +30,9 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
+// DefaultMonitoringConfigMapKey is the key that should be used in the default metrics configmap to store the queries
+const DefaultMonitoringConfigMapKey = "queries"
+
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 
@@ -81,6 +84,42 @@ func (r *Cluster) Default() {
 	if r.Spec.LogLevel == "" {
 		r.Spec.LogLevel = log.InfoLevelString
 	}
+
+	// we inject the defaultMonitoringQueries if the MonitoringQueriesConfigmap parameter is not empty
+	// and defaultQueries not disabled on cluster crd
+	if configuration.Current.MonitoringQueriesConfigmap != "" && !r.Spec.Monitoring.AreDefaultQueriesDisabled() {
+		r.defaultMonitoringQueries(configuration.Current.MonitoringQueriesConfigmap)
+	}
+}
+
+// defaultMonitoringQueries adds the default monitoring queries configMap
+// if not already present in CustomQueriesConfigMap
+func (r *Cluster) defaultMonitoringQueries(defaultMonitoringQueriesConfigmap string) {
+	if r.Spec.Monitoring == nil {
+		r.Spec.Monitoring = &MonitoringConfiguration{}
+	}
+
+	var defaultConfigMapQueriesAlreadyPresent bool
+
+	// we check if they default queries are been already inserted in the monitoring configuration
+	for _, monitoringConfigMap := range r.Spec.Monitoring.CustomQueriesConfigMap {
+		if monitoringConfigMap.Name == defaultMonitoringQueriesConfigmap {
+			defaultConfigMapQueriesAlreadyPresent = true
+			break
+		}
+	}
+
+	// if the default queries are already present there is no need to re-add them, so we quit the function
+	if defaultConfigMapQueriesAlreadyPresent {
+		return
+	}
+
+	// we add the default monitoring queries to the array
+	r.Spec.Monitoring.CustomQueriesConfigMap = append(r.Spec.Monitoring.CustomQueriesConfigMap,
+		ConfigMapKeySelector{
+			LocalObjectReference: LocalObjectReference{Name: defaultMonitoringQueriesConfigmap},
+			Key:                  DefaultMonitoringConfigMapKey,
+		})
 }
 
 // defaultInitDB enriches the initDB with defaults if not all the required arguments were passed

@@ -1539,6 +1539,10 @@ spec:
                       - name
                       type: object
                     type: array
+                  disableDefaultQueries:
+                    description: 'Whether the default queries should be injected.
+                      Default: false.'
+                    type: boolean
                 type: object
               nodeMaintenanceWindow:
                 description: Define a maintenance window for the Kubernetes nodes
