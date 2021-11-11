@@ -298,6 +298,11 @@ Take care that the referred resources have to be created **in the same namespace
     add a label with key `k8s.enterprisedb.io/reload` to it, otherwise you will have to reload
     the instances using the `kubectl cnp reload` subcommand.
 
+!!! Important
+    When a user defined metric overwrites an already existing metric the instance manager prints a json warning log,
+    containing the message:`Query with the same name already found. Overwriting the existing one.`
+    and a key `queryName` containing the overwritten query name.
+
 #### Example of a user defined metric
 
 Here you can see an example of a `ConfigMap` containing a single custom query,

@@ -206,7 +206,7 @@ func (q QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
 	}
 	defer func() {
 		if err := tx.Rollback(); err != nil {
-			log.Info("Error while rolling back monitoring tx to retrieve accessible databases list", "err", err.Error())
+			log.Error(err, "Error while rolling back monitoring tx to retrieve accessible databases list")
 		}
 	}()
 	databases, errors := postgres.GetAllAccessibleDatabases(tx, "datallowconn AND NOT datistemplate")
@@ -270,6 +270,12 @@ func (q *QueriesCollector) ParseQueries(customQueries []byte) error {
 		return err
 	}
 	for name, query := range parsedQueries {
+		if _, found := q.userQueries[name]; found {
+			log.Warning("Query with the same name already found. Overwriting the existing one.",
+				"queryName",
+				name)
+		}
+
 		q.userQueries[name] = query
 		q.mappings[name], q.variableLabels[name] = query.ToMetricMap(
 			fmt.Sprintf("%v_%v", q.collectorName, name))
@@ -309,7 +315,7 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 
 	defer func() {
 		if err := tx.Rollback(); err != nil {
-			log.Info("Error while rolling back metrics extraction", "err", err.Error())
+			log.Error(err, "Error while rolling back metrics extraction")
 		}
 	}()
 
@@ -319,11 +325,11 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			log.Info("Error while closing metrics extraction",
+			log.Warning("Error while closing metrics extraction",
 				"err", err.Error())
 		}
 		if rows.Err() != nil {
-			log.Info("Error while loading metrics",
+			log.Warning("Error while loading metrics",
 				"err", err.Error())
 		}
 	}()
@@ -340,7 +346,7 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 	}
 
 	if len(columns) != len(c.columnMapping) {
-		log.Info("Columns number mismatch",
+		log.Warning("Columns number mismatch",
 			"name", c.namespace,
 			"columnNumberFromDB", len(columns),
 			"columnNumberFromConfiguration", len(c.columnMapping))
@@ -368,7 +374,7 @@ func (c QueryCollector) collectLabels(columns []string, columnData []interface{}
 		if mapping, ok := c.columnMapping[columnName]; ok && mapping.Label {
 			value, ok := postgres.DBToString(columnData[idx])
 			if !ok {
-				log.Info("Label value cannot be converted to string",
+				log.Warning("Label value cannot be converted to string",
 					"value", value,
 					"mapping", mapping)
 				return nil, false
@@ -386,7 +392,7 @@ func (c QueryCollector) collectColumns(columns []string, columnData []interface{
 	for idx, columnName := range columns {
 		mapping, ok := c.columnMapping[columnName]
 		if !ok {
-			log.Info("Missing mapping for column", "column", columnName, "mapping", c.columnMapping)
+			log.Warning("Missing mapping for column", "column", columnName, "mapping", c.columnMapping)
 			continue
 		}
 
@@ -453,7 +459,7 @@ func (c QueryCollector) collectConstMetric(
 	mapping MetricMap, value interface{}, variableLabels []string, ch chan<- prometheus.Metric) {
 	floatData, ok := postgres.DBToFloat64(value)
 	if !ok {
-		log.Info("Error while parsing value",
+		log.Warning("Error while parsing value",
 			"namespace", c.namespace,
 			"value", value,
 			"mapping", mapping)
