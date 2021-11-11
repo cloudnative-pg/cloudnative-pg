@@ -17,6 +17,7 @@ PostgreSQL database using a service which is solely managed by the operator,
 without having to worry about changes of the primary role following a failover
 or a switchover. Applications that reside outside the Kubernetes cluster, need
 to configure an Ingress object to expose the service via TCP.
+Web applications can take advantage of the native connection pooler based on PgBouncer.
 
 Cloud Native PostgreSQL works with PostgreSQL and is available under the
 [EnterpriseDB Limited Use License](https://www.enterprisedb.com/limited-use-license).
@@ -55,13 +56,20 @@ format for the following platforms: `linux/amd64`, `linux/arm64`,
 !!! Warning
     Cloud Native PostgreSQL requires that all nodes in a Kubernetes cluster have the
     same CPU architecture, thus a hybrid CPU architecture Kubernetes cluster is not
-    supported.
+    supported. Additionally, EDB supports `linux/ppc64le` and `linux/s390x` architectures
+    on OpenShift only.
 
 ## Supported Postgres versions
 
 The following versions of Postgres are currently supported:
 
-- PostgreSQL 14, 13, 12, 11 and 10 (`linux/amd64`)
+- PostgreSQL 14 (default), 13, 12, 11, and 10
+
+All of the above versions, except PostgreSQL 10, are available on the
+following platforms: `linux/amd64`, `linux/ppc64le`, `linux/s390x`.
+PostgreSQL 10 is available on `linux/amd64` only.
+EDB supports operand images for `linux/ppc64le` and `linux/s390x`
+architectures on OpenShift only.
 
 ## Main features
 
