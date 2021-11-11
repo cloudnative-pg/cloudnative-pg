@@ -404,7 +404,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 			client.ObjectKey{Namespace: r.instance.Namespace, Name: reference.Name},
 			&configMap)
 		if err != nil {
-			contextLogger.Info("Unable to get configMap containing custom monitoring queries",
+			contextLogger.Warning("Unable to get configMap containing custom monitoring queries",
 				"reference", reference,
 				"error", err.Error())
 			continue
@@ -412,14 +412,14 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 
 		data, ok := configMap.Data[reference.Key]
 		if !ok {
-			contextLogger.Info("Missing key in configMap",
+			contextLogger.Warning("Missing key in configMap",
 				"reference", reference)
 			continue
 		}
 
 		err = queriesCollector.ParseQueries([]byte(data))
 		if err != nil {
-			contextLogger.Info("Error while parsing custom queries in ConfigMap",
+			contextLogger.Warning("Error while parsing custom queries in ConfigMap",
 				"reference", reference,
 				"error", err.Error())
 			continue
@@ -430,7 +430,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		var secret corev1.Secret
 		err := r.GetClient().Get(ctx, client.ObjectKey{Namespace: r.instance.Namespace, Name: reference.Name}, &secret)
 		if err != nil {
-			contextLogger.Info("Unable to get secret containing custom monitoring queries",
+			contextLogger.Warning("Unable to get secret containing custom monitoring queries",
 				"reference", reference,
 				"error", err.Error())
 			continue
@@ -438,14 +438,14 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 
 		data, ok := secret.Data[reference.Key]
 		if !ok {
-			contextLogger.Info("Missing key in secret",
+			contextLogger.Warning("Missing key in secret",
 				"reference", reference)
 			continue
 		}
 
 		err = queriesCollector.ParseQueries(data)
 		if err != nil {
-			contextLogger.Info("Error while parsing custom queries in Secret",
+			contextLogger.Warning("Error while parsing custom queries in Secret",
 				"reference", reference,
 				"error", err.Error())
 			continue
