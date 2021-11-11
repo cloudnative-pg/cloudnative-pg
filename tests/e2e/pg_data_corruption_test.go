@@ -55,14 +55,6 @@ var _ = Describe("PGDATA Corruption", func() {
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		// make sure jobs get deleted
-		Eventually(func() (int, error) {
-			jobList, err := env.GetJobList(namespace)
-			if err != nil {
-				return 1, err
-			}
-			return len(jobList.Items), err
-		}, 60).Should(BeEquivalentTo(0))
 		AssertCreateTestData(namespace, clusterName, tableName)
 		By("gather current primary pod and pvc info", func() {
 			oldPrimaryPodInfo, err = env.GetClusterPrimary(namespace, clusterName)
