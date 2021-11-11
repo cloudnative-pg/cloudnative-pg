@@ -34,3 +34,10 @@ instructions accordingly for your version.
   slides for Cloud Native PostgreSQL
 - Create a pull request in UPM substrate by changing the version in
   https://github.com/EnterpriseDB/upm-substrate/blob/main/config/azure/base/cnp-operator/kustomization.yaml
+
+## Helm chart release walkthrough:
+
+- copy the output of the following command to `charts/cloud-native-postgresql/templates/crds/crds.yaml` in the cloud-native-postgresql-helm chart: `kustomize build config/helm`
+- diff the new release version with the previous one (e.g.: `vimdiff releases/postgresql-operator-1.9.1.yaml releases/postgresql-operator-1.9.2.yaml` using your IDE of choice)
+- port any diff to the templates in the helm chart accordingly
+- proceed with the release process described in the `RELEASE.md` file in the cloud-native-postgresql-helm repository.
