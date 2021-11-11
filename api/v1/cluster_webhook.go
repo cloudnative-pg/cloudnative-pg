@@ -109,17 +109,22 @@ func (r *Cluster) defaultMonitoringQueries(defaultMonitoringQueriesConfigmap str
 		}
 	}
 
-	// if the default queries are already present there is no need to re-add them, so we quit the function
+	// if the default queries are already present there is no need to re-add them, so we quit the function.
+	// Please note that in this case that the default configMap could overwrite user existing queries
+	// depending on the order. This is an accepted behavior because the user willingly defined the order of his array
 	if defaultConfigMapQueriesAlreadyPresent {
 		return
 	}
 
-	// we add the default monitoring queries to the array
-	r.Spec.Monitoring.CustomQueriesConfigMap = append(r.Spec.Monitoring.CustomQueriesConfigMap,
-		ConfigMapKeySelector{
+	// we add the default monitoring queries to the array.
+	// It is important that the DefaultMonitoringConfigMap is the first element of the array
+	// because it should be overwritten by the user defined metrics.
+	r.Spec.Monitoring.CustomQueriesConfigMap = append([]ConfigMapKeySelector{
+		{
 			LocalObjectReference: LocalObjectReference{Name: defaultMonitoringQueriesConfigmap},
 			Key:                  DefaultMonitoringConfigMapKey,
-		})
+		},
+	}, r.Spec.Monitoring.CustomQueriesConfigMap...)
 }
 
 // defaultInitDB enriches the initDB with defaults if not all the required arguments were passed
