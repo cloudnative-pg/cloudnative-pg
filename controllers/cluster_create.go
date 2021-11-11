@@ -791,14 +791,14 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	if err = r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
-			return ctrl.Result{}, nil
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 
 		contextLogger.Error(err, "Unable to create job", "job", job)
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
 
 // getOriginBackup gets the backup that is used to bootstrap a new PostgreSQL cluster
@@ -870,7 +870,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			contextLogger.Info("Job already exist, maybe the cache is stale", "pod", job.Name)
-			return ctrl.Result{}, nil
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 
 		contextLogger.Error(err, "Unable to create Job", "job", job)
@@ -899,7 +899,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 			err)
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
 
 // reconcilePVCs reattaches a dangling PVC
