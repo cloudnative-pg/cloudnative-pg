@@ -58,7 +58,7 @@ metadata:
   name: cluster-example
 spec:
   instances: 3
-  imageName: quay.io/enterprisedb/postgresql:14.0
+  imageName: quay.io/enterprisedb/postgresql:14.1
 
   affinity:
     enablePodAntiAffinity: true #default value
