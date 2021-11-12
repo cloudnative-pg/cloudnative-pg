@@ -47,14 +47,17 @@ jobs:
           paths_ignore: '["README.md", "docs/**"]'
           do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
 
-  docs-changes:
-    name: Validate if docs has changed
+  change-triage:
+    name: Check changed files
     needs: duplicate_runs
     if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
     runs-on: ubuntu-20.04
     outputs:
       docs-changed: ${{ steps.filter.outputs.docs-changed }}
-      code-changed: ${{ steps.filter.outputs.code-changed }}
+      operator-changed: ${{ steps.filter.outputs.operator-changed }}
+      test-changed: ${{ steps.filter.outputs.test-changed }}
+      shell-script-changed: ${{ steps.filter.outputs.shell-script-changed }}
+      go-code-changed: ${{ steps.filter.outputs.go-code-changed }}
     steps:
     - name: Checkout
       uses: actions/checkout@v2.3.5
@@ -62,25 +65,43 @@ jobs:
     - name: Check for changes
       uses: dorny/paths-filter@v2.10.2
       id: filter
+      # Remember to add new folders in the operator-changed filter if needed
       with:
         filters: |
           docs-changed:
             - '**/*.md'
             - 'docs/**'
-            - '**/*.txt'
-          code-changed:
-            - '**/*.go'
-            - '**/*.sh'
-            - '**/*.py'
-            - '**/*.yml'
+            - '.wordlist-en-custom.txt'
+          operator-changed:
+            - 'api/**'
+            - 'cmd/**'
             - 'config/**'
-            - '**/*.template'
-            - '**/*.json'
+            - 'controllers/**'
+            - 'internal/**'
+            - 'licenses/**'
+            - 'pkg/**'
+            - '.github/workflows/continuous-delivery.yml'
+            - '.goreleaser-multiarch.yml'
+            - 'Dockerfile'
+            - 'Makefile'
+            - 'go.mod'
+            - 'go.sum'
+          test-changed:
+            - 'tests/**'
+            - 'hack/**'
+          shell-script-changed:
+            - '**/*.sh'
+          go-code-changed:
+            - '**/*.go'
+            - '.golangci.yml'
 
   golangci:
     name: Run linters
-    needs: duplicate_runs
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+    needs:
+      - duplicate_runs
+      - change-triage
+    # Run Go linter if Go code have changed
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && needs.change-triage.outputs.go-code-changed == 'true' }}
     runs-on: ubuntu-20.04
     steps:
       -
@@ -95,8 +116,11 @@ jobs:
 
   shellcheck:
     name: Run shellcheck linter
-    needs: duplicate_runs
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+    needs:
+      - duplicate_runs
+      - change-triage
+    # Run shellcheck linter if shell code have changed
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && needs.change-triage.outputs.shell-script-changed == 'true' }}
     runs-on: ubuntu-20.04
     env:
         SHELLCHECK_OPTS: -a -S style
@@ -109,8 +133,14 @@ jobs:
 
   tests:
     name: Run unit tests
-    needs: duplicate_runs
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+    needs:
+      - duplicate_runs
+      - change-triage
+    # Run unit tests if anything but docs, e2e tests and shell scripts have changed
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      (needs.change-triage.outputs.operator-changed == 'true' ||
+      needs.change-triage.outputs.go-code-changed == 'true')
     runs-on: ubuntu-20.04
     steps:
       -
@@ -146,8 +176,14 @@ jobs:
 
   apidoc:
     name: Verify API doc is up to date
-    needs: duplicate_runs
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+    needs:
+      - duplicate_runs
+      - change-triage
+    # Run make apidoc if Go code or docs have changed
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      (needs.change-triage.outputs.go-code-changed == 'true' ||
+      needs.change-triage.outputs.docs-changed == 'true')
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout code
@@ -172,8 +208,11 @@ jobs:
 
   crd:
     name: Verify CRD is up to date
-    needs: duplicate_runs
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+    needs:
+      - duplicate_runs
+      - change-triage
+    # Run make manifests if Go code have changed
+    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && needs.change-triage.outputs.go-code-changed == 'true' }}
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
@@ -205,8 +244,20 @@ jobs:
       - apidoc
       - crd
       - duplicate_runs
-      - docs-changes
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && needs.docs-changes.outputs.code-changed == 'true' }}
+      - change-triage
+    # Build containers if anything but docs have changed
+    if: |
+      always() &&
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      (needs.change-triage.outputs.operator-changed == 'true' ||
+      needs.change-triage.outputs.test-changed == 'true' ||
+      needs.change-triage.outputs.shell-script-changed == 'true' ||
+      needs.change-triage.outputs.go-code-changed == 'true') &&
+      (needs.golangci.result == 'success' || needs.golangci.result == 'skipped') &&
+      (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
+      (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
+      (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
+      (needs.crd.result == 'success' || needs.crd.result == 'skipped')
     runs-on: ubuntu-20.04
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
@@ -334,9 +385,22 @@ jobs:
       - tests
       - apidoc
       - crd
-      - docs-changes
+      - change-triage
       - duplicate_runs
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && github.event.sender.login != 'cnp-autobot' && needs.docs-changes.outputs.code-changed == 'true' }}
+    # Trigger OCP bundle if anything but docs have changed
+    if: |
+      always() &&
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      github.event.sender.login != 'cnp-autobot' &&
+      (needs.change-triage.outputs.operator-changed == 'true' ||
+      needs.change-triage.outputs.test-changed == 'true' ||
+      needs.change-triage.outputs.shell-script-changed == 'true' ||
+      needs.change-triage.outputs.go-code-changed == 'true') &&
+      (needs.golangci.result == 'success' || needs.golangci.result == 'skipped') &&
+      (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
+      (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
+      (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
+      (needs.crd.result == 'success' || needs.crd.result == 'skipped')
     runs-on: ubuntu-20.04
     steps:
       - name: Repository Dispatch
@@ -353,7 +417,10 @@ jobs:
     needs:
       - buildx
       - duplicate_runs
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
+    if: |
+      always() &&
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.buildx.result == 'success'
     runs-on: ubuntu-20.04
     outputs:
       image: ${{ needs.buildx.outputs.image }}
@@ -384,6 +451,10 @@ jobs:
     name: Evaluate test level
     needs:
       - generate-jobs
+    if: |
+      always() &&
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.generate-jobs.result == 'success'
     runs-on: ubuntu-20.04
     outputs:
       testLevel: ${{ steps.evaluate-test-level.outputs.testLevel }}
@@ -407,7 +478,12 @@ jobs:
 
   e2e-local:
     name: Run E2E on local executors
-    if: ${{ needs.generate-jobs.outputs.localEnabled == 'true' && needs.duplicate_runs.outputs.should_skip != 'true' }}
+    if: |
+      always() &&
+      needs.generate-jobs.outputs.localEnabled == 'true' &&
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.generate-jobs.result == 'success' &&
+      needs.evaluate-test-level.result == 'success'
     needs:
       - generate-jobs
       - duplicate_runs
@@ -492,7 +568,12 @@ jobs:
 
   e2e-aks:
     name: Run E2E on Microsoft AKS
-    if: ${{ needs.generate-jobs.outputs.aksEnabled == 'true' && needs.duplicate_runs.outputs.should_skip != 'true' }}
+    if: |
+      always() &&
+      needs.generate-jobs.outputs.aksEnabled == 'true' &&
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.generate-jobs.result == 'success' &&
+      needs.evaluate-test-level.result == 'success'
     needs:
       - generate-jobs
       - duplicate_runs
@@ -639,7 +720,12 @@ jobs:
 
   e2e-eks:
     name: Run E2E on Amazon EKS
-    if: ${{ needs.generate-jobs.outputs.eksEnabled == 'true' && needs.duplicate_runs.outputs.should_skip != 'true' }}
+    if: |
+      always() &&
+      needs.generate-jobs.outputs.eksEnabled == 'true' &&
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.generate-jobs.result == 'success' &&
+      needs.evaluate-test-level.result == 'success'
     needs:
       - generate-jobs
       - duplicate_runs
@@ -765,7 +851,12 @@ jobs:
 
   e2e-gke:
     name: Run E2E on Google GKE
-    if: ${{ needs.generate-jobs.outputs.gkeEnabled == 'true' && needs.duplicate_runs.outputs.should_skip != 'true' }}
+    if: |
+      always() &&
+      needs.generate-jobs.outputs.gkeEnabled == 'true' &&
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.generate-jobs.result == 'success' &&
+      needs.evaluate-test-level.result == 'success'
     needs:
       - generate-jobs
       - duplicate_runs
@@ -901,7 +992,12 @@ jobs:
 
   e2e-rke:
       name: Run E2E on Rancher RKE
-      if: ${{ needs.generate-jobs.outputs.rkeEnabled == 'true' && needs.duplicate_runs.outputs.should_skip != 'true' }}
+      if: |
+        always() &&
+        needs.generate-jobs.outputs.rkeEnabled == 'true' &&
+        needs.duplicate_runs.outputs.should_skip != 'true' &&
+        needs.generate-jobs.result == 'success' &&
+        needs.evaluate-test-level.result == 'success'
       needs:
         - generate-jobs
         - duplicate_runs
