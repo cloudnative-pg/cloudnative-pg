@@ -281,7 +281,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 	for _, instance := range instanceStatus.Items {
 		if instance.Error != nil {
 			status.AddLine(
-				'-',
+				"-",
 				instance.Pod.Name,
 				"-",
 				"-",
