@@ -8,18 +8,14 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package walarchive
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"os/exec"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
 	cacheClient "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache/client"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
@@ -28,16 +24,13 @@ import (
 
 // NewCmd creates the new cobra command
 func NewCmd() *cobra.Command {
-	var clusterName string
-	var namespace string
-
 	cmd := cobra.Command{
 		Use:           "wal-archive [name]",
 		SilenceErrors: true,
 		Args:          cobra.ExactArgs(1),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			contextLog := log.WithName("wal-archive")
-			err := run(contextLog, namespace, clusterName, args)
+			err := run(contextLog, args)
 			if err != nil {
 				contextLog.Error(err, "failed to run wal-archive command")
 				return err
@@ -46,30 +39,16 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
-		"current cluster in k8s")
-	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
-		"the cluster and of the Pod in k8s")
-
 	return &cmd
 }
 
-func run(contextLog log.Logger, namespace, clusterName string, args []string) error {
-	ctx := context.Background()
-
+func run(contextLog log.Logger, args []string) error {
 	walName := args[0]
 
 	var cluster *apiv1.Cluster
 	var err error
-	var typedClient client.Client
 
-	typedClient, err = management.NewControllerRuntimeClient()
-	if err != nil {
-		contextLog.Error(err, "Error while creating k8s client")
-		return err
-	}
-
-	cluster, err = cacheClient.GetCluster(ctx, typedClient, namespace, clusterName)
+	cluster, err = cacheClient.GetCluster()
 	if err != nil {
 		contextLog.Error(err, "Error while getting cluster from cache")
 		return fmt.Errorf("failed to get cluster: %w", err)
@@ -85,17 +64,13 @@ func run(contextLog log.Logger, namespace, clusterName string, args []string) er
 		return nil
 	}
 
-	options, err := barmanCloudWalArchiveOptions(*cluster, clusterName, walName)
+	options, err := barmanCloudWalArchiveOptions(*cluster, cluster.Name, walName)
 	if err != nil {
 		contextLog.Error(err, "while getting barman-cloud-wal-archive options")
 		return err
 	}
 
-	env, err := cacheClient.GetEnv(ctx,
-		typedClient,
-		cluster.Namespace,
-		cluster.Spec.Backup.BarmanObjectStore,
-		cache.WALArchiveKey)
+	env, err := cacheClient.GetEnv(cache.WALArchiveKey)
 	if err != nil {
 		contextLog.Error(err, "Error while getting environment from cache")
 		return fmt.Errorf("failed to get envs: %w", err)

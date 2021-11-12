@@ -8,7 +8,6 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package walrestore
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -16,12 +15,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
 	cacheClient "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache/client"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
@@ -37,8 +34,6 @@ var (
 
 // NewCmd creates a new cobra command
 func NewCmd() *cobra.Command {
-	var clusterName string
-	var namespace string
 	var podName string
 
 	cmd := cobra.Command{
@@ -47,7 +42,7 @@ func NewCmd() *cobra.Command {
 		Args:          cobra.ExactArgs(2),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			contextLog := log.WithName("wal-restore")
-			err := run(contextLog, namespace, clusterName, podName, args)
+			err := run(contextLog, podName, args)
 			if err == nil {
 				return nil
 			}
@@ -63,33 +58,20 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
-		"current cluster in k8s")
 	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of the "+
 		"current pod in k8s")
-	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
-		"the cluster and of the Pod in k8s")
 
 	return &cmd
 }
 
-func run(contextLog log.Logger, namespace, clusterName, podName string, args []string) error {
-	ctx := context.Background()
-
+func run(contextLog log.Logger, podName string, args []string) error {
 	walName := args[0]
 	destinationPath := args[1]
 
 	var cluster *apiv1.Cluster
 	var err error
-	var typedClient client.Client
 
-	typedClient, err = management.NewControllerRuntimeClient()
-	if err != nil {
-		contextLog.Error(err, "Error while creating k8s client")
-		return err
-	}
-
-	cluster, err = cacheClient.GetCluster(ctx, typedClient, namespace, clusterName)
+	cluster, err = cacheClient.GetCluster()
 	if err != nil {
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
@@ -117,11 +99,7 @@ func run(contextLog log.Logger, namespace, clusterName, podName string, args []s
 		return err
 	}
 
-	env, err := cacheClient.GetEnv(ctx,
-		typedClient,
-		cluster.Namespace,
-		barmanConfiguration,
-		cache.WALRestoreKey)
+	env, err := cacheClient.GetEnv(cache.WALRestoreKey)
 	if err != nil {
 		return fmt.Errorf("failed to get envs: %w", err)
 	}
