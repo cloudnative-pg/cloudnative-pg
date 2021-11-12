@@ -35,58 +35,86 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
-	// The following code works under the assumption that the latest element
-	// is the primary and this assumption should be enforced by the
-	// `updateTargetPrimaryFromPods` function, which is executed before this
+	// The following code works under the assumption that podList.Items list is ordered
+	// by lag (primary first)
 
+	// upgrade all the replicas starting from the more lagged
+	var primaryPostgresqlStatus *postgres.PostgresqlStatus
 	for i := len(podList.Items) - 1; i >= 0; i-- {
 		postgresqlStatus := podList.Items[i]
+
+		// If this pod is the current primary, we upgrade it in the last step
+		if cluster.Status.CurrentPrimary == postgresqlStatus.Pod.Name {
+			primaryPostgresqlStatus = &podList.Items[i]
+			continue
+		}
 
 		shouldRestart, reason := conditionFunc(postgresqlStatus, cluster)
 		if !shouldRestart {
 			continue
 		}
 
-		// if it is not the current primary, we can just upgrade it
-		if cluster.Status.CurrentPrimary != postgresqlStatus.Pod.Name {
-			if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
-				fmt.Sprintf("Restarting instance, because: %s", reason)); err != nil {
-				return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", postgresqlStatus.Pod.Name, err)
-			}
-			return true, r.upgradePod(ctx, cluster, &postgresqlStatus.Pod)
-		}
-
-		// if it's a primary instance, we need to check whether a manual switchover is required
-		if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
-			contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
-				"reason", reason, "primaryPod", postgresqlStatus.Pod.Name)
-			return true, r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser,
-				"User must issue a supervised switchover")
-		}
-
-		// if the cluster has more than one instance, we should trigger a switchover before upgrading the
-		if cluster.Status.Instances > 1 && len(podList.Items) > 1 {
-			// podList.Items[1] is the first replica, as the pod list
-			// is sorted in the same order we use for switchover / failovers
-			targetPrimary := podList.Items[1].Pod.Name
-			contextLogger.Info("The primary needs to be restarted, we'll trigger a switchover first",
-				"reason", reason,
-				"currentPrimary", postgresqlStatus.Pod.Name,
-				"targetPrimary", targetPrimary)
-			return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)
-		}
-
-		// if there is only one instance in the cluster, we should upgrade it even if it's a primary
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
-			fmt.Sprintf("The primary instance needs to be restarted: %s, reason: %s",
-				postgresqlStatus.Pod.Name, reason)); err != nil {
+			fmt.Sprintf("Restarting instance %s, because: %s", postgresqlStatus.Pod.Name, reason),
+		); err != nil {
 			return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", postgresqlStatus.Pod.Name, err)
 		}
-
 		return true, r.upgradePod(ctx, cluster, &postgresqlStatus.Pod)
 	}
 
-	return false, nil
+	// report an error if there is no primary. This condition should never happen because
+	// `updateTargetPrimaryFromPods()` is executed before this function
+	if primaryPostgresqlStatus == nil {
+		return false, fmt.Errorf("expected 1 primary postgressql but none found")
+	}
+
+	shouldRestart, reason := conditionFunc(*primaryPostgresqlStatus, cluster)
+	if !shouldRestart {
+		return false, nil
+	}
+
+	// we need to check whether a manual switchover is required
+	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
+		contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
+			"reason", reason, "primaryPod", primaryPostgresqlStatus.Pod.Name)
+		err := r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser, "User must issue a supervised switchover")
+		if err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}
+
+	// if the cluster has more than one instance, we should trigger a switchover before upgrading
+	if cluster.Status.Instances > 1 && len(podList.Items) > 1 {
+		// podList.Items[1] is the first replica, as the pod list
+		// is sorted in the same order we use for switchover / failover
+		targetPrimary := podList.Items[1].Pod.Name
+		contextLogger.Info("The primary needs to be restarted, we'll trigger a switchover to do that",
+			"reason", reason,
+			"currentPrimary", primaryPostgresqlStatus.Pod.Name,
+			"targetPrimary", targetPrimary)
+		r.Recorder.Eventf(cluster, "Normal", "SwitchOver",
+			"Initiating switchover to %s to upgrade %s", targetPrimary, primaryPostgresqlStatus.Pod.Name)
+		return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)
+	}
+
+	err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
+		fmt.Sprintf("The sole primary instance %s needs to be restarted: reason: %s",
+			primaryPostgresqlStatus.Pod.Name, reason))
+	if err != nil {
+		return false, err
+	}
+
+	// if there is only one instance in the cluster, we should upgrade it even if it's a primary
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
+		fmt.Sprintf("The primary instance needs to be restarted: %s, reason: %s",
+			primaryPostgresqlStatus.Pod.Name, reason),
+	); err != nil {
+		return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", primaryPostgresqlStatus.Pod.Name, err)
+	}
+
+	return true, r.upgradePod(ctx, cluster, &primaryPostgresqlStatus.Pod)
 }
 
 // IsPodNeedingRollout checks whether a given postgres instance has to be rolled out for any reason,
