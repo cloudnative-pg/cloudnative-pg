@@ -67,6 +67,7 @@ jobs:
       id: filter
       # Remember to add new folders in the operator-changed filter if needed
       with:
+        base: 'main'
         filters: |
           docs-changed:
             - '**/*.md'
@@ -101,7 +102,9 @@ jobs:
       - duplicate_runs
       - change-triage
     # Run Go linter if Go code have changed
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && needs.change-triage.outputs.go-code-changed == 'true' }}
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.change-triage.outputs.go-code-changed == 'true'
     runs-on: ubuntu-20.04
     steps:
       -
@@ -120,7 +123,9 @@ jobs:
       - duplicate_runs
       - change-triage
     # Run shellcheck linter if shell code have changed
-    if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' && needs.change-triage.outputs.shell-script-changed == 'true' }}
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.change-triage.outputs.shell-script-changed == 'true'
     runs-on: ubuntu-20.04
     env:
         SHELLCHECK_OPTS: -a -S style
@@ -139,8 +144,10 @@ jobs:
     # Run unit tests if anything but docs, e2e tests and shell scripts have changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
-      (needs.change-triage.outputs.operator-changed == 'true' ||
-      needs.change-triage.outputs.go-code-changed == 'true')
+      (
+        needs.change-triage.outputs.operator-changed == 'true' ||
+        needs.change-triage.outputs.go-code-changed == 'true'
+      )
     runs-on: ubuntu-20.04
     steps:
       -
@@ -182,8 +189,10 @@ jobs:
     # Run make apidoc if Go code or docs have changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
-      (needs.change-triage.outputs.go-code-changed == 'true' ||
-      needs.change-triage.outputs.docs-changed == 'true')
+      (
+        needs.change-triage.outputs.go-code-changed == 'true' ||
+        needs.change-triage.outputs.docs-changed == 'true'
+      )
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout code
@@ -245,14 +254,21 @@ jobs:
       - crd
       - duplicate_runs
       - change-triage
-    # Build containers if anything but docs have changed
+    # Build containers if anything but docs have changed,
+    # or it is a scheduled execution
+    # See https://github.com/actions/runner/issues/491#issuecomment-850884422
     if: |
+      (
+        github.event_name == 'schedule' ||
+        needs.duplicate_runs.outputs.should_skip != 'true' &&
+        (
+          needs.change-triage.outputs.operator-changed == 'true' ||
+          needs.change-triage.outputs.test-changed == 'true' ||
+          needs.change-triage.outputs.shell-script-changed == 'true' ||
+          needs.change-triage.outputs.go-code-changed == 'true'
+        )
+      ) &&
       always() &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      (needs.change-triage.outputs.operator-changed == 'true' ||
-      needs.change-triage.outputs.test-changed == 'true' ||
-      needs.change-triage.outputs.shell-script-changed == 'true' ||
-      needs.change-triage.outputs.go-code-changed == 'true') &&
       (needs.golangci.result == 'success' || needs.golangci.result == 'skipped') &&
       (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
       (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
@@ -385,17 +401,24 @@ jobs:
       - tests
       - apidoc
       - crd
-      - change-triage
       - duplicate_runs
-    # Trigger OCP bundle if anything but docs have changed
+      - change-triage
+    # Trigger OCP bundle if anything but docs have changed,
+    # or it is a scheduled execution
+    # See https://github.com/actions/runner/issues/491#issuecomment-850884422
     if: |
+      (
+        github.event_name == 'schedule' ||
+        needs.duplicate_runs.outputs.should_skip != 'true' &&
+        github.event.sender.login != 'cnp-autobot' &&
+        (
+          needs.change-triage.outputs.operator-changed == 'true' ||
+          needs.change-triage.outputs.test-changed == 'true' ||
+          needs.change-triage.outputs.shell-script-changed == 'true' ||
+          needs.change-triage.outputs.go-code-changed == 'true'
+        )
+      ) &&
       always() &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      github.event.sender.login != 'cnp-autobot' &&
-      (needs.change-triage.outputs.operator-changed == 'true' ||
-      needs.change-triage.outputs.test-changed == 'true' ||
-      needs.change-triage.outputs.shell-script-changed == 'true' ||
-      needs.change-triage.outputs.go-code-changed == 'true') &&
       (needs.golangci.result == 'success' || needs.golangci.result == 'skipped') &&
       (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
       (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
@@ -418,8 +441,8 @@ jobs:
       - buildx
       - duplicate_runs
     if: |
-      always() &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
+      always() &&
       needs.buildx.result == 'success'
     runs-on: ubuntu-20.04
     outputs:
@@ -452,8 +475,8 @@ jobs:
     needs:
       - generate-jobs
     if: |
-      always() &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
+      always() &&
       needs.generate-jobs.result == 'success'
     runs-on: ubuntu-20.04
     outputs:
@@ -479,9 +502,9 @@ jobs:
   e2e-local:
     name: Run E2E on local executors
     if: |
-      always() &&
       needs.generate-jobs.outputs.localEnabled == 'true' &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
+      always() &&
       needs.generate-jobs.result == 'success' &&
       needs.evaluate-test-level.result == 'success'
     needs:
@@ -569,9 +592,9 @@ jobs:
   e2e-aks:
     name: Run E2E on Microsoft AKS
     if: |
-      always() &&
       needs.generate-jobs.outputs.aksEnabled == 'true' &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
+      always() &&
       needs.generate-jobs.result == 'success' &&
       needs.evaluate-test-level.result == 'success'
     needs:
@@ -721,9 +744,9 @@ jobs:
   e2e-eks:
     name: Run E2E on Amazon EKS
     if: |
-      always() &&
       needs.generate-jobs.outputs.eksEnabled == 'true' &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
+      always() &&
       needs.generate-jobs.result == 'success' &&
       needs.evaluate-test-level.result == 'success'
     needs:
@@ -852,9 +875,9 @@ jobs:
   e2e-gke:
     name: Run E2E on Google GKE
     if: |
-      always() &&
       needs.generate-jobs.outputs.gkeEnabled == 'true' &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
+      always() &&
       needs.generate-jobs.result == 'success' &&
       needs.evaluate-test-level.result == 'success'
     needs:
@@ -993,9 +1016,9 @@ jobs:
   e2e-rke:
       name: Run E2E on Rancher RKE
       if: |
-        always() &&
         needs.generate-jobs.outputs.rkeEnabled == 'true' &&
         needs.duplicate_runs.outputs.should_skip != 'true' &&
+        always() &&
         needs.generate-jobs.result == 'success' &&
         needs.evaluate-test-level.result == 'success'
       needs:
