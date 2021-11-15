@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: cluster-restored-sas
 spec:
-  instances: 3
+  instances: 2
 
   storage:
     size: 1Gi

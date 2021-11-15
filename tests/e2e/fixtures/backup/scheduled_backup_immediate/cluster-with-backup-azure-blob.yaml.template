@@ -8,7 +8,7 @@ kind: Cluster
 metadata:
   name: scheduled-backups-immediate-azure
 spec:
-  instances: 3
+  instances: 2
 
   postgresql:
     parameters:

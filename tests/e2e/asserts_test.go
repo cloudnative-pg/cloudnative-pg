@@ -33,6 +33,7 @@ import (
 func AssertSwitchOver(namespace string, clusterName string, env *tests.TestingEnvironment) {
 	var pods []string
 	var oldPrimary, targetPrimary string
+	var oldPodListLength int
 
 	// First we check that the starting situation is the expected one
 	By("checking that CurrentPrimary and TargetPrimary are the same", func() {
@@ -47,7 +48,8 @@ func AssertSwitchOver(namespace string, clusterName string, env *tests.TestingEn
 
 		// Gather pod names
 		podList, err := env.GetClusterPodList(namespace, clusterName)
-		Expect(len(podList.Items), err).To(BeEquivalentTo(3))
+		Expect(err).ToNot(HaveOccurred())
+		oldPodListLength = len(podList.Items)
 		for _, p := range podList.Items {
 			pods = append(pods, p.Name)
 		}
@@ -116,7 +118,7 @@ func AssertSwitchOver(namespace string, clusterName string, env *tests.TestingEn
 
 		// Gather pod names
 		podList, err := env.GetClusterPodList(namespace, clusterName)
-		Expect(len(podList.Items), err).To(BeEquivalentTo(3))
+		Expect(len(podList.Items), err).To(BeEquivalentTo(oldPodListLength))
 		for _, p := range podList.Items {
 			pods = append(pods, p.Name)
 		}
@@ -135,7 +137,7 @@ func AssertSwitchOver(namespace string, clusterName string, env *tests.TestingEn
 				}
 
 				numHistory := len(strings.Split(strings.TrimSpace(out), "\n"))
-				fmt.Fprintf(GinkgoWriter, "count %d: pod: %s, the number of history file in pg_wal: %d\n", count, pod, numHistory)
+				GinkgoWriter.Printf("count %d: pod: %s, the number of history file in pg_wal: %d\n", count, pod, numHistory)
 				count++
 				if numHistory > 0 {
 					continue
@@ -583,7 +585,7 @@ func getScheduledBackupBackups(namespace string, scheduledBackupName string) ([]
 	if err != nil {
 		return nil, err
 	}
-	ret := []apiv1.Backup{}
+	var ret []apiv1.Backup
 
 	for _, backup := range backups.Items {
 		if strings.HasPrefix(backup.Name, scheduledBackup.Name+"-") {

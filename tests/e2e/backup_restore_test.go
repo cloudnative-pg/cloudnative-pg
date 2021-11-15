@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -937,6 +938,9 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile 
 
 		AssertDataExpectedCount(namespace, primaryReplica, tableName, 3)
 
+		cluster, err := env.GetCluster(namespace, restoredClusterName)
+		Expect(err).ToNot(HaveOccurred())
+		expectedReplicas := cluster.Spec.Instances - 1
 		// Cascading replicas should be attached to primary replica
 		cmd = postgresLogin + "'SELECT count(*) FROM pg_stat_replication'"
 		out, _, err = tests.Run(fmt.Sprintf(
@@ -944,7 +948,9 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile 
 			namespace,
 			primaryReplica,
 			cmd))
-		Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
+		Expect(err).ToNot(HaveOccurred())
+		connectedReplicas, err := strconv.Atoi(strings.Trim(out, "\n"))
+		Expect(connectedReplicas, err).To(BeEquivalentTo(expectedReplicas))
 	})
 }
 
@@ -1012,14 +1018,15 @@ func AssertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupN
 			return scheduledBackup.Labels[utils.ClusterLabelName] == scheduledBackup.Spec.Cluster.Name
 		}, 30).ShouldNot(BeTrue())
 
-		// backup count should be 1 that is immediate one
+		// The immediate backup fixtures has crontabs that hardly ever run
+		// The only backup that we get should be the immediate one
 		Eventually(func() (int, error) {
 			currentBackupCount, err := getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
 			if err != nil {
 				return 0, err
 			}
 			return currentBackupCount, err
-		}, 60).Should(BeNumerically("==", 1))
+		}, 120).Should(BeNumerically("==", 1))
 	})
 }
 
@@ -1084,7 +1091,10 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 			return scheduledBackup.Labels[utils.ClusterLabelName] == scheduledBackup.Spec.Cluster.Name
 		}, 30).ShouldNot(BeTrue())
 	})
-	By("waiting for ongoing backup to complete", func() {
+	By("waiting for ongoing backups to complete", func() {
+		// After suspending, new backups shouldn't start.
+		// If there are running backups they had already started,
+		// and we give them some time to finish.
 		Eventually(func() (bool, error) {
 			completedBackupsCount, err = getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
 			if err != nil {
@@ -1095,7 +1105,7 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 				return false, err
 			}
 			return len(backups) == completedBackupsCount, nil
-		}, 60).Should(BeTrue())
+		}, 80).Should(BeTrue())
 	})
 	By("verifying backup has suspended", func() {
 		Consistently(func() (int, error) {
@@ -1104,7 +1114,7 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 				return 0, err
 			}
 			return len(backups), err
-		}, 40).Should(BeEquivalentTo(completedBackupsCount))
+		}, 80).Should(BeEquivalentTo(completedBackupsCount))
 	})
 	By("resuming suspended backup", func() {
 		// take current backup count before suspend the schedule backup
@@ -1123,7 +1133,7 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 				return 0, err
 			}
 			return currentBackupCount, err
-		}, 70).Should(BeNumerically(">", completedBackupsCount))
+		}, 90).Should(BeNumerically(">", completedBackupsCount))
 	})
 }
 
