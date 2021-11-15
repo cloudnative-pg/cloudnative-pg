@@ -7,7 +7,7 @@ kind: Cluster
 metadata:
   name: backup-azure-blob-pitr
 spec:
-  instances: 3
+  instances: 2
 
   postgresql:
     parameters:

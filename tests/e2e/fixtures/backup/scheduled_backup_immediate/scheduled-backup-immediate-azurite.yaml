@@ -3,8 +3,8 @@ kind: ScheduledBackup
 metadata:
   name: scheduled-backups-immediate-azurite
 spec:
-  # Test immediate option, setting backup at 00:00 on day-of-month 31 in January.
-  schedule: "* 0 0 31 1 *"
+  # The cron should never run so we can test the immediate option
+  schedule: "0 0 0 31 1 0"
   cluster:
     name: pg-backup-azurite
   immediate: true

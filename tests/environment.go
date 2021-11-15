@@ -386,6 +386,20 @@ func (env TestingEnvironment) GetEventList(namespace string) (*eventsv1beta1.Eve
 	return eventList, err
 }
 
+// GetCluster gets a cluster given name and namespace
+func (env TestingEnvironment) GetCluster(namespace string, name string) (*apiv1.Cluster, error) {
+	namespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}
+	cluster := &apiv1.Cluster{}
+	err := env.Client.Get(env.Ctx, namespacedName, cluster)
+	if err != nil {
+		return nil, err
+	}
+	return cluster, nil
+}
+
 // DumpClusterEnv logs the JSON for the a cluster in a namespace, its pods and endpoints
 func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName string, filename string) {
 	f, err := os.Create(filename)
@@ -394,12 +408,8 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 		return
 	}
 	w := bufio.NewWriter(f)
-	namespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      clusterName,
-	}
-	cluster := &apiv1.Cluster{}
-	_ = env.Client.Get(env.Ctx, namespacedName, cluster)
+	cluster, _ := env.GetCluster(namespace, clusterName)
+
 	out, _ := json.MarshalIndent(cluster, "", "    ")
 	_, _ = fmt.Fprintf(w, "Dumping %v/%v cluster\n", namespace, clusterName)
 	_, _ = fmt.Fprintln(w, string(out))
