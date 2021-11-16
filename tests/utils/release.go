@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -23,24 +24,23 @@ func GetMostRecentReleaseTag(releasesPath string) (string, error) {
 		return "", err
 	}
 
-	var mostRecentTag, previousMostRecentTag semver.Version
+	versions := []*semver.Version{}
 
-	isDevTag := isDevTagVersion()
-
+	// build the array that contains the versions
+	// found in the releasePath directory
 	for _, file := range fileInfo {
 		tag := extractTag(file.Name())
-		version := semver.MustParse(tag)
-		if version.GreaterThan(&mostRecentTag) {
-			previousMostRecentTag = mostRecentTag
-			mostRecentTag = *version
-		}
+		versions = append(versions, semver.MustParse(tag))
 	}
 
-	if !isDevTag {
-		return previousMostRecentTag.String(), nil
+	// Sorting version as descending order ([v1.10.0, v1.9.0...])
+	sort.Sort(sort.Reverse(semver.Collection(versions)))
+
+	if !isDevTagVersion() {
+		return versions[1].String(), nil
 	}
 
-	return mostRecentTag.String(), nil
+	return versions[0].String(), nil
 }
 
 func isDevTagVersion() bool {
