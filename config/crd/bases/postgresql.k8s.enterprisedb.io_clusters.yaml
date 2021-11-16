@@ -1478,9 +1478,10 @@ spec:
               logLevel:
                 default: info
                 description: 'The instances'' log level, one of the following values:
-                  error, info (default), debug, trace'
+                  error, warning, info (default), debug, trace'
                 enum:
                 - error
+                - warning
                 - info
                 - debug
                 - trace
