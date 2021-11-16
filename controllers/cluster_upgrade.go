@@ -59,13 +59,14 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		); err != nil {
 			return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", postgresqlStatus.Pod.Name, err)
 		}
+
 		return true, r.upgradePod(ctx, cluster, &postgresqlStatus.Pod)
 	}
 
 	// report an error if there is no primary. This condition should never happen because
 	// `updateTargetPrimaryFromPods()` is executed before this function
 	if primaryPostgresqlStatus == nil {
-		return false, fmt.Errorf("expected 1 primary postgressql but none found")
+		return false, fmt.Errorf("expected 1 primary PostgreSQL but none found")
 	}
 
 	shouldRestart, reason := conditionFunc(*primaryPostgresqlStatus, cluster)
@@ -97,13 +98,6 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		r.Recorder.Eventf(cluster, "Normal", "SwitchOver",
 			"Initiating switchover to %s to upgrade %s", targetPrimary, primaryPostgresqlStatus.Pod.Name)
 		return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)
-	}
-
-	err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
-		fmt.Sprintf("The sole primary instance %s needs to be restarted: reason: %s",
-			primaryPostgresqlStatus.Pod.Name, reason))
-	if err != nil {
-		return false, err
 	}
 
 	// if there is only one instance in the cluster, we should upgrade it even if it's a primary
