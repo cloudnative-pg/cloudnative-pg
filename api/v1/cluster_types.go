@@ -209,9 +209,9 @@ type ClusterSpec struct {
 	// The list of external clusters which are used in the configuration
 	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
 
-	// The instances' log level, one of the following values: error, info (default), debug, trace
+	// The instances' log level, one of the following values: error, warning, info (default), debug, trace
 	// +kubebuilder:default:=info
-	// +kubebuilder:validation:Enum:=error;info;debug;trace
+	// +kubebuilder:validation:Enum:=error;warning;info;debug;trace
 	LogLevel string `json:"logLevel,omitempty"`
 }
 
