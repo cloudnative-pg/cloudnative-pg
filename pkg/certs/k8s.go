@@ -22,6 +22,7 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 var pkiLog = log.WithName("pki")
@@ -81,6 +82,11 @@ func EnsureRootCACertificate(
 	}
 
 	secret = pair.GenerateCASecret(namespace, name)
+	err = utils.SetAsOwnedByOperatorDeployment(ctx, client, &secret.ObjectMeta)
+	if err != nil {
+		return nil, err
+	}
+
 	createdSecret, err := client.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -246,11 +252,16 @@ func (pki PublicKeyInfrastructure) EnsureCertificate(
 	}
 
 	secret = webhookPair.GenerateCertificateSecret(pki.OperatorNamespace, pki.SecretName)
-	createdSecret, err := client.CoreV1().Secrets(
-		pki.OperatorNamespace).Create(ctx, secret, metav1.CreateOptions{})
+	err = utils.SetAsOwnedByOperatorDeployment(ctx, client, &secret.ObjectMeta)
 	if err != nil {
 		return nil, err
 	}
+
+	createdSecret, err := client.CoreV1().Secrets(pki.OperatorNamespace).Create(ctx, secret, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
 	return createdSecret, nil
 }
 

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	fakeApiExtension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,13 +26,18 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	operatorDeploymentName = "postgresql-operator-controller-manager"
+	operatorNamespaceName  = "operator-namespace"
+)
+
 var (
 	pkiEnvironmentTemplate = PublicKeyInfrastructure{
 		CertDir:                            "/tmp",
 		CaSecretName:                       "ca-secret",
 		SecretName:                         "webhook-secret-name",
 		ServiceName:                        "webhook-service",
-		OperatorNamespace:                  "operator-namespace",
+		OperatorNamespace:                  operatorNamespaceName,
 		MutatingWebhookConfigurationName:   "mutating-webhook",
 		ValidatingWebhookConfigurationName: "validating-webhook",
 		CustomResourceDefinitionsName: []string{
@@ -91,46 +97,61 @@ var (
 	}
 )
 
+func generateFakeOperatorDeployment(clientSet *fake.Clientset) {
+	operatorDep := appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      operatorDeploymentName,
+			Namespace: operatorNamespaceName,
+		},
+		Spec: appsv1.DeploymentSpec{},
+	}
+	_, err := clientSet.AppsV1().Deployments(operatorNamespaceName).
+		Create(context.TODO(), &operatorDep, metav1.CreateOptions{})
+	Expect(err).To(BeNil())
+}
+
 var _ = Describe("Root CA secret generation", func() {
 	It("must generate a new CA secret when it doesn't already exist", func() {
 		clientSet := fake.NewSimpleClientset()
-		secret, err := EnsureRootCACertificate(context.TODO(), clientSet, "operator-namespace", "ca-secret-name")
+		generateFakeOperatorDeployment(clientSet)
+		secret, err := EnsureRootCACertificate(context.TODO(), clientSet, operatorNamespaceName, "ca-secret-name")
 		Expect(err).To(BeNil())
 
-		Expect(secret.Namespace).To(Equal("operator-namespace"))
+		Expect(secret.Namespace).To(Equal(operatorNamespaceName))
 		Expect(secret.Name).To(Equal("ca-secret-name"))
 
-		_, err = clientSet.CoreV1().Secrets("operator-namespace").Get(
+		_, err = clientSet.CoreV1().Secrets(operatorNamespaceName).Get(
 			context.TODO(), "ca-secret-name", metav1.GetOptions{})
 		Expect(err).To(BeNil())
 	})
 
 	It("must adopt the current certificate if it is valid", func() {
-		ca, err := CreateRootCA("ca-secret-name", "operator-namespace")
+		ca, err := CreateRootCA("ca-secret-name", operatorNamespaceName)
 		Expect(err).To(BeNil())
 
-		secret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
+		secret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(secret)
 
-		resultingSecret, err := EnsureRootCACertificate(context.TODO(), clientSet, "operator-namespace", "ca-secret-name")
+		resultingSecret, err := EnsureRootCACertificate(context.TODO(), clientSet, operatorNamespaceName, "ca-secret-name")
 		Expect(err).To(BeNil())
-		Expect(resultingSecret.Namespace).To(Equal("operator-namespace"))
+		Expect(resultingSecret.Namespace).To(Equal(operatorNamespaceName))
 		Expect(resultingSecret.Name).To(Equal("ca-secret-name"))
 	})
 
 	It("must renew the CA certificate if it is not valid", func() {
 		notAfter := time.Now().Add(-10 * time.Hour)
 		notBefore := notAfter.Add(-90 * 24 * time.Hour)
-		ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", "operator-namespace")
+		ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", operatorNamespaceName)
 		Expect(err).To(BeNil())
 
-		secret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
+		secret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(secret)
 
 		// The secret should have been renewed now
-		resultingSecret, err := EnsureRootCACertificate(context.TODO(), clientSet, "operator-namespace", "ca-secret-name")
+		resultingSecret, err := EnsureRootCACertificate(context.TODO(), clientSet, operatorNamespaceName, "ca-secret-name")
 		Expect(err).To(BeNil())
-		Expect(resultingSecret.Namespace).To(Equal("operator-namespace"))
+		Expect(resultingSecret.Namespace).To(Equal(operatorNamespaceName))
 		Expect(resultingSecret.Name).To(Equal("ca-secret-name"))
 
 		caPair, err := ParseCASecret(resultingSecret)
@@ -146,9 +167,13 @@ var _ = Describe("Root CA secret generation", func() {
 
 var _ = Describe("Webhook certificate validation", func() {
 	When("we have a valid CA secret", func() {
-		ca, _ := CreateRootCA("ca-secret-name", "operator-namespace")
-		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
-		clientSet := fake.NewSimpleClientset(caSecret)
+		clientSet := fake.NewSimpleClientset()
+		generateFakeOperatorDeployment(clientSet)
+
+		ca, _ := CreateRootCA("ca-secret-name", operatorNamespaceName)
+		caSecret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
+		err := clientSet.Tracker().Add(caSecret)
+		Expect(err).To(BeNil())
 		pki := pkiEnvironmentTemplate
 
 		It("should correctly generate a pki certificate", func() {
@@ -169,9 +194,13 @@ var _ = Describe("Webhook certificate validation", func() {
 	})
 
 	When("we have a valid CA and webhook secret", func() {
-		ca, _ := CreateRootCA("ca-secret-name", "operator-namespace")
-		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
-		clientSet := fake.NewSimpleClientset(caSecret)
+		clientSet := fake.NewSimpleClientset()
+		generateFakeOperatorDeployment(clientSet)
+
+		ca, _ := CreateRootCA("ca-secret-name", operatorNamespaceName)
+		caSecret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
+		err := clientSet.Tracker().Add(caSecret)
+		Expect(err).To(BeNil())
 		pki := pkiEnvironmentTemplate
 		webhookSecret, _ := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
 
@@ -183,15 +212,23 @@ var _ = Describe("Webhook certificate validation", func() {
 	})
 
 	When("we have a valid CA secret and expired webhook secret", func() {
-		ca, _ := CreateRootCA("ca-secret-name", "operator-namespace")
-		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
+		clientSet := fake.NewSimpleClientset()
+		generateFakeOperatorDeployment(clientSet)
+
+		ca, _ := CreateRootCA("ca-secret-name", operatorNamespaceName)
+		caSecret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 
 		notAfter := time.Now().Add(-10 * time.Hour)
 		notBefore := notAfter.Add(-90 * 24 * time.Hour)
 		server, _ := ca.createAndSignPairWithValidity("this.server.com", notBefore, notAfter, CertTypeServer, nil)
-		serverSecret := server.GenerateCertificateSecret("operator-namespace", "pki-secret-name")
+		serverSecret := server.GenerateCertificateSecret(operatorNamespaceName, "pki-secret-name")
 
-		clientSet := fake.NewSimpleClientset(caSecret, serverSecret)
+		err := clientSet.Tracker().Add(caSecret)
+		Expect(err).To(BeNil())
+
+		err = clientSet.Tracker().Add(serverSecret)
+		Expect(err).To(BeNil())
+
 		pki := pkiEnvironmentTemplate
 
 		It("must renew the secret", func() {
@@ -211,10 +248,16 @@ var _ = Describe("Webhook certificate validation", func() {
 	})
 
 	It("can dump the secrets to a directory", func() {
-		ca, err := CreateRootCA("ca-secret-name", "operator-namespace")
+		clientSet := fake.NewSimpleClientset()
+		generateFakeOperatorDeployment(clientSet)
+
+		ca, err := CreateRootCA("ca-secret-name", operatorNamespaceName)
 		Expect(err).To(BeNil())
-		caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
-		clientSet := fake.NewSimpleClientset(caSecret)
+
+		caSecret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
+		err = clientSet.Tracker().Add(caSecret)
+		Expect(err).To(BeNil())
+
 		pki := pkiEnvironmentTemplate
 		webhookSecret, err := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
 		Expect(err).To(BeNil())
@@ -238,8 +281,8 @@ var _ = Describe("TLS certificates injection", func() {
 	pki := pkiEnvironmentTemplate
 
 	// Create a CA and the pki secret
-	ca, _ := CreateRootCA("ca-secret-name", "operator-namespace")
-	caSecret := ca.GenerateCASecret("operator-namespace", "ca-secret-name")
+	ca, _ := CreateRootCA("ca-secret-name", operatorNamespaceName)
+	caSecret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 	webhookPair, _ := ca.CreateAndSignPair("pki-service.operator-namespace.svc", CertTypeServer, nil)
 	webhookSecret := webhookPair.GenerateCertificateSecret(pki.OperatorNamespace, pki.SecretName)
 
@@ -292,6 +335,8 @@ var _ = Describe("Webhook environment creation", func() {
 		secondCrd := secondCrdTemplate
 
 		clientSet := fake.NewSimpleClientset(&mutatingWebhook, &validatingWebhook)
+		generateFakeOperatorDeployment(clientSet)
+
 		apiClientSet := fakeApiExtension.NewSimpleClientset(&firstCrd, &secondCrd)
 
 		err = pki.Setup(ctx, clientSet, apiClientSet)
