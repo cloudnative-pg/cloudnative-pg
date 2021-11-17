@@ -17,6 +17,7 @@ nav:
   - quickstart.md
   - bootstrap.md
   - security.md
+  - instance_manager.md
   - scheduling.md
   - resource_management.md
   - failure_modes.md
@@ -32,6 +33,7 @@ nav:
   - logging.md
   - certificates.md
   - ssl_connections.md
+  - applications.md
   - connection_pooling.md
   - kubernetes_upgrade.md
   - expose_pg_services.md

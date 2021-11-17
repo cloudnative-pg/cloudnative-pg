@@ -31,9 +31,6 @@ the code such as hard-coded credentials, integer overflows and SQL injections - 
     for the entire delivery of Cloud Native PostgreSQL, meaning that each commit is validated
     against all the linters defined by GolangCI-Lint.
 
-Source code is also regularly inspected through [Coverity Scan by Synopsys](https://scan.coverity.com/)
-via EnterpriseDB's internal CI/CD pipeline.
-
 ## Container
 
 Every container image that is part of Cloud Native PostgreSQL is automatically built via CI/CD pipelines following every commit.

@@ -7,24 +7,10 @@ PostgreSQL can face on a Kubernetes cluster during its lifetime.
     In case the failure scenario you are experiencing is not covered by this
     section, please immediately contact EnterpriseDB for support and assistance.
 
-## Liveness and readiness probes
-
-Each pod of a `Cluster` has a `postgres` container with a **liveness**
-and a **readiness**
-[probe](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes).
-
-The liveness probe relies on `pg_isready`, while the readiness probe checks if
-the database is up and able to accept connections using the superuser
-credentials. The two probes will report a failure if the probe command fails 3
-times with a 10 seconds interval between each check.
-
-For now, the operator doesn't configure a `startupProbe` on the Pods, since
-startup probes have been introduced only in Kubernetes 1.17.
-
-The liveness probe is used to detect if the PostgreSQL instance is in a
-broken state and needs to be restarted. The value in `startDelay` is used
-to delay the probe's execution, which is used to prevent an
-instance with a long startup time from being restarted.
+!!! Seealso "Postgres instance manager"
+    Please refer to the ["Postgres instance manager" section](instance_manager.md)
+    for more information the liveness and readiness probes implemented by
+    Cloud Native PostgreSQL.
 
 ## Storage space usage
 

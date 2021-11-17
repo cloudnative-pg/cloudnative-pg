@@ -162,7 +162,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	registerSignalHandler(reconciler, postgresProcess)
+	registerSignalHandler(reconciler, cluster.GetMaxStopDelay())
 
 	state, err := postgresProcess.Wait()
 	if err != nil && !state.Success() {
@@ -212,22 +212,22 @@ func startReconciler(ctx context.Context, reconciler *controller.InstanceReconci
 
 // registerSignalHandler handles signals from k8s, notifying postgres as
 // needed
-func registerSignalHandler(reconciler *controller.InstanceReconciler, postgresProcess *os.Process) {
+func registerSignalHandler(reconciler *controller.InstanceReconciler, maxStopDelay int32) {
+	// We need to shut down the postmaster in a certain time (dictated by `cluster.GetMaxStopDelay()`).
+	// For half of this time, we are waiting for connections to go down, the other half
+	// we just handle the shutdown procedure itself.
+	smartShutdownTimeout := int(maxStopDelay) / 2
+
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
+		var err error
+
 		sig := <-signals
 		log.Info("Received termination signal", "signal", sig)
 
-		log.Info("Shutting down web server")
-		err := webserver.Shutdown()
-		if err != nil {
-			log.Error(err, "Error while shutting down the web server")
-		} else {
-			log.Info("Web server shut down")
-		}
-
+		log.Info("Shutting down the metrics server")
 		err = metricsserver.Shutdown()
 		if err != nil {
 			log.Error(err, "Error while shutting down the metrics server")
@@ -238,12 +238,35 @@ func registerSignalHandler(reconciler *controller.InstanceReconciler, postgresPr
 		log.Info("Shutting down controller")
 		reconciler.Stop()
 
-		if postgresProcess != nil {
-			log.Info("Shutting down PostgreSQL instance")
-			err := postgresProcess.Signal(syscall.SIGINT)
-			if err != nil {
-				log.Error(err, "Unable to send SIGINT to PostgreSQL instance")
-			}
+		log.Info("Requesting smart shutdown of the PostgreSQL instance")
+		err = reconciler.Instance().Shutdown(postgres.ShutdownOptions{
+			Mode:    postgres.ShutdownModeSmart,
+			Wait:    true,
+			Timeout: &smartShutdownTimeout,
+		})
+		if err != nil {
+			log.Warning("Error while handling the smart shutdown request: requiring fast shutdown",
+				"err", err)
+			err = reconciler.Instance().Shutdown(postgres.ShutdownOptions{
+				Mode: postgres.ShutdownModeFast,
+				Wait: true,
+			})
+		}
+		if err != nil {
+			log.Error(err, "Error while shutting down the PostgreSQL instance")
+		} else {
+			log.Info("PostgreSQL instance shut down")
+		}
+
+		// We can't shut down the web server before shutting down PostgreSQL.
+		// PostgreSQL need it because the wal-archive process need to be able
+		// to his job doing the PostgreSQL shut down.
+		log.Info("Shutting down web server")
+		err = webserver.Shutdown()
+		if err != nil {
+			log.Error(err, "Error while shutting down the web server")
+		} else {
+			log.Info("Web server shut down")
 		}
 	}()
 }

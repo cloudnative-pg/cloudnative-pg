@@ -44,6 +44,43 @@ const (
 	pgPingNoAttempt  = 3 // connection not attempted (bad params)
 )
 
+// ShutdownMode represent a way to request the postmaster shutdown
+type ShutdownMode string
+
+const (
+	// ShutdownModeSmart waits for all active clients to disconnect and any online backup to finish.
+	// If the server is in hot standby, recovery and streaming replication will be terminated once
+	// all clients have disconnected.
+	ShutdownModeSmart = "smart"
+
+	// ShutdownModeFast does not wait for clients to disconnect and will terminate an online
+	// backup in progress
+	ShutdownModeFast = "fast"
+)
+
+// ShutdownOptions is the configuration of a shutdown request to PostgreSQL
+type ShutdownOptions struct {
+	// Mode is the method we require for the shutdown
+	Mode ShutdownMode
+
+	// Wait is true whether we want to wait for the shutdown to complete
+	Wait bool
+
+	// Timeout is the maximum number of seconds to wait for the shutdown to complete
+	// Used only if Wait is true. Defaulted by PostgreSQL to 60 seconds.
+	Timeout *int
+}
+
+// DefaultShutdownOptions are the default shutdown options. That is:
+// 1. use the "fast" mode
+// 2. wait for the operation to succeed
+// 3. without setting any explicit timeout (defaulted by PostgreSQL to 60 seconds)
+var DefaultShutdownOptions = ShutdownOptions{
+	Mode:    ShutdownModeFast,
+	Wait:    true,
+	Timeout: nil,
+}
+
 var (
 	// ErrPgRejectingConnection postgres is alive, but rejecting connections
 	ErrPgRejectingConnection = fmt.Errorf("server is alive but rejecting connections")
@@ -183,8 +220,10 @@ func (instance *Instance) ShutdownConnections() {
 }
 
 // Shutdown shuts down a PostgreSQL instance which was previously started
-// with Startup
-func (instance *Instance) Shutdown() error {
+// with Startup.
+// This function will return an error whether PostgreSQL is still up
+// after the shutdown request.
+func (instance *Instance) Shutdown(options ShutdownOptions) error {
 	instance.ShutdownConnections()
 
 	// check instance status
@@ -192,19 +231,28 @@ func (instance *Instance) Shutdown() error {
 		return fmt.Errorf("instance is not running")
 	}
 
-	options := []string{
+	pgCtlOptions := []string{
 		"-D",
 		instance.PgData,
 		"-m",
-		"fast",
-		"-w",
+		string(options.Mode),
 		"stop",
+	}
+
+	if options.Wait {
+		pgCtlOptions = append(pgCtlOptions, "-w")
+	} else {
+		pgCtlOptions = append(pgCtlOptions, "-W")
+	}
+
+	if options.Timeout != nil {
+		pgCtlOptions = append(pgCtlOptions, "-t", fmt.Sprintf("%v", *options.Timeout))
 	}
 
 	log.Info("Shutting down instance",
 		"pgdata", instance.PgData)
 
-	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
+	pgCtlCmd := exec.Command(pgCtlName, pgCtlOptions...) // #nosec
 	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
 	if err != nil {
 		return fmt.Errorf("error stopping PostgreSQL instance: %w", err)
@@ -297,7 +345,7 @@ func (instance Instance) WithActiveInstance(inner func() error) error {
 		return fmt.Errorf("while activating instance: %w", err)
 	}
 	defer func() {
-		if err := instance.Shutdown(); err != nil {
+		if err := instance.Shutdown(DefaultShutdownOptions); err != nil {
 			log.Info("Error while deactivating instance", "err", err)
 		}
 	}()
