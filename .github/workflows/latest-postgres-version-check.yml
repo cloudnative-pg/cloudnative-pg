@@ -16,12 +16,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2.3.5
 
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Generate PostgreSQL JSON files
+        run: |
+          python .github/postgres-versions-update.py
+
       - name: Get the latest version of PostgreSQL Docker image
         id: latest
+        env:
+          QUAY_REPO: quay.io/enterprisedb/postgresql
         run: |
-          DOCKER_REGISTRY="enterprisedb/postgresql"
-          QUAY_REPO="quay.io/enterprisedb/postgresql"
-          LATEST_POSTGRES_VERSION=$(curl -s -X GET "https://quay.io/api/v1/repository/${DOCKER_REGISTRY}" | jq -r '.tags[].name' | grep -v '[-[:alpha:]]' | sort -V | tail -1)
+          LATEST_POSTGRES_VERSION=$(jq -r '.[keys | max][0]' < .github/pg_versions.json)
           LATEST_POSTGRES_VERSION_IMAGE="${QUAY_REPO}:${LATEST_POSTGRES_VERSION}"
           echo "::set-output name=LATEST_POSTGRES_VERSION::$LATEST_POSTGRES_VERSION"
           echo "::set-output name=LATEST_POSTGRES_VERSION_IMAGE::$LATEST_POSTGRES_VERSION_IMAGE"
@@ -41,20 +50,35 @@ jobs:
           LATEST_POSTGRES_VERSION: ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}
           LATEST_POSTGRES_VERSION_IMAGE: ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION_IMAGE }}
         run: |
-          echo "Version mismatch; updating!"
+          echo "New PostgreSQL version detected ; updating!"
 
           # Update pkg/versions/versions.go
           sed -i '/DefaultImageName *=/s@".*"@"'"${LATEST_POSTGRES_VERSION_IMAGE}"'"@' pkg/versions/versions.go
 
           # Update docs directory (only .md and .yaml filename extensions)
           find docs -type f \( -name '*.md' -o -name '*.yaml' \) -exec sed -i "s/${CURRENT_POSTGRES_VERSION//./\\.}/${LATEST_POSTGRES_VERSION}/g" {} +
+
       - name: Create PR to update PostgreSQL version
+        if: steps.latest.outputs.LATEST_POSTGRES_VERSION_IMAGE != steps.current.outputs.CURRENT_POSTGRES_VERSION_IMAGE
         uses: gr2m/create-or-update-pull-request-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           title: "feat: update default PostgreSQL version to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
           body: "Update default PostgreSQL version from ${{ steps.current.outputs.CURRENT_POSTGRES_VERSION }} to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
-          branch: "latest-postgres-version-update"
-          author: "latest-postgres-version-check <latest-postgres-version-check@users.noreply.github.com>"
+          branch: "postgres-versions-update"
+          author: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
           commit-message: "feat: update default PostgreSQL version to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
+
+      - name: Create Pull Request if postgresql versions have been updated
+        if: steps.latest.outputs.LATEST_POSTGRES_VERSION_IMAGE == steps.current.outputs.CURRENT_POSTGRES_VERSION_IMAGE
+        uses: gr2m/create-or-update-pull-request-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          title: "test: Updated Postgres versions used in E2E tests"
+          body: "Update the Postgres versions used in E2E tests"
+          branch: "postgres-versions-update"
+          author: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
+          path: ".github/"
+          commit-message: "test: Updated Postgres versions used in E2E tests"

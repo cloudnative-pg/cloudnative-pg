@@ -16,6 +16,7 @@ AKS_VERSIONS_FILE = ".github/aks_versions.json"
 EKS_VERSIONS_FILE = ".github/eks_versions.json"
 GKE_VERSIONS_FILE = ".github/gke_versions.json"
 RKE_VERSIONS_FILE = ".github/rke_versions.json"
+PG_VERSIONS_FILE = ".github/pg_versions.json"
 
 
 class VersionList(list):
@@ -89,15 +90,10 @@ RKE_K8S = VersionList(rke_versions)
 # First entry is used as default testing version
 # Entries format:
 # MAJOR: [VERSION, PRE_ROLLING_UPDATE_VERSION],
-POSTGRES = MajorVersionList(
-    {
-        "14": ["14.0", "14.0-1"],
-        "13": ["13.4", "13.3"],
-        "12": ["12.8", "12.7"],
-        "11": ["11.13", "11.12"],
-        "10": ["10.18", "10.17"],
-    }
-)
+
+with open(PG_VERSIONS_FILE, "r") as json_file:
+    postgres_versions = json.load(json_file)
+POSTGRES = MajorVersionList(postgres_versions)
 
 
 class E2EJob(dict):
