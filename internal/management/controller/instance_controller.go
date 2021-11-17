@@ -59,6 +59,19 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 		"eventType", event.Type,
 		"type", event.Object.GetObjectKind().GroupVersionKind())
 
+	if event.Type == watch.Deleted {
+		// The cluster has been deleted.
+		// We just need to wait for this instance manager to be terminated
+		return nil
+	}
+
+	if event.Type == watch.Error {
+		// We can't decode the cluster anymore. This may happen because
+		// the cluster is being deleted while we are watching it.
+		// Nothing to do here beside waiting for another loop
+		return nil
+	}
+
 	cluster, ok := event.Object.(*apiv1.Cluster)
 	if !ok {
 		return fmt.Errorf("error decoding cluster resource")
@@ -765,7 +778,7 @@ func (r *InstanceReconciler) reconcileReplica(ctx context.Context, cluster *apiv
 	// I was the primary, but now I'm not the primary anymore.
 	// Here we need to invoke a fast shutdown on the instance, and wait the the pod
 	// restart to demote as a replica of the new primary
-	return r.instance.Shutdown()
+	return r.instance.Shutdown(postgresManagement.DefaultShutdownOptions)
 }
 
 // refreshParentServer will ensure that this replica instance is actually replicating from the correct

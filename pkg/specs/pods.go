@@ -144,20 +144,6 @@ func createPostgresContainers(
 					},
 				},
 			},
-			Lifecycle: &corev1.Lifecycle{
-				PreStop: &corev1.Handler{
-					Exec: &corev1.ExecAction{
-						Command: []string{
-							"sh",
-							"-c",
-							fmt.Sprintf(
-								"pg_ctl stop -m smart -t %v || exit 0",
-								cluster.GetMaxStopDelay(),
-							),
-						},
-					},
-				},
-			},
 			Command: []string{
 				"/controller/manager",
 				"instance",
@@ -300,6 +286,7 @@ func CreatePostgresSecurityContext(postgresUser, postgresGroup int64) *corev1.Po
 // PodWithExistingStorage create a new instance with an existing storage
 func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	gracePeriod := int64(cluster.GetMaxStopDelay())
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -319,13 +306,14 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod
 			InitContainers: []corev1.Container{
 				createBootstrapContainer(cluster),
 			},
-			Containers:         createPostgresContainers(cluster, podName),
-			Volumes:            createPostgresVolumes(cluster, podName),
-			SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
-			Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
-			Tolerations:        cluster.Spec.Affinity.Tolerations,
-			ServiceAccountName: cluster.Name,
-			NodeSelector:       cluster.Spec.Affinity.NodeSelector,
+			Containers:                    createPostgresContainers(cluster, podName),
+			Volumes:                       createPostgresVolumes(cluster, podName),
+			SecurityContext:               CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
+			Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
+			Tolerations:                   cluster.Spec.Affinity.Tolerations,
+			ServiceAccountName:            cluster.Name,
+			NodeSelector:                  cluster.Spec.Affinity.NodeSelector,
+			TerminationGracePeriodSeconds: &gracePeriod,
 		},
 	}
 

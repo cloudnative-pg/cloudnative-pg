@@ -10,9 +10,9 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
@@ -59,16 +59,49 @@ func NewInstanceReconciler(instance *postgres.Instance) (*InstanceReconciler, er
 // Run runs the reconciliation loop for this resource
 func (r *InstanceReconciler) Run(ctx context.Context) {
 	for {
-		// Retry with exponential back-off, unless it is a connection refused error
-		err := retry.OnError(retry.DefaultBackoff, func(err error) bool {
-			log.Error(err, "Error calling Watch", "cluster", r.instance.ClusterName)
-			return !utilnet.IsConnectionRefused(err)
-		}, func() error {
+		errorIsRetriable := func(err error) bool {
+			log.Warning("Error watching cluster resource",
+				"cluster", r.instance.ClusterName,
+				"err", err,
+				"reason", apierrs.ReasonForError(err))
+
+			// Better to wait a bit, probably the API server is not responsive
+			if utilnet.IsConnectionRefused(err) {
+				return false
+			}
+
+			// The cluster has been deleted, no need to retry
+			if apierrs.IsNotFound(err) {
+				return false
+			}
+
+			// We are not presenting any right credential for some reason,
+			// e.g. the service account was already deleted.
+			// Therefore, no need to retry as we would continue failing.
+			if apierrs.IsUnauthorized(err) {
+				return false
+			}
+
+			return true
+		}
+
+		// Retry with exponential back-off, unless it's a retryable error according to the definition above
+		err := retry.OnError(retry.DefaultBackoff, errorIsRetriable, func() error {
 			return r.watch(ctx)
 		})
-		if err != nil {
-			// If this is "connection refused" error, it means that apiserver is probably not responsive.
-			// If that's the case wait and resend watch request.
+
+		switch {
+		case err == nil:
+			// nothing to do here beside trying again
+
+		case apierrs.IsNotFound(err):
+			// The cluster we are watching doesn't exist anymore.
+			// There is no need to retry
+			return
+
+		default:
+			// Let's wait a bit before retrying it again
+			log.Error(err, "Waiting one second before retrying watching the cluster")
 			time.Sleep(time.Second)
 		}
 	}
@@ -88,7 +121,9 @@ func (r *InstanceReconciler) watch(ctx context.Context) error {
 		Namespace:     r.instance.Namespace,
 	})
 	if err != nil {
-		return fmt.Errorf("error watching cluster: %w", err)
+		// Make sure to not decorate the error, otherwise the caller
+		// will fail identifying the cause.
+		return err
 	}
 	defer r.Stop()
 
@@ -115,4 +150,9 @@ func (r *InstanceReconciler) Stop() {
 // GetClient returns the dynamic client that is being used for a certain reconciler
 func (r *InstanceReconciler) GetClient() ctrl.Client {
 	return r.client
+}
+
+// Instance get the PostgreSQL instance that this reconciler is working on
+func (r *InstanceReconciler) Instance() *postgres.Instance {
+	return r.instance
 }
