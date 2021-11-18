@@ -13,6 +13,8 @@ Rolling upgrades are started when:
 - a change in the PostgreSQL configuration requires a restart to be
   applied;
 
+- a change on the `Cluster` `.spec.resources` values
+
 - after the operator is updated, to ensure the Pods run the latest instance
   manager (unless [in-place updates are enabled](installation_upgrade.md#in-place-updates-of-the-instance-manager)).
 

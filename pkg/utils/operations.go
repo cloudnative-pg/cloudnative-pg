@@ -7,6 +7,8 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package utils
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	config "github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 )
 
@@ -57,6 +59,27 @@ func isMapSubset(mapSet map[string]string, mapSubset map[string]string) bool {
 	return true
 }
 
+// isResourceListSubset returns true if subResourceList is a subset of resourceList otherwise false
+func isResourceListSubset(resourceList, subResourceList corev1.ResourceList) bool {
+	if len(resourceList) < len(subResourceList) {
+		return false
+	}
+
+	if len(subResourceList) == 0 {
+		return true
+	}
+
+	for key, subValue := range subResourceList {
+		value := resourceList[key]
+
+		if value != subValue {
+			return false
+		}
+	}
+
+	return true
+}
+
 // IsLabelSubset checks if a label map is a subset of another
 func IsLabelSubset(mapSet map[string]string, mapSubset map[string]string, configuration *config.Data) bool {
 	mapToEvaluate := map[string]string{}
@@ -79,4 +102,10 @@ func IsAnnotationSubset(mapSet map[string]string, mapSubset map[string]string, c
 	}
 
 	return isMapSubset(mapSet, mapToEvaluate)
+}
+
+// IsResourceSubset checks if some resource requirements are a subset of another
+func IsResourceSubset(resources, resourcesSubset corev1.ResourceRequirements) bool {
+	return isResourceListSubset(resources.Requests, resourcesSubset.Requests) &&
+		isResourceListSubset(resources.Limits, resourcesSubset.Limits)
 }
