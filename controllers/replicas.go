@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
@@ -302,8 +303,83 @@ func (r *ClusterReconciler) getStatusFromInstances(
 	return status
 }
 
+// updateClusterAnnotationsOnPods we check if we need to add or modify existing annotations specified in the cluster but
+// not existing in the pods. We do not support the case of removed annotations from the cluster resource.
+func (r *ClusterReconciler) updateClusterAnnotationsOnPods(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pods corev1.PodList,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+
+		// if all the required annotations are already set and with the correct value,
+		// we proceed to the next item
+		if utils.IsAnnotationSubset(pod.Annotations, cluster.Annotations, configuration.Current) {
+			contextLogger.Debug(
+				"Skipping cluster annotations reconciliation, because they are already present on pod",
+				"pod", pod.Name,
+				"podAnnotations", pod.Annotations,
+				"clusterAnnotations", cluster.Annotations,
+			)
+			continue
+		}
+
+		// otherwise, we add the modified/new annotations to the pod
+		patch := client.MergeFrom(pod.DeepCopy())
+		utils.InheritAnnotations(&pod.ObjectMeta, cluster.Annotations, configuration.Current)
+
+		contextLogger.Info("Updating cluster annotations on pod", "pod", pod.Name)
+		if err := r.Patch(ctx, pod, patch); err != nil {
+			return err
+		}
+		continue
+	}
+
+	return nil
+}
+
+// updateClusterAnnotationsOnPods we check if we need to add or modify existing labels specified in the cluster but
+// not existing in the pods. We do not support the case of removed labels from the cluster resource.
+func (r *ClusterReconciler) updateClusterLabelsOnPods(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pods corev1.PodList,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+
+		// if all the required labels are already set and with the correct value,
+		// we proceed to the next item
+		if utils.IsLabelSubset(pod.Labels, cluster.Labels, configuration.Current) {
+			contextLogger.Debug(
+				"Skipping cluster label reconciliation, because they are already present on pod",
+				"pod", pod.Name,
+				"podLabels", pod.Labels,
+				"clusterLabels", cluster.Labels,
+			)
+			continue
+		}
+
+		// otherwise, we add the modified/new labels to the pod
+		patch := client.MergeFrom(pod.DeepCopy())
+		utils.InheritLabels(&pod.ObjectMeta, cluster.Labels, configuration.Current)
+
+		contextLogger.Info("Updating cluster labels on pod", "pod", pod.Name)
+		if err := r.Patch(ctx, pod, patch); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Make sure that only the currentPrimary has the label forward write traffic to him
-func (r *ClusterReconciler) updateLabelsOnPods(
+func (r *ClusterReconciler) updateRoleLabelsOnPods(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	pods corev1.PodList,

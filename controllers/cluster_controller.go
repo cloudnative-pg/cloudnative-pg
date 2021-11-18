@@ -207,8 +207,18 @@ func (r *ClusterReconciler) reconcileResources(
 	contextLogger, ctx := log.SetupLogger(ctx)
 
 	// Update the labels for the -rw service to work correctly
-	if err := r.updateLabelsOnPods(ctx, cluster, resources.pods); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot update labels on pods: %w", err)
+	if err := r.updateRoleLabelsOnPods(ctx, cluster, resources.pods); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pods: %w", err)
+	}
+
+	// Update any modified/new labels coming from the cluster resource
+	if err := r.updateClusterLabelsOnPods(ctx, cluster, resources.pods); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pods: %w", err)
+	}
+
+	// Update any modified/new annotations coming from the cluster resource
+	if err := r.updateClusterAnnotationsOnPods(ctx, cluster, resources.pods); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pods: %w", err)
 	}
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted

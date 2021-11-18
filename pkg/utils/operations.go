@@ -6,6 +6,10 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 
 package utils
 
+import (
+	config "github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+)
+
 // CollectDifferencesFromMaps returns a map of the differences (as slice of strings) of the values of two given maps.
 // Map result values are added when a key is present just in one of the input maps, or if the values are different
 // given the same key
@@ -30,4 +34,49 @@ func CollectDifferencesFromMaps(p1 map[string]string, p2 map[string]string) map[
 		return diff
 	}
 	return nil
+}
+
+// isMapSubset returns true if mapSubset is a subset of mapSet otherwise false
+func isMapSubset(mapSet map[string]string, mapSubset map[string]string) bool {
+	if len(mapSet) < len(mapSubset) {
+		return false
+	}
+
+	if len(mapSubset) == 0 {
+		return true
+	}
+
+	for subMapKey, subMapValue := range mapSubset {
+		mapValue := mapSet[subMapKey]
+
+		if mapValue != subMapValue {
+			return false
+		}
+	}
+
+	return true
+}
+
+// IsLabelSubset checks if a label map is a subset of another
+func IsLabelSubset(mapSet map[string]string, mapSubset map[string]string, configuration *config.Data) bool {
+	mapToEvaluate := map[string]string{}
+	for key, value := range mapSubset {
+		if configuration.IsLabelInherited(key) {
+			mapToEvaluate[key] = value
+		}
+	}
+
+	return isMapSubset(mapSet, mapToEvaluate)
+}
+
+// IsAnnotationSubset checks if an annotation map is a subset of another
+func IsAnnotationSubset(mapSet map[string]string, mapSubset map[string]string, configuration *config.Data) bool {
+	mapToEvaluate := map[string]string{}
+	for key, value := range mapSubset {
+		if configuration.IsAnnotationInherited(key) {
+			mapToEvaluate[key] = value
+		}
+	}
+
+	return isMapSubset(mapSet, mapToEvaluate)
 }

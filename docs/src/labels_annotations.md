@@ -73,8 +73,7 @@ kubectl get pods --show-labels
 
 ## Current limitations
 
-Cloud Native PostgreSQL does not currently support synchronization of labels
-or annotations after a resource has been created. For example, suppose you
-deploy a cluster. When you add a new annotation to be inherited and define it
-in the existing cluster, the operator will not automatically set it
-on the associated resources.
+Currently, Cloud Native PostgreSQL does not automatically propagate labels or
+annotations deletions. Therefore, when an annotation or label is removed from
+a Cluster, which was previously propagated to the underlying pods, the operator
+will not automatically remove it on the associated resources.
