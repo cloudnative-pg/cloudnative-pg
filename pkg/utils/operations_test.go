@@ -7,6 +7,8 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package utils
 
 import (
+	config "github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -29,5 +31,46 @@ var _ = Describe("Difference of values of maps", func() {
 		p2["a"] = "apple"
 		res := CollectDifferencesFromMaps(p1, p2)
 		Expect(len(res)).To(BeEquivalentTo(2))
+	})
+})
+
+var _ = Describe("Testing Annotations and labels subset", func() {
+	const environment = "environment"
+	const department = "finance"
+	subSet := map[string]string{
+		environment: "test",
+		department:  "finance",
+	}
+	set := map[string]string{
+		environment:   "test",
+		"application": "game-history",
+	}
+
+	It("should make sure that a contained annotations subset is recognized", func() {
+		isSubset := IsAnnotationSubset(set, subSet, &config.Data{
+			InheritedAnnotations: []string{environment},
+		})
+		Expect(isSubset).To(BeTrue())
+	})
+
+	It("should make sure that a annotations non-subset is recognized", func() {
+		isSubset := IsAnnotationSubset(set, subSet, &config.Data{
+			InheritedAnnotations: []string{environment, department},
+		})
+		Expect(isSubset).To(BeFalse())
+	})
+
+	It("should make sure that a contained labels subset is recognized", func() {
+		isSubset := IsLabelSubset(set, subSet, &config.Data{
+			InheritedLabels: []string{environment},
+		})
+		Expect(isSubset).To(BeTrue())
+	})
+
+	It("should make sure that a labels non-subset is recognized", func() {
+		isSubset := IsLabelSubset(set, subSet, &config.Data{
+			InheritedLabels: []string{environment, department},
+		})
+		Expect(isSubset).To(BeFalse())
 	})
 })
