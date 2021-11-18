@@ -20,4 +20,7 @@ const (
 
 	// LabelNoOpenshift is the string for labelling tests that don't run on Openshift
 	LabelNoOpenshift = "no-openshift"
+
+	// LabelIgnoreFails is the string for labelling tests that should not be considered when failing.
+	LabelIgnoreFails = "ignore-fails"
 )

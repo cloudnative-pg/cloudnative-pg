@@ -21,6 +21,7 @@
 
 # Testing artifacts and logs
 _*/
+tests/e2e/out/
 
 # goreleaser
 /dist/
