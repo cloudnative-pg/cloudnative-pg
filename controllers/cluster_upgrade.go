@@ -25,6 +25,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 func (r *ClusterReconciler) rolloutDueToCondition(
@@ -111,8 +112,20 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 	return true, r.upgradePod(ctx, cluster, &primaryPostgresqlStatus.Pod)
 }
 
-// IsPodNeedingRollout checks whether a given postgres instance has to be rolled out for any reason,
-// returning if it does need to and a human-readable string explaining the reason for it
+// IsPodNeedingRollout checks if a given cluster instance needs a rollout by comparing its actual state
+// with its expected state defined inside the cluster struct.
+//
+// Arguments:
+//
+// - The status of a postgres cluster instance.
+//
+// - The cluster struct containing the desired state.
+//
+// Returns:
+//
+// - a boolean indicating if a rollout is needed.
+//
+// - a string indicating the reason of the rollout.
 func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluster) (bool, string) {
 	if !status.IsReady {
 		return false, ""
@@ -120,8 +133,8 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 
 	// check if the pod is reporting his instance manager version
 	if status.ExecutableHash == "" {
-		// this is an old instance manager and we need to replace it with one supporting
-		// the online operator upgrade feature
+		// This is an old instance manager.
+		// We need to replace it with one supporting the online operator upgrade feature
 		return true, ""
 	}
 
@@ -146,6 +159,21 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 		if newImage != "" {
 			return true, fmt.Sprintf("the instance is using an old init container image: %s -> %s",
 				oldImage, newImage)
+		}
+	}
+
+	// Detect changes in the postgres container configuration
+	for _, container := range status.Pod.Spec.Containers {
+		// we go to the next array element if it isn't the postgres container
+		if container.Name != specs.PostgresContainerName {
+			continue
+		}
+
+		// Check if there is a change in the resource requirements
+		if !utils.IsResourceSubset(container.Resources, cluster.Spec.Resources) {
+			return true, fmt.Sprintf("resources changed, old: %+v, new: %+v",
+				cluster.Spec.Resources,
+				container.Resources)
 		}
 	}
 
