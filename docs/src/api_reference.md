@@ -446,11 +446,11 @@ Name | Description           | Type
 
 MonitoringConfiguration is the type containing all the monitoring configuration for a certain cluster
 
-Name                   | Description                                                     | Type                                           
----------------------- | --------------------------------------------------------------- | -----------------------------------------------
-`disableDefaultQueries ` | Whether the default queries should be injected. Default: false. | *bool                                          
-`customQueriesConfigMap` | The list of config maps containing the custom queries           | [[]ConfigMapKeySelector](#ConfigMapKeySelector)
-`customQueriesSecret   ` | The list of secrets containing the custom queries               | [[]SecretKeySelector](#SecretKeySelector)      
+Name                   | Description                                                                                                                                    | Type                                           
+---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------------------------
+`disableDefaultQueries ` | Whether the default queries should be injected. Set it to `true` if you don't want to inject default queries into the cluster. Default: false. | *bool                                          
+`customQueriesConfigMap` | The list of config maps containing the custom queries                                                                                          | [[]ConfigMapKeySelector](#ConfigMapKeySelector)
+`customQueriesSecret   ` | The list of secrets containing the custom queries                                                                                              | [[]SecretKeySelector](#SecretKeySelector)      
 
 <a id='NodeMaintenanceWindow'></a>
 

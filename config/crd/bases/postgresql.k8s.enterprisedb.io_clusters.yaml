@@ -1542,7 +1542,8 @@ spec:
                     type: array
                   disableDefaultQueries:
                     description: 'Whether the default queries should be injected.
-                      Default: false.'
+                      Set it to `true` if you don''t want to inject default queries
+                      into the cluster. Default: false.'
                     type: boolean
                 type: object
               nodeMaintenanceWindow:
