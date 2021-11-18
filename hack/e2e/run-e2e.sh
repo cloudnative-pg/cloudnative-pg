@@ -91,7 +91,13 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
   mkdir -p "${ROOT_DIR}/tests/e2e/out"
   # Unset DEBUG to prevent k8s from spamming messages
   unset DEBUG
-  ginkgo --nodes=1 --slow-spec-threshold=5m --label-filter "upgrade" -v "${ROOT_DIR}/tests/e2e/..." || RC=$?
+  ginkgo --nodes=1 --slow-spec-threshold=5m --label-filter "upgrade" --output-dir "${ROOT_DIR}/tests/e2e/out/" --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || true
+
+  # Report if there are any tests that failed and did NOT have an "ignore-fails" label
+  jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
+  # We make sure that the report.json is deleted after the analysis.
+  # We don't check file existence to make sure the process fails in case of some weird script behavior
+  rm "${ROOT_DIR}/tests/e2e/out/report.json"
 fi
 
 CONTROLLER_IMG="${CONTROLLER_IMG}" \
@@ -111,5 +117,12 @@ export PATH=${ROOT_DIR}/bin/:${PATH}
 mkdir -p "${ROOT_DIR}/tests/e2e/out"
 # Create at most 4 testing nodes. Using -p instead of --nodes
 # would create CPUs-1 nodes and saturate the testing server
-ginkgo --nodes=4 --timeout 2h --slow-spec-threshold 5m --label-filter "!(upgrade)" -v "${ROOT_DIR}/tests/e2e/..." || RC=$?
+ginkgo --nodes=4 --timeout 2h --slow-spec-threshold 5m --label-filter "!(upgrade)" --output-dir "${ROOT_DIR}/tests/e2e/out/" --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || true
+
+# Report if there are any tests that failed and did NOT have an "ignore-fails" label
+jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
+# We make sure that the report.json is deleted after the analysis
+# We don't check file existence to make sure the process fails in case of some weird script behavior
+rm "${ROOT_DIR}/tests/e2e/out/report.json"
+
 exit $RC
