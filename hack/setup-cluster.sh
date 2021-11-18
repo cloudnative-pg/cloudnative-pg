@@ -430,7 +430,7 @@ deploy() {
 
 print_image() {
   local tag=devel
-  if [ -n "${ENABLE_REGISTRY:-}" ]; then
+  if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_${ENGINE}"; then
     tag=latest
   fi
   echo "${registry_name}:5000/cloud-native-postgresql:${tag}"
