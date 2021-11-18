@@ -15,8 +15,6 @@ spec:
         env:
           - name: POD_DEBUG
             value: "1"
-#          - name: MONITORING_QUERIES_CONFIGMAP
-#            value: $(DEFAULT_MONITORING_CONFIGMAP)
         args:
         - controller
         - --enable-leader-election

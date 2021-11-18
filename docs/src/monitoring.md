@@ -504,6 +504,36 @@ cnp_pg_replication_streaming_replicas 2
 cnp_pg_replication_is_wal_receiver_up 0
 ```
 
+### Default set of metrics
+
+The operator can be configured to automatically inject in a Cluster a set of 
+monitoring queries defined in a ConfigMap inside the operator's namespace.
+To do so, you have to set the `MONITORING_QUERIES_CONFIGMAP` key in the
+["operator configuration"](operator_conf.md) to the name of the ConfigMap;
+the operator will then use the content of the `queries` key.
+
+Any change to the ConfigMap will be immediately reflected on all the
+deployed Clusters using it.
+
+The operator installation manifests come with a predefined ConfigMap,
+called `default-monitoring`, to be used by all Clusters.
+`MONITORING_QUERIES_CONFIGMAP` is by default set to `defaut-monitoring` in the
+operator configuration.
+
+In case you don't want to use the default set of metrics, you have two options:
+- disable it at operator level: delete the environment variable
+  `MONITORING_QUERIES_CONFIGMAP` in the operator's deployment or override it
+  through the operator's configuration ConfigMap by setting
+  `MONITORING_QUERIES_CONFIGMAP` to `""` (empty string).
+- disable it for a specific Cluster: set
+  `.spec.monitoring.disableDefaultQueries` to `true` in the Cluster.
+
+Changing the `MONITORING_QUERIES_CONFIGMAP` parameter requires an
+[operator reload](operator_conf.md#restarting-the-operator-to-reload-configs).
+After a parameter change, older default ConfigMaps are not removed.
+Existing clusters will add the new default ConfigMap to the existing set of
+ConfigMaps. Older default ConfigMaps are not automatically removed.
+
 ### Differences with the Prometheus Postgres exporter
 
 Cloud Native PostgreSQL is inspired by the PostgreSQL Prometheus Exporter, but
