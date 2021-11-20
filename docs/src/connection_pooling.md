@@ -39,7 +39,7 @@ spec:
   pgbouncer:
     poolMode: session
     parameters:
-      max_client_connections: "1000"
+      max_client_conn: "1000"
       default_pool_size: "10"
 ```
 
