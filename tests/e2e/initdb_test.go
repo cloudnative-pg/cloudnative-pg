@@ -66,6 +66,25 @@ var _ = Describe("InitDB settings", func() {
 					cmd))
 				Expect(err).ToNot(HaveOccurred())
 			})
+			By("querying the App database tables via psql", func() {
+				cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM application_numbers'"
+				_, _, err := tests.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primaryDst,
+					cmd))
+				Expect(err).ToNot(HaveOccurred())
+			})
+			By("querying the database to ensure the installed extension is there", func() {
+				cmd := `psql -U postgres postgres -tAc "SELECT count(*) FROM pg_available_extensions WHERE name LIKE 'intarray'"`
+				stdout, _, err := tests.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primaryDst,
+					cmd))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(stdout, err).To(Equal("1\n"))
+			})
 			By("checking inside the database the default locale", func() {
 				cmd := "psql -U postgres postgres -tAc \"select datcollate from pg_database where datname='template0'\""
 				stdout, _, err := tests.Run(fmt.Sprintf(

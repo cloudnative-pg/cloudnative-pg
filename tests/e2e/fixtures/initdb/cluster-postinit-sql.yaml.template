@@ -26,6 +26,11 @@ spec:
       postInitSQL:
         - create table numbers (i integer)
         - insert into numbers (select generate_series(1,10000))
+      postInitTemplateSQL:
+        - create extension intarray
+      postInitApplicationSQL:
+        - create table application_numbers (i integer)
+        - insert into application_numbers (select generate_series(1,10000))
 
   # Persistent storage configuration
   storage:

@@ -28,6 +28,7 @@ func NewCmd() *cobra.Command {
 	var pgData string
 	var podName string
 	var postInitSQLStr string
+	var postInitApplicationSQLStr string
 	var postInitTemplateSQLStr string
 
 	cmd := &cobra.Command{
@@ -45,6 +46,12 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
+			postInitApplicationSQL, err := shellquote.Split(postInitApplicationSQLStr)
+			if err != nil {
+				log.Error(err, "Error while parsing post init template SQL queries")
+				return err
+			}
+
 			postInitTemplateSQL, err := shellquote.Split(postInitTemplateSQLStr)
 			if err != nil {
 				log.Error(err, "Error while parsing post init template SQL queries")
@@ -52,16 +59,17 @@ func NewCmd() *cobra.Command {
 			}
 
 			info := postgres.InitInfo{
-				ApplicationDatabase: appDBName,
-				ApplicationUser:     appUser,
-				ClusterName:         clusterName,
-				InitDBOptions:       initDBFlags,
-				Namespace:           namespace,
-				ParentNode:          parentNode,
-				PgData:              pgData,
-				PodName:             podName,
-				PostInitSQL:         postInitSQL,
-				PostInitTemplateSQL: postInitTemplateSQL,
+				ApplicationDatabase:    appDBName,
+				ApplicationUser:        appUser,
+				ClusterName:            clusterName,
+				InitDBOptions:          initDBFlags,
+				Namespace:              namespace,
+				ParentNode:             parentNode,
+				PgData:                 pgData,
+				PodName:                podName,
+				PostInitSQL:            postInitSQL,
+				PostInitApplicationSQL: postInitApplicationSQL,
+				PostInitTemplateSQL:    postInitTemplateSQL,
 			}
 
 			return initSubCommand(info)
@@ -84,6 +92,8 @@ func NewCmd() *cobra.Command {
 		"be checked against the cluster state")
 	cmd.Flags().StringVar(&postInitSQLStr, "post-init-sql", "", "The list of SQL queries to be "+
 		"executed to configure the new instance")
+	cmd.Flags().StringVar(&postInitApplicationSQLStr, "post-init-application-sql", "", "The list of SQL queries to be "+
+		"executed inside application database right after the database is created")
 	cmd.Flags().StringVar(&postInitTemplateSQLStr, "post-init-template-sql", "", "The list of SQL queries to be "+
 		"executed inside template1 database to configure the new instance")
 
