@@ -84,3 +84,23 @@ var _ = Describe("Barman endpoint CA", func() {
 			BeEquivalentTo("test_key_endpoint"))
 	})
 })
+
+var _ = Describe("Job created via InitDB", func() {
+	It("contain cluster post-init SQL instructions", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						PostInitSQL:            []string{"testPostInitSql"},
+						PostInitTemplateSQL:    []string{"testPostInitTemplateSql"},
+						PostInitApplicationSQL: []string{"testPostInitApplicationSql"},
+					},
+				},
+			},
+		}
+		job := CreatePrimaryJobViaInitdb(cluster, 0)
+		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitSql"))
+		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitTemplateSql"))
+		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitApplicationSql"))
+	})
+})

@@ -10,6 +10,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
+	"database/sql"
 	"fmt"
 	"os/exec"
 	"path"
@@ -52,6 +53,10 @@ type InitInfo struct {
 	// The list of queries to be executed just after having
 	// configured a new instance
 	PostInitSQL []string
+
+	// The list of queries to be executed just after having
+	// the application database created
+	PostInitApplicationSQL []string
 
 	// The list of queries to be executed inside the template1
 	// database just after having configured a new instance
@@ -176,33 +181,51 @@ func (info InitInfo) ConfigureNewInstance(instance Instance) error {
 
 	// Execute the custom set of init queries
 	log.Info("Executing post-init SQL instructions")
-	for _, sqlQuery := range info.PostInitSQL {
-		_, err = dbSuperUser.Exec(sqlQuery)
-		if err != nil {
-			return err
-		}
+	if err = info.executeQueries(dbSuperUser, info.PostInitSQL); err != nil {
+		return err
 	}
 
-	if len(info.PostInitTemplateSQL) != 0 {
-		dbTemplate, err := instance.GetTemplateDB()
-		if err != nil {
-			return fmt.Errorf("while getting template database: %w", err)
-		}
-		// Execute the custom set of init queries
-		log.Info("Executing post-init template SQL instructions")
-		for _, sqlQuery := range info.PostInitTemplateSQL {
-			log.Debug("Executing post-init template query", "sqlQuery", sqlQuery)
-			_, err = dbTemplate.Exec(sqlQuery)
-			if err != nil {
-				return err
-			}
-		}
+	dbTemplate, err := instance.GetTemplateDB()
+	if err != nil {
+		return fmt.Errorf("while getting template database: %w", err)
+	}
+	// Execute the custom set of init queries of the template
+	log.Info("Executing post-init template SQL instructions")
+	if err = info.executeQueries(dbTemplate, info.PostInitTemplateSQL); err != nil {
+		return fmt.Errorf("could not execute init Template queries: %w", err)
 	}
 
 	if info.ApplicationDatabase != "" {
 		_, err = dbSuperUser.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
 			pq.QuoteIdentifier(info.ApplicationDatabase),
 			pq.QuoteIdentifier(info.ApplicationUser)))
+		if err != nil {
+			return fmt.Errorf("could not create ApplicationDatabase: %w", err)
+		}
+		appDB, err := instance.ConnectionPool().Connection(info.ApplicationDatabase)
+		if err != nil {
+			return fmt.Errorf("could not get connection to ApplicationDatabase: %w", err)
+		}
+		// Execute the custom set of init queries of the application database
+		log.Info("Executing Application instructions")
+		if err = info.executeQueries(appDB, info.PostInitApplicationSQL); err != nil {
+			return fmt.Errorf("could not execute init Application queries: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// executeQueries run the set of queries in the provided database connection
+func (info InitInfo) executeQueries(sqlUser *sql.DB, queries []string) error {
+	if len(queries) == 0 {
+		log.Debug("No queries to execute")
+		return nil
+	}
+
+	for _, sqlQuery := range queries {
+		log.Debug("Executing query", "sqlQuery", sqlQuery)
+		_, err := sqlUser.Exec(sqlQuery)
 		if err != nil {
 			return err
 		}

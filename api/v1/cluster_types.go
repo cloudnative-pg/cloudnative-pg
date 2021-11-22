@@ -546,6 +546,11 @@ type BootstrapInitDB struct {
 	// (by default empty)
 	PostInitSQL []string `json:"postInitSQL,omitempty"`
 
+	// List of SQL queries to be executed as a superuser in the application
+	// database right after is created - to be used with extreme care
+	// (by default empty)
+	PostInitApplicationSQL []string `json:"postInitApplicationSQL,omitempty"`
+
 	// List of SQL queries to be executed as a superuser in the `template1`
 	// after the cluster has been created - to be used with extreme care
 	// (by default empty)
