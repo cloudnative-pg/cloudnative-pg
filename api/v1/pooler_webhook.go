@@ -163,12 +163,12 @@ func (r *Pooler) Validate() (allErrs field.ErrorList) {
 func (r *Pooler) validatePgbouncerGenericParameters() field.ErrorList {
 	var result field.ErrorList
 
-	for param, value := range r.Spec.PgBouncer.Parameters {
+	for param := range r.Spec.PgBouncer.Parameters {
 		if !AllowedPgbouncerGenericConfigurationParameters.Has(param) {
 			result = append(result,
 				field.Invalid(
-					field.NewPath("spec", "cluster", "parameters", param),
-					value, "This parameter is reserved"))
+					field.NewPath("spec", "cluster", "parameters"),
+					param, "Invalid or reserved parameter"))
 		}
 	}
 	return result
