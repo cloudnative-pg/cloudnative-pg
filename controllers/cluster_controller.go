@@ -37,10 +37,11 @@ import (
 )
 
 const (
-	podOwnerKey      = ".metadata.controller"
-	pvcOwnerKey      = ".metadata.controller"
-	jobOwnerKey      = ".metadata.controller"
-	poolerClusterKey = ".spec.cluster.name"
+	podOwnerKey                   = ".metadata.controller"
+	pvcOwnerKey                   = ".metadata.controller"
+	jobOwnerKey                   = ".metadata.controller"
+	poolerClusterKey              = ".spec.cluster.name"
+	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
 )
 
 var apiGVString = apiv1.GroupVersion.String()
@@ -504,6 +505,24 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		return err
 	}
 
+	// Create a new indexed field on Clusters. This field will be used to easily
+	// find all Clusters with default queries enabled
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Cluster{},
+		disableDefaultQueriesSpecPath, func(rawObj client.Object) []string {
+			cluster := rawObj.(*apiv1.Cluster)
+
+			if cluster.Spec.Monitoring == nil ||
+				cluster.Spec.Monitoring.DisableDefaultQueries == nil ||
+				!*cluster.Spec.Monitoring.DisableDefaultQueries {
+				return []string{"false"}
+			}
+			return []string{"true"}
+		}); err != nil {
+		return err
+	}
+
 	// Create a new indexed field on Pods. This field will be used to easily
 	// find all the Pods created by node
 	if err := mgr.GetFieldIndexer().IndexField(
@@ -635,19 +654,42 @@ func (r *ClusterReconciler) mapConfigMapsToClusters(ctx context.Context) handler
 			return nil
 		}
 		var clusters apiv1.ClusterList
-		// get all the clusters handled by the operator in the configmap namespaces
-		err := r.List(ctx, &clusters,
-			client.InNamespace(config.Namespace),
-		)
+		var err error
+		const shouldFetchDefaultConfigMap = "false"
+
+		if configuration.Current.MonitoringQueriesConfigmap != "" &&
+			config.Namespace == configuration.Current.OperatorNamespace &&
+			config.Name == configuration.Current.MonitoringQueriesConfigmap {
+			// The events in MonitoringQueriesConfigmap impacts all the clusters.
+			// We proceed to fetch all the clusters and create a reconciliation request for them
+			// This works as long the replicated MonitoringQueriesConfigmap in the different namespaces
+			// have the same name.
+			//
+			// See cluster.UsesConfigMap method
+			err = r.List(
+				ctx,
+				&clusters,
+				client.MatchingFields{disableDefaultQueriesSpecPath: shouldFetchDefaultConfigMap},
+			)
+		} else {
+			// This is a configmap that affects only a given namespace, so we fetch only the clusters residing in there.
+			err = r.List(
+				ctx,
+				&clusters,
+				client.InNamespace(config.Namespace),
+			)
+		}
 		if err != nil {
 			log.FromContext(ctx).Error(err, "while getting cluster list", "namespace", config.Namespace)
 			return nil
 		}
-		// build requests for cluster referring the configmap
+		// build requests for clusters that refer the configmap
 		return filterClustersUsingConfigMap(clusters, config)
 	}
 }
 
+// filterClustersUsingConfigMap returns a list of reconcile.Request for the clusters
+// that reference the secret
 func filterClustersUsingSecret(
 	clusters apiv1.ClusterList,
 	secret *corev1.Secret,
@@ -668,6 +710,8 @@ func filterClustersUsingSecret(
 	return requests
 }
 
+// filterClustersUsingConfigMap returns a list of reconcile.Request for the clusters
+// that reference the configMap
 func filterClustersUsingConfigMap(
 	clusters apiv1.ClusterList,
 	config *corev1.ConfigMap,
