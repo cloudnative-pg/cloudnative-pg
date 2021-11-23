@@ -323,7 +323,6 @@ func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
 	// exposing timestamps using the relative Unix timestamp
 	// number. See:
 	// https://prometheus.io/docs/practices/instrumentation/#timestamps-not-time-since
-	log.Info("pippo", "times", parsedTS.Unix())
 	e.Metrics.FirstRecoverabilityPoint.Set(float64(parsedTS.Unix()))
 }
 
