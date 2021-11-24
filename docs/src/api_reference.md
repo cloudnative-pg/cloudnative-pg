@@ -592,9 +592,10 @@ Name      | Description                                                         
 
 PoolerStatus defines the observed state of Pooler
 
-Name    | Description                               | Type                            
-------- | ----------------------------------------- | --------------------------------
-`secrets` | The resource version of the config object | [*PoolerSecrets](#PoolerSecrets)
+Name      | Description                               | Type                            
+--------- | ----------------------------------------- | --------------------------------
+`secrets  ` | The resource version of the config object | [*PoolerSecrets](#PoolerSecrets)
+`instances` | The number of pods trying to be scheduled | int32                           
 
 <a id='PostgresConfiguration'></a>
 
