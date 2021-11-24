@@ -96,6 +96,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if apierrs.IsNotFound(err) {
 			contextLogger.Info("Resource has been deleted")
 
+			if err := r.deleteDanglingMonitoringConfigMaps(ctx, req.Namespace); err != nil && !apierrs.IsNotFound(err) {
+				contextLogger.Error(
+					err,
+					"error while deleting dangling monitoring configMap",
+					"configMapName", configuration.Current.MonitoringQueriesConfigmap,
+					"namespace", req.Namespace,
+				)
+			}
+
 			return ctrl.Result{}, nil
 		}
 
