@@ -51,6 +51,10 @@ func (r *PoolerReconciler) updatePoolerStatus(
 		}
 	}
 
+	if resources.Deployment != nil {
+		updatedStatus.Instances = resources.Deployment.Status.Replicas
+	}
+
 	// then update the status if anything changed
 	if !reflect.DeepEqual(pooler.Status, updatedStatus) {
 		pooler.Status = *updatedStatus

@@ -6937,6 +6937,10 @@ spec:
           status:
             description: PoolerStatus defines the observed state of Pooler
             properties:
+              instances:
+                description: The number of pods trying to be scheduled
+                format: int32
+                type: integer
               secrets:
                 description: The resource version of the config object
                 properties:

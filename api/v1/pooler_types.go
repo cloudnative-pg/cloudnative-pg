@@ -139,6 +139,8 @@ func (in PgBouncerSpec) IsPaused() bool {
 type PoolerStatus struct {
 	// The resource version of the config object
 	Secrets *PoolerSecrets `json:"secrets,omitempty"`
+	// The number of pods trying to be scheduled
+	Instances int32 `json:"instances,omitempty"`
 }
 
 // PoolerSecrets contains the versions of all the secrets used
