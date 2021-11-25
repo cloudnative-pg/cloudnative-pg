@@ -26,6 +26,11 @@ func (r *ClusterReconciler) deleteDanglingMonitoringConfigMaps(ctx context.Conte
 		return nil
 	}
 
+	// we avoid deleting the operator configmap.
+	if namespace == configuration.Current.OperatorNamespace {
+		return nil
+	}
+
 	clustersUsingConfigMap := apiv1.ClusterList{}
 	err := r.List(
 		ctx,
