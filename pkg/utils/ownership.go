@@ -8,6 +8,9 @@ package utils
 
 import (
 	"context"
+	"fmt"
+
+	v1 "k8s.io/api/apps/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -37,22 +40,49 @@ func SetAsOwnedByOperatorDeployment(ctx context.Context,
 	client kubernetes.Interface,
 	controlled *metav1.ObjectMeta,
 ) error {
-	const operatorDepName = "postgresql-operator-controller-manager"
-	// This is the easiest way to get the typeMeta.
-	// If you instantiate an empty v1.Deployment struct it does NOT contain the typeMeta information.
-	typeMeta := metav1.TypeMeta{
-		Kind:       "Deployment",
-		APIVersion: "apps/v1",
-	}
-
-	getOptions := metav1.GetOptions{TypeMeta: typeMeta}
-	dep, err := client.AppsV1().Deployments(controlled.Namespace).Get(ctx, operatorDepName, getOptions)
+	deployment, err := GetOperatorDeployment(ctx, client, controlled.Namespace)
 	if err != nil {
 		return err
 	}
 
-	// The deployment typeMeta is empty (kubernetes bug), so we pass the one we already populated.
-	SetAsOwnedBy(controlled, dep.ObjectMeta, typeMeta)
+	// The deployment typeMeta is empty (kubernetes bug), so we need to explicitly populate it.
+	typeMeta := metav1.TypeMeta{
+		Kind:       "Deployment",
+		APIVersion: "apps/v1",
+	}
+	SetAsOwnedBy(controlled, deployment.ObjectMeta, typeMeta)
 
 	return nil
+}
+
+// GetOperatorDeployment find the operator deployment using labels
+// and then return the deployment object, in case we can't find a deployment
+// or we find more than one, we just return an error.
+func GetOperatorDeployment(ctx context.Context, client kubernetes.Interface, namespace string) (*v1.Deployment, error) {
+	deploymentList, err := client.AppsV1().Deployments(namespace).List(
+		ctx, metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=cloud-native-postgresql"})
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case len(deploymentList.Items) == 1:
+		return &deploymentList.Items[0], nil
+	case len(deploymentList.Items) > 1:
+		return nil, fmt.Errorf("more than one operator deployment running")
+	}
+
+	deploymentList, err = client.AppsV1().Deployments(namespace).List(
+		ctx, metav1.ListOptions{LabelSelector: "operators.coreos.com/cloud-native-postgresql.openshift-operators="})
+	if err != nil {
+		return nil, err
+	}
+
+	switch {
+	case len(deploymentList.Items) == 0:
+		return nil, fmt.Errorf("no deployment detected")
+	case len(deploymentList.Items) > 1:
+		return nil, fmt.Errorf("more than one operator deployment running")
+	}
+
+	return &deploymentList.Items[0], nil
 }

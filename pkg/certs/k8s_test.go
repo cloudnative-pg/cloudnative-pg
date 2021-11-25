@@ -103,6 +103,9 @@ func generateFakeOperatorDeployment(clientSet *fake.Clientset) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      operatorDeploymentName,
 			Namespace: operatorNamespaceName,
+			Labels: map[string]string{
+				"app.kubernetes.io/name": "cloud-native-postgresql",
+			},
 		},
 		Spec: appsv1.DeploymentSpec{},
 	}
