@@ -456,7 +456,8 @@ func (r *ClusterReconciler) handleRollingUpdate(ctx context.Context, cluster *ap
 	}
 
 	// Cleanup stuff
-	return ctrl.Result{}, r.cleanupCluster(ctx, cluster, resources.jobs)
+	r.cleanupCluster(ctx, resources.jobs)
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager creates a ClusterReconciler

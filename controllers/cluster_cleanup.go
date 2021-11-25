@@ -10,12 +10,9 @@ import (
 	"context"
 
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -23,13 +20,12 @@ import (
 // cleanupCluster remove all the Jobs which are completed
 func (r *ClusterReconciler) cleanupCluster(
 	ctx context.Context,
-	cluster *apiv1.Cluster,
-	jobs batchv1.JobList) error {
+	jobs batchv1.JobList) {
 	contextLogger := log.FromContext(ctx)
 
 	completeJobs := utils.FilterCompleteJobs(jobs.Items)
 	if len(completeJobs) == 0 {
-		return nil
+		return
 	}
 
 	for i, job := range completeJobs {
@@ -43,17 +39,4 @@ func (r *ClusterReconciler) cleanupCluster(
 			continue
 		}
 	}
-
-	// Let's remove the stale ConfigMap if we have it
-	var configMap corev1.ConfigMap
-	err := r.Get(
-		ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name}, &configMap)
-	if err != nil {
-		if apierrs.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	return r.Delete(ctx, &configMap)
 }
