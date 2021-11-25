@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -23,38 +25,38 @@ var _ = Describe("Release tag extraction", func() {
 
 var _ = Describe("Most recent tag", func() {
 	It("properly works with release tag", func() {
-		err := os.Setenv("VERSION", "1.9.1")
+		err := os.Setenv("CNP_VERSION", "1.9.1")
 		Expect(err).To(BeNil())
 		wd, err := os.Getwd()
 		Expect(err).To(BeNil())
-		parentDir := filepath.Dir(filepath.Dir(wd))
+		parentDir := filepath.Dir(filepath.Dir(filepath.Dir(wd)))
 		tag, err := GetMostRecentReleaseTag(parentDir + "/releases")
 		Expect(tag).To(Not(BeEmpty()))
-		Expect(tag).To(BeEquivalentTo("1.9.0"))
+		Expect(tag).ToNot(BeEquivalentTo(versions.Version))
 		Expect(err).To(BeNil())
 	})
 
 	It("properly works with dev tag", func() {
-		err := os.Setenv("VERSION", "1.9.1-test")
+		err := os.Setenv("CNP_VERSION", "1.9.1-test")
 		Expect(err).To(BeNil())
 		wd, err := os.Getwd()
 		Expect(err).To(BeNil())
-		parentDir := filepath.Dir(filepath.Dir(wd))
+		parentDir := filepath.Dir(filepath.Dir(filepath.Dir(wd)))
 		tag, err := GetMostRecentReleaseTag(parentDir + "/releases")
 		Expect(tag).To(Not(BeEmpty()))
-		Expect(tag).To(BeEquivalentTo("1.9.1"))
+		Expect(tag).To(BeEquivalentTo(versions.Version))
 		Expect(err).To(BeNil())
 	})
 })
 
 var _ = Describe("Dev tag version check", func() {
-	It("returns true when version contains a dev tag", func() {
-		err := os.Setenv("VERSION", "100.9.1-test")
+	It("returns true when CNP_VERSION contains a dev tag", func() {
+		err := os.Setenv("CNP_VERSION", "100.9.1-test")
 		Expect(err).To(BeNil())
 		Expect(isDevTagVersion()).To(BeTrue())
 	})
-	It("returns false when version contains a release tag", func() {
-		err := os.Setenv("VERSION", "100.9.1")
+	It("returns false when CNP_VERSION contains a release tag", func() {
+		err := os.Setenv("CNP_VERSION", "100.9.1")
 		Expect(err).To(BeNil())
 		Expect(isDevTagVersion()).To(BeFalse())
 	})

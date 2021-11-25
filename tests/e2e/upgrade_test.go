@@ -24,13 +24,13 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/internal/tests/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 /*

@@ -277,6 +277,7 @@ jobs:
     runs-on: ubuntu-20.04
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
+      cnp_version: ${{ steps.build-meta.outputs.cnp_version }}
     steps:
       -
         name: Checkout
@@ -301,6 +302,7 @@ jobs:
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
+          git_version_tag=$(git describe --tags --match 'v*')
           if [ "${GITHUB_REF#refs/heads/}" == main ]
           then
             images="${images},upmdev.azurecr.io/enterprisedb/cloud-native-postgresql"
@@ -311,6 +313,7 @@ jobs:
           echo "::set-output name=date::${commit_date}"
           echo "::set-output name=version::${commit_version}"
           echo "::set-output name=commit::${commit_short}"
+          echo "::set-output name=cnp_version::${git_version_tag}"
       -
         name: Set GoReleaser environment
         run: |
@@ -508,6 +511,7 @@ jobs:
       needs.generate-jobs.result == 'success' &&
       needs.evaluate-test-level.result == 'success'
     needs:
+      - buildx
       - generate-jobs
       - duplicate_runs
       - evaluate-test-level
@@ -520,6 +524,7 @@ jobs:
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
+      CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
 
       DOCKER_SERVER: quay.io/enterprisedb
       DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
