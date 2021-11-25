@@ -130,6 +130,21 @@ func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret
 	return updatedSecret, nil
 }
 
+// Cleanup will remove the PKI infrastructure from the operator namespace
+func (pki PublicKeyInfrastructure) Cleanup(ctx context.Context, client *kubernetes.Clientset) error {
+	err := client.CoreV1().Secrets(pki.OperatorNamespace).Delete(ctx, pki.CaSecretName, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	err = client.CoreV1().Secrets(pki.OperatorNamespace).Delete(ctx, pki.SecretName, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	return nil
+}
+
 // Setup will setup the PKI infrastructure that is needed for the operator
 // to correctly work, and copy the certificates which are required for the webhook
 // server to run in the right folder
@@ -146,13 +161,7 @@ func (pki PublicKeyInfrastructure) Setup(
 		return err
 	}
 
-	if pki.CertDir != "" {
-		if err = pki.setupWebhooksCertificate(ctx, client, apiClient, caSecret); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return pki.setupWebhooksCertificate(ctx, client, apiClient, caSecret)
 }
 
 func (pki PublicKeyInfrastructure) setupWebhooksCertificate(

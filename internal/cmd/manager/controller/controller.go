@@ -131,7 +131,7 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 
 	certificatesGenerationFolder := mgr.GetWebhookServer().CertDir
 	if configuration.Current.WebhookCertDir != "" {
-		// OLM is generating certificates for us so we can avoid
+		// OLM is generating certificates for us, so we can avoid
 		// injecting/creating certificates
 		certificatesGenerationFolder = ""
 	}
@@ -165,10 +165,18 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 		"systemUID", utils.GetKubeSystemUID(),
 		"haveSCC", utils.HaveSecurityContextConstraints())
 
-	err = setupPKI(ctx, certificatesGenerationFolder)
-	if err != nil {
-		setupLog.Error(err, "unable to setup PKI infrastructure")
-		return err
+	if certificatesGenerationFolder != "" {
+		err = setupPKI(ctx, certificatesGenerationFolder)
+		if err != nil {
+			setupLog.Error(err, "unable to setup PKI infrastructure")
+			return err
+		}
+	} else {
+		err = cleanupPKI(ctx)
+		if err != nil {
+			setupLog.Error(err, "unable to cleanup PKI infrastructure")
+			return err
+		}
 	}
 
 	if err = (&controllers.ClusterReconciler{
@@ -341,6 +349,16 @@ func setupPKI(ctx context.Context, certDir string) error {
 	}
 
 	return nil
+}
+
+// cleanupPKI ensures that the PKI infrastructure is removed from the kubernetes cluster
+func cleanupPKI(ctx context.Context) error {
+	pkiConfig := certs.PublicKeyInfrastructure{
+		CaSecretName:      CaSecretName,
+		SecretName:        WebhookSecretName,
+		OperatorNamespace: configuration.Current.OperatorNamespace,
+	}
+	return pkiConfig.Cleanup(ctx, clientSet)
 }
 
 // readConfigMap reads the configMap and returns its content as map
