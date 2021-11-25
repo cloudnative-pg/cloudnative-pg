@@ -174,8 +174,8 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 	} else {
 		err = cleanupPKI(ctx)
 		if err != nil {
-			setupLog.Error(err, "unable to cleanup PKI infrastructure")
-			return err
+			setupLog.Warning("unable to cleanup PKI infrastructure", "error", err)
+			// We do not have a `return` here because this is not a critical issue.
 		}
 	}
 
