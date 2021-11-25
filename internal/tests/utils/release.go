@@ -8,6 +8,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package utils
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -17,7 +18,10 @@ import (
 	"github.com/Masterminds/semver/v3"
 )
 
-// GetMostRecentReleaseTag retrieves the most recent release tag from a list of files into a folder
+// GetMostRecentReleaseTag retrieves the most recent release tag from
+// the list of YAML files in the top-level `releases/` directory.
+// Used for testing upgrades, so: if we're in a release branch, the MostRecent
+// should be the next-to-last release
 func GetMostRecentReleaseTag(releasesPath string) (string, error) {
 	fileInfo, err := ioutil.ReadDir(releasesPath)
 	if err != nil {
@@ -35,17 +39,22 @@ func GetMostRecentReleaseTag(releasesPath string) (string, error) {
 
 	// Sorting version as descending order ([v1.10.0, v1.9.0...])
 	sort.Sort(sort.Reverse(semver.Collection(versions)))
-
-	if !isDevTagVersion() {
-		return versions[1].String(), nil
+	if len(versions) == 0 {
+		return "", errors.New("could not find releases")
 	}
 
-	return versions[0].String(), nil
+	if isDevTagVersion() {
+		return versions[0].String(), nil
+	}
+
+	// if we're running on a release branch, we should get the previous version
+	// to test upgrades from it
+	return versions[1].String(), nil
 }
 
 func isDevTagVersion() bool {
-	var currentTagVersion string
-	if currentTagVersion = os.Getenv("VERSION"); currentTagVersion == "" {
+	currentTagVersion := os.Getenv("CNP_VERSION")
+	if currentTagVersion == "" {
 		currentTagVersionBytes, err := exec.Command("git", "describe", "--tags", "--match", "v*").Output()
 		if err != nil {
 			return false
@@ -53,8 +62,8 @@ func isDevTagVersion() bool {
 		currentTagVersion = string(currentTagVersionBytes)
 	}
 
-	s := strings.Split(currentTagVersion, "-")
-	return len(s) != 1
+	fragments := strings.Split(currentTagVersion, "-")
+	return len(fragments) > 1
 }
 
 func extractTag(releaseFile string) string {
