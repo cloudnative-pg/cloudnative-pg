@@ -203,8 +203,9 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.PVCCount = newPVCCount
 	pvcClassification := specs.DetectPVCs(resources.pods.Items, resources.jobs.Items, resources.pvcs.Items)
 	cluster.Status.DanglingPVC = pvcClassification.Dangling
-	cluster.Status.InitializingPVC = pvcClassification.Initializing
 	cluster.Status.HealthyPVC = pvcClassification.Healthy
+	cluster.Status.InitializingPVC = pvcClassification.Initializing
+	cluster.Status.ResizingPVC = pvcClassification.Resizing
 
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones

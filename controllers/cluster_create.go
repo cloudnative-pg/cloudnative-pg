@@ -955,6 +955,16 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 
 	pod := specs.PodWithExistingStorage(*cluster, int32(nodeSerial))
 
+	if configuration.Current.EnableAzurePVCUpdates {
+		for _, resizingPVC := range cluster.Status.ResizingPVC {
+			// This code works on the assumption that the PVC have the same name as the pod using it.
+			if resizingPVC == pvc.Name {
+				contextLogger.Info("PVC is in resizing status, retrying in 5 seconds", "pod", pod.Name)
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			}
+		}
+	}
+
 	// If this cluster has been restarted, mark the Pod with the latest restart time
 	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok {
 		if pod.Annotations == nil {

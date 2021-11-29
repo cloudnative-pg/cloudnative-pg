@@ -40,6 +40,11 @@ type PVCUsageStatus struct {
 	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
 	Initializing []string
 
+	// List of PVCs with Resizing condition. Requires a pod restart.
+	//
+	// INFO: https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/
+	Resizing []string
+
 	// List of PVCs that are dangling (they don't have a corresponding Job nor a corresponding Pod)
 	Dangling []string
 
@@ -98,7 +103,7 @@ func CreatePVC(
 	return result, nil
 }
 
-// DetectPVCs fill the list of the PVCs which are dangling, given that
+// DetectPVCs fill the list with the PVCs which are dangling, given that
 // PVC are usually named after Pods
 func DetectPVCs(
 	podList []corev1.Pod,
@@ -114,6 +119,10 @@ func DetectPVCs(
 		// There's no point in reattaching deleted PVCs
 		if pvc.ObjectMeta.DeletionTimestamp != nil {
 			continue
+		}
+
+		if isResizing(pvc) {
+			result.Resizing = append(result.Resizing, pvc.Name)
 		}
 
 		// Find a Pod corresponding to this PVC
@@ -158,4 +167,15 @@ func DetectPVCs(
 	}
 
 	return result
+}
+
+// isResizing returns true if PersistentVolumeClaimResizing condition is present
+func isResizing(pvc corev1.PersistentVolumeClaim) bool {
+	for _, condition := range pvc.Status.Conditions {
+		if condition.Type == corev1.PersistentVolumeClaimResizing {
+			return true
+		}
+	}
+
+	return false
 }
