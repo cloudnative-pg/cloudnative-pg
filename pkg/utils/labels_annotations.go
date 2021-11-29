@@ -16,6 +16,9 @@ const (
 	// ClusterLabelName is the name of cluster which the backup CR belongs to
 	ClusterLabelName = "k8s.enterprisedb.io/cluster"
 
+	// JobRoleLabelName is the name of the label containing the purpose of the executed job
+	JobRoleLabelName = "k8s.enterprisedb.io/jobRole"
+
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
 	OperatorVersionAnnotationName = "k8s.enterprisedb.io/operatorVersion"
@@ -28,6 +31,14 @@ func LabelClusterName(object *metav1.ObjectMeta, name string) {
 	}
 
 	object.Labels[ClusterLabelName] = name
+}
+
+// LabelJobRole labels a job with its role
+func LabelJobRole(object *metav1.ObjectMeta, role string) {
+	if object.Labels == nil {
+		object.Labels = make(map[string]string)
+	}
+	object.Labels[JobRoleLabelName] = role
 }
 
 // SetOperatorVersion set inside a certain object metadata the annotation
