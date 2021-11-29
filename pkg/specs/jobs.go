@@ -17,6 +17,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
@@ -190,10 +191,11 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 	return createPrimaryJob(cluster, nodeSerial, "join", initCommand)
 }
 
-// createPrimaryJob create a job that executes the provided command
-func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int32, shortName string, initCommand []string) *batchv1.Job {
+// createPrimaryJob create a job that executes the provided command.
+// The role should describe the purpose of the executed job
+func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int32, role string, initCommand []string) *batchv1.Job {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
-	jobName := fmt.Sprintf("%s-%v-%s", cluster.Name, nodeSerial, shortName)
+	jobName := fmt.Sprintf("%s-%v-%s", cluster.Name, nodeSerial, role)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -210,7 +212,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int32, shortName string,
 					},
 					Containers: []corev1.Container{
 						{
-							Name:            shortName,
+							Name:            role,
 							Image:           cluster.GetImageName(),
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 							Env:             createEnvVarPostgresContainer(cluster, podName),
@@ -232,6 +234,8 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int32, shortName string,
 		},
 	}
 
+	utils.LabelJobRole(&job.ObjectMeta, role)
+	utils.LabelClusterName(&job.ObjectMeta, cluster.Name)
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 
 	return job
