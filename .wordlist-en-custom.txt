@@ -9,6 +9,7 @@ AuthQuery
 AuthQuerySecret
 Autoscaler
 AzureCredentials
+AzurePVCUpdateEnabled
 Azurite
 BDR
 BackupConfiguration
@@ -94,8 +95,8 @@ Gi
 Golang
 GolangCI
 Grafana
-Hai
 HH
+Hai
 INPLACE
 IfNotPresent
 InfoSec
@@ -191,6 +192,7 @@ RedHat's
 ReplicaClusterConfiguration
 ReplicaSet
 ReplicationTLSSecret
+ResizingPVC
 ResourceRequirements
 ResourceVersion
 RetentionPolicy
@@ -231,9 +233,9 @@ TopologyKey
 UID
 Uncomment
 VLDB
-VOLNAME
 VM
 VMs
+VOLNAME
 Valerio
 VirtualBox
 WAL
@@ -309,8 +311,8 @@ classid
 cli
 clientCASecret
 clusterBackup
-clusterlist
 clusterName
+clusterlist
 clusterspec
 clusterstatus
 cnp
@@ -538,8 +540,8 @@ podAffinityTerm
 podAntiAffinity
 podAntiAffinityType
 podMetricsEndpoints
-podmonitor
 podName
+podmonitor
 poolMode
 pooler
 poolers
@@ -636,11 +638,11 @@ stopDelay
 stoppedAt
 storageAccount
 storageClass
-storageclasses
 storageClassName
 storageKey
 storageSasToken
 storageclass
+storageclasses
 storageconfiguration
 subcommand
 subresource

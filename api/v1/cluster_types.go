@@ -279,6 +279,9 @@ type ClusterStatus struct {
 	// which are not attached to a Pod
 	DanglingPVC []string `json:"danglingPVC,omitempty"`
 
+	// List of all the PVCs that have ResizingPVC condition.
+	ResizingPVC []string `json:"resizingPVC,omitempty"`
+
 	// List of all the PVCs that are being initialized by this cluster
 	InitializingPVC []string `json:"initializingPVC,omitempty"`
 
@@ -332,6 +335,9 @@ type ClusterStatus struct {
 
 	// OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster
 	OnlineUpdateEnabled bool `json:"onlineUpdateEnabled,omitempty"`
+
+	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
+	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
 }
 
 // PoolerIntegrations encapsulates the needed integration for the poolers referencing the cluster

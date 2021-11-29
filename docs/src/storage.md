@@ -243,7 +243,7 @@ So, you can repeat these steps for the remaining Pods.
 
 ### Recreating storage
 
-IF the storage class does not support volume expansion, you can still regenerate your cluster
+If the storage class does not support volume expansion, you can still regenerate your cluster
 on different PVCs, by allocating new PVCs with increased storage and then move the
 database there. This operation is feasible only when the cluster contains more than one node.
 

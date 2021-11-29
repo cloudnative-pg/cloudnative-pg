@@ -138,6 +138,15 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 		return true, ""
 	}
 
+	if configuration.Current.EnableAzurePVCUpdates {
+		for _, pvc := range cluster.Status.ResizingPVC {
+			// This code works on the assumption that the PVC have the same name as the pod using it.
+			if status.Pod.Name == pvc {
+				return true, fmt.Sprintf("rebooting pod to complete resizing %s", pvc)
+			}
+		}
+	}
+
 	// check if the pod requires an image upgrade
 	oldImage, newImage, err := isPodNeedingUpgradedImage(cluster, status.Pod)
 	if err != nil {
