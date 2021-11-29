@@ -8,6 +8,7 @@ package postgres
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -598,21 +599,33 @@ func (instance *Instance) PgIsReady() error {
 		"-q",
 	}
 
+	// Run `pg_isready` which returns 0 if everything is OK.
+	// It returns 1 when PostgreSQL is not ready to accept
+	// connections but it is starting up (this is a valid
+	// condition for example for a standby that is fetching
+	// WAL files and trying to reach a consistent state).
 	cmd := exec.Command(pgIsReady, options...) // #nosec G204
-	if err := cmd.Run(); err != nil {
-		return err
+	err := cmd.Run()
+
+	// Verify that `pg_isready` has been executed correctly.
+	// We expect that `pg_isready` returns 0 (err == nil) or another
+	// valid exit code such as 1 or 2
+	var exitError *exec.ExitError
+	if err == nil || errors.As(err, &exitError) {
+		switch code := cmd.ProcessState.ExitCode(); code {
+		case pqPingOk:
+			return nil
+		case pqPingReject:
+			return ErrPgRejectingConnection
+		case pqPingNoResponse:
+			return ErrNoConnectionEstablished
+		case pgPingNoAttempt:
+			return fmt.Errorf("pg_isready usage error: %w", err)
+		default:
+			return fmt.Errorf("unknown exit code %d: %w", code, err)
+		}
 	}
 
-	switch code := cmd.ProcessState.ExitCode(); code {
-	case pqPingOk:
-		return nil
-	case pqPingReject:
-		return ErrPgRejectingConnection
-	case pqPingNoResponse:
-		return ErrNoConnectionEstablished
-	case pgPingNoAttempt:
-		return fmt.Errorf("pg_isready usage error")
-	default:
-		return fmt.Errorf("unknown exit code: %d", code)
-	}
+	// `pg_isready` had an unexpected failure
+	return fmt.Errorf("failure executing %s: %w", pgIsReady, err)
 }
