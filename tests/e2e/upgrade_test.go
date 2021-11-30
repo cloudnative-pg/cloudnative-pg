@@ -13,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,6 +25,9 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 /*
@@ -376,7 +377,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				"kubectl exec -n %v %v -- %v",
 				upgradeNamespace,
 				primary,
-				switchWalCmd))
+				"psql -U postgres appdb -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"))
 			Expect(err).ToNot(HaveOccurred())
 			latestWAL := strings.TrimSpace(out)
 
@@ -580,39 +581,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			testsUtils.EnableOnlineUpgradeForInstanceManager(operatorNamespace, configName, env)
 		})
 
-		// TODO: Change this By block with the installation of the latest release tag after merging dev/online-update
-		// and creating a new release
-		By("updating operator image to the testing tag version", func() {
-			deployment, err := env.GetOperatorDeployment()
-			Expect(err).NotTo(HaveOccurred())
+		mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
+		Expect(err).NotTo(HaveOccurred())
 
-			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				var container *corev1.Container
-
-				newImage := "quay.io/enterprisedb/cloud-native-postgresql-testing:online-update"
-
-				Expect(deployment.Spec.Template.Spec.Containers[0].Name).Should(Equal("manager"))
-				container = &deployment.Spec.Template.Spec.Containers[0]
-				container.Image = newImage
-				for i := range container.Env {
-					if container.Env[i].Name == "OPERATOR_IMAGE_NAME" {
-						container.Env[i].Value = newImage
-					}
-				}
-
-				return env.Client.Update(env.Ctx, &deployment)
-			})
-			Expect(err).ShouldNot(HaveOccurred())
-
-			Eventually(func() error {
-				stdout, stderr, err := testsUtils.RunUnchecked(
-					"kubectl rollout status --timeout=2m -n postgresql-operator-system " +
-						"deployment/postgresql-operator-controller-manager")
-				GinkgoWriter.Printf("stdout: %s\n", stdout)
-				GinkgoWriter.Printf("stderr: %s\n", stderr)
-				return err
-			}, 150).ShouldNot(HaveOccurred())
-		})
+		GinkgoWriter.Printf("installing the recent CNP tag %s\n", mostRecentTag)
+		testsUtils.InstallLatestCNPOperator(mostRecentTag, env)
 
 		// set upgradeNamespace for log naming
 		upgradeNamespace = onlineUpgradeNamespace
