@@ -9,10 +9,11 @@ package e2e
 import (
 	"regexp"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
 
 var _ = Describe("PGBouncer Metrics", func() {
@@ -22,6 +23,8 @@ var _ = Describe("PGBouncer Metrics", func() {
 		namespace                   = "pgbouncer-metrics-e2e"
 		level                       = tests.Low
 	)
+
+	var clusterName string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -49,7 +52,7 @@ var _ = Describe("PGBouncer Metrics", func() {
 
 			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthRWSampleFile, 1)
 
-			podList, err := getPGBouncerPodList(namespace, poolerBasicAuthRWSampleFile)
+			podList, err := utils.GetPGBouncerPodList(namespace, poolerBasicAuthRWSampleFile, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			metricsRegexp := regexp.MustCompile(
@@ -70,7 +73,7 @@ var _ = Describe("PGBouncer Metrics", func() {
 					`cnp_pgbouncer_stats_total_query_count{database="pgbouncer"} \d+` +
 					`)$)`)
 
-			podCommandResults, err := tests.RunOnPodList(namespace, "sh -c 'curl -s 127.0.0.1:9127/metrics'", podList)
+			podCommandResults, err := utils.RunOnPodList(namespace, "sh -c 'curl -s 127.0.0.1:9127/metrics'", podList)
 			Expect(err).ToNot(HaveOccurred())
 
 			for _, podCommandResult := range podCommandResults {

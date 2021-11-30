@@ -10,13 +10,13 @@ import (
 	"fmt"
 	"strings"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
 
 var _ = Describe("nodeSelector", func() {
@@ -62,7 +62,7 @@ var _ = Describe("nodeSelector", func() {
 			})
 
 			By(fmt.Sprintf("creating a cluster in the %v namespace", namespace), func() {
-				_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + sampleFile)
+				_, _, err := utils.Run("kubectl create -n " + namespace + " -f " + sampleFile)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -127,7 +127,7 @@ var _ = Describe("nodeSelector", func() {
 					}
 				}
 				cmd := fmt.Sprintf("kubectl label node %v nodeselectortest=exists --overwrite", nodeName)
-				_, _, err = tests.Run(cmd)
+				_, _, err = utils.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 			})
 

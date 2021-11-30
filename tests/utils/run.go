@@ -4,9 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-// Package tests contains the e2e test infrastructure of the cloud native PostgreSQL
-// operator
-package tests
+package utils
 
 import (
 	"bytes"
@@ -30,7 +28,7 @@ type PodCommandResult struct {
 func RunUnchecked(command string) (stdout string, stderr string, err error) {
 	tokens, err := shlex.Split(command)
 	if err != nil {
-		fmt.Fprintf(ginkgo.GinkgoWriter, "Error parsing command `%v`: %v\n", command, err)
+		ginkgo.GinkgoWriter.Printf("Error parsing command `%v`: %v\n", command, err)
 		return "", "", err
 	}
 
@@ -49,21 +47,10 @@ func Run(command string) (stdout string, stderr string, err error) {
 
 	var exerr *exec.ExitError
 	if errors.As(err, &exerr) {
-		fmt.Fprintf(ginkgo.GinkgoWriter, "RunCheck: %v\nExitCode: %v\n Out:\n%v\nErr:\n%v\n",
+		ginkgo.GinkgoWriter.Printf("RunCheck: %v\nExitCode: %v\n Out:\n%v\nErr:\n%v\n",
 			command, exerr.ExitCode(), stdout, stderr)
 	}
 	return
-}
-
-// FirstEndpointIP returns the IP of first Address in the Endpoint
-func FirstEndpointIP(endpoint *corev1.Endpoints) string {
-	if endpoint == nil {
-		return ""
-	}
-	if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
-		return ""
-	}
-	return endpoint.Subsets[0].Addresses[0].IP
 }
 
 // RunOnPodList executes a command on a list of pod and returns the outputs

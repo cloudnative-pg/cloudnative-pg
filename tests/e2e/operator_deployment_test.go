@@ -7,9 +7,10 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package e2e
 
 import (
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 )
 
 var _ = Describe("PostgreSQL operator deployment", func() {

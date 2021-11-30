@@ -9,13 +9,13 @@ package e2e
 import (
 	"fmt"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
 
 // Set of tests in which we check that we're able to connect to the -rw,
@@ -40,7 +40,7 @@ var _ = Describe("Connection via services", func() {
 		appDBUser string,
 		appPassword string,
 		superuserPassword string,
-		env *tests.TestingEnvironment) {
+		env *utils.TestingEnvironment) {
 
 		// we use a pod in the cluster to have a psql client ready and
 		// internal access to the k8s cluster

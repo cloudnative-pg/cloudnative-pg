@@ -9,16 +9,12 @@ package e2e
 import (
 	"fmt"
 	"regexp"
-	"strings"
-	"time"
-
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
 
 var _ = Describe("Metrics", func() {
@@ -84,7 +80,7 @@ var _ = Describe("Metrics", func() {
 			Expect(err).ToNot(HaveOccurred())
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
-				out, _, err := tests.Run(fmt.Sprintf(
+				out, _, err := utils.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					pod.GetName(),
@@ -104,85 +100,9 @@ var _ = Describe("Metrics", func() {
 		AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsDBFile, env)
-		CreateTestDataForTargetDB(namespace, metricsClusterName, targetDBOne, testTableName)
-		CreateTestDataForTargetDB(namespace, metricsClusterName, targetDBTwo, testTableName)
-		CreateTestDataForTargetDB(namespace, metricsClusterName, targetDBSecret, testTableName)
+		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBOne, testTableName)
+		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBTwo, testTableName)
+		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBSecret, testTableName)
 		AssertMetricsData(namespace, metricsClusterName, targetDBOne, targetDBTwo, targetDBSecret)
 	})
 })
-
-func AssertCustomMetricsResourcesExist(namespace, sampleFile string, configMapsCount, secretsCount int) {
-	By("verifying the custom metrics ConfigMaps and Secrets exist", func() {
-		// Create the ConfigMaps and a Secret
-		_, _, err := tests.Run("kubectl apply -n " + namespace + " -f " + sampleFile)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Check configmaps exist
-		timeout := 20
-		Eventually(func() ([]corev1.ConfigMap, error) {
-			cmList := &corev1.ConfigMapList{}
-			err := env.Client.List(
-				env.Ctx, cmList, client.InNamespace(namespace),
-				client.MatchingLabels{"e2e": "metrics"},
-			)
-			return cmList.Items, err
-		}, timeout).Should(HaveLen(configMapsCount))
-
-		// Check secret exists
-		Eventually(func() ([]corev1.Secret, error) {
-			secretList := &corev1.SecretList{}
-			err := env.Client.List(
-				env.Ctx, secretList, client.InNamespace(namespace),
-				client.MatchingLabels{"e2e": "metrics"},
-			)
-			return secretList.Items, err
-		}, timeout).Should(HaveLen(secretsCount))
-	})
-}
-
-func CreateTestDataForTargetDB(namespace, clusterName, targetDBName, tableName string) {
-	By(fmt.Sprintf("creating target database '%v' and table '%v'", targetDBName, tableName), func() {
-		primaryPodName, err := env.GetClusterPrimary(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-		timeout := time.Second * 2
-		// Create database
-		createDBQuery := fmt.Sprintf("create database %v;", targetDBName)
-		_, _, err = env.ExecCommand(env.Ctx, *primaryPodName, "postgres", &timeout,
-			"psql", "-U", "postgres", "-tAc", createDBQuery)
-		Expect(err).ToNot(HaveOccurred())
-		// Create table on target database
-		dsn := fmt.Sprintf("user=postgres port=5432 dbname=%v ", targetDBName)
-		createTableQuery := fmt.Sprintf("create table %v (id int);", tableName)
-		_, _, err = env.ExecCommand(env.Ctx, *primaryPodName, "postgres", &timeout,
-			"psql", dsn, "-tAc", createTableQuery)
-		Expect(err).ToNot(HaveOccurred())
-		// Grant a permission
-		grantRoleQuery := "GRANT SELECT ON all tables in schema public to pg_monitor;"
-		_, _, err = env.ExecCommand(env.Ctx, *primaryPodName, "postgres", &timeout,
-			"psql", "-U", "postgres", dsn, "-tAc", grantRoleQuery)
-		Expect(err).ToNot(HaveOccurred())
-	})
-}
-
-func AssertMetricsData(namespace, clusterName, targetOne, targetTwo, targetSecret string) {
-	By("collect and verify metric being exposed with target databases", func() {
-		podList, err := env.GetClusterPodList(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-		for _, pod := range podList.Items {
-			podName := pod.GetName()
-			out, _, err := tests.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				podName,
-				"sh -c 'curl -s 127.0.0.1:9187/metrics'"))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(strings.Contains(out, fmt.Sprintf(`cnp_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
-				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
-			Expect(strings.Contains(out, fmt.Sprintf(`cnp_some_query_rows{datname="%v"} 0`, targetTwo))).Should(BeTrue(),
-				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
-			Expect(strings.Contains(out, fmt.Sprintf(`cnp_some_query_test_rows{datname="%v"} 1`,
-				targetSecret))).Should(BeTrue(),
-				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
-		}
-	})
-}

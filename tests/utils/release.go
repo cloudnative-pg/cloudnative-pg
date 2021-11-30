@@ -28,13 +28,13 @@ func GetMostRecentReleaseTag(releasesPath string) (string, error) {
 		return "", err
 	}
 
-	versions := []*semver.Version{}
+	versions := make([]*semver.Version, len(fileInfo))
 
 	// build the array that contains the versions
 	// found in the releasePath directory
-	for _, file := range fileInfo {
+	for i, file := range fileInfo {
 		tag := extractTag(file.Name())
-		versions = append(versions, semver.MustParse(tag))
+		versions[i] = semver.MustParse(tag)
 	}
 
 	// Sorting version as descending order ([v1.10.0, v1.9.0...])
