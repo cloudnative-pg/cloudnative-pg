@@ -458,6 +458,37 @@ spec:
 You can configure the encryption directly in your bucket, and the operator
 will use it unless you override it in the cluster configuration.
 
+PostgreSQL implements a sequential archiving scheme, where the
+`archive_command` will be executed sequentially for every WAL
+segment to be archived.
+
+When the bandwidth between the PostgreSQL instance and the object
+store allows archiving more than one WAL file in parallel, you
+can use the parallel WAL archiving feature of the instance manager
+like in the following example:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      [...]
+      wal:
+        compression: gzip
+        maxParallel: 8
+        encryption: AES256
+```
+
+In the previous example, the instance manager optimizes the WAL
+archiving process by archiving in parallel at most eight ready
+WALs, including the one requested by PostgreSQL.
+
+When PostgreSQL will request the archiving of a WAL that has
+already been archived by the instance manager as an optimization,
+that archival request will be just dismissed with a positive status.
+
 ## Recovery
 
 Cluster restores are not performed "in-place" on an existing cluster.

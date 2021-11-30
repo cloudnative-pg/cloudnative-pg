@@ -935,6 +935,16 @@ spec:
                             - AES256
                             - aws:kms
                             type: string
+                          maxParallel:
+                            description: Number of WAL files to be either archived
+                              in parallel (when the PostgreSQL instance is archiving
+                              to a backup object store) or restored in parallel (when
+                              a PostgreSQL standby is fetching WAL files from a recovery
+                              object store). If not specified, WAL files will be processed
+                              one at a time. It accepts a positive integer as a value
+                              - with 1 being the minimum accepted value.
+                            minimum: 1
+                            type: integer
                         type: object
                     required:
                     - destinationPath
@@ -1359,6 +1369,17 @@ spec:
                               - AES256
                               - aws:kms
                               type: string
+                            maxParallel:
+                              description: Number of WAL files to be either archived
+                                in parallel (when the PostgreSQL instance is archiving
+                                to a backup object store) or restored in parallel
+                                (when a PostgreSQL standby is fetching WAL files from
+                                a recovery object store). If not specified, WAL files
+                                will be processed one at a time. It accepts a positive
+                                integer as a value - with 1 being the minimum accepted
+                                value.
+                              minimum: 1
+                              type: integer
                           type: object
                       required:
                       - destinationPath
