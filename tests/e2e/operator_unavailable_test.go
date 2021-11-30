@@ -17,6 +17,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -69,7 +70,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive), f
 				// Scale down operator deployment to zero replicas
 				cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=0 -n %v",
 					operatorDeployment.Name, operatorNamespace)
-				_, _, err = tests.Run(cmd)
+				_, _, err = testsUtils.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Verify the operator pod is not present anymore
@@ -120,7 +121,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive), f
 				Expect(err).ToNot(HaveOccurred())
 				cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=1 -n %v",
 					deployment.Name, operatorNamespace)
-				_, _, err = tests.Run(cmd)
+				_, _, err = testsUtils.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 120
 				Eventually(func() (int, error) {

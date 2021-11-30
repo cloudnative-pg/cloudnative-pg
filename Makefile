@@ -61,7 +61,7 @@ help: ## Display this help.
 ##@ Development
 
 test: generate fmt vet manifests ## Run tests.
-	go test ./api/... ./cmd/... ./controllers/... ./internal/... ./pkg/... -coverprofile cover.out
+	go test ./api/... ./cmd/... ./controllers/... ./internal/... ./pkg/... ./tests/utils -coverprofile cover.out
 
 e2e-test-kind: ## Run e2e tests locally using kind.
 	hack/e2e/run-e2e-kind.sh

@@ -16,6 +16,8 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils/nodes"
 )
 
 // Set of tests in which we check that operator is able to fail over a new
@@ -36,7 +38,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 			if (node.Spec.Unschedulable != true) && (len(node.Spec.Taints) == 0) {
 				nodesWithLabels = append(nodesWithLabels, node.Name)
 				cmd := fmt.Sprintf("kubectl label node %v drain=drain --overwrite", node.Name)
-				_, _, err := tests.Run(cmd)
+				_, _, err := testsUtils.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 			}
 			if len(nodesWithLabels) == 3 {
@@ -50,10 +52,10 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 	AfterEach(func() {
 		// Uncordon the cordoned nodes and remove the labels we added in the
 		// BeforeEach section
-		uncordonAllNodes()
+		nodes.UncordonAllNodes(env)
 		for _, node := range nodesWithLabels {
 			cmd := fmt.Sprintf("kubectl label node %v drain- ", node)
-			_, _, err := tests.Run(cmd)
+			_, _, err := testsUtils.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 		}
 		nodesWithLabels = nil
@@ -92,7 +94,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 				// mark a node unschedulable so the pods will be distributed only on two nodes
 				for _, cordonNode := range nodesWithLabels[:len(nodesWithLabels)-2] {
 					cmd := fmt.Sprintf("kubectl cordon %v", cordonNode)
-					_, _, err := tests.Run(cmd)
+					_, _, err := testsUtils.Run(cmd)
 					Expect(err).ToNot(HaveOccurred())
 				}
 			})
@@ -134,7 +136,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 			}
 
 			// Drain the node containing the primary pod and store the list of running pods
-			podsOnPrimaryNode := drainPrimaryNode(namespace, clusterName)
+			podsOnPrimaryNode := nodes.DrainPrimaryNode(namespace, clusterName, env)
 
 			By("verifying failover after drain", func() {
 				timeout := 180
@@ -146,7 +148,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 			})
 
 			By("uncordon nodes and check new pods use old pvcs", func() {
-				uncordonAllNodes()
+				nodes.UncordonAllNodes(env)
 				// Ensure evicted pods have restarted and are running.
 				// one of them could have become the new primary.
 				timeout := 300
@@ -205,7 +207,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 					for _, cordonNode := range nodesWithLabels[:len(nodesWithLabels)-1] {
 						cordonNodes = append(cordonNodes, cordonNode)
 						cmd := fmt.Sprintf("kubectl cordon %v", cordonNode)
-						_, _, err := tests.Run(cmd)
+						_, _, err := testsUtils.Run(cmd)
 						Expect(err).ToNot(HaveOccurred())
 					}
 				})
@@ -249,12 +251,12 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 				// to move to.
 				By(fmt.Sprintf("uncordon one more node '%v'", cordonNodes[0]), func() {
 					cmd := fmt.Sprintf("kubectl uncordon %v", cordonNodes[0])
-					_, _, err = tests.Run(cmd)
+					_, _, err = testsUtils.Run(cmd)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
 				// Drain the node containing the primary pod and store the list of running pods
-				podsOnPrimaryNode := drainPrimaryNode(namespace, clusterName)
+				podsOnPrimaryNode := nodes.DrainPrimaryNode(namespace, clusterName, env)
 
 				By("verifying failover after drain", func() {
 					timeout := 180
@@ -325,7 +327,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 			By("leaving a single uncordoned", func() {
 				for _, cordonNode := range nodesWithLabels[:len(nodesWithLabels)-1] {
 					cmd := fmt.Sprintf("kubectl cordon %v", cordonNode)
-					_, _, err := tests.Run(cmd)
+					_, _, err := testsUtils.Run(cmd)
 					Expect(err).ToNot(HaveOccurred())
 				}
 			})
@@ -362,13 +364,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 			// We uncordon a cordoned node. New pods can go there.
 			By("uncordon node for pod failover", func() {
 				cmd := fmt.Sprintf("kubectl uncordon %v", nodesWithLabels[0])
-				_, _, err := tests.Run(cmd)
+				_, _, err := testsUtils.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			// Drain the node containing the primary pod. Pods should be moved
 			// to the node we've just uncordoned
-			drainPrimaryNode(namespace, clusterName)
+			nodes.DrainPrimaryNode(namespace, clusterName, env)
 
 			// Expect pods to be recreated and to be ready
 			AssertClusterIsReady(namespace, clusterName, 600, env)
@@ -399,63 +401,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 			Expect(err).ToNot(HaveOccurred())
 			AssertDataExpectedCount(namespace, primary.GetName(), "test", 2)
 			assertClusterStandbysAreStreaming(namespace, clusterName)
-			uncordonAllNodes()
+			nodes.UncordonAllNodes(env)
 		})
 	})
 })
-
-// drainPrimaryNode drains the node containing the primary pod.
-// It returns the names of the pods that were running on that node
-func drainPrimaryNode(namespace string, clusterName string) []string {
-	var primaryNode string
-	var podNames []string
-	By("identifying primary node and draining", func() {
-		pod, err := env.GetClusterPrimary(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-		primaryNode = pod.Spec.NodeName
-
-		// Gather the pods running on this node
-		podList, err := env.GetClusterPodList(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-		for _, pod := range podList.Items {
-			if pod.Spec.NodeName == primaryNode {
-				podNames = append(podNames, pod.Name)
-			}
-		}
-
-		// Draining the primary pod's node
-		timeout := 900
-		// should set a timeout otherwise will hang forever
-		var stdout, stderr string
-		Eventually(func() error {
-			cmd := fmt.Sprintf("kubectl drain %v --ignore-daemonsets --delete-local-data --force --timeout=%ds",
-				primaryNode, timeout)
-			stdout, stderr, err = tests.RunUnchecked(cmd)
-			return err
-		}, timeout).ShouldNot(HaveOccurred(), fmt.Sprintf("stdout: %s, stderr: %s", stdout, stderr))
-	})
-	By("ensuring no cluster pod is still running on the drained node", func() {
-		timeout := 60
-		Eventually(func() ([]string, error) {
-			var usedNodes []string
-			podList, err := env.GetClusterPodList(namespace, clusterName)
-			for _, pod := range podList.Items {
-				usedNodes = append(usedNodes, pod.Spec.NodeName)
-			}
-			return usedNodes, err
-		}, timeout).ShouldNot(ContainElement(primaryNode))
-	})
-
-	return podNames
-}
-
-func uncordonAllNodes() {
-	nodeList, err := env.GetNodeList()
-	Expect(err).ToNot(HaveOccurred())
-	// uncordoning all nodes
-	for _, node := range nodeList.Items {
-		command := fmt.Sprintf("kubectl uncordon %v", node.Name)
-		_, _, err := tests.Run(command)
-		Expect(err).ToNot(HaveOccurred())
-	}
-}

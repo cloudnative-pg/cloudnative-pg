@@ -18,6 +18,7 @@ import (
 
 	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -99,7 +100,7 @@ var _ = Describe("Synchronous Replicas", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Scale the cluster down to 2 pods
-			_, _, err := tests.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace, clusterName))
+			_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace, clusterName))
 			Expect(err).ToNot(HaveOccurred())
 			timeout := 120
 			// Wait for pod 3 to be completely terminated
@@ -180,7 +181,7 @@ var _ = Describe("Synchronous Replicas", func() {
 
 		By("checking that synchronous_standby_names has the expected value on the primary", func() {
 			Eventually(func() string {
-				out, _, err := tests.Run(
+				out, _, err := utils.Run(
 					fmt.Sprintf("kubectl exec -n %v %v-1 -c postgres -- "+
 						"psql -U postgres -tAc \"select setting from pg_settings where name = 'synchronous_standby_names'\"",
 						namespace, clusterName))

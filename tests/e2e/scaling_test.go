@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -47,7 +48,7 @@ var _ = Describe("Cluster scale up and down", func() {
 		// Add a node to the cluster and verify the cluster has one more
 		// element
 		By("adding an instance to the cluster", func() {
-			_, _, err := tests.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
+			_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
 			Expect(err).ToNot(HaveOccurred())
 			timeout := 300
 			AssertClusterIsReady(namespace, clusterName, timeout, env)
@@ -56,7 +57,7 @@ var _ = Describe("Cluster scale up and down", func() {
 		// Remove a node from the cluster and verify the cluster has one
 		// element less
 		By("removing an instance from the cluster", func() {
-			_, _, err := tests.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
+			_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
 			Expect(err).ToNot(HaveOccurred())
 			timeout := 60
 			AssertClusterIsReady(namespace, clusterName, timeout, env)

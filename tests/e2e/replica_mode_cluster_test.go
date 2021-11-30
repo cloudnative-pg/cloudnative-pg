@@ -16,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
 
 var _ = Describe("Replica Mode", func() {
@@ -86,7 +87,7 @@ var _ = Describe("Replica Mode", func() {
 			})
 
 			By("disabling the replica mode", func() {
-				_, _, err = tests.Run(fmt.Sprintf(
+				_, _, err = utils.Run(fmt.Sprintf(
 					"kubectl patch cluster %v -n %v  -p '{\"spec\":{\"replica\":{\"enabled\":false}}}'"+
 						" --type='merge'",
 					replicaClusterName, replicaNamespace))
@@ -148,6 +149,8 @@ var _ = Describe("Replica Mode", func() {
 			// Get primary from replica cluster
 			primaryReplicaCluster, err := env.GetClusterPrimary(replicaNamespace, replicaClusterName)
 			Expect(err).ToNot(HaveOccurred())
+
+			commandTimeout := time.Second * 5
 
 			By("verify archive mode is set to 'always on' designated primary", func() {
 				query := "show archive_mode;"

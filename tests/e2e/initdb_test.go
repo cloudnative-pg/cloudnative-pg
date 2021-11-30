@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -59,7 +60,7 @@ var _ = Describe("InitDB settings", func() {
 
 			By("querying the tables via psql", func() {
 				cmd := "psql -U postgres postgres -tAc 'SELECT count(*) FROM numbers'"
-				_, _, err := tests.Run(fmt.Sprintf(
+				_, _, err := utils.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					primaryDst,
@@ -68,7 +69,7 @@ var _ = Describe("InitDB settings", func() {
 			})
 			By("querying the App database tables via psql", func() {
 				cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM application_numbers'"
-				_, _, err := tests.Run(fmt.Sprintf(
+				_, _, err := utils.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					primaryDst,
@@ -77,7 +78,7 @@ var _ = Describe("InitDB settings", func() {
 			})
 			By("querying the database to ensure the installed extension is there", func() {
 				cmd := `psql -U postgres postgres -tAc "SELECT count(*) FROM pg_available_extensions WHERE name LIKE 'intarray'"`
-				stdout, _, err := tests.Run(fmt.Sprintf(
+				stdout, _, err := utils.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					primaryDst,
@@ -87,7 +88,7 @@ var _ = Describe("InitDB settings", func() {
 			})
 			By("checking inside the database the default locale", func() {
 				cmd := "psql -U postgres postgres -tAc \"select datcollate from pg_database where datname='template0'\""
-				stdout, _, err := tests.Run(fmt.Sprintf(
+				stdout, _, err := utils.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					primaryDst,
@@ -127,7 +128,7 @@ var _ = Describe("InitDB settings", func() {
 
 			By("checking inside the database", func() {
 				cmd := "psql -U postgres postgres -tAc \"select datcollate from pg_database where datname='template0'\""
-				stdout, _, err := tests.Run(fmt.Sprintf(
+				stdout, _, err := utils.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					primaryDst,

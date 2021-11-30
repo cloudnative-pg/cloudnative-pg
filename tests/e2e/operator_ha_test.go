@@ -7,15 +7,14 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package e2e
 
 import (
-	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/controller"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -78,7 +77,7 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 
 		By("verifying current leader", func() {
 			// Check for the current Operator Pod leader from ConfigMap
-			Expect(getLeaderInfoFromConfigMap(operatorNamespace)).To(HavePrefix(operatorPodName.GetName()))
+			Expect(testsUtils.GetLeaderInfoFromConfigMap(operatorNamespace, env)).To(HavePrefix(operatorPodName.GetName()))
 		})
 
 		By("scale up operator replicas to 3", func() {
@@ -88,7 +87,7 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 			// Scale up operator deployment to 3 replicas
 			cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=3 -n %v",
 				operatorDeployment.Name, operatorNamespace)
-			_, _, err = tests.Run(cmd)
+			_, _, err = testsUtils.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Verify the 3 operator pods are present
@@ -108,7 +107,7 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 		By("verifying leader information after scale up", func() {
 			// Check for Operator Pod leader from ConfigMap to be the former one
 			Eventually(func() (string, error) {
-				return getLeaderInfoFromConfigMap(operatorNamespace)
+				return testsUtils.GetLeaderInfoFromConfigMap(operatorNamespace, env)
 			}, 60).Should(HavePrefix(oldLeaderPodName))
 		})
 
@@ -136,7 +135,7 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 		By("new leader should be configured", func() {
 			// Verify that the leader name is different from the previous one
 			Eventually(func() (string, error) {
-				return getLeaderInfoFromConfigMap(operatorNamespace)
+				return testsUtils.GetLeaderInfoFromConfigMap(operatorNamespace, env)
 			}, 120).ShouldNot(HavePrefix(oldLeaderPodName))
 		})
 
@@ -162,7 +161,7 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 			// Scale down operator deployment to one replica
 			cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=1 -n %v",
 				operatorDeployment.Name, operatorNamespace)
-			_, _, err = tests.Run(cmd)
+			_, _, err = testsUtils.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Verify there is only one operator pod
@@ -191,43 +190,8 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 
 			// Verify the Operator Pod is the leader
 			Eventually(func() (string, error) {
-				return getLeaderInfoFromConfigMap(operatorNamespace)
+				return testsUtils.GetLeaderInfoFromConfigMap(operatorNamespace, env)
 			}, 120).Should(HavePrefix(operatorPodName.GetName()))
 		})
 	})
 })
-
-// Gather leader holderIdentity annotation the operator configMap
-func getLeaderInfoFromConfigMap(operatorNamespace string) (string, error) {
-	// Leader election id is referred as configMap name for store leader details
-	leaderElectionID := controller.LeaderElectionID
-	configMapList := &corev1.ConfigMapList{}
-	err := env.Client.List(
-		env.Ctx, configMapList, ctrlclient.InNamespace(operatorNamespace),
-		ctrlclient.MatchingFields{"metadata.name": leaderElectionID},
-	)
-	if err != nil {
-		return "", err
-	}
-
-	if len(configMapList.Items) != 1 {
-		err := fmt.Errorf("configMapList item length is not 1: %v", len(configMapList.Items))
-		return "", err
-	}
-
-	const leaderAnnotation = "control-plane.alpha.kubernetes.io/leader"
-	if annotationInfo, ok :=
-		configMapList.Items[0].ObjectMeta.Annotations[leaderAnnotation]; ok {
-		mapAnnotationInfo := make(map[string]interface{})
-		if err = json.Unmarshal([]byte(annotationInfo), &mapAnnotationInfo); err != nil {
-			return "", err
-		}
-		for key, value := range mapAnnotationInfo {
-			if key == "holderIdentity" {
-				return fmt.Sprintf("%v", value), nil
-			}
-		}
-		return "", fmt.Errorf("no holderIdentity key found in %v", leaderAnnotation)
-	}
-	return "", fmt.Errorf("no %v annotation found", leaderAnnotation)
-}

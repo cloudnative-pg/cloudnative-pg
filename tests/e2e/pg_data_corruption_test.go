@@ -11,13 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -74,7 +75,7 @@ var _ = Describe("PGDATA Corruption", func() {
 		By("corrupting primary pod by removing pg data", func() {
 			cmd := fmt.Sprintf("kubectl exec %v -n %v postgres -- /bin/bash -c 'rm -fr %v/base/*'",
 				oldPrimaryPodInfo.GetName(), namespace, specs.PgDataPath)
-			_, _, err = tests.Run(cmd)
+			_, _, err = testsUtils.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 		})
 		By("verify failover after primary pod pg data corruption", func() {
@@ -113,7 +114,7 @@ var _ = Describe("PGDATA Corruption", func() {
 		})
 		By("removing old primary pod and attached pvc", func() {
 			// removing old primary pod attached pvc
-			_, _, err = tests.Run(fmt.Sprintf("kubectl delete pvc  %v -n %v --wait=false", oldPrimaryPVCName, namespace))
+			_, _, err = testsUtils.Run(fmt.Sprintf("kubectl delete pvc  %v -n %v --wait=false", oldPrimaryPVCName, namespace))
 			Expect(err).ToNot(HaveOccurred())
 
 			zero := int64(0)

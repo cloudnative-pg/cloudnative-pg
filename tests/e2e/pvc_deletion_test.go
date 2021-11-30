@@ -14,6 +14,7 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -72,7 +73,7 @@ var _ = Describe("PVC Deletion", func() {
 			originalPVCUID := pvc.GetUID()
 
 			// Delete the pod
-			_, _, err = tests.Run(fmt.Sprintf("kubectl delete -n %v pod/%v", namespace, podName))
+			_, _, err = testsUtils.Run(fmt.Sprintf("kubectl delete -n %v pod/%v", namespace, podName))
 			Expect(err).ToNot(HaveOccurred())
 
 			// The pod should be back
@@ -115,7 +116,7 @@ var _ = Describe("PVC Deletion", func() {
 			originalPVCUID := pvc.GetUID()
 
 			// Delete the PVC and the Pod
-			_, _, err = tests.Run(fmt.Sprintf("kubectl delete -n %v pvc/%v pod/%v", namespace, pvcName, podName))
+			_, _, err = testsUtils.Run(fmt.Sprintf("kubectl delete -n %v pvc/%v pod/%v", namespace, pvcName, podName))
 			Expect(err).ToNot(HaveOccurred())
 			// A new pod should be created
 			timeout := 300

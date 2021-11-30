@@ -22,15 +22,16 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-func AssertSwitchOver(namespace string, clusterName string, env *tests.TestingEnvironment) {
+func AssertSwitchOver(namespace string, clusterName string, env *testsUtils.TestingEnvironment) {
 	var pods []string
 	var oldPrimary, targetPrimary string
 	var oldPodListLength int
@@ -126,7 +127,7 @@ func AssertSwitchOver(namespace string, clusterName string, env *tests.TestingEn
 		Eventually(func() error {
 			count := 0
 			for _, pod := range pods {
-				out, _, err := tests.Run(fmt.Sprintf(
+				out, _, err := testsUtils.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,
 					pod,
@@ -152,7 +153,7 @@ func AssertSwitchOver(namespace string, clusterName string, env *tests.TestingEn
 
 // AssertCreateCluster tests that the pods that should have been created by the sample
 // exist and are in ready state
-func AssertCreateCluster(namespace string, clusterName string, sample string, env *tests.TestingEnvironment) {
+func AssertCreateCluster(namespace string, clusterName string, sample string, env *testsUtils.TestingEnvironment) {
 	By(fmt.Sprintf("having a %v namespace", namespace), func() {
 		// Creating a namespace should be quick
 		timeout := 20
@@ -168,14 +169,14 @@ func AssertCreateCluster(namespace string, clusterName string, sample string, en
 		}, timeout).Should(BeEquivalentTo(namespace))
 	})
 	By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
-		_, _, err := tests.Run("kubectl create -n " + namespace + " -f " + sample)
+		_, _, err := testsUtils.Run("kubectl create -n " + namespace + " -f " + sample)
 		Expect(err).ToNot(HaveOccurred())
 	})
 	// Setting up a cluster with three pods is slow, usually 200-600s
 	AssertClusterIsReady(namespace, clusterName, 600, env)
 }
 
-func AssertClusterIsReady(namespace string, clusterName string, timeout int, env *tests.TestingEnvironment) {
+func AssertClusterIsReady(namespace string, clusterName string, timeout int, env *testsUtils.TestingEnvironment) {
 	By("having a Cluster with each instance in status ready", func() {
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
@@ -198,7 +199,7 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 // AssertConnection is used if a connection from a pod to a postgresql
 // database works
 func AssertConnection(host string, user string, dbname string,
-	password string, queryingPod corev1.Pod, timeout int, env *tests.TestingEnvironment) {
+	password string, queryingPod corev1.Pod, timeout int, env *testsUtils.TestingEnvironment) {
 	By(fmt.Sprintf("connecting to the %v service as %v", host, user), func() {
 		Eventually(func() string {
 			dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require", host, user, dbname, password)
@@ -254,8 +255,10 @@ func AssertCreateTestData(namespace, clusterName, tableName string) {
 	})
 }
 
-// insertRecordIntoTable insert an entry entry into a table
+// insertRecordIntoTable insert an entry into a table
 func insertRecordIntoTable(namespace, clusterName, tableName string, value int) {
+	commandTimeout := time.Second * 5
+
 	primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -460,7 +463,7 @@ func AssertNewPrimary(namespace string, clusterName string, oldprimary string) {
 }
 
 func AssertStorageCredentialsAreCreated(namespace string, name string, id string, key string) {
-	_, _, err := tests.Run(fmt.Sprintf("kubectl create secret generic %v -n %v "+
+	_, _, err := testsUtils.Run(fmt.Sprintf("kubectl create secret generic %v -n %v "+
 		"--from-literal='ID=%v' "+
 		"--from-literal='KEY=%v'",
 		name, namespace, id, key))
@@ -475,10 +478,10 @@ func InstallMinio(namespace string) {
 	minioDeploymentFile := fixturesDir +
 		"/backup/minio/minio-deployment.yaml"
 
-	_, _, err := tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+	_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
 		namespace, minioPVCFile))
 	Expect(err).ToNot(HaveOccurred())
-	_, _, err = tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+	_, _, err = testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
 		namespace, minioDeploymentFile))
 	Expect(err).ToNot(HaveOccurred())
 
@@ -494,7 +497,7 @@ func InstallMinio(namespace string) {
 	}, 300).Should(BeEquivalentTo(1))
 
 	// Create a minio service
-	_, _, err = tests.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+	_, _, err = testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
 		namespace, fixturesDir+"/backup/minio/minio-service.yaml"))
 	Expect(err).ToNot(HaveOccurred())
 }
@@ -502,7 +505,7 @@ func InstallMinio(namespace string) {
 // InstallMinioClient installs minio client to verify the backup and archive walls
 func InstallMinioClient(namespace string) {
 	clientFile := fixturesDir + "/backup/minio/minio-client.yaml"
-	_, _, err := tests.Run(fmt.Sprintf(
+	_, _, err := testsUtils.Run(fmt.Sprintf(
 		"kubectl apply -n %v -f %v",
 		namespace, clientFile))
 	Expect(err).ToNot(HaveOccurred())
@@ -523,7 +526,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string) {
 	// Create a WAL on the primary and check if it arrives at minio, within a short time
 	By("archiving WALs and verifying they exist", func() {
 		primary := clusterName + "-1"
-		out, _, err := tests.Run(fmt.Sprintf(
+		out, _, err := testsUtils.Run(fmt.Sprintf(
 			"kubectl exec -n %v %v -- %v",
 			namespace,
 			primary,
@@ -539,7 +542,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string) {
 }
 
 func AssertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string, timeout int) {
-	_, _, err := tests.Run(fmt.Sprintf(
+	_, _, err := testsUtils.Run(fmt.Sprintf(
 		"kubectl apply -n %v -f %v",
 		namespace, backupYAMLPath))
 	Expect(err).NotTo(HaveOccurred())
@@ -614,11 +617,11 @@ func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupNam
 // amount of files matching the given `path`
 func CountFilesOnMinio(namespace string, path string) (value int, err error) {
 	var stdout string
-	stdout, _, err = tests.RunUnchecked(fmt.Sprintf(
+	stdout, _, err = testsUtils.RunUnchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		namespace,
 		minioClientName,
-		composeFindMinioCmd(path, "minio")))
+		testsUtils.ComposeFindMinioCmd(path, "minio")))
 	if err != nil {
 		return -1, err
 	}
@@ -635,7 +638,7 @@ func AssertReplicaModeCluster(
 	checkQuery string) {
 	var primarySrcCluster, primaryReplicaCluster *corev1.Pod
 	var err error
-	commandTimeout = time.Second * 5
+	commandTimeout := time.Second * 5
 
 	By("creating source cluster", func() {
 		// Create replica source cluster
@@ -745,4 +748,1188 @@ func AssertWritesToPrimarySucceeds(
 				"psql", dsn, "-tAc", "CREATE TABLE table1(var1 text);")
 			Expect(err).ToNot(HaveOccurred())
 		})
+}
+
+func AssertFastFailOver(
+	namespace,
+	sampleFile,
+	clusterName,
+	webTestFile,
+	webTestJob string,
+	maxReattachTime,
+	maxFailoverTime int32) {
+	// Create a cluster in a namespace we'll delete after the test
+	err := env.CreateNamespace(namespace)
+	Expect(err).ToNot(HaveOccurred())
+
+	By(fmt.Sprintf("having a %v namespace", namespace), func() {
+		// Creating a namespace should be quick
+		timeout := 20
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      namespace,
+		}
+
+		Eventually(func() (string, error) {
+			namespaceResource := &corev1.Namespace{}
+			err = env.Client.Get(env.Ctx, namespacedName, namespaceResource)
+			return namespaceResource.GetName(), err
+		}, timeout).Should(BeEquivalentTo(namespace))
+	})
+
+	By(fmt.Sprintf("creating a Cluster in the %v namespace",
+		namespace), func() {
+		_, _, err = testsUtils.Run(
+			"kubectl create -n " + namespace + " -f " + sampleFile)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By("having a Cluster with three instances ready", func() {
+		AssertClusterIsReady(namespace, clusterName, 600, env)
+	})
+
+	// Node 1 should be the primary, so the -rw service should
+	// point there. We verify this.
+	By("having the current primary on node1", func() {
+		endpointName := clusterName + "-rw"
+		endpoint := &corev1.Endpoints{}
+		endpointNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      endpointName,
+		}
+		podName := clusterName + "-1"
+		pod := &corev1.Pod{}
+		podNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      podName,
+		}
+		err = env.Client.Get(env.Ctx, endpointNamespacedName,
+			endpoint)
+		Expect(err).ToNot(HaveOccurred())
+		err = env.Client.Get(env.Ctx, podNamespacedName, pod)
+		Expect(testsUtils.FirstEndpointIP(endpoint), err).To(
+			BeEquivalentTo(pod.Status.PodIP))
+	})
+
+	By("preparing the db for the test scenario", func() {
+		// Create the table used by the scenario
+		query := "CREATE SCHEMA tps; " +
+			"CREATE TABLE tps.tl ( " +
+			"id BIGSERIAL" +
+			", timeline TEXT DEFAULT (substring(pg_walfile_name(" +
+			"    pg_current_wal_lsn()), 1, 8))" +
+			", t timestamp DEFAULT (clock_timestamp() AT TIME ZONE 'UTC')" +
+			", source text NOT NULL" +
+			", PRIMARY KEY (id)" +
+			")"
+
+		commandTimeout := time.Second * 5
+		primaryPodName := clusterName + "-1"
+		primaryPod := &corev1.Pod{}
+		primaryPodNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      primaryPodName,
+		}
+
+		err = env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
+		Expect(err).ToNot(HaveOccurred())
+		_, _, err = env.ExecCommand(env.Ctx, *primaryPod, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By("starting load", func() {
+		// We set up hey and webtest. Hey, a load generator,
+		// continuously calls the webtest api to execute inserts
+		// on the postgres primary. We make sure that the first
+		// records appear on the database before moving to the next
+		// step.
+		_, _, err = testsUtils.Run("kubectl create -n " + namespace +
+			" -f " + webTestFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		_, _, err = testsUtils.Run("kubectl create -n " + namespace +
+			" -f " + webTestJob)
+		Expect(err).ToNot(HaveOccurred())
+
+		commandTimeout := time.Second * 2
+		timeout := 60
+		primaryPodName := clusterName + "-1"
+		primaryPodNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      primaryPodName,
+		}
+
+		Eventually(func() (string, error) {
+			primaryPod := &corev1.Pod{}
+			err = env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
+			out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, "postgres",
+				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
+				"SELECT count(*) > 0 FROM tps.tl")
+			return strings.TrimSpace(out), err
+		}, timeout).Should(BeEquivalentTo("t"))
+	})
+
+	By("deleting the primary", func() {
+		// The primary is force-deleted.
+		zero := int64(0)
+		forceDelete := &ctrlclient.DeleteOptions{
+			GracePeriodSeconds: &zero,
+		}
+		lm := clusterName + "-1"
+		err = env.DeletePod(namespace, lm, forceDelete)
+
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
+
+	AssertWritesResumedBeforeTimeout(namespace, clusterName, maxFailoverTime)
+}
+
+func AssertCustomMetricsResourcesExist(namespace, sampleFile string, configMapsCount, secretsCount int) {
+	By("verifying the custom metrics ConfigMaps and Secrets exist", func() {
+		// Create the ConfigMaps and a Secret
+		_, _, err := testsUtils.Run("kubectl apply -n " + namespace + " -f " + sampleFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Check configmaps exist
+		timeout := 20
+		Eventually(func() ([]corev1.ConfigMap, error) {
+			cmList := &corev1.ConfigMapList{}
+			err = env.Client.List(
+				env.Ctx, cmList, ctrlclient.InNamespace(namespace),
+				ctrlclient.MatchingLabels{"e2e": "metrics"},
+			)
+			return cmList.Items, err
+		}, timeout).Should(HaveLen(configMapsCount))
+
+		// Check secret exists
+		Eventually(func() ([]corev1.Secret, error) {
+			secretList := &corev1.SecretList{}
+			err = env.Client.List(
+				env.Ctx, secretList, ctrlclient.InNamespace(namespace),
+				ctrlclient.MatchingLabels{"e2e": "metrics"},
+			)
+			return secretList.Items, err
+		}, timeout).Should(HaveLen(secretsCount))
+	})
+}
+
+func AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBName, tableName string) {
+	By(fmt.Sprintf("creating target database '%v' and table '%v'", targetDBName, tableName), func() {
+		primaryPodName, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		timeout := time.Second * 2
+		// Create database
+		createDBQuery := fmt.Sprintf("create database %v;", targetDBName)
+		_, _, err = env.ExecCommand(env.Ctx, *primaryPodName, "postgres", &timeout,
+			"psql", "-U", "postgres", "-tAc", createDBQuery)
+		Expect(err).ToNot(HaveOccurred())
+		// Create table on target database
+		dsn := fmt.Sprintf("user=postgres port=5432 dbname=%v ", targetDBName)
+		createTableQuery := fmt.Sprintf("create table %v (id int);", tableName)
+		_, _, err = env.ExecCommand(env.Ctx, *primaryPodName, "postgres", &timeout,
+			"psql", dsn, "-tAc", createTableQuery)
+		Expect(err).ToNot(HaveOccurred())
+		// Grant a permission
+		grantRoleQuery := "GRANT SELECT ON all tables in schema public to pg_monitor;"
+		_, _, err = env.ExecCommand(env.Ctx, *primaryPodName, "postgres", &timeout,
+			"psql", "-U", "postgres", dsn, "-tAc", grantRoleQuery)
+		Expect(err).ToNot(HaveOccurred())
+	})
+}
+
+func AssertMetricsData(namespace, clusterName, targetOne, targetTwo, targetSecret string) {
+	By("collect and verify metric being exposed with target databases", func() {
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		for _, pod := range podList.Items {
+			podName := pod.GetName()
+			out, _, err := testsUtils.Run(fmt.Sprintf(
+				"kubectl exec -n %v %v -- %v",
+				namespace,
+				podName,
+				"sh -c 'curl -s 127.0.0.1:9187/metrics'"))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(strings.Contains(out, fmt.Sprintf(`cnp_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
+				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
+			Expect(strings.Contains(out, fmt.Sprintf(`cnp_some_query_rows{datname="%v"} 0`, targetTwo))).Should(BeTrue(),
+				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
+			Expect(strings.Contains(out, fmt.Sprintf(`cnp_some_query_test_rows{datname="%v"} 1`,
+				targetSecret))).Should(BeTrue(),
+				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
+		}
+	})
+}
+
+func CreateAndAssertCertificatesSecrets(
+	namespace, clusterName, caSecName, tlsSecName, certType string, includeCAPrivateKey bool) {
+	cluster, caPair := testsUtils.CreateSecretCA(namespace, clusterName, caSecName, includeCAPrivateKey, env)
+
+	AssertCACertificateCreation(namespace, certType, caPair, cluster, tlsSecName)
+}
+
+func AssertCACertificateCreation(namespace string, certType string, caPair *certs.KeyPair,
+	cluster *apiv1.Cluster, tlsSecName string) {
+	if certType == certs.CertTypeServer {
+		By("creating server TLS certificate", func() {
+			serverPair, err := caPair.CreateAndSignPair(cluster.GetServiceReadWriteName(), certs.CertTypeServer,
+				cluster.GetClusterAltDNSNames(),
+			)
+			Expect(err).ToNot(HaveOccurred())
+			serverSecret := serverPair.GenerateCertificateSecret(namespace, tlsSecName)
+			err = env.Client.Create(env.Ctx, serverSecret)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	}
+	if certType == certs.CertTypeClient {
+		By("creating client TLS certificate", func() {
+			// Sign tls certificates for streaming_replica user
+			serverPair, err := caPair.CreateAndSignPair("streaming_replica", certs.CertTypeClient, nil)
+			Expect(err).ToNot(HaveOccurred())
+
+			serverSecret := serverPair.GenerateCertificateSecret(namespace, tlsSecName)
+			err = env.Client.Create(env.Ctx, serverSecret)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Creating 'app' user tls certificates to validate connection from psql client
+			serverPair, err = caPair.CreateAndSignPair("app", certs.CertTypeClient, nil)
+			Expect(err).ToNot(HaveOccurred())
+
+			serverSecret = serverPair.GenerateCertificateSecret(namespace, "app-user-cert")
+			err = env.Client.Create(env.Ctx, serverSecret)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	}
+}
+
+func AssertClientCertificatesSecretsUsingCnpPlugin(namespace, clusterName string) {
+	clientCertName := "cluster-cert"
+	By("creating a client Certificate using the 'kubectl-cnp' plugin", func() {
+		_, _, err := testsUtils.Run(fmt.Sprintf(
+			"kubectl cnp certificate %v --cnp-cluster %v --cnp-user app -n %v",
+			clientCertName,
+			clusterName,
+			namespace))
+		Expect(err).ToNot(HaveOccurred())
+	})
+	By("verifying client certificate secret", func() {
+		secret := &corev1.Secret{}
+		err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clientCertName}, secret)
+		Expect(err).ToNot(HaveOccurred())
+	})
+}
+
+func AssertDBConnectionFromAppPod(namespace, clusterName, sampleAppFile, testPodName string) {
+	By("creating an app Pod and connecting to DB, using Certificate authentication", func() {
+		_, _, err := testsUtils.Run("kubectl create -n " + namespace + " -f " + sampleAppFile)
+		Expect(err).ToNot(HaveOccurred())
+		// The pod should be ready
+		podNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      testPodName,
+		}
+		pod := &corev1.Pod{}
+		Eventually(func() (bool, error) {
+			err = env.Client.Get(env.Ctx, podNamespacedName, pod)
+			return utils.IsPodActive(*pod) && utils.IsPodReady(*pod), err
+		}, 240).Should(BeTrue())
+
+		// Connecting to DB, using Certificate authentication
+		Eventually(func() (string, string, error) {
+			dsn := fmt.Sprintf("host=%v-rw.%v.svc port=5432 "+
+				"sslkey=/etc/secrets/tls/tls.key "+
+				"sslcert=/etc/secrets/tls/tls.crt "+
+				"sslrootcert=/etc/secrets/ca/ca.crt "+
+				"dbname=app user=app sslmode=verify-full", clusterName, namespace)
+			timeout := time.Second * 2
+			stdout, stderr, err := env.ExecCommand(env.Ctx, *pod, testPodName, &timeout,
+				"psql", dsn, "-tAc", "SELECT 1")
+			return stdout, stderr, err
+		}, 360).Should(BeEquivalentTo("1\n"))
+	})
+}
+
+func AssertSetupPgBasebackup(namespace, srcClusterName, srcCluster string) string {
+	primarySrc := srcClusterName + "-1"
+	// Create a cluster in a namespace we'll delete after the test
+	err := env.CreateNamespace(namespace)
+	Expect(err).ToNot(HaveOccurred())
+
+	// Create the src Cluster
+	AssertCreateCluster(namespace, srcClusterName, srcCluster, env)
+
+	cmd := "psql -U postgres app -tAc 'CREATE TABLE to_bootstrap AS VALUES (1), (2);'"
+	_, _, err = testsUtils.Run(fmt.Sprintf(
+		"kubectl exec -n %v %v -- %v",
+		namespace,
+		primarySrc,
+		cmd))
+	Expect(err).ToNot(HaveOccurred())
+	return primarySrc
+}
+
+func AssertCreateSASTokenCredentials(namespace string, id string, key string) {
+	// Adding 24 hours to the current time
+	date := time.Now().UTC().Add(time.Hour * 24)
+	// Creating date time format for az command
+	expiringDate := fmt.Sprintf("%v"+"-"+"%d"+"-"+"%v"+"T"+"%v"+":"+"%v"+"Z",
+		date.Year(),
+		date.Month(),
+		date.Day(),
+		date.Hour(),
+		date.Minute())
+
+	out, _, err := testsUtils.Run(fmt.Sprintf(
+		// SAS Token at Blob Container level does not currently work in Barman Cloud
+		// https://github.com/EnterpriseDB/barman/issues/388
+		// we will use SAS Token at Storage Account level
+		// ( "az storage container generate-sas --account-name %v "+
+		// "--name %v "+
+		// "--https-only --permissions racwdl --auth-mode key --only-show-errors "+
+		// "--expiry \"$(date -u -d \"+4 hours\" '+%%Y-%%m-%%dT%%H:%%MZ')\"",
+		// id, blobContainerName )
+		"az storage account generate-sas --account-name %v "+
+			"--https-only --permissions cdlruwap --account-key %v "+
+			"--resource-types co --services b --expiry %v -o tsv",
+		id, key, expiringDate))
+	Expect(err).ToNot(HaveOccurred())
+	SASTokenRW := strings.TrimRight(out, "\n")
+
+	out, _, err = testsUtils.Run(fmt.Sprintf(
+		"az storage account generate-sas --account-name %v "+
+			"--https-only --permissions lr --account-key %v "+
+			"--resource-types co --services b --expiry %v -o tsv",
+		id, key, expiringDate))
+	Expect(err).ToNot(HaveOccurred())
+	SASTokenRO := strings.TrimRight(out, "\n")
+
+	AssertROSASTokenUnableToWrite("restore-cluster-sas", id, SASTokenRO)
+
+	AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds-sas", id, SASTokenRW)
+	AssertStorageCredentialsAreCreated(namespace, "restore-storage-creds-sas", id, SASTokenRO)
+}
+
+func AssertROSASTokenUnableToWrite(containerName string, id string, key string) {
+	_, _, err := testsUtils.Run(fmt.Sprintf("az storage container create "+
+		"--name %v --account-name %v "+
+		"--sas-token %v", containerName, id, key))
+	Expect(err).To(HaveOccurred())
+}
+
+func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile, tableName string) {
+	By("Async Replication into external cluster", func() {
+		restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
+		Expect(err).ToNot(HaveOccurred())
+		_, _, err = testsUtils.Run(fmt.Sprintf(
+			"kubectl apply -n %v -f %v",
+			namespace, restoreClusterFile))
+		Expect(err).ToNot(HaveOccurred())
+
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, restoredClusterName, 800, env)
+
+		// Test data should be present on restored primary
+		primaryReplica := restoredClusterName + "-1"
+		postgresLogin := "psql -U postgres app -tAc "
+
+		// Assert that the initial data is there from the create function
+		cmd := postgresLogin + "'SELECT count(*) FROM to_restore'"
+		out, _, err := testsUtils.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primaryReplica,
+			cmd))
+		Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
+
+		// Add additional data to the source cluster
+		sourceClusterName, err := env.GetResourceNameFromYAML(sourceClusterFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		insertRecordIntoTable(namespace, sourceClusterName, "to_restore", 3)
+		AssertArchiveWalOnMinio(namespace, sourceClusterName)
+
+		AssertDataExpectedCount(namespace, primaryReplica, tableName, 3)
+
+		cluster, err := env.GetCluster(namespace, restoredClusterName)
+		Expect(err).ToNot(HaveOccurred())
+		expectedReplicas := cluster.Spec.Instances - 1
+		// Cascading replicas should be attached to primary replica
+		cmd = postgresLogin + "'SELECT count(*) FROM pg_stat_replication'"
+		out, _, err = testsUtils.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primaryReplica,
+			cmd))
+		Expect(err).ToNot(HaveOccurred())
+		connectedReplicas, err := strconv.Atoi(strings.Trim(out, "\n"))
+		Expect(connectedReplicas, err).To(BeEquivalentTo(expectedReplicas))
+	})
+}
+
+func AssertStorageCredentialsAreCreatedOnAzurite(namespace string) {
+	// This is required by Azurite deployment
+	secretFile := fixturesDir + "/backup/azurite/azurite-secret.yaml"
+	_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+		namespace, secretFile))
+	Expect(err).ToNot(HaveOccurred())
+}
+
+func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
+	By("Restoring a backup in a new cluster", func() {
+		restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
+		Expect(err).ToNot(HaveOccurred())
+		_, _, err = testsUtils.Run(fmt.Sprintf(
+			"kubectl apply -n %v -f %v",
+			namespace, restoreClusterFile))
+		Expect(err).ToNot(HaveOccurred())
+
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, restoredClusterName, 800, env)
+
+		// Test data should be present on restored primary
+		primary := restoredClusterName + "-1"
+		AssertDataExpectedCount(namespace, primary, tableName, 2)
+
+		// Restored primary should be on timeline 2
+		cmd := "psql -U postgres app -tAc 'select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)'"
+		out, _, err := testsUtils.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primary,
+			cmd))
+		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
+
+		// Restored standby should be attached to restored primary
+		assertClusterStandbysAreStreaming(namespace, restoredClusterName)
+	})
+}
+
+func AssertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupName string) {
+	By("scheduling immediate backups", func() {
+		var err error
+		// Create the ScheduledBackup
+		_, _, err = testsUtils.Run(fmt.Sprintf(
+			"kubectl apply -n %v -f %v",
+			namespace, backupYAMLPath))
+		Expect(err).NotTo(HaveOccurred())
+
+		// We expect the scheduled backup to be scheduled after creation
+		scheduledBackupNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      scheduledBackupName,
+		}
+		Eventually(func() (*v1.Time, error) {
+			scheduledBackup := &apiv1.ScheduledBackup{}
+			err = env.Client.Get(env.Ctx,
+				scheduledBackupNamespacedName, scheduledBackup)
+			return scheduledBackup.Status.LastScheduleTime, err
+		}, 30).ShouldNot(BeNil())
+
+		// The immediate backup fixtures has crontabs that hardly ever run
+		// The only backup that we get should be the immediate one
+		Eventually(func() (int, error) {
+			currentBackupCount, err := getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
+			if err != nil {
+				return 0, err
+			}
+			return currentBackupCount, err
+		}, 120).Should(BeNumerically("==", 1))
+	})
+}
+
+func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
+	var completedBackupsCount int
+	var err error
+	By("suspending the scheduled backup", func() {
+		// update suspend status to true
+		cmd := fmt.Sprintf("kubectl patch ScheduledBackup %v -n %v -p '{\"spec\":{\"suspend\":true}}' "+
+			"--type='merge'", scheduledBackupName, namespace)
+		_, _, err = testsUtils.Run(cmd)
+		Expect(err).ToNot(HaveOccurred())
+		scheduledBackupNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      scheduledBackupName,
+		}
+		Eventually(func() bool {
+			scheduledBackup := &apiv1.ScheduledBackup{}
+			err = env.Client.Get(env.Ctx, scheduledBackupNamespacedName, scheduledBackup)
+			return *scheduledBackup.Spec.Suspend
+		}, 30).Should(BeTrue())
+	})
+	By("waiting for ongoing backups to complete", func() {
+		// After suspending, new backups shouldn't start.
+		// If there are running backups they had already started,
+		// and we give them some time to finish.
+		Eventually(func() (bool, error) {
+			completedBackupsCount, err = getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
+			if err != nil {
+				return false, err
+			}
+			backups, err := getScheduledBackupBackups(namespace, scheduledBackupName)
+			if err != nil {
+				return false, err
+			}
+			return len(backups) == completedBackupsCount, nil
+		}, 80).Should(BeTrue())
+	})
+	By("verifying backup has suspended", func() {
+		Consistently(func() (int, error) {
+			backups, err := getScheduledBackupBackups(namespace, scheduledBackupName)
+			if err != nil {
+				return 0, err
+			}
+			return len(backups), err
+		}, 80).Should(BeEquivalentTo(completedBackupsCount))
+	})
+	By("resuming suspended backup", func() {
+		// take current backup count before suspend the schedule backup
+		completedBackupsCount, err = getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
+		Expect(err).ToNot(HaveOccurred())
+
+		cmd := fmt.Sprintf("kubectl patch ScheduledBackup %v -n %v -p '{\"spec\":{\"suspend\":false}}' "+
+			"--type='merge'", scheduledBackupName, namespace)
+		_, _, err = testsUtils.Run(cmd)
+		Expect(err).ToNot(HaveOccurred())
+	})
+	By("verifying backup has resumed", func() {
+		Eventually(func() (int, error) {
+			currentBackupCount, err := getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
+			if err != nil {
+				return 0, err
+			}
+			return currentBackupCount, err
+		}, 90).Should(BeNumerically(">", completedBackupsCount))
+	})
+}
+
+func AssertClusterRestorePITR(namespace, clusterName, tableName string) {
+	primaryInfo := &corev1.Pod{}
+	var err error
+	commandTimeout := time.Second * 5
+
+	By("restoring a backup cluster with PITR in a new cluster", func() {
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, clusterName, 800, env)
+
+		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Restored primary should be on timeline 2
+		query := "select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)"
+		stdOut, _, err := env.ExecCommand(env.Ctx, *primaryInfo, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Trim(stdOut, "\n"), err).To(Equal("00000002"))
+
+		// Restored standby should be attached to restored primary
+		query = "SELECT count(*) FROM pg_stat_replication"
+		stdOut, _, err = env.ExecCommand(env.Ctx, *primaryInfo, "postgres",
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Trim(stdOut, "\n"), err).To(BeEquivalentTo("2"))
+	})
+
+	By(fmt.Sprintf("after restored, 3rd entry should not be exists in table '%v'", tableName), func() {
+		// Only 2 entries should be present
+		AssertDataExpectedCount(namespace, primaryInfo.GetName(), tableName, 2)
+	})
+}
+
+func AssertArchiveWalOnAzurite(namespace, clusterName string) {
+	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
+	By("archiving WALs and verifying they exist", func() {
+		primary := clusterName + "-1"
+		out, _, err := testsUtils.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primary,
+			switchWalCmd))
+		Expect(err).ToNot(HaveOccurred())
+
+		latestWAL := strings.TrimSpace(out)
+		// verifying on blob storage using az
+		// Define what file we are looking for in Azurite.
+		// Escapes are required since az expects forward slashes to be escaped
+		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
+		// verifying on blob storage using az
+		Eventually(func() (int, error) {
+			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, path)
+		}, 60).Should(BeEquivalentTo(1))
+	})
+}
+
+func AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey string) {
+	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage, within a short time
+	By("archiving WALs and verifying they exist", func() {
+		primary := clusterName + "-1"
+		out, _, err := testsUtils.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primary,
+			switchWalCmd))
+		Expect(err).ToNot(HaveOccurred())
+
+		latestWAL := strings.TrimSpace(out)
+		// Define what file we are looking for in Azure.
+		// Escapes are required since az expects forward slashes to be escaped
+		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
+		// Verifying on blob storage using az
+		Eventually(func() (int, error) {
+			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, path)
+		}, 30).Should(BeEquivalentTo(1))
+	})
+}
+
+func prepareClusterForPITROnMinio(
+	namespace,
+	clusterName,
+	clusterSampleFile,
+	backupSampleFile,
+	tableName string,
+	currentTimestamp *string) {
+	err := env.CreateNamespace(namespace)
+	Expect(err).ToNot(HaveOccurred())
+
+	By("creating the credentials for minio", func() {
+		AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+	})
+
+	By("setting up minio", func() {
+		InstallMinio(namespace)
+	})
+
+	// Create the minio client pod and wait for it to be ready.
+	// We'll use it to check if everything is archived correctly
+	By("setting up minio client pod", func() {
+		InstallMinioClient(namespace)
+	})
+
+	// Create the cluster
+	AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
+
+	By("backing up a cluster and verifying it exists on minio", func() {
+		testsUtils.ExecuteBackup(namespace, backupSampleFile, env)
+
+		Eventually(func() (int, error) {
+			return CountFilesOnMinio(namespace, "data.tar")
+		}, 30).Should(BeEquivalentTo(1))
+		Eventually(func() (string, error) {
+			cluster := &apiv1.Cluster{}
+			err := env.Client.Get(env.Ctx,
+				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+				cluster)
+			return cluster.Status.FirstRecoverabilityPoint, err
+		}, 30).ShouldNot(BeEmpty())
+	})
+
+	// Write a table and insert 2 entries on the "app" database
+	AssertCreateTestData(namespace, clusterName, tableName)
+
+	By("getting currentTimestamp", func() {
+		ts, err := testsUtils.GetCurrentTimeStamp(namespace, clusterName, env)
+		*currentTimestamp = ts
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableName), func() {
+		insertRecordIntoTable(namespace, clusterName, tableName, 3)
+	})
+	AssertArchiveWalOnMinio(namespace, clusterName)
+}
+
+func prepareClusterForPITROnAzureBlob(
+	namespace,
+	clusterName,
+	clusterSampleFile,
+	backupSampleFile,
+	azStorageAccount,
+	azStorageKey,
+	tableName string,
+	currentTimestamp *string) {
+	// The Azure Blob Storage should have been created ad-hoc for the test.
+	// The credentials are retrieved from the environment variables, as we can't create
+	// a fixture for them
+	By("creating the Azure Blob Storage credentials", func() {
+		AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", azStorageAccount, azStorageKey)
+	})
+
+	// Create the cluster
+	AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
+
+	By("backing up a cluster and verifying it exists on Azure Blob", func() {
+		testsUtils.ExecuteBackup(namespace, backupSampleFile, env)
+
+		Eventually(func() (int, error) {
+			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
+		}, 30).Should(BeEquivalentTo(1))
+		Eventually(func() (string, error) {
+			cluster := &apiv1.Cluster{}
+			err := env.Client.Get(env.Ctx,
+				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+				cluster)
+			return cluster.Status.FirstRecoverabilityPoint, err
+		}, 30).ShouldNot(BeEmpty())
+	})
+
+	// Write a table and insert 2 entries on the "app" database
+	AssertCreateTestData(namespace, clusterName, tableName)
+
+	By("getting currentTimestamp", func() {
+		ts, err := testsUtils.GetCurrentTimeStamp(namespace, clusterName, env)
+		*currentTimestamp = ts
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableName), func() {
+		insertRecordIntoTable(namespace, clusterName, tableName, 3)
+	})
+	AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+}
+
+func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
+	// Create a cluster in a namespace we'll delete after the test
+	err := env.CreateNamespace(namespace)
+	Expect(err).ToNot(HaveOccurred())
+
+	By("creating the Azurite storage credentials", func() {
+		AssertStorageCredentialsAreCreatedOnAzurite(namespace)
+	})
+
+	By("setting up Azurite to hold the backups", func() {
+		// Deploying azurite for blob storage
+		installAzurite(namespace)
+	})
+
+	By("setting up az-cli", func() {
+		// This is required as we have a service of Azurite running locally.
+		// In order to connect, we need az cli inside the namespace
+		installAzCli(namespace)
+	})
+
+	// Creating cluster
+	AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
+}
+
+func prepareClusterBackupOnAzurite(namespace, clusterName, clusterSampleFile, backupFile, tableName string) {
+	// Setting up Azurite and az cli along with Postgresql cluster
+	prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile)
+	// Write a table and some data on the "app" database
+	AssertCreateTestData(namespace, clusterName, tableName)
+	AssertArchiveWalOnAzurite(namespace, clusterName)
+
+	By("backing up a cluster and verifying it exists on azurite", func() {
+		// We create a Backup
+		testsUtils.ExecuteBackup(namespace, backupFile, env)
+		// Verifying file called data.tar should be available on Azurite blob storage
+		Eventually(func() (int, error) {
+			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
+		}, 30).Should(BeNumerically(">=", 1))
+		Eventually(func() (string, error) {
+			cluster := &apiv1.Cluster{}
+			err := env.Client.Get(env.Ctx,
+				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+				cluster)
+			return cluster.Status.FirstRecoverabilityPoint, err
+		}, 30).ShouldNot(BeEmpty())
+	})
+}
+
+func prepareClusterForPITROnAzurite(
+	namespace,
+	clusterName,
+	clusterSampleFile,
+	backupSampleFile,
+	tableName string,
+	currentTimestamp *string) {
+	prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile)
+
+	By("backing up a cluster and verifying it exists on azurite", func() {
+		// We create a Backup
+		testsUtils.ExecuteBackup(namespace, backupSampleFile, env)
+		// Verifying file called data.tar should be available on Azurite blob storage
+		Eventually(func() (int, error) {
+			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
+		}, 30).Should(BeNumerically(">=", 1))
+		Eventually(func() (string, error) {
+			cluster := &apiv1.Cluster{}
+			err := env.Client.Get(env.Ctx,
+				ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+				cluster)
+			return cluster.Status.FirstRecoverabilityPoint, err
+		}, 30).ShouldNot(BeEmpty())
+	})
+
+	// Write a table and insert 2 entries on the "app" database
+	AssertCreateTestData(namespace, clusterName, tableName)
+
+	By("getting currentTimestamp", func() {
+		ts, err := testsUtils.GetCurrentTimeStamp(namespace, clusterName, env)
+		*currentTimestamp = ts
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableName), func() {
+		insertRecordIntoTable(namespace, clusterName, tableName, 3)
+	})
+	AssertArchiveWalOnAzurite(namespace, clusterName)
+}
+
+func installAzurite(namespace string) {
+	// Create an Azurite for blob storage
+	azuriteDeploymentFile := fixturesDir +
+		"/backup/azurite/azurite-deployment.yaml"
+
+	_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+		namespace, azuriteDeploymentFile))
+	Expect(err).ToNot(HaveOccurred())
+
+	// Wait for the Azurite pod to be ready
+	deploymentNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      "azurite",
+	}
+	Eventually(func() (int32, error) {
+		deployment := &appsv1.Deployment{}
+		err = env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
+		return deployment.Status.ReadyReplicas, err
+	}, 300).Should(BeEquivalentTo(1))
+
+	// Create an Azurite service
+	serviceFile := fixturesDir + "/backup/azurite/azurite-service.yaml"
+	_, _, err = testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
+		namespace, serviceFile))
+	Expect(err).ToNot(HaveOccurred())
+}
+
+func installAzCli(namespace string) {
+	clientFile := fixturesDir + "/backup/azurite/az-cli.yaml"
+	_, _, err := testsUtils.Run(fmt.Sprintf(
+		"kubectl apply -n %v -f %v",
+		namespace, clientFile))
+	Expect(err).ToNot(HaveOccurred())
+	azCliNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      "az-cli",
+	}
+	Eventually(func() (bool, error) {
+		az := &corev1.Pod{}
+		err = env.Client.Get(env.Ctx, azCliNamespacedName, az)
+		return utils.IsPodReady(*az), err
+	}, 180).Should(BeTrue())
+}
+
+func createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerYamlFilePath string, expectedInstanceCount int) {
+	_, _, err := testsUtils.Run("kubectl create -n " + namespace + " -f " + poolerYamlFilePath)
+	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func() (int32, error) {
+		deployment, err := testsUtils.GetPGBouncerDeployment(namespace, poolerYamlFilePath, env)
+
+		return deployment.Status.ReadyReplicas, err
+	}, 300).Should(BeEquivalentTo(expectedInstanceCount))
+
+	// check pooler pod is up and running
+	assertPGBouncerPodsAreReady(namespace, poolerYamlFilePath, expectedInstanceCount)
+}
+
+// assertPGBouncerPodsAreReady verifies if PGBouncer pooler pods are ready
+func assertPGBouncerPodsAreReady(namespace, poolerYamlFilePath string, expectedPodCount int) {
+	Eventually(func() (bool, error) {
+		podList, err := testsUtils.GetPGBouncerPodList(namespace, poolerYamlFilePath, env)
+		if err != nil {
+			return false, err
+		}
+
+		podItemsCount := len(podList.Items)
+		if podItemsCount != expectedPodCount {
+			return false, fmt.Errorf("expected pgBouncer pods count match passed expected instance count. "+
+				"Got: %v, Expected: %v", podItemsCount, expectedPodCount)
+		}
+
+		activeAndReadyPodCount := 0
+		for _, item := range podList.Items {
+			if utils.IsPodActive(item) && utils.IsPodReady(item) {
+				activeAndReadyPodCount++
+			}
+			continue
+		}
+
+		if activeAndReadyPodCount != expectedPodCount {
+			return false, fmt.Errorf("expected pgBouncer pods to be all active and ready. Got: %v, Expected: %v",
+				activeAndReadyPodCount, expectedPodCount)
+		}
+
+		return true, nil
+	}, 90).Should(BeTrue())
+}
+
+func assertReadWriteConnectionUsingPgBouncerService(
+	namespace,
+	clusterName,
+	poolerYamlFilePath string,
+	isPoolerRW bool,
+) {
+	poolerServiceName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
+	Expect(err).ToNot(HaveOccurred())
+	podName := clusterName + "-1"
+	pod := &corev1.Pod{}
+	namespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      podName,
+	}
+	err = env.Client.Get(env.Ctx, namespacedName, pod)
+	Expect(err).ToNot(HaveOccurred())
+
+	// Get the app user password from the -app secret
+	appSecretName := clusterName + "-app"
+	appSecret := &corev1.Secret{}
+	appSecretNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      appSecretName,
+	}
+	err = env.Client.Get(env.Ctx, appSecretNamespacedName, appSecret)
+	Expect(err).ToNot(HaveOccurred())
+	generatedAppUserPassword := string(appSecret.Data["password"])
+	AssertConnection(poolerServiceName, "app", "app", generatedAppUserPassword, *pod, 180, env)
+
+	// verify that, if pooler type setup read write then it will allow both read and
+	// write operations or if pooler type setup read only then it will allow only read operations
+	if isPoolerRW {
+		AssertWritesToPrimarySucceeds(pod, poolerServiceName, "app", "app",
+			generatedAppUserPassword)
+	} else {
+		AssertWritesToReplicaFails(pod, poolerServiceName, "app", "app",
+			generatedAppUserPassword)
+	}
+}
+
+func assertPodIsRecreated(namespace, poolerSampleFile string) {
+	var podNameBeforeDelete string
+	poolerName, err := env.GetResourceNameFromYAML(poolerSampleFile)
+	Expect(err).ToNot(HaveOccurred())
+
+	By(fmt.Sprintf("deleting pooler '%s' pod", poolerName), func() {
+		// gather pgbouncer pod name before deleting
+		podList, err := testsUtils.GetPGBouncerPodList(namespace, poolerSampleFile, env)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(len(podList.Items)).Should(BeEquivalentTo(1))
+		podNameBeforeDelete = podList.Items[0].GetName()
+
+		// deleting pgbouncer pod
+		cmd := fmt.Sprintf("kubectl delete pod %s -n %s", podNameBeforeDelete, namespace)
+		_, _, err = testsUtils.Run(cmd)
+		Expect(err).ToNot(HaveOccurred())
+	})
+	By(fmt.Sprintf("verifying pooler '%s' pod has recreated", poolerName), func() {
+		// New pod should be created
+		Eventually(func() (bool, error) {
+			podList, err := testsUtils.GetPGBouncerPodList(namespace, poolerSampleFile, env)
+			if err != nil {
+				return false, err
+			}
+			if len(podList.Items) == 1 {
+				if utils.IsPodActive(podList.Items[0]) && utils.IsPodReady(podList.Items[0]) {
+					if !(podNameBeforeDelete == podList.Items[0].GetName()) {
+						return true, err
+					}
+				}
+			}
+			return false, err
+		}, 120).Should(BeTrue())
+	})
+}
+
+func assertDeploymentIsRecreated(namespace, poolerSampleFile string) {
+	var deploymentUID types.UID
+	deploymentInfo, err := testsUtils.GetPGBouncerDeployment(namespace, poolerSampleFile, env)
+	Expect(err).ToNot(HaveOccurred())
+	deploymentName := deploymentInfo.GetName()
+
+	By(fmt.Sprintf("deleting pgbouncer '%s' deployment", deploymentName), func() {
+		// gather pgbouncer deployment info before delete
+		deploymentUID = deploymentInfo.UID
+		// deleting pgbouncer deployment
+		cmd := fmt.Sprintf("kubectl delete deployment %s -n %s", deploymentName, namespace)
+		_, _, err = testsUtils.Run(cmd)
+		Expect(err).ToNot(HaveOccurred())
+	})
+	By(fmt.Sprintf("verifying new deployment '%s' has recreated", deploymentName), func() {
+		// new deployment will be created and ready replicas should be one
+		Eventually(func() (int32, error) {
+			deployment, err := testsUtils.GetPGBouncerDeployment(namespace, poolerSampleFile, env)
+			return deployment.Status.ReadyReplicas, err
+		}, 300).Should(BeEquivalentTo(1))
+
+		// new deployment UID will be different from old one
+		deploymentInfo, err = testsUtils.GetPGBouncerDeployment(namespace, poolerSampleFile, env)
+		Expect(err).ToNot(HaveOccurred())
+		newDeploymentUID := deploymentInfo.UID
+		Expect(newDeploymentUID).ToNot(BeEquivalentTo(deploymentUID))
+	})
+	By(fmt.Sprintf("newly created pod has up and running after deleting '%s' deployment", deploymentName), func() {
+		// check pgbouncer pod will be up and running
+		Eventually(func() (bool, error) {
+			podList, err := testsUtils.GetPGBouncerPodList(namespace, poolerSampleFile, env)
+			if err != nil {
+				return false, err
+			}
+			if len(podList.Items) == 1 {
+				return utils.IsPodActive(podList.Items[0]) && utils.IsPodReady(podList.Items[0]), err
+			}
+			return false, nil
+		}, 120).Should(BeTrue())
+	})
+}
+
+// assertPGBouncerEndpointsContainsPodsIP makes sure that the Endpoints resource directs the traffic
+// to the correct pods.
+func assertPGBouncerEndpointsContainsPodsIP(
+	namespace,
+	poolerYamlFilePath string,
+	expectedPodCount int,
+) {
+	var pgBouncerPods []*corev1.Pod
+	ep, err := testsUtils.GetPoolerEndpoints(namespace, poolerYamlFilePath, env)
+	Expect(err).ToNot(HaveOccurred())
+
+	podList, err := testsUtils.GetPGBouncerPodList(namespace, poolerYamlFilePath, env)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(ep.Subsets).ToNot(BeEmpty())
+
+	for _, ip := range ep.Subsets[0].Addresses {
+		for podIndex, pod := range podList.Items {
+			if pod.Status.PodIP == ip.IP {
+				pgBouncerPods = append(pgBouncerPods, &podList.Items[podIndex])
+				continue
+			}
+		}
+	}
+
+	Expect(pgBouncerPods).Should(HaveLen(expectedPodCount), "Pod length or IP mismatch in ep")
+}
+
+// assertPGBouncerHasServiceNameInsideHostParameter makes sure that the service name is contained inside the host file
+func assertPGBouncerHasServiceNameInsideHostParameter(namespace, serviceName string, podList *corev1.PodList) {
+	for _, pod := range podList.Items {
+		command := fmt.Sprintf("kubectl exec -n %s %s -- /bin/bash -c 'grep "+
+			" \"host=%s\" controller/configs/pgbouncer.ini'", namespace, pod.Name, serviceName)
+		out, _, err := testsUtils.Run(command)
+		Expect(err).ToNot(HaveOccurred())
+		expectedContainedHost := fmt.Sprintf("host=%s", serviceName)
+		Expect(out).To(ContainSubstring(expectedContainedHost))
+	}
+}
+
+// OnlineResizePVC is for verifying if storage can be automatically expanded, or not
+func OnlineResizePVC(namespace, clusterName string) {
+	pvc := &corev1.PersistentVolumeClaimList{}
+	By("verify PVC before expansion", func() {
+		// Verifying the first stage of deployment to compare it further with expanded value
+		err := env.Client.List(env.Ctx, pvc, ctrlclient.InNamespace(namespace))
+		Expect(err).ToNot(HaveOccurred())
+		// Iterating through PVC list to assure its default size
+		for _, pvClaim := range pvc.Items {
+			Expect(pvClaim.Status.Capacity.Storage().String()).To(BeEquivalentTo("1Gi"))
+		}
+	})
+	By("expanding Cluster storage", func() {
+		// Patching cluster to expand storage size from 1Gi to 2Gi
+		_, _, err := testsUtils.Run("kubectl patch cluster " + clusterName + " -n " + namespace +
+			" -p '{\"spec\":{\"storage\":{\"size\":\"2Gi\"}}}' --type=merge")
+		Expect(err).ToNot(HaveOccurred())
+	})
+	By("verifying Cluster storage is expanded", func() {
+		// Gathering and verifying the new size of PVC after update on cluster
+		Eventually(func() int {
+			// Variable counter to store the updated total of expanded PVCs. It should be equal to three
+			updateCount := 0
+			// Gathering PVC list
+			err := env.Client.List(env.Ctx, pvc, ctrlclient.InNamespace(namespace))
+			Expect(err).ToNot(HaveOccurred())
+			// Iterating through PVC list to compare with expanded size
+			for _, pvClaim := range pvc.Items {
+				// Size comparison
+				if pvClaim.Status.Capacity.Storage().String() == "2Gi" {
+					updateCount++
+				}
+			}
+			return updateCount
+		}, 300).Should(BeEquivalentTo(3))
+	})
+}
+
+func OfflineResizePVC(namespace, clusterName string, timeout int) {
+	By("verify PVC size before expansion", func() {
+		// Gathering PVC list for future use of comparison and deletion after storage expansion
+		pvc := &corev1.PersistentVolumeClaimList{}
+		err := env.Client.List(env.Ctx, pvc, ctrlclient.InNamespace(namespace))
+		Expect(err).ToNot(HaveOccurred())
+		// Iterating through PVC list to verify the default size for future comparison
+		for _, pvClaim := range pvc.Items {
+			Expect(pvClaim.Status.Capacity.Storage().String()).To(BeEquivalentTo("1Gi"))
+		}
+	})
+	By("expanding Cluster storage", func() {
+		// Expanding cluster storage
+		_, _, err := testsUtils.Run("kubectl patch cluster " + clusterName + " -n " + namespace +
+			" -p '{\"spec\":{\"storage\":{\"size\":\"2Gi\"}}}' --type=merge")
+		Expect(err).ToNot(HaveOccurred())
+	})
+	By("deleting Pod and pPVC", func() {
+		// Gathering cluster primary
+		currentPrimary, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		zero := int64(0)
+		forceDelete := &ctrlclient.DeleteOptions{
+			GracePeriodSeconds: &zero,
+		}
+		// Gathering PVC list to be deleted
+		pvc := &corev1.PersistentVolumeClaimList{}
+		err = env.Client.List(env.Ctx, pvc, ctrlclient.InNamespace(namespace))
+		Expect(err).ToNot(HaveOccurred())
+		// Iterating through PVC list for deleting pod and PVC for storage expansion
+		for _, pvClaimNew := range pvc.Items {
+			// Comparing cluster pods to not be primary to ensure cluster is healthy.
+			// Primary will be eventually deleted
+			if pvClaimNew.Name != currentPrimary.Name {
+				// Deleting PVC
+				_, _, err = testsUtils.Run("kubectl delete pvc " + pvClaimNew.Name + " -n " + namespace + " --wait=false")
+				Expect(err).ToNot(HaveOccurred())
+				// Deleting standby and replica pods
+				err = env.DeletePod(namespace, pvClaimNew.Name, forceDelete)
+				Expect(err).ToNot(HaveOccurred())
+				// Ensuring cluster is healthy with three pods
+				AssertClusterIsReady(namespace, clusterName, timeout, env)
+			}
+		}
+		// Deleting primary pvc
+		_, _, err = testsUtils.Run("kubectl delete pvc " + currentPrimary.Name + " -n " + namespace + " --wait=false")
+		Expect(err).ToNot(HaveOccurred())
+		// Deleting primary pod
+		err = env.DeletePod(namespace, currentPrimary.Name, forceDelete)
+		Expect(err).ToNot(HaveOccurred())
+	})
+	// Ensuring cluster is healthy, after failover of the primary pod and new pod is recreated
+	AssertClusterIsReady(namespace, clusterName, timeout, env)
+	By("verifying Cluster storage is expanded", func() {
+		// Gathering PVC list for comparison
+		pvcList, err := env.GetPVCList(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		// Gathering PVC size and comparing with expanded value
+		Eventually(func() int {
+			// Bool value to ensure every pod in cluster expanded, will be eventually compared as true
+			count := 0
+			// Iterating through PVC list for comparison
+			for _, pvClaim := range pvcList.Items {
+				// Comparing to expanded value.
+				// Once all pods will be expanded, count will be equal to three
+				if pvClaim.Status.Capacity.Storage().String() == "2Gi" {
+					count++
+				}
+			}
+			return count
+		}, 30).Should(BeEquivalentTo(3))
+	})
 }

@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -40,7 +41,7 @@ var _ = Describe("Connection via services", func() {
 		appDBUser string,
 		appPassword string,
 		superuserPassword string,
-		env *tests.TestingEnvironment) {
+		env *utils.TestingEnvironment) {
 
 		// we use a pod in the cluster to have a psql client ready and
 		// internal access to the k8s cluster

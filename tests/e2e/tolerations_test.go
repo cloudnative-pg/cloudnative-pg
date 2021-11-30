@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -44,7 +45,7 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive), f
 		_ = env.DeleteNamespace(namespace)
 		for _, node := range taintedNodes {
 			cmd := fmt.Sprintf("kubectl taint node %v %s=test:NoSchedule-", node, tolerationKey)
-			_, _, err := tests.Run(cmd)
+			_, _, err := utils.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 		}
 		taintedNodes = nil
@@ -61,7 +62,7 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive), f
 			for _, node := range nodes.Items {
 				if (node.Spec.Unschedulable != true) && (len(node.Spec.Taints) == 0) {
 					cmd := fmt.Sprintf("kubectl taint node %v %s=test:NoSchedule", node.Name, tolerationKey)
-					_, _, err := tests.Run(cmd)
+					_, _, err := utils.Run(cmd)
 					Expect(err).ToNot(HaveOccurred())
 					taintedNodes = append(taintedNodes, node.Name)
 				}

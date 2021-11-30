@@ -15,6 +15,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -56,7 +57,7 @@ var _ = Describe("Configuration update", func() {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			// Update the configuration
-			_, _, err = tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+			_, _, err = utils.Run("kubectl apply -n " + namespace + " -f " + sample)
 			Expect(err).ToNot(HaveOccurred())
 			timeout := 60
 			commandtimeout := time.Second * 2
@@ -83,7 +84,7 @@ var _ = Describe("Configuration update", func() {
 				"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1")
 			Expect(err).To(HaveOccurred())
 			// Update the configuration
-			_, _, err = tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+			_, _, err = utils.Run("kubectl apply -n " + namespace + " -f " + sample)
 			Expect(err).ToNot(HaveOccurred())
 			// The new pg_hba rule should be present in every pod
 			for _, pod := range podList.Items {
@@ -117,7 +118,7 @@ var _ = Describe("Configuration update", func() {
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
 			// Update the configuration
-			_, _, err = tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+			_, _, err = utils.Run("kubectl apply -n " + namespace + " -f " + sample)
 			Expect(err).ToNot(HaveOccurred())
 			timeout := 300
 			commandtimeout := time.Second * 2
@@ -152,7 +153,7 @@ var _ = Describe("Configuration update", func() {
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
 			// Update the configuration
-			_, _, err = tests.Run("kubectl apply -n " + namespace + " -f " + sample)
+			_, _, err = utils.Run("kubectl apply -n " + namespace + " -f " + sample)
 			Expect(err).ToNot(HaveOccurred())
 			timeout := 300
 			commandtimeout := time.Second * 2
@@ -182,7 +183,7 @@ var _ = Describe("Configuration update", func() {
 		By("Erroring out when a fixedConfigurationParameter is modified", func() {
 			sample := fixturesDir + "/config_update/05-fixed-params.yaml"
 			// Update the configuration
-			_, _, err := tests.RunUnchecked("kubectl apply -n " + namespace + " -f " + sample)
+			_, _, err := utils.RunUnchecked("kubectl apply -n " + namespace + " -f " + sample)
 			// Expecting an error when a fixedConfigurationParameter is modified
 			Expect(err).To(HaveOccurred())
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -203,7 +204,7 @@ var _ = Describe("Configuration update", func() {
 		By("Erroring out when a blockedConfigurationParameter is modified", func() {
 			sample := fixturesDir + "/config_update/06-blocked-params.yaml"
 			// Update the configuration
-			_, _, err := tests.RunUnchecked("kubectl apply -n " + namespace + " -f " + sample)
+			_, _, err := utils.RunUnchecked("kubectl apply -n " + namespace + " -f " + sample)
 			// Expecting an error when a blockedConfigurationParameter is modified
 			Expect(err).To(HaveOccurred())
 			podList, err := env.GetClusterPodList(namespace, clusterName)

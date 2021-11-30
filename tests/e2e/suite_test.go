@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	k8sscheme "k8s.io/client-go/kubernetes/scheme"
-
 	"github.com/thoas/go-funk"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -28,14 +28,14 @@ const (
 )
 
 var (
-	env                     *tests.TestingEnvironment
+	env                     *utils.TestingEnvironment
 	testLevelEnv            *tests.TestEnvLevel
 	expectedOperatorPodName string
 )
 
 var _ = BeforeSuite(func() {
 	var err error
-	env, err = tests.NewTestingEnvironment()
+	env, err = utils.NewTestingEnvironment()
 	if err != nil {
 		panic(err)
 	}

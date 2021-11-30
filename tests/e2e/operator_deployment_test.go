@@ -8,6 +8,7 @@ package e2e
 
 import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
