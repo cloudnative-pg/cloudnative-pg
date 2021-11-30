@@ -808,6 +808,15 @@ type WalBackupConfiguration struct {
 	// `AES256` and `aws:kms`
 	// +kubebuilder:validation:Enum=AES256;"aws:kms"
 	Encryption EncryptionType `json:"encryption,omitempty"`
+
+	// Number of WAL files to be either archived in parallel (when the
+	// PostgreSQL instance is archiving to a backup object store) or
+	// restored in parallel (when a PostgreSQL standby is fetching WAL
+	// files from a recovery object store). If not specified, WAL files
+	// will be processed one at a time. It accepts a positive integer as a
+	// value - with 1 being the minimum accepted value.
+	// +kubebuilder:validation:Minimum=1
+	MaxParallel int `json:"maxParallel,omitempty"`
 }
 
 // DataBackupConfiguration is the configuration of the backup of
