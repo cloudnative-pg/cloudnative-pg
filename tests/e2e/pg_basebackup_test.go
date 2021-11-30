@@ -10,10 +10,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
 
 var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
@@ -46,7 +47,7 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 	})
 
 	It("can bootstrap with pg_basebackup using basic auth", func() {
-		primarySrc := setupPgBasebackup(namespace, srcClusterName, srcCluster)
+		primarySrc := AssertSetupPgBasebackup(namespace, srcClusterName, srcCluster)
 
 		primaryDst := dstClusterName + "-1"
 
@@ -59,7 +60,7 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 
 		By("checking data have been copied correctly", func() {
 			// Test data should be present on restored primary
-			out, _, err := tests.Run(fmt.Sprintf(
+			out, _, err := utils.Run(fmt.Sprintf(
 				"kubectl exec -n %v %v -- %v",
 				namespace,
 				primaryDst,
@@ -72,7 +73,7 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 		})
 
 		By("checking the src cluster was not modified", func() {
-			out, _, err := tests.Run(fmt.Sprintf(
+			out, _, err := utils.Run(fmt.Sprintf(
 				"kubectl exec -n %v %v -- %v",
 				namespace,
 				primarySrc,
@@ -108,7 +109,7 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
 	})
 
 	It("can bootstrap with pg_basebackup using TLS auth", func() {
-		primarySrc := setupPgBasebackup(namespace, srcClusterName, srcCluster)
+		primarySrc := AssertSetupPgBasebackup(namespace, srcClusterName, srcCluster)
 
 		primaryDst := dstClusterName + "-1"
 		By("creating the dst cluster", func() {
@@ -120,7 +121,7 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
 
 		By("checking data have been copied correctly", func() {
 			// Test data should be present on restored primary
-			out, _, err := tests.Run(fmt.Sprintf(
+			out, _, err := utils.Run(fmt.Sprintf(
 				"kubectl exec -n %v %v -- %v",
 				namespace,
 				primaryDst,
@@ -134,7 +135,7 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
 		})
 
 		By("checking the src cluster was not modified", func() {
-			out, _, err := tests.Run(fmt.Sprintf(
+			out, _, err := utils.Run(fmt.Sprintf(
 				"kubectl exec -n %v %v -- %v",
 				namespace,
 				primarySrc,
@@ -144,22 +145,3 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
 		})
 	})
 })
-
-func setupPgBasebackup(namespace, srcClusterName, srcCluster string) string {
-	primarySrc := srcClusterName + "-1"
-	// Create a cluster in a namespace we'll delete after the test
-	err := env.CreateNamespace(namespace)
-	Expect(err).ToNot(HaveOccurred())
-
-	// Create the src Cluster
-	AssertCreateCluster(namespace, srcClusterName, srcCluster, env)
-
-	cmd := "psql -U postgres app -tAc 'CREATE TABLE to_bootstrap AS VALUES (1), (2);'"
-	_, _, err = tests.Run(fmt.Sprintf(
-		"kubectl exec -n %v %v -- %v",
-		namespace,
-		primarySrc,
-		cmd))
-	Expect(err).ToNot(HaveOccurred())
-	return primarySrc
-}

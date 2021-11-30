@@ -11,15 +11,15 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
 
 var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func() {
@@ -76,7 +76,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 		})
 		By(fmt.Sprintf("creating a Cluster in the %v namespace",
 			namespace), func() {
-			_, _, err := tests.Run(
+			_, _, err := utils.Run(
 				"kubectl create -n " + namespace + " -f " + sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -102,7 +102,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 				endpoint)
 			Expect(err).ToNot(HaveOccurred())
 			err = env.Client.Get(env.Ctx, podNamespacedName, pod)
-			Expect(tests.FirstEndpointIP(endpoint), err).To(
+			Expect(utils.FirstEndpointIP(endpoint), err).To(
 				BeEquivalentTo(pod.Status.PodIP))
 		})
 		By("preparing the db for the test scenario", func() {
@@ -136,10 +136,10 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 			// records appear on the database before moving to the next
 			// step.
 
-			_, _, err := tests.Run("kubectl create -n " + namespace +
+			_, _, err := utils.Run("kubectl create -n " + namespace +
 				" -f " + webTestFile)
 			Expect(err).ToNot(HaveOccurred())
-			_, _, err = tests.Run("kubectl create -n " + namespace +
+			_, _, err = utils.Run("kubectl create -n " + namespace +
 				" -f " + webTestJob)
 			Expect(err).ToNot(HaveOccurred())
 

@@ -4,6 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
+// Package tests contains the test infrastructure of the Cloud Native PostgreSQL operator
 package tests
 
 // List of the labels we use for labeling test specs

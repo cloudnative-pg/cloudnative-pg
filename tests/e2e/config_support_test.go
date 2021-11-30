@@ -9,15 +9,15 @@ package e2e
 import (
 	"fmt"
 
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterapiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
 
 // Set of tests for config map for the operator. It is useful to configure the operator globally to survive
@@ -35,14 +35,14 @@ var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() 
 	var operatorNamespace string
 	var err error
 
-	AssertReloadOperatorDeployment := func(operatorNamespace string, env *tests.TestingEnvironment) {
+	AssertReloadOperatorDeployment := func(operatorNamespace string, env *utils.TestingEnvironment) {
 		By("reload the configmap by restarting the operator deployment", func() {
 			operatorPod, err := env.GetOperatorPod()
 			Expect(err).ToNot(HaveOccurred())
 
 			// Restart operator deployment
 			cmd := fmt.Sprintf("kubectl delete pod %v -n %v --force", operatorPod.Name, operatorNamespace)
-			_, _, err = tests.Run(cmd)
+			_, _, err = utils.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 
 			// verify new operator pod is up and running
@@ -73,12 +73,12 @@ var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() 
 
 		// Delete the configmap and restore the previous behaviour
 		cmd := fmt.Sprintf("kubectl delete -n %v -f %v", operatorNamespace, configMapFile)
-		_, _, err = tests.Run(cmd)
+		_, _, err = utils.Run(cmd)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Delete the secret and restore the previous behaviour
 		cmd = fmt.Sprintf("kubectl delete -n %v -f %v", operatorNamespace, secretFile)
-		_, _, err = tests.Run(cmd)
+		_, _, err = utils.Run(cmd)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertReloadOperatorDeployment(operatorNamespace, env)
@@ -88,7 +88,7 @@ var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() 
 		By("creating configmap", func() {
 			// create a config map where operator is deployed
 			cmd := fmt.Sprintf("kubectl apply -n %v -f %v", operatorNamespace, configMapFile)
-			_, _, err = tests.Run(cmd)
+			_, _, err = utils.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 			// Check if configmap is created
 			Eventually(func() ([]corev1.ConfigMap, error) {
@@ -104,7 +104,7 @@ var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() 
 		By("creating secret", func() {
 			// create a secret where operator is deployed
 			cmd := fmt.Sprintf("kubectl apply -n %v -f %v", operatorNamespace, secretFile)
-			_, _, err = tests.Run(cmd)
+			_, _, err = utils.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 			// Check if configmap is created
 			Eventually(func() ([]corev1.Secret, error) {

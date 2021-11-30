@@ -9,13 +9,11 @@ package e2e
 import (
 	"fmt"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
 
 var _ = Describe("PGBouncer Types", func() {
@@ -29,6 +27,8 @@ var _ = Describe("PGBouncer Types", func() {
 		poolerServiceRW               = "cluster-pgbouncer-rw"
 		poolerServiceRO               = "cluster-pgbouncer-ro"
 	)
+
+	var namespace, clusterName string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -69,7 +69,7 @@ var _ = Describe("PGBouncer Types", func() {
 		})
 
 		By("verify that read-only pooler pgbouncer.ini contains the correct host service", func() {
-			podList, err := getPGBouncerPodList(namespace, poolerCertificateROSampleFile)
+			podList, err := utils.GetPGBouncerPodList(namespace, poolerCertificateROSampleFile, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRO, podList)
@@ -80,7 +80,7 @@ var _ = Describe("PGBouncer Types", func() {
 		})
 
 		By("verify that read-write pooler pgbouncer.ini contains the correct host service", func() {
-			podList, err := getPGBouncerPodList(namespace, poolerCertificateRWSampleFile)
+			podList, err := utils.GetPGBouncerPodList(namespace, poolerCertificateRWSampleFile, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRW, podList)
@@ -110,7 +110,7 @@ var _ = Describe("PGBouncer Types", func() {
 			// scale up command for 3 replicas for readonly
 			command := fmt.Sprintf("kubectl scale pooler %s -n %s --replicas=3",
 				poolerResourceNameRO, namespace)
-			_, _, err := tests.Run(command)
+			_, _, err := utils.Run(command)
 			Expect(err).ToNot(HaveOccurred())
 
 			// verifying if PGBouncer pooler pods are ready after scale up
@@ -118,7 +118,7 @@ var _ = Describe("PGBouncer Types", func() {
 
 			// // scale up command for 3 replicas for read write
 			command = fmt.Sprintf("kubectl scale pooler %s -n %s --replicas=3", poolerResourceNameRW, namespace)
-			_, _, err = tests.Run(command)
+			_, _, err = utils.Run(command)
 			Expect(err).ToNot(HaveOccurred())
 
 			// verifying if PGBouncer pooler pods are ready after scale up
@@ -130,7 +130,7 @@ var _ = Describe("PGBouncer Types", func() {
 		})
 
 		By("SCALE UP: verify that read-only pooler pgbouncer.ini contains the correct host service", func() {
-			podList, err := getPGBouncerPodList(namespace, poolerCertificateROSampleFile)
+			podList, err := utils.GetPGBouncerPodList(namespace, poolerCertificateROSampleFile, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRO, podList)
@@ -141,7 +141,7 @@ var _ = Describe("PGBouncer Types", func() {
 		})
 
 		By("SCALE UP: verify that read-write pooler pgbouncer.ini contains the correct host service", func() {
-			podList, err := getPGBouncerPodList(namespace, poolerCertificateRWSampleFile)
+			podList, err := utils.GetPGBouncerPodList(namespace, poolerCertificateRWSampleFile, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRW, podList)
@@ -151,7 +151,7 @@ var _ = Describe("PGBouncer Types", func() {
 			// scale down command for 1 replicas for readonly
 			command := fmt.Sprintf("kubectl scale pooler %s -n %s --replicas=1",
 				poolerResourceNameRO, namespace)
-			_, _, err := tests.Run(command)
+			_, _, err := utils.Run(command)
 			Expect(err).ToNot(HaveOccurred())
 
 			// verifying if PGBouncer pooler pods are ready
@@ -159,7 +159,7 @@ var _ = Describe("PGBouncer Types", func() {
 
 			// scale down command for 1 replicas for read write
 			command = fmt.Sprintf("kubectl scale pooler %s -n %s --replicas=1", poolerResourceNameRW, namespace)
-			_, _, err = tests.Run(command)
+			_, _, err = utils.Run(command)
 			Expect(err).ToNot(HaveOccurred())
 
 			// verifying if PGBouncer pooler pods are ready
@@ -171,7 +171,7 @@ var _ = Describe("PGBouncer Types", func() {
 		})
 
 		By("SCALE DOWN: verify that read-only pooler pgbouncer.ini contains the correct host service", func() {
-			podList, err := getPGBouncerPodList(namespace, poolerCertificateROSampleFile)
+			podList, err := utils.GetPGBouncerPodList(namespace, poolerCertificateROSampleFile, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRO, podList)
@@ -182,66 +182,10 @@ var _ = Describe("PGBouncer Types", func() {
 		})
 
 		By("SCALE DOWN: verify that read-write pooler pgbouncer.ini contains the correct host service", func() {
-			podList, err := getPGBouncerPodList(namespace, poolerCertificateRWSampleFile)
+			podList, err := utils.GetPGBouncerPodList(namespace, poolerCertificateRWSampleFile, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			assertPGBouncerHasServiceNameInsideHostParameter(namespace, poolerServiceRW, podList)
 		})
 	})
 })
-
-func getPoolerEndpoints(namespace, poolerYamlFilePath string) (*corev1.Endpoints, error) {
-	endPoint := &corev1.Endpoints{}
-	endPointName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
-	Expect(err).ToNot(HaveOccurred())
-	// Wait for the deployment to be ready
-	endPointNamespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      endPointName,
-	}
-	err = env.Client.Get(env.Ctx, endPointNamespacedName, endPoint)
-	if err != nil {
-		return &corev1.Endpoints{}, err
-	}
-
-	return endPoint, nil
-}
-
-// assertPGBouncerEndpointsContainsPodsIP makes sure that the Endpoints resource directs the traffic
-// to the correct pods.
-func assertPGBouncerEndpointsContainsPodsIP(
-	namespace,
-	poolerYamlFilePath string,
-	expectedPodCount int,
-) {
-	var pgBouncerPods []*corev1.Pod
-	ep, err := getPoolerEndpoints(namespace, poolerYamlFilePath)
-	Expect(err).ToNot(HaveOccurred())
-
-	podList, err := getPGBouncerPodList(namespace, poolerYamlFilePath)
-	Expect(err).ToNot(HaveOccurred())
-	Expect(ep.Subsets).ToNot(BeEmpty())
-
-	for _, ip := range ep.Subsets[0].Addresses {
-		for podIndex, pod := range podList.Items {
-			if pod.Status.PodIP == ip.IP {
-				pgBouncerPods = append(pgBouncerPods, &podList.Items[podIndex])
-				continue
-			}
-		}
-	}
-
-	Expect(pgBouncerPods).Should(HaveLen(expectedPodCount), "Pod length or IP mismatch in ep")
-}
-
-// assertPGBouncerHasServiceNameInsideHostParameter makes sure that the service name is contained inside the host file
-func assertPGBouncerHasServiceNameInsideHostParameter(namespace, serviceName string, podList *corev1.PodList) {
-	for _, pod := range podList.Items {
-		command := fmt.Sprintf("kubectl exec -n %s %s -- /bin/bash -c 'grep "+
-			" \"host=%s\" controller/configs/pgbouncer.ini'", namespace, pod.Name, serviceName)
-		out, _, err := tests.Run(command)
-		Expect(err).ToNot(HaveOccurred())
-		expectedContainedHost := fmt.Sprintf("host=%s", serviceName)
-		Expect(out).To(ContainSubstring(expectedContainedHost))
-	}
-}
