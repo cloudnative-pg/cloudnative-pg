@@ -129,13 +129,6 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 	mgr.GetWebhookServer().CertName = "apiserver.crt"
 	mgr.GetWebhookServer().KeyName = "apiserver.key"
 
-	certificatesGenerationFolder := mgr.GetWebhookServer().CertDir
-	if configuration.Current.WebhookCertDir != "" {
-		// OLM is generating certificates for us, so we can avoid
-		// injecting/creating certificates
-		certificatesGenerationFolder = ""
-	}
-
 	err = createKubernetesClient(mgr.GetConfig())
 	if err != nil {
 		setupLog.Error(err, "unable to create Kubernetes clients")
@@ -165,17 +158,20 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 		"systemUID", utils.GetKubeSystemUID(),
 		"haveSCC", utils.HaveSecurityContextConstraints())
 
-	if certificatesGenerationFolder != "" {
-		err = setupPKI(ctx, certificatesGenerationFolder)
-		if err != nil {
-			setupLog.Error(err, "unable to setup PKI infrastructure")
-			return err
-		}
-	} else {
+	if configuration.Current.WebhookCertDir != "" {
+		// OLM is generating certificates for us, so we can avoid injecting/creating certificates.
+		// It also means that CNP may have CA secrets leftover from the previous deployment, deleting them.
 		err = cleanupPKI(ctx)
 		if err != nil {
 			setupLog.Warning("unable to cleanup PKI infrastructure", "error", err)
-			// We do not have a `return` here because this is not a critical issue.
+		}
+	} else {
+		// We need to self-manage required PKI infrastructure and install the certificates into
+		// the webhooks configuration
+		err = setupPKI(ctx, mgr.GetWebhookServer().CertDir)
+		if err != nil {
+			setupLog.Error(err, "unable to setup PKI infrastructure")
+			return err
 		}
 	}
 
