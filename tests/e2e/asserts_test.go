@@ -182,16 +182,22 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			Name:      clusterName,
 		}
 		// Eventually the number of ready instances should be equal to the
-		// amount of instances defined in the cluster
+		// amount of instances defined in the cluster and
+		// the cluster status should be in healthy state
 		cluster := &apiv1.Cluster{}
 		err := env.Client.Get(env.Ctx, namespacedName, cluster)
 		Expect(err).ToNot(HaveOccurred())
-		Eventually(func() (int, error) {
+		Eventually(func() (string, error) {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			readyInstances := utils.CountReadyPods(podList.Items)
-			return readyInstances, err
-		}, timeout).Should(BeEquivalentTo(cluster.Spec.Instances))
+			if err != nil {
+				return "", err
+			}
+			if cluster.Spec.Instances == int32(utils.CountReadyPods(podList.Items)) {
+				err = env.Client.Get(env.Ctx, namespacedName, cluster)
+				return cluster.Status.Phase, err
+			}
+			return "", nil
+		}, timeout, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy))
 	})
 }
 
@@ -646,7 +652,7 @@ func AssertReplicaModeCluster(
 		Eventually(func() error {
 			primarySrcCluster, err = env.GetClusterPrimary(namespace, srcClusterName)
 			return err
-		}, 5).Should(BeNil())
+		}, 30, 3).Should(BeNil())
 	})
 
 	By("creating test data in source cluster", func() {
@@ -662,7 +668,7 @@ func AssertReplicaModeCluster(
 		Eventually(func() error {
 			primaryReplicaCluster, err = env.GetClusterPrimary(namespace, replicaClusterName)
 			return err
-		}, 5).Should(BeNil())
+		}, 30, 3).Should(BeNil())
 	})
 
 	By("verifying that replica cluster primary is in recovery mode", func() {
