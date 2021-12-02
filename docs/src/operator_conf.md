@@ -44,6 +44,20 @@ Name | Description
 Values in `INHERITED_ANNOTATIONS` and `INHERITED_LABELS` support path-like wildcards. For example, the value `example.com/*` will match
 both the value `example.com/one` and `example.com/two`.
 
+When you specify an additional pull secret name using the `PULL_SECRET_NAME` parameter,
+the operator will use that secret to create a pull secret for every created PostgreSQL
+cluster. That secret will be named `<cluster-name>-pull`.
+
+The namespace where the operator looks for the `PULL_SECRET_NAME` secret is where
+you installed the operator. If the operator is not able to find that secret, it
+will ignore the configuration parameter.
+
+!!! Warning
+    Previous versions of the operator copied the `PULL_SECRET_NAME` secret inside
+    the namespaces where you deploy the PostgreSQL clusters. From version "1.11.0"
+    the behavior changed to match the previous description. The pull secrets
+    created by the previous versions of the operator are unused.
+
 ## Defining an operator config map
 
 The example below customizes the behavior of the operator, by defining
