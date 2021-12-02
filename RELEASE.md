@@ -22,7 +22,6 @@ instructions accordingly for your version.
 
 ### What's missing
 
-- Automation of `OpenShift` release
 - Automation of Helm chart release (???)
 
 ## Post-release operations
@@ -41,3 +40,7 @@ instructions accordingly for your version.
 - diff the new release version with the previous one (e.g.: `vimdiff releases/postgresql-operator-1.9.1.yaml releases/postgresql-operator-1.9.2.yaml` using your IDE of choice)
 - port any diff to the templates in the helm chart accordingly
 - proceed with the release process described in the `RELEASE.md` file in the cloud-native-postgresql-helm repository.
+
+## OpenShift
+
+For OpenShift release, please check the [OCP Certified](https://github.com/EnterpriseDB/cloud-native-postgresql-ocp-certified/blob/main/RELEASE.md#release) repository with the instructions.
