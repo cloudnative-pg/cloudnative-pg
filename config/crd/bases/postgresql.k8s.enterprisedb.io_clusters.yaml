@@ -1690,7 +1690,7 @@ spec:
               stopDelay:
                 default: 30
                 description: The time in seconds that is allowed for a PostgreSQL
-                  instance node to gracefully shutdown (default 30)
+                  instance to gracefully shutdown (default 30)
                 format: int32
                 type: integer
               storage:
@@ -1885,6 +1885,12 @@ spec:
                 required:
                 - name
                 type: object
+              switchoverDelay:
+                default: 30
+                description: The time in seconds that is allowed for a primary PostgreSQL
+                  instance to gracefully shutdown during a switchover (default 30)
+                format: int32
+                type: integer
             required:
             - instances
             type: object

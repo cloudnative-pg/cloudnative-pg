@@ -96,7 +96,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 			"reason", reason,
 			"currentPrimary", primaryPostgresqlStatus.Pod.Name,
 			"targetPrimary", targetPrimary)
-		r.Recorder.Eventf(cluster, "Normal", "SwitchOver",
+		r.Recorder.Eventf(cluster, "Normal", "Switchover",
 			"Initiating switchover to %s to upgrade %s", targetPrimary, primaryPostgresqlStatus.Pod.Name)
 		return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)
 	}

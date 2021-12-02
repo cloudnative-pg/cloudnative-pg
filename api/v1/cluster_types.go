@@ -175,10 +175,15 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=30
 	MaxStartDelay int32 `json:"startDelay,omitempty"`
 
-	// The time in seconds that is allowed for a PostgreSQL instance node to
+	// The time in seconds that is allowed for a PostgreSQL instance to
 	// gracefully shutdown (default 30)
 	// +kubebuilder:default:=30
 	MaxStopDelay int32 `json:"stopDelay,omitempty"`
+
+	// The time in seconds that is allowed for a primary PostgreSQL instance
+	// to gracefully shutdown during a switchover (default 30)
+	// +kubebuilder:default:=30
+	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
 	// Affinity/Anti-affinity rules for Pods
 	// +optional
@@ -1141,10 +1146,18 @@ func (cluster *Cluster) GetMaxStartDelay() int32 {
 	return 30
 }
 
-// GetMaxStopDelay get the amount of time PostgreSQL has to stop with -m smart
+// GetMaxStopDelay get the amount of time PostgreSQL has to stop
 func (cluster *Cluster) GetMaxStopDelay() int32 {
 	if cluster.Spec.MaxStopDelay > 0 {
 		return cluster.Spec.MaxStopDelay
+	}
+	return 30
+}
+
+// GetMaxSwitchoverDelay get the amount of time PostgreSQL has to stop before switchover
+func (cluster *Cluster) GetMaxSwitchoverDelay() int32 {
+	if cluster.Spec.MaxSwitchoverDelay > 0 {
+		return cluster.Spec.MaxSwitchoverDelay
 	}
 	return 30
 }
