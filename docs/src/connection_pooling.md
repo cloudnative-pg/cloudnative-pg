@@ -217,12 +217,12 @@ metrics having the `cnp_pgbouncer_` prefix, by running:
 - `SHOW STATS` (prefix: `cnp_pgbouncer_stats`)
 
 Similarly to the Cloud Native PostgreSQL instance, the exporter runs on port
-`9187` of each pod running PgBouncer, and also provides metrics related to the
+`9127` of each pod running PgBouncer, and also provides metrics related to the
 Go runtime (with prefix `go_*`). You can debug the exporter on a pod running
 PgBouncer through the following command:
 
 ```console
-kubectl exec -ti <PGBOUNCER_POD> -- curl 127.0.0.1:9187/metrics
+kubectl exec -ti <PGBOUNCER_POD> -- curl 127.0.0.1:9127/metrics
 ```
 
 An example of the output for `cnp_pgbouncer` metrics:
@@ -387,6 +387,22 @@ cnp_pgbouncer_stats_total_xact_count{database="pgbouncer"} 3
 # HELP cnp_pgbouncer_stats_total_xact_time Total number of microseconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries.
 # TYPE cnp_pgbouncer_stats_total_xact_time gauge
 cnp_pgbouncer_stats_total_xact_time{database="pgbouncer"} 0
+```
+
+Like for `Clusters`, if you are using the [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator)
+you can configure it to scrape a specific Pooler by defining the following [PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor):
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: <POOLER_NAME>
+spec:
+  selector:
+    matchLabels:
+      k8s.enterprisedb.io/poolerName: <POOLER_NAME>
+  podMetricsEndpoints:
+  - port: metrics
 ```
 
 ## Logging
