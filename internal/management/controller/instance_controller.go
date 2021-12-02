@@ -99,7 +99,17 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 	// Reconcile PostgreSQL instance parameters
 	r.reconcileInstance(cluster)
 
-	// Populate the cache with the cluster
+	err := r.UpdateCacheFromCluster(ctx, cluster)
+	if err != nil {
+		return fmt.Errorf("cannot update the cache: %w", err)
+	}
+
+	// Reconcile secrets and cryptographic material
+	return r.reconcileSecrets(ctx, cluster)
+}
+
+// UpdateCacheFromCluster refreshes the reconciler internal cache using the provided cluster
+func (r *InstanceReconciler) UpdateCacheFromCluster(ctx context.Context, cluster *apiv1.Cluster) error {
 	cache.Store(cache.ClusterKey, cluster)
 
 	// Populate the cache with the backup configuration
@@ -143,8 +153,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) 
 		cache.Delete(cache.WALRestoreKey)
 	}
 
-	// Reconcile secrets and cryptographic material
-	return r.reconcileSecrets(ctx, cluster)
+	return nil
 }
 
 // reconcileDatabases reconciles all the existing databases

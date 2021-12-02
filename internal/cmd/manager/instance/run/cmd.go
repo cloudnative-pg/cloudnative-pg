@@ -70,13 +70,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 
 	reconciler, err := controller.NewInstanceReconciler(instance)
 	if err != nil {
-		log.Error(err, "Error while starting reconciler")
-		return err
-	}
-
-	_, err = instance.RefreshConfigurationFiles(ctx, reconciler.GetClient())
-	if err != nil {
-		log.Error(err, "Error while writing the bootstrap configuration")
+		log.Error(err, "Error while creating reconciler")
 		return err
 	}
 
@@ -86,6 +80,28 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		&cluster)
 	if err != nil {
 		log.Error(err, "Error while getting cluster")
+		return err
+	}
+
+	err = reconciler.UpdateCacheFromCluster(ctx, &cluster)
+	if err != nil {
+		log.Error(err, "Error while initializing cache")
+		return err
+	}
+
+	_, err = instance.RefreshConfigurationFiles(ctx, reconciler.GetClient())
+	if err != nil {
+		log.Error(err, "Error while writing the bootstrap configuration")
+		return err
+	}
+
+	if err = logpipe.Start(); err != nil {
+		log.Error(err, "Error while starting the logging collector routine")
+		return err
+	}
+
+	if err = startWebServer(instance); err != nil {
+		log.Error(err, "Error while starting the web server")
 		return err
 	}
 
@@ -133,11 +149,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		}
 	}
 
-	if err = startWebServer(instance); err != nil {
-		log.Error(err, "Error while starting the web server")
-		return err
-	}
-
 	startReconciler(ctx, reconciler)
 
 	// Print the content of PostgreSQL control data, for debugging and tracing
@@ -148,11 +159,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	err = execlog.RunBuffering(pgControlDataCmd, pgControlDataName)
 	if err != nil {
 		log.Error(err, "Error printing the control information of this PostgreSQL instance")
-		return err
-	}
-
-	if err = logpipe.Start(); err != nil {
-		log.Error(err, "Error while starting the logging collector routine")
 		return err
 	}
 
