@@ -137,7 +137,7 @@ var _ = Describe("Backup and restore", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			AssertSwitchOver(namespace, clusterName, env)
+			AssertSwitchover(namespace, clusterName, env)
 
 			By("checking the number of .history after switchover", func() {
 				Eventually(func() (int, error) {

@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func AssertSwitchOver(namespace string, clusterName string, env *testsUtils.TestingEnvironment) {
+func AssertSwitchover(namespace string, clusterName string, env *testsUtils.TestingEnvironment) {
 	var pods []string
 	var oldPrimary, targetPrimary string
 	var oldPodListLength int
