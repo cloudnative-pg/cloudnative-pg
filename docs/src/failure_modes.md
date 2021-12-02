@@ -133,3 +133,26 @@ to solve the problem manually.
 !!! Important
     In such cases, please do not perform any manual operation without the
     support and assistance of EnterpriseDB engineering team.
+
+From version 1.11.0 of the operator, you can use the
+`k8s.enterprisedb.io/reconciliationLoop` annotation to temporarily disable the
+reconciliation loop on a selected PostgreSQL cluster, as follows:
+
+``` yaml
+metadata:
+  name: cluster-example-no-reconcile
+  annotations:
+    k8s.enterprisedb.io/reconciliationLoop: "disabled"
+spec:
+  # ...
+```
+
+The `k8s.enterprisedb.io/reconciliationLoop` must be used with extreme care
+and for the sole duration of the extraordinary/emergency operation.
+
+!!! Warning
+    Please make sure that you use this annotation only for a limited period of
+    time and you remove it when the emergency has finished. Leaving this annotation
+    in a cluster will prevent the operator from issuing any self-healing operation,
+    such as a failover.
+

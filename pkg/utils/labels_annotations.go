@@ -22,6 +22,13 @@ const (
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
 	OperatorVersionAnnotationName = "k8s.enterprisedb.io/operatorVersion"
+
+	// ReconciliationLoopAnnotationName is the name of the annotation controlling
+	// the status of the reconciliation loop for the cluster
+	ReconciliationLoopAnnotationName = "k8s.enterprisedb.io/reconciliationLoop"
+
+	// ReconciliationDisabledValue it the value that stops the reconciliation loop
+	ReconciliationDisabledValue = "disabled"
 )
 
 // LabelClusterName labels the object with the cluster name
@@ -79,4 +86,9 @@ func InheritLabels(object *metav1.ObjectMeta, labels map[string]string, config *
 			object.Labels[key] = value
 		}
 	}
+}
+
+// IsReconciliationDisabled checks if the reconciliation loop is disabled on the given resource
+func IsReconciliationDisabled(object *metav1.ObjectMeta) bool {
+	return object.Annotations[ReconciliationLoopAnnotationName] == ReconciliationDisabledValue
 }

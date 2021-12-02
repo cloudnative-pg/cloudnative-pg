@@ -34,6 +34,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 const (
@@ -120,6 +121,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if !namespace.DeletionTimestamp.IsZero() {
 		// This happens when you delete a namespace containing a Cluster resource. If that's the case,
 		// let's just wait for the Kubernetes to remove all object in the namespace.
+		return ctrl.Result{}, nil
+	}
+
+	if utils.IsReconciliationDisabled(&cluster.ObjectMeta) {
+		contextLogger.Warning("Disable reconciliation loop annotation set, skipping the reconciliation.")
 		return ctrl.Result{}, nil
 	}
 
