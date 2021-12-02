@@ -41,6 +41,6 @@ var _ = Describe("Switchover", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		AssertSwitchOver(namespace, clusterName, env)
+		AssertSwitchover(namespace, clusterName, env)
 	})
 })

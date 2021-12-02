@@ -775,10 +775,14 @@ func (r *InstanceReconciler) reconcileReplica(ctx context.Context, cluster *apiv
 
 	contextLogger.Info("This is an old primary node. Shutting it down to get it demoted to a replica")
 
-	// I was the primary, but now I'm not the primary anymore.
-	// Here we need to invoke a fast shutdown on the instance, and wait the the pod
+	// Here we need to invoke a fast shutdown on the instance, and wait the pod
 	// restart to demote as a replica of the new primary
-	return r.instance.Shutdown(postgresManagement.DefaultShutdownOptions)
+	timeout := int(cluster.GetMaxSwitchoverDelay())
+	return r.instance.Shutdown(postgresManagement.ShutdownOptions{
+		Mode:    postgresManagement.ShutdownModeFast,
+		Wait:    true,
+		Timeout: &timeout,
+	})
 }
 
 // refreshParentServer will ensure that this replica instance is actually replicating from the correct
