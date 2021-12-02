@@ -153,12 +153,22 @@ that, you will need to delete the Pod to trigger the resize.
 The best way to proceed is to delete one Pod at a time, starting from replicas and waiting
 for each Pod to be back up.
 
-### Workaround for volume expansion on AKS
+### Expanding PVC volumes on AKS
 
-This paragraph covers [Azure issue on AKS storage classes](https://github.com/Azure/AKS/issues/1477), that are supposed to support
-online resizing, but they actually require the following workaround.
+At the moment, [Azure is not able to resize the PVC's volume without restarting the pod](https://github.com/Azure/AKS/issues/1477).
+Cloud Native PostgreSQL has overcome this limitation through the
+`ENABLE_AZURE_PVC_UPDATES` environment variable in the
+[operator configuration](operator_conf.md#available-options).
+When set to `'true'`, Cloud Native PostgreSQL triggers a rolling update of the
+Postgres cluster.
 
-Let's suppose you have a cluster with three replicas:
+Alternatively, you can follow the workaround below to manually resize the
+volume in AKS.
+
+#### Workaround for volume expansion on AKS
+
+You can manually resize a PVC on AKS by following these procedures.
+As an example, let's suppose you have a cluster with 3 replicas:
 
 ```
 $ kubectl get pods
