@@ -470,8 +470,8 @@ func (r *ClusterReconciler) generateServiceAccountPullSecretsNames(
 		return nil, err
 	}
 
-	if operatorPullSecret {
-		pullSecretNames = append(pullSecretNames, configuration.Current.OperatorPullSecretName)
+	if operatorPullSecret != "" {
+		pullSecretNames = append(pullSecretNames, operatorPullSecret)
 	}
 
 	// Append the secrets specified by the user
@@ -484,12 +484,11 @@ func (r *ClusterReconciler) generateServiceAccountPullSecretsNames(
 
 // copyPullSecretFromOperator will create a secret to download the operator, if the
 // operator was downloaded via a Secret.
-// It will return "true" if a secret need to be used to use the operator, false
-// if not
-func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
+// It will return the string of the secret name if a secret need to be used to use the operator
+func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, cluster *apiv1.Cluster) (string, error) {
 	if configuration.Current.OperatorNamespace == "" {
 		// We are not getting started via a k8s deployment. Perhaps we are running in our development environment
-		return false, nil
+		return "", nil
 	}
 
 	// Let's find the operator secret
@@ -500,16 +499,18 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 	}, &operatorSecret); err != nil {
 		if apierrs.IsNotFound(err) {
 			// There is no secret like that, probably because we are running in our development environment
-			return false, nil
+			return "", nil
 		}
-		return false, err
+		return "", err
 	}
+
+	clusterSecretName := fmt.Sprintf("%s-pull", cluster.Name)
 
 	// Let's create the secret with the required info
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cluster.Namespace,
-			Name:      configuration.Current.OperatorPullSecretName,
+			Name:      clusterSecretName,
 		},
 		Data: operatorSecret.Data,
 		Type: operatorSecret.Type,
@@ -518,10 +519,10 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 
 	// Another sync loop may have already created the service. Let's check that
 	if err := r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
-		return false, err
+		return "", err
 	}
 
-	return true, nil
+	return clusterSecretName, nil
 }
 
 // createOrPatchRole ensures that the required role for the instance manager exists and
