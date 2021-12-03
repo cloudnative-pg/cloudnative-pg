@@ -19,7 +19,6 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  namespace: default
   name: example-monitoring
   labels:
     k8s.enterprisedb.io/reload: ""
@@ -238,7 +237,6 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  namespace: default
   name: example-monitoring-secret
   labels:
     k8s.enterprisedb.io/reload: ""
