@@ -180,7 +180,7 @@ cluster-example-3   1/1     Running   0          2m10s
 
 An Azure disk can only be expanded while in "unattached" state, as described in the
 [docs](https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/known-issues/sizegrow.md).  <!-- wokeignore:rule=master -->
-This means, that to resize a disk used by a PostgresSQL cluster, you will need to perform a manual rollout,
+This means, that to resize a disk used by a PostgreSQL cluster, you will need to perform a manual rollout,
 first cordoning the node that hosts the Pod using the PVC bound to the disk. This will prevent the Operator
 to recreate the Pod and immediately reattach it to its PVC before the background disk resizing has been completed.
 
