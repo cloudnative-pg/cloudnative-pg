@@ -188,6 +188,10 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 			continue
 		}
 
+		if !utils.IsPodReady(candidate.Pod) {
+			continue
+		}
+
 		// Set the current candidate as targetPrimary
 		contextLogger.Info("Current primary is running on unschedulable node, triggering a switchover",
 			"currentPrimary", primaryPod.Pod.Name, "currentPrimaryNode", primaryPod.Node,
