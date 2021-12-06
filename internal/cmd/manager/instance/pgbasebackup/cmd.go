@@ -107,13 +107,13 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 		return err
 	}
 
-	return env.configureInstanceAsNewPrimary(ctx)
+	return env.configureInstanceAsNewPrimary(&cluster)
 }
 
 // configureInstanceAsNewPrimary sets up this instance as a new primary server, using
 // the configuration created by the user and setting up the global objects as needed
-func (env *CloneInfo) configureInstanceAsNewPrimary(ctx context.Context) error {
-	if err := env.info.WriteInitialPostgresqlConf(ctx, env.client); err != nil {
+func (env *CloneInfo) configureInstanceAsNewPrimary(cluster *apiv1.Cluster) error {
+	if err := env.info.WriteInitialPostgresqlConf(cluster); err != nil {
 		return err
 	}
 

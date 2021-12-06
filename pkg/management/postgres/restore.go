@@ -70,7 +70,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.WriteInitialPostgresqlConf(ctx, typedClient); err != nil {
+	if err := info.WriteInitialPostgresqlConf(cluster); err != nil {
 		return err
 	}
 
@@ -348,7 +348,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 
 // WriteInitialPostgresqlConf resets the postgresql.conf that there is in the instance using
 // a new bootstrapped instance as reference
-func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, client client.Client) error {
+func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	if err := fileutils.EnsureDirectoryExist(postgresSpec.RecoveryTemporaryDirectory); err != nil {
 		return err
 	}
@@ -379,7 +379,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, client clie
 	temporaryInstance.Namespace = info.Namespace
 	temporaryInstance.ClusterName = info.ClusterName
 
-	_, err = temporaryInstance.RefreshConfigurationFiles(ctx, client)
+	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(cluster)
 	if err != nil {
 		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
 	}
