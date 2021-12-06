@@ -289,7 +289,9 @@ an AWS S3 bucket) and, optionally, a generic endpoint URL. WAL archiving,
 a prerequisite for continuous backup, does not require any further
 action from the user: the operator will automatically and transparently set
 the `archive_command` to rely on `barman-cloud-wal-archive` to ship WAL
-files to the defined endpoint. Users can decide the compression algorithm.
+files to the defined endpoint. Users can decide the compression algorithm,
+as well as the number of parallel jobs to concurrently upload WAL files
+in the archive.
 
 You can define base backups in two ways: on-demand (through the `Backup`
 custom resource definition) or scheduled (through the `ScheduledBackup`
@@ -309,6 +311,7 @@ initiates the instance in recovery mode and replays all available WAL files
 from the specified archive, exiting recovery and starting as a primary.
 Subsequently, the operator will clone the requested number of standby instances
 from the primary.
+Cloud Native PostgreSQL supports parallel WAL fetching from the archive.
 
 ### Point-In-Time Recovery (PITR) from a backup
 
@@ -355,9 +358,12 @@ native capabilities).
 The operator defines liveness and readiness probes for the Postgres
 Containers that are then invoked by the kubelet. They are mapped respectively
 to the `/healthz` and `/readyz` endpoints of the web server managed
-directly by the instance manager. They both use Go to connect to the cluster
-and issue a simple query (`;`) to verify that the server is ready to accept
-connections.
+directly by the instance manager.
+The liveness probe is based on the `pg_isready` executable, and the pod is
+considered healthy with exit codes 0  (server accepting connections normally)
+and 1 (server is rejecting connections, for example during startup).  The
+readiness probe issues a simple query (`;`) to verify that the server is
+ready to accept connections.
 
 ### Rolling deployments
 

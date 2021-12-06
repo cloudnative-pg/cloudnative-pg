@@ -234,3 +234,41 @@ func CreateFifo(fileName string) error {
 	}
 	return nil
 }
+
+// MoveFile moves a file from a source path to its destination by copying
+// the source file to the destination and then removing it from the original
+// location.
+// This will work between different volumes too.
+func MoveFile(sourcePath, destPath string) (err error) {
+	var inputFile, outputFile *os.File
+
+	inputFile, err = os.Open(sourcePath) // #nosec
+	if err != nil {
+		return err
+	}
+	defer func() {
+		closeErr := inputFile.Close()
+		if closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+
+	outputFile, err = os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		closeErr := outputFile.Close()
+		if closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+
+	_, err = io.Copy(outputFile, inputFile)
+	if err != nil {
+		return err
+	}
+
+	err = os.Remove(sourcePath)
+	return err
+}

@@ -93,7 +93,7 @@ func (archiver *WALArchiver) ArchiveList(walNames []string, options []string) (r
 			walStatus.Err = archiver.Archive(walNames[walIndex], options)
 			walStatus.EndTime = time.Now()
 			if walStatus.Err == nil && walIndex != 0 {
-				walStatus.Err = archiver.spool.Add(walNames[walIndex])
+				walStatus.Err = archiver.spool.Touch(walNames[walIndex])
 			}
 
 			elapsedWalTime := walStatus.EndTime.Sub(walStatus.StartTime)

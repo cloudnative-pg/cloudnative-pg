@@ -9,12 +9,17 @@ package spool
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
+
+// ErrorNonExistentFile is returned when the spool tried to work
+// on a file which doesn't exist
+var ErrorNonExistentFile = fs.ErrNotExist
 
 // WALSpool is a way to keep track of which WAL files were processes from the parallel
 // feature and not by PostgreSQL request.
@@ -46,11 +51,16 @@ func (spool *WALSpool) Contains(walFile string) (bool, error) {
 // exist an error is returned
 func (spool *WALSpool) Remove(walFile string) error {
 	walFile = path.Base(walFile)
-	return os.Remove(path.Join(spool.spoolDirectory, walFile))
+
+	err := os.Remove(path.Join(spool.spoolDirectory, walFile))
+	if err != nil && os.IsNotExist(err) {
+		return ErrorNonExistentFile
+	}
+	return err
 }
 
-// Add ensure that a certain WAL file is included into the spool
-func (spool *WALSpool) Add(walFile string) (err error) {
+// Touch ensure that a certain WAL file is included into the spool as an empty file
+func (spool *WALSpool) Touch(walFile string) (err error) {
 	var f *os.File
 
 	walFile = path.Base(walFile)
@@ -62,4 +72,22 @@ func (spool *WALSpool) Add(walFile string) (err error) {
 		log.Warning("Cannot close empty file, error skipped", "fileName", fileName, "err", err)
 	}
 	return nil
+}
+
+// MoveOut moves out a file from the spool to the destination file
+func (spool *WALSpool) MoveOut(walName, destination string) (err error) {
+	// We cannot use os.Rename here, as it will not work between different
+	// volumes, such as moving files from an EmptyDir volume to the data
+	// directory.
+	// Given that, we rely on the old strategy to copy stuff around.
+	err = fileutils.MoveFile(path.Join(spool.spoolDirectory, walName), destination)
+	if err != nil && os.IsNotExist(err) {
+		return ErrorNonExistentFile
+	}
+	return err
+}
+
+// FileName gets the name of the file for the given WAL inside the spool
+func (spool *WALSpool) FileName(walName string) string {
+	return path.Join(spool.spoolDirectory, walName)
 }
