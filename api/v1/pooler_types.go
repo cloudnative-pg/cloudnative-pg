@@ -46,6 +46,7 @@ type PoolerSpec struct {
 	Cluster LocalObjectReference `json:"cluster"`
 
 	// Which instances we must forward traffic to?
+	// +kubebuilder:default:=rw
 	Type PoolerType `json:"type"`
 
 	// The number of replicas we want
@@ -105,6 +106,7 @@ type PodMeta struct {
 // PgBouncerSpec defines how to configure PgBouncer
 type PgBouncerSpec struct {
 	// The pool mode
+	// +kubebuilder:default:=session
 	PoolMode PgBouncerPoolMode `json:"poolMode"`
 
 	// The credentials of the user that need to be used for the authentication
@@ -127,6 +129,7 @@ type PgBouncerSpec struct {
 	// server, first waiting for all queries to complete, and pause all new
 	// client connections until this value is set to `false` (default). Internally,
 	// the operator calls PgBouncer's `PAUSE` and `RESUME` commands.
+	// +kubebuilder:default:=false
 	Paused *bool `json:"paused,omitempty"`
 }
 

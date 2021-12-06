@@ -93,6 +93,7 @@ spec:
                       can configure
                     type: object
                   paused:
+                    default: false
                     description: When set to `true`, PgBouncer will disconnect from
                       the PostgreSQL server, first waiting for all queries to complete,
                       and pause all new client connections until this value is set
@@ -100,6 +101,7 @@ spec:
                       `PAUSE` and `RESUME` commands.
                     type: boolean
                   poolMode:
+                    default: session
                     description: The pool mode
                     enum:
                     - session
@@ -6923,6 +6925,7 @@ spec:
                     type: object
                 type: object
               type:
+                default: rw
                 description: Which instances we must forward traffic to?
                 enum:
                 - rw
