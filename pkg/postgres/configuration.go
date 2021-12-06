@@ -271,7 +271,6 @@ var (
 		"recovery_target_xid":       fixedConfigurationParameter,
 		"restore_command":           fixedConfigurationParameter,
 		"shared_preload_libraries":  fixedConfigurationParameter,
-		"shared_memory_type":        blockedConfigurationParameter,
 		"unix_socket_directories":   blockedConfigurationParameter,
 		"unix_socket_group":         blockedConfigurationParameter,
 		"unix_socket_permissions":   blockedConfigurationParameter,
@@ -336,11 +335,16 @@ var (
 			SharedPreloadLibraries: "",
 		},
 		DefaultSettings: map[MajorVersionRange]SettingsCollection{
-			{MajorVersionRangeUnlimited, 130000}: {
+			{MajorVersionRangeUnlimited, 120000}: {
 				"wal_keep_segments": "32",
 			},
+			{120000, 130000}: {
+				"wal_keep_segments":  "32",
+				"shared_memory_type": "mmap",
+			},
 			{130000, MajorVersionRangeUnlimited}: {
-				"wal_keep_size": "512MB",
+				"wal_keep_size":      "512MB",
+				"shared_memory_type": "mmap",
 			},
 		},
 		MandatorySettings: SettingsCollection{
