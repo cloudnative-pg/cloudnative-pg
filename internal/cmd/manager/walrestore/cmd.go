@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -20,9 +19,9 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
 	cacheClient "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache/client"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
-	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/restorer"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 var (
@@ -30,6 +29,12 @@ var (
 	ErrPrimaryServer = errors.New("avoiding restoring WAL on the primary server")
 	// ErrNoBackupConfigured is returned when no backup is configured
 	ErrNoBackupConfigured = errors.New("backup not configured")
+)
+
+const (
+	// SpoolDirectory is the directory where we spool the WAL files that
+	// were pre-archived in parallel
+	SpoolDirectory = postgres.ScratchDataDirectory + "/wal-restore-spool"
 )
 
 // NewCmd creates a new cobra command
@@ -65,6 +70,7 @@ func NewCmd() *cobra.Command {
 }
 
 func run(contextLog log.Logger, podName string, args []string) error {
+	startTime := time.Now()
 	walName := args[0]
 	destinationPath := args[1]
 
@@ -78,8 +84,7 @@ func run(contextLog log.Logger, podName string, args []string) error {
 
 	recoverClusterName, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
 	if err != nil {
-		contextLog.Error(err, "while getting recover configuration")
-		return err
+		return fmt.Errorf("while getting recover configuration: %w", err)
 	}
 
 	if barmanConfiguration == nil {
@@ -93,10 +98,9 @@ func run(contextLog log.Logger, podName string, args []string) error {
 	}
 
 	options, err := barmanCloudWalRestoreOptions(
-		barmanConfiguration, recoverClusterName, walName, destinationPath)
+		barmanConfiguration, recoverClusterName)
 	if err != nil {
-		contextLog.Error(err, "while getting barman-cloud-wal-restore options")
-		return err
+		return fmt.Errorf("while getting barman-cloud-wal-restore options: %w", err)
 	}
 
 	env, err := cacheClient.GetEnv(cache.WALRestoreKey)
@@ -104,22 +108,69 @@ func run(contextLog log.Logger, podName string, args []string) error {
 		return fmt.Errorf("failed to get envs: %w", err)
 	}
 
-	barmanCloudWalRestoreCmd := exec.Command(barmanCapabilities.BarmanCloudWalRestore, options...) // #nosec G204
-	barmanCloudWalRestoreCmd.Env = env
-	err = execlog.RunStreaming(barmanCloudWalRestoreCmd, barmanCapabilities.BarmanCloudWalRestore)
-	if err != nil {
-		contextLog.Info("Error invoking "+barmanCapabilities.BarmanCloudWalRestore,
-			"error", err.Error(),
-			"walName", walName,
-			"currentPrimary", cluster.Status.CurrentPrimary,
-			"targetPrimary", cluster.Status.TargetPrimary,
-			"options", options,
-			"exitCode", barmanCloudWalRestoreCmd.ProcessState.ExitCode(),
-		)
-		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCapabilities.BarmanCloudWalRestore, err)
+	// Create the restorer
+	var walRestorer *restorer.WALRestorer
+	if walRestorer, err = restorer.New(cluster, env, SpoolDirectory); err != nil {
+		return fmt.Errorf("while creating the restorer: %w", err)
 	}
 
-	return nil
+	// Step 1: check if this WAL file is not already in the spool
+	var wasInSpool bool
+	if wasInSpool, err = walRestorer.RestoreFromSpool(walName, destinationPath); err != nil {
+		return fmt.Errorf("while restoring a file from the spool directory: %w", err)
+	}
+	if wasInSpool {
+		contextLog.Info("Restored WAL file from spool (parallel)",
+			"walName", walName,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary)
+		return nil
+	}
+
+	// Step 2: gather the WAL files names to restore
+	// is not really a WAL.
+	// To do that we need to implement something like this function
+	// here: https://github.com/EnterpriseDB/barman/blob/749f33bcfdd6ea865390ddb34ece95301c797690/barman/xlog.py#L135
+	var walFilesList []string
+	maxParallel := 1
+	if barmanConfiguration.Wal != nil && barmanConfiguration.Wal.MaxParallel > 1 {
+		maxParallel = barmanConfiguration.Wal.MaxParallel
+	}
+	if postgres.IsWALFile(walName) {
+		// If this is a regular WAL file, we try to prefetch
+		if walFilesList, err = gatherWALFilesToRestore(walName, maxParallel); err != nil {
+			return fmt.Errorf("while generating the list of WAL files to restore: %w", err)
+		}
+	} else {
+		// This is not a regular WAL file, we fetch it directly
+		walFilesList = []string{walName}
+	}
+
+	// Step 3: download the WAL files into the required place
+	downloadStartTime := time.Now()
+	walStatus := walRestorer.RestoreList(walFilesList, destinationPath, options)
+	if len(walStatus) > 1 {
+		successfulWalRestore := 0
+		for idx := range walStatus {
+			if walStatus[idx].Err == nil {
+				successfulWalRestore++
+			}
+		}
+		contextLog.Info("Completed restore command (parallel)",
+			"maxParallel", maxParallel,
+			"successfulWalRestore", successfulWalRestore,
+			"failedWalRestore", maxParallel-successfulWalRestore,
+			"startTime", startTime,
+			"downloadStartTime", downloadStartTime,
+			"downloadTotalTime", time.Since(downloadStartTime),
+			"totalTime", time.Since(startTime))
+	}
+
+	// We return only the first error to PostgreSQL, because the first error
+	// is the one raised by the file that PostgreSQL has requested to restore.
+	// The other errors are related to WAL files that were pre-restored in
+	// the spool as a performance optimization and are just logged
+	return walStatus[0].Err
 }
 
 // GetRecoverConfiguration get the appropriate recover Configuration for a given cluster
@@ -161,11 +212,33 @@ func GetRecoverConfiguration(
 	return recoverClusterName, barmanConfiguration, nil
 }
 
+// gatherWALFilesToRestore files a list of possible WAL files to restore, always
+// including as the first one the requested WAL file
+func gatherWALFilesToRestore(walName string, parallel int) (walList []string, err error) {
+	var segment postgres.Segment
+
+	segment, err = postgres.SegmentFromName(walName)
+	if err != nil {
+		// This seems an invalid segment name. It's not a problem
+		// because PostgreSQL may request also other files such as
+		// backup, history, etc.
+		// Let's just avoid prefetching in this case
+		return []string{walName}, nil
+	}
+	// NextSegments would accept postgresVersion and segmentSize,
+	// but we do not have this info here, so we pass nil.
+	segmentList := segment.NextSegments(parallel, nil, nil)
+	walList = make([]string, len(segmentList))
+	for idx := range segmentList {
+		walList[idx] = segmentList[idx].Name()
+	}
+
+	return walList, err
+}
+
 func barmanCloudWalRestoreOptions(
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 	clusterName string,
-	walName string,
-	destinationPath string,
 ) ([]string, error) {
 	var options []string
 	if configuration.Wal != nil {
@@ -197,8 +270,6 @@ func barmanCloudWalRestoreOptions(
 	options = append(
 		options,
 		configuration.DestinationPath,
-		serverName,
-		walName,
-		destinationPath)
+		serverName)
 	return options, nil
 }
