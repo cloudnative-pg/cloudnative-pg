@@ -9,6 +9,9 @@ package spool
 import (
 	"io/ioutil"
 	"os"
+	"path"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -16,11 +19,15 @@ import (
 
 var _ = Describe("Spool", func() {
 	var tmpDir string
+	var tmpDir2 string
 	var spool *WALSpool
 
 	_ = BeforeEach(func() {
 		var err error
 		tmpDir, err = ioutil.TempDir("", "spool-test-")
+		Expect(err).NotTo(HaveOccurred())
+
+		tmpDir2, err = ioutil.TempDir("", "spool-test-tmp-")
 		Expect(err).NotTo(HaveOccurred())
 
 		spool, err = New(tmpDir)
@@ -29,21 +36,22 @@ var _ = Describe("Spool", func() {
 
 	_ = AfterEach(func() {
 		Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		Expect(os.RemoveAll(tmpDir2)).To(Succeed())
 	})
 
 	It("create and removes files from/into the spool", func() {
 		var err error
-		walFile := "000000020000068A00000001"
+		const walFile = "000000020000068A00000002"
 
 		// This WAL file doesn't exist
 		Expect(spool.Contains(walFile)).To(BeFalse())
 
 		// If I try to remove a WAL file that doesn't exist, I obtain an error
 		err = spool.Remove(walFile)
-		Expect(err).To(HaveOccurred())
+		Expect(err).To(Equal(ErrorNonExistentFile))
 
 		// I add it into the spool
-		err = spool.Add(walFile)
+		err = spool.Touch(walFile)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Now the file exists
@@ -55,5 +63,25 @@ var _ = Describe("Spool", func() {
 
 		// And now it doesn't exist again
 		Expect(spool.Contains(walFile)).To(BeFalse())
+	})
+
+	It("can move out files from the spool", func() {
+		var err error
+		const walFile = "000000020000068A00000003"
+
+		err = spool.Touch(walFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Move out this file
+		destinationPath := path.Join(tmpDir2, "testFile")
+		err = spool.MoveOut(walFile, destinationPath)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(spool.Contains(walFile)).To(BeFalse())
+		Expect(fileutils.FileExists(destinationPath))
+	})
+
+	It("can determine names for each WAL files", func() {
+		const walFile = "000000020000068A00000004"
+		Expect(spool.FileName(walFile)).To(Equal(path.Join(tmpDir, walFile)))
 	})
 })

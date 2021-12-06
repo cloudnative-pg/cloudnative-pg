@@ -475,6 +475,7 @@ mallocs
 matchExpressions
 matchLabels
 maxClientConnections
+maxParallel
 maxSyncReplicas
 maxwait
 mcache

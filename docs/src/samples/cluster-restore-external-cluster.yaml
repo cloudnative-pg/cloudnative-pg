@@ -24,3 +24,5 @@ spec:
           secretAccessKey:
             name: minio
             key: ACCESS_SECRET_KEY
+        wal:
+          maxParallel: 8

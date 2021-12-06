@@ -492,71 +492,38 @@ that archival request will be just dismissed with a positive status.
 ## Recovery
 
 Cluster restores are not performed "in-place" on an existing cluster.
-You can use the data uploaded to the object storage to bootstrap a
-new cluster from a backup. The operator will orchestrate the recovery
-process using the `barman-cloud-restore` tool.
+You can use the data uploaded to the object storage to *bootstrap* a
+new cluster from a previously taken backup.
+The operator will orchestrate the recovery process using the
+`barman-cloud-restore` tool (for the base backup) and the
+`barman-cloud-wal-restore` tool (for WAL files, including parallel support, if
+requested).
 
-When a backup is completed, the corresponding Kubernetes resource will
-contain every information needed to restore it, just like in the
-following example:
+For details and instructions on the `recovery` bootstrap method, please refer
+to the ["Bootstrap from a backup" section](bootstrap.md#bootstrap-from-a-backup-recovery).
 
-```text
-Name:         backup-example
-Namespace:    default
-Labels:       <none>
-Annotations:  API Version:  postgresql.k8s.enterprisedb.io/v1
-Kind:         Backup
-Metadata:
-  Creation Timestamp:  2020-10-26T13:57:40Z
-  Self Link:         /apis/postgresql.k8s.enterprisedb.io/v1/namespaces/default/backups/backup-example
-  UID:               ad5f855c-2ffd-454a-a157-900d5f1f6584
-Spec:
-  Cluster:
-    Name:  pg-backup
-Status:
-  Backup Id:         20201026T135740
-  Destination Path:  s3://backups/
-  Endpoint URL:      http://minio:9000
-  Phase:             completed
-  s3Credentials:
-    Access Key Id:
-      Key:   ACCESS_KEY_ID
-      Name:  minio
-    Secret Access Key:
-      Key:      ACCESS_SECRET_KEY
-      Name:     minio
-  Server Name:  pg-backup
-  Started At:   2020-10-26T13:57:40Z
-  Stopped At:   2020-10-26T13:57:44Z
-Events:         <none>
-```
+Under the hood, the operator will inject an init container in the first
+instance of the new cluster, and the init container will start recovering the
+backup from the object storage.
 
-Given the following cluster definition:
+!!! Important
+    The duration of the base backup copy in the new PVC depends on
+    the size of the backup, as well as the speed of both the network and the
+    storage.
 
-```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
-kind: Cluster
-metadata:
-  name: cluster-restore
-spec:
-  instances: 3
+When the base backup recovery process is completed, the operator starts the
+Postgres instance in recovery mode: in this phase, PostgreSQL is up, albeit not
+being able to accept connections, and the pod is healthy, according to the
+liveness probe. Through the `restore_command`, PostgreSQL starts fetching WAL
+files from the archive (you can speed up this phase by setting the
+`maxParallel` option and enable the parallel WAL restore capability).
 
-  storage:
-    size: 5Gi
-
-  bootstrap:
-    recovery:
-      backup:
-        name: backup-example
-```
-
-The operator will inject an init container in the first instance of the
-cluster and the init container will start recovering the backup from the
-object storage.
-
-When the recovery process is completed, the operator will start the instance
-to allow it to recover the transaction log files needed for the
-consistency of the restored data directory.
+This phase terminates when PostgreSQL reaches the target (either the end of the
+WAL or the required target in case of Point-In-Time-Recovery). Indeed, you can
+optionally specify a `recoveryTarget` to perform a point in time recovery. If
+left unspecified, the recovery will continue up to the latest available WAL on
+the default target timeline (`current` for PostgreSQL up to 11, `latest` for
+version 12 and above).
 
 Once the recovery is complete, the operator will set the required
 superuser password into the instance. The new primary instance will start
@@ -565,14 +532,10 @@ as usual, and the remaining instances will join the cluster as replicas.
 The process is transparent for the user and it is managed by the instance
 manager running in the Pods.
 
-You can optionally specify a `recoveryTarget` to perform a point in time
-recovery. If left unspecified, the recovery will continue up to the latest
-available WAL on the default target timeline (`current` for PostgreSQL up to
-11, `latest` for version 12 and above).
-
 ## Retention policies
 
-Cloud Native PostgreSQL can manage the automated deletion of backup files from the backup object store, using **retention policies** based on recovery window.
+Cloud Native PostgreSQL can manage the automated deletion of backup files from
+the backup object store, using **retention policies** based on recovery window.
 
 Internally, the retention policy feature uses `barman-cloud-backup-delete`
 with `--retention-policy “RECOVERY WINDOW OF {{ retention policy value }} {{ retention policy unit }}”`.

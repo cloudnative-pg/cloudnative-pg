@@ -298,7 +298,7 @@ There are two ways to achieve this result in Cloud Native PostgreSQL:
 
 - using a recovery object store, that is a backup of another cluster
   created by Barman Cloud and defined via the `barmanObjectStore` option
-  in the `externalClusters` section
+  in the `externalClusters` section (*recommended*)
 - using an existing `Backup` object in the same namespace (this was the
   only option available before version 1.8.0).
 
@@ -345,6 +345,8 @@ spec:
           storageKey:
             name: recovery-object-store-secret
             key: storage_account_key
+        wal:
+          maxParallel: 8
 ```
 
 !!! Important
@@ -355,10 +357,19 @@ spec:
     `backupObjectStore.serverName` property (by default assigned to the
     value of `name` in the external clusters definition).
 
+!!! Note
+    In the above example we are taking advantage of the parallel WAL restore
+    feature, dedicating up to 8 jobs to concurrently fetch the required WAL
+    files from the archive. This feature can sensibly reduce the recovery time.
+    Make sure that you plan ahead for this scenario and correctly tune the
+    value of this parameter for your environment. It will certainly make a
+    difference **when** (not if) you'll need it.
+
 #### Recovery from a `Backup` object
 
-In case a Backup resource is already available in the namespace in which the cluster should be created,
-you can specify its name through `.spec.bootstrap.recovery.backup.name`, as in the following example:
+In case a Backup resource is already available in the namespace in which the
+cluster should be created, you can specify its name through
+`.spec.bootstrap.recovery.backup.name`, as in the following example:
 
 ```yaml
 apiVersion: postgresql.k8s.enterprisedb.io/v1
@@ -400,6 +411,11 @@ available WAL on the default target timeline (`current` for PostgreSQL up to
 11, `latest` for version 12 and above).
 You can optionally specify a `recoveryTarget` to perform a point in time
 recovery (see the ["Point in time recovery" section](#point-in-time-recovery)).
+
+!!! Important
+    Consider using the `barmanObjectStore.wal.maxParallel` option to speed
+    up WAL fetching from the archive by concurrently download the transaction
+    logs from the recovery object store.
 
 #### Point in time recovery (PITR)
 
@@ -443,6 +459,8 @@ spec:
           storageKey:
             name: recovery-object-store-secret
             key: storage_account_key
+        wal:
+          maxParallel: 8
 ```
 
 Besides `targetTime`, you can use the following criteria to stop the recovery:
@@ -498,6 +516,8 @@ spec:
           storageKey:
             name: recovery-object-store-secret
             key: storage_account_key
+        wal:
+          maxParallel: 8
 ```
 
 ### Bootstrap from a live cluster (`pg_basebackup`)
