@@ -488,6 +488,7 @@ microsoft
 minSyncReplicas
 minikube
 minio
+mmap
 monitoringconfiguration
 mountPath
 msg
@@ -665,6 +666,7 @@ sv
 svc
 switchovers
 sys
+sysv
 tAc
 tablespace
 tablespaces
