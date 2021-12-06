@@ -76,23 +76,14 @@ log_truncate_on_rotation = 'false'
 max_parallel_workers = '32'
 max_replication_slots = '32'
 max_worker_processes = '32'
-```
-
-The **default parameters for PostgreSQL 13 or higher** are:
-
-```text
-wal_keep_size = '512MB'
-```
-
-The **default parameters for PostgreSQL 10 to 12** are:
-
-```text
-wal_keep_segments = '32'
+shared_memory_type = 'mmap' # for PostgreSQL >= 12 only
+wal_keep_size = '512MB' # for PostgreSQL >= 13 only
+wal_keep_segments = '32' # for PostgreSQL <= 12 only
 ```
 
 !!! Warning
     It is your duty to plan for WAL segments retention in your PostgreSQL
-    cluster and properly configure either `wal_keep_segments` or `wal_keep_size`,
+    cluster and properly configure either `wal_keep_size` or `wal_keep_segments`,
     depending on the server version, based on the expected and observed workloads.
     Until Cloud Native PostgreSQL supports replication slots, and if you don't have
     continuous backup in place, this is the only way at the moment that protects
@@ -429,7 +420,6 @@ Users are not allowed to set the following configuration parameters in the
 - `recovery_target_xid`
 - `restart_after_crash`
 - `restore_command`
-- `shared_memory_type`
 - `shared_preload_libraries`
 - `ssl`
 - `ssl_ca_file`
