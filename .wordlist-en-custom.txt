@@ -432,6 +432,7 @@ instancesStatus
 inuse
 io
 ip
+ipcs
 ips
 jobCount
 jq
@@ -461,6 +462,7 @@ linters
 linux
 listmeta
 liveness
+lm
 localeCType
 localeCollate
 localobjectreference
@@ -501,6 +503,9 @@ nginx
 nodeMaintenanceWindow
 nodeSelector
 nodemaintenancewindow
+nodev
+noexec
+nosuid
 ntt
 num
 oauth
@@ -546,6 +551,7 @@ poolMode
 pooler
 poolers
 pos
+posix
 postInitSQL
 postgres
 postgresGID
@@ -557,6 +563,7 @@ preferredDuringSchedulingIgnoredDuringExecution
 preload
 prepended
 primaryUpdateStrategy
+proc
 programmatically
 prometheus
 provisioner
@@ -579,6 +586,7 @@ recoveryTarget
 recoverytarget
 recv
 redhat
+relatime
 replicationTLSSecret
 req
 requiredDuringSchedulingIgnoredDuringExecution
@@ -614,6 +622,9 @@ serverCASecret
 serverName
 serverTLSSecret
 sha
+shm
+shmall
+shmmax
 sig
 sigs
 specificities
@@ -668,6 +679,7 @@ targetXID
 tcp
 tls
 tmp
+tmpfs
 tolerations
 topologyKey
 transactional
