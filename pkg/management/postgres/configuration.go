@@ -7,13 +7,10 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
-
-	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configfile"
@@ -81,18 +78,6 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cl
 	}
 
 	return postgresConfigurationChanged || postgresHBAChanged, nil
-}
-
-// RefreshConfigurationFiles gets the latest version of the ConfigMap from the API
-// server and then write the configuration in PGDATA
-func (instance *Instance) RefreshConfigurationFiles(ctx context.Context, client ctrl.Client) (bool, error) {
-	var cluster apiv1.Cluster
-	err := client.Get(ctx, ctrl.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName}, &cluster)
-	if err != nil {
-		return false, err
-	}
-
-	return instance.RefreshConfigurationFilesFromCluster(&cluster)
 }
 
 // UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version

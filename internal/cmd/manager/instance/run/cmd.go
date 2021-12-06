@@ -73,7 +73,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		log.Error(err, "Error while creating reconciler")
 		return err
 	}
-
 	var cluster apiv1.Cluster
 	err = reconciler.GetClient().Get(ctx,
 		ctrl.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName},
@@ -89,7 +88,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	_, err = instance.RefreshConfigurationFiles(ctx, reconciler.GetClient())
+	_, err = instance.RefreshConfigurationFilesFromCluster(&cluster)
 	if err != nil {
 		log.Error(err, "Error while writing the bootstrap configuration")
 		return err
