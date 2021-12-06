@@ -65,6 +65,7 @@ operator by applying the following sections in this order:
 The **global default parameters** are:
 
 ```text
+dynamic_shared_memory_type = 'posix'
 logging_collector = 'on'
 log_destination = 'csvlog'
 log_directory = '/controller/log'
@@ -309,6 +310,73 @@ configuration to apply the changes.
 If the change involves a parameter requiring a restart, the operator will
 perform a rolling upgrade.
 
+## Dynamic Shared Memory settings
+
+PostgreSQL supports a few implementations for dynamic shared memory
+management through the
+[`dynamic_shared_memory_type`](https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-DYNAMIC-SHARED-MEMORY-TYPE)
+configuration option. In Cloud Native PostgreSQL we recommend to limit ourselves to
+any of the following two values:
+
+- `posix`: which relies on POSIX shared memory allocated using `shm_open` (default setting)
+- `sysv`: which is based on System V shared memory allocated via `shmget`
+
+In PostgreSQL, this setting is particularly important for memory allocation in parallel queries.
+For details, please refer to this
+[thread from the `pgsql-general` mailing list](https://www.postgresql.org/message-id/CA%2BhUKGJOj7qzDLxeFPVvto8YEWop6FSQoTYPO9Z6Ee%3Di-nPS_Q%40mail.gmail.com).
+
+### POSIX shared memory
+
+The default setting of `posix` should be enough in most cases, considering that
+the operator automatically mounts a *memory-bound `EmptyDir` volume* called `shm`
+under `/dev/shm`. You can verify the size of such volume inside the running
+Postgres container with:
+
+```sh
+mount | grep shm
+```
+
+You should get something similar to the following output:
+
+```console
+shm on /dev/shm type tmpfs (rw,nosuid,nodev,noexec,relatime,size=******)
+```
+
+### System V shared memory
+
+In case your Kubernetes cluster has a high enough value for the `SHMMAX`
+and `SHMALL` parameters, you can also set:
+
+```yaml
+dynamic_shared_memory_type: "sysv"
+```
+
+You can check the `SHMMAX`/`SHMALL` from inside a PostgreSQL container, by running:
+
+```sh
+ipcs -lm
+```
+
+For example:
+
+```console
+------ Shared Memory Limits --------
+max number of segments = 4096
+max seg size (kbytes) = 18014398509465599
+max total shared memory (kbytes) = 18014398509481980
+min seg size (bytes) = 1
+```
+
+As you can see, the very high number of `max total shared memory` recommends
+setting `dynamic_shared_memory_type` to `sysv`.
+
+An alternate method is to run:
+
+```sh
+cat /proc/sys/kernel/shmall
+cat /proc/sys/kernel/shmmax
+```
+
 ## Fixed parameters
 
 Some PostgreSQL configuration parameters should be managed exclusively by the
@@ -328,7 +396,6 @@ Users are not allowed to set the following configuration parameters in the
 - `config_file`
 - `data_directory`
 - `data_sync_retry`
-- `dynamic_shared_memory_type`
 - `event_source`
 - `external_pid_file`
 - `full_page_writes`
