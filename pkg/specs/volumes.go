@@ -29,6 +29,14 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
+		{
+			Name: "shm",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium: "Memory",
+				},
+			},
+		},
 	}
 
 	if cluster.GetEnableSuperuserAccess() {
@@ -73,6 +81,10 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		{
 			Name:      "scratch-data",
 			MountPath: postgres.ScratchDataDirectory,
+		},
+		{
+			Name:      "shm",
+			MountPath: "/dev/shm",
 		},
 	}
 
