@@ -375,7 +375,7 @@ func DumpSecretToDir(secret *v1.Secret, certDir string, basename string) error {
 	for name, content := range secret.Data {
 		extension := filepath.Ext(name)
 		fileName := path.Join(certDir, basename+extension)
-		if err := ioutil.WriteFile(fileName, content, 0o600); err != nil {
+		if _, err = fileutils.WriteFileAtomic(fileName, content, 0o600); err != nil {
 			return err
 		}
 	}
