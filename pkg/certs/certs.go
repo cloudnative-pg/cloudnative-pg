@@ -274,11 +274,16 @@ func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey, parentCert
 		parentCertificate = &newCertificate
 	}
 
+	tlsPrivateKey, err := pair.ParseECPrivateKey()
+	if err != nil {
+		return err
+	}
+
 	certificateBytes, err := x509.CreateCertificate(
 		rand.Reader,
 		&newCertificate,
 		parentCertificate,
-		&caPrivateKey.PublicKey,
+		&tlsPrivateKey.PublicKey,
 		caPrivateKey)
 	if err != nil {
 		return err
