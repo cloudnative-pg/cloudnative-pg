@@ -50,14 +50,20 @@ func (instance *Instance) IsServerReady() error {
 
 // GetStatus Extract the status of this PostgreSQL database
 func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
-	superUserDB, err := instance.GetSuperUserDB()
-	if err != nil {
-		return nil, err
-	}
-
 	result := postgres.PostgresqlStatus{
 		Pod:                    corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
 		InstanceManagerVersion: versions.Version,
+	}
+
+	if instance.PgRewindIsRunning {
+		// We know that pg_rewind is running, so we exit with the proper status
+		// updated, and we can provide that information to the user.
+		result.IsPgRewindRunning = true
+		return &result, nil
+	}
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return nil, err
 	}
 
 	row := superUserDB.QueryRow(

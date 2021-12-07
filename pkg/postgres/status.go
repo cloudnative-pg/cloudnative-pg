@@ -20,6 +20,7 @@ type PostgresqlStatus struct {
 	IsWalReceiverActive bool       `json:"isWalReceiverActive"`
 	Node                string     `json:"node"`
 	Pod                 corev1.Pod `json:"pod"`
+	IsPgRewindRunning   bool       `json:"isPgRewindRunning"`
 
 	// WAL Status
 	// SELECT
