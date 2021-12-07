@@ -128,7 +128,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	err = reconciler.VerifyPgDataCoherence(ctx)
+	err = reconciler.VerifyPgDataCoherence(ctx, &cluster)
 	if err != nil {
 		log.Error(err, "Error while checking Kubernetes cluster status")
 		return err

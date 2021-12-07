@@ -131,8 +131,11 @@ type Instance struct {
 	// pgVersion is the PostgreSQL version
 	pgVersion *semver.Version
 
-	// InstanceManagerIsUpgrading tells is there is an instance manager upgrade in process
+	// InstanceManagerIsUpgrading tells if there is an instance manager upgrade in process
 	InstanceManagerIsUpgrading bool
+
+	// PgRewindIsRunning tells if there is a `pg_rewind` process running
+	PgRewindIsRunning bool
 }
 
 // RetryUntilServerAvailable is the default retry configuration that is used
@@ -562,6 +565,12 @@ func waitForStreamingConnectionAvailable(db *sql.DB) error {
 // Rewind uses pg_rewind to align this data directory with the contents of the primary node.
 // If postgres major version is >= 13, add "--restore-target-wal" option
 func (instance *Instance) Rewind(postgresMajorVersion int) error {
+	// Signal the liveness probe that we are running pg_rewind before starting postgres
+	instance.PgRewindIsRunning = true
+	defer func() {
+		instance.PgRewindIsRunning = false
+	}()
+
 	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
 	options := []string{
 		"-P",
