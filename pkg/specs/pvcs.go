@@ -143,7 +143,7 @@ func DetectPVCs(
 
 		jobFound := false
 		for idx := range jobList {
-			if strings.HasPrefix(jobList[idx].Name, pvc.Name+"-") {
+			if IsJobOperatingOnPVC(jobList[idx], pvc) {
 				jobFound = true
 				break
 			}
@@ -167,6 +167,11 @@ func DetectPVCs(
 	}
 
 	return result
+}
+
+// IsJobOperatingOnPVC checks if a Job is initializing the provided PVC
+func IsJobOperatingOnPVC(job batchv1.Job, pvc corev1.PersistentVolumeClaim) bool {
+	return strings.HasPrefix(job.Name, pvc.Name+"-")
 }
 
 // isResizing returns true if PersistentVolumeClaimResizing condition is present
