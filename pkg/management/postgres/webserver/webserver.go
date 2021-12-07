@@ -38,10 +38,12 @@ var (
 func isServerHealthy(w http.ResponseWriter, r *http.Request) {
 	err := instance.IsServerHealthy()
 	if err != nil {
-		log.Info("Server doesn't look healthy", "err", err.Error())
+		log.Info("Liveness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), 500)
 		return
 	}
+
+	log.Trace("Liveness probe succeeding")
 
 	_, _ = fmt.Fprint(w, "OK")
 }
@@ -50,10 +52,12 @@ func isServerHealthy(w http.ResponseWriter, r *http.Request) {
 func isServerReady(w http.ResponseWriter, r *http.Request) {
 	err := instance.IsServerReady()
 	if err != nil {
-		log.Info("Server doesn't look ready", "err", err.Error())
+		log.Info("Readiness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), 500)
 		return
 	}
+
+	log.Trace("Readiness probe succeeding")
 
 	_, _ = fmt.Fprint(w, "OK")
 }
