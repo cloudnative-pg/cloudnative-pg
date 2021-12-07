@@ -39,8 +39,9 @@ func SetAsOwnedBy(controlled *metav1.ObjectMeta, controller metav1.ObjectMeta, t
 func SetAsOwnedByOperatorDeployment(ctx context.Context,
 	client kubernetes.Interface,
 	controlled *metav1.ObjectMeta,
+	operatorLabelSelector string,
 ) error {
-	deployment, err := GetOperatorDeployment(ctx, client, controlled.Namespace)
+	deployment, err := GetOperatorDeployment(ctx, client, controlled.Namespace, operatorLabelSelector)
 	if err != nil {
 		return err
 	}
@@ -58,9 +59,12 @@ func SetAsOwnedByOperatorDeployment(ctx context.Context,
 // GetOperatorDeployment find the operator deployment using labels
 // and then return the deployment object, in case we can't find a deployment
 // or we find more than one, we just return an error.
-func GetOperatorDeployment(ctx context.Context, client kubernetes.Interface, namespace string) (*v1.Deployment, error) {
+func GetOperatorDeployment(
+	ctx context.Context,
+	client kubernetes.Interface,
+	namespace, operatorLabelSelector string) (*v1.Deployment, error) {
 	deploymentList, err := client.AppsV1().Deployments(namespace).List(
-		ctx, metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=cloud-native-postgresql"})
+		ctx, metav1.ListOptions{LabelSelector: operatorLabelSelector})
 	if err != nil {
 		return nil, err
 	}
