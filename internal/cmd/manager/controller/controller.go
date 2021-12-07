@@ -331,6 +331,7 @@ func setupPKI(ctx context.Context, certDir string) error {
 			"clusters.postgresql.k8s.enterprisedb.io",
 			"scheduledbackups.postgresql.k8s.enterprisedb.io",
 		},
+		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloud-native-postgresql",
 	}
 	err := retry.OnError(retry.DefaultRetry, apierrs.IsNotFound, func() error {
 		return pkiConfig.Setup(ctx, clientSet, apiClientSet)

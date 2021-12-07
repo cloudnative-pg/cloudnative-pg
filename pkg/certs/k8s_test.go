@@ -118,7 +118,7 @@ var _ = Describe("Root CA secret generation", func() {
 	It("must generate a new CA secret when it doesn't already exist", func() {
 		clientSet := fake.NewSimpleClientset()
 		generateFakeOperatorDeployment(clientSet)
-		secret, err := EnsureRootCACertificate(context.TODO(), clientSet, operatorNamespaceName, "ca-secret-name")
+		secret, err := EnsureRootCACertificate(context.TODO(), clientSet, operatorNamespaceName, "ca-secret-name", "")
 		Expect(err).To(BeNil())
 
 		Expect(secret.Namespace).To(Equal(operatorNamespaceName))
@@ -136,7 +136,8 @@ var _ = Describe("Root CA secret generation", func() {
 		secret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(secret)
 
-		resultingSecret, err := EnsureRootCACertificate(context.TODO(), clientSet, operatorNamespaceName, "ca-secret-name")
+		resultingSecret, err := EnsureRootCACertificate(context.TODO(),
+			clientSet, operatorNamespaceName, "ca-secret-name", "")
 		Expect(err).To(BeNil())
 		Expect(resultingSecret.Namespace).To(Equal(operatorNamespaceName))
 		Expect(resultingSecret.Name).To(Equal("ca-secret-name"))
@@ -145,14 +146,16 @@ var _ = Describe("Root CA secret generation", func() {
 	It("must renew the CA certificate if it is not valid", func() {
 		notAfter := time.Now().Add(-10 * time.Hour)
 		notBefore := notAfter.Add(-90 * 24 * time.Hour)
-		ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", operatorNamespaceName)
+		ca, err := createCAWithValidity(notBefore, notAfter,
+			nil, nil, "root", operatorNamespaceName)
 		Expect(err).To(BeNil())
 
 		secret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(secret)
 
 		// The secret should have been renewed now
-		resultingSecret, err := EnsureRootCACertificate(context.TODO(), clientSet, operatorNamespaceName, "ca-secret-name")
+		resultingSecret, err := EnsureRootCACertificate(context.TODO(),
+			clientSet, operatorNamespaceName, "ca-secret-name", "")
 		Expect(err).To(BeNil())
 		Expect(resultingSecret.Namespace).To(Equal(operatorNamespaceName))
 		Expect(resultingSecret.Name).To(Equal("ca-secret-name"))
