@@ -56,11 +56,16 @@ type PublicKeyInfrastructure struct {
 	// The name of every CRD that has a reference to a conversion webhook
 	// on which we need to inject our public key
 	CustomResourceDefinitionsName []string
+
+	// The labelSelector to be used to get the operators deployment,
+	// e.g. "app.kubernetes.io/name=cloud-native-postgresql"
+	OperatorDeploymentLabelSelector string
 }
 
 // EnsureRootCACertificate ensure that in the cluster there is a root CA Certificate
 func EnsureRootCACertificate(
-	ctx context.Context, client kubernetes.Interface, namespace string, name string) (*v1.Secret, error) {
+	ctx context.Context, client kubernetes.Interface, namespace, name,
+	operatorLabelSelector string) (*v1.Secret, error) {
 	// Checking if the root CA already exist
 	secret, err := client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err == nil {
@@ -82,7 +87,7 @@ func EnsureRootCACertificate(
 	}
 
 	secret = pair.GenerateCASecret(namespace, name)
-	err = utils.SetAsOwnedByOperatorDeployment(ctx, client, &secret.ObjectMeta)
+	err = utils.SetAsOwnedByOperatorDeployment(ctx, client, &secret.ObjectMeta, operatorLabelSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +161,7 @@ func (pki PublicKeyInfrastructure) Setup(
 		ctx,
 		client,
 		pki.OperatorNamespace,
-		pki.CaSecretName)
+		pki.CaSecretName, pki.OperatorDeploymentLabelSelector)
 	if err != nil {
 		return err
 	}
@@ -261,7 +266,7 @@ func (pki PublicKeyInfrastructure) EnsureCertificate(
 	}
 
 	secret = webhookPair.GenerateCertificateSecret(pki.OperatorNamespace, pki.SecretName)
-	err = utils.SetAsOwnedByOperatorDeployment(ctx, client, &secret.ObjectMeta)
+	err = utils.SetAsOwnedByOperatorDeployment(ctx, client, &secret.ObjectMeta, pki.OperatorDeploymentLabelSelector)
 	if err != nil {
 		return nil, err
 	}
