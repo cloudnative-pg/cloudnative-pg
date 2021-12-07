@@ -283,12 +283,14 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		"Replicating",
 		"Replay paused",
 		"Pending restart",
+		"Running pg_rewind",
 		"Status")
 	for _, instance := range instanceStatus.Items {
 		if instance.Error != nil {
 			status.AddLine(
 				"-",
 				instance.Pod.Name,
+				"-",
 				"-",
 				"-",
 				"-",
@@ -310,6 +312,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 				boolToCheck(instance.IsWalReceiverActive),
 				boolToCheck(instance.ReplayPaused),
 				boolToCheck(instance.PendingRestart),
+				boolToCheck(instance.IsPgRewindRunning),
 				"OK")
 		}
 	}
