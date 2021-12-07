@@ -126,19 +126,10 @@ func (r *InstanceReconciler) RefreshBarmanEndpointCA(ctx context.Context, cluste
 
 // VerifyPgDataCoherence checks if this cluster exists in K8s. It panics if this
 // pod belongs to a primary but the cluster status is not coherent with that
-func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
+func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Checking PGDATA coherence")
-
-	var cluster apiv1.Cluster
-	err := r.GetClient().Get(
-		ctx,
-		client.ObjectKey{Namespace: r.instance.Namespace, Name: r.instance.ClusterName},
-		&cluster)
-	if err != nil {
-		return fmt.Errorf("error while decoding runtime.Object data from watch: %w", err)
-	}
 
 	if err := fileutils.EnsurePgDataPerms(r.instance.PgData); err != nil {
 		return err
@@ -156,7 +147,7 @@ func (r *InstanceReconciler) VerifyPgDataCoherence(ctx context.Context) error {
 	contextLogger.Info("Instance type", "isPrimary", isPrimary)
 
 	if isPrimary {
-		return r.verifyPgDataCoherenceForPrimary(ctx, &cluster)
+		return r.verifyPgDataCoherenceForPrimary(ctx, cluster)
 	}
 
 	return nil
