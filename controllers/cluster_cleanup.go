@@ -17,8 +17,8 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
-// cleanupCluster remove all the Jobs which are completed
-func (r *ClusterReconciler) cleanupCluster(
+// cleanupCompletedJobs remove all the Jobs which are completed
+func (r *ClusterReconciler) cleanupCompletedJobs(
 	ctx context.Context,
 	jobs batchv1.JobList) {
 	contextLogger := log.FromContext(ctx)

@@ -942,11 +942,14 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 		return ctrl.Result{}, fmt.Errorf("error while reattaching PVC: %v", err)
 	}
 
-	// Selected PVC in this point must be ready.
-	// Let's make sure the annotation is properly set.
-	err = r.pvcSetStatusReady(ctx, pvc)
-	if err != nil {
-		return ctrl.Result{}, err
+	// This should not happen. However, we put this guard here
+	// as an assertion to catch unexpected events.
+	pvcStatus := pvc.Annotations[specs.PVCStatusAnnotationName]
+	if pvcStatus != specs.PVCStatusReady {
+		contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
+			"pvc", pvc.Name,
+			"status", pvcStatus)
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
 	nodeSerial, err := specs.GetNodeSerial(pvc.ObjectMeta)
