@@ -224,7 +224,7 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 
 	// First, let's check the connection. No need to proceed if this fails.
 	if err := db.Ping(); err != nil {
-		log.Error(err, "Error pinging PostgreSQL")
+		log.Warning("Unable to collect metrics", "error", err)
 		e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.ClusterName).Set(0)
 		e.Metrics.Error.Set(1)
 		e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
