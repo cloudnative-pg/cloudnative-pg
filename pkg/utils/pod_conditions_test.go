@@ -123,4 +123,28 @@ var _ = Describe("Pod conditions test suite", func() {
 			Expect(CountReadyPods(podList)).To(Equal(2))
 		})
 	})
+
+	Describe("Must detect if a pod has been evicted or not", func() {
+		pod := corev1.Pod{
+			Status: corev1.PodStatus{
+				Phase:  corev1.PodFailed,
+				Reason: PodReasonEvicted,
+				Message: "The node was low on resource: memory. " +
+					"Container postgres was using 111 which exceeds its request of 0.",
+			},
+		}
+		Expect(IsPodEvicted(pod)).To(BeTrue())
+
+		pod = corev1.Pod{
+			Status: corev1.PodStatus{
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.ContainersReady,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		}
+		Expect(IsPodEvicted(pod)).To(BeFalse())
+	})
 })

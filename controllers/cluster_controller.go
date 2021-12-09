@@ -243,6 +243,16 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
+	// Delete Pods which have been evicted by the Kubelet
+	result, err := r.deleteEvictedPods(ctx, cluster, resources)
+	if err != nil {
+		contextLogger.Error(err, "While deleting evicted pods")
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+	if result != nil {
+		return *result, err
+	}
+
 	if !resources.allPodsAreActive() {
 		contextLogger.Debug("A managed resource is currently being created or deleted. Waiting")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
@@ -267,6 +277,37 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// deleteEvictedPods will delete the Pods that the Kubelet has evicted
+func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv1.Cluster,
+	resources *managedResources) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+	deletedPods := false
+
+	for idx := range resources.pods.Items {
+		if utils.IsPodEvicted(resources.pods.Items[idx]) {
+			contextLogger.Warning("Deleting evicted pod",
+				"pod", resources.pods.Items[idx].Name,
+				"podStatus", resources.pods.Items[idx].Status)
+			if err := r.Delete(ctx, &resources.pods.Items[idx]); err != nil {
+				if apierrs.IsConflict(err) {
+					return &ctrl.Result{Requeue: true}, nil
+				}
+				return nil, err
+			}
+			deletedPods = true
+			r.Recorder.Eventf(cluster, "Normal", "DeletePod",
+				"Deleted evicted Pod %v",
+				resources.pods.Items[idx].Name)
+		}
+	}
+	if deletedPods {
+		// We cleaned up Pods which were evicted.
+		// Let's wait for the informer cache to notice that
+		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+	return nil, nil
 }
 
 // checkPodsArchitecture checks whether the architecture of the instances is consistent with the runtime one
