@@ -1,0 +1,1624 @@
+{
+  "items": [
+    {
+      "receivedLsn": "3BB/AA000000",
+      "replayLsn": "3BB/A9FFFBE8",
+      "systemID": "7037468792984805397",
+      "isPrimary": false,
+      "replayPaused": false,
+      "pendingRestart": false,
+      "isWalReceiverActive": true,
+      "node": "aks-pgparalarch-28878343-vmss00000c",
+      "pod": {
+        "kind": "Pod",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "sandbox-6",
+          "namespace": "default",
+          "uid": "9e238b96-0afd-4546-ad48-38f647269965",
+          "resourceVersion": "3656838",
+          "creationTimestamp": "2021-12-09T16:10:34Z",
+          "labels": {
+            "k8s.enterprisedb.io/cluster": "sandbox",
+            "postgresql": "sandbox",
+            "role": "replica"
+          },
+          "annotations": {
+            "k8s.enterprisedb.io/nodeSerial": "6",
+            "k8s.enterprisedb.io/operatorVersion": "1.10.0"
+          },
+          "ownerReferences": [
+            {
+              "apiVersion": "postgresql.k8s.enterprisedb.io/v1",
+              "kind": "Cluster",
+              "name": "sandbox",
+              "uid": "b1ec3b05-27e3-408b-b66d-43b2a3608fcf",
+              "controller": true,
+              "blockOwnerDeletion": true
+            }
+          ],
+          "managedFields": [
+            {
+              "manager": "manager",
+              "operation": "Update",
+              "apiVersion": "v1",
+              "time": "2021-12-09T16:10:40Z",
+              "fieldsType": "FieldsV1",
+              "fieldsV1": {
+                "f:metadata": {
+                  "f:annotations": {
+                    ".": {},
+                    "f:k8s.enterprisedb.io/nodeSerial": {},
+                    "f:k8s.enterprisedb.io/operatorVersion": {}
+                  },
+                  "f:labels": {
+                    ".": {},
+                    "f:k8s.enterprisedb.io/cluster": {},
+                    "f:postgresql": {},
+                    "f:role": {}
+                  },
+                  "f:ownerReferences": {
+                    ".": {},
+                    "k:{\"uid\":\"b1ec3b05-27e3-408b-b66d-43b2a3608fcf\"}": {
+                      ".": {},
+                      "f:apiVersion": {},
+                      "f:blockOwnerDeletion": {},
+                      "f:controller": {},
+                      "f:kind": {},
+                      "f:name": {},
+                      "f:uid": {}
+                    }
+                  }
+                },
+                "f:spec": {
+                  "f:affinity": {
+                    ".": {},
+                    "f:podAntiAffinity": {
+                      ".": {},
+                      "f:preferredDuringSchedulingIgnoredDuringExecution": {}
+                    }
+                  },
+                  "f:containers": {
+                    "k:{\"name\":\"postgres\"}": {
+                      ".": {},
+                      "f:command": {},
+                      "f:env": {
+                        ".": {},
+                        "k:{\"name\":\"CLUSTER_NAME\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        },
+                        "k:{\"name\":\"NAMESPACE\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        },
+                        "k:{\"name\":\"PGDATA\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        },
+                        "k:{\"name\":\"PGHOST\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        },
+                        "k:{\"name\":\"PGPORT\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        },
+                        "k:{\"name\":\"POD_NAME\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        }
+                      },
+                      "f:image": {},
+                      "f:imagePullPolicy": {},
+                      "f:livenessProbe": {
+                        ".": {},
+                        "f:failureThreshold": {},
+                        "f:httpGet": {
+                          ".": {},
+                          "f:path": {},
+                          "f:port": {},
+                          "f:scheme": {}
+                        },
+                        "f:initialDelaySeconds": {},
+                        "f:periodSeconds": {},
+                        "f:successThreshold": {},
+                        "f:timeoutSeconds": {}
+                      },
+                      "f:name": {},
+                      "f:ports": {
+                        ".": {},
+                        "k:{\"containerPort\":5432,\"protocol\":\"TCP\"}": {
+                          ".": {},
+                          "f:containerPort": {},
+                          "f:name": {},
+                          "f:protocol": {}
+                        },
+                        "k:{\"containerPort\":8000,\"protocol\":\"TCP\"}": {
+                          ".": {},
+                          "f:containerPort": {},
+                          "f:name": {},
+                          "f:protocol": {}
+                        },
+                        "k:{\"containerPort\":9187,\"protocol\":\"TCP\"}": {
+                          ".": {},
+                          "f:containerPort": {},
+                          "f:name": {},
+                          "f:protocol": {}
+                        }
+                      },
+                      "f:readinessProbe": {
+                        ".": {},
+                        "f:failureThreshold": {},
+                        "f:httpGet": {
+                          ".": {},
+                          "f:path": {},
+                          "f:port": {},
+                          "f:scheme": {}
+                        },
+                        "f:periodSeconds": {},
+                        "f:successThreshold": {},
+                        "f:timeoutSeconds": {}
+                      },
+                      "f:resources": {
+                        ".": {},
+                        "f:limits": {
+                          ".": {},
+                          "f:cpu": {},
+                          "f:memory": {}
+                        },
+                        "f:requests": {
+                          ".": {},
+                          "f:cpu": {},
+                          "f:memory": {}
+                        }
+                      },
+                      "f:securityContext": {
+                        ".": {},
+                        "f:allowPrivilegeEscalation": {},
+                        "f:capabilities": {
+                          ".": {},
+                          "f:drop": {}
+                        },
+                        "f:privileged": {},
+                        "f:readOnlyRootFilesystem": {},
+                        "f:runAsNonRoot": {}
+                      },
+                      "f:terminationMessagePath": {},
+                      "f:terminationMessagePolicy": {},
+                      "f:volumeMounts": {
+                        ".": {},
+                        "k:{\"mountPath\":\"/controller\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/dev/shm\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/etc/app-secret\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/etc/superuser-secret\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/run\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/var/lib/postgresql/data\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        }
+                      }
+                    }
+                  },
+                  "f:dnsPolicy": {},
+                  "f:enableServiceLinks": {},
+                  "f:hostname": {},
+                  "f:initContainers": {
+                    ".": {},
+                    "k:{\"name\":\"bootstrap-controller\"}": {
+                      ".": {},
+                      "f:command": {},
+                      "f:image": {},
+                      "f:imagePullPolicy": {},
+                      "f:name": {},
+                      "f:resources": {
+                        ".": {},
+                        "f:limits": {
+                          ".": {},
+                          "f:cpu": {},
+                          "f:memory": {}
+                        },
+                        "f:requests": {
+                          ".": {},
+                          "f:cpu": {},
+                          "f:memory": {}
+                        }
+                      },
+                      "f:securityContext": {
+                        ".": {},
+                        "f:allowPrivilegeEscalation": {},
+                        "f:capabilities": {
+                          ".": {},
+                          "f:drop": {}
+                        },
+                        "f:privileged": {},
+                        "f:readOnlyRootFilesystem": {},
+                        "f:runAsNonRoot": {}
+                      },
+                      "f:terminationMessagePath": {},
+                      "f:terminationMessagePolicy": {},
+                      "f:volumeMounts": {
+                        ".": {},
+                        "k:{\"mountPath\":\"/controller\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/dev/shm\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/etc/app-secret\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/etc/superuser-secret\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/run\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/var/lib/postgresql/data\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        }
+                      }
+                    }
+                  },
+                  "f:nodeSelector": {
+                    ".": {},
+                    "f:workload": {}
+                  },
+                  "f:restartPolicy": {},
+                  "f:schedulerName": {},
+                  "f:securityContext": {
+                    ".": {},
+                    "f:fsGroup": {},
+                    "f:runAsGroup": {},
+                    "f:runAsNonRoot": {},
+                    "f:runAsUser": {}
+                  },
+                  "f:serviceAccount": {},
+                  "f:serviceAccountName": {},
+                  "f:subdomain": {},
+                  "f:terminationGracePeriodSeconds": {},
+                  "f:volumes": {
+                    ".": {},
+                    "k:{\"name\":\"app-secret\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:secret": {
+                        ".": {},
+                        "f:defaultMode": {},
+                        "f:secretName": {}
+                      }
+                    },
+                    "k:{\"name\":\"pgdata\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:persistentVolumeClaim": {
+                        ".": {},
+                        "f:claimName": {}
+                      }
+                    },
+                    "k:{\"name\":\"scratch-data\"}": {
+                      ".": {},
+                      "f:emptyDir": {},
+                      "f:name": {}
+                    },
+                    "k:{\"name\":\"shm\"}": {
+                      ".": {},
+                      "f:emptyDir": {
+                        ".": {},
+                        "f:medium": {}
+                      },
+                      "f:name": {}
+                    },
+                    "k:{\"name\":\"superuser-secret\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:secret": {
+                        ".": {},
+                        "f:defaultMode": {},
+                        "f:secretName": {}
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "manager": "kubelet",
+              "operation": "Update",
+              "apiVersion": "v1",
+              "time": "2021-12-09T16:22:55Z",
+              "fieldsType": "FieldsV1",
+              "fieldsV1": {
+                "f:status": {
+                  "f:conditions": {
+                    "k:{\"type\":\"ContainersReady\"}": {
+                      ".": {},
+                      "f:lastProbeTime": {},
+                      "f:lastTransitionTime": {},
+                      "f:status": {},
+                      "f:type": {}
+                    },
+                    "k:{\"type\":\"Initialized\"}": {
+                      ".": {},
+                      "f:lastProbeTime": {},
+                      "f:lastTransitionTime": {},
+                      "f:status": {},
+                      "f:type": {}
+                    },
+                    "k:{\"type\":\"Ready\"}": {
+                      ".": {},
+                      "f:lastProbeTime": {},
+                      "f:lastTransitionTime": {},
+                      "f:status": {},
+                      "f:type": {}
+                    }
+                  },
+                  "f:containerStatuses": {},
+                  "f:hostIP": {},
+                  "f:initContainerStatuses": {},
+                  "f:phase": {},
+                  "f:podIP": {},
+                  "f:podIPs": {
+                    ".": {},
+                    "k:{\"ip\":\"10.0.0.177\"}": {
+                      ".": {},
+                      "f:ip": {}
+                    }
+                  },
+                  "f:startTime": {}
+                }
+              }
+            }
+          ]
+        },
+        "spec": {
+          "volumes": [
+            {
+              "name": "pgdata",
+              "persistentVolumeClaim": {
+                "claimName": "sandbox-6"
+              }
+            },
+            {
+              "name": "scratch-data",
+              "emptyDir": {}
+            },
+            {
+              "name": "shm",
+              "emptyDir": {
+                "medium": "Memory"
+              }
+            },
+            {
+              "name": "superuser-secret",
+              "secret": {
+                "secretName": "sandbox-superuser",
+                "defaultMode": 420
+              }
+            },
+            {
+              "name": "app-secret",
+              "secret": {
+                "secretName": "sandbox-app",
+                "defaultMode": 420
+              }
+            },
+            {
+              "name": "sandbox-token-kdx6z",
+              "secret": {
+                "secretName": "sandbox-token-kdx6z",
+                "defaultMode": 420
+              }
+            }
+          ],
+          "initContainers": [
+            {
+              "name": "bootstrap-controller",
+              "image": "quay.io/enterprisedb/cloud-native-postgresql-testing:main@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
+              "command": [
+                "/manager",
+                "bootstrap",
+                "/controller/manager",
+                "--log-level=info"
+              ],
+              "resources": {
+                "limits": {
+                  "cpu": "7",
+                  "memory": "56Gi"
+                },
+                "requests": {
+                  "cpu": "7",
+                  "memory": "56Gi"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "name": "pgdata",
+                  "mountPath": "/var/lib/postgresql/data"
+                },
+                {
+                  "name": "scratch-data",
+                  "mountPath": "/run"
+                },
+                {
+                  "name": "scratch-data",
+                  "mountPath": "/controller"
+                },
+                {
+                  "name": "shm",
+                  "mountPath": "/dev/shm"
+                },
+                {
+                  "name": "superuser-secret",
+                  "mountPath": "/etc/superuser-secret"
+                },
+                {
+                  "name": "app-secret",
+                  "mountPath": "/etc/app-secret"
+                },
+                {
+                  "name": "sandbox-token-kdx6z",
+                  "readOnly": true,
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+                }
+              ],
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "imagePullPolicy": "IfNotPresent",
+              "securityContext": {
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "privileged": false,
+                "runAsNonRoot": true,
+                "readOnlyRootFilesystem": true,
+                "allowPrivilegeEscalation": false
+              }
+            }
+          ],
+          "containers": [
+            {
+              "name": "postgres",
+              "image": "quay.io/enterprisedb/postgresql:14.1",
+              "command": [
+                "/controller/manager",
+                "instance",
+                "run",
+                "--log-level=info"
+              ],
+              "ports": [
+                {
+                  "name": "postgresql",
+                  "containerPort": 5432,
+                  "protocol": "TCP"
+                },
+                {
+                  "name": "metrics",
+                  "containerPort": 9187,
+                  "protocol": "TCP"
+                },
+                {
+                  "name": "status",
+                  "containerPort": 8000,
+                  "protocol": "TCP"
+                }
+              ],
+              "env": [
+                {
+                  "name": "PGDATA",
+                  "value": "/var/lib/postgresql/data/pgdata"
+                },
+                {
+                  "name": "POD_NAME",
+                  "value": "sandbox-6"
+                },
+                {
+                  "name": "NAMESPACE",
+                  "value": "default"
+                },
+                {
+                  "name": "CLUSTER_NAME",
+                  "value": "sandbox"
+                },
+                {
+                  "name": "PGPORT",
+                  "value": "5432"
+                },
+                {
+                  "name": "PGHOST",
+                  "value": "/controller/run"
+                }
+              ],
+              "resources": {
+                "limits": {
+                  "cpu": "7",
+                  "memory": "56Gi"
+                },
+                "requests": {
+                  "cpu": "7",
+                  "memory": "56Gi"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "name": "pgdata",
+                  "mountPath": "/var/lib/postgresql/data"
+                },
+                {
+                  "name": "scratch-data",
+                  "mountPath": "/run"
+                },
+                {
+                  "name": "scratch-data",
+                  "mountPath": "/controller"
+                },
+                {
+                  "name": "shm",
+                  "mountPath": "/dev/shm"
+                },
+                {
+                  "name": "superuser-secret",
+                  "mountPath": "/etc/superuser-secret"
+                },
+                {
+                  "name": "app-secret",
+                  "mountPath": "/etc/app-secret"
+                },
+                {
+                  "name": "sandbox-token-kdx6z",
+                  "readOnly": true,
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+                }
+              ],
+              "livenessProbe": {
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8000,
+                  "scheme": "HTTP"
+                },
+                "initialDelaySeconds": 300,
+                "timeoutSeconds": 5,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "failureThreshold": 3
+              },
+              "readinessProbe": {
+                "httpGet": {
+                  "path": "/readyz",
+                  "port": 8000,
+                  "scheme": "HTTP"
+                },
+                "timeoutSeconds": 5,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "failureThreshold": 3
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "imagePullPolicy": "IfNotPresent",
+              "securityContext": {
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "privileged": false,
+                "runAsNonRoot": true,
+                "readOnlyRootFilesystem": true,
+                "allowPrivilegeEscalation": false
+              }
+            }
+          ],
+          "restartPolicy": "Always",
+          "terminationGracePeriodSeconds": 300,
+          "dnsPolicy": "ClusterFirst",
+          "nodeSelector": {
+            "workload": "pg-parallel-archive"
+          },
+          "serviceAccountName": "sandbox",
+          "serviceAccount": "sandbox",
+          "nodeName": "aks-pgparalarch-28878343-vmss00000c",
+          "securityContext": {
+            "runAsUser": 26,
+            "runAsGroup": 26,
+            "runAsNonRoot": true,
+            "fsGroup": 26
+          },
+          "imagePullSecrets": [
+            {
+              "name": "sandbox-pull"
+            }
+          ],
+          "hostname": "sandbox-6",
+          "subdomain": "sandbox-any",
+          "affinity": {
+            "podAntiAffinity": {
+              "preferredDuringSchedulingIgnoredDuringExecution": [
+                {
+                  "weight": 100,
+                  "podAffinityTerm": {
+                    "labelSelector": {
+                      "matchExpressions": [
+                        {
+                          "key": "postgresql",
+                          "operator": "In",
+                          "values": [
+                            "sandbox"
+                          ]
+                        }
+                      ]
+                    },
+                    "topologyKey": "kubernetes.io/hostname"
+                  }
+                }
+              ]
+            }
+          },
+          "schedulerName": "default-scheduler",
+          "tolerations": [
+            {
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "effect": "NoExecute",
+              "tolerationSeconds": 300
+            },
+            {
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "effect": "NoExecute",
+              "tolerationSeconds": 300
+            },
+            {
+              "key": "node.kubernetes.io/memory-pressure",
+              "operator": "Exists",
+              "effect": "NoSchedule"
+            }
+          ],
+          "priority": 0,
+          "enableServiceLinks": true,
+          "preemptionPolicy": "PreemptLowerPriority"
+        },
+        "status": {
+          "phase": "Running",
+          "conditions": [
+            {
+              "type": "Initialized",
+              "status": "True",
+              "lastProbeTime": null,
+              "lastTransitionTime": "2021-12-09T16:10:36Z"
+            },
+            {
+              "type": "Ready",
+              "status": "True",
+              "lastProbeTime": null,
+              "lastTransitionTime": "2021-12-09T16:22:55Z"
+            },
+            {
+              "type": "ContainersReady",
+              "status": "True",
+              "lastProbeTime": null,
+              "lastTransitionTime": "2021-12-09T16:22:55Z"
+            },
+            {
+              "type": "PodScheduled",
+              "status": "True",
+              "lastProbeTime": null,
+              "lastTransitionTime": "2021-12-09T16:10:34Z"
+            }
+          ],
+          "hostIP": "10.0.0.159",
+          "podIP": "10.0.0.177",
+          "podIPs": [
+            {
+              "ip": "10.0.0.177"
+            }
+          ],
+          "startTime": "2021-12-09T16:10:34Z",
+          "initContainerStatuses": [
+            {
+              "name": "bootstrap-controller",
+              "state": {
+                "terminated": {
+                  "exitCode": 0,
+                  "reason": "Completed",
+                  "startedAt": "2021-12-09T16:10:35Z",
+                  "finishedAt": "2021-12-09T16:10:36Z",
+                  "containerID": "containerd://427a187550b0cf110edb9ee4f32227d7ed819b127834b1917f2034ddb797a1df"
+                }
+              },
+              "lastState": {},
+              "ready": true,
+              "restartCount": 0,
+              "image": "sha256:af7b34df0036a4b89f6c19b6c2fac884295cb05ebe80b0039f624733df2f54fe",
+              "imageID": "quay.io/enterprisedb/cloud-native-postgresql-testing@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
+              "containerID": "containerd://427a187550b0cf110edb9ee4f32227d7ed819b127834b1917f2034ddb797a1df"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "name": "postgres",
+              "state": {
+                "running": {
+                  "startedAt": "2021-12-09T16:10:38Z"
+                }
+              },
+              "lastState": {
+                "terminated": {
+                  "exitCode": 2,
+                  "reason": "Error",
+                  "startedAt": "2021-12-09T16:10:37Z",
+                  "finishedAt": "2021-12-09T16:10:37Z",
+                  "containerID": "containerd://900c2befc2d04c4621030fdc4aa917874286bca4cd24c8357597f14847e4e567"
+                }
+              },
+              "ready": true,
+              "restartCount": 1,
+              "image": "quay.io/enterprisedb/postgresql:14.1",
+              "imageID": "quay.io/enterprisedb/postgresql@sha256:93041846eddfc45fe63346bb31b78023868fe2f5a38690c34893e3c1f6106778",
+              "containerID": "containerd://98852540844e5da171df94619b74f2e1f3e2eaff42223df01e4aa9005c93081b",
+              "started": true
+            }
+          ],
+          "qosClass": "Guaranteed"
+        }
+      },
+      "isPgRewindRunning": false,
+      "isReady": true,
+      "executableHash": "a0ba03fdefac022d3a9c7e13771c2370980a5ce2aea14740f280e3e61ae2d6cc",
+      "isInstanceManagerUpgrading": false,
+      "instanceManagerVersion": "1.10.0",
+      "instanceArch": "amd64"
+    },
+    {
+      "receivedLsn": "3BE/4BB52000",
+      "replayLsn": "3BE/4BB51C38",
+      "systemID": "7037468792984805397",
+      "isPrimary": false,
+      "replayPaused": false,
+      "pendingRestart": false,
+      "isWalReceiverActive": true,
+      "node": "aks-pgparalarch-28878343-vmss00000e",
+      "pod": {
+        "kind": "Pod",
+        "apiVersion": "v1",
+        "metadata": {
+          "name": "sandbox-3",
+          "namespace": "default",
+          "uid": "64b83150-c08e-4941-b39e-3d27e8711196",
+          "resourceVersion": "3650327",
+          "creationTimestamp": "2021-12-09T15:23:04Z",
+          "labels": {
+            "k8s.enterprisedb.io/cluster": "sandbox",
+            "postgresql": "sandbox",
+            "role": "replica"
+          },
+          "annotations": {
+            "k8s.enterprisedb.io/nodeSerial": "3",
+            "k8s.enterprisedb.io/operatorVersion": "1.10.0"
+          },
+          "ownerReferences": [
+            {
+              "apiVersion": "postgresql.k8s.enterprisedb.io/v1",
+              "kind": "Cluster",
+              "name": "sandbox",
+              "uid": "b1ec3b05-27e3-408b-b66d-43b2a3608fcf",
+              "controller": true,
+              "blockOwnerDeletion": true
+            }
+          ],
+          "managedFields": [
+            {
+              "manager": "manager",
+              "operation": "Update",
+              "apiVersion": "v1",
+              "time": "2021-12-09T15:23:18Z",
+              "fieldsType": "FieldsV1",
+              "fieldsV1": {
+                "f:metadata": {
+                  "f:annotations": {
+                    ".": {},
+                    "f:k8s.enterprisedb.io/nodeSerial": {},
+                    "f:k8s.enterprisedb.io/operatorVersion": {}
+                  },
+                  "f:labels": {
+                    ".": {},
+                    "f:k8s.enterprisedb.io/cluster": {},
+                    "f:postgresql": {},
+                    "f:role": {}
+                  },
+                  "f:ownerReferences": {
+                    ".": {},
+                    "k:{\"uid\":\"b1ec3b05-27e3-408b-b66d-43b2a3608fcf\"}": {
+                      ".": {},
+                      "f:apiVersion": {},
+                      "f:blockOwnerDeletion": {},
+                      "f:controller": {},
+                      "f:kind": {},
+                      "f:name": {},
+                      "f:uid": {}
+                    }
+                  }
+                },
+                "f:spec": {
+                  "f:affinity": {
+                    ".": {},
+                    "f:podAntiAffinity": {
+                      ".": {},
+                      "f:preferredDuringSchedulingIgnoredDuringExecution": {}
+                    }
+                  },
+                  "f:containers": {
+                    "k:{\"name\":\"postgres\"}": {
+                      ".": {},
+                      "f:command": {},
+                      "f:env": {
+                        ".": {},
+                        "k:{\"name\":\"CLUSTER_NAME\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        },
+                        "k:{\"name\":\"NAMESPACE\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        },
+                        "k:{\"name\":\"PGDATA\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        },
+                        "k:{\"name\":\"PGHOST\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        },
+                        "k:{\"name\":\"PGPORT\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        },
+                        "k:{\"name\":\"POD_NAME\"}": {
+                          ".": {},
+                          "f:name": {},
+                          "f:value": {}
+                        }
+                      },
+                      "f:image": {},
+                      "f:imagePullPolicy": {},
+                      "f:livenessProbe": {
+                        ".": {},
+                        "f:failureThreshold": {},
+                        "f:httpGet": {
+                          ".": {},
+                          "f:path": {},
+                          "f:port": {},
+                          "f:scheme": {}
+                        },
+                        "f:initialDelaySeconds": {},
+                        "f:periodSeconds": {},
+                        "f:successThreshold": {},
+                        "f:timeoutSeconds": {}
+                      },
+                      "f:name": {},
+                      "f:ports": {
+                        ".": {},
+                        "k:{\"containerPort\":5432,\"protocol\":\"TCP\"}": {
+                          ".": {},
+                          "f:containerPort": {},
+                          "f:name": {},
+                          "f:protocol": {}
+                        },
+                        "k:{\"containerPort\":8000,\"protocol\":\"TCP\"}": {
+                          ".": {},
+                          "f:containerPort": {},
+                          "f:name": {},
+                          "f:protocol": {}
+                        },
+                        "k:{\"containerPort\":9187,\"protocol\":\"TCP\"}": {
+                          ".": {},
+                          "f:containerPort": {},
+                          "f:name": {},
+                          "f:protocol": {}
+                        }
+                      },
+                      "f:readinessProbe": {
+                        ".": {},
+                        "f:failureThreshold": {},
+                        "f:httpGet": {
+                          ".": {},
+                          "f:path": {},
+                          "f:port": {},
+                          "f:scheme": {}
+                        },
+                        "f:periodSeconds": {},
+                        "f:successThreshold": {},
+                        "f:timeoutSeconds": {}
+                      },
+                      "f:resources": {
+                        ".": {},
+                        "f:limits": {
+                          ".": {},
+                          "f:cpu": {},
+                          "f:memory": {}
+                        },
+                        "f:requests": {
+                          ".": {},
+                          "f:cpu": {},
+                          "f:memory": {}
+                        }
+                      },
+                      "f:securityContext": {
+                        ".": {},
+                        "f:allowPrivilegeEscalation": {},
+                        "f:capabilities": {
+                          ".": {},
+                          "f:drop": {}
+                        },
+                        "f:privileged": {},
+                        "f:readOnlyRootFilesystem": {},
+                        "f:runAsNonRoot": {}
+                      },
+                      "f:terminationMessagePath": {},
+                      "f:terminationMessagePolicy": {},
+                      "f:volumeMounts": {
+                        ".": {},
+                        "k:{\"mountPath\":\"/controller\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/dev/shm\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/etc/app-secret\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/etc/superuser-secret\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/run\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/var/lib/postgresql/data\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        }
+                      }
+                    }
+                  },
+                  "f:dnsPolicy": {},
+                  "f:enableServiceLinks": {},
+                  "f:hostname": {},
+                  "f:initContainers": {
+                    ".": {},
+                    "k:{\"name\":\"bootstrap-controller\"}": {
+                      ".": {},
+                      "f:command": {},
+                      "f:image": {},
+                      "f:imagePullPolicy": {},
+                      "f:name": {},
+                      "f:resources": {
+                        ".": {},
+                        "f:limits": {
+                          ".": {},
+                          "f:cpu": {},
+                          "f:memory": {}
+                        },
+                        "f:requests": {
+                          ".": {},
+                          "f:cpu": {},
+                          "f:memory": {}
+                        }
+                      },
+                      "f:securityContext": {
+                        ".": {},
+                        "f:allowPrivilegeEscalation": {},
+                        "f:capabilities": {
+                          ".": {},
+                          "f:drop": {}
+                        },
+                        "f:privileged": {},
+                        "f:readOnlyRootFilesystem": {},
+                        "f:runAsNonRoot": {}
+                      },
+                      "f:terminationMessagePath": {},
+                      "f:terminationMessagePolicy": {},
+                      "f:volumeMounts": {
+                        ".": {},
+                        "k:{\"mountPath\":\"/controller\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/dev/shm\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/etc/app-secret\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/etc/superuser-secret\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/run\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        },
+                        "k:{\"mountPath\":\"/var/lib/postgresql/data\"}": {
+                          ".": {},
+                          "f:mountPath": {},
+                          "f:name": {}
+                        }
+                      }
+                    }
+                  },
+                  "f:nodeSelector": {
+                    ".": {},
+                    "f:workload": {}
+                  },
+                  "f:restartPolicy": {},
+                  "f:schedulerName": {},
+                  "f:securityContext": {
+                    ".": {},
+                    "f:fsGroup": {},
+                    "f:runAsGroup": {},
+                    "f:runAsNonRoot": {},
+                    "f:runAsUser": {}
+                  },
+                  "f:serviceAccount": {},
+                  "f:serviceAccountName": {},
+                  "f:subdomain": {},
+                  "f:terminationGracePeriodSeconds": {},
+                  "f:volumes": {
+                    ".": {},
+                    "k:{\"name\":\"app-secret\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:secret": {
+                        ".": {},
+                        "f:defaultMode": {},
+                        "f:secretName": {}
+                      }
+                    },
+                    "k:{\"name\":\"pgdata\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:persistentVolumeClaim": {
+                        ".": {},
+                        "f:claimName": {}
+                      }
+                    },
+                    "k:{\"name\":\"scratch-data\"}": {
+                      ".": {},
+                      "f:emptyDir": {},
+                      "f:name": {}
+                    },
+                    "k:{\"name\":\"shm\"}": {
+                      ".": {},
+                      "f:emptyDir": {
+                        ".": {},
+                        "f:medium": {}
+                      },
+                      "f:name": {}
+                    },
+                    "k:{\"name\":\"superuser-secret\"}": {
+                      ".": {},
+                      "f:name": {},
+                      "f:secret": {
+                        ".": {},
+                        "f:defaultMode": {},
+                        "f:secretName": {}
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "manager": "kubelet",
+              "operation": "Update",
+              "apiVersion": "v1",
+              "time": "2021-12-09T15:52:04Z",
+              "fieldsType": "FieldsV1",
+              "fieldsV1": {
+                "f:status": {
+                  "f:conditions": {
+                    "k:{\"type\":\"ContainersReady\"}": {
+                      ".": {},
+                      "f:lastProbeTime": {},
+                      "f:lastTransitionTime": {},
+                      "f:status": {},
+                      "f:type": {}
+                    },
+                    "k:{\"type\":\"Initialized\"}": {
+                      ".": {},
+                      "f:lastProbeTime": {},
+                      "f:lastTransitionTime": {},
+                      "f:status": {},
+                      "f:type": {}
+                    },
+                    "k:{\"type\":\"Ready\"}": {
+                      ".": {},
+                      "f:lastProbeTime": {},
+                      "f:lastTransitionTime": {},
+                      "f:status": {},
+                      "f:type": {}
+                    }
+                  },
+                  "f:containerStatuses": {},
+                  "f:hostIP": {},
+                  "f:initContainerStatuses": {},
+                  "f:phase": {},
+                  "f:podIP": {},
+                  "f:podIPs": {
+                    ".": {},
+                    "k:{\"ip\":\"10.0.0.241\"}": {
+                      ".": {},
+                      "f:ip": {}
+                    }
+                  },
+                  "f:startTime": {}
+                }
+              }
+            }
+          ]
+        },
+        "spec": {
+          "volumes": [
+            {
+              "name": "pgdata",
+              "persistentVolumeClaim": {
+                "claimName": "sandbox-3"
+              }
+            },
+            {
+              "name": "scratch-data",
+              "emptyDir": {}
+            },
+            {
+              "name": "shm",
+              "emptyDir": {
+                "medium": "Memory"
+              }
+            },
+            {
+              "name": "superuser-secret",
+              "secret": {
+                "secretName": "sandbox-superuser",
+                "defaultMode": 420
+              }
+            },
+            {
+              "name": "app-secret",
+              "secret": {
+                "secretName": "sandbox-app",
+                "defaultMode": 420
+              }
+            },
+            {
+              "name": "sandbox-token-kdx6z",
+              "secret": {
+                "secretName": "sandbox-token-kdx6z",
+                "defaultMode": 420
+              }
+            }
+          ],
+          "initContainers": [
+            {
+              "name": "bootstrap-controller",
+              "image": "quay.io/enterprisedb/cloud-native-postgresql-testing:main@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
+              "command": [
+                "/manager",
+                "bootstrap",
+                "/controller/manager",
+                "--log-level=info"
+              ],
+              "resources": {
+                "limits": {
+                  "cpu": "7",
+                  "memory": "56Gi"
+                },
+                "requests": {
+                  "cpu": "7",
+                  "memory": "56Gi"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "name": "pgdata",
+                  "mountPath": "/var/lib/postgresql/data"
+                },
+                {
+                  "name": "scratch-data",
+                  "mountPath": "/run"
+                },
+                {
+                  "name": "scratch-data",
+                  "mountPath": "/controller"
+                },
+                {
+                  "name": "shm",
+                  "mountPath": "/dev/shm"
+                },
+                {
+                  "name": "superuser-secret",
+                  "mountPath": "/etc/superuser-secret"
+                },
+                {
+                  "name": "app-secret",
+                  "mountPath": "/etc/app-secret"
+                },
+                {
+                  "name": "sandbox-token-kdx6z",
+                  "readOnly": true,
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+                }
+              ],
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "imagePullPolicy": "IfNotPresent",
+              "securityContext": {
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "privileged": false,
+                "runAsNonRoot": true,
+                "readOnlyRootFilesystem": true,
+                "allowPrivilegeEscalation": false
+              }
+            }
+          ],
+          "containers": [
+            {
+              "name": "postgres",
+              "image": "quay.io/enterprisedb/postgresql:14.1",
+              "command": [
+                "/controller/manager",
+                "instance",
+                "run",
+                "--log-level=info"
+              ],
+              "ports": [
+                {
+                  "name": "postgresql",
+                  "containerPort": 5432,
+                  "protocol": "TCP"
+                },
+                {
+                  "name": "metrics",
+                  "containerPort": 9187,
+                  "protocol": "TCP"
+                },
+                {
+                  "name": "status",
+                  "containerPort": 8000,
+                  "protocol": "TCP"
+                }
+              ],
+              "env": [
+                {
+                  "name": "PGDATA",
+                  "value": "/var/lib/postgresql/data/pgdata"
+                },
+                {
+                  "name": "POD_NAME",
+                  "value": "sandbox-3"
+                },
+                {
+                  "name": "NAMESPACE",
+                  "value": "default"
+                },
+                {
+                  "name": "CLUSTER_NAME",
+                  "value": "sandbox"
+                },
+                {
+                  "name": "PGPORT",
+                  "value": "5432"
+                },
+                {
+                  "name": "PGHOST",
+                  "value": "/controller/run"
+                }
+              ],
+              "resources": {
+                "limits": {
+                  "cpu": "7",
+                  "memory": "56Gi"
+                },
+                "requests": {
+                  "cpu": "7",
+                  "memory": "56Gi"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "name": "pgdata",
+                  "mountPath": "/var/lib/postgresql/data"
+                },
+                {
+                  "name": "scratch-data",
+                  "mountPath": "/run"
+                },
+                {
+                  "name": "scratch-data",
+                  "mountPath": "/controller"
+                },
+                {
+                  "name": "shm",
+                  "mountPath": "/dev/shm"
+                },
+                {
+                  "name": "superuser-secret",
+                  "mountPath": "/etc/superuser-secret"
+                },
+                {
+                  "name": "app-secret",
+                  "mountPath": "/etc/app-secret"
+                },
+                {
+                  "name": "sandbox-token-kdx6z",
+                  "readOnly": true,
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+                }
+              ],
+              "livenessProbe": {
+                "httpGet": {
+                  "path": "/healthz",
+                  "port": 8000,
+                  "scheme": "HTTP"
+                },
+                "initialDelaySeconds": 300,
+                "timeoutSeconds": 5,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "failureThreshold": 3
+              },
+              "readinessProbe": {
+                "httpGet": {
+                  "path": "/readyz",
+                  "port": 8000,
+                  "scheme": "HTTP"
+                },
+                "timeoutSeconds": 5,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "failureThreshold": 3
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "imagePullPolicy": "IfNotPresent",
+              "securityContext": {
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                },
+                "privileged": false,
+                "runAsNonRoot": true,
+                "readOnlyRootFilesystem": true,
+                "allowPrivilegeEscalation": false
+              }
+            }
+          ],
+          "restartPolicy": "Always",
+          "terminationGracePeriodSeconds": 300,
+          "dnsPolicy": "ClusterFirst",
+          "nodeSelector": {
+            "workload": "pg-parallel-archive"
+          },
+          "serviceAccountName": "sandbox",
+          "serviceAccount": "sandbox",
+          "nodeName": "aks-pgparalarch-28878343-vmss00000e",
+          "securityContext": {
+            "runAsUser": 26,
+            "runAsGroup": 26,
+            "runAsNonRoot": true,
+            "fsGroup": 26
+          },
+          "imagePullSecrets": [
+            {
+              "name": "sandbox-pull"
+            }
+          ],
+          "hostname": "sandbox-3",
+          "subdomain": "sandbox-any",
+          "affinity": {
+            "podAntiAffinity": {
+              "preferredDuringSchedulingIgnoredDuringExecution": [
+                {
+                  "weight": 100,
+                  "podAffinityTerm": {
+                    "labelSelector": {
+                      "matchExpressions": [
+                        {
+                          "key": "postgresql",
+                          "operator": "In",
+                          "values": [
+                            "sandbox"
+                          ]
+                        }
+                      ]
+                    },
+                    "topologyKey": "kubernetes.io/hostname"
+                  }
+                }
+              ]
+            }
+          },
+          "schedulerName": "default-scheduler",
+          "tolerations": [
+            {
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "effect": "NoExecute",
+              "tolerationSeconds": 300
+            },
+            {
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "effect": "NoExecute",
+              "tolerationSeconds": 300
+            },
+            {
+              "key": "node.kubernetes.io/memory-pressure",
+              "operator": "Exists",
+              "effect": "NoSchedule"
+            }
+          ],
+          "priority": 0,
+          "enableServiceLinks": true,
+          "preemptionPolicy": "PreemptLowerPriority"
+        },
+        "status": {
+          "phase": "Running",
+          "conditions": [
+            {
+              "type": "Initialized",
+              "status": "True",
+              "lastProbeTime": null,
+              "lastTransitionTime": "2021-12-09T15:23:15Z"
+            },
+            {
+              "type": "Ready",
+              "status": "True",
+              "lastProbeTime": null,
+              "lastTransitionTime": "2021-12-09T15:52:04Z"
+            },
+            {
+              "type": "ContainersReady",
+              "status": "True",
+              "lastProbeTime": null,
+              "lastTransitionTime": "2021-12-09T15:52:04Z"
+            },
+            {
+              "type": "PodScheduled",
+              "status": "True",
+              "lastProbeTime": null,
+              "lastTransitionTime": "2021-12-09T15:23:04Z"
+            }
+          ],
+          "hostIP": "10.0.0.221",
+          "podIP": "10.0.0.241",
+          "podIPs": [
+            {
+              "ip": "10.0.0.241"
+            }
+          ],
+          "startTime": "2021-12-09T15:23:04Z",
+          "initContainerStatuses": [
+            {
+              "name": "bootstrap-controller",
+              "state": {
+                "terminated": {
+                  "exitCode": 0,
+                  "reason": "Completed",
+                  "startedAt": "2021-12-09T15:23:14Z",
+                  "finishedAt": "2021-12-09T15:23:14Z",
+                  "containerID": "containerd://150389f0f62f838673a28c58db5a1917e3ba132c666e7431aca347f3e7030c94"
+                }
+              },
+              "lastState": {},
+              "ready": true,
+              "restartCount": 0,
+              "image": "sha256:af7b34df0036a4b89f6c19b6c2fac884295cb05ebe80b0039f624733df2f54fe",
+              "imageID": "quay.io/enterprisedb/cloud-native-postgresql-testing@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
+              "containerID": "containerd://150389f0f62f838673a28c58db5a1917e3ba132c666e7431aca347f3e7030c94"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "name": "postgres",
+              "state": {
+                "running": {
+                  "startedAt": "2021-12-09T15:43:44Z"
+                }
+              },
+              "lastState": {
+                "terminated": {
+                  "exitCode": 0,
+                  "reason": "Completed",
+                  "startedAt": "2021-12-09T15:23:15Z",
+                  "finishedAt": "2021-12-09T15:43:44Z",
+                  "containerID": "containerd://528a76a356af8e440bde8174fa3354d43b184a3d7eb99c3401fb9468a3a4d2f8"
+                }
+              },
+              "ready": true,
+              "restartCount": 1,
+              "image": "quay.io/enterprisedb/postgresql:14.1",
+              "imageID": "quay.io/enterprisedb/postgresql@sha256:93041846eddfc45fe63346bb31b78023868fe2f5a38690c34893e3c1f6106778",
+              "containerID": "containerd://9ffbc2517e11fca5585cd8a4a83c846d9ae580a908965145cf8d3e4f551154c8",
+              "started": true
+            }
+          ],
+          "qosClass": "Guaranteed"
+        }
+      },
+      "isPgRewindRunning": false,
+      "isReady": true,
+      "executableHash": "a0ba03fdefac022d3a9c7e13771c2370980a5ce2aea14740f280e3e61ae2d6cc",
+      "isInstanceManagerUpgrading": false,
+      "instanceManagerVersion": "1.10.0",
+      "instanceArch": "amd64"
+    }
+  ]
+}

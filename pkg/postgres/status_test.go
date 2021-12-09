@@ -7,7 +7,9 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 
 	. "github.com/onsi/ginkgo"
@@ -127,6 +129,35 @@ var _ = Describe("PostgreSQL status", func() {
 		It("put the incomplete statuses at the bottom of the list", func() {
 			Expect(list.Items[5].Pod.Name).To(Equal("server-04"))
 			Expect(list.Items[5].Pod.Name).To(Equal("server-04"))
+		})
+	})
+})
+
+var _ = Describe("PostgreSQL status real", func() {
+	f, err := os.Open("testdata/lsn_overflow.json")
+	defer func() {
+		_ = f.Close()
+	}()
+	Expect(err).ToNot(HaveOccurred())
+
+	var list PostgresqlStatusList
+	err = json.NewDecoder(f).Decode(&list)
+	Expect(err).ToNot(HaveOccurred())
+
+	Describe("when sorted", func() {
+		sort.Sort(&list)
+
+		It("most advanced server comes first", func() {
+			Expect(list.Items[0].IsPrimary).To(BeFalse())
+			Expect(list.Items[0].Pod.Name).To(Equal("sandbox-3"))
+		})
+
+		// order again to verify that the result is stable
+		sort.Sort(&list)
+
+		It("most advanced server comes first (stable order)", func() {
+			Expect(list.Items[0].IsPrimary).To(BeFalse())
+			Expect(list.Items[0].Pod.Name).To(Equal("sandbox-3"))
 		})
 	})
 })

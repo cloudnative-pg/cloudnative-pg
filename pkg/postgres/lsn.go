@@ -39,12 +39,14 @@ func (lsn LSN) Parse() (int64, error) {
 		return 0, fmt.Errorf("error parsing LSN %s", lsn)
 	}
 
-	segment, err := strconv.ParseInt(components[0], 16, 32)
+	// Segment is unsigned int 32, so we parse using 64 bits to avoid overflow on sign bit
+	segment, err := strconv.ParseInt(components[0], 16, 64)
 	if err != nil {
 		return 0, fmt.Errorf("error parsing LSN %s: %w", lsn, err)
 	}
 
-	displacement, err := strconv.ParseInt(components[1], 16, 32)
+	// Segment is unsigned int 32, so we parse using 64 bits to avoid overflow on sign bit
+	displacement, err := strconv.ParseInt(components[1], 16, 64)
 	if err != nil {
 		return 0, fmt.Errorf("error parsing LSN %s: %w", lsn, err)
 	}
