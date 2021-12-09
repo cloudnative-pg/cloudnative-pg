@@ -25,6 +25,7 @@ var _ = Describe("LSN handling functions", func() {
 		It("works for good LSNs", func() {
 			Expect(LSN("1/1").Parse()).Should(Equal(int64(4294967297)))
 			Expect(LSN("3/23").Parse()).Should(Equal(int64(12884901923)))
+			Expect(LSN("3BB/A9FFFBE8").Parse()).Should(Equal(int64(4104545893352)))
 		})
 	})
 })
