@@ -25,10 +25,12 @@ import (
 )
 
 var (
-	// ErrPrimaryServer is returned when the instance is the cluster's primary, therefore doesn't need wal-restore
-	ErrPrimaryServer = errors.New("avoiding restoring WAL on the primary server")
 	// ErrNoBackupConfigured is returned when no backup is configured
 	ErrNoBackupConfigured = errors.New("backup not configured")
+	// ErrExternalClusterNotFound is returned when the specification refers to
+	// an external cluster which is not defined. This should be prevented
+	// from the validation webhook
+	ErrExternalClusterNotFound = errors.New("external cluster not found")
 )
 
 const (
@@ -83,18 +85,17 @@ func run(contextLog log.Logger, podName string, args []string) error {
 	}
 
 	recoverClusterName, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
-	if err != nil {
-		return fmt.Errorf("while getting recover configuration: %w", err)
-	}
-
-	if barmanConfiguration == nil {
+	if errors.Is(err, ErrNoBackupConfigured) {
 		// Backup not configured, skipping WAL
 		contextLog.Trace("Skipping WAL restore, there is no backup configuration",
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
 		)
-		return ErrNoBackupConfigured
+		return err
+	}
+	if err != nil {
+		return fmt.Errorf("while getting recover configuration: %w", err)
 	}
 
 	options, err := barmanCloudWalRestoreOptions(
@@ -182,34 +183,28 @@ func GetRecoverConfiguration(
 	*apiv1.BarmanObjectStoreConfiguration,
 	error,
 ) {
-	recoverClusterName := cluster.Name
-	var barmanConfiguration *apiv1.BarmanObjectStoreConfiguration
-
-	switch {
-	case !cluster.IsReplica() && cluster.Status.CurrentPrimary == podName:
-		// Why a request to restore a WAL file is arriving from the primary server?
-		// Something strange is happening here
-		return "", nil, ErrPrimaryServer
-
-	case cluster.IsReplica() && cluster.Status.CurrentPrimary == podName:
-		// I am the designated primary. Let's use the recovery object store for this wal
+	// If I am the designated primary. Let's use the recovery object store for this wal
+	if cluster.IsReplica() && cluster.Status.CurrentPrimary == podName {
 		sourceName := cluster.Spec.ReplicaCluster.Source
 		externalCluster, found := cluster.ExternalCluster(sourceName)
 		if !found {
-			return "", nil, fmt.Errorf("external cluster not found: %v", sourceName)
+			return "", nil, ErrExternalClusterNotFound
 		}
 
-		barmanConfiguration = externalCluster.BarmanObjectStore
-		recoverClusterName = externalCluster.Name
-
-	default:
-		// I am a plain replica. Let's use the object store which we are using to
-		// back up this cluster
-		if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
-			barmanConfiguration = cluster.Spec.Backup.BarmanObjectStore
+		if externalCluster.BarmanObjectStore == nil {
+			return "", nil, ErrNoBackupConfigured
 		}
+
+		return externalCluster.Name, externalCluster.BarmanObjectStore, nil
 	}
-	return recoverClusterName, barmanConfiguration, nil
+
+	// Otherwise, let's use the object store which we are using to
+	// back up this cluster
+	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
+		return cluster.Name, cluster.Spec.Backup.BarmanObjectStore, nil
+	}
+
+	return "", nil, ErrNoBackupConfigured
 }
 
 // gatherWALFilesToRestore files a list of possible WAL files to restore, always
