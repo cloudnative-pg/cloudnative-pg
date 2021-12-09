@@ -12,6 +12,12 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
+const (
+	// PodReasonEvicted is set inside the status as the Pod failure reason
+	// when the Kubelet evicts a Pod
+	PodReasonEvicted = "Evicted"
+)
+
 var utilsLog = log.WithName("utils")
 
 // PodStatus represent the possible status of pods
@@ -39,13 +45,20 @@ func IsPodReady(pod corev1.Pod) bool {
 	return false
 }
 
-// IsPodActive check if a pod is active, copied from:
+// IsPodActive checks if a pod is active, copied from:
 //nolint:lll // https://github.com/kubernetes/kubernetes/blob/1bd00776b5d78828a065b5c21e7003accc308a06/test/e2e/framework/pod/resource.go#L664
 func IsPodActive(p corev1.Pod) bool {
 	return corev1.PodSucceeded != p.Status.Phase &&
 		corev1.PodPending != p.Status.Phase &&
 		corev1.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil
+}
+
+// IsPodEvicted checks if a pod has been evicted by the
+// Kubelet
+func IsPodEvicted(p corev1.Pod) bool {
+	return corev1.PodFailed == p.Status.Phase &&
+		PodReasonEvicted == p.Status.Reason
 }
 
 // IsPodAlive check if a pod is active and not crash-looping
