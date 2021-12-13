@@ -327,10 +327,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("having a Cluster with three instances ready", func() {
-			AssertClusterIsReady(upgradeNamespace, clusterName1, 600, env)
-		})
-
 		By("having minio resources ready", func() {
 			// Wait for the minio pod to be ready
 			deploymentName := "minio"
@@ -354,6 +350,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				err := env.Client.Get(env.Ctx, mcNamespacedName, mc)
 				return utils.IsPodReady(*mc), err
 			}, 180).Should(BeTrue())
+		})
+
+		// Cluster ready happens after minio is ready
+		By("having a Cluster with three instances ready", func() {
+			AssertClusterIsReady(upgradeNamespace, clusterName1, 600, env)
 		})
 
 		// Now that everything is in place, we add a bit of data we'll use to
@@ -454,11 +455,17 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// to decrease to 1.
 			Eventually(func() (int32, error) {
 				deployment, err := env.GetOperatorDeployment()
+				if err != nil {
+					return 0, err
+				}
 				return deployment.Status.Replicas, err
 			}, timeout).Should(BeEquivalentTo(1))
 			// For a final check, we verify the pod is ready
 			Eventually(func() (int32, error) {
 				deployment, err := env.GetOperatorDeployment()
+				if err != nil {
+					return 0, err
+				}
 				return deployment.Status.ReadyReplicas, err
 			}, timeout).Should(BeEquivalentTo(1))
 		})
@@ -474,6 +481,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		operatorConfigMap := &corev1.ConfigMap{}
 		err = env.Client.Get(env.Ctx, operatorConfigMapNamespacedName, operatorConfigMap)
 		if err != nil || operatorConfigMap.Data["ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES"] == "false" {
+			GinkgoWriter.Printf("rolling upgrade\n")
 			// Wait for rolling update. We expect all the pods to change UID
 			Eventually(func() (int, error) {
 				var currentUIDs []types.UID
@@ -487,8 +495,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				return len(funk.Join(currentUIDs, podUIDs, funk.InnerJoin).([]types.UID)), nil
 			}, 300).Should(BeEquivalentTo(0))
 		} else {
+			GinkgoWriter.Printf("online upgrade\n")
 			// Pods shouldn't change and there should be an event
 			assertManagerRollout()
+			GinkgoWriter.Printf("assertManagerRollout is done\n")
 			Eventually(func() (int, error) {
 				var currentUIDs []types.UID
 				currentPodList, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
