@@ -9,6 +9,7 @@ package run
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -170,8 +171,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	registerSignalHandler(reconciler, cluster.GetMaxStopDelay())
 
 	state, err := postgresProcess.Wait()
-	if err != nil && !state.Success() {
-		log.Error(err, "PostgreSQL exited with errors")
+	if err != nil {
+		log.Error(err, "Error waiting on PostgreSQL process")
+	}
+	if !state.Success() {
+		err = fmt.Errorf("exit status %v", state.ExitCode())
+		log.Error(err, "PostgreSQL process exited with errors")
 		return err
 	}
 

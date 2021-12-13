@@ -11,7 +11,8 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"syscall"
+
+	"github.com/mitchellh/go-ps"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
@@ -28,7 +29,7 @@ const PostgresqlPidFile = "postmaster.pid" //wokeignore:rule=master
 // directory and check the existence of the relative process. If the
 // process exists, then that process entry is returned.
 // If it doesn't exist then the PID file is stale and is removed.
-func (instance *Instance) CheckForExistingPostmaster() (*os.Process, error) {
+func (instance *Instance) CheckForExistingPostmaster(postgresExecutable string) (*os.Process, error) {
 	pidFile := path.Join(instance.PgData, PostgresqlPidFile)
 	pidFileExists, err := fileutils.FileExists(pidFile)
 	if err != nil {
@@ -61,23 +62,28 @@ func (instance *Instance) CheckForExistingPostmaster() (*os.Process, error) {
 		return nil, os.Remove(pidFile)
 	}
 
-	process, err := os.FindProcess(pid)
+	process, err := ps.FindProcess(pid)
 	if err != nil {
 		// We cannot find this PID, so we can't really tell if this
 		// process exists or not
 		return nil, err
 	}
-
-	err = process.Signal(syscall.Signal(0))
-	if err != nil {
+	if process == nil {
 		// The process doesn't exist and this PID file is stale
 		contextLog.Info("The PID file is stale, deleting it")
 		contextLog.Debug("PID file", "contents", pidFileContents)
 		return nil, os.Remove(pidFile)
 	}
 
-	// The postmaster PID file is not stale and we need to keep it
+	if process.Executable() != postgresExecutable {
+		// The process is not running PostgreSQL and this PID file is stale
+		contextLog.Info("The PID file is stale (executable mismatch), deleting it")
+		contextLog.Debug("PID file", "contents", pidFileContents)
+		return nil, os.Remove(pidFile)
+	}
+
+	// The postmaster PID file is not stale, and we need to keep it
 	contextLog.Info("Detected alive postmaster from PID file")
 	contextLog.Debug("PID file", "contents", pidFileContents)
-	return process, nil
+	return os.FindProcess(pid)
 }
