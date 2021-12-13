@@ -13,6 +13,7 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/lib/pq v1.10.4
 	github.com/logrusorgru/aurora/v3 v3.0.0
+	github.com/mitchellh/go-ps v1.0.0
 	github.com/onsi/ginkgo v1.16.6-0.20211022041942-6e68f79684d4
 	github.com/onsi/gomega v1.17.0
 	github.com/prometheus/client_golang v1.11.0
