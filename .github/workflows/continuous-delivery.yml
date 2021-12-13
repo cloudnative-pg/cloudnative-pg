@@ -866,20 +866,54 @@ jobs:
         name: Clean up
         if: always()
         run: |
-          while true; do
-              output=$( eksctl delete cluster -n ${{ env.CLUSTER_NAME }} -r "${{ env.AWS_REGION }}" --wait 2>&1 )
+          CLUSTER_NAME="${{ env.CLUSTER_NAME }}"
+          REGION_NAME="${{ env.AWS_REGION }}"
+          STACK_NAME="eksctl-${CLUSTER_NAME}-cluster"
+          CLOUDFORMATION_STATUS_CURRENT=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME}" | jq -r '.Stacks[].StackStatus' || true)
+          if [[ -z "${CLOUDFORMATION_STATUS_CURRENT}" ]]; then
+            echo "CloudFormation stack not found. Nothing to cleanup."
+            exit 0
+          fi
+
+          # Attempting three times to cleanly remove the cluster via eksctl
+          attempt=1
+          max_attempts=3
+          while [ "${attempt}" -le "${max_attempts}" ]; do
+              echo "Deleting cluster. Attempt ${attempt} of ${max_attempts}"
+              output=$( eksctl delete cluster -n "${CLUSTER_NAME}" -r "${REGION_NAME}" --wait 2>&1 )
               status=$?
               if [[ $status == 0 ]]; then
                   echo "EKS cluster deleted"
                   break
               fi
-              if ( grep "ResourceNotFoundException: No cluster found for name: ${{ env.CLUSTER_NAME }}" <<< "$output" ); then
+              if ( grep "ResourceNotFoundException: No cluster found for name: ${CLUSTER_NAME}" <<< "$output" ); then
                   echo "EKS cluster doesn't exist, nothing to remove"
                   break
               fi
-              echo "Failed deleting cluster ${{ env.CLUSTER_NAME }}, retrying"
+              echo "Failed deleting cluster ${CLUSTER_NAME}, retrying"
               sleep 5
+              attempt=$((attempt+1))
           done
+
+          # Recheck if something got stuck, and use harder methods to clean up
+          CLOUDFORMATION_STATUS_CURRENT=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME}" | jq -r '.Stacks[].StackStatus' || true)
+          CLOUDFORMATION_STATUS_ARRAY=("DELETE_FAILED ROLLBACK_FAILED ROLLBACK_COMPLETE")
+
+          if [ -n "${CLOUDFORMATION_STATUS_CURRENT}" ] && [[ "${CLOUDFORMATION_STATUS_ARRAY[*]}" =~ "${CLOUDFORMATION_STATUS_CURRENT}" ]] ; then
+            echo "::warning file=continuous-delivery.yml::eksctl failed deleting a cluster cleanly"
+            # When the status of CloudFormation stack managed by eksctl reports an error, try to delete resources directly with AWS CLI
+            pip install boto3
+            for vpc_id in $(aws ec2 describe-vpcs | jq -r '.Vpcs[] | select(.Tags?[]? | .Key == "Name" and (.Value | contains("'"${STACK_NAME}"'"))).VpcId'); do
+              python .github/vpc_destroy.py --vpc_id "${vpc_id}" --region "${REGION_NAME}" --services ec2
+            done
+            # Then we try to delete the cluster cleanly and the cloudformation
+            if aws eks describe-cluster --name "${CLUSTER_NAME}" --region "${REGION_NAME}" ; then
+               eksctl delete cluster -n "${CLUSTER_NAME}" -r "${REGION_NAME}" --wait
+            fi
+            if aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --region "${REGION_NAME}" ; then
+               aws cloudformation delete-stack --stack-name "${STACK_NAME}" --region "${REGION_NAME}"
+            fi
+          fi
 
   e2e-gke:
     name: Run E2E on Google GKE
