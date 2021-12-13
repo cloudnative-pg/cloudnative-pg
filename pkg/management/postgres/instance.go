@@ -301,7 +301,7 @@ func (instance *Instance) Reload() error {
 // Run this instance returning an OS process needed
 // to control the instance execution
 func (instance Instance) Run() (*os.Process, error) {
-	process, err := instance.CheckForExistingPostmaster()
+	process, err := instance.CheckForExistingPostmaster(postgresName)
 	if err != nil {
 		return nil, err
 	}
