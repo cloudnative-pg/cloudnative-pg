@@ -67,13 +67,13 @@ func pgStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := instance.GetStatus()
 	if err != nil {
 		log.Info(
-			"Server doesn't look healthy, cannot extract instance status",
+			"Instance status probe failing",
 			"err", err.Error())
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	log.Debug("Cluster status extraction succeeded")
+	log.Trace("Instance status probe succeeding")
 
 	js, err := json.Marshal(status)
 	if err != nil {
