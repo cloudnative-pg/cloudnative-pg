@@ -272,3 +272,29 @@ func MoveFile(sourcePath, destPath string) (err error) {
 	err = os.Remove(sourcePath)
 	return err
 }
+
+// RemoveDirectoryContent removes all the files and directories inside the provided path.
+// The directory itself is preserved.
+func RemoveDirectoryContent(dir string) (err error) {
+	dirFile, err := os.Open(dir) // #nosec
+	if err != nil {
+		return
+	}
+	defer func() {
+		closeErr := dirFile.Close()
+		if closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+	names, err := dirFile.Readdirnames(-1)
+	if err != nil {
+		return
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return
+		}
+	}
+	return
+}

@@ -71,4 +71,44 @@ var _ = Describe("File copying functions", func() {
 		Expect(err).To(BeNil())
 		Expect(result).To(BeTrue())
 	})
+
+	It("removes the content of a directory", func() {
+		var err error
+		var result bool
+
+		result, err = FileExists(path.Join(tempDir2, "test3.txt"))
+		Expect(err).To(BeNil())
+		Expect(result).To(BeTrue())
+
+		result, err = FileExists(path.Join(tempDir2, "test3.txt"))
+		Expect(err).To(BeNil())
+		Expect(result).To(BeTrue())
+
+		result, err = FileExists(path.Join(tempDir2, "temp"))
+		Expect(err).To(BeNil())
+		Expect(result).To(BeTrue())
+
+		result, err = FileExists(path.Join(tempDir2, "temp", "test3.txt"))
+		Expect(err).To(BeNil())
+		Expect(result).To(BeTrue())
+
+		err = RemoveDirectoryContent(tempDir2)
+		Expect(err).To(BeNil())
+
+		result, err = FileExists(path.Join(tempDir2, "test3.txt"))
+		Expect(err).To(BeNil())
+		Expect(result).To(BeFalse())
+
+		result, err = FileExists(path.Join(tempDir2, "test3.txt"))
+		Expect(err).To(BeNil())
+		Expect(result).To(BeFalse())
+
+		result, err = FileExists(path.Join(tempDir2, "temp"))
+		Expect(err).To(BeNil())
+		Expect(result).To(BeFalse())
+
+		result, err = FileExists(path.Join(tempDir2, "temp", "test3.txt"))
+		Expect(err).To(BeNil())
+		Expect(result).To(BeFalse())
+	})
 })

@@ -59,7 +59,7 @@ func (instance *Instance) CheckForExistingPostmaster(postgresExecutable string) 
 		// to be stale, and continue our work
 		contextLog.Info("The PID file content is wrong, deleting it and assuming it's stale")
 		contextLog.Debug("PID file", "contents", pidFileContents)
-		return nil, os.Remove(pidFile)
+		return nil, instance.cleanUpStalePid(pidFile)
 	}
 
 	process, err := ps.FindProcess(pid)
@@ -72,18 +72,28 @@ func (instance *Instance) CheckForExistingPostmaster(postgresExecutable string) 
 		// The process doesn't exist and this PID file is stale
 		contextLog.Info("The PID file is stale, deleting it")
 		contextLog.Debug("PID file", "contents", pidFileContents)
-		return nil, os.Remove(pidFile)
+		return nil, instance.cleanUpStalePid(pidFile)
 	}
 
 	if process.Executable() != postgresExecutable {
 		// The process is not running PostgreSQL and this PID file is stale
 		contextLog.Info("The PID file is stale (executable mismatch), deleting it")
 		contextLog.Debug("PID file", "contents", pidFileContents)
-		return nil, os.Remove(pidFile)
+		return nil, instance.cleanUpStalePid(pidFile)
 	}
 
 	// The postmaster PID file is not stale, and we need to keep it
 	contextLog.Info("Detected alive postmaster from PID file")
 	contextLog.Debug("PID file", "contents", pidFileContents)
 	return os.FindProcess(pid)
+}
+
+// cleanUpStalePid is called to clean up the files left around by a crashed PostgreSQL instance.
+// It removes the PostgreSQL pid file and the content of the socket directory.
+func (instance *Instance) cleanUpStalePid(pidFile string) error {
+	if err := os.Remove(pidFile); err != nil {
+		return err
+	}
+
+	return fileutils.RemoveDirectoryContent(instance.SocketDirectory)
 }
