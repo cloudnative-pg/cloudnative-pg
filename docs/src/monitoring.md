@@ -579,3 +579,55 @@ spec:
   podMetricsEndpoints:
     - port: metrics
 ```
+
+## Monitoring on OpenShift
+
+Starting on Openshift 4.6 there is a complete monitoring stack called
+["Monitoring for user-defined projects"](https://docs.openshift.com/container-platform/4.6/monitoring/enabling-monitoring-for-user-defined-projects.html)
+which can be enabled by cluster administrators. Cloud Native PostgreSQL will
+automatically create a `PodMonitor` object if the option
+`spec.monitoring.enablePodMonitor` of the `Cluster` definition is set to
+`true`.
+
+To enable cluster wide `user-defined` monitoring you must first create a
+`ConfigMap` with the name `cluster-monitoring-config` in the
+`openshift-monitoring` namespace/project with the following content:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+data:
+  config.yaml: |
+    enableUserWorkload: true
+```
+If the `ConfigMap` already exists, just add the variable `enableUserWorkload: true`.
+
+!!! Important
+    This will enable the monitoring for the whole cluster, if it is needed only
+    for one namespace/project please refer to the official Red Hat documentation or
+    talk with your cluster administrator.
+
+After that, just create the proper PodMonitor in the namespace/project with
+something similar to this:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cluster-sample
+spec:
+  selector:
+    matchLabels:
+      postgresql: cluster-sample
+  podMetricsEndpoints:
+  - port: metrics
+```
+
+!!! Note
+    We currently don’t use `ServiceMonitor` because our service doesn’t define
+    a port pointing to the metrics. If we added a metric port this could expose
+    sensitive data.
+
