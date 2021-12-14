@@ -181,8 +181,10 @@ type ClusterSpec struct {
 	MaxStopDelay int32 `json:"stopDelay,omitempty"`
 
 	// The time in seconds that is allowed for a primary PostgreSQL instance
-	// to gracefully shutdown during a switchover (default 30)
-	// +kubebuilder:default:=30
+	// to gracefully shutdown during a switchover.
+	// Default value is 40000000, greater than one year in seconds,
+	// big enough to simulate an infinite delay
+	// +kubebuilder:default:=40000000
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
 	// Affinity/Anti-affinity rules for Pods
@@ -418,9 +420,14 @@ const (
 	// (`unsupervised`, default)
 	PrimaryUpdateStrategyUnsupervised = "unsupervised"
 
-	// DefaultPgCtlTimeoutForPromotion is the default for the pg_ctl timeout to be provided when promotion is performed.
+	// DefaultPgCtlTimeoutForPromotion is the default for the pg_ctl timeout when a promotion is performed.
 	// It is greater than one year in seconds, big enough to simulate an infinite timeout
 	DefaultPgCtlTimeoutForPromotion = 40000000
+
+	// DefaultMaxSwitchoverDelay is the default for the pg_ctl timeout in seconds when a primary PostgreSQL instance
+	// is gracefully shutdown during a switchover.
+	// It is greater than one year in seconds, big enough to simulate an infinite timeout
+	DefaultMaxSwitchoverDelay = 40000000
 )
 
 // PostgresConfiguration defines the PostgreSQL configuration
@@ -433,7 +440,9 @@ type PostgresConfiguration struct {
 	// +optional
 	PgHBA []string `json:"pg_hba,omitempty"`
 
-	// Specifies the maximum number of seconds to wait when promoting an instance to primary
+	// Specifies the maximum number of seconds to wait when promoting an instance to primary.
+	// Default value is 40000000, greater than one year in seconds,
+	// big enough to simulate an infinite timeout
 	// +optional
 	PgCtlTimeoutForPromotion int32 `json:"promotionTimeout,omitempty"`
 
@@ -1159,7 +1168,7 @@ func (cluster *Cluster) GetMaxSwitchoverDelay() int32 {
 	if cluster.Spec.MaxSwitchoverDelay > 0 {
 		return cluster.Spec.MaxSwitchoverDelay
 	}
-	return 30
+	return DefaultMaxSwitchoverDelay
 }
 
 // GetPrimaryUpdateStrategy get the cluster primary update strategy,

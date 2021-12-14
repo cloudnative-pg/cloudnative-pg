@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/lib/pq"
@@ -785,11 +786,22 @@ func (r *InstanceReconciler) reconcileReplica(ctx context.Context, cluster *apiv
 	// Here we need to invoke a fast shutdown on the instance, and wait the pod
 	// restart to demote as a replica of the new primary
 	timeout := int(cluster.GetMaxSwitchoverDelay())
-	return r.instance.Shutdown(postgresManagement.ShutdownOptions{
+	err = r.instance.Shutdown(postgresManagement.ShutdownOptions{
 		Mode:    postgresManagement.ShutdownModeFast,
 		Wait:    true,
 		Timeout: &timeout,
 	})
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
+			"exitCode", exitError.ExitCode())
+		err = r.instance.Shutdown(postgresManagement.ShutdownOptions{
+			Mode: postgresManagement.ShutdownModeImmediate,
+			Wait: true,
+		})
+	}
+
+	return err
 }
 
 // refreshParentServer will ensure that this replica instance is actually replicating from the correct
