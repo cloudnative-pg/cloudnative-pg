@@ -8,6 +8,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package walrestore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -49,7 +50,8 @@ func NewCmd() *cobra.Command {
 		Args:          cobra.ExactArgs(2),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			contextLog := log.WithName("wal-restore")
-			err := run(contextLog, podName, args)
+			ctx := log.IntoContext(cobraCmd.Context(), contextLog)
+			err := run(ctx, podName, args)
 			if err == nil {
 				return nil
 			}
@@ -71,7 +73,8 @@ func NewCmd() *cobra.Command {
 	return &cmd
 }
 
-func run(contextLog log.Logger, podName string, args []string) error {
+func run(ctx context.Context, podName string, args []string) error {
+	contextLog := log.FromContext(ctx)
 	startTime := time.Now()
 	walName := args[0]
 	destinationPath := args[1]
@@ -111,7 +114,7 @@ func run(contextLog log.Logger, podName string, args []string) error {
 
 	// Create the restorer
 	var walRestorer *restorer.WALRestorer
-	if walRestorer, err = restorer.New(cluster, env, SpoolDirectory); err != nil {
+	if walRestorer, err = restorer.New(ctx, cluster, env, SpoolDirectory); err != nil {
 		return fmt.Errorf("while creating the restorer: %w", err)
 	}
 
@@ -149,7 +152,7 @@ func run(contextLog log.Logger, podName string, args []string) error {
 
 	// Step 3: download the WAL files into the required place
 	downloadStartTime := time.Now()
-	walStatus := walRestorer.RestoreList(walFilesList, destinationPath, options)
+	walStatus := walRestorer.RestoreList(ctx, walFilesList, destinationPath, options)
 	if len(walStatus) > 1 {
 		successfulWalRestore := 0
 		for idx := range walStatus {
