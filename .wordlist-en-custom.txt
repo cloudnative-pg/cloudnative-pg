@@ -221,6 +221,7 @@ Seealso
 ServerCASecret
 ServerTLSSecret
 ServiceAccount
+ServiceMonitor
 Silvela
 StorageClass
 StorageConfiguration
@@ -383,6 +384,7 @@ edb
 eks
 enablePodAntiAffinity
 enableSuperuserAccess
+enableUserWorkload
 endpointURL
 enterprisedb
 env
