@@ -55,8 +55,11 @@ const (
 	ShutdownModeSmart = "smart"
 
 	// ShutdownModeFast does not wait for clients to disconnect and will terminate an online
-	// backup in progress
+	// backup in progress.
 	ShutdownModeFast = "fast"
+
+	// ShutdownModeImmediate aborts all server processes immediately, without a clean shutdown.
+	ShutdownModeImmediate = "immediate"
 )
 
 // ShutdownOptions is the configuration of a shutdown request to PostgreSQL
@@ -254,7 +257,10 @@ func (instance *Instance) Shutdown(options ShutdownOptions) error {
 	}
 
 	log.Info("Shutting down instance",
-		"pgdata", instance.PgData)
+		"pgdata", instance.PgData,
+		"mode", options.Mode,
+		"timeout", options.Timeout,
+	)
 
 	pgCtlCmd := exec.Command(pgCtlName, pgCtlOptions...) // #nosec
 	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
