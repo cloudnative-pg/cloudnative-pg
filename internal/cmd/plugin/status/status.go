@@ -66,7 +66,9 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 			nonFatalError = err
 		}
 	}
+
 	status.printBackupStatus()
+	status.printReplicaStatus()
 	status.printInstancesStatus()
 
 	if nonFatalError != nil {
@@ -141,9 +143,13 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 		fmt.Println(aurora.Red(cluster.Status.Phase), " ", cluster.Status.PhaseReason)
 	}
 
+	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 	summary := tabby.New()
 	summary.AddLine("Name:", cluster.Name)
 	summary.AddLine("Namespace:", cluster.Namespace)
+	if primaryInstanceStatus != nil {
+		summary.AddLine("System ID:", primaryInstanceStatus.SystemID)
+	}
 	summary.AddLine("PostgreSQL Image:", cluster.GetImageName())
 	summary.AddLine("Primary instance:", primaryInstance)
 	if cluster.Spec.Instances == cluster.Status.Instances {
@@ -164,15 +170,14 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 			fmt.Println(aurora.Red("Switchover in progress"))
 		}
 	}
-	var primaryInstanceStatus *postgres.PostgresqlStatus
-	for idx, instance := range fullStatus.InstanceStatus.Items {
-		if instance.IsPrimary && instance.Pod.Name == primaryInstance {
-			primaryInstanceStatus = &fullStatus.InstanceStatus.Items[idx]
-		}
-	}
-	if primaryInstanceStatus != nil {
-		summary.AddLine("Current Timeline:", primaryInstanceStatus.TimeLineID)
-		summary.AddLine("Current WAL file:", primaryInstanceStatus.CurrentWAL)
+	if !cluster.IsReplica() && primaryInstanceStatus != nil {
+		lsnInfo := fmt.Sprintf(
+			"%s (Timeline: %d - WAL File: %s)",
+			primaryInstanceStatus.CurrentLsn,
+			primaryInstanceStatus.TimeLineID,
+			primaryInstanceStatus.CurrentWAL,
+		)
+		summary.AddLine("Current Write LSN:", lsnInfo)
 	}
 
 	summary.Print()
@@ -228,12 +233,7 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	}
 	status.AddLine("First Point of Recoverability:", FPoR)
 
-	var primaryInstanceStatus *postgres.PostgresqlStatus
-	for idx, instanceStatus := range fullStatus.InstanceStatus.Items {
-		if instanceStatus.IsPrimary {
-			primaryInstanceStatus = &fullStatus.InstanceStatus.Items[idx]
-		}
-	}
+	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 	if primaryInstanceStatus == nil {
 		status.AddLine("No Primary instance found")
 		return
@@ -267,63 +267,171 @@ func getWalArchivingStatus(isArchivingWAL bool, lastFailedWAL string) string {
 	}
 }
 
+func (fullStatus *PostgresqlStatus) printReplicaStatus() {
+	fmt.Println(aurora.Green("Streaming Replication status"))
+	if fullStatus.Cluster.Spec.Instances == 1 {
+		fmt.Println(aurora.Yellow("Not configured").String())
+		fmt.Println()
+		return
+	}
+
+	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
+	if primaryInstanceStatus == nil {
+		fmt.Println(aurora.Yellow("Primary instance not found").String())
+		fmt.Println()
+		return
+	}
+
+	status := tabby.New()
+	status.AddHeader(
+		"Name",
+		"Sent LSN",
+		"Write LSN",
+		"Flush LSN",
+		"Replay LSN", // For standby use "Replay LSN"
+		"Write Lag",
+		"Flush Lag",
+		"Replay Lag",
+		"State",
+		"Sync State",
+		"Sync Priority",
+	)
+	for _, replication := range primaryInstanceStatus.ReplicationInfo {
+		status.AddLine(
+			replication.ApplicationName,
+			replication.SentLsn,
+			replication.WriteLsn,
+			replication.FlushLsn,
+			replication.ReplayLsn,
+			replication.WriteLag,
+			replication.FlushLag,
+			replication.ReplayLag,
+			replication.State,
+			replication.SyncState,
+			replication.SyncPriority,
+		)
+	}
+	status.Print()
+	fmt.Println()
+}
+
 func (fullStatus *PostgresqlStatus) printInstancesStatus() {
-	instanceStatus := fullStatus.InstanceStatus
+	//  Column "Replication role"
+	//  If instance is primary, print "Primary"
+	//  	Otherwise, it is considered a standby
+	//  else if it is not replicating:
+	//  	if it is accepting connections: # readiness OK
+	//      	print "Standby (file based)"
+	//    	else:
+	//  		if pg_rewind is running, print "Standby (pg_rewind)"  - #liveness OK, readiness Not OK
+	//    		else print "Standby (starting up)"  - #liveness OK, readiness Not OK
+	//  else:
+	//  	if it is paused, print "Standby (paused)"
+	//  	else if SyncState = sync/quorum print "Standby (sync)"
+	//  	else print "Standby (async)"
 
 	status := tabby.New()
 	fmt.Println(aurora.Green("Instances status"))
 	status.AddHeader(
-		"Manager Version",
-		"Pod name",
-		"Current LSN",
-		"Received LSN",
-		"Replay LSN",
-		"System ID",
-		"Primary",
-		"Replicating",
-		"Replay paused",
-		"Pending restart",
-		"Running pg_rewind",
-		"Status")
-	for _, instance := range instanceStatus.Items {
+		"Name",
+		"Database Size",
+		"Current LSN", // For standby use "Replay LSN"
+		"Replication role",
+		"Status",
+		"QoS",
+		"Manager Version")
+	for _, instance := range fullStatus.InstanceStatus.Items {
 		if instance.Error != nil {
 			status.AddLine(
-				"-",
 				instance.Pod.Name,
 				"-",
 				"-",
 				"-",
-				"-",
-				"-",
-				"-",
-				"-",
-				"-",
-				"-",
-				instance.Error.Error())
-		} else {
-			status.AddLine(
-				instance.InstanceManagerVersion,
-				instance.Pod.Name,
-				instance.CurrentLsn,
-				instance.ReceivedLsn,
-				instance.ReplayLsn,
-				instance.SystemID,
-				boolToCheck(instance.IsPrimary),
-				boolToCheck(instance.IsWalReceiverActive),
-				boolToCheck(instance.ReplayPaused),
-				boolToCheck(instance.PendingRestart),
-				boolToCheck(instance.IsPgRewindRunning),
-				"OK")
+				instance.Error.Error(),
+				instance.Pod.Status.QOSClass,
+				"-")
+			continue
 		}
+		statusMsg := "OK"
+		if instance.PendingRestart {
+			statusMsg += " (pending restart)"
+		}
+
+		replicaRole := getReplicaRole(instance, fullStatus)
+		status.AddLine(
+			instance.Pod.Name,
+			instance.TotalInstanceSize,
+			getCurrentLSN(instance),
+			replicaRole,
+			statusMsg,
+			instance.Pod.Status.QOSClass,
+			instance.InstanceManagerVersion,
+		)
+		continue
 	}
 	status.Print()
 }
 
-func boolToCheck(val bool) string {
-	if val {
-		return "\u2713"
+func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.PostgresqlStatus {
+	for idx, instanceStatus := range fullStatus.InstanceStatus.Items {
+		if instanceStatus.IsPrimary || len(instanceStatus.ReplicationInfo) > 0 {
+			return &fullStatus.InstanceStatus.Items[idx]
+		}
 	}
-	return "\u2717"
+
+	return nil
+}
+
+func getCurrentLSN(instance postgres.PostgresqlStatus) postgres.LSN {
+	if instance.IsPrimary {
+		return instance.CurrentLsn
+	}
+	return instance.ReplayLsn
+}
+
+func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlStatus) string {
+	if instance.IsPrimary {
+		return "Primary"
+	}
+	if fullStatus.Cluster.IsReplica() && len(instance.ReplicationInfo) > 0 {
+		return "Designated primary"
+	}
+
+	if !instance.IsWalReceiverActive {
+		if utils.IsPodReady(instance.Pod) {
+			return "Standby (file based)"
+		}
+		if instance.IsPgRewindRunning {
+			return "Standby (pg_rewind)"
+		}
+		return "Standby (starting up)"
+	}
+
+	if instance.ReplayPaused {
+		return "Standby (paused)"
+	}
+
+	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
+	if primaryInstanceStatus == nil {
+		return "Unknown"
+	}
+
+	for _, state := range primaryInstanceStatus.ReplicationInfo {
+		// todo: handle others states other than 'streaming'
+		if !(state.ApplicationName == instance.Pod.Name && state.State == "streaming") {
+			continue
+		}
+		switch state.SyncState {
+		case "quorum", "sync":
+			return "Standby (sync)"
+		case "async":
+			return "Standby (async)"
+		default:
+			continue
+		}
+	}
+
+	return "Unknown"
 }
 
 func extractInstancesStatus(

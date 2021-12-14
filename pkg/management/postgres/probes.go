@@ -8,11 +8,13 @@ package postgres
 
 import (
 	"errors"
+	"fmt"
 	"runtime"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/executablehash"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
@@ -89,7 +91,13 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	}
 	result.PendingRestart = settingsPendingRestart > 0
 
-	err = instance.fillWalStatus(&result)
+	err = instance.fillStatus(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	row = superUserDB.QueryRow("SELECT pg_size_pretty(SUM(pg_database_size(oid))) FROM pg_database")
+	err = row.Scan(&result.TotalInstanceSize)
 	if err != nil {
 		return nil, err
 	}
@@ -106,18 +114,25 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	return &result, nil
 }
 
-// fillWalStatus extract the current WAL information into the PostgresqlStatus
+// fillStatus extract the current instance information into the PostgresqlStatus
 // structure
-func (instance *Instance) fillWalStatus(result *postgres.PostgresqlStatus) error {
+func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
+	var err error
+
 	if result.IsPrimary {
-		return instance.fillWalStatusPrimary(result)
+		err = instance.fillStatusFromPrimary(result)
+	} else {
+		err = instance.fillStatusFromReplica(result)
+	}
+	if err != nil {
+		return err
 	}
 
-	return instance.fillWalStatusReplica(result)
+	return instance.fillWalSendersStatus(result)
 }
 
-// fillWalStatusPrimary get WAL information for primary servers
-func (instance *Instance) fillWalStatusPrimary(result *postgres.PostgresqlStatus) error {
+// fillStatusFromPrimary get information for primary servers (including WAL and replication)
+func (instance *Instance) fillStatusFromPrimary(result *postgres.PostgresqlStatus) error {
 	var err error
 
 	superUserDB, err := instance.GetSuperUserDB()
@@ -126,13 +141,6 @@ func (instance *Instance) fillWalStatusPrimary(result *postgres.PostgresqlStatus
 	}
 
 	row := superUserDB.QueryRow(
-		"SELECT pg_current_wal_lsn()")
-	err = row.Scan(&result.CurrentLsn)
-	if err != nil {
-		return err
-	}
-
-	row = superUserDB.QueryRow(
 		"SELECT " +
 			"COALESCE(last_archived_wal, '') , " +
 			"COALESCE(last_archived_time,'-infinity'), " +
@@ -140,21 +148,86 @@ func (instance *Instance) fillWalStatusPrimary(result *postgres.PostgresqlStatus
 			"COALESCE(last_failed_time, '-infinity'), " +
 			"COALESCE(last_archived_time,'-infinity') > COALESCE(last_failed_time, '-infinity') AS is_archiving," +
 			"pg_walfile_name(pg_current_wal_lsn()) as current_wal, " +
+			"pg_current_wal_lsn(), " +
 			"(SELECT timeline_id FROM pg_control_checkpoint()) as timeline_id " +
-			"FROM pg_stat_archiver;")
+			"FROM pg_catalog.pg_stat_archiver")
 	err = row.Scan(&result.LastArchivedWAL,
 		&result.LastArchivedWALTime,
 		&result.LastFailedWAL,
 		&result.LastFailedWALTime,
 		&result.IsArchivingWAL,
 		&result.CurrentWAL,
+		&result.CurrentLsn,
 		&result.TimeLineID,
 	)
+
 	return err
 }
 
-// fillWalStatusReplica get WAL information for replica servers
-func (instance *Instance) fillWalStatusReplica(result *postgres.PostgresqlStatus) error {
+// fillWalSendersStatus retrieves the information of the WAL senders processes
+func (instance *Instance) fillWalSendersStatus(result *postgres.PostgresqlStatus) error {
+	var err error
+
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+	rows, err := superUserDB.Query(
+		`SELECT
+			application_name,
+			coalesce(state, ''),
+			coalesce(sent_lsn::text, ''),
+			coalesce(write_lsn::text, ''),
+			coalesce(flush_lsn::text, ''),
+			coalesce(replay_lsn::text, ''),
+			coalesce(write_lag, '0'::interval),
+			coalesce(flush_lag, '0'::interval),
+			coalesce(replay_lag, '0'::interval),
+			coalesce(sync_state, ''),
+			coalesce(sync_priority, 0)
+		FROM pg_catalog.pg_stat_replication
+		WHERE application_name LIKE $1 AND usename = $2`,
+		fmt.Sprintf("%s-%%", instance.ClusterName),
+		v1.StreamingReplicationUser,
+	)
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+	if result.ReplicationInfo == nil {
+		result.ReplicationInfo = []postgres.PgStatReplication{}
+	}
+	for rows.Next() {
+		pgr := postgres.PgStatReplication{}
+		err := rows.Scan(
+			&pgr.ApplicationName,
+			&pgr.State,
+			&pgr.SentLsn,
+			&pgr.WriteLsn,
+			&pgr.FlushLsn,
+			&pgr.ReplayLsn,
+			&pgr.WriteLag,
+			&pgr.FlushLag,
+			&pgr.ReplayLag,
+			&pgr.SyncState,
+			&pgr.SyncPriority,
+		)
+		if err != nil {
+			return err
+		}
+		result.ReplicationInfo = append(result.ReplicationInfo, pgr)
+	}
+
+	if err = rows.Err(); err != nil {
+		return err
+	}
+
+	return err
+}
+
+// fillStatusFromReplica get WAL information for replica servers
+func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatus) error {
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return err
