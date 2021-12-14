@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,8 +77,8 @@ const (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
-
 	_ = apiv1.AddToScheme(scheme)
+	_ = monitoringv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -142,8 +143,13 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 
 	setupLog.Info("Operator configuration loaded", "configuration", configuration.Current)
 
+	discoveryClient, err := utils.GetDiscoveryClient()
+	if err != nil {
+		return err
+	}
+
 	// Detect if we are running under a system that implements OpenShift Security Context Constraints
-	if err = utils.DetectSecurityContextConstraints(); err != nil {
+	if err = utils.DetectSecurityContextConstraints(discoveryClient); err != nil {
 		setupLog.Error(err, "unable to detect OpenShift Security Context Constraints presence")
 		return err
 	}
@@ -176,9 +182,10 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 	}
 
 	if err = (&controllers.ClusterReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloud-native-postgresql"),
+		DiscoveryClient: discoveryClient,
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		Recorder:        mgr.GetEventRecorderFor("cloud-native-postgresql"),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err

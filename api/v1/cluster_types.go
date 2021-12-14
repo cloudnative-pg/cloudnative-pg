@@ -901,6 +901,7 @@ type MonitoringConfiguration struct {
 	// Whether the default queries should be injected.
 	// Set it to `true` if you don't want to inject default queries into the cluster.
 	// Default: false.
+	// +kubebuilder:default:=false
 	DisableDefaultQueries *bool `json:"disableDefaultQueries,omitempty"`
 
 	// The list of config maps containing the custom queries
@@ -908,6 +909,10 @@ type MonitoringConfiguration struct {
 
 	// The list of secrets containing the custom queries
 	CustomQueriesSecret []SecretKeySelector `json:"customQueriesSecret,omitempty"`
+
+	// Enable or disable the `PodMonitor`
+	// +kubebuilder:default:=false
+	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 }
 
 // AreDefaultQueriesDisabled checks whether default monitoring queries should be disabled
@@ -1326,6 +1331,15 @@ func (cluster *Cluster) UsesConfigMap(config string) (ok bool) {
 	if _, ok := cluster.Status.ConfigMapResourceVersion.Metrics[config]; ok {
 		return true
 	}
+	return false
+}
+
+// IsPodMonitorEnabled checks if the PodMonitor object needs to be created
+func (cluster *Cluster) IsPodMonitorEnabled() bool {
+	if cluster.Spec.Monitoring != nil {
+		return cluster.Spec.Monitoring.EnablePodMonitor
+	}
+
 	return false
 }
 
