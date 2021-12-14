@@ -282,6 +282,12 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 		return
 	}
 
+	if len(primaryInstanceStatus.ReplicationInfo) == 0 {
+		fmt.Println(aurora.Yellow("Not available yet").String())
+		fmt.Println()
+		return
+	}
+
 	status := tabby.New()
 	status.AddHeader(
 		"Name",
