@@ -187,6 +187,17 @@ rules:
   - get
   - update
 - apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - podmonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets

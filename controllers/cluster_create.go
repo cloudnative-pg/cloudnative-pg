@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"time"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -73,6 +74,11 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 	if configuration.Current.MonitoringQueriesConfigmap != "" && !cluster.Spec.Monitoring.AreDefaultQueriesDisabled() {
 		err = r.createOrPatchDefaultMetrics(ctx, cluster)
 	}
+	if err != nil {
+		return err
+	}
+
+	err = r.createOrPatchPodMonitor(ctx, cluster)
 	if err != nil {
 		return err
 	}
@@ -633,6 +639,69 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 	patchedConfigMap.Data = sourceConfigmap.Data
 	if err := r.Patch(ctx, patchedConfigMap, client.MergeFrom(&targetConfigMap)); err != nil {
 		return fmt.Errorf("while patching default monitoring queries: %w", err)
+	}
+
+	return nil
+}
+
+// createOrPatchPodMonitor
+func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	// Checking for the PodMonitor resource in the cluster
+	havePodMonitor, err := utils.PodMonitorExist(r.DiscoveryClient)
+	if err != nil || !havePodMonitor {
+		contextLogger.Debug("Kind PodMonitor not detected", "err", err)
+		return err
+	}
+
+	// If the PodMonitor is disabled we make sure that is removed
+	if !cluster.IsPodMonitorEnabled() {
+		return r.deletePodMonitor(ctx, cluster)
+	}
+
+	// Create the base PodMonitor object
+	newPodMonitor := specs.CreatePodMonitor(cluster)
+
+	// We get the pod monitor and the error is not found we create the PodMonitor
+	var podMonitor monitoringv1.PodMonitor
+	if err := r.Get(ctx, client.ObjectKey{
+		Name:      cluster.Name,
+		Namespace: cluster.Namespace,
+	},
+		&podMonitor); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return fmt.Errorf("while getting the podmonitor: %w", err)
+		}
+
+		contextLogger.Debug("Creating PodMonitor",
+			"cluster-name", cluster.Name)
+		SetClusterOwnerAnnotationsAndLabels(&newPodMonitor.ObjectMeta, cluster)
+		return r.Create(ctx, newPodMonitor)
+	}
+
+	// Compare both spec, if there's no changes we just return nil
+	if reflect.DeepEqual(podMonitor.Spec, newPodMonitor.Spec) {
+		return nil
+	}
+
+	// We patch the PodMonitor, so we always reconcile it with the cluster changes
+	podMonitor.Spec = newPodMonitor.Spec
+	contextLogger.Debug("Patching PodMonitor",
+		"cluster-name", cluster.Name)
+	return r.Patch(ctx, &podMonitor, client.MergeFrom(newPodMonitor))
+}
+
+func (r *ClusterReconciler) deletePodMonitor(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+	podMonitor := specs.CreatePodMonitor(cluster)
+
+	contextLogger.Info("Deleting PodMonitor",
+		"cluster-name", cluster.Name)
+	if err := r.Delete(ctx, podMonitor); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return err
+		}
 	}
 
 	return nil

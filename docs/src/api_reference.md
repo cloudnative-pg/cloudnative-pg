@@ -455,6 +455,7 @@ Name                   | Description                                            
 `disableDefaultQueries ` | Whether the default queries should be injected. Set it to `true` if you don't want to inject default queries into the cluster. Default: false. | *bool                                          
 `customQueriesConfigMap` | The list of config maps containing the custom queries                                                                                          | [[]ConfigMapKeySelector](#ConfigMapKeySelector)
 `customQueriesSecret   ` | The list of secrets containing the custom queries                                                                                              | [[]SecretKeySelector](#SecretKeySelector)      
+`enablePodMonitor      ` | Enable or disable the `PodMonitor`                                                                                                             | bool                                           
 
 <a id='NodeMaintenanceWindow'></a>
 

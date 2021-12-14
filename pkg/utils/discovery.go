@@ -7,6 +7,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package utils
 
 import (
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -14,47 +15,46 @@ import (
 // This variable store the result of the DetectSecurityContextConstraints check
 var haveSCC bool
 
-// DetectSecurityContextConstraints connects to the discovery API and find out if
-// we're running under a system that implements OpenShift Security Context Constraints
-func DetectSecurityContextConstraints() error {
+// GetDiscoveryClient creates a discovery client or return error
+func GetDiscoveryClient() (*discovery.DiscoveryClient, error) {
 	config, err := ctrl.GetConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	client, err := discovery.NewDiscoveryClientForConfig(config)
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	groupFound := false
+	return discoveryClient, nil
+}
 
-	apiGroupList, err := client.ServerGroups()
+func resourceExist(client *discovery.DiscoveryClient, groupVersion, kind string) (bool, error) {
+	apiResourceList, err := client.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
-		return err
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+
+		return false, err
 	}
-	for i := 0; i < len(apiGroupList.Groups); i++ {
-		if apiGroupList.Groups[i].Name == "security.openshift.io" {
-			groupFound = true
-			break
+
+	for _, resource := range apiResourceList.APIResources {
+		if resource.Name == kind {
+			return true, nil
 		}
 	}
 
-	if !groupFound {
-		haveSCC = false
-		return nil
-	}
+	return false, nil
+}
 
-	apiResourceList, err := client.ServerResourcesForGroupVersion("security.openshift.io/v1")
+// DetectSecurityContextConstraints connects to the discovery API and find out if
+// we're running under a system that implements OpenShift Security Context Constraints
+func DetectSecurityContextConstraints(client *discovery.DiscoveryClient) error {
+	_, err := resourceExist(client, "security.openshift.io/v1", "securitycontextconstraints")
 	if err != nil {
 		return err
-	}
-
-	for i := 0; i < len(apiResourceList.APIResources); i++ {
-		if apiResourceList.APIResources[i].Name == "securitycontextconstraints" {
-			haveSCC = true
-			break
-		}
 	}
 
 	return nil
@@ -65,4 +65,14 @@ func DetectSecurityContextConstraints() error {
 // It panics if called before DetectSecurityContextConstraints
 func HaveSecurityContextConstraints() bool {
 	return haveSCC
+}
+
+// PodMonitorExist tries to find the PodMonitor resource in the current cluster
+func PodMonitorExist(client *discovery.DiscoveryClient) (bool, error) {
+	exist, err := resourceExist(client, "monitoring.coreos.com/v1", "podmonitors")
+	if err != nil {
+		return false, err
+	}
+
+	return exist, nil
 }

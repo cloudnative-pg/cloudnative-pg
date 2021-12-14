@@ -1569,9 +1569,14 @@ spec:
                       type: object
                     type: array
                   disableDefaultQueries:
+                    default: false
                     description: 'Whether the default queries should be injected.
                       Set it to `true` if you don''t want to inject default queries
                       into the cluster. Default: false.'
+                    type: boolean
+                  enablePodMonitor:
+                    default: false
+                    description: Enable or disable the `PodMonitor`
                     type: boolean
                 type: object
               nodeMaintenanceWindow:
