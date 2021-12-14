@@ -23,83 +23,127 @@ kubectl cnp <command> <args...>
 
 ### Status
 
-The `status` command provides a brief of the current status of your cluster.
+The `status` command provides an overview of the current status of your
+cluster, including:
+
+- **general information**: name of the cluster, PostgreSQL's system ID, number of
+  instances, current timeline and position in the WAL
+- **backup**: point of recoverability, and WAL archiving status as returned by
+  the `pg_stat_archiver` view from the primary - or designated primary in the
+  case of a replica cluster
+- **streaming replication**: information taken directly from the `pg_stat_replication`
+  view on the primary instance
+- **instances**: information about each Postgres instance, taken directly by each
+  instance manager; in the case of a standby, the `Current LSN` field corresponds
+  to the latest write-ahead log location that has been replayed during recovery
+  (replay LSN).
+
+!!! Important
+    The status information above is taken at different times and at different
+    locations, resulting in slightly inconsistent returned values. For example,
+    the `Current Write LSN` location in the main header, might be different
+    from the `Current LSN` field in the instances status as it is taken at
+    two different time intervals.
 
 ```shell
-kubectl cnp status cluster-example
+kubectl cnp status sandbox
 ```
 
 ```shell
-Cluster in healthy state   
-Name:              cluster-example
-Namespace:         default
-PostgreSQL Image:  quay.io/enterprisedb/postgresql:13
-Primary instance:  cluster-example-1
-Instances:         3
-Ready instances:   3
-Current Timeline:  2
-Current WAL file:  00000002000000000000000A
+Cluster in healthy state
+Name:               sandbox
+Namespace:          default
+System ID:          7039966298120953877
+PostgreSQL Image:   quay.io/enterprisedb/postgresql:14.1
+Primary instance:   sandbox-2
+Instances:          3
+Ready instances:    3
+Current Write LSN:  3AF/EAFA6168 (Timeline: 8 - WAL File: 00000008000003AF00000075)
 
 Continuous Backup status
-First Point of Recoverability:  2021-11-09T13:36:43Z
+First Point of Recoverability:  Not Available
 Working WAL archiving:          OK
-Last Archived WAL:              00000002000000000000000A   @   2021-11-09T13:47:28.354645Z
+Last Archived WAL:              00000008000003AE00000079   @   2021-12-14T10:16:29.340047Z
+Last Failed WAL: -
+
+Streaming Replication status
+Name       Sent LSN      Write LSN     Flush LSN     Replay LSN    Write Lag        Flush Lag        Replay Lag       State      Sync State  Sync Priority
+----       --------      ---------     ---------     ----------    ---------        ---------        ----------       -----      ----------  -------------
+sandbox-1  3AF/EB0524F0  3AF/EB011760  3AF/EAFEDE50  3AF/EAFEDE50  00:00:00.004461  00:00:00.007901  00:00:00.007901  streaming  quorum      1
+sandbox-3  3AF/EB0524F0  3AF/EB030B00  3AF/EB030B00  3AF/EB011760  00:00:00.000977  00:00:00.004194  00:00:00.008252  streaming  quorum      1
 
 Instances status
-Manager Version  Pod name           Current LSN  Received LSN  Replay LSN  System ID            Primary  Replicating  Replay paused  Pending restart  Status
----------------  --------           -----------  ------------  ----------  ---------            -------  -----------  -------------  ---------------  ------
-1.10.0           cluster-example-1  0/5000060                              7027078108164751389  ✓        ✗            ✗              ✗                OK
-1.10.0           cluster-example-2               0/5000060     0/5000060   7027078108164751389  ✗        ✓            ✗              ✗                OK
-1.10.0           cluster-example-3               0/5000060     0/5000060   7027078108164751389  ✗        ✓            ✗              ✗                OK
-
+Name       Database Size  Current LSN   Replication role  Status  QoS         Manager Version
+----       -------------  -----------   ----------------  ------  ---         ---------------
+sandbox-1  302 GB         3AF/E9FFFFE0  Standby (sync)    OK      Guaranteed  1.11.0
+sandbox-2  302 GB         3AF/EAFA6168  Primary           OK      Guaranteed  1.11.0
+sandbox-3  302 GB         3AF/EBAD5D18  Standby (sync)    OK      Guaranteed  1.11.0
 ```
 
 You can also get a more verbose version of the status by adding `--verbose` or just `-v`
 
 ```shell
-kubectl cnp status cluster-example --verbose
+kubectl cnp status sandbox --verbose
 ```
 
 ```shell
-Cluster in healthy state   
-Name:              cluster-example
-Namespace:         default
-PostgreSQL Image:  quay.io/enterprisedb/postgresql:13
-Primary instance:  cluster-example-1
-Instances:         3
-Ready instances:   3
-Current Timeline:  2
-Current WAL file:  00000002000000000000000A
+Cluster in healthy state
+Name:               sandbox
+Namespace:          default
+System ID:          7039966298120953877
+PostgreSQL Image:   quay.io/enterprisedb/postgresql:14.1
+Primary instance:   sandbox-2
+Instances:          3
+Ready instances:    3
+Current Write LSN:  3B1/61DE3158 (Timeline: 8 - WAL File: 00000008000003B100000030)
 
 PostgreSQL Configuration
 archive_command = '/controller/manager wal-archive --log-destination /controller/log/postgres.json %p'
 archive_mode = 'on'
 archive_timeout = '5min'
-cluster_name = 'cluster-example'
+checkpoint_completion_target = '0.9'
+checkpoint_timeout = '900s'
+cluster_name = 'sandbox'
+dynamic_shared_memory_type = 'sysv'
 full_page_writes = 'on'
 hot_standby = 'true'
+jit = 'on'
 listen_addresses = '*'
+log_autovacuum_min_duration = '1s'
+log_checkpoints = 'on'
 log_destination = 'csvlog'
 log_directory = '/controller/log'
 log_filename = 'postgres'
+log_lock_waits = 'on'
+log_min_duration_statement = '1000'
 log_rotation_age = '0'
 log_rotation_size = '0'
+log_statement = 'ddl'
+log_temp_files = '1024'
 log_truncate_on_rotation = 'false'
 logging_collector = 'on'
+maintenance_work_mem = '2GB'
+max_connections = '1000'
 max_parallel_workers = '32'
 max_replication_slots = '32'
+max_wal_size = '15GB'
 max_worker_processes = '32'
+pg_stat_statements.max = '10000'
+pg_stat_statements.track = 'all'
 port = '5432'
-shared_preload_libraries = ''
+shared_buffers = '16GB'
+shared_memory_type = 'sysv'
+shared_preload_libraries = 'pg_stat_statements'
 ssl = 'on'
 ssl_ca_file = '/controller/certificates/client-ca.crt'
 ssl_cert_file = '/controller/certificates/server.crt'
 ssl_key_file = '/controller/certificates/server.key'
+synchronous_standby_names = 'ANY 1 ("sandbox-1","sandbox-3")'
 unix_socket_directories = '/controller/run'
 wal_keep_size = '512MB'
 wal_level = 'logical'
 wal_log_hints = 'on'
-cnp.config_sha256 = '407239112913e96626722395d549abc78b2cf9b767471e1c8eac6f33132e789c'
+cnp.config_sha256 = '3cfa683e23fe513afaee7c97b50ce0628e0cc634bca8b096517538a9a4428efc'
 
 PostgreSQL HBA Rules
 
@@ -111,22 +155,28 @@ hostssl postgres streaming_replica all cert
 hostssl replication streaming_replica all cert
 hostssl all cnp_pooler_pgbouncer all cert
 
-
-
 # Otherwise use the default authentication method
-host all all all md5
+host all all all scram-sha-256
+
 
 Continuous Backup status
-First Point of Recoverability:  2021-11-09T13:36:43Z
+First Point of Recoverability:  Not Available
 Working WAL archiving:          OK
-Last Archived WAL:              00000002000000000000000A   @   2021-11-09T13:47:28.354645Z
+Last Archived WAL:              00000008000003B00000001D   @   2021-12-14T10:20:42.272815Z
+Last Failed WAL: -
+
+Streaming Replication status
+Name       Sent LSN      Write LSN     Flush LSN     Replay LSN    Write Lag        Flush Lag        Replay Lag       State      Sync State  Sync Priority
+----       --------      ---------     ---------     ----------    ---------        ---------        ----------       -----      ----------  -------------
+sandbox-1  3B1/61E26448  3B1/61DF82F0  3B1/61DF82F0  3B1/61DF82F0  00:00:00.000333  00:00:00.000333  00:00:00.005484  streaming  quorum      1
+sandbox-3  3B1/61E26448  3B1/61E26448  3B1/61DF82F0  3B1/61DF82F0  00:00:00.000756  00:00:00.000756  00:00:00.000756  streaming  quorum      1
 
 Instances status
-Manager Version  Pod name           Current LSN  Received LSN  Replay LSN  System ID            Primary  Replicating  Replay paused  Pending restart  Status
----------------  --------           -----------  ------------  ----------  ---------            -------  -----------  -------------  ---------------  ------
-1.10.0           cluster-example-1  0/5000060                              7027078108164751389  ✓        ✗            ✗              ✗                OK
-1.10.0           cluster-example-2               0/5000060     0/5000060   7027078108164751389  ✗        ✓            ✗              ✗                OK
-1.10.0           cluster-example-3               0/5000060     0/5000060   7027078108164751389  ✗        ✓            ✗              ✗                OK
+Name       Database Size  Current LSN   Replication role  Status  QoS         Manager Version
+----       -------------  -----------   ----------------  ------  ---         ---------------
+sandbox-1                 3B1/610204B8  Standby (sync)    OK      Guaranteed  1.11.0
+sandbox-2                 3B1/61DE3158  Primary           OK      Guaranteed  1.11.0
+sandbox-3                 3B1/62618470  Standby (sync)    OK      Guaranteed  1.11.0
 ```
 
 The command also supports output in `yaml` and `json` format.

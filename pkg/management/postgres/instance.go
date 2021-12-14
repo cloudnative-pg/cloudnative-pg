@@ -408,13 +408,16 @@ func (instance *Instance) parseVersion(version string) (semver.Version, error) {
 
 // ConnectionPool gets or initializes the connection pool for this instance
 func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
+	const applicationName = "cnp-instance-manager"
 	if instance.pool == nil {
 		socketDir := GetSocketDir()
 		dsn := fmt.Sprintf(
-			"host=%s port=%v user=%v sslmode=disable",
+			"host=%s port=%v user=%v sslmode=disable application_name=%v",
 			socketDir,
 			GetServerPort(),
-			"postgres")
+			"postgres",
+			applicationName,
+		)
 
 		instance.pool = pool.NewConnectionPool(dsn)
 	}

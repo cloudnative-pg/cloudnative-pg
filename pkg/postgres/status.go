@@ -21,6 +21,7 @@ type PostgresqlStatus struct {
 	Node                string     `json:"node"`
 	Pod                 corev1.Pod `json:"pod"`
 	IsPgRewindRunning   bool       `json:"isPgRewindRunning"`
+	TotalInstanceSize   string     `json:"totalInstanceSize"`
 
 	// WAL Status
 	// SELECT
@@ -52,6 +53,24 @@ type PostgresqlStatus struct {
 	IsInstanceManagerUpgrading bool   `json:"isInstanceManagerUpgrading"`
 	InstanceManagerVersion     string `json:"instanceManagerVersion"`
 	InstanceArch               string `json:"instanceArch"`
+
+	// contains the PgStatReplication rows content.
+	ReplicationInfo []PgStatReplication `json:"replicationInfo,omitempty"`
+}
+
+// PgStatReplication contains the replications of replicas as reported by the primary instance
+type PgStatReplication struct {
+	ApplicationName string `json:"applicationName,omitempty"`
+	State           string `json:"state,omitempty"`
+	SentLsn         LSN    `json:"receivedLsn,omitempty"`
+	WriteLsn        LSN    `json:"writeLsn,omitempty"`
+	FlushLsn        LSN    `json:"flushLsn,omitempty"`
+	ReplayLsn       LSN    `json:"replayLsn,omitempty"`
+	WriteLag        string `json:"writeLag,omitempty"`
+	FlushLag        string `json:"flushLag,omitempty"`
+	ReplayLag       string `json:"replayLag,omitempty"`
+	SyncState       string `json:"syncState,omitempty"`
+	SyncPriority    string `json:"syncPriority,omitempty"`
 }
 
 // PostgresqlStatusList is a list of PostgreSQL instances status, useful to
