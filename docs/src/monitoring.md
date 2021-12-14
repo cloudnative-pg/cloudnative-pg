@@ -41,10 +41,16 @@ by specifying a list of one or more databases in the `target_databases` option.
 ### Prometheus Operator example
 
 A specific PostgreSQL cluster can be monitored using the
-[Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) by defining the following
-[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor)
-resource:
+[Prometheus Operator's](https://github.com/prometheus-operator/prometheus-operator) resource 
+[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor).
+A PodMonitor correctly pointing to a Cluster can be automatically created by the operator by setting
+`.spec.monitoring.enablePodMonitor` to `true` in the Cluster resource itself (default: false).
 
+!!! Important
+    Any change to the `PodMonitor` created automatically will be overridden by the Operator at the next reconciliation
+    cycle, in case you need to customize it, you can do so as described below.
+
+To deploy a `PodMonitor` for a specific Cluster manually, you can just define it as follows, changing it as needed:
 ```yaml
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
