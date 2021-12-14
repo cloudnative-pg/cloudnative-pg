@@ -51,8 +51,8 @@ func resourceExist(client *discovery.DiscoveryClient, groupVersion, kind string)
 
 // DetectSecurityContextConstraints connects to the discovery API and find out if
 // we're running under a system that implements OpenShift Security Context Constraints
-func DetectSecurityContextConstraints(client *discovery.DiscoveryClient) error {
-	_, err := resourceExist(client, "security.openshift.io/v1", "securitycontextconstraints")
+func DetectSecurityContextConstraints(client *discovery.DiscoveryClient) (err error) {
+	haveSCC, err = resourceExist(client, "security.openshift.io/v1", "securitycontextconstraints")
 	if err != nil {
 		return err
 	}
