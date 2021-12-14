@@ -8,6 +8,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package archiver
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"sync"
@@ -49,11 +50,17 @@ type WALArchiverResult struct {
 }
 
 // New creates a new WAL archiver
-func New(cluster *apiv1.Cluster, env []string, spoolDirectory string) (archiver *WALArchiver, err error) {
+func New(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	env []string,
+	spoolDirectory string,
+) (archiver *WALArchiver, err error) {
+	contextLog := log.FromContext(ctx)
 	var walArchiveSpool *spool.WALSpool
 
 	if walArchiveSpool, err = spool.New(spoolDirectory); err != nil {
-		log.Info("Cannot initialize the WAL spool", "spoolDirectory", spoolDirectory)
+		contextLog.Info("Cannot initialize the WAL spool", "spoolDirectory", spoolDirectory)
 		return nil, fmt.Errorf("while creating spool directory: %w", err)
 	}
 
@@ -80,7 +87,12 @@ func (archiver *WALArchiver) DeleteFromSpool(walName string) (hasBeenDeleted boo
 }
 
 // ArchiveList archives a list of WAL files in parallel
-func (archiver *WALArchiver) ArchiveList(walNames []string, options []string) (result []WALArchiverResult) {
+func (archiver *WALArchiver) ArchiveList(
+	ctx context.Context,
+	walNames []string,
+	options []string,
+) (result []WALArchiverResult) {
+	contextLog := log.FromContext(ctx)
 	result = make([]WALArchiverResult, len(walNames))
 
 	var waitGroup sync.WaitGroup
@@ -98,7 +110,7 @@ func (archiver *WALArchiver) ArchiveList(walNames []string, options []string) (r
 
 			elapsedWalTime := walStatus.EndTime.Sub(walStatus.StartTime)
 			if walStatus.Err != nil {
-				log.Warning(
+				contextLog.Warning(
 					"Failed archiving WAL: PostgreSQL will retry",
 					"walName", walStatus.WalName,
 					"startTime", walStatus.StartTime,
@@ -106,7 +118,7 @@ func (archiver *WALArchiver) ArchiveList(walNames []string, options []string) (r
 					"elapsedWalTime", elapsedWalTime,
 					"error", walStatus.Err)
 			} else {
-				log.Info(
+				contextLog.Info(
 					"Archived WAL file",
 					"walName", walStatus.WalName,
 					"startTime", walStatus.StartTime,

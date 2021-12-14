@@ -8,6 +8,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package restorer
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"sync"
@@ -52,11 +53,15 @@ type Result struct {
 }
 
 // New creates a new WAL archiver
-func New(cluster *apiv1.Cluster, env []string, spoolDirectory string) (archiver *WALRestorer, err error) {
+func New(ctx context.Context, cluster *apiv1.Cluster, env []string, spoolDirectory string) (
+	archiver *WALRestorer,
+	err error,
+) {
+	contextLog := log.FromContext(ctx)
 	var walRecoverSpool *spool.WALSpool
 
 	if walRecoverSpool, err = spool.New(spoolDirectory); err != nil {
-		log.Info("Cannot initialize the WAL spool", "spoolDirectory", spoolDirectory)
+		contextLog.Info("Cannot initialize the WAL spool", "spoolDirectory", spoolDirectory)
 		return nil, fmt.Errorf("while creating spool directory: %w", err)
 	}
 
@@ -88,11 +93,13 @@ func (restorer *WALRestorer) RestoreFromSpool(walName, destinationPath string) (
 // RestoreList restores a list of WALs. The first WAL of the list will go directly into the
 // destination path, the others will be adopted by the spool
 func (restorer *WALRestorer) RestoreList(
+	ctx context.Context,
 	fetchList []string,
 	destinationPath string,
 	options []string,
 ) (resultList []Result) {
 	resultList = make([]Result, len(fetchList))
+	contextLog := log.FromContext(ctx)
 	var waitGroup sync.WaitGroup
 
 	for idx := range fetchList {
@@ -114,7 +121,7 @@ func (restorer *WALRestorer) RestoreList(
 
 			elapsedWalTime := result.EndTime.Sub(result.StartTime)
 			if result.Err == nil {
-				log.Info(
+				contextLog.Info(
 					"Restored WAL file",
 					"walName", result.WalName,
 					"startTime", result.StartTime,
@@ -126,7 +133,7 @@ func (restorer *WALRestorer) RestoreList(
 				//
 				// The implemented prefetch is speculative and this WAL may just
 				// not exist, this means that this may not be a real error.
-				log.Warning(
+				contextLog.Warning(
 					"Failed restoring WAL: PostgreSQL will retry if needed",
 					"walName", result.WalName,
 					"options", options,

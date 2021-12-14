@@ -92,7 +92,7 @@ func run(ctx context.Context, args []string) error {
 
 	// Create the archiver
 	var walArchiver *archiver.WALArchiver
-	if walArchiver, err = archiver.New(cluster, env, SpoolDirectory); err != nil {
+	if walArchiver, err = archiver.New(ctx, cluster, env, SpoolDirectory); err != nil {
 		return fmt.Errorf("while creating the archiver: %w", err)
 	}
 
@@ -121,7 +121,7 @@ func run(ctx context.Context, args []string) error {
 
 	// Step 4: archive the WAL files in parallel
 	uploadStartTime := time.Now()
-	walStatus := walArchiver.ArchiveList(walFilesList, options)
+	walStatus := walArchiver.ArchiveList(ctx, walFilesList, options)
 	if len(walStatus) > 1 {
 		contextLog.Info("Completed archive command (parallel)",
 			"walsCount", len(walStatus),
