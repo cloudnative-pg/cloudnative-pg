@@ -40,14 +40,14 @@ func NewCmd() *cobra.Command {
 		Use: "run [flags]",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			var instance postgres.Instance
+			instance := postgres.NewInstance()
 
 			instance.PgData = pgData
 			instance.Namespace = namespace
 			instance.PodName = podName
 			instance.ClusterName = clusterName
 
-			return runSubCommand(ctx, &instance)
+			return runSubCommand(ctx, instance)
 		},
 	}
 
