@@ -105,6 +105,9 @@ type Instance struct {
 	// The data directory
 	PgData string
 
+	// The socket directory
+	SocketDirectory string
+
 	// The environment variables that will be used to start the instance
 	Env []string
 
@@ -139,6 +142,13 @@ type Instance struct {
 
 	// PgRewindIsRunning tells if there is a `pg_rewind` process running
 	PgRewindIsRunning bool
+}
+
+// NewInstance creates a new Instance object setting the defaults
+func NewInstance() *Instance {
+	return &Instance{
+		SocketDirectory: postgres.SocketDirectory,
+	}
 }
 
 // RetryUntilServerAvailable is the default retry configuration that is used

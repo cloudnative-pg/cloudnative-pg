@@ -154,17 +154,16 @@ func (info InitInfo) CreateDataDirectory() error {
 }
 
 // GetInstance gets the PostgreSQL instance which correspond to these init information
-func (info InitInfo) GetInstance() Instance {
-	postgresInstance := Instance{
-		PgData:         info.PgData,
-		StartupOptions: []string{"listen_addresses='127.0.0.1'"},
-	}
+func (info InitInfo) GetInstance() *Instance {
+	postgresInstance := NewInstance()
+	postgresInstance.PgData = info.PgData
+	postgresInstance.StartupOptions = []string{"listen_addresses='127.0.0.1'"}
 	return postgresInstance
 }
 
 // ConfigureNewInstance creates the expected users and databases in a new
 // PostgreSQL instance. If any error occurs, we return it
-func (info InitInfo) ConfigureNewInstance(instance Instance) error {
+func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	log.Info("Configuring new PostgreSQL instance")
 
 	dbSuperUser, err := instance.GetSuperUserDB()

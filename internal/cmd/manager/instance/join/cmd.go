@@ -32,7 +32,7 @@ func NewCmd() *cobra.Command {
 		Use: "join [options]",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			var instance postgres.Instance
+			instance := postgres.NewInstance()
 
 			// The following are needed to correctly
 			// download the secret containing the TLS
@@ -47,7 +47,7 @@ func NewCmd() *cobra.Command {
 				PodName:    podName,
 			}
 
-			return joinSubCommand(ctx, &instance, info)
+			return joinSubCommand(ctx, instance, info)
 		},
 	}
 

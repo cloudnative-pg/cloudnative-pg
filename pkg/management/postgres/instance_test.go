@@ -12,7 +12,7 @@ import (
 )
 
 var _ = Describe("Parsing version", func() {
-	instance := &Instance{}
+	instance := NewInstance()
 
 	It("properly works when version is malformed", func() {
 		_, err := instance.parseVersion("not-a-version")
