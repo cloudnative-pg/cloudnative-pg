@@ -1617,7 +1617,9 @@ spec:
                     type: array
                   promotionTimeout:
                     description: Specifies the maximum number of seconds to wait when
-                      promoting an instance to primary
+                      promoting an instance to primary. Default value is 40000000,
+                      greater than one year in seconds, big enough to simulate an
+                      infinite timeout
                     format: int32
                     type: integer
                   shared_preload_libraries:
@@ -1886,9 +1888,11 @@ spec:
                 - name
                 type: object
               switchoverDelay:
-                default: 30
+                default: 40000000
                 description: The time in seconds that is allowed for a primary PostgreSQL
-                  instance to gracefully shutdown during a switchover (default 30)
+                  instance to gracefully shutdown during a switchover. Default value
+                  is 40000000, greater than one year in seconds, big enough to simulate
+                  an infinite delay
                 format: int32
                 type: integer
             required:
