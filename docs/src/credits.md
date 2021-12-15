@@ -14,6 +14,8 @@ developed, and tested by the EnterpriseDB Cloud Native team:
 - Hai He
 - Federico Innocenti
 - Danish Khan
+- Dhilip Kumar
+- Tao Li
 - John Long
 - Marco Nenciarini
 - Adrian Noland
