@@ -2,6 +2,83 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.11.0
+
+**Release date:** 15 December 2021
+
+Features:
+
+- **Parallel WAL archiving and restore:** allow the database to keep up with WAL
+  generation on high write systems by introducing the
+  `backupObjectStore.maxParallel` option to set the maximum number of parallel
+  jobs to be executed during both WAL archiving (by PostgreSQL’s
+  `archive_command`) and WAL restore (by `restore_command`). Using parallel
+  restore option can allow newly promoted Standbys to get to a ready state faster
+  by fetching needed WAL files to replay in parallel rather than sequentially
+- **Default set of metrics for monitoring:** a new `ConfigMap` called
+  `default-monitoring` is automatically deployed in the same namespace of the
+  operator and, by default, added to any existing Postgres cluster. Such behavior
+  can be changed globally by setting the `MONITORING_QUERIES_CONFIGMAP` parameter
+  in the operator’s configuration, or at cluster level through the
+  `.spec.monitoring.disableDefaultQueries` option (by default set to `false`)
+- Introduce the `enablePodMonitor` option in the monitoring section of a
+  cluster to automatically manage a `PodMonitor` resource and seamlessly
+  integrate with Prometheus
+- Improve the PostgreSQL shutdown procedure by trying to execute a smart
+  shutdown for the first half of the desired `stopDelay` time, and a fast
+  shutdown for the remaining half, before the pod is killed by Kubernetes
+- Add the `switchoverDelay` option to control the time given to the former
+  primary to shut down gracefully and archive all the WAL files before
+  promoting the new primary (by default, Cloud Native PostgreSQL waits
+  indefinitely to privilege data durability)
+- Handle changes to resource requests and limits for a PostgreSQL `Cluster` by
+  issuing a rolling update
+- Improve the `status` command of the `cnp` plugin for `kubectl` with
+  additional information: streaming replication status, total size of the
+  database, role of an instance in the cluster
+- Enhance support of workloads with many parallel workers by enabling
+  configuration of the `dynamic_shared_memory_type` and `shared_memory_type`
+  parameters for PostgreSQL’s management of shared memory
+- Propagate labels and annotations defined at cluster level to the
+  associated resources, including pods (deletions are not supported)
+- Automatically remove pods that have been evicted by the Kubelet
+- Manage automated resizing of persistent volumes in Azure through the
+  `ENABLE_AZURE_PVC_UPDATES` operator configuration option, by issuing a
+  rolling update of the cluster if needed (disabled by default)
+- Introduce the`k8s.enterprisedb.io/reconciliationLoop` annotation that, when
+  set to `disabled` on a given Postgres cluster, prevents the reconciliation
+  loop from running
+- Introduce the `postInitApplicationSQL` option as part of the `initdb`
+  bootstrap method to specify a list of SQL queries to be executed on the main
+  application database as a superuser immediately after the cluster has been
+  created
+
+Fixes:
+
+- Liveness probe now correctly handles the startup process of a PostgreSQL
+  server. This fixes an issue reported by a few customers and affects a
+  restarted standby server that needs to recover WAL files to reach a consistent
+  state, but it was not able to do it before the timeout of liveness probe would
+  kick in, leaving the pods in `CrashLoopBackOff` status.
+- Liveness probe now correctly handles the case of a former primary that needs
+  to use `pg_rewind` to re-align with the current primary after a timeline
+  diversion. This fixes the pod of the new standby from repeatedly being killed
+  by Kubernetes.
+- Reduce client-side throttling from Postgres pods (e.g. `Waited for
+  1.182388649s due to client-side throttling, not priority and fairness,
+  request: GET`)
+- Disable Public Key Infrastructure (PKI) initialization on OpenShift and OLM
+  installations, by using the provided one
+- When changing configuration parameters that require a restart, always leave
+  the primary as last
+- Mark a PVC to be ready only after a job has been completed successfully,
+  preventing a race condition in PVC initialization
+- Use the correct public key when renewing the expired webhook TLS secret.
+- Fix an overflow when parsing an LSN
+- Remove stale PID files at startup
+- Let the `Pooler` resource inherit the `imagePullSecret` defined in the
+  operator, if exists
+
 ## Version 1.10.0
 
 **Release date:** 11 November 2021

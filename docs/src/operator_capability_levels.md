@@ -36,8 +36,8 @@ operator and a PostgreSQL cluster configuration.
 ### Operator deployment via declarative configuration
 
 The operator is installed in a declarative way using a Kubernetes manifest
-which defines 3 `CustomResourceDefinition` objects: `Cluster`, `Backup`,
-`ScheduledBackup`.
+which defines 4 major `CustomResourceDefinition` objects: `Cluster`, `Pooler`,
+`Backup`, and `ScheduledBackup`.
 
 ### PostgreSQL cluster deployment via declarative configuration
 
@@ -253,9 +253,9 @@ minutes based on the actual database workload.
 
 ### Display cluster availability status during upgrade
 
-At any time, convey the cluster's high availability status, for example, `OK`,
-`Failover in progress`, `Switchover in progress`, `Upgrade in progress`, or
-`Upgrade failed`.
+At any time, convey the cluster's high availability status, for example,
+`Setting up primary`, `Creating a new replica`, `Cluster in healthy state`,
+`Switchover in progress`, `Failing over`, `Upgrading cluster`, etc.
 
 ## Level 3 - Full Lifecycle
 
@@ -443,6 +443,9 @@ and/or `Secret` objects using a syntax that is compatible with the
 [`postgres_exporter` for Prometheus](https://github.com/prometheus-community/postgres_exporter).
 Cloud Native PostgreSQL provides a set of basic monitoring queries for
 PostgreSQL that can be integrated and adapted to your context.
+The [cnp-sandbox project] is an open source Helm chart that demonstrates
+how to integrate Cloud Native PostgreSQL with Prometheus and Grafana, by providing
+some basic metrics and an example of dashboard.
 
 ### Standard output logging of PostgreSQL error messages in JSON format
 

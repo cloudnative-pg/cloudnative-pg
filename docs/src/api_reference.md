@@ -5,6 +5,7 @@ custom resources:
 
 -   [Backup](#backup)
 -   [Cluster](#cluster)
+-   [Pooler](#pooler)
 -   [ScheduledBackup](#scheduledbackup)
 
 All the resources are defined in the `postgresql.k8s.enterprisedb.io/v1`
