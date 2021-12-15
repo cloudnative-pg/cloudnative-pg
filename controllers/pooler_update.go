@@ -34,6 +34,10 @@ func (r *PoolerReconciler) updateOwnedObjects(
 		return err
 	}
 
+	if err := r.updateServiceAccount(ctx, pooler, resources); err != nil {
+		return err
+	}
+
 	if err := r.updateRBAC(ctx, pooler, resources); err != nil {
 		return err
 	}
@@ -136,26 +140,6 @@ func (r *PoolerReconciler) updateRBAC(
 	resources *poolerManagedResources,
 ) error {
 	contextLog := log.FromContext(ctx)
-	serviceAccount := pgbouncer.ServiceAccount(pooler)
-	if err := r.ensureServiceAccountPullSecret(ctx, pooler, serviceAccount); err != nil {
-		return err
-	}
-	if resources.ServiceAccount == nil {
-		contextLog.Info("Creating service account")
-		if err := ctrl.SetControllerReference(pooler, serviceAccount, r.Scheme); err != nil {
-			return err
-		}
-		if err := r.Create(ctx, serviceAccount); err != nil && !apierrs.IsAlreadyExists(err) {
-			return err
-		}
-		resources.ServiceAccount = serviceAccount
-	} else if !reflect.DeepEqual(serviceAccount.ImagePullSecrets, resources.ServiceAccount.ImagePullSecrets) {
-		contextLog.Info("Updating service account")
-		resources.ServiceAccount.ImagePullSecrets = serviceAccount.ImagePullSecrets
-		if err := r.Update(ctx, resources.ServiceAccount); err != nil {
-			return err
-		}
-	}
 
 	role := pgbouncer.Role(pooler)
 	if resources.Role == nil {
@@ -194,66 +178,121 @@ func (r *PoolerReconciler) updateRBAC(
 	return nil
 }
 
-// ensureServiceAccountPullSecret will create the image pull secret in the pooler namespace and add the reference
-// inside the pooler service account
-func (r *PoolerReconciler) ensureServiceAccountPullSecret(
+// updateServiceAccount update or create the pgbouncer ServiceAccount
+// The goal of this method is to make sure that:
+//
+//   * the ServiceAccount exits
+//   * it contains the ImagePullSecret if required
+//
+// Any other property of the ServiceAccount is preserved
+func (r *PoolerReconciler) updateServiceAccount(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
-	serviceAccount *corev1.ServiceAccount,
+	resources *poolerManagedResources,
 ) error {
-	if serviceAccount == nil {
+	contextLog := log.FromContext(ctx)
+
+	pullSecretName, err := r.ensureServiceAccountPullSecret(ctx, pooler)
+	if err != nil {
+		return err
+	}
+
+	if resources.ServiceAccount == nil {
+		serviceAccount := pgbouncer.ServiceAccount(pooler)
+		ensureServiceAccountHaveImagePullSecret(resources.ServiceAccount, pullSecretName)
+		contextLog.Info("Creating service account")
+		if err := ctrl.SetControllerReference(pooler, serviceAccount, r.Scheme); err != nil {
+			return err
+		}
+		if err := r.Create(ctx, serviceAccount); err != nil && !apierrs.IsAlreadyExists(err) {
+			return err
+		}
+		resources.ServiceAccount = serviceAccount
 		return nil
 	}
 
+	origServiceAccount := resources.ServiceAccount.DeepCopy()
+	ensureServiceAccountHaveImagePullSecret(resources.ServiceAccount, pullSecretName)
+	if !reflect.DeepEqual(origServiceAccount, resources.ServiceAccount) {
+		contextLog.Info("Updating service account")
+		if err := r.Patch(ctx, resources.ServiceAccount, client.MergeFrom(origServiceAccount)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ensureServiceAccountPullSecret will create the image pull secret in the pooler namespace
+// The returned poolerSecretName can be an empty string if no pull secret is required
+func (r *PoolerReconciler) ensureServiceAccountPullSecret(
+	ctx context.Context,
+	pooler *apiv1.Pooler,
+) (pullSecretName string, err error) {
 	contextLog := log.FromContext(ctx)
 	if configuration.Current.OperatorNamespace == "" {
 		// We are not getting started via a k8s deployment. Perhaps we are running in our development environment
-		return nil
+		return "", nil
 	}
 
 	// no pull secret name, there is nothing to do
 	if configuration.Current.OperatorPullSecretName == "" {
-		return nil
+		return "", nil
 	}
+
 	// Let's find the operator secret
 	var operatorSecret corev1.Secret
-	if err := r.Get(ctx, client.ObjectKey{
+	if err = r.Get(ctx, client.ObjectKey{
 		Name:      configuration.Current.OperatorPullSecretName,
 		Namespace: configuration.Current.OperatorNamespace,
 	}, &operatorSecret); err != nil {
 		if apierrs.IsNotFound(err) {
 			// There is no secret like that, probably because we are running in our development environment
-			return nil
+			return "", nil
 		}
-		return err
+		return "", err
 	}
 
-	poolerSecretName := fmt.Sprintf("%s-pull", pooler.Name)
+	pullSecretName = fmt.Sprintf("%s-pull", pooler.Name)
 
 	// Let's create the secret with the required info
 	secret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: pooler.Namespace,
 			// we change name to avoid ownership conflicts with the managed secret from cnp cluster
-			Name: poolerSecretName,
+			Name: pullSecretName,
 		},
 		Data: operatorSecret.Data,
 		Type: operatorSecret.Type,
 	}
 
-	if err := ctrl.SetControllerReference(pooler, &secret, r.Scheme); err != nil {
-		return err
+	if err = ctrl.SetControllerReference(pooler, &secret, r.Scheme); err != nil {
+		return "", err
 	}
 
 	contextLog.Debug("creating image pull secret for service account")
 	// Another sync loop may have already created the service. Let's check that
-	if err := r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
-		return err
+	if err = r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
+		return "", err
 	}
 
-	serviceAccount.ImagePullSecrets = append(serviceAccount.ImagePullSecrets, corev1.LocalObjectReference{
-		Name: poolerSecretName,
-	})
+	return pullSecretName, nil
+}
 
-	return nil
+func ensureServiceAccountHaveImagePullSecret(serviceAccount *corev1.ServiceAccount, pullSecretName string) {
+	if serviceAccount == nil || pullSecretName == "" {
+		return
+	}
+
+	// If the secret is already in the serviceAccount we are done
+	for _, item := range serviceAccount.ImagePullSecrets {
+		if item.Name == pullSecretName {
+			return
+		}
+	}
+
+	// Add the secret in the service account
+	serviceAccount.ImagePullSecrets = append(serviceAccount.ImagePullSecrets, corev1.LocalObjectReference{
+		Name: pullSecretName,
+	})
 }
