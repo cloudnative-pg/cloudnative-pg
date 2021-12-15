@@ -159,8 +159,16 @@ var _ = Describe("Disabling superuser password", func() {
 				err = env.Client.Get(env.Ctx,
 					client.ObjectKey{Namespace: namespace, Name: secretName},
 					&secret)
-				return apierrors.IsNotFound(err)
-			}, 60).Should(BeEquivalentTo(true))
+				if err == nil {
+					GinkgoWriter.Printf("Secret %v in namespace %v still exists\n", secretName, namespace)
+					return false
+				}
+				secretNotFound := apierrors.IsNotFound(err)
+				if !secretNotFound {
+					GinkgoWriter.Printf("Error reported is %s\n", err.Error())
+				}
+				return secretNotFound
+			}, 90).WithPolling(time.Second).Should(BeEquivalentTo(true))
 
 			// We test that the password was set to null in pod 1
 			pod, err := env.GetClusterPrimary(namespace, clusterName)
