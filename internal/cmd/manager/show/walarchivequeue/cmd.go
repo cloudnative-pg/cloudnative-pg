@@ -9,13 +9,11 @@ package walarchivequeue
 
 import (
 	"fmt"
-	"io/ioutil"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
@@ -37,19 +35,11 @@ func NewCmd() *cobra.Command {
 }
 
 func run() error {
-	files, err := ioutil.ReadDir(specs.PgWalArchiveStatusPath)
+	fileNames, err := postgres.GetReadyWALFiles()
 	if err != nil {
 		return err
 	}
-
-	for _, file := range files {
-		fileNameWithExtension := file.Name()
-		fileExtension := filepath.Ext(fileNameWithExtension)
-		if fileExtension != ".ready" {
-			continue
-		}
-
-		fileName := strings.TrimSuffix(fileNameWithExtension, fileExtension)
+	for _, fileName := range fileNames {
 		fmt.Println(fileName)
 	}
 	return nil

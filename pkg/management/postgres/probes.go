@@ -9,14 +9,18 @@ package postgres
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"runtime"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/executablehash"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
@@ -128,7 +132,7 @@ func (instance *Instance) fillStatus(result *postgres.PostgresqlStatus) error {
 		return err
 	}
 
-	return instance.fillWalSendersStatus(result)
+	return instance.fillWalStatus(result)
 }
 
 // fillStatusFromPrimary get information for primary servers (including WAL and replication)
@@ -164,8 +168,9 @@ func (instance *Instance) fillStatusFromPrimary(result *postgres.PostgresqlStatu
 	return err
 }
 
-// fillWalSendersStatus retrieves the information of the WAL senders processes
-func (instance *Instance) fillWalSendersStatus(result *postgres.PostgresqlStatus) error {
+// fillWalStatus retrieves information about the WAL senders processes
+// and the on-disk WAL archives status
+func (instance *Instance) fillWalStatus(result *postgres.PostgresqlStatus) error {
 	var err error
 
 	superUserDB, err := instance.GetSuperUserDB()
@@ -223,7 +228,12 @@ func (instance *Instance) fillWalSendersStatus(result *postgres.PostgresqlStatus
 		return err
 	}
 
-	return err
+	result.ReadyWALFiles, _, err = GetWALArchiveCounters()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // fillStatusFromReplica get WAL information for replica servers
@@ -278,4 +288,41 @@ func (instance *Instance) IsWALReceiverActive() (bool, error) {
 	}
 
 	return result, nil
+}
+
+// GetWALArchiveCounters returns the number of WAL files with status ready,
+// and the number of those in status done.
+func GetWALArchiveCounters() (ready, done int, err error) {
+	files, err := fileutils.GetDirectoryContent(specs.PgWalArchiveStatusPath)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	for _, fileName := range files {
+		switch {
+		case strings.HasSuffix(fileName, ".ready"):
+			ready++
+		case strings.HasSuffix(fileName, ".done"):
+			done++
+		}
+	}
+	return ready, done, nil
+}
+
+// GetReadyWALFiles returns an array containing the list of all the WAL
+// files that are marked as ready to be archived.
+func GetReadyWALFiles() (fileNames []string, err error) {
+	files, err := fileutils.GetDirectoryContent(specs.PgWalArchiveStatusPath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, file := range files {
+		fileExtension := filepath.Ext(file)
+		if fileExtension == ".ready" {
+			fileNames = append(fileNames, strings.TrimSuffix(file, fileExtension))
+		}
+	}
+
+	return fileNames, nil
 }

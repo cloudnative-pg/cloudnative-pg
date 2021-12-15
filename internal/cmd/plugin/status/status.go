@@ -240,18 +240,21 @@ func (fullStatus *PostgresqlStatus) printBackupStatus() {
 	}
 	status.AddLine("Working WAL archiving:",
 		getWalArchivingStatus(primaryInstanceStatus.IsArchivingWAL, primaryInstanceStatus.LastFailedWAL))
+	status.AddLine("WALs waiting to be archived:", primaryInstanceStatus.ReadyWALFiles)
+
 	if primaryInstanceStatus.LastArchivedWAL == "" {
-		status.AddLine("Last Archived WAL: -")
+		status.AddLine("Last Archived WAL:", "-")
 	} else {
 		status.AddLine("Last Archived WAL:", primaryInstanceStatus.LastArchivedWAL,
 			" @ ", primaryInstanceStatus.LastArchivedWALTime)
 	}
 	if primaryInstanceStatus.LastFailedWAL == "" {
-		status.AddLine("Last Failed WAL: -")
+		status.AddLine("Last Failed WAL:", "-")
 	} else {
 		status.AddLine("Last Failed WAL:", primaryInstanceStatus.LastFailedWAL,
 			" @ ", primaryInstanceStatus.LastFailedWALTime)
 	}
+
 	status.Print()
 	fmt.Println()
 }
