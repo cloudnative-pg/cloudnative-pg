@@ -147,7 +147,7 @@ func addBarmanEndpointCA(cluster apiv1.Cluster, job *batchv1.Job) {
 					Items: []corev1.KeyToPath{
 						{
 							Key:  secretKey,
-							Path: postgres.BarmanEndpointCACertificateLocation,
+							Path: postgres.BarmanEndpointCACertificateFileName,
 						},
 					},
 				},
@@ -157,8 +157,7 @@ func addBarmanEndpointCA(cluster apiv1.Cluster, job *batchv1.Job) {
 		job.Spec.Template.Spec.Containers[0].VolumeMounts =
 			append(job.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
 				Name:      "barman-endpoint-ca",
-				MountPath: postgres.BarmanEndpointCACertificateLocation,
-				SubPath:   postgres.BarmanEndpointCACertificateFileName,
+				MountPath: postgres.CertificatesDir,
 			},
 			)
 		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
