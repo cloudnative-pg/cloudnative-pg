@@ -39,6 +39,9 @@ type PostgresqlStatus struct {
 	IsArchivingWAL      bool   `json:"isArchivingWAL,omitempty"`
 	CurrentWAL          string `json:"currentWAL,omitempty"`
 
+	// Is the number of '.ready' wal files contained in the wal archive folder
+	ReadyWALFiles int `json:"readyWalFiles,omitempty"`
+
 	// The current timeline ID
 	// SELECT timeline_id FROM pg_control_checkpoint()
 	TimeLineID int `json:"timeLineID,omitempty"`
