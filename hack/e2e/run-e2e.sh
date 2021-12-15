@@ -95,9 +95,6 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
 
   # Report if there are any tests that failed and did NOT have an "ignore-fails" label
   jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
-  # We make sure that the report.json is deleted after the analysis.
-  # We don't check file existence to make sure the process fails in case of some weird script behavior
-  rm "${ROOT_DIR}/tests/e2e/out/report.json"
 fi
 
 CONTROLLER_IMG="${CONTROLLER_IMG}" \
@@ -121,8 +118,5 @@ ginkgo --nodes=4 --timeout 2h --slow-spec-threshold 5m --label-filter "!(upgrade
 
 # Report if there are any tests that failed and did NOT have an "ignore-fails" label
 jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
-# We make sure that the report.json is deleted after the analysis
-# We don't check file existence to make sure the process fails in case of some weird script behavior
-rm "${ROOT_DIR}/tests/e2e/out/report.json"
 
 exit $RC
