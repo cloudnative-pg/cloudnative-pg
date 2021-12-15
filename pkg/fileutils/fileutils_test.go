@@ -7,7 +7,10 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package fileutils
 
 import (
+	"fmt"
+	"io/ioutil"
 	"path"
+	"path/filepath"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -110,5 +113,24 @@ var _ = Describe("File copying functions", func() {
 		result, err = FileExists(path.Join(tempDir2, "temp", "test3.txt"))
 		Expect(err).To(BeNil())
 		Expect(result).To(BeFalse())
+	})
+})
+
+var _ = Describe("function GetDirectoryContent", func() {
+	It("returns error if directory doesn't exist", func() {
+		_, err := GetDirectoryContent(filepath.Join(tempDir3, "not-exists"))
+		Expect(err).Should(HaveOccurred())
+	})
+	It("returns the list of file names in a directory", func() {
+		testFiles := make([]string, 10)
+		for i := 0; i < 10; i++ {
+			testFiles[i] = fmt.Sprintf("test_file_%v", i)
+			file := filepath.Join(tempDir3, testFiles[i])
+			err := ioutil.WriteFile(file, []byte("fake_content"), 0o400)
+			Expect(err).ShouldNot(HaveOccurred())
+		}
+		files, err := GetDirectoryContent(tempDir3)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(files).Should(ConsistOf(testFiles))
 	})
 })

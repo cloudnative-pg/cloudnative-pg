@@ -13,7 +13,6 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -358,30 +357,11 @@ func collectPGVersion(e *Exporter) error {
 }
 
 func collectPGWalArchiveMetric(exporter *Exporter) error {
-	pgWalArchiveDir, err := os.Open(specs.PgWalArchiveStatusPath)
+	ready, done, err := postgres.GetWALArchiveCounters()
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = pgWalArchiveDir.Close()
-	}()
-	files, err := pgWalArchiveDir.Readdir(-1)
-	if err != nil {
-		return err
-	}
-	var ready, done int
-	for _, f := range files {
-		if f.IsDir() {
-			continue
-		}
-		fileName := f.Name()
-		switch {
-		case strings.HasSuffix(fileName, ".ready"):
-			ready++
-		case strings.HasSuffix(fileName, ".done"):
-			done++
-		}
-	}
+
 	exporter.Metrics.PgWALArchiveStatus.WithLabelValues("ready").Set(float64(ready))
 	exporter.Metrics.PgWALArchiveStatus.WithLabelValues("done").Set(float64(done))
 	return nil
@@ -397,13 +377,13 @@ func collectPGWalMetric(exporter *Exporter, db *sql.DB) error {
 	defer func() {
 		_ = pgWalDir.Close()
 	}()
-	files, err := pgWalDir.Readdir(-1)
+	files, err := pgWalDir.Readdirnames(-1)
 	if err != nil {
 		return err
 	}
 	var count int
-	for _, f := range files {
-		if f.IsDir() || !regexPGWalFileName.MatchString(f.Name()) {
+	for _, file := range files {
+		if !regexPGWalFileName.MatchString(file) {
 			continue
 		}
 		count++

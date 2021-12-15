@@ -276,17 +276,7 @@ func MoveFile(sourcePath, destPath string) (err error) {
 // RemoveDirectoryContent removes all the files and directories inside the provided path.
 // The directory itself is preserved.
 func RemoveDirectoryContent(dir string) (err error) {
-	dirFile, err := os.Open(dir) // #nosec
-	if err != nil {
-		return
-	}
-	defer func() {
-		closeErr := dirFile.Close()
-		if closeErr != nil && err == nil {
-			err = closeErr
-		}
-	}()
-	names, err := dirFile.Readdirnames(-1)
+	names, err := GetDirectoryContent(dir)
 	if err != nil {
 		return
 	}
@@ -296,5 +286,25 @@ func RemoveDirectoryContent(dir string) (err error) {
 			return
 		}
 	}
+	return
+}
+
+// GetDirectoryContent return a slice of string with the name of the files
+// in the dir directory
+func GetDirectoryContent(dir string) (files []string, err error) {
+	directory, err := os.Open(dir) // #nosec
+	if err != nil {
+		return
+	}
+	defer func() {
+		closeErr := directory.Close()
+		if closeErr != nil {
+			err = closeErr
+		}
+	}()
+
+	const readAllNames = -1
+	files, err = directory.Readdirnames(readAllNames)
+
 	return
 }
