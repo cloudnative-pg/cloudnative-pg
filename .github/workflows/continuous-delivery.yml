@@ -576,6 +576,20 @@ jobs:
         run:
           make e2e-test-kind
       -
+        name: Report failed E2E tests
+        if: failure()
+        run: |
+          set +x
+          chmod +x .github/report-failed-test.sh
+          ./.github/report-failed-test.sh
+      -
+        name: Cleanup ginkgo JSON report
+        # Delete report.json after the analysis. Step should fail if file is not there
+        if: always()
+        run:
+          rm tests/e2e/out/report.json
+
+      -
         name: Archive Kind logs
         if: failure()
         uses: actions/upload-artifact@v2
@@ -728,6 +742,19 @@ jobs:
         name: Run E2E tests
         run: hack/e2e/run-e2e.sh
       -
+        name: Report failed E2E tests
+        if: failure()
+        run: |
+          set +x
+          chmod +x .github/report-failed-test.sh
+          ./.github/report-failed-test.sh
+      -
+        name: Cleanup ginkgo JSON report
+        # Delete report.json after the analysis. Step should fail if file is not there
+        if: always()
+        run:
+          rm tests/e2e/out/report.json
+      -
         name: Archive e2e failure contexts
         if: failure()
         uses: actions/upload-artifact@v2
@@ -852,6 +879,19 @@ jobs:
       -
         name: Run E2E tests
         run: hack/e2e/run-e2e.sh
+      -
+        name: Report failed E2E tests
+        if: failure()
+        run: |
+          set +x
+          chmod +x .github/report-failed-test.sh
+          ./.github/report-failed-test.sh
+      -
+        name: Cleanup ginkgo JSON report
+        # Delete report.json after the analysis. Step should fail if file is not there
+        if: always()
+        run:
+          rm tests/e2e/out/report.json
       -
         name: Archive e2e failure contexts
         if: failure()
@@ -1034,6 +1074,19 @@ jobs:
         name: Run E2E tests
         run: hack/e2e/run-e2e.sh
       -
+        name: Report failed E2E tests
+        if: failure()
+        run: |
+          set +x
+          chmod +x .github/report-failed-test.sh
+          ./.github/report-failed-test.sh
+      -
+        name: Cleanup ginkgo JSON report
+        # Delete report.json after the analysis. Step should fail if file is not there
+        if: always()
+        run:
+          rm tests/e2e/out/report.json
+      -
         name: Archive e2e failure contexts
         if: failure()
         uses: actions/upload-artifact@v2
@@ -1160,6 +1213,19 @@ jobs:
       -
         name: Run E2E tests
         run: hack/e2e/run-e2e.sh
+      -
+        name: Report failed E2E tests
+        if: failure()
+        run: |
+          set +x
+          chmod +x .github/report-failed-test.sh
+          ./.github/report-failed-test.sh
+      -
+        name: Cleanup ginkgo JSON report
+        # Delete report.json after the analysis. Step should fail if file is not there
+        if: always()
+        run:
+          rm tests/e2e/out/report.json
       -
         name: Wait for PVs to be released
         if: always()
