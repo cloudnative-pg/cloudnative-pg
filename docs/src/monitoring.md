@@ -10,6 +10,11 @@ configurable and customizable system to define additional queries via one or
 more `ConfigMap` or `Secret` resources (see the
 ["User defined metrics" section](#user-defined-metrics) below for details).
 
+!!! Important
+    Starting from version 1.11, Cloud Native PostgreSQL already installs
+    [by default a set of predefined metrics](#default-set-of-metrics) in
+    a `ConfigMap` called `default-monitoring`.
+
 Metrics can be accessed as follows:
 
 ```shell
@@ -37,6 +42,10 @@ to the following logic:
 
 The default database can always be overridden for a given user-defined metric,
 by specifying a list of one or more databases in the `target_databases` option.
+
+!!! Seealso "Prometheus/Grafana"
+    If you are interested in evaluating the integration of Cloud Native PostgreSQL
+    with Prometheus and Grafana, please look at [cnp-sandbox](https://github.com/EnterpriseDB/cnp-sandbox).
 
 ### Prometheus Operator example
 
@@ -538,13 +547,8 @@ If you want to disable the default set of metrics, you can:
 ### Differences with the Prometheus Postgres exporter
 
 Cloud Native PostgreSQL is inspired by the PostgreSQL Prometheus Exporter, but
-presents some differences. In particular, the following fields of a metric that
-are defined in the official Prometheus exporter are not implemented in Cloud
-Native PostgreSQL's exporter:
-
-- `cache_seconds`: number of seconds to cache the result of the query
-
-Similarly, the `pg_version` field of a column definition is not implemented.
+presents some differences. In particular, the `cache_seconds` field is not implemented
+in Cloud Native PostgreSQL's exporter.
 
 ## Monitoring the operator
 

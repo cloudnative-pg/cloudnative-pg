@@ -60,6 +60,7 @@ CronJobs
 CustomResourceDefinition
 CustomResourceDefinitions
 Customizations
+Dhilip
 DISA
 DNS
 DataBackupConfiguration
@@ -106,6 +107,7 @@ Istio
 JSON
 Jihyuk
 Jitendra
+Kumar
 LPV
 LSN
 LTS
@@ -144,6 +146,7 @@ Openshift
 OperatorHub
 PGAudit
 PGDATA
+PKI
 PODNAME
 PV
 PVCs
