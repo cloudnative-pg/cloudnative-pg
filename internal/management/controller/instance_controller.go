@@ -273,9 +273,10 @@ func (r *InstanceReconciler) reconcileExtensions(
 // PostgreSQL instance
 func (r *InstanceReconciler) reconcilePoolers(
 	ctx context.Context, db *sql.DB, dbName string, integrations *apiv1.PoolerIntegrations) (err error) {
-	if len(integrations.PgBouncerIntegration.Secrets) == 0 {
+	if integrations == nil || len(integrations.PgBouncerIntegration.Secrets) == 0 {
 		return
 	}
+
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
