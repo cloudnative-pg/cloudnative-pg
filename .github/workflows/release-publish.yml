@@ -145,8 +145,9 @@ jobs:
       -
         name: Certify Operator Image with Red Hat Connect
         env:
-          DIGEST: ${{ needs.build.outputs.digest }}
-          CNP_VERSION: ${{ needs.build.outputs.version }}
+          DIGEST: ${{ needs.buildx.outputs.digest }}
+          CNP_VERSION: ${{ steps.build-meta.outputs.version }}
+          IMAGE_REGISTRY: "quay.io/enterprisedb/cloud-native-postgresql"
         run: |
           # We create the proper headers files for all the curl commands
           echo "accept: application/json
@@ -163,15 +164,15 @@ jobs:
           }'
 
           # The image to certify
-          PULL_SPEC="${{ env.IMAGE_REGISTRY }}@${DIGEST}"
+          PULL_SPEC="${{ env.IMAGE_REGISTRY }}@${{ env.DIGEST }}"
 
           # We start the certification process
-          curl -s -i -X 'POST' \
+          curl -s -X 'POST' \
             '${{ env.RH_API }}/${{ secrets.RH_PROJ_ID }}/requests/scans' \
             -H @headers.txt \
             -d '{
               "pull_spec": "'"${PULL_SPEC}"'",
-              "tag": "'"${{ env.CNP_VERSION }}"'-'"${{ github.run_attempt }}"'"
+              "tag": "'"${{ env.CNP_VERSION }}"'"
             }' > scan_return.json
 
           # Get the scan requests result and check the status
@@ -188,13 +189,13 @@ jobs:
           while [ "$STATUS" != "passed" ] && [ "$STATUS" != "failed" ] && [ $ITER -lt 30 ]; do
             ITER=$((ITER + 1))
             STATUS=`curl -s -X 'GET' '${{ env.RH_API }}/${{ secrets.RH_PROJ_ID }}/images?page_size=10&page=0&sort_by=creation_date%5Bdesc%5D'\
-            -H @headers.txt | jq -r '.data[] | select (.docker_image_digest == "'${DIGEST}'") | .scan_status'`
+            -H @headers.txt | jq -r '.data[] | select (.docker_image_digest == "'${{ env.DIGEST }}'") | .scan_status'`
             sleep 60
           done
 
           if [ "$STATUS" != "passed" ]; then
             curl -s -X 'GET' '${{ env.RH_API }}/${{ secrets.RH_PROJ_ID }}/images?page_size=10&page=0&sort_by=creation_date%5Bdesc%5D'\
-            -H @headers.txt | jq -r '.data[] | select (.docker_image_digest == "'${DIGEST}'")'
+            -H @headers.txt | jq -r '.data[] | select (.docker_image_digest == "'${{ env.DIGEST }}'")'
             exit 1
           fi
 
