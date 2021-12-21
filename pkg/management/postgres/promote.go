@@ -21,6 +21,8 @@ import (
 func (instance *Instance) PromoteAndWait() error {
 	instance.ShutdownConnections()
 
+	instance.LogPgControldata()
+
 	options := []string{
 		"-D",
 		instance.PgData,

@@ -590,6 +590,8 @@ func (instance *Instance) Rewind(postgresMajorVersion int) error {
 		instance.PgRewindIsRunning = false
 	}()
 
+	instance.LogPgControldata()
+
 	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
 	options := []string{
 		"-P",
@@ -656,4 +658,16 @@ func (instance *Instance) PgIsReady() error {
 
 	// `pg_isready` had an unexpected failure
 	return fmt.Errorf("failure executing %s: %w", pgIsReady, err)
+}
+
+// LogPgControldata logs the content of PostgreSQL control data, for debugging and tracing
+func (instance *Instance) LogPgControldata() {
+	const pgControlDataName = "pg_controldata"
+	pgControlDataCmd := exec.Command(pgControlDataName)
+	pgControlDataCmd.Env = os.Environ()
+	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+instance.PgData)
+	err := execlog.RunBuffering(pgControlDataCmd, pgControlDataName)
+	if err != nil {
+		log.Error(err, "Error printing the control information of this PostgreSQL instance")
+	}
 }
