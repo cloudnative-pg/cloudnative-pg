@@ -11,7 +11,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -20,7 +19,6 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
@@ -151,16 +149,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 
 	startReconciler(ctx, reconciler)
 
-	// Print the content of PostgreSQL control data, for debugging and tracing
-	const pgControlDataName = "pg_controldata"
-	pgControlDataCmd := exec.Command(pgControlDataName)
-	pgControlDataCmd.Env = os.Environ()
-	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+instance.PgData)
-	err = execlog.RunBuffering(pgControlDataCmd, pgControlDataName)
-	if err != nil {
-		log.Error(err, "Error printing the control information of this PostgreSQL instance")
-		return err
-	}
+	instance.LogPgControldata()
 
 	postgresProcess, err := instance.Run()
 	if err != nil {
@@ -179,6 +168,8 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		log.Error(err, "PostgreSQL process exited with errors")
 		return err
 	}
+
+	instance.LogPgControldata()
 
 	return nil
 }
