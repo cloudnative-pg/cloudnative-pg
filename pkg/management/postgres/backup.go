@@ -301,22 +301,24 @@ func (b *BackupCommand) run(ctx context.Context) {
 }
 
 // UpdateBackupStatusAndRetry updates a certain backup's status in the k8s database,
-// retrying when conflicts are detected
+// retries when error occurs
 func UpdateBackupStatusAndRetry(
 	ctx context.Context,
 	cli client.Client,
 	backup *apiv1.Backup,
 ) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		newBackup := &apiv1.Backup{}
-		err := cli.Get(ctx, types.NamespacedName{Namespace: backup.GetNamespace(), Name: backup.GetName()}, newBackup)
-		if err != nil {
-			return err
-		}
+	return retry.OnError(retry.DefaultBackoff, func(error) bool { return true },
+		func() error {
+			newBackup := &apiv1.Backup{}
+			namespacedName := types.NamespacedName{Namespace: backup.GetNamespace(), Name: backup.GetName()}
+			err := cli.Get(ctx, namespacedName, newBackup)
+			if err != nil {
+				return err
+			}
 
-		newBackup.Status = backup.Status
-		return cli.Status().Update(ctx, newBackup)
-	})
+			newBackup.Status = backup.Status
+			return cli.Status().Update(ctx, newBackup)
+		})
 }
 
 // setClusterFirstRecoverabilityPoint sets the firstRecoverabilityPoint value in the status
