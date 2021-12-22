@@ -19,7 +19,6 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
@@ -117,6 +116,7 @@ var _ = Describe("JSON log output", func() {
 				// Gather pod logs in the form of a Json Array
 				logEntries, err := testsUtils.ParseJSONLogs(namespace, primaryPod.GetName(), env)
 				if err != nil {
+					GinkgoWriter.Printf("Error reported while gathering primary pod log %s\n", err.Error())
 					return false, err
 				}
 
@@ -165,19 +165,23 @@ var _ = Describe("JSON log output", func() {
 			Eventually(func() (string, error) {
 				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
+				if err != nil {
+					GinkgoWriter.Printf("Error reported while getting current primary %s\n", err.Error())
+					return "", err
+				}
 				return cluster.Status.CurrentPrimary, err
 			}, timeout).ShouldNot(BeEquivalentTo(currentPrimary))
 
-			// Wait for the pods to be ready again
-			Eventually(func() (int, error) {
-				podList, err := env.GetClusterPodList(namespace, clusterName)
-				return utils.CountReadyPods(podList.Items), err
-			}, timeout).Should(BeEquivalentTo(3))
+			// Here we need to verify the number of the ready pods as well as wait for
+			// the cluster status to be PhaseHealthy, using the AssertClusterIsReady.
+			AssertClusterIsReady(namespace, clusterName, timeout, env)
 
 			Eventually(func() (bool, error) {
 				// Gather pod logs in the form of a JSON slice
 				logEntries, err := testsUtils.ParseJSONLogs(namespace, currentPrimary.GetName(), env)
 				if err != nil {
+					GinkgoWriter.Printf("Error reported while getting the 'pg_rewind' logger in old primary %s, %s\n",
+						currentPrimary, err.Error())
 					return false, err
 				}
 				// Expect pg_rewind logger to eventually be present on the old primary logs
