@@ -128,6 +128,74 @@ Through templates you can configure pods as you like, including fine
 control over affinity and anti-affinity rules for pods and nodes.
 By default, containers use images from `quay.io/enterprisedb/pgbouncer`.
 
+Here an example of Pooler specifying PodAntiAffinity:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 3
+  type: rw
+
+  template:
+    metadata:
+      labels:
+        app: pooler
+    spec:
+      containers: []
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - pooler
+            topologyKey: "kubernetes.io/hostname"
+```
+
+!!! Note
+    `.spec.template.spec.containers` has to be explicitly set to `[]` when not modified, as it's a required field for a `PodSpec`.
+    If `.spec.template.spec.containers` is not set the kubernetes api-server will return the following error when trying to apply the manifest:
+    `error validating "pooler.yaml": error validating data: ValidationError(Pooler.spec.template.spec): missing required field "containers"`
+
+
+
+Here an example setting resources and changing the used image:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 3
+  type: rw
+
+  template:
+    metadata:
+      labels:
+        app: pooler
+    spec:
+      containers:
+        - name: pgbouncer
+          image: my-pgbouncer:latest
+          resources:
+            requests:
+              cpu: 0.1
+              memory: 100Mi
+            limits:
+              cpu: 0.5
+              memory: 500Mi
+```
+
 ## High Availability (HA)
 
 Thanks to Kubernetes' deployments, you can configure your pooler to run
