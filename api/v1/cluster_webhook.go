@@ -51,6 +51,11 @@ var _ webhook.Defaulter = &Cluster{}
 func (r *Cluster) Default() {
 	clusterLog.Info("default", "name", r.Name)
 
+	r.SetDefaults()
+}
+
+// SetDefaults apply the defaults to undefined values in a Cluster
+func (r *Cluster) SetDefaults() {
 	// Defaulting the image name if not specified
 	if r.Spec.ImageName == "" {
 		r.Spec.ImageName = configuration.Current.PostgresImageName
@@ -203,7 +208,7 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	oldCluster := old.(*Cluster)
 
 	// applying defaults before validating updates to set any new default
-	oldCluster.Default()
+	oldCluster.SetDefaults()
 
 	allErrs := append(
 		r.Validate(),
