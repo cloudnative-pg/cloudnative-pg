@@ -134,7 +134,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Make sure default values are populated.
-	cluster.Default()
+	cluster.SetDefaults()
 
 	// Ensure we have the required global objects
 	if err := r.createPostgresClusterObjects(ctx, &cluster); err != nil {
