@@ -23,34 +23,16 @@ import (
 
 // Set of tests for config map for the operator. It is useful to configure the operator globally to survive
 // the upgrades (especially in OLM installation like OpenShift).
-var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() {
+var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive), func() {
 	const (
-		clusterName   = "configmap-support"
-		sampleFile    = fixturesDir + "/configmap-support/config-support.yaml"
-		configMapFile = fixturesDir + "/configmap-support/configmap.yaml"
-		secretFile    = fixturesDir + "/configmap-support/secret.yaml"
-		configName    = "postgresql-operator-controller-manager-config"
-		namespace     = "configmap-support-e2e"
-		level         = tests.Low
+		clusterWithInheritedLabelsFile = fixturesDir + "/configmap-support/config-support.yaml"
+		configMapFile                  = fixturesDir + "/configmap-support/configmap.yaml"
+		secretFile                     = fixturesDir + "/configmap-support/secret.yaml"
+		configName                     = "postgresql-operator-controller-manager-config"
+		clusterWithDefaultMetricsFile  = fixturesDir + "/base/cluster-storage-class.yaml"
+		level                          = tests.Low
 	)
-	var operatorNamespace string
-	var err error
-
-	AssertReloadOperatorDeployment := func(operatorNamespace string, env *utils.TestingEnvironment) {
-		By("reload the configmap by restarting the operator deployment", func() {
-			operatorPod, err := env.GetOperatorPod()
-			Expect(err).ToNot(HaveOccurred())
-
-			// Restart operator deployment
-			cmd := fmt.Sprintf("kubectl delete pod %v -n %v --force", operatorPod.Name, operatorNamespace)
-			_, _, err = utils.Run(cmd)
-			Expect(err).ToNot(HaveOccurred())
-
-			// verify new operator pod is up and running
-			// TODO write as an assert
-			Eventually(env.IsOperatorReady, 120).Should(BeTrue(), "Operator pod is not ready")
-		})
-	}
+	var operatorNamespace, clusterName, namespace string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -68,62 +50,71 @@ var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() 
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
-	AfterEach(func() {
-		err = env.DeleteNamespace(namespace)
+	AfterAll(func() {
+		err := env.DeleteNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Delete the configmap and restore the previous behaviour
-		cmd := fmt.Sprintf("kubectl delete -n %v -f %v", operatorNamespace, configMapFile)
-		_, _, err = utils.Run(cmd)
+		configMap := &corev1.ConfigMap{}
+		err = env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: operatorNamespace, Name: configName}, configMap)
 		Expect(err).ToNot(HaveOccurred())
+		err = env.Client.Delete(env.Ctx, configMap)
+		Expect(err).NotTo(HaveOccurred())
 
 		// Delete the secret and restore the previous behaviour
-		cmd = fmt.Sprintf("kubectl delete -n %v -f %v", operatorNamespace, secretFile)
+		secret := &corev1.Secret{}
+		err = env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: operatorNamespace, Name: configName}, secret)
+		Expect(err).ToNot(HaveOccurred())
+		// If the secret exists, we remove it
+		err = env.Client.Delete(env.Ctx, secret)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = utils.ReloadOperatorDeployment(env, 120)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("can create the configuration map and secret", func() {
+		// create a config map where operator is deployed
+		cmd := fmt.Sprintf("kubectl apply -n %v -f %v", operatorNamespace, configMapFile)
+		_, _, err := utils.Run(cmd)
+		Expect(err).ToNot(HaveOccurred())
+		// Check if configmap is created
+		Eventually(func() ([]corev1.ConfigMap, error) {
+			tempConfigMapList := &corev1.ConfigMapList{}
+			err := env.Client.List(
+				env.Ctx, tempConfigMapList, ctrlclient.InNamespace(operatorNamespace),
+				ctrlclient.MatchingFields{"metadata.name": configName},
+			)
+			return tempConfigMapList.Items, err
+		}, 60).Should(HaveLen(1))
+
+		// create a secret where operator is deployed
+		cmd = fmt.Sprintf("kubectl apply -n %v -f %v", operatorNamespace, secretFile)
 		_, _, err = utils.Run(cmd)
 		Expect(err).ToNot(HaveOccurred())
+		// Check if configmap is created
+		Eventually(func() ([]corev1.Secret, error) {
+			tempSecretList := &corev1.SecretList{}
+			err := env.Client.List(
+				env.Ctx, tempSecretList, ctrlclient.InNamespace(operatorNamespace),
+				ctrlclient.MatchingFields{"metadata.name": configName},
+			)
+			return tempSecretList.Items, err
+		}, 10).Should(HaveLen(1))
 
-		AssertReloadOperatorDeployment(operatorNamespace, env)
+		// Reload the operator with the new config
+		err = utils.ReloadOperatorDeployment(env, 120)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("verify label's and annotation's inheritance support", func() {
-		By("creating configmap", func() {
-			// create a config map where operator is deployed
-			cmd := fmt.Sprintf("kubectl apply -n %v -f %v", operatorNamespace, configMapFile)
-			_, _, err = utils.Run(cmd)
-			Expect(err).ToNot(HaveOccurred())
-			// Check if configmap is created
-			Eventually(func() ([]corev1.ConfigMap, error) {
-				tempConfigMapList := &corev1.ConfigMapList{}
-				err := env.Client.List(
-					env.Ctx, tempConfigMapList, ctrlclient.InNamespace(operatorNamespace),
-					ctrlclient.MatchingFields{"metadata.name": configName},
-				)
-				return tempConfigMapList.Items, err
-			}, 60).Should(HaveLen(1))
-		})
-
-		By("creating secret", func() {
-			// create a secret where operator is deployed
-			cmd := fmt.Sprintf("kubectl apply -n %v -f %v", operatorNamespace, secretFile)
-			_, _, err = utils.Run(cmd)
-			Expect(err).ToNot(HaveOccurred())
-			// Check if configmap is created
-			Eventually(func() ([]corev1.Secret, error) {
-				tempSecretList := &corev1.SecretList{}
-				err := env.Client.List(
-					env.Ctx, tempSecretList, ctrlclient.InNamespace(operatorNamespace),
-					ctrlclient.MatchingFields{"metadata.name": configName},
-				)
-				return tempSecretList.Items, err
-			}, 60).Should(HaveLen(1))
-		})
-
-		AssertReloadOperatorDeployment(operatorNamespace, env)
+		clusterName = "configmap-support"
+		namespace = "configmap-support-e2e"
 
 		// Create the cluster namespace
-		err = env.CreateNamespace(namespace)
+		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		AssertCreateCluster(namespace, clusterName, clusterWithInheritedLabelsFile, env)
 		By("verify labels inherited on cluster and pods", func() {
 			// Gathers the cluster list using labels
 			clusterList := &clusterapiv1.ClusterList{}
@@ -146,7 +137,7 @@ var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() 
 					},
 				)
 				return int32(len(podList.Items))
-			}, 180).Should(BeEquivalentTo(3), "label is not inherited on pod")
+			}, 180).Should(BeEquivalentTo(1), "label is not inherited on pod")
 		})
 		By("verify wildcard labels inherited", func() {
 			// Gathers pod list using wildcard labels
@@ -160,7 +151,7 @@ var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() 
 					},
 				)
 				return int32(len(podList.Items))
-			}, 60).Should(BeEquivalentTo(3),
+			}, 60).Should(BeEquivalentTo(1),
 				"wildcard labels are not inherited on pods")
 		})
 		By("verify annotations inherited on cluster and pods", func() {
@@ -209,5 +200,19 @@ var _ = Describe("Config support", Serial, Label(tests.LabelDisruptive), func() 
 						pod.ObjectMeta.Name))
 			}
 		})
+	})
+
+	// Setting MONITORING_QUERIES_CONFIGMAP: "" should disable monitoring
+	// queries on new cluster. We
+	It("verify metrics details when updated default monitoring configMap queries parameter is set to be empty", func() {
+		var err error
+		clusterName, err = env.GetResourceNameFromYAML(clusterWithDefaultMetricsFile)
+		Expect(err).ToNot(HaveOccurred())
+		namespace = "default-metrics-e2e"
+		// Create the cluster namespace
+		err = env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, clusterName, clusterWithDefaultMetricsFile, env)
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, false)
 	})
 })

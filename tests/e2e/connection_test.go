@@ -41,8 +41,8 @@ var _ = Describe("Connection via services", func() {
 		appDBUser string,
 		appPassword string,
 		superuserPassword string,
-		env *utils.TestingEnvironment) {
-
+		env *utils.TestingEnvironment,
+	) {
 		// we use a pod in the cluster to have a psql client ready and
 		// internal access to the k8s cluster
 		podName := clusterName + "-1"

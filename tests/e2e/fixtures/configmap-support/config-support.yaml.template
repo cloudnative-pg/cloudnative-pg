@@ -15,7 +15,7 @@ metadata:
     example.com/prod: prod
 
 spec:
-  instances: 3
+  instances: 1
 
   postgresql:
     parameters:

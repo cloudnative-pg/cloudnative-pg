@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/Masterminds/semver/v3 v3.1.1
+	github.com/avast/retry-go v2.7.0+incompatible
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/davecgh/go-spew v1.1.1

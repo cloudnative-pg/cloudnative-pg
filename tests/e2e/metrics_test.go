@@ -10,6 +10,9 @@ import (
 	"fmt"
 	"regexp"
 
+	corev1 "k8s.io/api/core/v1"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
@@ -19,14 +22,15 @@ import (
 
 var _ = Describe("Metrics", func() {
 	const (
-		targetDBOne             = "test"
-		targetDBTwo             = "test1"
-		targetDBSecret          = "secret_test"
-		testTableName           = "test_table"
-		clusterMetricsFile      = fixturesDir + "/metrics/cluster-metrics.yaml"
-		clusterMetricsDBFile    = fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml"
-		customQueriesSampleFile = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
-		level                   = tests.Low
+		targetDBOne                    = "test"
+		targetDBTwo                    = "test1"
+		targetDBSecret                 = "secret_test"
+		testTableName                  = "test_table"
+		clusterMetricsFile             = fixturesDir + "/metrics/cluster-metrics.yaml"
+		clusterMetricsDBFile           = fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml"
+		customQueriesSampleFile        = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
+		defaultMonitoringConfigMapName = "postgresql-operator-default-monitoring"
+		level                          = tests.Low
 	)
 
 	BeforeEach(func() {
@@ -37,7 +41,7 @@ var _ = Describe("Metrics", func() {
 
 	// Cluster identifiers
 	var namespace, metricsClusterName string
-
+	var err error
 	// We define a few metrics in the tests. We check that all of them exist and
 	// there are no errors during the collection.
 	metricsRegexp := regexp.MustCompile(
@@ -55,7 +59,7 @@ var _ = Describe("Metrics", func() {
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, clusterMetricsFile,
+			env.DumpClusterEnv(namespace, metricsClusterName,
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
@@ -63,10 +67,12 @@ var _ = Describe("Metrics", func() {
 		err := env.DeleteNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 	})
+
 	It("can gather metrics", func() {
 		// Create the cluster namespace
 		namespace = "cluster-metrics-e2e"
-		metricsClusterName = "postgresql-metrics"
+		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsFile)
+		Expect(err).ToNot(HaveOccurred())
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -93,7 +99,8 @@ var _ = Describe("Metrics", func() {
 
 	It("can gather metrics with multiple target databases", func() {
 		namespace = "metrics-target-databases-e2e"
-		metricsClusterName = "metrics-target-databases"
+		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsDBFile)
+		Expect(err).ToNot(HaveOccurred())
 		// Create the cluster namespace
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
@@ -104,5 +111,43 @@ var _ = Describe("Metrics", func() {
 		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBTwo, testTableName)
 		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBSecret, testTableName)
 		AssertMetricsData(namespace, metricsClusterName, targetDBOne, targetDBTwo, targetDBSecret)
+	})
+
+	It("can gather default metrics details", func() {
+		const clusterWithDefaultMetricsFile = fixturesDir + "/base/cluster-storage-class.yaml"
+		namespace = "default-metrics-details"
+		metricsClusterName, err = env.GetResourceNameFromYAML(clusterWithDefaultMetricsFile)
+		Expect(err).ToNot(HaveOccurred())
+		err = env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, metricsClusterName, clusterWithDefaultMetricsFile, env)
+
+		By("verify default monitoring configMap in cluster namespace", func() {
+			// verify that, configMap should be created in cluster
+			Eventually(func() error {
+				configMap := &corev1.ConfigMap{}
+				err = env.Client.Get(
+					env.Ctx,
+					ctrlclient.ObjectKey{Namespace: namespace, Name: defaultMonitoringConfigMapName},
+					configMap)
+				return err
+			}, 10).ShouldNot(HaveOccurred())
+		})
+
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, true)
+	})
+
+	It("default set of metrics queries should not be injected into the cluster "+
+		"when disableDefaultQueries field set to be true", func() {
+		const defaultMonitoringQueriesDisableSampleFile = fixturesDir + "/metrics/cluster-disable-default-metrics.yaml"
+		namespace = "disable-default-metrics"
+		metricsClusterName, err = env.GetResourceNameFromYAML(defaultMonitoringQueriesDisableSampleFile)
+		Expect(err).ToNot(HaveOccurred())
+		err = env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		// Create the cluster
+		AssertCreateCluster(namespace, metricsClusterName, defaultMonitoringQueriesDisableSampleFile, env)
+
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, false)
 	})
 })
