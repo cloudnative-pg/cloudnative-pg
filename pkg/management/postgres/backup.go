@@ -350,6 +350,7 @@ func (b *BackupCommand) setupBackupStatus() {
 
 	backupStatus.S3Credentials = barmanConfiguration.S3Credentials
 	backupStatus.AzureCredentials = barmanConfiguration.AzureCredentials
+	backupStatus.EndpointCA = barmanConfiguration.EndpointCA
 	backupStatus.EndpointURL = barmanConfiguration.EndpointURL
 	backupStatus.DestinationPath = barmanConfiguration.DestinationPath
 	if barmanConfiguration.Data != nil {

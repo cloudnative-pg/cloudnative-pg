@@ -152,6 +152,21 @@ spec:
               endWal:
                 description: The ending WAL
                 type: string
+              endpointCA:
+                description: EndpointCA store the CA bundle of the barman endpoint.
+                  Useful when using self-signed certificates to avoid errors with
+                  certificate issuer and barman-cloud-wal-archive.
+                properties:
+                  key:
+                    description: The key to select
+                    type: string
+                  name:
+                    description: Name of the referent.
+                    type: string
+                required:
+                - key
+                - name
+                type: object
               endpointURL:
                 description: Endpoint to be used to upload data to the cloud, overriding
                   the automatic endpoint discovery
