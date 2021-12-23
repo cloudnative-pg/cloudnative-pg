@@ -48,6 +48,11 @@ type BackupStatus struct {
 	// The credentials to be used to upload data to Azure Blob Storage
 	AzureCredentials *AzureCredentials `json:"azureCredentials,omitempty"`
 
+	// EndpointCA store the CA bundle of the barman endpoint.
+	// Useful when using self-signed certificates to avoid
+	// errors with certificate issuer and barman-cloud-wal-archive.
+	EndpointCA *SecretKeySelector `json:"endpointCA,omitempty"`
+
 	// Endpoint to be used to upload data to the cloud,
 	// overriding the automatic endpoint discovery
 	EndpointURL string `json:"endpointURL,omitempty"`

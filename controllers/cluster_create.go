@@ -807,8 +807,9 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	switch {
 	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil:
+		var backup *apiv1.Backup
 		if cluster.Spec.Bootstrap.Recovery.Backup != nil {
-			backup, err := r.getOriginBackup(ctx, cluster)
+			backup, err = r.getOriginBackup(ctx, cluster)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -823,7 +824,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		}
 
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
-		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial)
+		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup)
 	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
 		job = specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial)
