@@ -436,7 +436,7 @@ jobs:
           repository: enterprisedb/cloud-native-postgresql-ocp-certified
           event-type: cnp-trigger
           client-payload: '{"upstream_commit": "${{ github.event.pull_request.head.sha || github.sha }}",
-          "info": {"Branch Name": "${{ github.ref_name }}", "Run Number": "${{ github.run_number }}"}}'
+          "info": {"branch_name": "${{ github.ref_name }}", "run_number": "${{ github.run_number }}"}}'
 
 
   generate-jobs:
