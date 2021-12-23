@@ -1938,3 +1938,39 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 		}, 30).Should(BeEquivalentTo(3))
 	})
 }
+
+func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName string, expectPresent bool) {
+	By("collecting and verify default set of metrics on each pod", func() {
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		expectedKeywordInMetricsOutput := [7]string{
+			"cnp_pg_settings_setting",
+			"cnp_backends_waiting_total",
+			"cnp_pg_postmaster_start_time",
+			"cnp_pg_replication",
+			"cnp_pg_stat_archiver",
+			"cnp_pg_stat_bgwriter",
+			"cnp_pg_stat_database",
+		}
+		for _, pod := range podList.Items {
+			podName := pod.GetName()
+			out, _, _ := testsUtils.Run(fmt.Sprintf(
+				"kubectl exec -n %v %v -- %v", namespace, podName, "sh -c 'curl -s 127.0.0.1:9187/metrics'"))
+			// errors should not be existed in metrics on each pod
+			Expect(strings.Contains(out, "cnp_collector_last_collection_error 0")).Should(BeTrue(),
+				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
+			// verify that, default set of monitoring queries should not be existed on each pod
+			for _, data := range expectedKeywordInMetricsOutput {
+				if expectPresent {
+					Expect(strings.Contains(out, data)).Should(BeTrue(),
+						"Metric collection issues on pod %v."+
+							"\nFor expected keyword '%v'.\nCollected metrics:\n%v", podName, data, out)
+				} else {
+					Expect(strings.Contains(out, data)).Should(BeFalse(),
+						"Metric collection issues on pod %v."+
+							"\nFor expected keyword '%v'.\nCollected metrics:\n%v", podName, data, out)
+				}
+			}
+		}
+	})
+}

@@ -35,8 +35,7 @@ func GetLeaderInfoFromConfigMap(operatorNamespace string, env *TestingEnvironmen
 	}
 
 	const leaderAnnotation = "control-plane.alpha.kubernetes.io/leader"
-	if annotationInfo, ok :=
-		configMapList.Items[0].ObjectMeta.Annotations[leaderAnnotation]; ok {
+	if annotationInfo, ok := configMapList.Items[0].ObjectMeta.Annotations[leaderAnnotation]; ok {
 		mapAnnotationInfo := make(map[string]interface{})
 		if err = json.Unmarshal([]byte(annotationInfo), &mapAnnotationInfo); err != nil {
 			return "", err
