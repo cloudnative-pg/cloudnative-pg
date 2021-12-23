@@ -3,6 +3,7 @@ data:
   INHERITED_ANNOTATIONS: categories, example.com/*
   # wrong example2.com on purpose to check overwriting via secret works fine
   INHERITED_LABELS: environment, example2.com/*
+  MONITORING_QUERIES_CONFIGMAP: ""
 kind: ConfigMap
 metadata:
   name: postgresql-operator-controller-manager-config
