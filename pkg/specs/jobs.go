@@ -106,7 +106,7 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 }
 
 // CreatePrimaryJobViaRecovery creates a new primary instance in a Pod
-func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
+func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup *apiv1.Backup) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -121,23 +121,28 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32) *batch
 
 	job := createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
 
-	addBarmanEndpointCA(cluster, job)
+	addBarmanEndpointCAToJob(cluster, backup, job)
 
 	return job
 }
 
-func addBarmanEndpointCA(cluster apiv1.Cluster, job *batchv1.Job) {
+func addBarmanEndpointCAToJob(cluster apiv1.Cluster, backup *apiv1.Backup, job *batchv1.Job) {
 	var secretName, secretKey string
-	if cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA != nil {
+	switch {
+	case cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA != nil:
 		secretName = cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA.Name
 		secretKey = cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA.Key
-	} else if cluster.Spec.Bootstrap.Recovery.Source != "" {
+	case backup != nil && backup.Status.EndpointCA != nil:
+		secretName = backup.Status.EndpointCA.Name
+		secretKey = backup.Status.EndpointCA.Key
+	case cluster.Spec.Bootstrap.Recovery.Source != "":
 		externalCluster, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
 		if ok && externalCluster.BarmanObjectStore != nil && externalCluster.BarmanObjectStore.EndpointCA != nil {
 			secretName = externalCluster.BarmanObjectStore.EndpointCA.Name
 			secretKey = externalCluster.BarmanObjectStore.EndpointCA.Key
 		}
 	}
+
 	if secretName != "" && secretKey != "" {
 		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, corev1.Volume{
 			Name: "barman-endpoint-ca",

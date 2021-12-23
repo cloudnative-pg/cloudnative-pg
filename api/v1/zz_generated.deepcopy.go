@@ -225,6 +225,11 @@ func (in *BackupStatus) DeepCopyInto(out *BackupStatus) {
 		*out = new(AzureCredentials)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.EndpointCA != nil {
+		in, out := &in.EndpointCA, &out.EndpointCA
+		*out = new(SecretKeySelector)
+		**out = **in
+	}
 	if in.StartedAt != nil {
 		in, out := &in.StartedAt, &out.StartedAt
 		*out = (*in).DeepCopy()

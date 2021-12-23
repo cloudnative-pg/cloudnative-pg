@@ -215,6 +215,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		Status: apiv1.BackupStatus{
 			S3Credentials:    server.BarmanObjectStore.S3Credentials,
 			AzureCredentials: server.BarmanObjectStore.AzureCredentials,
+			EndpointCA:       server.BarmanObjectStore.EndpointCA,
 			EndpointURL:      server.BarmanObjectStore.EndpointURL,
 			DestinationPath:  server.BarmanObjectStore.DestinationPath,
 			ServerName:       serverName,
@@ -254,6 +255,7 @@ func (info InitInfo) loadBackupFromReference(
 		&apiv1.BarmanObjectStoreConfiguration{
 			S3Credentials:    backup.Status.S3Credentials,
 			AzureCredentials: backup.Status.AzureCredentials,
+			EndpointCA:       backup.Status.EndpointCA,
 			EndpointURL:      backup.Status.EndpointURL,
 			DestinationPath:  backup.Status.DestinationPath,
 			ServerName:       backup.Status.ServerName,

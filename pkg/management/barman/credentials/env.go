@@ -42,6 +42,11 @@ func envSetAWSCredentials(
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 	env []string,
 ) ([]string, error) {
+	// check if AWS credentials are defined
+	if configuration.S3Credentials == nil {
+		return nil, fmt.Errorf("missing S3 credentials")
+	}
+
 	var accessKeyIDSecret corev1.Secret
 	var secretAccessKeySecret corev1.Secret
 
@@ -86,6 +91,11 @@ func envSetAzureCredentials(
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 	env []string,
 ) ([]string, error) {
+	// check if Azure credentials are defined
+	if configuration.AzureCredentials == nil {
+		return nil, fmt.Errorf("missing Azure credentials")
+	}
+
 	var storageAccountSecret corev1.Secret
 
 	// Get storage account name

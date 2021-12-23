@@ -606,7 +606,7 @@ type BackupSource struct {
 	LocalObjectReference `json:",inline"`
 	// EndpointCA store the CA bundle of the barman endpoint.
 	// Useful when using self-signed certificates to avoid
-	// errors with certificate issuer and barman-cloud-wal-archive
+	// errors with certificate issuer and barman-cloud-wal-archive.
 	EndpointCA *SecretKeySelector `json:"endpointCA,omitempty"`
 }
 
