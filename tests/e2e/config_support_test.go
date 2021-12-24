@@ -28,7 +28,6 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive)
 		configMapFile                  = fixturesDir + "/configmap-support/configmap.yaml"
 		secretFile                     = fixturesDir + "/configmap-support/secret.yaml"
 		configName                     = "postgresql-operator-controller-manager-config"
-		clusterWithDefaultMetricsFile  = fixturesDir + "/base/cluster-storage-class.yaml"
 		level                          = tests.Low
 	)
 	var operatorNamespace, clusterName, namespace string
@@ -202,16 +201,8 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive)
 	})
 
 	// Setting MONITORING_QUERIES_CONFIGMAP: "" should disable monitoring
-	// queries on new cluster. We
+	// queries on new cluster. We expect those metrics to be missing.
 	It("verify metrics details when updated default monitoring configMap queries parameter is set to be empty", func() {
-		var err error
-		clusterName, err = env.GetResourceNameFromYAML(clusterWithDefaultMetricsFile)
-		Expect(err).ToNot(HaveOccurred())
-		namespace = "default-metrics-e2e"
-		// Create the cluster namespace
-		err = env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, clusterWithDefaultMetricsFile, env)
 		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, false)
 	})
 })
