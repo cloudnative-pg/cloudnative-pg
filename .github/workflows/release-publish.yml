@@ -41,8 +41,6 @@ jobs:
           images="quay.io/enterprisedb/cloud-native-postgresql-testing"
           images="${images},quay.io/enterprisedb/cloud-native-postgresql"
           images="${images},enterprisedb/cloud-native-postgresql"
-          images="${images},edbcloud.azurecr.io/enterprisedb/cloud-native-postgresql"
-          images="${images},upmdev.azurecr.io/enterprisedb/cloud-native-postgresql"
           commit_sha=${{ github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
@@ -108,20 +106,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_HUB_SECRET }}
-      -
-        name: Login to Azure Dev Container Registry
-        uses: docker/login-action@v1
-        with:
-          registry: upmdev.azurecr.io
-          username: ${{ secrets.AZURECR_USER }}
-          password: ${{ secrets.AZURECR_SECRET }}
-      -
-        name: Login to Azure Prod Container Registry
-        uses: docker/login-action@v1.9.0
-        with:
-          registry: edbcloud.azurecr.io
-          username: ${{ secrets.AZURECR_PROD_USER }}
-          password: ${{ secrets.AZURECR_PROD_SECRET }}
       -
         name: Build and push
         id: build
