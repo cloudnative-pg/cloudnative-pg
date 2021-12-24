@@ -31,6 +31,10 @@ following plugins/utilities to be available in your system:
 
 - [`cnp` plugin](cnp-plugin.md) for `kubectl`
 - [`jq`](https://stedolan.github.io/jq/), a lightweight and flexible command-line JSON processor
+- [`grep`](https://www.gnu.org/software/grep/), searches one or more input files
+  for lines containing a match to a specified pattern. It is already available in most \*nix distros.
+  If you are on Windows OS, you can use [`findstr`](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/findstr) as an alternative to `grep` or directly use [`wsl`](https://docs.microsoft.com/en-us/windows/wsl/)
+  and install your preferred *nix distro and use the tools mentioned above.
 
 ### Logs
 
@@ -87,6 +91,63 @@ Then get the logs from the same pod by running:
 kubectl get logs -n postgresql-operator-system <POD>
 ```
 
+### Gather more information about the operator
+
+Get logs from all pods in Cloud Native PostgreSQL operator Deployment
+(in case you have a multi operator deployment) by running:
+
+```shell
+kubectl logs -n postgresql-operator-system \
+  deployment/postgresql-operator-controller-manager --all-containers=true
+```
+
+!!! Tip
+    You can add `-f` flag to above command to follow logs in real time.
+
+Save logs to a JSON file by running:
+
+```shell
+kubectl logs -n postgresql-operator-system \
+  deployment/postgresql-operator-controller-manager --all-containers=true | \
+  jq -r . > cnp_logs.json
+```
+
+Get Cloud Native PostgreSQL operator version by using `kubectl-cnp` plugin:
+
+```shell
+kubectl-cnp status <CLUSTER>
+```
+
+Output:
+
+```shell
+Cluster in healthy state
+Name:               cluster-example
+Namespace:          default
+System ID:          7044925089871458324
+PostgreSQL Image:   quay.io/enterprisedb/postgresql:14.1-3
+Primary instance:   cluster-example-1
+Instances:          3
+Ready instances:    3
+Current Write LSN:  0/5000000 (Timeline: 1 - WAL File: 000000010000000000000004)
+
+Continuous Backup status
+Not configured
+
+Streaming Replication status
+Name               Sent LSN   Write LSN  Flush LSN  Replay LSN  Write Lag       Flush Lag       Replay Lag      State      Sync State  Sync Priority
+----               --------   ---------  ---------  ----------  ---------       ---------       ----------      -----      ----------  -------------
+cluster-example-2  0/5000000  0/5000000  0/5000000  0/5000000   00:00:00        00:00:00        00:00:00        streaming  async       0
+cluster-example-3  0/5000000  0/5000000  0/5000000  0/5000000   00:00:00.10033  00:00:00.10033  00:00:00.10033  streaming  async       0
+
+Instances status
+Name               Database Size  Current LSN  Replication role  Status  QoS         Manager Version
+----               -------------  -----------  ----------------  ------  ---         ---------------
+cluster-example-1  33 MB          0/5000000    Primary           OK      BestEffort  1.12.0
+cluster-example-2  33 MB          0/5000000    Standby (async)   OK      BestEffort  1.12.0
+cluster-example-3  33 MB          0/5000060    Standby (async)   OK      BestEffort  1.12.0
+```
+
 ## Cluster information
 
 You can check the status of the `<CLUSTER>` cluster in the `NAMESPACE`
@@ -98,7 +159,7 @@ kubectl get cluster -n <NAMESPACE> <CLUSTER>
 
 Output:
 
-```console
+```shell
 NAME        AGE        INSTANCES   READY   STATUS                     PRIMARY
 <CLUSTER>   10d4h3m    3           3       Cluster in healthy state   <CLUSTER>-1
 ```
@@ -123,13 +184,37 @@ kubectl cnp status -n <NAMESPACE> <CLUSTER>
 !!! Tip
     You can print more information by adding the `--verbose` option.
 
+!!! Note
+    Besides knowing cluster status, you can also do the following things with the cnp plugin:
+    Promote a replica.<br />
+    Manage certificates.<br />
+    Make a rollout restart cluster to apply configuration changes.<br />
+    Make a reconciliation loop to reload and apply configuration changes.<br />
+    For more information, please see [`cnp` plugin](cnp-plugin.md) documentation.
+
+Get PostgreSQL container image version:
+
+```shell
+kubectl describe cluster <CLUSTER_NAME> -n <NAMESPACE> | grep "Image Name"
+```
+
+Output:
+
+```shell
+  Image Name:    quay.io/enterprisedb/postgresql:14.1-3
+```
+
+!!! Note
+    Also you can use `kubectl-cnp status -n <NAMESPACE> <CLUSTER_NAME>`
+    to get the same information.
+
 ## Pod information
 
 You can retrieve the list of instances that belong to a given PostgreSQL
 cluster with:
 
 ```shell
-# using labels available from CNP 1.10.0
+# using labels available from CNP 1.12.0
 kubectl get pod -l k8s.enterprisedb.io/cluster=<CLUSTER> -L role -n <NAMESPACE>
 # using legacy labels
 kubectl get pod -l postgresql=<CLUSTER> -L role -n <NAMESPACE>
@@ -137,7 +222,7 @@ kubectl get pod -l postgresql=<CLUSTER> -L role -n <NAMESPACE>
 
 Output:
 
-```console
+```shell
 NAME          READY   STATUS    RESTARTS   AGE       ROLE
 <CLUSTER>-1   1/1     Running   0          10d4h5m   primary
 <CLUSTER>-2   1/1     Running   0          10d4h4m   replica
@@ -159,15 +244,104 @@ kubectl logs -n <NAMESPACE> <CLUSTER>-<N>
 If you want to limit the search to the PostgreSQL process only, you can run:
 
 ```shell
-kubectl logs -n <NAMESPACE> <CLUSTER>-<N> \
-  | jq 'select(.logger=="postgres") | .record.message'
+kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
+  jq 'select(.logger=="postgres") | .record.message'
 ```
 
 The following example also adds the timestamp in a user-friendly format:
 
 ```shell
-kubectl logs -n <NAMESPACE> <CLUSTER>-<N> \
-  | jq -r 'select(.logger=="postgres") | [(.ts|strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .record.message] | @csv'
+kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
+  jq -r 'select(.logger=="postgres") | [(.ts|strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .record.message] | @csv'
+```
+
+### Gather and filter extra information about PostgreSQL pods
+
+Check logs from a specific pod that has crashed:
+
+```shell
+kubectl logs -n <NAMESPACE> --previous <CLUSTER>-<N>
+```
+
+Get FATAL errors from a specific PostgreSQL pod:
+
+```shell
+kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
+  jq -r '.record | select(.error_severity == "FATAL")'
+```
+
+Output:
+
+```json
+{
+  "log_time": "2021-11-08 14:07:44.520 UTC",
+  "user_name": "streaming_replica",
+  "process_id": "68",
+  "connection_from": "10.244.0.10:60616",
+  "session_id": "61892f30.44",
+  "session_line_num": "1",
+  "command_tag": "startup",
+  "session_start_time": "2021-11-08 14:07:44 UTC",
+  "virtual_transaction_id": "3/75",
+  "transaction_id": "0",
+  "error_severity": "FATAL",
+  "sql_state_code": "28000",
+  "message": "role \"streaming_replica\" does not exist",
+  "backend_type": "walsender"
+}
+```
+
+Filter PostgreSQL DB error messages in logs for a specific pod:
+
+```shell
+kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | jq -r '.err | select(. != null)'
+```
+
+Output:
+
+```shell
+dial unix /controller/run/.s.PGSQL.5432: connect: no such file or directory
+```
+
+Get messages matching `err` word from a specific pod:
+
+```shell
+kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | jq -r '.msg' | grep "err"
+```
+
+Output:
+
+```shell
+2021-11-08 14:07:39.610 UTC [15] LOG:  ending log output to stderr
+```
+
+Get all logs from PostgreSQL process from a specific pod:
+
+```shell
+kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
+  jq -r '. | select(.logger == "postgres") | select(.msg != "record") | .msg'
+```
+Output:
+
+```shell
+2021-11-08 14:07:52.591 UTC [16] LOG:  redirecting log output to logging collector process
+2021-11-08 14:07:52.591 UTC [16] HINT:  Future log output will appear in directory "/controller/log".
+2021-11-08 14:07:52.591 UTC [16] LOG:  ending log output to stderr
+2021-11-08 14:07:52.591 UTC [16] HINT:  Future log output will go to log destination "csvlog".
+```
+
+Get pod logs filtered by fields with values and join them separated by `|` running:
+
+```shell
+kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
+  jq -r '[.level, .ts, .logger, .msg] | join(" | ")'
+```
+
+Output:
+
+```shell
+info | 1636380469.5728037 | wal-archive | Backup not configured, skip WAL archiving
+info | 1636383566.0664876 | postgres | record
 ```
 
 ## Backup information
@@ -185,14 +359,16 @@ kubectl get backup -l k8s.enterprisedb.io/cluster=<CLUSTER>
 
 ## Storage information
 
-Sometimes it might be useful to gather more information about the underlying
-storage class used in the cluster. You can execute the following operation on
-any of the pods that are part of the PostgreSQL cluster:
+Sometimes is useful to double-check the StorageClass used by the cluster to have
+some more context during investigations or troubleshooting, like this:
 
 ```shell
 STORAGECLASS=$(kubectl get pvc <POD> -o jsonpath='{.spec.storageClassName}')
 kubectl get storageclasses $STORAGECLASS -o yaml
 ```
+
+We are taking the StorageClass from one of the cluster pod here since often
+clusters are created using the default StorageClass.
 
 ## Node information
 
@@ -263,7 +439,7 @@ fall out of synchronization.
 Similarly, when `pg_rewind` might require a WAL file that is not present
 anymore in the former primary, reporting `pg_rewind: error: could not open file`.
 
-In these cases, pods cannot become ready anymore and you are required to delete
+In these cases, pods cannot become ready anymore, and you are required to delete
 the PVC and let the operator rebuild the replica.
 
 If you rely on dynamically provisioned Persistent Volumes, and you are confident

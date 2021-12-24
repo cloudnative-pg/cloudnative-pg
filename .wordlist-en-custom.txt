@@ -180,6 +180,7 @@ PoolerType
 Postgres
 PostgresConfiguration
 PrimaryUpdateStrategy
+PGSQL
 PullPolicy
 Quaresima
 QuickStart
@@ -375,12 +376,15 @@ destinationPath
 dev
 devel
 devsecops
+distro
+distros
 dl
 dns
 dockle
 dod
 domainbetakubernetesiozone
 downtimes
+dT
 dvcmQ
 ecdsa
 edb
@@ -400,6 +404,7 @@ fd
 ffd
 filesystem
 fio
+findstr
 freddie
 gc
 gcc
@@ -451,6 +456,7 @@ kubelet
 kubernetes
 labelColumnName
 labelColumnValue
+labelling
 labelSelector
 largeobject
 lastCheckTime
@@ -562,6 +568,7 @@ posix
 postInitSQL
 postgres
 postgresGID
+postgresImageName
 postgresUID
 postgresconfiguration
 postgresql
@@ -663,6 +670,7 @@ storageSasToken
 storageclass
 storageclasses
 storageconfiguration
+strflocaltime
 subcommand
 subresource
 substatement
@@ -719,6 +727,7 @@ webtest
 wikipedia
 wp
 writeService
+wsl
 www
 xact
 xlog
