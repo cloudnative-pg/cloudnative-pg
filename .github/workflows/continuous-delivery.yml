@@ -303,10 +303,6 @@ jobs:
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
           git_version_tag=$(git describe --tags --match 'v*')
-          if [ "${GITHUB_REF#refs/heads/}" == main ]
-          then
-            images="${images},upmdev.azurecr.io/enterprisedb/cloud-native-postgresql"
-          fi
           echo "::set-output name=images::${images}"
           echo "::set-output name=tags::${tags}"
           echo "::set-output name=labels::${labels}"
@@ -365,13 +361,6 @@ jobs:
           registry: quay.io/enterprisedb
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
-      -
-        name: Login to Azure Container Registry
-        uses: docker/login-action@v1
-        with:
-          registry: upmdev.azurecr.io
-          username: ${{ secrets.AZURECR_USER }}
-          password: ${{ secrets.AZURECR_SECRET }}
       -
         name: Build and push
         uses: docker/build-push-action@v2.7.0
