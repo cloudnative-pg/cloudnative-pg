@@ -55,8 +55,6 @@ func (r *ClusterReconciler) scaleDownCluster(
 	contextLogger.Info("Too many nodes for cluster, deleting an instance",
 		"pod", sacrificialPod.Name)
 	if err := r.Delete(ctx, sacrificialPod); err != nil {
-		// We cannot observe a deletion if it was not accepted by the server
-
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("cannot kill the Pod to scale down: %w", err)
@@ -73,8 +71,6 @@ func (r *ClusterReconciler) scaleDownCluster(
 
 	err := r.Delete(ctx, &pvc)
 	if err != nil {
-		// We cannot observe a deletion if it was not accepted by the server
-
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialPod.Name, err)
