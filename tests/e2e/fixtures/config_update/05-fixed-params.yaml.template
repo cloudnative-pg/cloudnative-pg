@@ -12,7 +12,7 @@ spec:
       shared_buffers: "256MB"
       max_replication_slots: "16"
       maintenance_work_mem: "128MB"
-      archive_mode: "cd ."
+      cluster_name: "Setting this parameter is not allowed"
       autovacuum_max_workers: "4"
       log_checkpoints: "on"
       log_lock_waits: "on"

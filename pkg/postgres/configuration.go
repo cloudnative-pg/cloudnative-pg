@@ -189,6 +189,9 @@ type ConfigurationInfo struct {
 
 	// List of additional sharedPreloadLibraries to be loaded
 	AdditionalSharedPreloadLibraries []string
+
+	// Is this a replica cluster?
+	IsReplicaCluster bool
 }
 
 // ManagedExtension defines all the information about a managed extension
@@ -351,7 +354,6 @@ var (
 			"listen_addresses":        "*",
 			"unix_socket_directories": SocketDirectory,
 			"hot_standby":             "true",
-			"archive_mode":            "on",
 			"archive_command": fmt.Sprintf(
 				"/controller/manager wal-archive --log-destination %s/%s.json %%p",
 				LogPath, LogFileName),
@@ -456,6 +458,13 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		}
 	}
 
+	// Apply the correct archive_mode
+	if info.IsReplicaCluster {
+		configuration.OverwriteConfig("archive_mode", "always")
+	} else {
+		configuration.OverwriteConfig("archive_mode", "on")
+	}
+
 	// Apply the list of replicas
 	setReplicasListConfigurations(info, configuration)
 
@@ -549,12 +558,14 @@ func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConf
 func FillCNPConfiguration(
 	majorVersion int,
 	userSettings map[string]string,
+	isReplicaCluster bool,
 ) map[string]string {
 	info := ConfigurationInfo{
-		Settings:     CnpConfigurationSettings,
-		MajorVersion: majorVersion,
-		UserSettings: userSettings,
-		Replicas:     nil,
+		Settings:         CnpConfigurationSettings,
+		MajorVersion:     majorVersion,
+		UserSettings:     userSettings,
+		Replicas:         nil,
+		IsReplicaCluster: isReplicaCluster,
 	}
 	pgConfig := CreatePostgresqlConfiguration(info)
 	return pgConfig.configs

@@ -102,6 +102,39 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			Expect(config.GetConfig("wal_keep_size")).To(Equal("512MB"))
 		})
 	})
+
+	When("replica cluster is being configured", func() {
+		It("will set archive_mode to always", func() {
+			info := ConfigurationInfo{
+				Settings:           CnpConfigurationSettings,
+				MajorVersion:       130000,
+				UserSettings:       settings,
+				IncludingMandatory: true,
+				Replicas:           nil,
+				SyncReplicas:       0,
+				IsReplicaCluster:   true,
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig("archive_mode")).To(Equal("always"))
+		})
+	})
+
+	When("a primary cluster is configured", func() {
+		It("will set archive_mode to on", func() {
+			info := ConfigurationInfo{
+				Settings:           CnpConfigurationSettings,
+				MajorVersion:       130000,
+				UserSettings:       settings,
+				IncludingMandatory: true,
+				Replicas:           nil,
+				SyncReplicas:       0,
+				IsReplicaCluster:   false,
+			}
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig("archive_mode")).To(Equal("on"))
+		})
+	})
+
 	It("adds shared_preload_library correctly", func() {
 		info := ConfigurationInfo{
 			Settings:                         CnpConfigurationSettings,

@@ -30,6 +30,7 @@ func (cluster *Cluster) CreatePostgresqlConfiguration() (string, string, error) 
 		IncludingMandatory:               true,
 		IncludingSharedPreloadLibraries:  true,
 		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
+		IsReplicaCluster:                 cluster.IsReplica(),
 	}
 
 	// We need to include every replica inside the list of possible synchronous standbys
