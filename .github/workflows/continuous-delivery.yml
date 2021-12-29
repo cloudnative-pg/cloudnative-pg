@@ -574,9 +574,13 @@ jobs:
           ./.github/report-failed-test.sh
       -
         name: Cleanup ginkgo JSON report
-        # Delete report.json after the analysis. Step should fail if file is not there
+        # Delete report.json after the analysis. File should always exist.
+        # Delete upgrade_report.json. It may not exist depending on test level.
         if: always()
-        run:
+        run: |
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            rm tests/e2e/out/upgrade_report.json
+          fi
           rm tests/e2e/out/report.json
 
       -
@@ -740,9 +744,13 @@ jobs:
           ./.github/report-failed-test.sh
       -
         name: Cleanup ginkgo JSON report
-        # Delete report.json after the analysis. Step should fail if file is not there
+        # Delete report.json after the analysis. File should always exist.
+        # Delete upgrade_report.json. It may not exist depending on test level.
         if: always()
-        run:
+        run: |
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            rm tests/e2e/out/upgrade_report.json
+          fi
           rm tests/e2e/out/report.json
       -
         name: Archive e2e failure contexts
@@ -878,9 +886,13 @@ jobs:
           ./.github/report-failed-test.sh
       -
         name: Cleanup ginkgo JSON report
-        # Delete report.json after the analysis. Step should fail if file is not there
+        # Delete report.json after the analysis. File should always exist.
+        # Delete upgrade_report.json. It may not exist depending on test level.
         if: always()
-        run:
+        run: |
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            rm tests/e2e/out/upgrade_report.json
+          fi
           rm tests/e2e/out/report.json
       -
         name: Archive e2e failure contexts
@@ -1072,9 +1084,13 @@ jobs:
           ./.github/report-failed-test.sh
       -
         name: Cleanup ginkgo JSON report
-        # Delete report.json after the analysis. Step should fail if file is not there
+        # Delete report.json after the analysis. File should always exist.
+        # Delete upgrade_report.json. It may not exist depending on test level.
         if: always()
-        run:
+        run: |
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            rm tests/e2e/out/upgrade_report.json
+          fi
           rm tests/e2e/out/report.json
       -
         name: Archive e2e failure contexts
@@ -1212,9 +1228,13 @@ jobs:
           ./.github/report-failed-test.sh
       -
         name: Cleanup ginkgo JSON report
-        # Delete report.json after the analysis. Step should fail if file is not there
+        # Delete report.json after the analysis. File should always exist.
+        # Delete upgrade_report.json. It may not exist depending on test level.
         if: always()
-        run:
+        run: |
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            rm tests/e2e/out/upgrade_report.json
+          fi
           rm tests/e2e/out/report.json
       -
         name: Wait for PVs to be released
