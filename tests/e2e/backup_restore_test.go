@@ -12,6 +12,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
@@ -84,13 +85,13 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			By("setting up minio", func() {
-				InstallMinio(namespace)
+				InstallMinio(namespace, "/backup/minio/minio-deployment.yaml")
 			})
 
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
-				InstallMinioClient(namespace)
+				InstallMinioClient(namespace, "/backup/minio/minio-client.yaml")
 			})
 
 			// Create ConfigMap and secrets to verify metrics for target database after backup restore
@@ -168,13 +169,13 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			By("setting up minio", func() {
-				InstallMinio(namespace)
+				InstallMinio(namespace, "/backup/minio/minio-deployment.yaml")
 			})
 
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
-				InstallMinioClient(namespace)
+				InstallMinioClient(namespace, "/backup/minio/minio-client.yaml")
 			})
 
 			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
@@ -207,13 +208,13 @@ var _ = Describe("Backup and restore", func() {
 			})
 
 			By("setting up minio", func() {
-				InstallMinio(namespace)
+				InstallMinio(namespace, "/backup/minio/minio-deployment.yaml")
 			})
 
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
-				InstallMinioClient(namespace)
+				InstallMinioClient(namespace, "/backup/minio/minio-client.yaml")
 			})
 
 			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
@@ -245,6 +246,89 @@ var _ = Describe("Backup and restore", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			AssertClusterRestorePITR(namespace, restoredClusterName, tableName)
+		})
+
+		It("backup and restore with endpoint ca and tls connection", func() {
+			const (
+				clusterWithMinioSampleFile = fixturesDir + "/backup/minio-with-tls/cluster-with-backup-minio.yaml"
+				clusterRestoreSampleFile   = fixturesDir + "/backup/minio-with-tls/cluster-from-restore.yaml"
+				caSecName                  = "minio-server-ca-secret"
+				tlsSecName                 = "minio-server-tls-secret"
+			)
+			namespace = "backup-minio-endpoint-ca"
+			clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			// create namespace
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			// create CA certificates
+			_, caPair := utils.CreateSecretCA(namespace, clusterName, caSecName, true, env)
+
+			// sign and create secret using CA certificate and key
+			serverPair, err := caPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
+				[]string{"minio-service.internal.mydomain.net, minio-service.default.svc, minio-service.default,"},
+			)
+			Expect(err).ToNot(HaveOccurred())
+			serverSecret := serverPair.GenerateCertificateSecret(namespace, tlsSecName)
+			err = env.Client.Create(env.Ctx, serverSecret)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating the credentials for minio", func() {
+				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+			})
+
+			By("setting up minio", func() {
+				InstallMinio(namespace, "/backup/minio-with-tls/minio-deployment.yaml")
+			})
+
+			// Create the minio client pod and wait for it to be ready.
+			// We'll use it to check if everything is archived correctly
+			By("setting up minio client pod", func() {
+				InstallMinioClient(namespace, "/backup/minio-with-tls/minio-client.yaml")
+			})
+
+			// Create the cluster
+			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
+
+			// Write a table and some data on the "app" database
+			AssertCreateTestData(namespace, clusterName, "test_table")
+
+			AssertArchiveWalOnMinio(namespace, clusterName)
+
+			// There should be a backup resource and
+			By("backing up a cluster and verifying it exists on minio", func() {
+				utils.ExecuteBackup(namespace, backupFile, env)
+
+				Eventually(func() (int, error) {
+					return CountFilesOnMinio(namespace, "data.tar")
+				}, 30).Should(BeEquivalentTo(1))
+				Eventually(func() (string, error) {
+					cluster := &apiv1.Cluster{}
+					err := env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+						cluster)
+					return cluster.Status.FirstRecoverabilityPoint, err
+				}, 30).ShouldNot(BeEmpty())
+			})
+
+			// Restore backup in a new cluster
+			AssertClusterRestore(namespace, clusterRestoreSampleFile, "test_table")
+
+			previous := 0
+
+			By("checking the previous number of .history files in minio", func() {
+				previous, err = CountFilesOnMinio(namespace, "*.history.gz")
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			AssertSwitchover(namespace, clusterName, env)
+
+			By("checking the number of .history after switchover", func() {
+				Eventually(func() (int, error) {
+					return CountFilesOnMinio(namespace, "*.history.gz")
+				}, 60).Should(BeNumerically(">", previous))
+			})
 		})
 	})
 
@@ -589,13 +673,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 			})
 			By("setting up minio", func() {
-				InstallMinio(namespace)
+				InstallMinio(namespace, "/backup/minio/minio-deployment.yaml")
 			})
 
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
-				InstallMinioClient(namespace)
+				InstallMinioClient(namespace, "/backup/minio/minio-client.yaml")
 			})
 
 			// Create the cluster
@@ -659,13 +743,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 			})
 			By("setting up minio", func() {
-				InstallMinio(namespace)
+				InstallMinio(namespace, "/backup/minio/minio-deployment.yaml")
 			})
 
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly.
 			By("setting up minio client pod", func() {
-				InstallMinioClient(namespace)
+				InstallMinioClient(namespace, "/backup/minio/minio-client.yaml")
 			})
 
 			// Create the Cluster

@@ -135,12 +135,12 @@ var _ = Describe("Replica Mode", func() {
 				AssertStorageCredentialsAreCreated(replicaNamespace, "backup-storage-creds", "minio", "minio123")
 			})
 			By("setting up minio", func() {
-				InstallMinio(replicaNamespace)
+				InstallMinio(replicaNamespace, "/backup/minio/minio-deployment.yaml")
 			})
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
-				InstallMinioClient(replicaNamespace)
+				InstallMinioClient(replicaNamespace, "/backup/minio/minio-client.yaml")
 			})
 
 			AssertReplicaModeCluster(replicaNamespace, srcClusterName, srcClusterSample, replicaClusterName,

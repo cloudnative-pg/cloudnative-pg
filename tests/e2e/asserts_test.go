@@ -477,12 +477,11 @@ func AssertStorageCredentialsAreCreated(namespace string, name string, id string
 }
 
 // InstallMinio installs minio to verify the backup and archive walls
-func InstallMinio(namespace string) {
+func InstallMinio(namespace string, deploymentFile string) {
 	// Create a PVC-based deployment for the minio version
 	// minio/minio:RELEASE.2020-04-23T00-58-49Z
 	minioPVCFile := fixturesDir + "/backup/minio/minio-pvc.yaml"
-	minioDeploymentFile := fixturesDir +
-		"/backup/minio/minio-deployment.yaml"
+	minioDeploymentFile := fixturesDir + deploymentFile
 
 	_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
 		namespace, minioPVCFile))
@@ -509,8 +508,8 @@ func InstallMinio(namespace string) {
 }
 
 // InstallMinioClient installs minio client to verify the backup and archive walls
-func InstallMinioClient(namespace string) {
-	clientFile := fixturesDir + "/backup/minio/minio-client.yaml"
+func InstallMinioClient(namespace string, minioClientPodFile string) {
+	clientFile := fixturesDir + minioClientPodFile
 	_, _, err := testsUtils.Run(fmt.Sprintf(
 		"kubectl apply -n %v -f %v",
 		namespace, clientFile))
@@ -1403,13 +1402,13 @@ func prepareClusterForPITROnMinio(
 	})
 
 	By("setting up minio", func() {
-		InstallMinio(namespace)
+		InstallMinio(namespace, "/backup/minio/minio-deployment.yaml")
 	})
 
 	// Create the minio client pod and wait for it to be ready.
 	// We'll use it to check if everything is archived correctly
 	By("setting up minio client pod", func() {
-		InstallMinioClient(namespace)
+		InstallMinioClient(namespace, "/backup/minio/minio-client.yaml")
 	})
 
 	// Create the cluster
