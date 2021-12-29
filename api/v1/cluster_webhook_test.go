@@ -1523,12 +1523,12 @@ var _ = Describe("Backup validation", func() {
 var _ = Describe("Default monitoring queries", func() {
 	It("correctly set the default monitoring queries configmap when none is already specified", func() {
 		cluster := &Cluster{Spec: ClusterSpec{Monitoring: &MonitoringConfiguration{}}}
-		cluster.defaultMonitoringQueries("test")
+		cluster.defaultMonitoringQueries()
 		Expect(cluster.Spec.Monitoring).NotTo(BeNil())
 		Expect(cluster.Spec.Monitoring.CustomQueriesConfigMap).NotTo(BeEmpty())
 		Expect(cluster.Spec.Monitoring.CustomQueriesConfigMap).
 			To(ContainElement(ConfigMapKeySelector{
-				LocalObjectReference: LocalObjectReference{Name: "test"},
+				LocalObjectReference: LocalObjectReference{Name: DefaultMonitoringConfigMapName},
 				Key:                  DefaultMonitoringConfigMapKey,
 			}))
 	})
@@ -1536,27 +1536,30 @@ var _ = Describe("Default monitoring queries", func() {
 		cluster := &Cluster{Spec: ClusterSpec{Monitoring: &MonitoringConfiguration{
 			CustomQueriesConfigMap: []ConfigMapKeySelector{
 				{
-					LocalObjectReference: LocalObjectReference{Name: "test2"},
+					LocalObjectReference: LocalObjectReference{Name: DefaultMonitoringConfigMapName},
 					Key:                  "test2",
 				},
 			},
 			CustomQueriesSecret: []SecretKeySelector{
 				{
-					LocalObjectReference: LocalObjectReference{Name: "test3"},
+					LocalObjectReference: LocalObjectReference{Name: DefaultMonitoringConfigMapName},
 					Key:                  "test3",
 				},
 			},
 		}}}
+
 		originalCluster := cluster.DeepCopy()
-		cluster.defaultMonitoringQueries("test")
+		cluster.defaultMonitoringQueries()
+
 		Expect(cluster.Spec.Monitoring).NotTo(BeNil())
 		Expect(cluster.Spec.Monitoring.CustomQueriesConfigMap).NotTo(BeEmpty())
 		Expect(cluster.Spec.Monitoring.CustomQueriesSecret).NotTo(BeEmpty())
 		Expect(cluster.Spec.Monitoring.CustomQueriesConfigMap).
 			To(ContainElement(ConfigMapKeySelector{
-				LocalObjectReference: LocalObjectReference{Name: "test"},
-				Key:                  DefaultMonitoringConfigMapKey,
+				LocalObjectReference: LocalObjectReference{Name: DefaultMonitoringConfigMapName},
+				Key:                  "test2",
 			}))
+
 		Expect(cluster.Spec.Monitoring.CustomQueriesSecret).
 			To(BeEquivalentTo(originalCluster.Spec.Monitoring.CustomQueriesSecret))
 		Expect(cluster.Spec.Monitoring.CustomQueriesConfigMap).

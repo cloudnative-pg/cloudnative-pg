@@ -105,7 +105,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				contextLogger.Error(
 					err,
 					"error while deleting dangling monitoring configMap",
-					"configMapName", configuration.Current.MonitoringQueriesConfigmap,
+					"configMapName", apiv1.DefaultMonitoringConfigMapName,
 					"namespace", req.Namespace,
 				)
 			}
