@@ -89,13 +89,24 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 
 	// if the cluster has more than one instance, we should trigger a switchover before upgrading
 	if cluster.Status.Instances > 1 && len(podList.Items) > 1 {
-		// podList.Items[1] is the first replica, as the pod list
-		// is sorted in the same order we use for switchover / failover
+		// If this is not a replica cluster, podList.Items[1] is the first replica,
+		// as the pod list is sorted in the same order we use for switchover / failover.
+		// This may not be true for replica clusters, where every instance is a replica
+		// from the PostgreSQL point-of-view.
 		targetPrimary := podList.Items[1].Pod.Name
+
+		// If this is a replica cluster, the target primary we chose may be
+		// the one we're trying to upgrade, as the list isn't sorted. In
+		// this case, we promote the first instance of the list
+		if targetPrimary == primaryPostgresqlStatus.Pod.Name {
+			targetPrimary = podList.Items[0].Pod.Name
+		}
+
 		contextLogger.Info("The primary needs to be restarted, we'll trigger a switchover to do that",
 			"reason", reason,
 			"currentPrimary", primaryPostgresqlStatus.Pod.Name,
-			"targetPrimary", targetPrimary)
+			"targetPrimary", targetPrimary,
+			"podList", podList)
 		r.Recorder.Eventf(cluster, "Normal", "Switchover",
 			"Initiating switchover to %s to upgrade %s", targetPrimary, primaryPostgresqlStatus.Pod.Name)
 		return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)

@@ -183,20 +183,3 @@ func RemoveArchiveModeFromPostgresAutoConf(pgData string) (changed bool, err err
 	updatedContent := configfile.RemoveOptionFromConfigurationContents(string(currentContent), "archive_mode")
 	return fileutils.WriteStringToFile(targetFile, updatedContent)
 }
-
-// SetArchiveModeToAlwaysIntoPostgresAutoConf sets the "archive_mode" option to "always" into "postgresql.auto.conf"
-func SetArchiveModeToAlwaysIntoPostgresAutoConf(pgData string) (changed bool, err error) {
-	targetFile := path.Join(pgData, "postgresql.auto.conf")
-	currentContent, err := fileutils.ReadFile(targetFile)
-	if err != nil {
-		return false, fmt.Errorf("error while reading content of %v: %w", targetFile, err)
-	}
-
-	options := map[string]string{
-		"archive_mode": "always",
-	}
-
-	updatedContent := configfile.UpdateConfigurationContents(string(currentContent), options)
-
-	return fileutils.WriteStringToFile(targetFile, updatedContent)
-}

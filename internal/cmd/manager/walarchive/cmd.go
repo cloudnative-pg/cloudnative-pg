@@ -36,27 +36,39 @@ const (
 
 // NewCmd creates the new cobra command
 func NewCmd() *cobra.Command {
+	var podName string
+
 	cmd := cobra.Command{
 		Use:           "wal-archive [name]",
 		SilenceErrors: true,
 		Args:          cobra.ExactArgs(1),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
+			const logErrorMessage = "failed to run wal-archive command"
+
 			contextLog := log.WithName("wal-archive")
 			ctx := log.IntoContext(cobraCmd.Context(), contextLog)
 
-			err := run(ctx, args)
+			if podName == "" {
+				err := fmt.Errorf("no pod-name value passed and failed to extract it from POD_NAME env variable")
+				contextLog.Error(err, logErrorMessage)
+				return err
+			}
+
+			err := run(ctx, podName, args)
 			if err != nil {
-				contextLog.Error(err, "failed to run wal-archive command")
+				contextLog.Error(err, logErrorMessage)
 				return err
 			}
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of the "+
+		"current pod in k8s")
 
 	return &cmd
 }
 
-func run(ctx context.Context, args []string) error {
+func run(ctx context.Context, podName string, args []string) error {
 	startTime := time.Now()
 	contextLog := log.FromContext(ctx)
 	walName := args[0]
@@ -76,6 +88,19 @@ func run(ctx context.Context, args []string) error {
 			"targetPrimary", cluster.Status.TargetPrimary,
 		)
 		return nil
+	}
+
+	if cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.Enabled {
+		if podName != cluster.Status.CurrentPrimary && podName != cluster.Status.TargetPrimary {
+			contextLog.Debug("WAL archiving on a replica cluster, "+
+				"but this node is not the target primary nor the current one. "+
+				"Skipping WAL archiving",
+				"walName", walName,
+				"currentPrimary", cluster.Status.CurrentPrimary,
+				"targetPrimary", cluster.Status.TargetPrimary,
+			)
+			return nil
+		}
 	}
 
 	maxParallel := 1
