@@ -74,7 +74,7 @@ var _ webhook.Validator = &Pooler{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Pooler) ValidateCreate() error {
 	var allErrs field.ErrorList
-	poolerLog.Info("validate create", "name", r.Name)
+	poolerLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 
 	allErrs = r.Validate()
 	if len(allErrs) == 0 {
@@ -89,7 +89,7 @@ func (r *Pooler) ValidateCreate() error {
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Pooler) ValidateUpdate(old runtime.Object) error {
 	var allErrs field.ErrorList
-	poolerLog.Info("validate update", "name", r.Name)
+	poolerLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
 
 	allErrs = r.Validate()
 	if len(allErrs) == 0 {
@@ -103,7 +103,7 @@ func (r *Pooler) ValidateUpdate(old runtime.Object) error {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *Pooler) ValidateDelete() error {
-	poolerLog.Info("validate delete", "name", r.Name)
+	poolerLog.Info("validate delete", "name", r.Name, "namespace", r.Namespace)
 	return nil
 }
 
