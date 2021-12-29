@@ -34,7 +34,7 @@ var _ webhook.Defaulter = &ScheduledBackup{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *ScheduledBackup) Default() {
-	scheduledBackupLog.Info("default", "name", r.Name)
+	scheduledBackupLog.Info("default", "name", r.Name, "namespace", r.Namespace)
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
@@ -45,7 +45,7 @@ var _ webhook.Validator = &ScheduledBackup{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *ScheduledBackup) ValidateCreate() error {
 	var allErrs field.ErrorList
-	scheduledBackupLog.Info("validate create", "name", r.Name)
+	scheduledBackupLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 
 	allErrs = append(allErrs, r.validateSchedule()...)
 
@@ -60,13 +60,13 @@ func (r *ScheduledBackup) ValidateCreate() error {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *ScheduledBackup) ValidateUpdate(old runtime.Object) error {
-	scheduledBackupLog.Info("validate update", "name", r.Name)
+	scheduledBackupLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
 	return nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *ScheduledBackup) ValidateDelete() error {
-	scheduledBackupLog.Info("validate delete", "name", r.Name)
+	scheduledBackupLog.Info("validate delete", "name", r.Name, "namespace", r.Namespace)
 	return nil
 }
 
