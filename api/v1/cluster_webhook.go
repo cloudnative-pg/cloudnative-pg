@@ -31,7 +31,10 @@ import (
 )
 
 // DefaultMonitoringConfigMapKey is the key that should be used in the default metrics configmap to store the queries
-const DefaultMonitoringConfigMapKey = "queries"
+const (
+	DefaultMonitoringConfigMapKey  = "queries"
+	DefaultMonitoringConfigMapName = "postgresql-operator-default-monitoring"
+)
 
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
@@ -94,13 +97,13 @@ func (r *Cluster) SetDefaults() {
 	// we inject the defaultMonitoringQueries if the MonitoringQueriesConfigmap parameter is not empty
 	// and defaultQueries not disabled on cluster crd
 	if configuration.Current.MonitoringQueriesConfigmap != "" && !r.Spec.Monitoring.AreDefaultQueriesDisabled() {
-		r.defaultMonitoringQueries(configuration.Current.MonitoringQueriesConfigmap)
+		r.defaultMonitoringQueries()
 	}
 }
 
 // defaultMonitoringQueries adds the default monitoring queries configMap
 // if not already present in CustomQueriesConfigMap
-func (r *Cluster) defaultMonitoringQueries(defaultMonitoringQueriesConfigmap string) {
+func (r *Cluster) defaultMonitoringQueries() {
 	if r.Spec.Monitoring == nil {
 		r.Spec.Monitoring = &MonitoringConfiguration{}
 	}
@@ -109,7 +112,7 @@ func (r *Cluster) defaultMonitoringQueries(defaultMonitoringQueriesConfigmap str
 
 	// we check if they default queries are been already inserted in the monitoring configuration
 	for _, monitoringConfigMap := range r.Spec.Monitoring.CustomQueriesConfigMap {
-		if monitoringConfigMap.Name == defaultMonitoringQueriesConfigmap {
+		if monitoringConfigMap.Name == DefaultMonitoringConfigMapName {
 			defaultConfigMapQueriesAlreadyPresent = true
 			break
 		}
@@ -127,7 +130,7 @@ func (r *Cluster) defaultMonitoringQueries(defaultMonitoringQueriesConfigmap str
 	// because it should be overwritten by the user defined metrics.
 	r.Spec.Monitoring.CustomQueriesConfigMap = append([]ConfigMapKeySelector{
 		{
-			LocalObjectReference: LocalObjectReference{Name: defaultMonitoringQueriesConfigmap},
+			LocalObjectReference: LocalObjectReference{Name: DefaultMonitoringConfigMapName},
 			Key:                  DefaultMonitoringConfigMapKey,
 		},
 	}, r.Spec.Monitoring.CustomQueriesConfigMap...)

@@ -589,7 +589,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 
 	if _, ok := sourceConfigmap.Data[apiv1.DefaultMonitoringConfigMapKey]; !ok {
 		contextLogger.Warning("key not found while checking default metrics configMap", "key",
-			apiv1.DefaultMonitoringConfigMapKey)
+			apiv1.DefaultMonitoringConfigMapKey, "configmap_name", sourceConfigmap.Name)
 		return nil
 	}
 
@@ -597,7 +597,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 	var targetConfigMap corev1.ConfigMap
 	if err := r.Get(ctx,
 		client.ObjectKey{
-			Name:      configuration.Current.MonitoringQueriesConfigmap,
+			Name:      apiv1.DefaultMonitoringConfigMapName,
 			Namespace: cluster.Namespace,
 		}, &targetConfigMap); err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -606,7 +606,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 		// if the configMap does not exist we create it
 		newConfigMap := corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      configuration.Current.MonitoringQueriesConfigmap,
+				Name:      apiv1.DefaultMonitoringConfigMapName,
 				Namespace: cluster.Namespace,
 				Labels: map[string]string{
 					specs.WatchedLabelName: "true",
@@ -637,6 +637,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 	patchedConfigMap := targetConfigMap.DeepCopy()
 	utils.SetOperatorVersion(&patchedConfigMap.ObjectMeta, versions.Version)
 	patchedConfigMap.Data = sourceConfigmap.Data
+
 	if err := r.Patch(ctx, patchedConfigMap, client.MergeFrom(&targetConfigMap)); err != nil {
 		return fmt.Errorf("while patching default monitoring queries: %w", err)
 	}

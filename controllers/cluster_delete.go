@@ -45,7 +45,7 @@ func (r *ClusterReconciler) deleteDanglingMonitoringConfigMaps(ctx context.Conte
 
 	configMap := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      configMapName,
+			Name:      apiv1.DefaultMonitoringConfigMapName,
 			Namespace: namespace,
 		},
 	}
