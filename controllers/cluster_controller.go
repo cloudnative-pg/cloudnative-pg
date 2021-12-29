@@ -219,12 +219,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Updates all the objects managed by the controller
-	return r.reconcileResources(ctx, req, &cluster, resources, instancesStatus)
+	return r.reconcileResources(ctx, &cluster, resources, instancesStatus)
 }
 
 // reconcileResources updates all the objects managed by the controller
 func (r *ClusterReconciler) reconcileResources(
-	ctx context.Context, req ctrl.Request, cluster *apiv1.Cluster,
+	ctx context.Context, cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
@@ -274,7 +274,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// Reconcile Pods
-	if res, err := r.ReconcilePods(ctx, req, cluster, resources, instancesStatus); err != nil {
+	if res, err := r.ReconcilePods(ctx, cluster, resources, instancesStatus); err != nil {
 		return res, err
 	}
 
@@ -395,7 +395,7 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 }
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
-func (r *ClusterReconciler) ReconcilePods(ctx context.Context, req ctrl.Request, cluster *apiv1.Cluster,
+func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 

@@ -791,13 +791,8 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, err
 	}
 
-	// Retrieve the cluster key
-
 	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, cluster)
-
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-		// We cannot observe a creation if it was not accepted by the server
-
 		contextLogger.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
 		return ctrl.Result{}, err
 	}
