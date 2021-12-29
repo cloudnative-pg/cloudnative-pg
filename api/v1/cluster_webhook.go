@@ -49,7 +49,7 @@ var _ webhook.Defaulter = &Cluster{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *Cluster) Default() {
-	clusterLog.Info("default", "name", r.Name)
+	clusterLog.Info("default", "name", r.Name, "namespace", r.Namespace)
 
 	r.SetDefaults()
 }
@@ -166,7 +166,7 @@ var _ webhook.Validator = &Cluster{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateCreate() error {
-	clusterLog.Info("validate create", "name", r.Name)
+	clusterLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 	allErrs := r.Validate()
 	if len(allErrs) == 0 {
 		return nil
@@ -205,7 +205,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Cluster) ValidateUpdate(old runtime.Object) error {
-	clusterLog.Info("validate update", "name", r.Name)
+	clusterLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
 	oldCluster := old.(*Cluster)
 
 	// applying defaults before validating updates to set any new default

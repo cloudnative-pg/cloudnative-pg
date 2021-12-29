@@ -30,7 +30,7 @@ var _ webhook.Defaulter = &Backup{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *Backup) Default() {
-	backupLog.Info("default", "name", r.Name)
+	backupLog.Info("default", "name", r.Name, "namespace", r.Namespace)
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
@@ -40,18 +40,18 @@ var _ webhook.Validator = &Backup{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Backup) ValidateCreate() error {
-	backupLog.Info("validate create", "name", r.Name)
+	backupLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 	return nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Backup) ValidateUpdate(old runtime.Object) error {
-	backupLog.Info("validate update", "name", r.Name)
+	backupLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
 	return nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *Backup) ValidateDelete() error {
-	backupLog.Info("validate delete", "name", r.Name)
+	backupLog.Info("validate delete", "name", r.Name, "namespace", r.Namespace)
 	return nil
 }
