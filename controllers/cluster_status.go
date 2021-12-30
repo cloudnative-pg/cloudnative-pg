@@ -92,8 +92,10 @@ func (resources managedResources) getPVC(name string) *corev1.PersistentVolumeCl
 }
 
 // getManagedResources get the managed resources of various types
-func (r *ClusterReconciler) getManagedResources(ctx context.Context,
-	cluster apiv1.Cluster) (*managedResources, error) {
+func (r *ClusterReconciler) getManagedResources(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (*managedResources, error) {
 	// Update the status of this resource
 	childPods, err := r.getManagedPods(ctx, cluster)
 	if err != nil {
@@ -119,7 +121,7 @@ func (r *ClusterReconciler) getManagedResources(ctx context.Context,
 
 func (r *ClusterReconciler) getManagedPods(
 	ctx context.Context,
-	cluster apiv1.Cluster,
+	cluster *apiv1.Cluster,
 ) (corev1.PodList, error) {
 	var childPods corev1.PodList
 	if err := r.List(ctx, &childPods,
@@ -139,7 +141,7 @@ func (r *ClusterReconciler) getManagedPods(
 
 func (r *ClusterReconciler) getManagedPVCs(
 	ctx context.Context,
-	cluster apiv1.Cluster,
+	cluster *apiv1.Cluster,
 ) (corev1.PersistentVolumeClaimList, error) {
 	var childPVCs corev1.PersistentVolumeClaimList
 	if err := r.List(ctx, &childPVCs,
@@ -161,7 +163,7 @@ func (r *ClusterReconciler) getManagedPVCs(
 // by this cluster
 func (r *ClusterReconciler) getManagedJobs(
 	ctx context.Context,
-	cluster apiv1.Cluster,
+	cluster *apiv1.Cluster,
 ) (batchv1.JobList, error) {
 	var childJobs batchv1.JobList
 	if err := r.List(ctx, &childJobs,

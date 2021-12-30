@@ -10,6 +10,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -49,8 +50,12 @@ func (r *ClusterReconciler) deleteDanglingMonitoringConfigMaps(ctx context.Conte
 			Namespace: namespace,
 		},
 	}
-	if len(clustersUsingConfigMap.Items) == 0 {
-		return r.Delete(ctx, &configMap)
+	if len(clustersUsingConfigMap.Items) > 0 {
+		return nil
+	}
+
+	if err = r.Delete(ctx, &configMap); err != nil && !apierrs.IsNotFound(err) {
+		return err
 	}
 
 	return nil
