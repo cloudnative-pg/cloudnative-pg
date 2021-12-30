@@ -72,7 +72,7 @@ func isResourceListSubset(resourceList, subResourceList corev1.ResourceList) boo
 	for key, subValue := range subResourceList {
 		value := resourceList[key]
 
-		if value != subValue {
+		if !subValue.Equal(value) {
 			return false
 		}
 	}
