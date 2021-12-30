@@ -28,10 +28,10 @@ var _ = Describe("nodeSelector", func() {
 		}
 	})
 
-	Context("The label doesn't exists", func() {
+	Context("The label doesn't exist", func() {
 		const namespace = "nodeselector-e2e-missing-label"
 		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-not-exists.yaml"
-		const clusterName = "postgresql-nodeselector-none-label"
+		const clusterName = "postgresql-nodeselector"
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpClusterEnv(namespace, clusterName,
@@ -71,7 +71,7 @@ var _ = Describe("nodeSelector", func() {
 			// to be stuck forever due to affinity issues.
 			// We check the error to verify that's the case
 			By("verifying that the pods can't be scheduled", func() {
-				timeout := 60
+				timeout := 120
 				Eventually(func() bool {
 					isPending := false
 					podList, err := env.GetPodList(namespace)
@@ -81,6 +81,11 @@ var _ = Describe("nodeSelector", func() {
 							if podList.Items[0].Status.Phase == "Pending" && strings.Contains(podList.Items[0].Status.Conditions[0].Message,
 								"didn't match") {
 								isPending = true
+							} else {
+								// should never happen, but useful once it happens
+								GinkgoWriter.Printf("Found pod in node with status %s and message %s\n",
+									podList.Items[0].Status.Phase,
+									podList.Items[0].Status.Conditions[0].Message)
 							}
 						}
 					}
