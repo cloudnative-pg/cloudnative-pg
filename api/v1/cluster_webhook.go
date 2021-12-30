@@ -395,7 +395,7 @@ func (r *Cluster) validateBootstrapPgBaseBackupSource() field.ErrorList {
 
 	// This validation is only applicable for physical backup
 	// based bootstrap
-	if r.Spec.Bootstrap.PgBaseBackup == nil {
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.PgBaseBackup == nil {
 		return result
 	}
 
@@ -418,7 +418,7 @@ func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
 	var result field.ErrorList
 
 	// This validation is only applicable for recovery based bootstrap
-	if r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.Source == "" {
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.Source == "" {
 		return result
 	}
 
