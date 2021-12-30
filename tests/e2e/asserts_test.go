@@ -202,6 +202,48 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 	})
 }
 
+func AssertClusterDefault(namespace string, clusterName string,
+	isExpectedToDefault bool, env *testsUtils.TestingEnvironment) {
+	By("having a Cluster object populated with default values", func() {
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
+		// Eventually the number of ready instances should be equal to the
+		// amount of instances defined in the cluster and
+		// the cluster status should be in healthy state
+		cluster := &apiv1.Cluster{}
+		err := env.Client.Get(env.Ctx, namespacedName, cluster)
+		Expect(err).ToNot(HaveOccurred())
+		validationErr := cluster.Validate()
+		if isExpectedToDefault {
+			Expect(len(validationErr)).Should(BeZero())
+		} else {
+			Expect(len(validationErr)).ShouldNot(BeZero())
+		}
+	})
+}
+
+func AssertWebhookEnabled(env *testsUtils.TestingEnvironment) {
+	By("re-setting namespace selector for all admission controllers", func() {
+		mWhc, err := env.GetCNPsMutatingWebhookConf()
+		Expect(err).ToNot(HaveOccurred())
+		for i := range mWhc.Webhooks {
+			mWhc.Webhooks[i].NamespaceSelector = nil
+		}
+		err = env.UpdateCNPsMutatingWebhookConf(mWhc)
+		Expect(err).ToNot(HaveOccurred())
+
+		vWhc, err := env.GetCNPsValidatingWebhookConf()
+		Expect(err).ToNot(HaveOccurred())
+		for i := range vWhc.Webhooks {
+			vWhc.Webhooks[i].NamespaceSelector = nil
+		}
+		err = env.UpdateCNPsValidatingWebhookConf(vWhc)
+		Expect(err).ToNot(HaveOccurred())
+	})
+}
+
 // AssertConnection is used if a connection from a pod to a postgresql
 // database works
 func AssertConnection(host string, user string, dbname string,

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -527,6 +528,54 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 	return true, err
 }
 
+// GetCNPsMutatingWebhookConf get the admissioncontrollers object
+func (env TestingEnvironment) GetCNPsMutatingWebhookConf() (
+	*admissionregistrationv1.MutatingWebhookConfiguration, error) {
+	ctx := context.Background()
+	mutatingWebhookConfig, err := env.Interface.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
+		ctx, controller.MutatingWebhookConfigurationName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return mutatingWebhookConfig, nil
+}
+
+// UpdateCNPsMutatingWebhookConf update the admissioncontrollers object
+func (env TestingEnvironment) UpdateCNPsMutatingWebhookConf(
+	wh *admissionregistrationv1.MutatingWebhookConfiguration) error {
+	ctx := context.Background()
+	_, err := env.Interface.AdmissionregistrationV1().
+		MutatingWebhookConfigurations().Update(ctx, wh, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetCNPsValidatingWebhookConf get the admissioncontrollers object
+func (env TestingEnvironment) GetCNPsValidatingWebhookConf() (
+	*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
+	ctx := context.Background()
+	validatingWebhookConfig, err := env.Interface.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
+		ctx, controller.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return validatingWebhookConfig, nil
+}
+
+// UpdateCNPsValidatingWebhookConf update the admissioncontrollers object
+func (env TestingEnvironment) UpdateCNPsValidatingWebhookConf(
+	wh *admissionregistrationv1.ValidatingWebhookConfiguration) error {
+	ctx := context.Background()
+	_, err := env.Interface.AdmissionregistrationV1().
+		ValidatingWebhookConfigurations().Update(ctx, wh, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // checkWebhookReady ensures that the operator has finished the webhook setup.
 func (env TestingEnvironment) checkWebhookReady(namespace string) error {
 	// Check CA
@@ -542,9 +591,7 @@ func (env TestingEnvironment) checkWebhookReady(namespace string) error {
 
 	ca := secret.Data["tls.crt"]
 
-	ctx := context.Background()
-	mutatingWebhookConfig, err := env.Interface.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
-		ctx, controller.MutatingWebhookConfigurationName, metav1.GetOptions{})
+	mutatingWebhookConfig, err := env.GetCNPsMutatingWebhookConf()
 	if err != nil {
 		return err
 	}
@@ -556,8 +603,7 @@ func (env TestingEnvironment) checkWebhookReady(namespace string) error {
 		}
 	}
 
-	validatingWebhookConfig, err := env.Interface.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
-		ctx, controller.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+	validatingWebhookConfig, err := env.GetCNPsValidatingWebhookConf()
 	if err != nil {
 		return err
 	}
@@ -575,6 +621,7 @@ func (env TestingEnvironment) checkWebhookReady(namespace string) error {
 		"scheduledbackups.postgresql.k8s.enterprisedb.io",
 	}
 
+	ctx := context.Background()
 	for _, c := range customResourceDefinitionsName {
 		crd, err := env.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
 			ctx, c, metav1.GetOptions{})
