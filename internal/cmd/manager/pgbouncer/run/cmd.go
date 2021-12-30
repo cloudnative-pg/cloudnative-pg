@@ -9,6 +9,7 @@ package run
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -108,7 +109,8 @@ func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedNam
 	stderrWriter := &pgBouncerLogWriter{
 		Logger: log.WithValues(execlog.PipeKey, execlog.StdErr),
 	}
-	err = execlog.RunStreamingNoWaitWithWriter(pgBouncerCmd, pgBouncerCommandName, stdoutWriter, stderrWriter)
+	streamingCmd, err := execlog.RunStreamingNoWaitWithWriter(
+		pgBouncerCmd, pgBouncerCommandName, stdoutWriter, stderrWriter)
 	if err != nil {
 		return fmt.Errorf("running pgbouncer: %w", err)
 	}
@@ -116,8 +118,14 @@ func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedNam
 	startReconciler(ctx, reconciler)
 	registerSignalHandler(reconciler, pgBouncerCmd)
 
-	if err = pgBouncerCmd.Wait(); err != nil {
-		return fmt.Errorf("pgbouncer exited with errors: %w", err)
+	if err = streamingCmd.Wait(); err != nil {
+		var exitError *exec.ExitError
+		if !errors.As(err, &exitError) {
+			log.Error(err, "Error waiting on pgbouncer process")
+		} else {
+			log.Error(exitError, "pgbouncer process exited with errors")
+		}
+		return err
 	}
 
 	return nil
