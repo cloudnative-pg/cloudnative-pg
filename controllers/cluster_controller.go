@@ -10,6 +10,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
 	goruntime "runtime"
 	"time"
 
@@ -93,39 +94,21 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
 	}()
 
-	var cluster apiv1.Cluster
-	if err := r.Get(ctx, req.NamespacedName, &cluster); err != nil {
-		// This also happens when you delete a Cluster resource in k8s. If
-		// that's the case, let's just wait for the Kubernetes garbage collector
-		// to remove all the Pods of the cluster.
-		if apierrs.IsNotFound(err) {
-			contextLogger.Info("Resource has been deleted")
+	cluster, err := r.getCluster(ctx, req)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-			if err := r.deleteDanglingMonitoringConfigMaps(ctx, req.Namespace); err != nil && !apierrs.IsNotFound(err) {
-				contextLogger.Error(
-					err,
-					"error while deleting dangling monitoring configMap",
-					"configMapName", apiv1.DefaultMonitoringConfigMapName,
-					"namespace", req.Namespace,
-				)
-			}
-
-			return ctrl.Result{}, nil
+	if cluster == nil {
+		if err := r.deleteDanglingMonitoringConfigMaps(ctx, req.Namespace); err != nil {
+			contextLogger.Error(
+				err,
+				"error while deleting dangling monitoring configMap",
+				"configMapName", apiv1.DefaultMonitoringConfigMapName,
+				"namespace", req.Namespace,
+			)
 		}
-
-		// This is a real error, maybe the RBAC configuration is wrong?
-		return ctrl.Result{}, fmt.Errorf("cannot get the managed resource: %w", err)
-	}
-
-	var namespace corev1.Namespace
-	if err := r.Get(ctx, client.ObjectKey{Namespace: "", Name: req.Namespace}, &namespace); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot get the containing namespace: %w", err)
-	}
-
-	if !namespace.DeletionTimestamp.IsZero() {
-		// This happens when you delete a namespace containing a Cluster resource. If that's the case,
-		// let's just wait for the Kubernetes to remove all object in the namespace.
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, err
 	}
 
 	if utils.IsReconciliationDisabled(&cluster.ObjectMeta) {
@@ -134,10 +117,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Make sure default values are populated.
-	cluster.SetDefaults()
+	err = r.setDefaults(ctx, cluster)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Ensure we have the required global objects
-	if err := r.createPostgresClusterObjects(ctx, &cluster); err != nil {
+	if err := r.createPostgresClusterObjects(ctx, cluster); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot create Cluster auxiliary objects: %w", err)
 	}
 
@@ -149,7 +135,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Update the status section of this Cluster resource
-	if err = r.updateResourceStatus(ctx, &cluster, resources); err != nil {
+	if err = r.updateResourceStatus(ctx, cluster, resources); err != nil {
 		if apierrs.IsConflict(err) {
 			// Requeue a new reconciliation cycle, as in this point we need
 			// to quickly react the changes
@@ -188,7 +174,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// We cannot merge this code with updateResourceStatus because
 	// it needs to run after retrieving the status from the pods,
 	// which is a time-expensive operation.
-	if err = r.updateOnlineUpdateEnabled(ctx, &cluster, onlineUpdateEnabled); err != nil {
+	if err = r.updateOnlineUpdateEnabled(ctx, cluster, onlineUpdateEnabled); err != nil {
 		if apierrs.IsConflict(err) {
 			// Requeue a new reconciliation cycle, as in this point we need
 			// to quickly react the changes
@@ -200,7 +186,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Update the target primary name from the Pods status.
 	// This means issuing a failover or switchover when needed.
-	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, &cluster, instancesStatus, resources)
+	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, cluster, instancesStatus, resources)
 	if err != nil {
 		if err == ErrWalReceiversRunning {
 			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
@@ -219,7 +205,56 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Updates all the objects managed by the controller
-	return r.reconcileResources(ctx, &cluster, resources, instancesStatus)
+	return r.reconcileResources(ctx, cluster, resources, instancesStatus)
+}
+
+func (r *ClusterReconciler) getCluster(
+	ctx context.Context,
+	req ctrl.Request,
+) (*apiv1.Cluster, error) {
+	contextLogger := log.FromContext(ctx)
+	cluster := &apiv1.Cluster{}
+	if err := r.Get(ctx, req.NamespacedName, cluster); err != nil {
+		// This also happens when you delete a Cluster resource in k8s. If
+		// that's the case, let's just wait for the Kubernetes garbage collector
+		// to remove all the Pods of the cluster.
+		if apierrs.IsNotFound(err) {
+			contextLogger.Info("Resource has been deleted")
+			return nil, nil
+		}
+
+		// This is a real error, maybe the RBAC configuration is wrong?
+		return nil, fmt.Errorf("cannot get the managed resource: %w", err)
+	}
+
+	var namespace corev1.Namespace
+	if err := r.Get(ctx, client.ObjectKey{Namespace: "", Name: req.Namespace}, &namespace); err != nil {
+		// This is a real error, maybe the RBAC configuration is wrong?
+		return nil, fmt.Errorf("cannot get the containing namespace: %w", err)
+	}
+
+	if !namespace.DeletionTimestamp.IsZero() {
+		// This happens when you delete a namespace containing a Cluster resource. If that's the case,
+		// let's just wait for the Kubernetes to remove all object in the namespace.
+		return nil, nil
+	}
+
+	return cluster, nil
+}
+
+func (r *ClusterReconciler) setDefaults(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+	originCluster := cluster.DeepCopy()
+	cluster.SetDefaults()
+	if !reflect.DeepEqual(originCluster.Spec, cluster.Spec) {
+		contextLogger.Info("Admission controllers (webhooks) appear to have been disabled. " +
+			"Please enable them for this object/namespace")
+		err := r.Patch(ctx, cluster, client.MergeFrom(originCluster))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // reconcileResources updates all the objects managed by the controller
