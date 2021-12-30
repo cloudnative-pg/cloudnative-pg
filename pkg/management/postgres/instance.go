@@ -316,7 +316,7 @@ func (instance *Instance) Reload() error {
 
 // Run this instance returning an OS process needed
 // to control the instance execution
-func (instance Instance) Run() (*os.Process, error) {
+func (instance Instance) Run() (*execlog.StreamingCmd, error) {
 	process, err := instance.CheckForExistingPostmaster(postgresName)
 	if err != nil {
 		return nil, err
@@ -329,7 +329,7 @@ func (instance Instance) Run() (*os.Process, error) {
 	// any harm because PostgreSQL stops writing on stdout/stderr
 	// when the logging collector starts.
 	if process != nil {
-		return process, nil
+		return execlog.StreamingCmdFromProcess(process), nil
 	}
 
 	// We don't have a postmaster running and we need to create
@@ -349,12 +349,12 @@ func (instance Instance) Run() (*os.Process, error) {
 	postgresCmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
-	err = execlog.RunStreamingNoWait(postgresCmd, postgresName)
+	streamingCmd, err := execlog.RunStreamingNoWait(postgresCmd, postgresName)
 	if err != nil {
 		return nil, err
 	}
 
-	return postgresCmd.Process, nil
+	return streamingCmd, nil
 }
 
 // WithActiveInstance execute the internal function while this

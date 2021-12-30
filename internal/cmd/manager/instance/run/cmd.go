@@ -9,8 +9,9 @@ package run
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -136,14 +137,14 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	primary, err := instance.IsPrimary()
 	if err != nil {
 		log.Error(err, "Error while getting the primary status")
-		os.Exit(1)
+		return err
 	}
 
 	if !primary {
 		err = reconciler.RefreshReplicaConfiguration(ctx)
 		if err != nil {
 			log.Error(err, "Error while creating the replica configuration")
-			os.Exit(1)
+			return err
 		}
 	}
 
@@ -151,7 +152,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 
 	instance.LogPgControldata()
 
-	postgresProcess, err := instance.Run()
+	streamingCmd, err := instance.Run()
 	if err != nil {
 		log.Error(err, "Unable to start PostgreSQL up")
 		return err
@@ -159,19 +160,18 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 
 	registerSignalHandler(reconciler, cluster.GetMaxStopDelay())
 
-	state, err := postgresProcess.Wait()
-	if err != nil {
-		log.Error(err, "Error waiting on PostgreSQL process")
-	}
-	if !state.Success() {
-		err = fmt.Errorf("exit status %v", state.ExitCode())
-		log.Error(err, "PostgreSQL process exited with errors")
-		return err
+	if err = streamingCmd.Wait(); err != nil {
+		var exitError *exec.ExitError
+		if !errors.As(err, &exitError) {
+			log.Error(err, "Error waiting on PostgreSQL process")
+		} else {
+			log.Error(exitError, "PostgreSQL process exited with errors")
+		}
 	}
 
 	instance.LogPgControldata()
 
-	return nil
+	return err
 }
 
 // startWebServer start the web server for handling probes given
