@@ -116,8 +116,9 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 	namespace,
 	externalClusterName,
 	sourceClusterName,
-	azStorageAccount,
-	targetTime string,
+	targetTime,
+	storageCredentialsSecretName,
+	azStorageAccount string,
 	env *TestingEnvironment) error {
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/", azStorageAccount, sourceClusterName)
@@ -164,13 +165,13 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 						AzureCredentials: &apiv1.AzureCredentials{
 							StorageAccount: &apiv1.SecretKeySelector{
 								LocalObjectReference: apiv1.LocalObjectReference{
-									Name: "backup-storage-creds",
+									Name: storageCredentialsSecretName,
 								},
 								Key: "ID",
 							},
 							StorageKey: &apiv1.SecretKeySelector{
 								LocalObjectReference: apiv1.LocalObjectReference{
-									Name: "backup-storage-creds",
+									Name: storageCredentialsSecretName,
 								},
 								Key: "KEY",
 							},
@@ -329,11 +330,6 @@ func ComposeAzBlobListAzuriteCmd(clusterName string, path string) string {
 	return fmt.Sprintf("az storage blob list --container-name %v --query \"[?contains(@.name, \\`%v\\`)].name\" "+
 		"--connection-string $AZURE_CONNECTION_STRING",
 		clusterName, path)
-}
-
-// ComposeFindMinioCmd builds the Minio find command
-func ComposeFindMinioCmd(path string, serviceName string) string {
-	return fmt.Sprintf("sh -c 'mc find %v --name %v | wc -l'", serviceName, path)
 }
 
 // ComposeAzBlobListCmd builds the Azure storage blob list command

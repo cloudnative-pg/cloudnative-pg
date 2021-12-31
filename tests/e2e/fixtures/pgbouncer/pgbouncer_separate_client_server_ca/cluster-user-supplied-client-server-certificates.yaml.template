@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: pgbouncer-separate-client-server-ca
 spec:
-  instances: 3
+  instances: 2
 
   postgresql:
     parameters:

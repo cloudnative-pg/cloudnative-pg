@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
@@ -77,7 +78,7 @@ var _ = Describe("Synchronous Replicas", func() {
 				Expect(err).ToNot(HaveOccurred())
 				query := "SELECT count(*) from pg_stat_replication WHERE sync_state = 'quorum'"
 				out, _, err := env.ExecCommand(
-					env.Ctx, primaryPod, "postgres", &timeout,
+					env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
 					"psql", "-U", "postgres", "-tAc", query)
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr

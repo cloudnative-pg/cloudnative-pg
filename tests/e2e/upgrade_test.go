@@ -22,6 +22,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
@@ -155,7 +156,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
 				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandTimeout,
+					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 						"psql", "-U", "postgres", "-tAc", "show max_replication_slots")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
 					return value, err, atoiErr
@@ -163,7 +164,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 					"Pod %v should have updated its config", pod.Name)
 
 				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandTimeout,
+					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 						"psql", "-U", "postgres", "-tAc", "show maintenance_work_mem")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
 					return value, err, atoiErr
@@ -196,7 +197,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).ToNot(HaveOccurred())
 
 			commandTimeout := time.Second * 2
-			_, _, err = env.ExecCommand(env.Ctx, *primary, "postgres", &commandTimeout,
+			_, _, err = env.ExecCommand(env.Ctx, *primary, specs.PostgresContainerName, &commandTimeout,
 				"psql", "-U", "postgres", "appdb", "-tAc", "CREATE TABLE postswitch(i int)")
 			Expect(err).ToNot(HaveOccurred())
 
@@ -211,7 +212,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 					if err := env.Client.Get(env.Ctx, podNamespacedName, pod); err != nil {
 						return "", err
 					}
-					out, _, err := env.ExecCommand(env.Ctx, *pod, "postgres",
+					out, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
 						&commandTimeout, "psql", "-U", "postgres", "appdb", "-tAc",
 						"SELECT count(*) = 0 FROM postswitch")
 					return strings.TrimSpace(out), err

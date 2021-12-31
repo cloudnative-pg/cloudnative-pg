@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
@@ -126,7 +127,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 			}
 			err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
 			Expect(err).ToNot(HaveOccurred())
-			_, _, err = env.ExecCommand(env.Ctx, *primaryPod, "postgres",
+			_, _, err = env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -153,7 +154,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 			Eventually(func() (string, error) {
 				primaryPod := &corev1.Pod{}
 				err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
-				out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, "postgres",
+				out, _, _ := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
 					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
 					"SELECT count(*) > 0 FROM tps.tl")
 				return strings.TrimSpace(out), err

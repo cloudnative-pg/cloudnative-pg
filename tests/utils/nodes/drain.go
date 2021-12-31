@@ -62,12 +62,17 @@ func DrainPrimaryNode(namespace string, clusterName string, env *utils.TestingEn
 }
 
 // UncordonAllNodes executes the 'kubectl uncordon' command on each node of the list
-func UncordonAllNodes(env *utils.TestingEnvironment) {
+func UncordonAllNodes(env *utils.TestingEnvironment) error {
 	nodeList, err := env.GetNodeList()
-	Expect(err).ToNot(HaveOccurred())
+	if err != nil {
+		return err
+	}
 	for _, node := range nodeList.Items {
 		command := fmt.Sprintf("kubectl uncordon %v", node.Name)
 		_, _, err = utils.Run(command)
-		Expect(err).ToNot(HaveOccurred())
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }

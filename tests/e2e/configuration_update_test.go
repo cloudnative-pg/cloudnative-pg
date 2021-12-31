@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
@@ -65,7 +66,7 @@ var _ = Describe("Configuration update", func() {
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
 				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandtimeout,
 						"psql", "-U", "postgres", "-tAc", "show work_mem")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
 					return value, err, atoiErr
@@ -80,7 +81,7 @@ var _ = Describe("Configuration update", func() {
 			// Connection should fail now because we are not supplying a password
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			stdout, _, err := env.ExecCommand(env.Ctx, podList.Items[0], "postgres", &commandtimeout,
+			stdout, _, err := env.ExecCommand(env.Ctx, podList.Items[0], specs.PostgresContainerName, &commandtimeout,
 				"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1")
 			Expect(err).To(HaveOccurred())
 			// Update the configuration
@@ -90,7 +91,7 @@ var _ = Describe("Configuration update", func() {
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
 				Eventually(func() (string, error) {
-					stdout, _, err = env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+					stdout, _, err = env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandtimeout,
 						"psql", "-U", "postgres", "-tAc",
 						"select count(*) from pg_hba_file_rules where type = 'host' and auth_method = 'trust'")
 					return strings.Trim(stdout, "\n"), err
@@ -98,7 +99,7 @@ var _ = Describe("Configuration update", func() {
 			}
 			// The connection should work now
 			Eventually(func() (int, error, error) {
-				stdout, _, err = env.ExecCommand(env.Ctx, podList.Items[0], "postgres", &commandtimeout,
+				stdout, _, err = env.ExecCommand(env.Ctx, podList.Items[0], specs.PostgresContainerName, &commandtimeout,
 					"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1")
 				value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
 				return value, err, atoiErr
@@ -126,7 +127,7 @@ var _ = Describe("Configuration update", func() {
 			for _, pod := range podList.Items {
 				pod := pod
 				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandtimeout,
 						"psql", "-U", "postgres", "-tAc", "show shared_buffers")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
 					return value, err, atoiErr
@@ -161,14 +162,14 @@ var _ = Describe("Configuration update", func() {
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
 				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandtimeout,
 						"psql", "-U", "postgres", "-tAc", "show max_replication_slots")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
 					return value, err, atoiErr
 				}, timeout).Should(BeEquivalentTo(16))
 
 				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandtimeout,
 						"psql", "-U", "postgres", "-tAc", "show maintenance_work_mem")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
 					return value, err, atoiErr
@@ -194,7 +195,7 @@ var _ = Describe("Configuration update", func() {
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
 				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandtimeout,
 						"psql", "-U", "postgres", "-tAc", "show autovacuum_max_workers")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
 					return value, err, atoiErr
@@ -215,7 +216,7 @@ var _ = Describe("Configuration update", func() {
 			for _, pod := range podList.Items {
 				pod := pod
 				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandtimeout,
+					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandtimeout,
 						"psql", "-U", "postgres", "-tAc", "show autovacuum_max_workers")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
 					return value, err, atoiErr

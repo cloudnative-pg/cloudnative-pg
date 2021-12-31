@@ -9,6 +9,10 @@ package e2e
 import (
 	"regexp"
 
+	corev1 "k8s.io/api/core/v1"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
@@ -52,7 +56,11 @@ var _ = Describe("PGBouncer Metrics", func() {
 
 			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthRWSampleFile, 1)
 
-			podList, err := utils.GetPGBouncerPodList(namespace, poolerBasicAuthRWSampleFile, env)
+			poolerName, err := env.GetResourceNameFromYAML(poolerBasicAuthRWSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			podList := &corev1.PodList{}
+			err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
+				ctrlclient.MatchingLabels{pgbouncer.PgbouncerNameLabel: poolerName})
 			Expect(err).ToNot(HaveOccurred())
 
 			metricsRegexp := regexp.MustCompile(

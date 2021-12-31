@@ -17,7 +17,9 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -103,13 +105,13 @@ var _ = Describe("Failover", func() {
 			timeout := time.Second * 2
 			query := "SELECT pid FROM pg_stat_activity WHERE backend_type = 'walreceiver'"
 			out, _, err := env.ExecCommand(
-				env.Ctx, pausedPod, "postgres", &timeout,
+				env.Ctx, pausedPod, specs.PostgresContainerName, &timeout,
 				"psql", "-U", "postgres", "-tAc", query)
 			Expect(err).ToNot(HaveOccurred())
 			pid = strings.Trim(out, "\n")
 
 			// Send the SIGSTOP
-			_, _, err = env.ExecCommand(env.Ctx, pausedPod, "postgres", &timeout,
+			_, _, err = env.ExecCommand(env.Ctx, pausedPod, specs.PostgresContainerName, &timeout,
 				"kill", "-STOP", pid)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -125,13 +127,13 @@ var _ = Describe("Failover", func() {
 			query = fmt.Sprintf("SELECT pg_terminate_backend(pid) FROM pg_stat_replication "+
 				"WHERE application_name = '%v'", pausedReplica)
 			_, _, err = env.ExecCommand(
-				env.Ctx, primaryPod, "postgres", &timeout,
+				env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
 				"psql", "-U", "postgres", "-tAc", query)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Expect the primary to have lost connection with the stopped standby
 			timeout = time.Second * 60
-			Eventually(func() (string, error) {
+			Eventually(func() (int, error) {
 				namespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      currentPrimary,
@@ -139,12 +141,8 @@ var _ = Describe("Failover", func() {
 				primaryPod := corev1.Pod{}
 				err := env.Client.Get(env.Ctx, namespacedName, &primaryPod)
 				Expect(err).ToNot(HaveOccurred())
-				query := "SELECT count(*) FROM pg_stat_replication"
-				out, _, err := env.ExecCommand(
-					env.Ctx, primaryPod, "postgres", &timeout,
-					"psql", "-U", "postgres", "-tAc", query)
-				return strings.Trim(out, "\n"), err
-			}, timeout).Should(BeEquivalentTo("1"))
+				return utils.CountReplicas(env, &primaryPod)
+			}, timeout).Should(BeEquivalentTo(1))
 		})
 
 		// Perform a CHECKPOINT on the primary and wait for the working standby
@@ -161,12 +159,12 @@ var _ = Describe("Failover", func() {
 			// Get the current lsn
 			timeout := time.Second * 2
 			initialLSN, _, err := env.ExecCommand(
-				env.Ctx, primaryPod, "postgres", &timeout,
+				env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
 				"psql", "-U", "postgres", "-tAc", "SELECT pg_current_wal_lsn()")
 			Expect(err).ToNot(HaveOccurred())
 
 			_, _, err = env.ExecCommand(
-				env.Ctx, primaryPod, "postgres", &timeout,
+				env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
 				"psql", "-U", "postgres", "-c", "CHECKPOINT")
 			Expect(err).ToNot(HaveOccurred())
 
@@ -181,7 +179,7 @@ var _ = Describe("Failover", func() {
 					"WHERE application_name = '%v' AND replay_lsn > '%v'",
 					targetPrimary, strings.Trim(initialLSN, "\n"))
 				out, _, err := env.ExecCommand(
-					env.Ctx, primaryPod, "postgres", &timeout,
+					env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
 					"psql", "-U", "postgres", "-tAc", query)
 				return strings.TrimSpace(out), err
 			}, timeout).Should(BeEquivalentTo("t"))
@@ -219,7 +217,7 @@ var _ = Describe("Failover", func() {
 			err = env.Client.Get(env.Ctx, namespacedPausedPodName, &pausedPod)
 			Expect(err).ToNot(HaveOccurred())
 			commandTimeout := time.Second * 2
-			_, _, err = env.ExecCommand(env.Ctx, pausedPod, "postgres",
+			_, _, err = env.ExecCommand(env.Ctx, pausedPod, specs.PostgresContainerName,
 				&commandTimeout, "kill", "-CONT", pid)
 			Expect(err).ToNot(HaveOccurred())
 

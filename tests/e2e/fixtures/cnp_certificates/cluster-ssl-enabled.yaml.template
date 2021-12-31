@@ -19,6 +19,12 @@ spec:
     pg_hba:
       - hostssl all all all cert
 
+  certificates:
+    serverCASecret: ""
+    serverTLSSecret: ""
+    clientCASecret: ""
+    replicationTLSSecret: ""
+
   bootstrap:
     initdb:
       database: app

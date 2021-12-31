@@ -4,4 +4,4 @@ metadata:
   name: cluster-backup
 spec:
   cluster:
-    name: source-cluster-azure-pitr-sas
+    name: pg-backup-azure-blob-sas

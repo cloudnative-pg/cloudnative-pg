@@ -31,7 +31,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 		sampleFile             = fixturesDir + "/base/cluster-basic.yaml"
 		operatorNamespace      = "postgresql-operator-system"
 		level                  = tests.Highest
-		patchMuatingWebhook    = `kubectl patch mutatingwebhookconfigurations/postgresql-operator-mutating-webhook-configuration -p '{"webhooks":[{"name":"mcluster.kb.io","namespaceSelector":{"matchLabels":{"test":"value"}}}]}'`     //nolint
+		patchMutatingWebhook   = `kubectl patch mutatingwebhookconfigurations/postgresql-operator-mutating-webhook-configuration -p '{"webhooks":[{"name":"mcluster.kb.io","namespaceSelector":{"matchLabels":{"test":"value"}}}]}'`     //nolint
 		patchValidatingWebhook = `kubectl patch validatingwebhookconfigurations/postgresql-operator-validating-webhook-configuration -p '{"webhooks":[{"name":"vcluster.kb.io","namespaceSelector":{"matchLabels":{"test":"value"}}}]}'` //nolint
 	)
 
@@ -77,7 +77,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 		clusterIsDefaulted = true
 		// Delete the Webhooks (validation and mutation)
 		By(fmt.Sprintf("Disabling the mutating webhook %v namespace", operatorNamespace), func() {
-			_, _, err := testsUtils.Run(patchMuatingWebhook)
+			_, _, err := testsUtils.Run(patchMutatingWebhook)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
