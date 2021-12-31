@@ -15,6 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
@@ -76,15 +77,9 @@ var _ = Describe("Replica Mode", func() {
 
 			err = env.CreateNamespace(replicaNamespace)
 			Expect(err).ToNot(HaveOccurred())
-			// Create a cluster first
-			By("creating a replica cluster", func() {
-				AssertReplicaModeCluster(replicaNamespace, srcClusterName, srcClusterSample,
-					replicaClusterName, replicaClusterSampleBasicAuth, checkQuery)
 
-				// Get primary from replica cluster
-				primaryReplicaCluster, err = env.GetClusterPrimary(replicaNamespace, replicaClusterName)
-				Expect(err).ToNot(HaveOccurred())
-			})
+			AssertReplicaModeCluster(replicaNamespace, srcClusterName, srcClusterSample,
+				replicaClusterName, replicaClusterSampleBasicAuth, checkQuery)
 
 			By("disabling the replica mode", func() {
 				_, _, err = utils.Run(fmt.Sprintf(
@@ -94,21 +89,19 @@ var _ = Describe("Replica Mode", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("verifying that replica designated primary has become an active primary", func() {
-				query := "select pg_is_in_recovery();"
-				Eventually(func() (string, error) {
-					stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, "postgres",
-						&replicaCommandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-					return strings.Trim(stdOut, "\n"), err
-				}, 300, 15).Should(BeEquivalentTo("f"))
-			})
-
 			By("verifying write operation on the replica cluster primary pod", func() {
 				query := "CREATE TABLE replica_cluster_primary AS VALUES (1), (2);"
 				// Expect write operation to succeed
-				_, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, "postgres",
-					&replicaCommandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					// Get primary from replica cluster
+					primaryReplicaCluster, err = env.GetClusterPrimary(replicaNamespace, replicaClusterName)
+					if err != nil {
+						return err
+					}
+					_, _, err = env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
+						&replicaCommandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+					return err
+				}, 300, 15).ShouldNot(HaveOccurred())
 			})
 
 			By("writing some new data to the source cluster", func() {
@@ -135,12 +128,17 @@ var _ = Describe("Replica Mode", func() {
 				AssertStorageCredentialsAreCreated(replicaNamespace, "backup-storage-creds", "minio", "minio123")
 			})
 			By("setting up minio", func() {
-				InstallMinio(replicaNamespace, "/backup/minio/minio-deployment.yaml")
+				minio, err := utils.MinioDefaultSetup(replicaNamespace)
+				Expect(err).ToNot(HaveOccurred())
+				err = utils.InstallMinio(env, minio, 300)
+				Expect(err).ToNot(HaveOccurred())
 			})
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
-				InstallMinioClient(replicaNamespace, "/backup/minio/minio-client.yaml")
+				minioClient := utils.MinioDefaultClient(replicaNamespace)
+				err := utils.PodCreateAndWaitForReady(env, &minioClient, 240)
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			AssertReplicaModeCluster(replicaNamespace, srcClusterName, srcClusterSample, replicaClusterName,
@@ -155,7 +153,7 @@ var _ = Describe("Replica Mode", func() {
 			By("verify archive mode is set to 'always on' designated primary", func() {
 				query := "show archive_mode;"
 				Eventually(func() (string, error) {
-					stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, "postgres",
+					stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
 						&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 					return strings.Trim(stdOut, "\n"), err
 				}, 30).Should(BeEquivalentTo("always"))

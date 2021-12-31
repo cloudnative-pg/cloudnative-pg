@@ -28,6 +28,7 @@ import (
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -162,7 +163,7 @@ func (env TestingEnvironment) ExecCommand(
 	return utils.ExecCommand(ctx, env.Interface, env.RestClientConfig, pod, containerName, timeout, command...)
 }
 
-// GetOperatorDeployment returns the operator deployment if there is a single one running, error otherwise
+// GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
 func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error) {
 	const operatorDeploymentName = "postgresql-operator-controller-manager"
 	deploymentList := &appsv1.DeploymentList{}
@@ -252,7 +253,7 @@ func (env TestingEnvironment) GetOperatorPod() (corev1.Pod, error) {
 	return podList.Items[0], nil
 }
 
-// GetOperatorNamespaceName returns the namespace the operator deployment is running in
+// GetOperatorNamespaceName returns the namespace the operator Deployment is running in
 func (env TestingEnvironment) GetOperatorNamespaceName() (string, error) {
 	deployment, err := env.GetOperatorDeployment()
 	if err != nil {
@@ -507,7 +508,7 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 		}
 	}
 
-	// Dry run object creation to check that webhook service is correctly running
+	// Dry run object creation to check that webhook Service is correctly running
 	testCluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "readiness-check-" + rand.String(5),
@@ -657,18 +658,11 @@ func (env TestingEnvironment) GetResourceNamespacedNameFromYAML(path string) (ty
 	if err != nil {
 		return types.NamespacedName{}, err
 	}
-	switch o := obj.(type) {
-	case *apiv1.ScheduledBackup:
-		return types.NamespacedName{Namespace: o.GetNamespace(), Name: o.GetName()}, nil
-	case *apiv1.Backup:
-		return types.NamespacedName{Namespace: o.GetNamespace(), Name: o.GetName()}, nil
-	case *apiv1.Cluster:
-		return types.NamespacedName{Namespace: o.GetNamespace(), Name: o.GetName()}, nil
-	case *apiv1.Pooler:
-		return types.NamespacedName{Namespace: o.GetNamespace(), Name: o.GetName()}, nil
-	default:
-		return types.NamespacedName{}, fmt.Errorf("unknown resource type: %T", o)
+	objectMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return types.NamespacedName{}, err
 	}
+	return types.NamespacedName{Namespace: objectMeta.GetNamespace(), Name: objectMeta.GetName()}, nil
 }
 
 // GetResourceNameFromYAML returns the name of a resource in a YAML file
@@ -699,7 +693,7 @@ func (env TestingEnvironment) GetPoolerList(namespace string) (*apiv1.PoolerList
 	return poolerList, err
 }
 
-// DumpPoolerResourcesInfo logs the JSON for the pooler resources in a namespace, its pods, deployment,
+// DumpPoolerResourcesInfo logs the JSON for the pooler resources in a namespace, its pods, Deployment,
 // services and endpoints
 func (env TestingEnvironment) DumpPoolerResourcesInfo(namespace, currentTestName string) {
 	poolerList, err := env.GetPoolerList(namespace)
@@ -736,11 +730,11 @@ func (env TestingEnvironment) DumpPoolerResourcesInfo(namespace, currentTestName
 			_, _ = fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
 			_, _ = fmt.Fprintln(w, string(out))
 
-			// dump pooler service info
+			// dump pooler Service info
 			service := &corev1.Service{}
 			_ = env.Client.Get(env.Ctx, namespacedName, service)
 			out, _ = json.MarshalIndent(service, "", "    ")
-			_, _ = fmt.Fprintf(w, "Dumping %v/%v service\n", namespace, service.Name)
+			_, _ = fmt.Fprintf(w, "Dumping %v/%v Service\n", namespace, service.Name)
 			_, _ = fmt.Fprintln(w, string(out))
 
 			// dump pooler pods info
@@ -753,11 +747,11 @@ func (env TestingEnvironment) DumpPoolerResourcesInfo(namespace, currentTestName
 				_, _ = fmt.Fprintln(w, string(out))
 			}
 
-			// dump deployment info
+			// dump Deployment info
 			deployment := &appsv1.Deployment{}
 			_ = env.Client.Get(env.Ctx, namespacedName, deployment)
 			out, _ = json.MarshalIndent(deployment, "", "    ")
-			_, _ = fmt.Fprintf(w, "Dumping %v/%v deployment\n", namespace, deployment.Name)
+			_, _ = fmt.Fprintf(w, "Dumping %v/%v Deployment\n", namespace, deployment.Name)
 			_, _ = fmt.Fprintln(w, string(out))
 		}
 	} else {

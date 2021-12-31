@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 )
 
@@ -176,7 +177,7 @@ var _ = Describe("Disabling superuser password", func() {
 			timeout := time.Second * 10
 			// We should have the `postgres` user with a null password
 			Eventually(func() string {
-				stdout, _, err := env.ExecCommand(env.Ctx, *pod, "postgres", &timeout,
+				stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &timeout,
 					"psql", "-U", "postgres", "-tAc",
 					"SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres'")
 				if err != nil {
@@ -282,7 +283,7 @@ var _ = Describe("Creating a cluster without superuser password", func() {
 			timeout := time.Second * 10
 			// We should have the `postgres` user with a null password
 			Eventually(func() string {
-				stdout, _, err := env.ExecCommand(env.Ctx, *pod, "postgres", &timeout,
+				stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &timeout,
 					"psql", "-U", "postgres", "-tAc",
 					"SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres'")
 				if err != nil {
