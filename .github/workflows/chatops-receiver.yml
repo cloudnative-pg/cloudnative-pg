@@ -27,6 +27,7 @@ jobs:
           ref: ${{ steps.vars.outputs.ref }}
           display-workflow-run-url: true
           wait-for-completion: false
+          inputs: '{"pull_request_number":"${{ github.event.client_payload.github.payload.issue.number }}"}'
       - name: Create comment
         uses: peter-evans/create-or-update-comment@v1
         with:
