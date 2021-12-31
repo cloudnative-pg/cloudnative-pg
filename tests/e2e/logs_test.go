@@ -19,6 +19,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
@@ -79,7 +80,7 @@ var _ = Describe("JSON log output", func() {
 			for _, pod := range podList.Items {
 				// Run a wrong query and save its result
 				commandTimeout := time.Second * 5
-				_, _, err = env.ExecCommand(env.Ctx, pod, "postgres",
+				_, _, err = env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName,
 					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", errorTestQuery)
 				Expect(err).To(HaveOccurred())
 				expectedResult := err.Error()
@@ -106,7 +107,7 @@ var _ = Describe("JSON log output", func() {
 
 			// Run a wrong query on just the primary and save its result
 			commandTimeout := time.Second * 5
-			_, _, err = env.ExecCommand(env.Ctx, *primaryPod, "postgres",
+			_, _, err = env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", errorTestQuery)
 			Expect(err).To(HaveOccurred())
 			expectedResult := err.Error()

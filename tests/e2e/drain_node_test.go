@@ -52,7 +52,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 	AfterEach(func() {
 		// Uncordon the cordoned nodes and remove the labels we added in the
 		// BeforeEach section
-		nodes.UncordonAllNodes(env)
+		err := nodes.UncordonAllNodes(env)
+		Expect(err).ToNot(HaveOccurred())
 		for _, node := range nodesWithLabels {
 			cmd := fmt.Sprintf("kubectl label node %v drain- ", node)
 			_, _, err := testsUtils.Run(cmd)
@@ -148,7 +149,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 			})
 
 			By("uncordon nodes and check new pods use old pvcs", func() {
-				nodes.UncordonAllNodes(env)
+				err := nodes.UncordonAllNodes(env)
+				Expect(err).ToNot(HaveOccurred())
 				// Ensure evicted pods have restarted and are running.
 				// one of them could have become the new primary.
 				timeout := 300
@@ -165,6 +167,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 
 					pod := corev1.Pod{}
 					err = env.Client.Get(env.Ctx, namespacedName, &pod)
+					Expect(err).ToNot(HaveOccurred())
 					// Check that the PVC UID hasn't changed
 					pvc := corev1.PersistentVolumeClaim{}
 					err = env.Client.Get(env.Ctx, namespacedName, &pvc)
@@ -401,7 +404,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 			Expect(err).ToNot(HaveOccurred())
 			AssertDataExpectedCount(namespace, primary.GetName(), "test", 2)
 			assertClusterStandbysAreStreaming(namespace, clusterName)
-			nodes.UncordonAllNodes(env)
+			err = nodes.UncordonAllNodes(env)
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 })

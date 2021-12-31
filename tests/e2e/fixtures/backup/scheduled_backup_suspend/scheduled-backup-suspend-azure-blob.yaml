@@ -6,5 +6,5 @@ spec:
   # Every minute
   schedule: "0 * * * * *"
   cluster:
-    name: scheduled-backups-suspend-azure
+    name: pg-backup-azure-blob
   suspend: false
