@@ -17,6 +17,9 @@ on:
       test_level:
         description: 'Test level (0-4)'
         required: false
+      pull_request_number:
+        description: 'Reserved for workflow triggered by pull request, ignore it when manually invoke'
+        required: false
   schedule:
     - cron:  '0 1 * * *'
 
