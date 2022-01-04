@@ -593,6 +593,15 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 		return nil
 	}
 
+	if cluster.Namespace == configuration.Current.OperatorNamespace {
+		contextLogger.Debug(
+			"skipping default metrics synchronization. The cluster resides in the same namespace of the operator",
+			"clusterNamespace", cluster.Namespace,
+			"clusterName", cluster.Name,
+		)
+		return nil
+	}
+
 	// we clone the configmap in the cluster namespace
 	var targetConfigMap corev1.ConfigMap
 	if err := r.Get(ctx,
