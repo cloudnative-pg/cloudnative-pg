@@ -165,6 +165,38 @@ func (builder *Builder) WithServiceAccountName(name string, overwrite bool) *Bui
 	return builder
 }
 
+// WithLivenessProbe add the provided liveness probe to a container
+func (builder *Builder) WithLivenessProbe(name string, livenessProbe *corev1.Probe, overwrite bool) *Builder {
+	builder.WithContainer(name)
+
+	for idxContainer, container := range builder.status.Spec.Containers {
+		if container.Name == name {
+			if container.LivenessProbe == nil || overwrite {
+				builder.status.Spec.Containers[idxContainer].LivenessProbe = livenessProbe
+			}
+			return builder
+		}
+	}
+
+	return builder
+}
+
+// WithReadinessProbe add the provided readiness probe to a container
+func (builder *Builder) WithReadinessProbe(name string, readinessProbe *corev1.Probe, overwrite bool) *Builder {
+	builder.WithContainer(name)
+
+	for idxContainer, container := range builder.status.Spec.Containers {
+		if container.Name == name {
+			if container.ReadinessProbe == nil || overwrite {
+				builder.status.Spec.Containers[idxContainer].ReadinessProbe = readinessProbe
+			}
+			return builder
+		}
+	}
+
+	return builder
+}
+
 // WithContainerCommand ensures that, if in the current status there is
 // a container with the passed name and the command is empty, the command will be
 // set to the one passed.
