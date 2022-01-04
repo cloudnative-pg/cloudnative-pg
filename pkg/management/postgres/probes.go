@@ -73,35 +73,20 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	}
 
 	row := superUserDB.QueryRow(
-		"SELECT system_identifier FROM pg_control_system()")
-	err = row.Scan(&result.SystemID)
+		`SELECT
+			(pg_control_system()).system_identifier,
+			-- True if this is a primary instance
+			NOT pg_is_in_recovery() as primary,
+			-- True if at least one column requires a restart
+			EXISTS(SELECT 1 FROM pg_settings WHERE pending_restart),
+			-- The size of database in human readable format
+			(SELECT pg_size_pretty(SUM(pg_database_size(oid))) FROM pg_database)`)
+	err = row.Scan(&result.SystemID, &result.IsPrimary, &result.PendingRestart, &result.TotalInstanceSize)
 	if err != nil {
 		return nil, err
 	}
-
-	row = superUserDB.QueryRow(
-		"SELECT NOT pg_is_in_recovery()")
-	err = row.Scan(&result.IsPrimary)
-	if err != nil {
-		return nil, err
-	}
-
-	settingsPendingRestart := 0
-	row = superUserDB.QueryRow(
-		"SELECT COUNT(*) FROM pg_settings WHERE pending_restart")
-	err = row.Scan(&settingsPendingRestart)
-	if err != nil {
-		return nil, err
-	}
-	result.PendingRestart = settingsPendingRestart > 0
 
 	err = instance.fillStatus(&result)
-	if err != nil {
-		return nil, err
-	}
-
-	row = superUserDB.QueryRow("SELECT pg_size_pretty(SUM(pg_database_size(oid))) FROM pg_database")
-	err = row.Scan(&result.TotalInstanceSize)
 	if err != nil {
 		return nil, err
 	}
