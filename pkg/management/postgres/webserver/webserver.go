@@ -39,7 +39,7 @@ func isServerHealthy(w http.ResponseWriter, r *http.Request) {
 	err := instance.IsServerHealthy()
 	if err != nil {
 		log.Info("Liveness probe failing", "err", err.Error())
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -53,7 +53,7 @@ func isServerReady(w http.ResponseWriter, r *http.Request) {
 	err := instance.IsServerReady()
 	if err != nil {
 		log.Info("Readiness probe failing", "err", err.Error())
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -69,7 +69,7 @@ func pgStatus(w http.ResponseWriter, r *http.Request) {
 		log.Info(
 			"Instance status probe failing",
 			"err", err.Error())
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -80,7 +80,7 @@ func pgStatus(w http.ResponseWriter, r *http.Request) {
 		log.Info(
 			"Internal error marshalling instance status",
 			"err", err.Error())
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -97,7 +97,7 @@ func requestBackup(typedClient client.Client, recorder record.EventRecorder, w h
 
 	backupName := r.URL.Query().Get("name")
 	if len(backupName) == 0 {
-		http.Error(w, "Missing backup name parameter", 400)
+		http.Error(w, "Missing backup name parameter", http.StatusBadRequest)
 		return
 	}
 
@@ -109,7 +109,7 @@ func requestBackup(typedClient client.Client, recorder record.EventRecorder, w h
 		http.Error(
 			w,
 			fmt.Sprintf("error while getting cluster: %v", err.Error()),
-			500)
+			http.StatusInternalServerError)
 		return
 	}
 
@@ -121,7 +121,7 @@ func requestBackup(typedClient client.Client, recorder record.EventRecorder, w h
 		http.Error(
 			w,
 			fmt.Sprintf("error while getting backup: %v", err.Error()),
-			500)
+			http.StatusInternalServerError)
 		return
 	}
 
@@ -146,7 +146,7 @@ func requestBackup(typedClient client.Client, recorder record.EventRecorder, w h
 		http.Error(
 			w,
 			fmt.Sprintf("error while starting backup: %v", err.Error()),
-			500)
+			http.StatusInternalServerError)
 		return
 	}
 
