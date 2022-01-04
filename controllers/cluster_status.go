@@ -9,8 +9,10 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"reflect"
 	"sort"
@@ -89,6 +91,16 @@ func (resources managedResources) getPVC(name string) *corev1.PersistentVolumeCl
 	}
 
 	return nil
+}
+
+// An InstanceStatusError reports an unsuccessful attempt to retrieve an instance status
+type InstanceStatusError struct {
+	StatusCode int
+	Body       string
+}
+
+func (i InstanceStatusError) Error() string {
+	return fmt.Sprintf("error status code: %v, body: %v", i.StatusCode, i.Body)
 }
 
 // getManagedResources get the managed resources of various types
@@ -662,27 +674,47 @@ func extractInstancesStatus(
 }
 
 // getReplicaStatusFromPodViaHTTP retrieves the status of PostgreSQL pod via HTTP, retrying
-// the request if some error is encountered
+// the request if some communication error is encountered
 func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) (result postgres.PostgresqlStatus) {
 	isErrorRetryable := func(err error) bool {
-		log.FromContext(ctx).Info("Error while requesting the status of an instance, retrying",
+		contextLog := log.FromContext(ctx)
+
+		// If it's a timeout, we do not want to retry
+		var netError net.Error
+		if errors.As(err, &netError) && netError.Timeout() {
+			return false
+		}
+
+		// If the pod answered with a not ok status, it is pointless to retry
+		var instanceStatusError InstanceStatusError
+		if errors.As(err, &instanceStatusError) {
+			return false
+		}
+
+		contextLog.Debug("Error while requesting the status of an instance, retrying",
 			"pod", pod.Name,
 			"error", err)
 		return true
 	}
 
-	err := retry.OnError(StatusRequestRetry, isErrorRetryable, func() error {
-		result = rawReplicaStatusRequest(ctx, pod)
+	// The retry here is to support restarting the instance manager during
+	// online upgrades. It is not intended to wait for recovering from any
+	// other remote failure.
+	_ = retry.OnError(StatusRequestRetry, isErrorRetryable, func() error {
+		result = rawInstanceStatusRequest(ctx, pod)
 		return result.Error
 	})
-	result.Error = err
 
 	return result
 }
 
-// rawReplicaStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.
-func rawReplicaStatusRequest(ctx context.Context, pod corev1.Pod) postgres.PostgresqlStatus {
-	var result postgres.PostgresqlStatus
+// rawInstanceStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.
+func rawInstanceStatusRequest(
+	ctx context.Context,
+	pod corev1.Pod,
+) (result postgres.PostgresqlStatus) {
+	const connectionTimeout = 2 * time.Second
+	const requestTimeout = 30 * time.Second
 
 	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
@@ -691,7 +723,18 @@ func rawReplicaStatusRequest(ctx context.Context, pod corev1.Pod) postgres.Postg
 		return result
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	// We want a connection timeout to prevent waiting for the default
+	// TCP connection timeout (30 seconds) on lost SYN packets
+	timeoutClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout: connectionTimeout,
+			}).DialContext,
+		},
+		Timeout: requestTimeout,
+	}
+
+	resp, err := timeoutClient.Do(req)
 	if err != nil {
 		result.Error = err
 		return result
@@ -711,7 +754,7 @@ func rawReplicaStatusRequest(ctx context.Context, pod corev1.Pod) postgres.Postg
 	}
 
 	if resp.StatusCode != 200 {
-		result.Error = fmt.Errorf("error status code: %d, body: %s", resp.StatusCode, string(body))
+		result.Error = &InstanceStatusError{StatusCode: resp.StatusCode, Body: string(body)}
 		return result
 	}
 
