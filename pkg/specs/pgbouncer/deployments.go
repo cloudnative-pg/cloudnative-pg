@@ -12,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	config "github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
@@ -92,6 +93,14 @@ func Deployment(pooler *apiv1.Pooler,
 		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "NAMESPACE", Value: pooler.Namespace}, true).
 		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "POOLER_NAME", Value: pooler.Name}, true).
 		WithServiceAccountName(pooler.Name, true).
+		WithReadinessProbe("pgbouncer", &corev1.Probe{
+			TimeoutSeconds: 5,
+			Handler: corev1.Handler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt(pgBouncerConfig.PgBouncerPort),
+				},
+			},
+		}, false).
 		Build()
 
 	return &appsv1.Deployment{
