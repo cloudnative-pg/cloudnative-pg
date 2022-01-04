@@ -531,18 +531,17 @@ Any change to the `queries` content will be immediately reflected on all the
 deployed Clusters using it.
 
 The operator installation manifests come with a predefined ConfigMap, 
-called `default-monitoring`, to be used by all Clusters.
-`MONITORING_QUERIES_CONFIGMAP` is by default set to `default-monitoring` in the operator configuration.
+called `postgresql-operator-default-monitoring`, to be used by all Clusters.
+`MONITORING_QUERIES_CONFIGMAP` is by default set to `postgresql-operator-default-monitoring` in the operator configuration.
 
 If you want to disable the default set of metrics, you can:
 - disable it at operator level: set the `MONITORING_QUERIES_CONFIGMAP` key to `""` (empty string), in the operator
   ConfigMap. Changes to operator ConfigMap require an operator restart.
 - disable it for a specific Cluster: set `.spec.monitoring.disableDefaultQueries` to `true` in the Cluster.
 
-!!! Warning
-    Currently if you change the `MONITORING_QUERIES_CONFIGMAP` value, the operator will not
-    automatically remove the old ConfigMap reference from existing cluster.
-    The new ConfigMap reference will be added when the Cluster is reconciled.
+!!! Important
+    The ConfigMap specified via `MONITORING_QUERIES_CONFIGMAP` will always be copied to the Cluster's namespace with a fixed name:
+    `postgresql-operator-default-monitoring`. So, if you intend to have default metrics, you should not create a ConfigMap with this name in the cluster's namespace.
 
 ### Differences with the Prometheus Postgres exporter
 
