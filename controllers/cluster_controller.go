@@ -358,6 +358,11 @@ func (r *ClusterReconciler) checkPodsArchitecture(ctx context.Context, status *p
 	isConsistent := true
 
 	for _, podStatus := range status.Items {
+		// Ignore architecture in podStatus with errors
+		if podStatus.Error != nil {
+			continue
+		}
+
 		switch podStatus.InstanceArch {
 		case goruntime.GOARCH:
 			// architecture matches, everything ok for this pod
