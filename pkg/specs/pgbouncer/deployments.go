@@ -21,6 +21,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/podspec"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils/hash"
 )
 
 const (
@@ -40,6 +41,11 @@ const (
 func Deployment(pooler *apiv1.Pooler,
 	cluster *apiv1.Cluster,
 ) (*appsv1.Deployment, error) {
+	poolerHash, err := hash.ComputeHash(pooler.Spec)
+	if err != nil {
+		return nil, err
+	}
+
 	podTemplate := podspec.NewFrom(pooler.Spec.Template).
 		WithLabel(PgbouncerNameLabel, pooler.Name).
 		WithVolume(&corev1.Volume{
@@ -107,6 +113,9 @@ func Deployment(pooler *apiv1.Pooler,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pooler.Name,
 			Namespace: pooler.Namespace,
+			Annotations: map[string]string{
+				PgbouncerPoolerSpecHash: poolerHash,
+			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &pooler.Spec.Instances,
