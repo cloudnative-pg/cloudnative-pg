@@ -27,3 +27,6 @@ jobs:
           commands: |
             test
             test-cnp
+          static-args: |
+            test_level=4
+            depth=main
