@@ -665,56 +665,55 @@ func (r *ClusterReconciler) createOrPatchPodMonitor(ctx context.Context, cluster
 		return err
 	}
 
-	// If the PodMonitor is disabled we make sure that is removed
-	if !cluster.IsPodMonitorEnabled() {
-		return r.deletePodMonitor(ctx, cluster)
-	}
-
-	// Create the base PodMonitor object
-	newPodMonitor := specs.CreatePodMonitor(cluster)
-
-	// We get the pod monitor and the error is not found we create the PodMonitor
-	var podMonitor monitoringv1.PodMonitor
-	if err := r.Get(ctx, client.ObjectKey{
-		Name:      cluster.Name,
-		Namespace: cluster.Namespace,
-	},
-		&podMonitor); err != nil {
+	// We get the current pod monitor
+	podMonitor := &monitoringv1.PodMonitor{}
+	if err := r.Get(
+		ctx,
+		client.ObjectKey{
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+		},
+		podMonitor,
+	); err != nil {
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("while getting the podmonitor: %w", err)
 		}
+		podMonitor = nil
+	}
 
-		contextLogger.Debug("Creating PodMonitor",
-			"cluster-name", cluster.Name)
+	switch {
+	// Pod monitor disabled and no pod monitor - nothing to do
+	case !cluster.IsPodMonitorEnabled() && podMonitor == nil:
+		return nil
+	// Pod monitor disabled and pod monitor present - delete it
+	case !cluster.IsPodMonitorEnabled() && podMonitor != nil:
+		contextLogger.Info("Deleting PodMonitor")
+		if err := r.Delete(ctx, podMonitor); err != nil {
+			if !apierrs.IsNotFound(err) {
+				return err
+			}
+		}
+		return nil
+	// Pod monitor enabled and no pod monitor - create it
+	case cluster.IsPodMonitorEnabled() && podMonitor == nil:
+		contextLogger.Debug("Creating PodMonitor")
+		newPodMonitor := specs.CreatePodMonitor(cluster)
 		SetClusterOwnerAnnotationsAndLabels(&newPodMonitor.ObjectMeta, cluster)
 		return r.Create(ctx, newPodMonitor)
-	}
+	// Pod monitor enabled and pod monitor present - update it
+	default:
+		origPodMonitor := podMonitor.DeepCopy()
+		podMonitor.Spec = specs.CreatePodMonitor(cluster).Spec
 
-	// Compare both spec, if there's no changes we just return nil
-	if reflect.DeepEqual(podMonitor.Spec, newPodMonitor.Spec) {
-		return nil
-	}
-
-	// We patch the PodMonitor, so we always reconcile it with the cluster changes
-	podMonitor.Spec = newPodMonitor.Spec
-	contextLogger.Debug("Patching PodMonitor",
-		"cluster-name", cluster.Name)
-	return r.Patch(ctx, &podMonitor, client.MergeFrom(newPodMonitor))
-}
-
-func (r *ClusterReconciler) deletePodMonitor(ctx context.Context, cluster *apiv1.Cluster) error {
-	contextLogger := log.FromContext(ctx)
-	podMonitor := specs.CreatePodMonitor(cluster)
-
-	contextLogger.Info("Deleting PodMonitor",
-		"cluster-name", cluster.Name)
-	if err := r.Delete(ctx, podMonitor); err != nil {
-		if !apierrs.IsNotFound(err) {
-			return err
+		// If there's no changes we are done
+		if reflect.DeepEqual(origPodMonitor, podMonitor) {
+			return nil
 		}
-	}
 
-	return nil
+		// Patch the PodMonitor, so we always reconcile it with the cluster changes
+		contextLogger.Debug("Patching PodMonitor")
+		return r.Patch(ctx, podMonitor, client.MergeFrom(origPodMonitor))
+	}
 }
 
 // createRole creates the role
