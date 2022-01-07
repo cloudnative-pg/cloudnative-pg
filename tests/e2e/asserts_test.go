@@ -470,7 +470,7 @@ func AssertWritesResumedBeforeTimeout(namespace string, clusterName string, time
 // AssertNewPrimary checks that, during a failover, a new primary
 // is being elected and promoted and that write operation succeed
 // on this new pod.
-func AssertNewPrimary(namespace string, clusterName string, oldprimary string) {
+func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 	By("verifying the new primary pod", func() {
 		// Gather the primary
 		timeout := 120
@@ -483,7 +483,7 @@ func AssertNewPrimary(namespace string, clusterName string, oldprimary string) {
 			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx, namespacedName, cluster)
 			return cluster.Status.TargetPrimary, err
-		}, timeout).ShouldNot(BeEquivalentTo(oldprimary))
+		}, timeout).ShouldNot(Or(BeEquivalentTo(oldPrimary), BeEquivalentTo(apiv1.PendingFailoverMarker)))
 		cluster := &apiv1.Cluster{}
 		err := env.Client.Get(env.Ctx, namespacedName, cluster)
 		newPrimary := cluster.Status.TargetPrimary

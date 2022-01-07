@@ -91,28 +91,43 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 
 	// The current primary is not correctly working, and we need to elect a new one
 	// but before doing that we need to wait for all the WAL receivers to be
-	// terminated. This is needed to avoid losing the WAL data that is being received
-	// (think about a switchover).
-	//
-	// Anyway we don't need to wait if the current primary isn't reporting the status,
-	// because in that case we are just waiting for the connections to time out.
-	if status.IsPodReporting(cluster.Status.CurrentPrimary) && !status.AreWalReceiversDown() {
+	// terminated. To make sure they eventually terminate we signal the old primary
+	// (if is still alive) to shut down by setting the apiv1.PendingFailoverMarker as
+	// target primary.
+	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
+		contextLogger.Info("Current primary isn't healthy, initiating a failover",
+			"clusterStatus", status)
+		contextLogger.Debug("Cluster status before initiating the failover", "pods", resources.pods)
+		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
+			"Current primary isn't healthy, initiating a failover from %v", cluster.Status.CurrentPrimary)
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
+			fmt.Sprintf("Initiating a failover from %v", cluster.Status.CurrentPrimary)); err != nil {
+			return "", err
+		}
+		err := r.setPrimaryInstance(ctx, cluster, apiv1.PendingFailoverMarker)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// Wait until all the WAL receivers are down. This is needed to avoid losing the WAL
+	// data that is being received (think about a switchover).
+	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
 		return "", ErrWalReceiversRunning
 	}
 
-	// Set the first pod in the sorted list as the new targetPrimary.
-	// This may trigger a failover if previous primary disappeared
+	// This may be tha last step of a failover if target primary is set to apiv1.PendingFailoverMarker
 	// or change the target primary if the current one is not valid anymore.
-	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
-		contextLogger.Info("Current primary isn't healthy, failing over",
+	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker {
+		contextLogger.Info("Failing over",
 			"newPrimary", status.Items[0].Pod.Name,
 			"clusterStatus", status)
 		contextLogger.Debug("Cluster status before failover", "pods", resources.pods)
-		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
-			"Current primary isn't healthy, failing over from %v to %v",
-			cluster.Status.TargetPrimary, status.Items[0].Pod.Name)
+		r.Recorder.Eventf(cluster, "Normal", "FailoverTarget",
+			"Failing over from %v to %v",
+			cluster.Status.CurrentPrimary, status.Items[0].Pod.Name)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseFailOver,
-			fmt.Sprintf("Failing over to %v", status.Items[0].Pod.Name)); err != nil {
+			fmt.Sprintf("Failing over from %v to %v", cluster.Status.CurrentPrimary, status.Items[0].Pod.Name)); err != nil {
 			return "", err
 		}
 	} else {
@@ -129,7 +144,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 		}
 	}
 
-	// No primary, no party. Failover please!
+	// Set the first pod in the sorted list as the new targetPrimary
 	return status.Items[0].Pod.Name, r.setPrimaryInstance(ctx, cluster, status.Items[0].Pod.Name)
 }
 
@@ -242,10 +257,7 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 	// but before doing that we need to wait for all the WAL receivers to be
 	// terminated. This is needed to avoid losing the WAL data that is being received
 	// (think about a switchover).
-	//
-	// Anyway we don't need to wait if the designated primary isn't reporting the status,
-	// because in that case we are just waiting for the connections to time out.
-	if status.IsPodReporting(cluster.Status.CurrentPrimary) && !status.AreWalReceiversDown() {
+	if !status.AreWalReceiversDown(cluster.Status.CurrentPrimary) {
 		return "", ErrWalReceiversRunning
 	}
 
