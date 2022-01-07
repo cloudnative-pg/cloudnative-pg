@@ -46,7 +46,7 @@ We test the following:
 * We reply all the previous tests, but we enable the online upgrade in the final CLuster.
 */
 
-var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), Ordered, func() {
+var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), Ordered, Serial, func() {
 	const (
 		operatorNamespace   = "postgresql-operator-system"
 		configName          = "postgresql-operator-controller-manager-config"
@@ -92,10 +92,17 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(upgradeNamespace, clusterName1,
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			// Dump the operator namespace, as operator is changing too
+			env.DumpOperator(operatorNamespace,
+				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
 		}
 	})
 	AfterEach(func() {
 		err := env.DeleteNamespace(upgradeNamespace)
+		Expect(err).ToNot(HaveOccurred())
+		// Delete the operator's namespace in case that the previous test make corrupted changes to
+		// the operator's namespace so that affects subsequent test
+		err = env.DeleteNamespaceAndWait(operatorNamespace, 60)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
