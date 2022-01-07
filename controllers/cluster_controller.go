@@ -935,3 +935,77 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 		}
 	}
 }
+
+// TODO: only required to cleanup custom monitoring queries configmaps from older versions (v1.10 and v1.11)
+// 		 that could have been copied with the source configmap name instead of the new default one.
+// 		 Should be removed in future releases.
+func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context, cluster *apiv1.Cluster) {
+	contextLogger := log.FromContext(ctx)
+
+	// if the cluster didn't have default monitoring queries, do nothing
+	if cluster.Spec.Monitoring.AreDefaultQueriesDisabled() ||
+		configuration.Current.MonitoringQueriesConfigmap == "" ||
+		configuration.Current.MonitoringQueriesConfigmap == apiv1.DefaultMonitoringConfigMapName {
+		return
+	}
+
+	// otherwise, remove the old default monitoring queries configmap from the cluster and delete it, if present
+	oldCmID := -1
+	for idx, cm := range cluster.Spec.Monitoring.CustomQueriesConfigMap {
+		if cm.Name == configuration.Current.MonitoringQueriesConfigmap &&
+			cm.Key == apiv1.DefaultMonitoringConfigMapKey {
+			oldCmID = idx
+			break
+		}
+	}
+
+	// if we didn't find it, do nothing
+	if oldCmID < 0 {
+		return
+	}
+
+	// if we found it, we are going to get it and check it was actually created by the operator or was already deleted
+	var oldCm corev1.ConfigMap
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      configuration.Current.MonitoringQueriesConfigmap,
+		Namespace: cluster.Namespace,
+	}, &oldCm)
+	// if we found it, we check the annotation the operator should have set to be sure it was created by us
+	if err == nil { // nolint:nestif
+		// if it was, we delete it and proceed to remove it from the cluster monitoring spec
+		if _, ok := oldCm.Annotations[utils.OperatorVersionAnnotationName]; ok {
+			err = r.Delete(ctx, &oldCm)
+			// if there is any error except the cm was already deleted, we return
+			if err != nil && !apierrs.IsNotFound(err) {
+				contextLogger.Warning("error while deleting old default monitoring custom queries configmap",
+					"err", err,
+					"configmap", configuration.Current.MonitoringQueriesConfigmap)
+				return
+			}
+		} else {
+			// it exists, but it's not handled by the operator, we do nothing
+			contextLogger.Warning("A configmap with the same name as the old default monitoring queries "+
+				"configmap exists, but doesn't have the required annotation, so it won't be deleted, "+
+				"nor removed from the cluster monitoring spec",
+				"configmap", oldCm.Name)
+			return
+		}
+	} else if !apierrs.IsNotFound(err) {
+		// if there is any error except the cm was already deleted, we return
+		contextLogger.Warning("error while getting old default monitoring custom queries configmap",
+			"err", err,
+			"configmap", configuration.Current.MonitoringQueriesConfigmap)
+		return
+	}
+	// both if it exists or not, if we are here we should delete it from the list of custom queries configmaps
+	oldCluster := cluster.DeepCopy()
+	cluster.Spec.Monitoring.CustomQueriesConfigMap = append(cluster.Spec.Monitoring.CustomQueriesConfigMap[:oldCmID],
+		cluster.Spec.Monitoring.CustomQueriesConfigMap[oldCmID+1:]...)
+	err = r.Patch(ctx, cluster, client.MergeFrom(oldCluster))
+	if err != nil {
+		log.Warning("had an error while removing the old custom monitoring queries configmap from "+
+			"the monitoring section in the cluster",
+			"err", err,
+			"configmap", configuration.Current.MonitoringQueriesConfigmap)
+	}
+}
