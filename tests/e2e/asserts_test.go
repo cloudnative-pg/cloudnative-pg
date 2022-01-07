@@ -378,7 +378,7 @@ func assertClusterStandbysAreStreaming(namespace string, clusterName string) {
 		}
 
 		return nil
-	}, 60).ShouldNot(HaveOccurred())
+	}, 120).ShouldNot(HaveOccurred())
 }
 
 func AssertStandbysFollowPromotion(namespace string, clusterName string, timeout int32) {

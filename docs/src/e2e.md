@@ -8,6 +8,7 @@ Moreover, the following Kubernetes versions are tested for each commit,
 ensuring failure and bugs detection at an early stage of the development
 process:
 
+* 1.23
 * 1.22
 * 1.21
 * 1.20
@@ -57,4 +58,4 @@ and the following suite of E2E tests are performed on that cluster:
 * Storage expansion;
 * Data corruption;
 
-The E2E tests suite is also run for OpenShift versions 4.6 and 4.7.
+The E2E tests suite is also run for OpenShift versions 4.6, 4.7, 4.8 and 4.9.
