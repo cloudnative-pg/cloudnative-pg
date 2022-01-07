@@ -38,25 +38,43 @@ var _ = Describe("Operator version annotation management", func() {
 	})
 })
 
+// nolint:dupl
 var _ = Describe("Annotation management", func() {
 	config := &configuration.Data{}
 	config.ReadConfigMap(map[string]string{"INHERITED_ANNOTATIONS": "one,two"})
+	toBeMatchedMap := map[string]string{"one": "1", "two": "2", "three": "3"}
+	fixedMap := map[string]string{"four": "4", "five": "5"}
 
 	It("must inherit annotations to be inherited", func() {
 		pod := &corev1.Pod{}
-		InheritAnnotations(&pod.ObjectMeta, map[string]string{"one": "1", "two": "2", "three": "3"}, config)
+		InheritAnnotations(&pod.ObjectMeta, toBeMatchedMap, nil, config)
 		Expect(pod.Annotations).To(Equal(map[string]string{"one": "1", "two": "2"}))
+	})
+
+	It("must inherit annotations to be inherited with fixed ones too", func() {
+		pod := &corev1.Pod{}
+		InheritAnnotations(&pod.ObjectMeta, toBeMatchedMap, fixedMap, config)
+		Expect(pod.Annotations).To(Equal(map[string]string{"one": "1", "two": "2", "four": "4", "five": "5"}))
 	})
 })
 
+// nolint:dupl
 var _ = Describe("Label management", func() {
 	config := &configuration.Data{}
 	config.ReadConfigMap(map[string]string{"INHERITED_LABELS": "alpha,beta"})
+	toBeMatchedMap := map[string]string{"alpha": "1", "beta": "2", "gamma": "3"}
+	fixedMap := map[string]string{"delta": "4", "epsilon": "5"}
 
 	It("must inherit labels to be inherited", func() {
 		pod := &corev1.Pod{}
-		InheritLabels(&pod.ObjectMeta, map[string]string{"alpha": "1", "beta": "2", "gamma": "3"}, config)
+		InheritLabels(&pod.ObjectMeta, toBeMatchedMap, nil, config)
 		Expect(pod.Labels).To(Equal(map[string]string{"alpha": "1", "beta": "2"}))
+	})
+	It("must inherit labels to be inherited with fixed ones passed", func() {
+		pod := &corev1.Pod{}
+		InheritLabels(&pod.ObjectMeta, toBeMatchedMap,
+			fixedMap, config)
+		Expect(pod.Labels).To(Equal(map[string]string{"alpha": "1", "beta": "2", "delta": "4", "epsilon": "5"}))
 	})
 })
 

@@ -345,7 +345,8 @@ func (r *ClusterReconciler) updateClusterAnnotationsOnPods(
 
 		// otherwise, we add the modified/new annotations to the pod
 		patch := client.MergeFrom(pod.DeepCopy())
-		utils.InheritAnnotations(&pod.ObjectMeta, cluster.Annotations, configuration.Current)
+		utils.InheritAnnotations(&pod.ObjectMeta, cluster.Annotations,
+			cluster.GetFixedInheritedAnnotations(), configuration.Current)
 
 		contextLogger.Info("Updating cluster annotations on pod", "pod", pod.Name)
 		if err := r.Patch(ctx, pod, patch); err != nil {
@@ -383,7 +384,7 @@ func (r *ClusterReconciler) updateClusterLabelsOnPods(
 
 		// otherwise, we add the modified/new labels to the pod
 		patch := client.MergeFrom(pod.DeepCopy())
-		utils.InheritLabels(&pod.ObjectMeta, cluster.Labels, configuration.Current)
+		utils.InheritLabels(&pod.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 
 		contextLogger.Info("Updating cluster labels on pod", "pod", pod.Name)
 		if err := r.Patch(ctx, pod, patch); err != nil {

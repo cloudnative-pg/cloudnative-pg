@@ -341,8 +341,8 @@ func (r *ClusterReconciler) updateOnlineUpdateEnabled(
 // SetClusterOwnerAnnotationsAndLabels sets the cluster as owner of the passed object and then
 // sets all the needed annotations and labels
 func SetClusterOwnerAnnotationsAndLabels(obj *v1.ObjectMeta, cluster *apiv1.Cluster) {
-	utils.InheritAnnotations(obj, cluster.Annotations, configuration.Current)
-	utils.InheritLabels(obj, cluster.Labels, configuration.Current)
+	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 	utils.LabelClusterName(obj, cluster.GetName())
 	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
 	utils.SetOperatorVersion(obj, versions.Version)
