@@ -276,16 +276,16 @@ spec:
       destinationPath: "<destination path here>"
       azureCredentials:
         connectionString:
-          name: azurite
+          name: azure-creds
           key: AZURE_CONNECTION_STRING
         storageAccount:
-          name: azurite
+          name: azure-creds
           key: AZURE_STORAGE_ACCOUNT
         storageKey:
-          name: azurite
+          name: azure-creds
           key: AZURE_STORAGE_KEY
         storageSasToken:
-          name: azurite
+          name: azure-creds
           key: AZURE_STORAGE_SAS_TOKEN
 ```
 
