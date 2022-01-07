@@ -228,7 +228,7 @@ var _ = Describe("Failover", func() {
 				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.TargetPrimary, err
-			}, timeout).ShouldNot(BeEquivalentTo(currentPrimary))
+			}, timeout).ShouldNot(Or(BeEquivalentTo(currentPrimary), BeEquivalentTo(apiv1.PendingFailoverMarker)))
 			cluster := &apiv1.Cluster{}
 			err = env.Client.Get(env.Ctx, namespacedName, cluster)
 			Expect(cluster.Status.TargetPrimary, err).To(

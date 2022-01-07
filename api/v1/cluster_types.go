@@ -85,6 +85,9 @@ const (
 
 	// DefaultPgBouncerPoolerSecretSuffix is the suffix for the default pgbouncer Pooler secret
 	DefaultPgBouncerPoolerSecretSuffix = "-pooler"
+
+	// PendingFailoverMarker is used as target primary to signal that a failover is required
+	PendingFailoverMarker = "pending"
 )
 
 // ClusterSpec defines the desired state of Cluster
@@ -237,9 +240,6 @@ const (
 
 	// PhaseUpgrade upgrade in process
 	PhaseUpgrade = "Upgrading cluster"
-
-	// PhaseUpgradeFailed used for failures in upgrade
-	PhaseUpgradeFailed = "Cluster upgrade failed"
 
 	// PhaseWaitingForUser set the status to wait for an action from the user
 	PhaseWaitingForUser = "Waiting for user action"
