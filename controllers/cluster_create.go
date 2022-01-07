@@ -83,6 +83,12 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
+	// TODO: only required to cleanup custom monitoring queries configmaps from older versions (v1.10 and v1.11)
+	// 		 that could have been copied with the source configmap name instead of the new default one.
+	// 		 Should be removed in future releases.
+	// should never return an error, not a requirement, just a nice to have
+	r.deleteOldCustomQueriesConfigmap(ctx, cluster)
+
 	return nil
 }
 
