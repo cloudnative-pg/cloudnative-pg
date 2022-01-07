@@ -130,7 +130,7 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 			Cluster: scheduledBackup.Spec.Cluster,
 		},
 	}
-	utils.InheritAnnotations(&backup.ObjectMeta, scheduledBackup.Annotations, configuration.Current)
+	utils.InheritAnnotations(&backup.ObjectMeta, scheduledBackup.Annotations, nil, configuration.Current)
 	return &backup
 }
 

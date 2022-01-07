@@ -61,9 +61,18 @@ func SetOperatorVersion(object *metav1.ObjectMeta, version string) {
 // InheritAnnotations puts into the object metadata the passed annotations if
 // the annotations are supposed to be inherited. The passed configuration is
 // used to determine whenever a certain annotation is inherited or not
-func InheritAnnotations(object *metav1.ObjectMeta, annotations map[string]string, config *configuration.Data) {
+func InheritAnnotations(
+	object *metav1.ObjectMeta,
+	annotations map[string]string,
+	fixedAnnotations map[string]string,
+	config *configuration.Data,
+) {
 	if object.Annotations == nil {
 		object.Annotations = make(map[string]string)
+	}
+
+	for key, value := range fixedAnnotations {
+		object.Annotations[key] = value
 	}
 
 	for key, value := range annotations {
@@ -76,9 +85,18 @@ func InheritAnnotations(object *metav1.ObjectMeta, annotations map[string]string
 // InheritLabels puts into the object metadata the passed labels if
 // the labels are supposed to be inherited. The passed configuration is
 // used to determine whenever a certain label is inherited or not
-func InheritLabels(object *metav1.ObjectMeta, labels map[string]string, config *configuration.Data) {
+func InheritLabels(
+	object *metav1.ObjectMeta,
+	labels map[string]string,
+	fixedLabels map[string]string,
+	config *configuration.Data,
+) {
 	if object.Labels == nil {
 		object.Labels = make(map[string]string)
+	}
+
+	for key, value := range fixedLabels {
+		object.Labels[key] = value
 	}
 
 	for key, value := range labels {

@@ -1497,6 +1497,19 @@ spec:
                   - name
                   type: object
                 type: array
+              inheritedMetadata:
+                description: Metadata that will be inherited by all objects related
+                  to the Cluster
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                type: object
               instances:
                 default: 1
                 description: Number of instances required in the cluster

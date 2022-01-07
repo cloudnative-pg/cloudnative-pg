@@ -864,10 +864,14 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		"primary", true)
 
 	utils.SetOperatorVersion(&job.ObjectMeta, versions.Version)
-	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations, configuration.Current)
-	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations, configuration.Current)
-	utils.InheritLabels(&job.ObjectMeta, cluster.Labels, configuration.Current)
-	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels, configuration.Current)
+	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
+	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
 
 	if err = r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
@@ -942,10 +946,14 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	}
 
 	utils.SetOperatorVersion(&job.ObjectMeta, versions.Version)
-	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations, configuration.Current)
-	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations, configuration.Current)
-	utils.InheritLabels(&job.ObjectMeta, cluster.Labels, configuration.Current)
-	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels, configuration.Current)
+	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
+	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
 
 	if err = r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
@@ -1066,8 +1074,10 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 	}
 
 	utils.SetOperatorVersion(&pod.ObjectMeta, versions.Version)
-	utils.InheritAnnotations(&pod.ObjectMeta, cluster.Annotations, configuration.Current)
-	utils.InheritLabels(&pod.ObjectMeta, cluster.Labels, configuration.Current)
+	utils.InheritAnnotations(&pod.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritLabels(&pod.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
 
 	if err := r.Create(ctx, pod); err != nil {
 		if apierrs.IsAlreadyExists(err) {
