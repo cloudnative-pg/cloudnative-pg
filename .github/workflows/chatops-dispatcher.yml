@@ -6,6 +6,14 @@ on:
 
 jobs:
   chatops-dispatcher:
+    if: |
+        github.event.issue.pull_request &&
+        (
+          startsWith(github.event.comment.body, '/test') ||
+          startsWith(github.event.comment.body, '/test-cnp') ||
+          startsWith(github.event.comment.body, '/test-ocp') ||
+          startsWith(github.event.comment.body, '/ok-to-merge')
+        )
     runs-on: ubuntu-20.04
     steps:
       - name: Run E2E on OpenShift
@@ -30,3 +38,9 @@ jobs:
           static-args: |
             test_level=4
             depth=main
+      - name: Add ok-to-merge label to CNP PR
+        uses: actions-ecosystem/action-add-labels@v1.1.0
+        if: ${{ startsWith(github.event.comment.body, '/ok-to-merge') }}
+        with:
+           github_token: ${{ secrets.REPO_GHA_PAT }}
+           labels: ok-to-merge
