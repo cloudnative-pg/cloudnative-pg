@@ -119,7 +119,7 @@ func (env TestingEnvironment) DeleteNamespace(name string, opts ...client.Delete
 }
 
 // DeleteNamespaceAndWait deletes a namespace if existent and returns when deletion is completed
-func (env TestingEnvironment) DeleteNamespaceAndWait(name string, opts ...client.DeleteOption) error {
+func (env TestingEnvironment) DeleteNamespaceAndWait(name string, timeoutSeconds int) error {
 	// Exit immediately if if the namespace is listed in PreserveNamespaces
 	for _, v := range env.PreserveNamespaces {
 		if v == name {
@@ -127,15 +127,9 @@ func (env TestingEnvironment) DeleteNamespaceAndWait(name string, opts ...client
 		}
 	}
 
-	u := &unstructured.Unstructured{}
-	u.SetName(name)
-	u.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Namespace",
-	})
+	_, _, err := Run(fmt.Sprintf("kubectl delete namespace %v --wait=true --timeout %vs", name, timeoutSeconds))
 
-	return env.Client.Delete(env.Ctx, u, opts...)
+	return err
 }
 
 // DeletePod deletes a pod if existent
@@ -346,6 +340,36 @@ func (env TestingEnvironment) GetCluster(namespace string, name string) (*apiv1.
 		return nil, err
 	}
 	return cluster, nil
+}
+
+// DumpOperator logs the JSON for the deployment in an operator namespace, its pods and endpoints
+func (env TestingEnvironment) DumpOperator(namespace string, filename string) {
+	f, err := os.Create(filename)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	w := bufio.NewWriter(f)
+
+	deployment, _ := env.GetOperatorDeployment()
+	out, _ := json.MarshalIndent(deployment, "", "    ")
+	_, _ = fmt.Fprintf(w, "Dumping %v/%v deployment\n", namespace, deployment.Name)
+	_, _ = fmt.Fprintln(w, string(out))
+
+	podList, _ := env.GetPodList(namespace)
+	for _, pod := range podList.Items {
+		out, _ := json.MarshalIndent(pod, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
+
+	err = w.Flush()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	_ = f.Sync()
+	_ = f.Close()
 }
 
 // DumpClusterEnv logs the JSON for the a cluster in a namespace, its pods and endpoints
