@@ -95,6 +95,9 @@ type ClusterSpec struct {
 	// Description of this PostgreSQL cluster
 	Description string `json:"description,omitempty"`
 
+	// Metadata that will be inherited by all objects related to the Cluster
+	InheritedMetadata *EmbeddedObjectMetadata `json:"inheritedMetadata,omitempty"`
+
 	// Name of the container image, supporting both tags (`<image>:<tag>`)
 	// and digests for deterministic and repeatable deployments
 	// (`<image>:<tag>@sha256:<digestValue>`)
@@ -345,6 +348,12 @@ type ClusterStatus struct {
 
 	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
 	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
+}
+
+// EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
+type EmbeddedObjectMetadata struct {
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // PoolerIntegrations encapsulates the needed integration for the poolers referencing the cluster
@@ -1118,6 +1127,24 @@ func (cluster *Cluster) GetClientCASecretName() string {
 		return cluster.Spec.Certificates.ClientCASecret
 	}
 	return fmt.Sprintf("%v%v", cluster.Name, ClientCaSecretSuffix)
+}
+
+// GetFixedInheritedAnnotations gets the annotations that should be
+// inherited by all resources according the cluster spec
+func (cluster *Cluster) GetFixedInheritedAnnotations() map[string]string {
+	if cluster.Spec.InheritedMetadata == nil || cluster.Spec.InheritedMetadata.Annotations == nil {
+		return nil
+	}
+	return cluster.Spec.InheritedMetadata.Annotations
+}
+
+// GetFixedInheritedLabels gets the labels that should be
+// inherited by all resources according the cluster spec
+func (cluster *Cluster) GetFixedInheritedLabels() map[string]string {
+	if cluster.Spec.InheritedMetadata == nil || cluster.Spec.InheritedMetadata.Labels == nil {
+		return nil
+	}
+	return cluster.Spec.InheritedMetadata.Labels
 }
 
 // GetReplicationSecretName get the name of the secret for the replication user

@@ -40,6 +40,7 @@ Below you will find a description of the defined resources:
 - [ConfigMapKeySelector](#ConfigMapKeySelector)
 - [ConfigMapResourceVersion](#ConfigMapResourceVersion)
 - [DataBackupConfiguration](#DataBackupConfiguration)
+- [EmbeddedObjectMetadata](#EmbeddedObjectMetadata)
 - [ExternalCluster](#ExternalCluster)
 - [InstanceID](#InstanceID)
 - [LocalObjectReference](#LocalObjectReference)
@@ -313,6 +314,7 @@ ClusterSpec defines the desired state of Cluster
 Name                  | Description                                                                                                                                                                                                                                                                                                                                                                                                             | Type                                                                                                                            
 --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------
 `description          ` | Description of this PostgreSQL cluster                                                                                                                                                                                                                                                                                                                                                                                  | string                                                                                                                          
+`inheritedMetadata    ` | Metadata that will be inherited by all objects related to the Cluster                                                                                                                                                                                                                                                                                                                                                   | [*EmbeddedObjectMetadata](#EmbeddedObjectMetadata)                                                                              
 `imageName            ` | Name of the container image, supporting both tags (`<image>:<tag>`) and digests for deterministic and repeatable deployments (`<image>:<tag>@sha256:<digestValue>`)                                                                                                                                                                                                                                                     | string                                                                                                                          
 `imagePullPolicy      ` | Image pull policy. One of `Always`, `Never` or `IfNotPresent`. If not defined, it defaults to `IfNotPresent`. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images                                                                                                                                                                                                       | corev1.PullPolicy                                                                                                               
 `postgresUID          ` | The UID of the `postgres` user inside the image, defaults to `26`                                                                                                                                                                                                                                                                                                                                                       | int64                                                                                                                           
@@ -408,6 +410,17 @@ Name                | Description                                               
 `encryption         ` | Whenever to force the encryption of files (if the bucket is not already configured for that). Allowed options are empty string (use the bucket policy, default), `AES256` and `aws:kms`                                                                                                                              | EncryptionType 
 `immediateCheckpoint` | Control whether the I/O workload for the backup initial checkpoint will be limited, according to the `checkpoint_completion_target` setting on the PostgreSQL server. If set to true, an immediate checkpoint will be used, meaning PostgreSQL will complete the checkpoint as soon as possible. `false` by default. | bool           
 `jobs               ` | The number of parallel jobs to be used to upload the backup, defaults to 2                                                                                                                                                                                                                                           | *int32         
+
+<a id='EmbeddedObjectMetadata'></a>
+
+## EmbeddedObjectMetadata
+
+EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
+
+Name        | Description            | Type             
+----------- |  | -----------------
+`labels     ` |  | map[string]string
+`annotations` |  | map[string]string
 
 <a id='ExternalCluster'></a>
 

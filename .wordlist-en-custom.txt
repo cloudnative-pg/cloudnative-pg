@@ -60,13 +60,13 @@ CronJobs
 CustomResourceDefinition
 CustomResourceDefinitions
 Customizations
-Dhilip
 DISA
 DNS
 DataBackupConfiguration
 DataBase
 DevOps
 DevSecOps
+Dhilip
 DoD
 DockerHub
 Dockle
@@ -74,6 +74,7 @@ EBS
 EDB
 EKS
 EOF
+EmbeddedObjectMetadata
 EncryptionType
 EndpointCA
 EnterpriseDB
@@ -146,6 +147,7 @@ Openshift
 OperatorHub
 PGAudit
 PGDATA
+PGSQL
 PKI
 PODNAME
 PV
@@ -180,7 +182,6 @@ PoolerType
 Postgres
 PostgresConfiguration
 PrimaryUpdateStrategy
-PGSQL
 PullPolicy
 Quaresima
 QuickStart
@@ -359,6 +360,7 @@ customQueriesSecret
 customizable
 cutover
 cyber
+dT
 danglingPVC
 dataChecksums
 databackupconfiguration
@@ -384,7 +386,6 @@ dockle
 dod
 domainbetakubernetesiozone
 downtimes
-dT
 dvcmQ
 ecdsa
 edb
@@ -403,8 +404,8 @@ fastpath
 fd
 ffd
 filesystem
-fio
 findstr
+fio
 freddie
 gc
 gcc
@@ -456,8 +457,8 @@ kubelet
 kubernetes
 labelColumnName
 labelColumnValue
-labelling
 labelSelector
+labelling
 largeobject
 lastCheckTime
 lastScheduleTime
