@@ -128,6 +128,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup
 
 func addBarmanEndpointCAToJob(cluster apiv1.Cluster, backup *apiv1.Backup, job *batchv1.Job) {
 	var secretName, secretKey string
+	var isAzure bool
 	switch {
 	case cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA != nil:
 		secretName = cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA.Name
@@ -135,11 +136,17 @@ func addBarmanEndpointCAToJob(cluster apiv1.Cluster, backup *apiv1.Backup, job *
 	case backup != nil && backup.Status.EndpointCA != nil:
 		secretName = backup.Status.EndpointCA.Name
 		secretKey = backup.Status.EndpointCA.Key
+		if backup.Status.AzureCredentials != nil {
+			isAzure = true
+		}
 	case cluster.Spec.Bootstrap.Recovery.Source != "":
 		externalCluster, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
 		if ok && externalCluster.BarmanObjectStore != nil && externalCluster.BarmanObjectStore.EndpointCA != nil {
 			secretName = externalCluster.BarmanObjectStore.EndpointCA.Name
 			secretKey = externalCluster.BarmanObjectStore.EndpointCA.Key
+			if externalCluster.BarmanObjectStore.AzureCredentials != nil {
+				isAzure = true
+			}
 		}
 	}
 
@@ -165,8 +172,16 @@ func addBarmanEndpointCAToJob(cluster apiv1.Cluster, backup *apiv1.Backup, job *
 				MountPath: postgres.CertificatesDir,
 			},
 			)
+
+		var CAEnvVariable string
+		if isAzure {
+			CAEnvVariable = "REQUESTS_CA_BUNDLE"
+		} else {
+			CAEnvVariable = "AWS_CA_BUNDLE"
+		}
+
 		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
-			Name:  "AWS_CA_BUNDLE",
+			Name:  CAEnvVariable,
 			Value: postgres.BarmanRestoreEndpointCACertificateLocation,
 		})
 	}
