@@ -107,21 +107,34 @@ func (r *InstanceReconciler) RefreshServerCA(ctx context.Context, cluster *apiv1
 // RefreshBarmanEndpointCA gets the latest barman endpoint CA certificates from the secrets.
 // It returns true if configuration has been changed
 func (r *InstanceReconciler) RefreshBarmanEndpointCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
-	if !cluster.Spec.Backup.IsBarmanEndpointCASet() {
+	endpointCAs := map[string]*apiv1.SecretKeySelector{}
+	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
+		endpointCAs[postgresSpec.BarmanBackupEndpointCACertificateLocation] = cluster.Spec.Backup.BarmanObjectStore.EndpointCA
+	}
+	if replicaBarmanCA := cluster.GetBarmanEndpointCAForReplicaCluster(); replicaBarmanCA != nil {
+		endpointCAs[postgresSpec.BarmanRestoreEndpointCACertificateLocation] = replicaBarmanCA
+	}
+	if len(endpointCAs) == 0 {
 		return false, nil
 	}
 
-	var secret corev1.Secret
-	endpointCA := cluster.Spec.Backup.BarmanObjectStore.EndpointCA
-	err := r.GetClient().Get(
-		ctx,
-		client.ObjectKey{Namespace: r.instance.Namespace, Name: endpointCA.Name},
-		&secret)
-	if err != nil {
-		return false, err
+	var changed bool
+	for target, secretKeySelector := range endpointCAs {
+		var secret corev1.Secret
+		err := r.GetClient().Get(
+			ctx,
+			client.ObjectKey{Namespace: r.instance.Namespace, Name: secretKeySelector.Name},
+			&secret)
+		if err != nil {
+			return false, err
+		}
+		c, err := r.refreshFileFromSecret(ctx, &secret, secretKeySelector.Key, target)
+		changed = changed || c
+		if err != nil {
+			return changed, err
+		}
 	}
-
-	return r.refreshFileFromSecret(ctx, &secret, endpointCA.Key, postgresSpec.BarmanEndpointCACertificateLocation)
+	return changed, nil
 }
 
 // VerifyPgDataCoherence checks if this cluster exists in K8s. It panics if this

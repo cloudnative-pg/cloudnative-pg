@@ -202,7 +202,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		}
 	}
 
-	b.Env, err = barmanCredentials.EnvSetCloudCredentials(
+	b.Env, err = barmanCredentials.EnvSetBackupCloudCredentials(
 		ctx,
 		b.Client,
 		b.Cluster.Namespace,

@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -87,7 +88,7 @@ func run(ctx context.Context, podName string, args []string) error {
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
-	recoverClusterName, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
+	recoverClusterName, recoverEnv, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
 	if errors.Is(err, ErrNoBackupConfigured) {
 		// Backup not configured, skipping WAL
 		contextLog.Trace("Skipping WAL restore, there is no backup configuration",
@@ -110,6 +111,18 @@ func run(ctx context.Context, podName string, args []string) error {
 	env, err := cacheClient.GetEnv(cache.WALRestoreKey)
 	if err != nil {
 		return fmt.Errorf("failed to get envs: %w", err)
+	}
+
+	for _, recoverEnvValue := range recoverEnv {
+		splitRecoverEnvValue := strings.Split(recoverEnvValue, "=")
+		if len(splitRecoverEnvValue) != 2 {
+			continue
+		}
+		for idx, envValue := range env {
+			if strings.HasPrefix(envValue, splitRecoverEnvValue[0]) {
+				env[idx] = recoverEnvValue
+			}
+		}
 	}
 
 	// Create the restorer
@@ -183,31 +196,38 @@ func GetRecoverConfiguration(
 	podName string,
 ) (
 	string,
+	[]string,
 	*apiv1.BarmanObjectStoreConfiguration,
 	error,
 ) {
+	var env []string
 	// If I am the designated primary. Let's use the recovery object store for this wal
 	if cluster.IsReplica() && cluster.Status.CurrentPrimary == podName {
 		sourceName := cluster.Spec.ReplicaCluster.Source
 		externalCluster, found := cluster.ExternalCluster(sourceName)
 		if !found {
-			return "", nil, ErrExternalClusterNotFound
+			return "", nil, nil, ErrExternalClusterNotFound
 		}
 
 		if externalCluster.BarmanObjectStore == nil {
-			return "", nil, ErrNoBackupConfigured
+			return "", nil, nil, ErrNoBackupConfigured
 		}
-
-		return externalCluster.Name, externalCluster.BarmanObjectStore, nil
+		if externalCluster.BarmanObjectStore.EndpointCA != nil {
+			env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanRestoreEndpointCACertificateLocation))
+		}
+		return externalCluster.Name, env, externalCluster.BarmanObjectStore, nil
 	}
 
 	// Otherwise, let's use the object store which we are using to
 	// back up this cluster
 	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
-		return cluster.Name, cluster.Spec.Backup.BarmanObjectStore, nil
+		if cluster.Spec.Backup.BarmanObjectStore.EndpointCA != nil {
+			env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanBackupEndpointCACertificateLocation))
+		}
+		return cluster.Name, env, cluster.Spec.Backup.BarmanObjectStore, nil
 	}
 
-	return "", nil, ErrNoBackupConfigured
+	return "", nil, nil, ErrNoBackupConfigured
 }
 
 // gatherWALFilesToRestore files a list of possible WAL files to restore, always
