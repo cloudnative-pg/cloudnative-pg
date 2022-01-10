@@ -536,3 +536,51 @@ var _ = Describe("Default Metrics", func() {
 		Expect(cluster.Spec.Monitoring.AreDefaultQueriesDisabled()).To(BeTrue())
 	})
 })
+
+var _ = Describe("Barman Endpoint CA for replica cluster", func() {
+	cluster1 := Cluster{}
+	It("is empty if cluster is not replica", func() {
+		Expect(cluster1.GetBarmanEndpointCAForReplicaCluster()).To(BeNil())
+	})
+
+	cluster2 := Cluster{
+		Spec: ClusterSpec{
+			ReplicaCluster: &ReplicaClusterConfiguration{
+				Source:  "testSource",
+				Enabled: true,
+			},
+		},
+	}
+	It("is empty if source name does not match external cluster name", func() {
+		Expect(cluster2.GetBarmanEndpointCAForReplicaCluster()).To(BeNil())
+	})
+
+	cluster3 := Cluster{
+		Spec: ClusterSpec{
+			ExternalClusters: []ExternalCluster{
+				{
+					Name: "testReplica",
+					ConnectionParameters: map[string]string{
+						"dbname": "test",
+					},
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						ServerName: "testServerRealName",
+						EndpointCA: &SecretKeySelector{
+							LocalObjectReference: LocalObjectReference{
+								Name: "barman-endpoint-ca-secret",
+							},
+							Key: "ca.crt",
+						},
+					},
+				},
+			},
+			ReplicaCluster: &ReplicaClusterConfiguration{
+				Source:  "testReplica",
+				Enabled: true,
+			},
+		},
+	}
+	It("is defined if source name matches external cluster name", func() {
+		Expect(cluster3.GetBarmanEndpointCAForReplicaCluster()).To(Not(BeNil()))
+	})
+})

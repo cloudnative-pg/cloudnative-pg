@@ -1293,9 +1293,22 @@ func (cluster Cluster) ExternalCluster(name string) (ExternalCluster, bool) {
 	return ExternalCluster{}, false
 }
 
-// IsReplica check if this is a replica cluster or not
+// IsReplica checks if this is a replica cluster or not
 func (cluster Cluster) IsReplica() bool {
 	return cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.Enabled
+}
+
+// GetBarmanEndpointCAForReplicaCluster checks if this is a replica cluster which needs barman endpoint CA
+func (cluster Cluster) GetBarmanEndpointCAForReplicaCluster() *SecretKeySelector {
+	if !cluster.IsReplica() {
+		return nil
+	}
+	sourceName := cluster.Spec.ReplicaCluster.Source
+	externalCluster, found := cluster.ExternalCluster(sourceName)
+	if !found || externalCluster.BarmanObjectStore == nil {
+		return nil
+	}
+	return externalCluster.BarmanObjectStore.EndpointCA
 }
 
 // GetClusterAltDNSNames returns all the names needed to build a valid Server Certificate
@@ -1339,6 +1352,10 @@ func (cluster *Cluster) UsesSecret(secret string) bool {
 	}
 
 	if cluster.Spec.Backup.IsBarmanEndpointCASet() && cluster.Spec.Backup.BarmanObjectStore.EndpointCA.Name == secret {
+		return true
+	}
+
+	if endpointCA := cluster.GetBarmanEndpointCAForReplicaCluster(); endpointCA != nil && endpointCA.Name == secret {
 		return true
 	}
 

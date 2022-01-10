@@ -152,7 +152,7 @@ func addBarmanEndpointCAToJob(cluster apiv1.Cluster, backup *apiv1.Backup, job *
 					Items: []corev1.KeyToPath{
 						{
 							Key:  secretKey,
-							Path: postgres.BarmanEndpointCACertificateFileName,
+							Path: postgres.BarmanRestoreEndpointCACertificateFileName,
 						},
 					},
 				},
@@ -167,7 +167,7 @@ func addBarmanEndpointCAToJob(cluster apiv1.Cluster, backup *apiv1.Backup, job *
 			)
 		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 			Name:  "AWS_CA_BUNDLE",
-			Value: postgres.BarmanEndpointCACertificateLocation,
+			Value: postgres.BarmanRestoreEndpointCACertificateLocation,
 		})
 	}
 }

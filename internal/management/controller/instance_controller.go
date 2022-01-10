@@ -115,7 +115,7 @@ func (r *InstanceReconciler) UpdateCacheFromCluster(ctx context.Context, cluster
 
 	// Populate the cache with the backup configuration
 	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
-		envArchive, err := barmanCredentials.EnvSetCloudCredentials(
+		envArchive, err := barmanCredentials.EnvSetBackupCloudCredentials(
 			ctx,
 			r.GetClient(),
 			cluster.Namespace,
@@ -131,7 +131,7 @@ func (r *InstanceReconciler) UpdateCacheFromCluster(ctx context.Context, cluster
 	}
 
 	// Populate the cache with the recover configuration
-	_, barmanConfiguration, err := walrestore.GetRecoverConfiguration(cluster, r.instance.PodName)
+	_, env, barmanConfiguration, err := walrestore.GetRecoverConfiguration(cluster, r.instance.PodName)
 	if errors.Is(err, walrestore.ErrNoBackupConfigured) {
 		cache.Delete(cache.WALRestoreKey)
 		return nil
@@ -140,13 +140,15 @@ func (r *InstanceReconciler) UpdateCacheFromCluster(ctx context.Context, cluster
 		log.Error(err, "while getting recover configuration")
 		return nil
 	}
+	env = append(env, os.Environ()...)
 
-	envRestore, err := barmanCredentials.EnvSetCloudCredentials(
+	envRestore, err := barmanCredentials.EnvSetBackupCloudCredentials(
 		ctx,
 		r.GetClient(),
 		cluster.Namespace,
 		barmanConfiguration,
-		os.Environ())
+		env,
+	)
 	if err != nil {
 		log.Error(err, "while getting recover credentials")
 	}
