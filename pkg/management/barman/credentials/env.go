@@ -15,17 +15,48 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
-// EnvSetCloudCredentials sets the AWS environment variables given the configuration
-// inside the cluster
-func EnvSetCloudCredentials(
+// EnvSetBackupCloudCredentials sets the AWS environment variables needed for backups
+// given the configuration inside the cluster
+func EnvSetBackupCloudCredentials(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 	env []string,
 ) ([]string, error) {
+	if configuration.EndpointCA != nil {
+		env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanBackupEndpointCACertificateLocation))
+	}
+	return envSetCloudCredentials(ctx, c, namespace, configuration, env)
+}
+
+// EnvSetRestoreCloudCredentials sets the AWS environment variables needed for restores
+// given the configuration inside the cluster
+func EnvSetRestoreCloudCredentials(
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+	configuration *apiv1.BarmanObjectStoreConfiguration,
+	env []string,
+) ([]string, error) {
+	if configuration.EndpointCA != nil {
+		env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanRestoreEndpointCACertificateLocation))
+	}
+	return envSetCloudCredentials(ctx, c, namespace, configuration, env)
+}
+
+// envSetCloudCredentials sets the AWS environment variables given the configuration
+// inside the cluster
+func envSetCloudCredentials(
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+	configuration *apiv1.BarmanObjectStoreConfiguration,
+	env []string,
+) (envs []string, err error) {
 	if configuration.S3Credentials != nil {
 		return envSetAWSCredentials(ctx, c, namespace, configuration, env)
 	}

@@ -76,9 +76,21 @@ host all all all {{.DefaultAuthenticationMethod}}
 	// server certificates
 	ServerCACertificateLocation = CertificatesDir + "server-ca.crt"
 
-	// BarmanEndpointCACertificateLocation is the location where the barman endpoint
+	// BarmanBackupEndpointCACertificateLocation is the location where the barman endpoint
 	// CA certificate is stored
-	BarmanEndpointCACertificateLocation = CertificatesDir + BarmanEndpointCACertificateFileName
+	BarmanBackupEndpointCACertificateLocation = CertificatesDir + BarmanBackupEndpointCACertificateFileName
+
+	// BarmanBackupEndpointCACertificateFileName is the name of the file in which the barman endpoint
+	// CA certificate for backups is stored
+	BarmanBackupEndpointCACertificateFileName = "backup-" + BarmanEndpointCACertificateFileName
+
+	// BarmanRestoreEndpointCACertificateLocation is the location where the barman endpoint
+	// CA certificate is stored
+	BarmanRestoreEndpointCACertificateLocation = CertificatesDir + BarmanRestoreEndpointCACertificateFileName
+
+	// BarmanRestoreEndpointCACertificateFileName is the name of the file in which the barman endpoint
+	// CA certificate for restores is stored
+	BarmanRestoreEndpointCACertificateFileName = "restore-" + BarmanEndpointCACertificateFileName
 
 	// BarmanEndpointCACertificateFileName is the name of the file in which the barman endpoint
 	// CA certificate is stored

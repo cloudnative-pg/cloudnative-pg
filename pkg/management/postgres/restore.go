@@ -177,7 +177,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	}
 	serverName := server.GetServerName()
 
-	env, err := barmanCredentials.EnvSetCloudCredentials(
+	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
 		typedClient,
 		cluster.Namespace,
@@ -248,7 +248,7 @@ func (info InitInfo) loadBackupFromReference(
 		return nil, nil, err
 	}
 
-	env, err := barmanCredentials.EnvSetCloudCredentials(
+	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
 		typedClient,
 		cluster.Namespace,

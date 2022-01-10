@@ -169,6 +169,17 @@ func externalClusterSecrets(cluster apiv1.Cluster) []string {
 			result = append(result,
 				server.Password.Name)
 		}
+		if barmanObjStore := server.BarmanObjectStore; barmanObjStore != nil {
+			result = append(
+				result,
+				s3CredentialsSecrets(barmanObjStore.S3Credentials)...)
+			result = append(
+				result,
+				azureCredentialsSecrets(barmanObjStore.AzureCredentials)...)
+			if barmanObjStore.EndpointCA != nil {
+				result = append(result, barmanObjStore.EndpointCA.Name)
+			}
+		}
 	}
 
 	return result
@@ -201,17 +212,6 @@ func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 		result = append(
 			result,
 			azureCredentialsSecrets(backupOrigin.Status.AzureCredentials)...)
-	}
-
-	for _, externalCluster := range cluster.Spec.ExternalClusters {
-		if externalCluster.BarmanObjectStore != nil {
-			result = append(
-				result,
-				s3CredentialsSecrets(externalCluster.BarmanObjectStore.S3Credentials)...)
-			result = append(
-				result,
-				azureCredentialsSecrets(externalCluster.BarmanObjectStore.AzureCredentials)...)
-		}
 	}
 
 	return result

@@ -173,13 +173,6 @@ func createPostgresContainers(
 
 	addManagerLoggingOptions(cluster, &containers[0])
 
-	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
-		containers[0].Env = append(containers[0].Env, corev1.EnvVar{
-			Name:  "AWS_CA_BUNDLE",
-			Value: postgres.BarmanEndpointCACertificateLocation,
-		})
-	}
-
 	return containers
 }
 
