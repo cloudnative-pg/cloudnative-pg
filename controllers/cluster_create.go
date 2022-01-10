@@ -599,7 +599,8 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 		return nil
 	}
 
-	if cluster.Namespace == configuration.Current.OperatorNamespace {
+	if cluster.Namespace == configuration.Current.OperatorNamespace &&
+		configuration.Current.MonitoringQueriesConfigmap == apiv1.DefaultMonitoringConfigMapName {
 		contextLogger.Debug(
 			"skipping default metrics synchronization. The cluster resides in the same namespace of the operator",
 			"clusterNamespace", cluster.Namespace,
