@@ -27,8 +27,10 @@ func EnvSetBackupCloudCredentials(
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 	env []string,
 ) ([]string, error) {
-	if configuration.EndpointCA != nil {
+	if configuration.EndpointCA != nil && configuration.S3Credentials != nil {
 		env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanBackupEndpointCACertificateLocation))
+	} else if configuration.EndpointCA != nil && configuration.AzureCredentials != nil {
+		env = append(env, fmt.Sprintf("REQUESTS_CA_BUNDLE=%s", postgres.BarmanBackupEndpointCACertificateLocation))
 	}
 	return envSetCloudCredentials(ctx, c, namespace, configuration, env)
 }
@@ -42,8 +44,10 @@ func EnvSetRestoreCloudCredentials(
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 	env []string,
 ) ([]string, error) {
-	if configuration.EndpointCA != nil {
+	if configuration.EndpointCA != nil && configuration.S3Credentials != nil {
 		env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanRestoreEndpointCACertificateLocation))
+	} else if configuration.EndpointCA != nil && configuration.AzureCredentials != nil {
+		env = append(env, fmt.Sprintf("REQUESTS_CA_BUNDLE=%s", postgres.BarmanRestoreEndpointCACertificateLocation))
 	}
 	return envSetCloudCredentials(ctx, c, namespace, configuration, env)
 }
