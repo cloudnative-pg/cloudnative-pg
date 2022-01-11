@@ -2,6 +2,53 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.12.0
+
+**Release date:** 11 January 2022
+
+Features:
+
+- Add Kubernetes 1.23 to the list of supported Kubernetes distributions and remove end-to-end tests for 1.17,  
+  which ended support by the Kubernetes project in Dec 2020
+- Improve the responsiveness of pod status checks in case of network issues
+  by adding a connection timeout of 2 seconds and a communication timeout
+  of 30 seconds. This change sets a limit on the time the operator waits for
+  a pod to report its status before declaring it as failed, enhancing
+  the robustness and predictability of a failover operation
+- Introduce the `.spec.inheritedMetadata` field to the Cluster allowing the user
+  to specify labels and annotations that will apply to all objects generated
+  by the Cluster
+- Reduce the number of queries executed when calculating the status
+  of an instance
+- Add a readiness probe for PgBouncer
+- Add support for custom Certification Authority of the endpoint of Barman’s
+  backup object store when using Azure protocol
+
+Fixes:
+
+- During a failover, wait to select a new primary until all the WAL streaming
+  connections are closed. The operator now sets by default `wal_sender_timeout`
+  and `wal_receiver_timeout` to 5 seconds to make sure standby nodes will
+  quickly notice if the primary has network issues
+- Change WAL archiving strategy in replica clusters to fix rolling updates
+  by setting "archive_mode" to "always" for any PostgreSQL instance in
+  a replica cluster. We then restrict the upload of the WAL only from
+  the current and target designated primary. A WAL may be uploaded twice
+  during switchovers, which is not an issue
+- Fix support for custom Certification Authority of the endpoint of Barman’s
+  backup object store in replica clusters source
+- Use a fixed name for default monitoring config map in the cluster namespace
+- If the defaulting webhook is not working for any reason, the operator now
+  updates the Cluster with the defaults also during the reconciliation cycle
+- Fix the comparison of resource requests and limits to fix a rare issue
+  leading to an update of all the pods on every reconciliation cycle
+- Improve log messages from webhooks to also include the object namespace
+- Stop logging a “default” message at the start of every reconciliation loop
+- Stop logging a PodMonitor deletion on every reconciliation cycle
+  if `enablePodMonitor` is false
+- Do not complain about possible architecture mismatch if a pod is not
+  reachable
+
 ## Version 1.11.0
 
 **Release date:** 15 December 2021
