@@ -226,22 +226,20 @@ func AssertClusterDefault(namespace string, clusterName string,
 	})
 }
 
-func AssertWebhookEnabled(env *testsUtils.TestingEnvironment) {
+func AssertWebhookEnabled(env *testsUtils.TestingEnvironment, mutating, validating string) {
 	By("re-setting namespace selector for all admission controllers", func() {
-		mWhc, err := env.GetCNPsMutatingWebhookConf()
+		// Setting the namespace selector in MutatingWebhook and ValidatingWebhook
+		// to nil will go back to the default behaviour
+		mWhc, position, err := testsUtils.GetCNPsMutatingWebhookByName(env, mutating)
 		Expect(err).ToNot(HaveOccurred())
-		for i := range mWhc.Webhooks {
-			mWhc.Webhooks[i].NamespaceSelector = nil
-		}
-		err = env.UpdateCNPsMutatingWebhookConf(mWhc)
+		mWhc.Webhooks[position].NamespaceSelector = nil
+		err = testsUtils.UpdateCNPsMutatingWebhookConf(env, mWhc)
 		Expect(err).ToNot(HaveOccurred())
 
-		vWhc, err := env.GetCNPsValidatingWebhookConf()
+		vWhc, position, err := testsUtils.GetCNPsValidatingWebhookByName(env, validating)
 		Expect(err).ToNot(HaveOccurred())
-		for i := range vWhc.Webhooks {
-			vWhc.Webhooks[i].NamespaceSelector = nil
-		}
-		err = env.UpdateCNPsValidatingWebhookConf(vWhc)
+		vWhc.Webhooks[position].NamespaceSelector = nil
+		err = testsUtils.UpdateCNPsValidatingWebhookConf(env, vWhc)
 		Expect(err).ToNot(HaveOccurred())
 	})
 }

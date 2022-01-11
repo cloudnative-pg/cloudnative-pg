@@ -9,11 +9,13 @@ package e2e
 import (
 	"fmt"
 
+	v13 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
 
 /*
@@ -27,12 +29,12 @@ affected.
 var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func() {
 	// Define some constants to be used in the test
 	const (
-		clusterName            = "cluster-basic"
-		sampleFile             = fixturesDir + "/base/cluster-basic.yaml"
-		operatorNamespace      = "postgresql-operator-system"
-		level                  = tests.Highest
-		patchMutatingWebhook   = `kubectl patch mutatingwebhookconfigurations/postgresql-operator-mutating-webhook-configuration -p '{"webhooks":[{"name":"mcluster.kb.io","namespaceSelector":{"matchLabels":{"test":"value"}}}]}'`     //nolint
-		patchValidatingWebhook = `kubectl patch validatingwebhookconfigurations/postgresql-operator-validating-webhook-configuration -p '{"webhooks":[{"name":"vcluster.kb.io","namespaceSelector":{"matchLabels":{"test":"value"}}}]}'` //nolint
+		clusterName       = "cluster-basic"
+		sampleFile        = fixturesDir + "/base/cluster-basic.yaml"
+		operatorNamespace = "postgresql-operator-system"
+		level             = tests.Highest
+		mutatingWebhook   = "mcluster.kb.io"
+		validatingWebhook = "vcluster.kb.io"
 	)
 
 	var webhookNamespace string
@@ -75,19 +77,35 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 	It("Does not crash the operator when disabled", func() {
 		webhookNamespace = "no-webhook-test"
 		clusterIsDefaulted = true
-		// Delete the Webhooks (validation and mutation)
+
+		mWebhook, admissionNumber, err := utils.GetCNPsMutatingWebhookByName(env, mutatingWebhook)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Add a namespace selector to MutatingWebhooks and ValidatingWebhook, this will assign the webhooks
+		// only to one namespace simulating the action of disabling the webhooks
 		By(fmt.Sprintf("Disabling the mutating webhook %v namespace", operatorNamespace), func() {
-			_, _, err := testsUtils.Run(patchMutatingWebhook)
+			newWebhook := mWebhook.DeepCopy()
+			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &v13.LabelSelector{
+				MatchLabels: map[string]string{"test": "value"},
+			}
+			err := utils.UpdateCNPsMutatingWebhookConf(env, newWebhook)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
+		vWebhook, admissionNumber, err := utils.GetCNPsValidatingWebhookByName(env, validatingWebhook)
+		Expect(err).ToNot(HaveOccurred())
+
 		By(fmt.Sprintf("Disabling the validating webhook %v namespace", operatorNamespace), func() {
-			_, _, err := testsUtils.Run(patchValidatingWebhook)
+			newWebhook := vWebhook.DeepCopy()
+			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &v13.LabelSelector{
+				MatchLabels: map[string]string{"test": "value"},
+			}
+			err := utils.UpdateCNPsValidatingWebhookConf(env, newWebhook)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		// Create a basic PG cluster
-		err := env.CreateNamespace(webhookNamespace)
+		err = env.CreateNamespace(webhookNamespace)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and has no default value in the object
@@ -101,7 +119,8 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 		})
 
 		By("by cleaning up the webhook configurations", func() {
-			AssertWebhookEnabled(env)
+			// Removing the namespace selector in the webhooks
+			AssertWebhookEnabled(env, mutatingWebhook, validatingWebhook)
 		})
 	})
 })
