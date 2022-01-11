@@ -26,7 +26,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -526,7 +525,7 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 
 	// If the operator is managing certificates for webhooks, check that the setup is completed
 	if !webhookManagedByOLM {
-		err = env.checkWebhookReady(namespace)
+		err = CheckWebhookReady(&env, namespace)
 		if err != nil {
 			return false, err
 		}
@@ -553,7 +552,7 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 	return true, err
 }
 
-// GetCNPsMutatingWebhookConf get the admissioncontrollers object
+// GetCNPsMutatingWebhookConf get the MutatingWebhook linked to the operator
 func (env TestingEnvironment) GetCNPsMutatingWebhookConf() (
 	*admissionregistrationv1.MutatingWebhookConfiguration, error) {
 	ctx := context.Background()
@@ -563,112 +562,6 @@ func (env TestingEnvironment) GetCNPsMutatingWebhookConf() (
 		return nil, err
 	}
 	return mutatingWebhookConfig, nil
-}
-
-// UpdateCNPsMutatingWebhookConf update the admissioncontrollers object
-func (env TestingEnvironment) UpdateCNPsMutatingWebhookConf(
-	wh *admissionregistrationv1.MutatingWebhookConfiguration) error {
-	ctx := context.Background()
-	_, err := env.Interface.AdmissionregistrationV1().
-		MutatingWebhookConfigurations().Update(ctx, wh, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// GetCNPsValidatingWebhookConf get the admissioncontrollers object
-func (env TestingEnvironment) GetCNPsValidatingWebhookConf() (
-	*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
-	ctx := context.Background()
-	validatingWebhookConfig, err := env.Interface.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
-		ctx, controller.ValidatingWebhookConfigurationName, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return validatingWebhookConfig, nil
-}
-
-// UpdateCNPsValidatingWebhookConf update the admissioncontrollers object
-func (env TestingEnvironment) UpdateCNPsValidatingWebhookConf(
-	wh *admissionregistrationv1.ValidatingWebhookConfiguration) error {
-	ctx := context.Background()
-	_, err := env.Interface.AdmissionregistrationV1().
-		ValidatingWebhookConfigurations().Update(ctx, wh, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// checkWebhookReady ensures that the operator has finished the webhook setup.
-func (env TestingEnvironment) checkWebhookReady(namespace string) error {
-	// Check CA
-	secret := &corev1.Secret{}
-	secretNamespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      controller.WebhookSecretName,
-	}
-	err := env.Client.Get(env.Ctx, secretNamespacedName, secret)
-	if err != nil {
-		return err
-	}
-
-	ca := secret.Data["tls.crt"]
-
-	mutatingWebhookConfig, err := env.GetCNPsMutatingWebhookConf()
-	if err != nil {
-		return err
-	}
-
-	for _, webhook := range mutatingWebhookConfig.Webhooks {
-		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
-			return fmt.Errorf("secret %+v not match with ca bundle in %v: %v is not equal to %v",
-				controller.MutatingWebhookConfigurationName, secret, string(ca), string(webhook.ClientConfig.CABundle))
-		}
-	}
-
-	validatingWebhookConfig, err := env.GetCNPsValidatingWebhookConf()
-	if err != nil {
-		return err
-	}
-
-	for _, webhook := range validatingWebhookConfig.Webhooks {
-		if !bytes.Equal(webhook.ClientConfig.CABundle, ca) {
-			return fmt.Errorf("secret not match with ca bundle in %v",
-				controller.ValidatingWebhookConfigurationName)
-		}
-	}
-
-	customResourceDefinitionsName := []string{
-		"backups.postgresql.k8s.enterprisedb.io",
-		"clusters.postgresql.k8s.enterprisedb.io",
-		"scheduledbackups.postgresql.k8s.enterprisedb.io",
-	}
-
-	ctx := context.Background()
-	for _, c := range customResourceDefinitionsName {
-		crd, err := env.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
-			ctx, c, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		if crd.Spec.Conversion == nil {
-			continue
-		}
-
-		if crd.Spec.Conversion.Strategy == v1.NoneConverter {
-			continue
-		}
-
-		if crd.Spec.Conversion.Webhook != nil && crd.Spec.Conversion.Webhook.ClientConfig != nil &&
-			!bytes.Equal(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, ca) {
-			return fmt.Errorf("secret not match with ca bundle in %v; %v not equal to %v", c,
-				string(crd.Spec.Conversion.Webhook.ClientConfig.CABundle), string(ca))
-		}
-	}
-	return nil
 }
 
 // GetResourceNamespacedNameFromYAML returns the NamespacedName representing a resource in a YAML file
