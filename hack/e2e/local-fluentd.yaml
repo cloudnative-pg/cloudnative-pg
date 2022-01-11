@@ -50,12 +50,32 @@ data:
       exclude_path "#{ENV['FLUENT_CONTAINER_TAIL_EXCLUDE_PATH'] || use_default}"
       read_from_head true
       <parse>
-        @type "none"
+        @type regexp
+        expression /^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<message>.*)$/
+        time_format %Y-%m-%dT%H:%M:%S.%L%z
       </parse>
+      @label @CONCAT
     </source>
-    <match **>
-      @type stdout
-    </match>
+
+    <label @CONCAT>
+      <filter kubernetes.**>
+        @type concat
+        key message
+        use_partial_cri_logtag true
+        partial_cri_logtag_key logtag
+        partial_cri_stream_key stream
+      </filter>
+      <match kubernetes.**>
+        @type relabel
+        @label @OUTPUT
+      </match>
+    </label>
+
+    <label @OUTPUT>
+      <match>
+        @type stdout
+      </match>
+    </label>
 
 kind: ConfigMap
 metadata:
