@@ -47,3 +47,40 @@ func PodWaitForReady(env *TestingEnvironment, pod *v1.Pod, timeoutSeconds uint) 
 	)
 	return err
 }
+
+// GetPodsWithLabels returns a PodList of all the pods with the requested labels
+// in a certain namespace
+func GetPodsWithLabels(env *TestingEnvironment, namespace string, labels map[string]string) (*v1.PodList, error) {
+	podList := &v1.PodList{}
+	err := env.Client.List(
+		env.Ctx, podList, client.InNamespace(namespace),
+		client.MatchingLabels(labels),
+	)
+	return podList, err
+}
+
+// PodHasLabels verifies that the labels of a pod contain a specified
+// labels map
+func PodHasLabels(pod v1.Pod, labels map[string]string) bool {
+	podLabels := pod.Labels
+	for k, v := range labels {
+		val, ok := podLabels[k]
+		if !ok || (v != val) {
+			return false
+		}
+	}
+	return true
+}
+
+// PodHasAnnotations verifies that the annotations of a pod contain a specified
+// annotations map
+func PodHasAnnotations(pod v1.Pod, annotations map[string]string) bool {
+	podAnnotations := pod.Annotations
+	for k, v := range annotations {
+		val, ok := podAnnotations[k]
+		if !ok || (v != val) {
+			return false
+		}
+	}
+	return true
+}

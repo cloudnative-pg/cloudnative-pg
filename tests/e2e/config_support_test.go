@@ -12,10 +12,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	clusterapiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
@@ -25,13 +23,14 @@ import (
 var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive), func() {
 	const (
 		clusterWithInheritedLabelsFile = fixturesDir + "/configmap-support/config-support.yaml"
-		clusterWithObjectMeta          = fixturesDir + "/configmap-support/cluster-level-objectMeta.yaml"
 		configMapFile                  = fixturesDir + "/configmap-support/configmap.yaml"
 		secretFile                     = fixturesDir + "/configmap-support/secret.yaml"
 		configName                     = "postgresql-operator-controller-manager-config"
+		clusterName                    = "configmap-support"
+		namespace                      = "configmap-support-e2e"
 		level                          = tests.Low
 	)
-	var operatorNamespace, clusterName, namespace string
+	var operatorNamespace string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -73,115 +72,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	testLabelsAndAnnotations := func(clusterName, namespace, manifest string, checkClusterObject bool) {
-		// Create the cluster namespace
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, manifest, env)
-		By("verify labels inherited on cluster and pods", func() {
-			if checkClusterObject {
-				// Gathers the cluster list using labels
-				clusterList := &clusterapiv1.ClusterList{}
-				err = env.Client.List(env.Ctx,
-					clusterList, ctrlclient.InNamespace(namespace),
-					ctrlclient.MatchingLabels{
-						"environment": "qaEnv",
-					},
-				)
-				Expect(len(clusterList.Items)).Should(BeEquivalentTo(1),
-					"label is not inherited on cluster")
-			}
-
-			// Gathers the pod list using labels
-			Eventually(func() int32 {
-				podList := &corev1.PodList{}
-				err = env.Client.List(
-					env.Ctx, podList, ctrlclient.InNamespace(namespace),
-					ctrlclient.MatchingLabels{
-						"environment": "qaEnv",
-					},
-				)
-				return int32(len(podList.Items))
-			}, 180).Should(BeEquivalentTo(1), "label is not inherited on pod")
-		})
-		By("verify wildcard labels inherited", func() {
-			// Gathers pod list using wildcard labels
-			Eventually(func() int32 {
-				podList := &corev1.PodList{}
-				err = env.Client.List(
-					env.Ctx, podList, ctrlclient.InNamespace(namespace),
-					ctrlclient.MatchingLabels{
-						"example.com/qa":   "qa",
-						"example.com/prod": "prod",
-					},
-				)
-				return int32(len(podList.Items))
-			}, 60).Should(BeEquivalentTo(1),
-				"wildcard labels are not inherited on pods")
-		})
-		By("verify annotations inherited on cluster and pods", func() {
-			expectedAnnotationValue := "DatabaseApplication"
-			var annotation string
-			if checkClusterObject {
-				// Gathers the cluster list using annotations
-				cluster := &clusterapiv1.Cluster{}
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      clusterName,
-				}
-				err = env.Client.Get(env.Ctx, namespacedName, cluster)
-				Expect(err).ShouldNot(HaveOccurred())
-				annotation = cluster.ObjectMeta.Annotations["categories"]
-				Expect(annotation).ShouldNot(BeEmpty(),
-					"annotation key is not inherited on cluster")
-				Expect(annotation).Should(BeEquivalentTo(expectedAnnotationValue),
-					"annotation value is not inherited on cluster")
-			}
-			// Gathers the pod list using annotations
-			podList, _ := env.GetClusterPodList(namespace, clusterName)
-			for _, pod := range podList.Items {
-				annotation = pod.ObjectMeta.Annotations["categories"]
-				Expect(annotation).ShouldNot(BeEmpty(),
-					fmt.Sprintf("annotation key is not inherited on pod %v", pod.ObjectMeta.Name))
-				Expect(annotation).Should(BeEquivalentTo(expectedAnnotationValue),
-					fmt.Sprintf("annotation value is not inherited on pod %v", pod.ObjectMeta.Name))
-			}
-		})
-		By("verify wildcard annotation inherited", func() {
-			// Gathers pod list using wildcard labels
-			podList, _ := env.GetClusterPodList(namespace, clusterName)
-			for _, pod := range podList.Items {
-				wildcardAnnotationOne := pod.ObjectMeta.Annotations["example.com/qa"]
-				wildcardAnnotationTwo := pod.ObjectMeta.Annotations["example.com/prod"]
-
-				Expect(wildcardAnnotationOne).ShouldNot(BeEmpty(),
-					fmt.Sprintf("wildcard annotaioon key %v is not inherited on pod %v", wildcardAnnotationOne,
-						pod.ObjectMeta.Name))
-				Expect(wildcardAnnotationTwo).ShouldNot(BeEmpty(),
-					fmt.Sprintf("wildcard annotation key %v is not inherited on pod %v", wildcardAnnotationTwo,
-						pod.ObjectMeta.Name))
-				Expect(wildcardAnnotationOne).Should(BeEquivalentTo("qa"),
-					fmt.Sprintf("wildcard annotation value %v is not inherited on pod %v", wildcardAnnotationOne,
-						pod.ObjectMeta.Name))
-				Expect(wildcardAnnotationTwo).Should(BeEquivalentTo("prod"),
-					fmt.Sprintf("wildcard annotation value %v is not inherited on pod %v", wildcardAnnotationTwo,
-						pod.ObjectMeta.Name))
-			}
-		})
-	}
-
-	It("verify label's and annotation's inheritance when per-cluster objectmeta changed ", func() {
-		clusterName := "objectmeta-inheritance"
-		namespace := "objectmeta-inheritance"
-		manifest := clusterWithObjectMeta
-		checkClusterObject := false
-		testLabelsAndAnnotations(clusterName, namespace, manifest, checkClusterObject)
-
-		err := env.DeleteNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	It("can create the configuration map and secret", func() {
+	It("creates the configuration map and secret", func() {
 		// create a config map where operator is deployed
 		cmd := fmt.Sprintf("kubectl apply -n %v -f %v", operatorNamespace, configMapFile)
 		_, _, err := utils.Run(cmd)
@@ -215,12 +106,54 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
+	It("creates a cluster", func() {
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, clusterName, clusterWithInheritedLabelsFile, env)
+	})
+
 	It("verify label's and annotation's inheritance when global config-map changed", func() {
-		clusterName := "configmap-support"
-		namespace := "configmap-support-e2e"
-		manifest := clusterWithInheritedLabelsFile
-		checkClusterObject := true
-		testLabelsAndAnnotations(clusterName, namespace, manifest, checkClusterObject)
+		cluster, err := env.GetCluster(namespace, clusterName)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("checking the cluster has the requested labels", func() {
+			expectedLabels := map[string]string{"environment": "qaEnv"}
+			Expect(utils.ClusterHasLabels(cluster, expectedLabels)).To(BeTrue())
+		})
+		By("checking the pods inherit labels matching the ones in the configuration secret", func() {
+			expectedLabels := map[string]string{"environment": "qaEnv"}
+			Eventually(func() (bool, error) {
+				return utils.AllClusterPodsHaveLabels(env, namespace, clusterName, expectedLabels)
+			}, 180).Should(BeTrue())
+		})
+		By("checking the pods inherit labels matching wildcard ones in the configuration secret", func() {
+			expectedLabels := map[string]string{
+				"example.com/qa":   "qa",
+				"example.com/prod": "prod",
+			}
+			Eventually(func() (bool, error) {
+				return utils.AllClusterPodsHaveLabels(env, namespace, clusterName, expectedLabels)
+			}, 180).Should(BeTrue())
+		})
+		By("checking the cluster has the requested annotation", func() {
+			expectedAnnotations := map[string]string{"categories": "DatabaseApplication"}
+			Expect(utils.ClusterHasAnnotations(cluster, expectedAnnotations)).To(BeTrue())
+		})
+		By("checking the pods inherit annotations matching the ones in the configuration configMap", func() {
+			expectedAnnotations := map[string]string{"categories": "DatabaseApplication"}
+			Eventually(func() (bool, error) {
+				return utils.AllClusterPodsHaveAnnotations(env, namespace, clusterName, expectedAnnotations)
+			}, 180).Should(BeTrue())
+		})
+		By("checking the pods inherit annotations matching wildcard ones in the configuration configMap", func() {
+			expectedAnnotations := map[string]string{
+				"example.com/qa":   "qa",
+				"example.com/prod": "prod",
+			}
+			Eventually(func() (bool, error) {
+				return utils.AllClusterPodsHaveLabels(env, namespace, clusterName, expectedAnnotations)
+			}, 180).Should(BeTrue())
+		})
 	})
 
 	// Setting MONITORING_QUERIES_CONFIGMAP: "" should disable monitoring
