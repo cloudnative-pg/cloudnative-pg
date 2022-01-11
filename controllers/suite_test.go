@@ -99,7 +99,7 @@ var _ = AfterSuite(func() {
 func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 	pooler := &apiv1.Pooler{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      rand.String(10),
+			Name:      "svcfriendly-" + rand.String(10),
 			Namespace: cluster.Namespace,
 		},
 		Spec: apiv1.PoolerSpec{
@@ -121,7 +121,7 @@ func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 }
 
 func newFakeCNPCluster(namespace string) *apiv1.Cluster {
-	name := rand.String(10)
+	name := "svcfriendly-" + rand.String(10)
 	caServer := fmt.Sprintf("%s-ca-server", name)
 	caClient := fmt.Sprintf("%s-ca-client", name)
 
