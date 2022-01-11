@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/avast/retry-go"
+	"github.com/avast/retry-go/v4"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
