@@ -9,8 +9,6 @@ on:
 
 env:
   GOLANG_VERSION: "1.17.x"
-  # Red Hat certification data
-  RH_API: "https://catalog.redhat.com/api/containers/v1/projects/certification/id"
 
 permissions:
   contents: write
@@ -120,71 +118,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  redhat_certification:
-    runs-on: ubuntu-20.04
-    name: Red Hat Certification
-    needs:
-      - buildx
-    steps:
-      -
-        name: Certify Operator Image with Red Hat Connect
-        env:
-          DIGEST: ${{ needs.buildx.outputs.digest }}
-          CNP_VERSION: ${{ steps.build-meta.outputs.version }}
-          IMAGE_REGISTRY: "quay.io/enterprisedb/cloud-native-postgresql"
-        run: |
-          # We create the proper headers files for all the curl commands
-          echo "accept: application/json
-          Content-Type: application/json
-          X-API-KEY: ${{ secrets.RH_CONNECT_API_KEY }}" > headers.txt
-
-          # In the same step we need to make sure that Red Hat has the secret to pull.
-          # The json auth must be the json parsed with `jq -R` to be escaped.
-          curl -s -i -X 'PATCH' \
-          '${{ env.RH_API }}/${{ secrets.RH_PROJ_ID }}' \
-          -H @headers.txt \
-          -d '{
-          "container": {"kube_objects": "${{ secrets.QUAY_JSON_AUTH }}"}
-          }'
-
-          # The image to certify
-          PULL_SPEC="${{ env.IMAGE_REGISTRY }}@${{ env.DIGEST }}"
-
-          # We start the certification process
-          curl -s -X 'POST' \
-            '${{ env.RH_API }}/${{ secrets.RH_PROJ_ID }}/requests/scans' \
-            -H @headers.txt \
-            -d '{
-              "pull_spec": "'"${PULL_SPEC}"'",
-              "tag": "'"${{ env.CNP_VERSION }}"'"
-            }' > scan_return.json
-
-          # Get the scan requests result and check the status
-          # 400, 404 and 409 are the only error that we're aware of for now
-          scanStatus=`cat scan_return.json | jq '.status'`
-          if [ "${scanStatus}" == "400" ] || [ "${scanStatus}" == "404" ] || [ "${scanStatus}" == "409" ]; then
-            cat scan_return.json
-            exit 1
-          fi
-
-          # Wait until we have the passed check on the image
-          STATUS=""
-          ITER=0
-          while [ "$STATUS" != "passed" ] && [ "$STATUS" != "failed" ] && [ $ITER -lt 30 ]; do
-            ITER=$((ITER + 1))
-            STATUS=`curl -s -X 'GET' '${{ env.RH_API }}/${{ secrets.RH_PROJ_ID }}/images?page_size=10&page=0&sort_by=creation_date%5Bdesc%5D'\
-            -H @headers.txt | jq -r '.data[] | select (.docker_image_digest == "'${{ env.DIGEST }}'") | .scan_status'`
-            sleep 60
-          done
-
-          if [ "$STATUS" != "passed" ]; then
-            curl -s -X 'GET' '${{ env.RH_API }}/${{ secrets.RH_PROJ_ID }}/images?page_size=10&page=0&sort_by=creation_date%5Bdesc%5D'\
-            -H @headers.txt | jq -r '.data[] | select (.docker_image_digest == "'${{ env.DIGEST }}'")'
-            exit 1
-          fi
-
-          rm headers.txt
-
   release:
     runs-on: ubuntu-20.04
     needs:
@@ -272,3 +205,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+
+  invoke-redhat-certification:
+    name: Trigger Red Hat Certification Workflow
+    runs-on: ubuntu-20.04
+    needs:
+      - buildx
+      - release
+    if: |
+      needs.buildx.result == 'success' &&
+      needs.release.result == 'success'
+    steps:
+      - name: Invoke workflow-dispatch
+        id: trigger-workflow
+        uses: aurelien-baudet/workflow-dispatch@v2.1.1
+        with:
+          workflow: redhat-certification
+          token: ${{ secrets.REPO_GHA_PAT }}
+          ref: ${{ steps.vars.outputs.ref }}
+          display-workflow-run-url: true
+          wait-for-completion: false
+          inputs: >
+            {"digest":"${{ needs.buildx.outputs.digest }}","version":"${{ needs.buildx.outputs.version }}"}
