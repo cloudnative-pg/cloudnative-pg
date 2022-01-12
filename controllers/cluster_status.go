@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
@@ -409,21 +410,33 @@ func (r *ClusterReconciler) getPgbouncerIntegrationStatus(
 			continue
 		}
 
+		secretName := pooler.GetAuthQuerySecretName()
+		// there is no need to examine further, the potential secret we may add is already present.
+		// This saves us:
+		// - further API calls to the kube-api server,
+		// - redundant iterations of the secrets passed
+		if slices.Contains(poolersIntegrations.Secrets, secretName) {
+			continue
+		}
+
 		// Check the secret existence and ownership
 		authQuerySecret := corev1.Secret{}
-		err := r.Get(ctx, client.ObjectKey{
-			Namespace: cluster.Namespace, Name: pooler.GetAuthQuerySecretName(),
-		}, &authQuerySecret)
+		err := r.Get(
+			ctx,
+			client.ObjectKey{Namespace: cluster.Namespace, Name: pooler.GetAuthQuerySecretName()},
+			&authQuerySecret,
+		)
+		if apierrs.IsNotFound(err) {
+			poolersIntegrations.Secrets = append(poolersIntegrations.Secrets, secretName)
+			continue
+		}
+		
 		if err != nil {
-			if apierrs.IsNotFound(err) {
-				poolersIntegrations.Secrets =
-					append(poolersIntegrations.Secrets, pooler.GetAuthQuerySecretName())
-			} else {
-				return apiv1.PgBouncerIntegrationStatus{}, fmt.Errorf("while getting secret for pooler integration")
-			}
-		} else if owner, ok := isOwnedByCluster(&authQuerySecret); ok && owner == cluster.Name {
-			poolersIntegrations.Secrets =
-				append(poolersIntegrations.Secrets, pooler.GetAuthQuerySecretName())
+			return apiv1.PgBouncerIntegrationStatus{}, fmt.Errorf("while getting secret for pooler integration")
+		}
+		if owner, ok := isOwnedByCluster(&authQuerySecret); ok && owner == cluster.Name {
+			poolersIntegrations.Secrets = append(poolersIntegrations.Secrets, secretName)
+			continue
 		}
 	}
 
