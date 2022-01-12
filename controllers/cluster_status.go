@@ -430,7 +430,7 @@ func (r *ClusterReconciler) getPgbouncerIntegrationStatus(
 			poolersIntegrations.Secrets = append(poolersIntegrations.Secrets, secretName)
 			continue
 		}
-		
+
 		if err != nil {
 			return apiv1.PgBouncerIntegrationStatus{}, fmt.Errorf("while getting secret for pooler integration")
 		}
