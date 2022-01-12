@@ -50,7 +50,6 @@ var _ = Describe("Update user password", func() {
 
 	It("can update the user application password", func() {
 		const namespace = "cluster-update-user-password"
-		var secret corev1.Secret
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
@@ -72,33 +71,15 @@ var _ = Describe("Update user password", func() {
 		By("update user application password", func() {
 			const secretName = clusterName + "-app"
 			const newPassword = "eeh2Zahohx" //nolint:gosec
-			err = env.Client.Get(env.Ctx,
-				client.ObjectKey{Namespace: namespace, Name: secretName},
-				&secret)
-			Expect(err).ToNot(HaveOccurred())
 
-			// newSecret := secret
-			secret.Data["password"] = []byte(newPassword)
-
-			err = env.Client.Update(env.Ctx, &secret)
-			Expect(err).ToNot(HaveOccurred())
-
+			AssertUpdateSecret(newPassword, secretName, namespace, clusterName, 30, env)
 			AssertConnection(rwService, "app", "app", newPassword, pod, 60, env)
 		})
 
 		By("update superuser password", func() {
 			const secretName = clusterName + "-superuser"
 			const newPassword = "fi6uCae7" //nolint:gosec
-			err = env.Client.Get(env.Ctx,
-				client.ObjectKey{Namespace: namespace, Name: secretName},
-				&secret)
-			Expect(err).ToNot(HaveOccurred())
-
-			secret.Data["password"] = []byte(newPassword)
-
-			err = env.Client.Update(env.Ctx, &secret)
-			Expect(err).ToNot(HaveOccurred())
-
+			AssertUpdateSecret(newPassword, secretName, namespace, clusterName, 30, env)
 			AssertConnection(rwService, "postgres", "postgres", newPassword, pod, 60, env)
 		})
 	})

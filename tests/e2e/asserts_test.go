@@ -243,6 +243,44 @@ func AssertWebhookEnabled(env *testsUtils.TestingEnvironment, mutating, validati
 	})
 }
 
+// Update the secrets and verify cluster reference the updated resource version of secrets
+func AssertUpdateSecret(newPassword string, secretName string, namespace string,
+	clusterName string, timeout int, env *testsUtils.TestingEnvironment) {
+	var secret corev1.Secret
+	err := env.Client.Get(env.Ctx,
+		ctrlclient.ObjectKey{Namespace: namespace, Name: secretName},
+		&secret)
+	Expect(err).ToNot(HaveOccurred())
+
+	secret.Data["password"] = []byte(newPassword)
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return env.Client.Update(env.Ctx, &secret)
+	})
+	Expect(err).ToNot(HaveOccurred())
+
+	// Wait for the cluster pickup the updated secrets version first
+	Eventually(func() string {
+		cluster, err := env.GetCluster(namespace, clusterName)
+		if err != nil {
+			GinkgoWriter.Printf("Error reports while retrieving cluster %v\n", err.Error())
+			return ""
+		}
+		switch {
+		case strings.HasSuffix(secretName, apiv1.ApplicationUserSecretSuffix):
+			GinkgoWriter.Printf("Resource version of Application secret referenced in the cluster is %v\n",
+				cluster.Status.SecretsResourceVersion.ApplicationSecretVersion)
+			return cluster.Status.SecretsResourceVersion.ApplicationSecretVersion
+		case strings.HasSuffix(secretName, apiv1.SuperUserSecretSuffix):
+			GinkgoWriter.Printf("Resource version of Superuser secret referenced in the cluster is %v\n",
+				cluster.Status.SecretsResourceVersion.SuperuserSecretVersion)
+			return cluster.Status.SecretsResourceVersion.SuperuserSecretVersion
+		default:
+			GinkgoWriter.Printf("Unsupported secrets name found %v\n", secretName)
+			return ""
+		}
+	}, timeout).Should(BeEquivalentTo(secret.ResourceVersion))
+}
+
 // AssertConnection is used if a connection from a pod to a postgresql
 // database works
 func AssertConnection(host string, user string, dbname string,
