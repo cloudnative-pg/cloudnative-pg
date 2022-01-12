@@ -1,0 +1,82 @@
+# When this workflow is invoked, it will start the Red Hat certification process
+# for the operator container image.
+name: redhat-certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: 'Digest from released CNP container'
+        required: true
+      version:
+        description: 'CNP released version'
+        required: true
+env:
+  # Red Hat certification data
+  RH_API: "https://catalog.redhat.com/api/containers/v1/projects/certification/id"
+
+permissions:
+  contents: write
+
+jobs:
+  redhat_certification:
+    runs-on: ubuntu-20.04
+    name: Red Hat Certification
+    steps:
+      - name: Certify Operator Image with Red Hat Connect
+        env:
+          DIGEST: ${{ github.event.inputs.digest }}
+          CNP_VERSION: ${{ github.event.inputs.version }}
+          IMAGE_REGISTRY: "quay.io/enterprisedb/cloud-native-postgresql"
+        run: |
+          # We create the proper headers files for all the curl commands
+          echo "accept: application/json
+          Content-Type: application/json
+          X-API-KEY: ${{ secrets.RH_CONNECT_API_KEY }}" > headers.txt
+
+          # In the same step we need to make sure that Red Hat has the secret to pull.
+          # The json auth must be the json parsed with `jq -R` to be escaped.
+          curl -s -i -X 'PATCH' \
+          '${{ env.RH_API }}/${{ secrets.RH_PROJ_ID }}' \
+          -H @headers.txt \
+          -d '{
+          "container": {"kube_objects": "${{ secrets.QUAY_JSON_AUTH }}"}
+          }'
+
+          # The image to certify
+          PULL_SPEC="${{ env.IMAGE_REGISTRY }}@${{ env.DIGEST }}"
+
+          # We start the certification process
+          curl -s -X 'POST' \
+            '${{ env.RH_API }}/${{ secrets.RH_PROJ_ID }}/requests/scans' \
+            -H @headers.txt \
+            -d '{
+              "pull_spec": "'"${PULL_SPEC}"'",
+              "tag": "'"${{ env.CNP_VERSION }}"'"
+            }' > scan_return.json
+
+          # Get the scan requests result and check the status
+          # 400, 404 and 409 are the only error that we're aware of for now
+          scanStatus=`cat scan_return.json | jq '.status'`
+          if [ "${scanStatus}" == "400" ] || [ "${scanStatus}" == "404" ] || [ "${scanStatus}" == "409" ]; then
+            cat scan_return.json
+            exit 1
+          fi
+
+          # Wait until we have the passed check on the image
+          STATUS=""
+          ITER=0
+          while [ "$STATUS" != "passed" ] && [ "$STATUS" != "failed" ] && [ $ITER -lt 30 ]; do
+            ITER=$((ITER + 1))
+            STATUS=`curl -s -X 'GET' '${{ env.RH_API }}/${{ secrets.RH_PROJ_ID }}/images?page_size=10&page=0&sort_by=creation_date%5Bdesc%5D'\
+            -H @headers.txt | jq -r '.data[] | select (.docker_image_digest == "'${{ env.DIGEST }}'") | .scan_status'`
+            sleep 60
+          done
+
+          if [ "$STATUS" != "passed" ]; then
+            curl -s -X 'GET' '${{ env.RH_API }}/${{ secrets.RH_PROJ_ID }}/images?page_size=10&page=0&sort_by=creation_date%5Bdesc%5D'\
+            -H @headers.txt | jq -r '.data[] | select (.docker_image_digest == "'${{ env.DIGEST }}'")'
+            exit 1
+          fi
+
+          rm headers.txt
