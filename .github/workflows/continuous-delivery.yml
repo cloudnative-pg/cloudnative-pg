@@ -17,9 +17,6 @@ on:
       test_level:
         description: 'Test level (0-4)'
         required: false
-      pull_request_number:
-        description: 'Reserved for workflow triggered by pull request, ignore it when manually invoke'
-        required: false
   schedule:
     - cron:  '0 1 * * *'
 
@@ -1305,3 +1302,41 @@ jobs:
         run: |
           terraform destroy -auto-approve
           rm -fr .terraform* terraform* id_rsa host.list
+
+  ok-to-merge:
+    name: Label PR ok-to-merge
+    needs:
+      - duplicate_runs
+      - evaluate-test-level
+      - e2e-local
+      - e2e-eks
+      - e2e-aks
+    if: |
+      !failure() && !cancelled() &&
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      github.ref != 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch' &&
+      ( github.event.inputs.depth == 'main' || github.event.inputs.depth == 'schedule' ) &&
+      github.event.inputs.limit == '' &&
+      needs.evaluate-test-level.outputs.testLevel >= 4
+    runs-on: ubuntu-20.04
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v2.3.5
+      -
+        name: Get PR number
+        id: get_pr_number
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
+        run: |
+          pr_number=$(gh pr view --json number -q .number || : )
+          echo "::set-output name=pr_number::${pr_number}"
+      -
+        name: Label PR ok-to-merge
+        if: steps.get_pr_number.outputs.pr_number != ''
+        uses: actions-ecosystem/action-add-labels@v1.1.3
+        with:
+          github_token: ${{ secrets.REPO_GHA_PAT }}
+          number: ${{ steps.get_pr_number.outputs.pr_number }}
+          labels: ok-to-merge

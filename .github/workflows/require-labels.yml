@@ -1,0 +1,17 @@
+# Verify if a pull request contains the labels required to enable the merge button.
+name: require-labels
+
+on:
+  pull_request:
+    types: [labeled, unlabeled]
+
+jobs:
+  require-labels:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Require labels
+        uses: docker://agilepathway/pull-request-label-checker:v1.0.104
+        with:
+          any_of: ok-to-merge
+          none_of: do not merge
+          repo_token: ${{ secrets.REPO_GHA_PAT }}
