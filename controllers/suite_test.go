@@ -117,6 +117,12 @@ func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 	err := k8sClient.Create(context.Background(), pooler)
 	Expect(err).To(BeNil())
 
+	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
+	pooler.TypeMeta = metav1.TypeMeta{
+		Kind:       apiv1.PoolerKind,
+		APIVersion: apiv1.GroupVersion.String(),
+	}
+
 	return pooler
 }
 
@@ -135,6 +141,9 @@ func newFakeCNPCluster(namespace string) *apiv1.Cluster {
 			Certificates: &apiv1.CertificatesConfiguration{
 				ServerCASecret: caServer,
 				ClientCASecret: caClient,
+			},
+			StorageConfiguration: apiv1.StorageConfiguration{
+				Size: "1G",
 			},
 		},
 		Status: apiv1.ClusterStatus{
