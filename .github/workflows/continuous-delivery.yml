@@ -149,6 +149,14 @@ jobs:
         needs.change-triage.outputs.go-code-changed == 'true'
       )
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        k8s-version:
+          - 1.19.x
+          - 1.20.x
+          - 1.21.x
+          - 1.22.x
+          - 1.23.x
     steps:
       -
         name: Checkout code
@@ -158,27 +166,11 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: ${{ env.GOLANG_VERSION }}
-      # Install kubebuilder that is a requirement to run tests
-      -
-        name: Install Kubebuilder
-        uses: nick-invision/retry@v2
-        with:
-          timeout_seconds: 30
-          max_attempts: 3
-          on_retry_command: |
-            # Clear-ups before retries
-            sudo rm -rf /tmp/kubebuilder/* /usr/local/kubebuilder
-          command: |
-            mkdir -p /tmp/kubebuilder
-            # The doc suggests using go.kubebuilder.io, but the redirects
-            # are currently not working there. We get the release directly
-            # from github.
-            kubebuilder_url="https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${{ env.KUBEBUILDER_VERSION }}/kubebuilder_${{ env.KUBEBUILDER_VERSION }}_$(go env GOOS)_$(go env GOARCH).tar.gz"
-            curl -sSL ${kubebuilder_url} | tar --strip-components=1 -xz -C /tmp/kubebuilder
-            sudo mv /tmp/kubebuilder /usr/local/
       -
         name: Run unit tests
-        run:
+        env:
+          ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
+        run: |
           make test
 
   apidoc:

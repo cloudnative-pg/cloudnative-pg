@@ -40,6 +40,12 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+# Setting SHELL to bash allows bash commands to be executed by recipes.
+# This is a requirement for 'setup-envtest.sh' in the test target.
+# Options are set to exit when a recipe line exits non-zero or a piped command fails.
+SHELL = /usr/bin/env bash -o pipefail
+.SHELLFLAGS = -ec
+
 all: build
 
 ##@ General
@@ -60,7 +66,12 @@ help: ## Display this help.
 
 ##@ Development
 
+ENVTEST_ASSETS_DIR=$$(pwd)/testbin
+
 test: generate fmt vet manifests ## Run tests.
+	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
+	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest ;\
+	source <(setup-envtest use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	go test ./api/... ./cmd/... ./controllers/... ./internal/... ./pkg/... ./tests/utils -coverprofile cover.out
 
 e2e-test-kind: ## Run e2e tests locally using kind.
