@@ -1340,3 +1340,34 @@ jobs:
           github_token: ${{ secrets.REPO_GHA_PAT }}
           number: ${{ steps.get_pr_number.outputs.pr_number }}
           labels: ok-to-merge
+
+  unlabel-ok-to-merge:
+    name: Remove label PR ok-to-merge
+    needs:
+      - duplicate_runs
+      - evaluate-test-level
+      - e2e-local
+      - e2e-eks
+      - e2e-aks
+    if: |
+      failure() &&
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      github.ref != 'refs/heads/main'
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2.3.5
+      - name: Get PR number
+        id: get_pr_number
+        env:
+          GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
+        run: |
+          pr_number=$(gh pr view --json number -q .number || : )
+          echo "::set-output name=pr_number::${pr_number}"
+      - name: Label PR ok-to-merge
+        if: steps.get_pr_number.outputs.pr_number != ''
+        uses: actions-ecosystem/action-remove-labels@v1.3.0
+        with:
+          github_token: ${{ secrets.REPO_GHA_PAT }}
+          number: ${{ steps.get_pr_number.outputs.pr_number }}
+          labels: ok-to-merge
