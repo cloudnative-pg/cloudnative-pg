@@ -38,10 +38,11 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	cfg              *rest.Config
-	k8sClient        client.Client
-	testEnv          *envtest.Environment
-	poolerReconciler *PoolerReconciler
+	cfg               *rest.Config
+	k8sClient         client.Client
+	testEnv           *envtest.Environment
+	poolerReconciler  *PoolerReconciler
+	clusterReconciler *ClusterReconciler
 )
 
 func TestAPIs(t *testing.T) {
@@ -76,6 +77,12 @@ var _ = BeforeSuite(func() {
 
 	k8client, err := client.New(cfg, client.Options{Scheme: schema})
 	Expect(err).To(BeNil())
+
+	clusterReconciler = &ClusterReconciler{
+		Client:   k8client,
+		Scheme:   schema,
+		Recorder: record.NewFakeRecorder(120),
+	}
 
 	poolerReconciler = &PoolerReconciler{
 		Client:   k8client,
