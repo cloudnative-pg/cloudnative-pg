@@ -371,15 +371,16 @@ var (
 			"archive_command": fmt.Sprintf(
 				"/controller/manager wal-archive --log-destination %s/%s.json %%p",
 				LogPath, LogFileName),
-			"port":             fmt.Sprint(ServerPort),
-			"wal_level":        "logical",
-			"wal_log_hints":    "on",
-			"archive_timeout":  "5min", // TODO support configurable archive timeout
-			"full_page_writes": "on",
-			"ssl":              "on",
-			"ssl_cert_file":    ServerCertificateLocation,
-			"ssl_key_file":     ServerKeyLocation,
-			"ssl_ca_file":      ClientCACertificateLocation,
+			"port":                fmt.Sprint(ServerPort),
+			"wal_level":           "logical",
+			"wal_log_hints":       "on",
+			"archive_timeout":     "5min", // TODO support configurable archive timeout
+			"full_page_writes":    "on",
+			"ssl":                 "on",
+			"ssl_cert_file":       ServerCertificateLocation,
+			"ssl_key_file":        ServerKeyLocation,
+			"ssl_ca_file":         ClientCACertificateLocation,
+			"restart_after_crash": "false",
 		},
 	}
 )
