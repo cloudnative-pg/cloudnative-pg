@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -154,7 +156,7 @@ func newFakeCNPCluster(namespace string) *apiv1.Cluster {
 			},
 		},
 		Status: apiv1.ClusterStatus{
-			Instances:                1,
+			Instances:                3,
 			SecretsResourceVersion:   apiv1.SecretsResourceVersion{},
 			ConfigMapResourceVersion: apiv1.ConfigMapResourceVersion{},
 			Certificates: apiv1.CertificatesStatus{
@@ -165,6 +167,8 @@ func newFakeCNPCluster(namespace string) *apiv1.Cluster {
 			},
 		},
 	}
+
+	cluster.Default()
 
 	err := k8sClient.Create(context.Background(), cluster)
 	Expect(err).To(BeNil())
@@ -198,4 +202,64 @@ func getPoolerDeployment(ctx context.Context, pooler *apiv1.Pooler) *appsv1.Depl
 	Expect(err).To(BeNil())
 
 	return deployment
+}
+
+func generateFakeClusterPods(cluster *apiv1.Cluster, markAsReady bool) []corev1.Pod {
+	var idx int32
+	var pods []corev1.Pod
+	for idx < cluster.Spec.Instances {
+		idx++
+		pod := specs.PodWithExistingStorage(*cluster, idx)
+
+		err := k8sClient.Create(context.Background(), pod)
+		Expect(err).To(BeNil())
+
+		// we overwrite local status, needed for certain tests. The status returned from fake api server will be always
+		// 'Pending'
+		if markAsReady {
+			pod.Status = corev1.PodStatus{
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.ContainersReady,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			}
+		}
+
+		pods = append(pods, *pod)
+	}
+	return pods
+}
+
+func generateFakeInitDBJobs(cluster *apiv1.Cluster) []batchv1.Job {
+	var idx int32
+	var jobs []batchv1.Job
+	for idx < cluster.Spec.Instances {
+		idx++
+		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
+
+		err := k8sClient.Create(context.Background(), job)
+		Expect(err).To(BeNil())
+
+		jobs = append(jobs, *job)
+	}
+	return jobs
+}
+
+func generateFakePVC(cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
+	var idx int32
+	var pvcs []corev1.PersistentVolumeClaim
+	for idx < cluster.Spec.Instances {
+		idx++
+
+		pvc, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, idx)
+		Expect(err).To(BeNil())
+
+		err = k8sClient.Create(context.Background(), pvc)
+		Expect(err).To(BeNil())
+
+		pvcs = append(pvcs, *pvc)
+	}
+	return pvcs
 }
