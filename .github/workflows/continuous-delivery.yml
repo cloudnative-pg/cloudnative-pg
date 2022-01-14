@@ -654,7 +654,7 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/ginkgo@6e68f79684d4
+            go install github.com/onsi/ginkgo/v2/ginkgo
       -
         name: Azure Login
         uses: azure/login@v1.4.2
@@ -829,7 +829,7 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/ginkgo@6e68f79684d4
+            go install github.com/onsi/ginkgo/v2/ginkgo
       -
         name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -1010,7 +1010,7 @@ jobs:
           timeout_seconds: 30
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/ginkgo@6e68f79684d4
+            go install github.com/onsi/ginkgo/v2/ginkgo
       -
         name: Set cluster name
         run: |
@@ -1168,7 +1168,7 @@ jobs:
           timeout_seconds: 30
           max_attempts: 3
           command: |
-            go install github.com/onsi/ginkgo/ginkgo@6e68f79684d4
+            go install github.com/onsi/ginkgo/v2/ginkgo
       -
         name:  Install Terraform
         uses: hashicorp/setup-terraform@v1

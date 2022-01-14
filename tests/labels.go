@@ -8,7 +8,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package tests
 
 // List of the labels we use for labeling test specs
-// See https://github.com/onsi/ginkgo/blob/ver2/docs/MIGRATING_TO_V2.md#label-decoration
+// See https://github.com/onsi/ginkgo/v2/blob/ver2/docs/MIGRATING_TO_V2.md#label-decoration
 const (
 	// LabelDisruptive is the string for labelling disruptive tests
 	LabelDisruptive = "disruptive"

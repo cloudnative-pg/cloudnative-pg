@@ -10,8 +10,8 @@ package nodes
 import (
 	"fmt"
 
-	. "github.com/onsi/ginkgo" //nolint
-	. "github.com/onsi/gomega" //nolint
+	. "github.com/onsi/ginkgo/v2" //nolint
+	. "github.com/onsi/gomega"    //nolint
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )

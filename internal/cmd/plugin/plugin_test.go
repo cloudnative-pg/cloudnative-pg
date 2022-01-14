@@ -7,7 +7,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package plugin
 
 import (
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

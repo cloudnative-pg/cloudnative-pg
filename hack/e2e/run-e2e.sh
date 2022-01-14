@@ -18,17 +18,6 @@ CONTROLLER_IMG=${CONTROLLER_IMG:-$("${ROOT_DIR}/hack/setup-cluster.sh" print-ima
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 
-install_go_module() {
-  local module=$1
-  local GO_TMP_DIR
-  GO_TMP_DIR=$(mktemp -d)
-  cd "$GO_TMP_DIR"
-  go mod init tmp
-  go get -u "${module}"
-  rm -rf "$GO_TMP_DIR"
-  cd -
-}
-
 notinpath () {
     case "$PATH" in
         *:$1:* | *:$1 | $1:*)
@@ -65,7 +54,7 @@ if notinpath "${go_bin}"; then
 fi
 
 if ! which ginkgo &>/dev/null; then
-  install_go_module "github.com/onsi/ginkgo/ginkgo@6e68f79684d4"
+  go install github.com/onsi/ginkgo/v2/ginkgo
 fi
 
 # To run all ginkgo test suite, store return code for individual ginkgo suite and

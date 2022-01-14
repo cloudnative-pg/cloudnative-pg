@@ -9,7 +9,7 @@ package execlog
 import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
