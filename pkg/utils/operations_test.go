@@ -9,7 +9,7 @@ package utils
 import (
 	config "github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

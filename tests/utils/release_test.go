@@ -12,7 +12,7 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

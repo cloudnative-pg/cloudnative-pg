@@ -29,7 +29,7 @@ import (
 
 	// +kubebuilder:scaffold:imports
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
