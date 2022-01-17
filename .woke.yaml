@@ -1,3 +1,5 @@
+ignore_files:
+  - config/crd/bases/postgresql.k8s.enterprisedb.io_poolers.yaml
 
 # Default internal rules refer https://github.com/get-woke/woke/blob/main/internal/rule/default.yaml
 rules:

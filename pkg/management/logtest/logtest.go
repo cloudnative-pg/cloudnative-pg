@@ -95,7 +95,7 @@ func (s *SpyLogger) AddRecord(record *LogRecord) {
 
 // GetLogger implements the log.Logger interface
 func (s SpyLogger) GetLogger() logr.Logger {
-	return nil
+	return logr.Logger{}
 }
 
 // Enabled implements the log.Logger interface
