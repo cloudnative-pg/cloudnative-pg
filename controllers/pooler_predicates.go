@@ -13,14 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
+// secretsPoolerPredicate contains the set of predicate functions of the pooler secrets
 var (
-	isUsefulPoolerSecret = func(object client.Object) bool {
-		return isOwnedByPoolerOrSatisfiesPredicate(object, func(object client.Object) bool {
-			_, ok := object.(*corev1.Secret)
-			return ok && hasReloadLabelSet(object)
-		})
-	}
-
 	secretsPoolerPredicate = predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			return isUsefulPoolerSecret(e.Object)
@@ -43,4 +37,11 @@ func isOwnedByPoolerOrSatisfiesPredicate(
 ) bool {
 	_, owned := isOwnedByPooler(object)
 	return owned || predicate(object)
+}
+
+func isUsefulPoolerSecret(object client.Object) bool {
+	return isOwnedByPoolerOrSatisfiesPredicate(object, func(object client.Object) bool {
+		_, ok := object.(*corev1.Secret)
+		return ok && hasReloadLabelSet(object)
+	})
 }
