@@ -3,7 +3,12 @@ name: require-labels
 
 on:
   pull_request:
-    types: [labeled, unlabeled]
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
 
 jobs:
   require-labels:
