@@ -228,5 +228,10 @@ func SetupLogger(ctx context.Context) (Logger, context.Context) {
 		ctx = newCtx
 	}
 
-	return FromContext(ctx), IntoContext(ctx, &logger{Logger: logr.FromContext(ctx)})
+	// The only error that we can have calling FromContext() is a not found
+	// in which case we will have an empty not nil value for newLogger which
+	// still useful when setting up the logger
+	newLogger, _ := logr.FromContext(ctx)
+
+	return FromContext(ctx), IntoContext(ctx, &logger{Logger: newLogger})
 }

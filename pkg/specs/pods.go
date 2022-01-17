@@ -122,7 +122,7 @@ func createPostgresContainers(
 			VolumeMounts:    createPostgresVolumeMounts(cluster),
 			ReadinessProbe: &corev1.Probe{
 				TimeoutSeconds: 5,
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathReady,
 						Port: intstr.FromInt(url.StatusPort),
@@ -137,7 +137,7 @@ func createPostgresContainers(
 			LivenessProbe: &corev1.Probe{
 				InitialDelaySeconds: cluster.GetMaxStartDelay(),
 				TimeoutSeconds:      5,
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
 						Port: intstr.FromInt(url.StatusPort),
