@@ -38,7 +38,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run [flags]",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := context.Background()
+			ctx := log.IntoContext(cmd.Context(), log.GetLogger())
 			instance := postgres.NewInstance()
 
 			instance.PgData = pgData

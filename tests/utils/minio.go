@@ -142,7 +142,7 @@ func MinioDefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeCl
 								},
 							},
 							LivenessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
 										Path: "/minio/health/live",
 										Port: intstr.IntOrString{
@@ -153,7 +153,7 @@ func MinioDefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeCl
 								InitialDelaySeconds: 30,
 							},
 							ReadinessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
 										Path: "/minio/health/ready",
 										Port: intstr.IntOrString{
