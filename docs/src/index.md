@@ -50,8 +50,7 @@ page from the EDB website for a list of the currently supported Kubernetes distr
 ### Multiple architectures
 
 The Cloud Native PostgreSQL Operator container images support the multi-arch
-format for the following platforms: `linux/amd64`, `linux/arm64`,
-`linux/ppc64le`, `linux/s390x`.
+format for the following platforms: `linux/amd64`, `linux/ppc64le`, `linux/s390x`.
 
 !!! Warning
     Cloud Native PostgreSQL requires that all nodes in a Kubernetes cluster have the
