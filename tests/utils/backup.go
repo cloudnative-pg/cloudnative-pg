@@ -267,7 +267,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 	targetTime string,
 	env *TestingEnvironment) error {
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-	DestinationPath := fmt.Sprintf("http://azurite:10000/storageaccountname/%v", sourceClusterName)
+	DestinationPath := fmt.Sprintf("https://azurite:10000/storageaccountname/%v", sourceClusterName)
 
 	restoreCluster := &apiv1.Cluster{
 		ObjectMeta: v1.ObjectMeta{
@@ -308,6 +308,12 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 					Name: sourceClusterName,
 					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
 						DestinationPath: DestinationPath,
+						EndpointCA: &apiv1.SecretKeySelector{
+							LocalObjectReference: apiv1.LocalObjectReference{
+								Name: "azurite-ca-secret",
+							},
+							Key: "ca.crt",
+						},
 						AzureCredentials: &apiv1.AzureCredentials{
 							ConnectionString: &apiv1.SecretKeySelector{
 								LocalObjectReference: apiv1.LocalObjectReference{
