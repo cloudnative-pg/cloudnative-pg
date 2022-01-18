@@ -1423,10 +1423,6 @@ func prepareClusterForPITROnAzureBlob(namespace, clusterName, backupSampleFile,
 }
 
 func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
-	// Create a cluster in a namespace we'll delete after the test
-	err := env.CreateNamespace(namespace)
-	Expect(err).ToNot(HaveOccurred())
-
 	By("creating the Azurite storage credentials", func() {
 		AssertStorageCredentialsAreCreatedOnAzurite(namespace)
 	})

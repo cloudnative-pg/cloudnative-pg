@@ -1,3 +1,5 @@
+# In az cli client pod we need to export env 'REQUESTS_CA_BUNDLE' variable with value "/etc/ssl/certs/rootCA.pem"
+# for custom CA bundle to connect azurite server
 apiVersion: v1
 kind: Pod
 metadata:
@@ -19,3 +21,15 @@ spec:
             secretKeyRef:
               name: azurite
               key: AZURE_CONNECTION_STRING
+        - name: REQUESTS_CA_BUNDLE
+          value: "/etc/ssl/certs/rootCA.pem"
+      volumeMounts:
+        - name: cert
+          mountPath: "/etc/ssl/certs"
+  volumes:
+    - name: cert
+      secret:
+        secretName: azurite-ca-secret
+        items:
+          - key: ca.crt
+            path: rootCA.pem

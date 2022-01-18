@@ -34,7 +34,10 @@ spec:
   externalClusters:
     - name: pg-backup-azurite
       barmanObjectStore:
-        destinationPath: http://azurite:10000/storageaccountname/pg-backup-azurite
+        destinationPath: https://azurite:10000/storageaccountname/pg-backup-azurite
+        endpointCA:
+          key: ca.crt
+          name: azurite-ca-secret
         azureCredentials:
           connectionString:
             name: azurite
