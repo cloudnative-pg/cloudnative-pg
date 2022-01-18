@@ -909,6 +909,11 @@ jobs:
             exit 0
           fi
 
+          # Attempt to remove any leftover PDB (and Cluster that would recreate it)
+          # that could prevent the EKS cluster deletion
+          kubectl delete cluster --all --all-namespaces || true
+          kubectl delete pdb --all --all-namespaces || true
+
           # Attempting three times to cleanly remove the cluster via eksctl
           attempt=1
           max_attempts=3
