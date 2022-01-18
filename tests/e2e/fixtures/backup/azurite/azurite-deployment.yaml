@@ -1,3 +1,5 @@
+# We need pass custom --cert and --key in .pem format to start azurite as https mode
+# refer "https://github.com/Azure/Azurite#https-setup"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,19 +20,31 @@ spec:
         app: azurite
     spec:
       containers:
-      - image: mcr.microsoft.com/azure-storage/azurite
-        name: azurite
-        env:
-          - name: AZURITE_ACCOUNTS
-            valueFrom:
-              secretKeyRef:
-                name: azurite
-                key: AZURITE_ACCOUNTS
-        ports:
-          - containerPort: 10000
-        volumeMounts:
-        - mountPath: /data
-          name: data-volume
+        - image: mcr.microsoft.com/azure-storage/azurite
+          name: azurite
+          command: ["azurite"]
+          args: ["-l", "/data", "--cert", "/etc/ssl/certs/azurite.pem", "--key", "/etc/ssl/certs/azurite-key.pem", "--oauth", "basic", "--blobHost", "0.0.0.0"]
+          env:
+            - name: AZURITE_ACCOUNTS
+              valueFrom:
+                secretKeyRef:
+                  name: azurite
+                  key: AZURITE_ACCOUNTS
+          ports:
+            - containerPort: 10000
+          volumeMounts:
+            - mountPath: /data
+              name: data-volume
+            - name: cert
+              mountPath: "/etc/ssl/certs"
       volumes:
-      - name: data-volume
-        emptyDir: { }
+        - name: data-volume
+          emptyDir: { }
+        - name: cert
+          secret:
+            secretName: azurite-tls-secret
+            items:
+              - key: tls.crt
+                path: azurite.pem
+              - key: tls.key
+                path: azurite-key.pem

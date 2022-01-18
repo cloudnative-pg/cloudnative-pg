@@ -449,6 +449,8 @@ var _ = Describe("Backup and restore", func() {
 			scheduledBackupImmediateSampleFile = fixturesDir +
 				"/backup/scheduled_backup_immediate/scheduled-backup-immediate-azurite.yaml"
 			backupFile = fixturesDir + "/backup/azurite/backup.yaml"
+			caSecName  = "azurite-ca-secret"
+			tlsSecName = "azurite-tls-secret"
 		)
 
 		BeforeAll(func() {
@@ -460,6 +462,24 @@ var _ = Describe("Backup and restore", func() {
 			namespace = "cluster-backup-azurite"
 			clusterName, err := env.GetResourceNameFromYAML(azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
+
+			// Create a cluster in a namespace we'll delete after the test
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating ca and tls certificate secrets", func() {
+				// create CA certificates
+				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, caSecName, true, env)
+
+				// sign and create secret using CA certificate and key
+				serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,
+					[]string{"azurite.internal.mydomain.net, azurite.default.svc, azurite.default,"},
+				)
+				Expect(err).ToNot(HaveOccurred())
+				serverSecret := serverPair.GenerateCertificateSecret(namespace, tlsSecName)
+				err = env.Client.Create(env.Ctx, serverSecret)
+				Expect(err).ToNot(HaveOccurred())
+			})
 
 			// Setup Azurite and az cli along with Postgresql cluster
 			prepareClusterBackupOnAzurite(namespace, clusterName, azuriteBlobSampleFile, backupFile, tableName)
@@ -547,6 +567,8 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 		sourceBackupFileAzureSAS        = fixturesBackupDir + "backup-azure-blob-sas.yaml"
 		sourceBackupFileAzurePITRSAS    = fixturesBackupDir + "backup-azure-blob-pitr-sas.yaml"
 		level                           = tests.High
+		caSecName                       = "azurite-ca-secret"
+		tlsSecName                      = "azurite-tls-secret"
 	)
 
 	var namespace, clusterName, azStorageAccount, azStorageKey string
@@ -837,6 +859,24 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			namespace = "recovery-barman-object-azurite"
 			clusterName, err := env.GetResourceNameFromYAML(azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
+
+			// Create a cluster in a namespace we'll delete after the test
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating ca and tls certificate secrets", func() {
+				// create CA certificates
+				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, caSecName, true, env)
+
+				// sign and create secret using CA certificate and key
+				serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,
+					[]string{"azurite.internal.mydomain.net, azurite.default.svc, azurite.default,"},
+				)
+				Expect(err).ToNot(HaveOccurred())
+				serverSecret := serverPair.GenerateCertificateSecret(namespace, tlsSecName)
+				err = env.Client.Create(env.Ctx, serverSecret)
+				Expect(err).ToNot(HaveOccurred())
+			})
 
 			// Setup Azurite and az cli along with PostgreSQL cluster
 			prepareClusterBackupOnAzurite(namespace, clusterName, azuriteBlobSampleFile, backupFileAzurite, tableName)
