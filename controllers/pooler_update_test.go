@@ -52,9 +52,9 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		By("making sure that updateDeployment creates the deployment", func() {
 			err := poolerReconciler.updateDeployment(ctx, pooler, res)
 			Expect(err).To(BeNil())
+			Expect(res.Deployment).ToNot(BeNil())
 
 			deployment := getPoolerDeployment(ctx, pooler)
-
 			Expect(*deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
 		})
 
@@ -65,7 +65,6 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(err).To(BeNil())
 
 			afterDep := getPoolerDeployment(ctx, pooler)
-
 			Expect(beforeDep.ResourceVersion).To(Equal(afterDep.ResourceVersion))
 			Expect(beforeDep.Annotations[pgbouncer.PgbouncerPoolerSpecHash]).
 				To(Equal(afterDep.Annotations[pgbouncer.PgbouncerPoolerSpecHash]))
@@ -107,6 +106,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		By("making sure that updateServiceAccount function creates the SA", func() {
 			err := poolerReconciler.updateServiceAccount(ctx, pooler, res)
 			Expect(err).To(BeNil())
+
 			sa := &corev1.ServiceAccount{}
 
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace}, sa)
@@ -208,8 +208,6 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPCluster(namespace)
 		pooler := newFakePooler(cluster)
-		// k8s.machinery.rand doesn't always produce compatible names for SVC, we make sure the pooler has a proper name
-		pooler.Name = "friendlyname" + pooler.Name
 		res := &poolerManagedResources{Cluster: cluster}
 
 		By("making sure the service doesn't exist", func() {

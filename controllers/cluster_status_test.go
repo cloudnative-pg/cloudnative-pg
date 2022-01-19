@@ -8,17 +8,18 @@ package controllers
 
 import (
 	"context"
+	"sync"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 )
 
 var _ = Describe("cluster_status unit tests", func() {
@@ -102,6 +103,7 @@ var _ = Describe("cluster_status unit tests", func() {
 
 		By("making sure the remote resource is updated", func() {
 			remoteCluster := &v1.Cluster{}
+
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, remoteCluster)
 			Expect(err).To(BeNil())
 			Expect(remoteCluster.Status.TargetPrimaryTimestamp).ToNot(BeEmpty())
@@ -128,6 +130,56 @@ var _ = Describe("cluster_status unit tests", func() {
 			Expect(err).To(BeNil())
 			Expect(remoteCluster.Status.Phase).To(Equal(v1.PhaseSwitchover))
 			Expect(remoteCluster.Status.PhaseReason).To(Equal(phaseReason))
+		})
+	})
+
+	It("makes sure that getManagedResources works correctly", func() {
+		ctx, cancel := context.WithCancel(context.TODO())
+		namespace := newFakeNamespace()
+		cluster := newFakeCNPCluster(namespace)
+		var jobs []batchv1.Job
+		var pods []corev1.Pod
+		var pvcs []corev1.PersistentVolumeClaim
+		crReconciler, _, mgr := createManagerWithReconcilers(ctx)
+
+		wg := sync.WaitGroup{}
+
+		By("starting the manager", func() {
+			wg.Add(1)
+			go func() {
+				err := (mgr).Start(ctx)
+				Expect(err).To(BeNil())
+				wg.Done()
+			}()
+		})
+
+		By("creating the required resources", func() {
+			jobs = generateFakeInitDBJobs(cluster)
+			pods = generateFakeClusterPods(cluster, true)
+			pvcs = generateFakePVC(cluster)
+			name, isOwned := isOwnedByCluster(&pods[0])
+			Expect(isOwned).To(BeTrue())
+			Expect(name).To(Equal(cluster.Name))
+		})
+
+		By("waiting the cache to sync", func() {
+			syncDone := mgr.GetCache().WaitForCacheSync(ctx)
+			Expect(syncDone).To(BeTrue())
+		})
+
+		By("making sure that the required resources are found", func() {
+			Eventually(func() (*managedResources, error) {
+				return crReconciler.getManagedResources(ctx, cluster)
+			}).Should(Satisfy(func(mr *managedResources) bool {
+				return len(mr.pods.Items) == len(pods) &&
+					len(mr.jobs.Items) == len(jobs) &&
+					len(mr.pvcs.Items) == len(pvcs)
+			}))
+		})
+
+		By("stopping the manager", func() {
+			cancel()
+			wg.Wait()
 		})
 	})
 })
