@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -24,8 +25,10 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
+	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	// +kubebuilder:scaffold:imports
 
@@ -45,7 +48,12 @@ var (
 	testEnv           *envtest.Environment
 	poolerReconciler  *PoolerReconciler
 	clusterReconciler *ClusterReconciler
+	scheme            *runtime.Scheme
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -71,32 +79,27 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
 
-	schema := runtime.NewScheme()
+	scheme = runtime.NewScheme()
 
-	utilruntime.Must(clientgoscheme.AddToScheme(schema))
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(apiv1.AddToScheme(schema))
+	utilruntime.Must(apiv1.AddToScheme(scheme))
 
-	k8client, err := client.New(cfg, client.Options{Scheme: schema})
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
+
 	Expect(err).To(BeNil())
 
 	clusterReconciler = &ClusterReconciler{
-		Client:   k8client,
-		Scheme:   schema,
+		Client:   k8sClient,
+		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(120),
 	}
 
 	poolerReconciler = &PoolerReconciler{
-		Client:   k8client,
-		Scheme:   schema,
+		Client:   k8sClient,
+		Scheme:   scheme,
 		Recorder: record.NewFakeRecorder(120),
 	}
-
-	// +kubebuilder:scaffold:scheme
-
-	k8sClient, err = client.New(cfg, client.Options{Scheme: schema})
-	Expect(err).ToNot(HaveOccurred())
-	Expect(k8sClient).ToNot(BeNil())
 })
 
 var _ = AfterSuite(func() {
@@ -173,6 +176,12 @@ func newFakeCNPCluster(namespace string) *apiv1.Cluster {
 	err := k8sClient.Create(context.Background(), cluster)
 	Expect(err).To(BeNil())
 
+	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
+	cluster.TypeMeta = metav1.TypeMeta{
+		Kind:       apiv1.ClusterKind,
+		APIVersion: apiv1.GroupVersion.String(),
+	}
+
 	return cluster
 }
 
@@ -210,6 +219,7 @@ func generateFakeClusterPods(cluster *apiv1.Cluster, markAsReady bool) []corev1.
 	for idx < cluster.Spec.Instances {
 		idx++
 		pod := specs.PodWithExistingStorage(*cluster, idx)
+		SetClusterOwnerAnnotationsAndLabels(&pod.ObjectMeta, cluster)
 
 		err := k8sClient.Create(context.Background(), pod)
 		Expect(err).To(BeNil())
@@ -226,7 +236,6 @@ func generateFakeClusterPods(cluster *apiv1.Cluster, markAsReady bool) []corev1.
 				},
 			}
 		}
-
 		pods = append(pods, *pod)
 	}
 	return pods
@@ -238,10 +247,10 @@ func generateFakeInitDBJobs(cluster *apiv1.Cluster) []batchv1.Job {
 	for idx < cluster.Spec.Instances {
 		idx++
 		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
+		SetClusterOwnerAnnotationsAndLabels(&job.ObjectMeta, cluster)
 
 		err := k8sClient.Create(context.Background(), job)
 		Expect(err).To(BeNil())
-
 		jobs = append(jobs, *job)
 	}
 	return jobs
@@ -255,11 +264,43 @@ func generateFakePVC(cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
 
 		pvc, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, idx)
 		Expect(err).To(BeNil())
+		SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
 
 		err = k8sClient.Create(context.Background(), pvc)
 		Expect(err).To(BeNil())
-
 		pvcs = append(pvcs, *pvc)
 	}
 	return pvcs
+}
+
+func createManagerWithReconcilers(ctx context.Context) (*ClusterReconciler, *PoolerReconciler, manager.Manager) {
+	mgr, err := controllerruntime.NewManager(cfg, controllerruntime.Options{
+		Scheme:             scheme,
+		LeaderElection:     false,
+		MetricsBindAddress: "0",
+		Port:               testEnv.WebhookInstallOptions.LocalServingPort,
+		Host:               testEnv.WebhookInstallOptions.LocalServingHost,
+		CertDir:            testEnv.WebhookInstallOptions.LocalServingCertDir,
+	})
+	Expect(err).To(BeNil())
+
+	clusterRec := &ClusterReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(120),
+	}
+
+	err = clusterRec.SetupWithManager(ctx, mgr)
+	Expect(err).To(BeNil())
+
+	poolerRec := &PoolerReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   scheme,
+		Recorder: record.NewFakeRecorder(120),
+	}
+
+	err = poolerRec.SetupWithManager(ctx, mgr)
+	Expect(err).To(BeNil())
+
+	return clusterRec, poolerRec, mgr
 }
