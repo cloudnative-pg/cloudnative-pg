@@ -44,270 +44,183 @@ var _ = Describe("Backup and restore", func() {
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
-	Context("using minio as object storage", func() {
+	Context("using minio as object storage", Ordered, func() {
 		// This is a set of tests using a minio server deployed in the same
 		// namespace as the cluster. Since each cluster is installed in its
 		// own namespace, they can share the configuration file
 
-		const backupFile = fixturesDir + "/backup/minio/backup-minio.yaml"
-		Context("HTTP Connections", Ordered, func() {
-			const (
-				clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml"
-				customQueriesSampleFile    = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
-			)
-			BeforeAll(func() {
-				isAKS, err := env.IsAKS()
-				Expect(err).ToNot(HaveOccurred())
-				if isAKS {
-					Skip("Test is not run on AKS.")
-				}
-				namespace = "cluster-backup-minio"
-				clusterName, err = env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
-				Expect(err).ToNot(HaveOccurred())
+		const (
+			backupFile                 = fixturesDir + "/backup/minio/backup-minio.yaml"
+			clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml"
+			customQueriesSampleFile    = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
+			minioCaSecName             = "minio-server-ca-secret"
+			minioTLSSecName            = "minio-server-tls-secret"
+		)
+		BeforeAll(func() {
+			isAKS, err := env.IsAKS()
+			Expect(err).ToNot(HaveOccurred())
+			if isAKS {
+				Skip("Test is not run on AKS.")
+			}
+			namespace = "cluster-backup-minio"
+			clusterName, err = env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+			Expect(err).ToNot(HaveOccurred())
 
-				err = env.CreateNamespace(namespace)
-				Expect(err).ToNot(HaveOccurred())
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
 
-				By("creating the credentials for minio", func() {
-					AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
-				})
-
-				By("setting up minio", func() {
-					minio, err := testUtils.MinioDefaultSetup(namespace)
-					Expect(err).ToNot(HaveOccurred())
-					err = testUtils.InstallMinio(env, minio, 300)
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				// Create the minio client pod and wait for it to be ready.
-				// We'll use it to check if everything is archived correctly
-				By("setting up minio client pod", func() {
-					minioClientPod := testUtils.MinioDefaultClient(namespace)
-					err = testUtils.PodCreateAndWaitForReady(env, &minioClientPod, 240)
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				// Create ConfigMap and secrets to verify metrics for target database after backup restore
-				AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
-
-				// Create the cluster
-				AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
-			})
-
-			AfterAll(func() {
-				err := env.DeleteNamespace(namespace)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			// We backup and restore a cluster, and verify some expected data to
-			// be there
-			It("backs up and restore a cluster", func() {
-				const (
-					targetDBOne              = "test"
-					targetDBTwo              = "test1"
-					targetDBSecret           = "secret_test"
-					testTableName            = "test_table"
-					clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore.yaml"
-				)
-
-				restoredClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
-				Expect(err).ToNot(HaveOccurred())
-				// Create required test data
-				AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBOne, testTableName)
-				AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBTwo, testTableName)
-				AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBSecret, testTableName)
-
-				// Write a table and some data on the "app" database
-				AssertCreateTestData(namespace, clusterName, tableName)
-
-				AssertArchiveWalOnMinio(namespace, clusterName)
-
-				// There should be a backup resource and
-				By("backing up a cluster and verifying it exists on minio", func() {
-					testUtils.ExecuteBackup(namespace, backupFile, env)
-
-					Eventually(func() (int, error) {
-						return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
-					}, 30).Should(BeEquivalentTo(1))
-					Eventually(func() (string, error) {
-						cluster := &apiv1.Cluster{}
-						err := env.Client.Get(env.Ctx,
-							ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-							cluster)
-						return cluster.Status.FirstRecoverabilityPoint, err
-					}, 30).ShouldNot(BeEmpty())
-				})
-
-				// Restore backup in a new cluster
-				AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
-
-				AssertMetricsData(namespace, restoredClusterName, targetDBOne, targetDBTwo, targetDBSecret)
-
-				previous := 0
-
-				By("checking the previous number of .history files in minio", func() {
-					previous, err = testUtils.CountFilesOnMinio(namespace, minioClientName, "*.history.gz")
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				AssertSwitchover(namespace, clusterName, env)
-
-				By("checking the number of .history after switchover", func() {
-					Eventually(func() (int, error) {
-						return testUtils.CountFilesOnMinio(namespace, minioClientName, "*.history.gz")
-					}, 60).Should(BeNumerically(">", previous))
-				})
-			})
-
-			// Create a scheduled backup with the 'immediate' option enabled. We expect the backup to be available
-			It("immediately starts a backup using ScheduledBackups 'immediate' option", func() {
-				const scheduledBackupSampleFile = fixturesDir +
-					"/backup/scheduled_backup_immediate/scheduled-backup-immediate-minio.yaml"
-				scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
-				Expect(err).ToNot(HaveOccurred())
-
-				AssertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
-
-				// AssertScheduledBackupsImmediate creates at least two backups, we should find
-				// their base backups
-				Eventually(func() (int, error) {
-					return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
-				}, 30).Should(BeNumerically("==", 2))
-			})
-
-			It("backs up and restore a cluster with PITR", func() {
-				clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
-				Expect(err).ToNot(HaveOccurred())
-				restoredClusterName := "restore-cluster-pitr"
-
-				prepareClusterForPITROnMinio(namespace, clusterName, backupFile, 2, currentTimestamp)
-
-				err = testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
-				Expect(err).NotTo(HaveOccurred())
-
-				AssertClusterRestorePITR(namespace, restoredClusterName, tableName, "00000003")
-			})
-
-			// We create a cluster and a scheduled backup, then it is patched to suspend its
-			// execution. We verify that the number of backups does not increase.
-			// We then patch it again back to its initial state and verify that
-			// the amount of backups keeps increasing again
-			It("verifies that scheduled backups can be suspended", func() {
-				const scheduledBackupSampleFile = fixturesDir +
-					"/backup/scheduled_backup_suspend/scheduled-backup-suspend-minio.yaml"
-				scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
-				Expect(err).ToNot(HaveOccurred())
-
-				By("scheduling backups", func() {
-					AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
-					Eventually(func() (int, error) {
-						return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
-					}, 60).Should(BeNumerically(">=", 2))
-				})
-
-				AssertSuspendScheduleBackups(namespace, scheduledBackupName)
-			})
-		})
-
-		Context("HTTPS Connections", func() {
-			BeforeEach(func() {
-				isAKS, err := env.IsAKS()
-				Expect(err).ToNot(HaveOccurred())
-				if isAKS {
-					Skip("Test is not run on AKS.")
-				}
-				namespace = "backup-minio-endpoint-ca"
-			})
-			AfterEach(func() {
-				err := env.DeleteNamespace(namespace)
-				Expect(err).ToNot(HaveOccurred())
-			})
-			It("backup and restore with endpoint ca and tls connection", func() {
-				const (
-					clusterWithMinioSampleFile = fixturesDir + "/backup/minio-with-tls/cluster-with-backup-minio.yaml"
-					clusterRestoreSampleFile   = fixturesDir + "/backup/minio-with-tls/cluster-from-restore.yaml"
-					caSecName                  = "minio-server-ca-secret"
-					tlsSecName                 = "minio-server-tls-secret"
-				)
-				clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
-				Expect(err).ToNot(HaveOccurred())
-				// create namespace
-				err = env.CreateNamespace(namespace)
-				Expect(err).ToNot(HaveOccurred())
-
+			By("creating ca and tls certificate secrets", func() {
 				// create CA certificates
-				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, caSecName, true, env)
+				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, minioCaSecName, true, env)
 
 				// sign and create secret using CA certificate and key
 				serverPair, err := caPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
 					[]string{"minio-service.internal.mydomain.net, minio-service.default.svc, minio-service.default,"},
 				)
 				Expect(err).ToNot(HaveOccurred())
-				serverSecret := serverPair.GenerateCertificateSecret(namespace, tlsSecName)
+				serverSecret := serverPair.GenerateCertificateSecret(namespace, minioTLSSecName)
 				err = env.Client.Create(env.Ctx, serverSecret)
 				Expect(err).ToNot(HaveOccurred())
-
-				By("creating the credentials for minio", func() {
-					AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
-				})
-
-				By("setting up minio", func() {
-					setup, err := testUtils.MinioSSLSetup(namespace)
-					Expect(err).ToNot(HaveOccurred())
-					err = testUtils.InstallMinio(env, setup, 300)
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				// Create the minio client pod and wait for it to be ready.
-				// We'll use it to check if everything is archived correctly
-				By("setting up minio client pod", func() {
-					minioClient := testUtils.MinioSSLClient(namespace)
-					err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				// Create the cluster
-				AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
-
-				// Write a table and some data on the "app" database
-				AssertCreateTestData(namespace, clusterName, "test_table")
-
-				AssertArchiveWalOnMinio(namespace, clusterName)
-
-				// There should be a backup resource and
-				By("backing up a cluster and verifying it exists on minio", func() {
-					testUtils.ExecuteBackup(namespace, backupFile, env)
-
-					Eventually(func() (int, error) {
-						return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
-					}, 30).Should(BeEquivalentTo(1))
-					Eventually(func() (string, error) {
-						cluster := &apiv1.Cluster{}
-						err := env.Client.Get(env.Ctx,
-							ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
-							cluster)
-						return cluster.Status.FirstRecoverabilityPoint, err
-					}, 30).ShouldNot(BeEmpty())
-				})
-
-				// Restore backup in a new cluster
-				AssertClusterRestore(namespace, clusterRestoreSampleFile, "test_table")
-
-				previous := 0
-
-				By("checking the previous number of .history files in minio", func() {
-					previous, err = testUtils.CountFilesOnMinio(namespace, minioClientName, "*.history.gz")
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				AssertSwitchover(namespace, clusterName, env)
-
-				By("checking the number of .history after switchover", func() {
-					Eventually(func() (int, error) {
-						return testUtils.CountFilesOnMinio(namespace, minioClientName, "*.history.gz")
-					}, 60).Should(BeNumerically(">", previous))
-				})
 			})
+
+			By("creating the credentials for minio", func() {
+				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+			})
+
+			By("setting up minio", func() {
+				setup, err := testUtils.MinioSSLSetup(namespace)
+				Expect(err).ToNot(HaveOccurred())
+				err = testUtils.InstallMinio(env, setup, 300)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			// Create the minio client pod and wait for it to be ready.
+			// We'll use it to check if everything is archived correctly
+			By("setting up minio client pod", func() {
+				minioClient := testUtils.MinioSSLClient(namespace)
+				err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			// Create ConfigMap and secrets to verify metrics for target database after backup restore
+			AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
+
+			// Create the cluster
+			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
+		})
+
+		AfterAll(func() {
+			err := env.DeleteNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		// We backup and restore a cluster, and verify some expected data to
+		// be there
+		It("backs up and restore a cluster", func() {
+			const (
+				targetDBOne              = "test"
+				targetDBTwo              = "test1"
+				targetDBSecret           = "secret_test"
+				testTableName            = "test_table"
+				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore.yaml"
+			)
+
+			restoredClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			// Create required test data
+			AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBOne, testTableName)
+			AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBTwo, testTableName)
+			AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBSecret, testTableName)
+
+			// Write a table and some data on the "app" database
+			AssertCreateTestData(namespace, clusterName, tableName)
+
+			AssertArchiveWalOnMinio(namespace, clusterName)
+
+			// There should be a backup resource and
+			By("backing up a cluster and verifying it exists on minio", func() {
+				testUtils.ExecuteBackup(namespace, backupFile, env)
+
+				Eventually(func() (int, error) {
+					return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
+				}, 30).Should(BeEquivalentTo(1))
+				Eventually(func() (string, error) {
+					cluster := &apiv1.Cluster{}
+					err := env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+						cluster)
+					return cluster.Status.FirstRecoverabilityPoint, err
+				}, 30).ShouldNot(BeEmpty())
+			})
+
+			// Restore backup in a new cluster
+			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
+
+			AssertMetricsData(namespace, restoredClusterName, targetDBOne, targetDBTwo, targetDBSecret)
+
+			previous := 0
+
+			By("checking the previous number of .history files in minio", func() {
+				previous, err = testUtils.CountFilesOnMinio(namespace, minioClientName, "*.history.gz")
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			AssertSwitchover(namespace, clusterName, env)
+
+			By("checking the number of .history after switchover", func() {
+				Eventually(func() (int, error) {
+					return testUtils.CountFilesOnMinio(namespace, minioClientName, "*.history.gz")
+				}, 60).Should(BeNumerically(">", previous))
+			})
+		})
+
+		// Create a scheduled backup with the 'immediate' option enabled. We expect the backup to be available
+		It("immediately starts a backup using ScheduledBackups 'immediate' option", func() {
+			const scheduledBackupSampleFile = fixturesDir +
+				"/backup/scheduled_backup_immediate/scheduled-backup-immediate-minio.yaml"
+			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			AssertScheduledBackupsImmediate(namespace, scheduledBackupSampleFile, scheduledBackupName)
+
+			// AssertScheduledBackupsImmediate creates at least two backups, we should find
+			// their base backups
+			Eventually(func() (int, error) {
+				return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
+			}, 30).Should(BeNumerically("==", 2))
+		})
+
+		It("backs up and restore a cluster with PITR", func() {
+			clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			restoredClusterName := "restore-cluster-pitr"
+
+			prepareClusterForPITROnMinio(namespace, clusterName, backupFile, 2, currentTimestamp)
+
+			err = testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
+			Expect(err).NotTo(HaveOccurred())
+
+			AssertClusterRestorePITR(namespace, restoredClusterName, tableName, "00000003")
+		})
+
+		// We create a cluster and a scheduled backup, then it is patched to suspend its
+		// execution. We verify that the number of backups does not increase.
+		// We then patch it again back to its initial state and verify that
+		// the amount of backups keeps increasing again
+		It("verifies that scheduled backups can be suspended", func() {
+			const scheduledBackupSampleFile = fixturesDir +
+				"/backup/scheduled_backup_suspend/scheduled-backup-suspend-minio.yaml"
+			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("scheduling backups", func() {
+				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
+				Eventually(func() (int, error) {
+					return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
+				}, 60).Should(BeNumerically(">=", 2))
+			})
+
+			AssertSuspendScheduleBackups(namespace, scheduledBackupName)
 		})
 	})
 
@@ -316,7 +229,7 @@ var _ = Describe("Backup and restore", func() {
 		// and that means that we must use different cluster names otherwise
 		// we risk mixing WALs and backups
 		const azureBlobSampleFile = fixturesDir + "/backup/azure_blob/cluster-with-backup-azure-blob.yaml"
-		const clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore.yaml"
+		const clusterRestoreSampleFile = fixturesDir + "/backup/azure_blob/cluster-from-restore.yaml"
 		const scheduledBackupSampleFile = fixturesDir +
 			"/backup/scheduled_backup_immediate/scheduled-backup-immediate-azure-blob.yaml"
 		backupFile := fixturesDir + "/backup/azure_blob/backup-azure-blob.yaml"
@@ -448,9 +361,9 @@ var _ = Describe("Backup and restore", func() {
 				"/backup/scheduled_backup_suspend/scheduled-backup-suspend-azurite.yaml"
 			scheduledBackupImmediateSampleFile = fixturesDir +
 				"/backup/scheduled_backup_immediate/scheduled-backup-immediate-azurite.yaml"
-			backupFile = fixturesDir + "/backup/azurite/backup.yaml"
-			caSecName  = "azurite-ca-secret"
-			tlsSecName = "azurite-tls-secret"
+			backupFile        = fixturesDir + "/backup/azurite/backup.yaml"
+			azuriteCaSecName  = "azurite-ca-secret"
+			azuriteTLSSecName = "azurite-tls-secret"
 		)
 
 		BeforeAll(func() {
@@ -469,14 +382,14 @@ var _ = Describe("Backup and restore", func() {
 
 			By("creating ca and tls certificate secrets", func() {
 				// create CA certificates
-				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, caSecName, true, env)
+				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
 
 				// sign and create secret using CA certificate and key
 				serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,
 					[]string{"azurite.internal.mydomain.net, azurite.default.svc, azurite.default,"},
 				)
 				Expect(err).ToNot(HaveOccurred())
-				serverSecret := serverPair.GenerateCertificateSecret(namespace, tlsSecName)
+				serverSecret := serverPair.GenerateCertificateSecret(namespace, azuriteTLSSecName)
 				err = env.Client.Create(env.Ctx, serverSecret)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -567,8 +480,10 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 		sourceBackupFileAzureSAS        = fixturesBackupDir + "backup-azure-blob-sas.yaml"
 		sourceBackupFileAzurePITRSAS    = fixturesBackupDir + "backup-azure-blob-pitr-sas.yaml"
 		level                           = tests.High
-		caSecName                       = "azurite-ca-secret"
-		tlsSecName                      = "azurite-tls-secret"
+		minioCaSecName                  = "minio-server-ca-secret"
+		minioTLSSecName                 = "minio-server-tls-secret"
+		azuriteCaSecName                = "azurite-ca-secret"
+		azuriteTLSSecName               = "azurite-tls-secret"
 	)
 
 	var namespace, clusterName, azStorageAccount, azStorageKey string
@@ -602,21 +517,36 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+			By("creating ca and tls certificate secrets", func() {
+				// create CA certificate
+				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, minioCaSecName, true, env)
+
+				// sign and create secret using CA certificate and key
+				serverPair, err := caPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
+					[]string{"minio-service.internal.mydomain.net, minio-service.default.svc, minio-service.default,"},
+				)
+				Expect(err).ToNot(HaveOccurred())
+				serverSecret := serverPair.GenerateCertificateSecret(namespace, minioTLSSecName)
+				err = env.Client.Create(env.Ctx, serverSecret)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
 			By("creating the credentials for minio", func() {
 				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 			})
+
 			By("setting up minio", func() {
-				minio, err := testUtils.MinioDefaultSetup(namespace)
+				setup, err := testUtils.MinioSSLSetup(namespace)
 				Expect(err).ToNot(HaveOccurred())
-				err = testUtils.InstallMinio(env, minio, 300)
+				err = testUtils.InstallMinio(env, setup, 300)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			// Create the minio client pod and wait for it to be ready.
 			// We'll use it to check if everything is archived correctly
 			By("setting up minio client pod", func() {
-				minioClient := testUtils.MinioDefaultClient(namespace)
-				err = testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
+				minioClient := testUtils.MinioSSLClient(namespace)
+				err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -866,14 +796,14 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 			By("creating ca and tls certificate secrets", func() {
 				// create CA certificates
-				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, caSecName, true, env)
+				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
 
 				// sign and create secret using CA certificate and key
 				serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,
 					[]string{"azurite.internal.mydomain.net, azurite.default.svc, azurite.default,"},
 				)
 				Expect(err).ToNot(HaveOccurred())
-				serverSecret := serverPair.GenerateCertificateSecret(namespace, tlsSecName)
+				serverSecret := serverPair.GenerateCertificateSecret(namespace, azuriteTLSSecName)
 				err = env.Client.Create(env.Ctx, serverSecret)
 				Expect(err).ToNot(HaveOccurred())
 			})
