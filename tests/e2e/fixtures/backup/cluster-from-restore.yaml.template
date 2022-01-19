@@ -23,6 +23,10 @@ spec:
     recovery:
       backup:
         name: cluster-backup
+        endpointCA:
+          key: ca.crt
+          name: minio-server-ca-secret
+
 
   monitoring:
     customQueriesConfigMap:
