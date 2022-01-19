@@ -504,6 +504,8 @@ jobs:
     env:
       TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
+      POSTGRES_VERSION: ${{ matrix.postgres_version }}
+      MATRIX: ${{ matrix.id }}
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
@@ -564,6 +566,34 @@ jobs:
           set +x
           chmod +x .github/report-failed-test.sh
           ./.github/report-failed-test.sh
+      - name: Create individual artifact for each E2E test
+        if: always()
+        run: |
+          set +x
+          echo '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
+          python .github/generate-test-artifacts.py \
+            -o testartifacts-${{ env.MATRIX }} \
+            -f tests/e2e/out/report.json \
+            -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            python .github/generate-test-artifacts.py \
+              -o testartifacts-${{ env.MATRIX }} \
+              -f tests/e2e/out/upgrade_report.json \
+              -m '{"runner": "local", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
+          fi
+      -
+        name: Archive test artifacts
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: testartifacts-local
+          path: testartifacts-${{ env.MATRIX }}/
+          retention-days: 7
+      -
+        name: Cleanup test artifacts
+        if: always()
+        run:
+          rm -rf testartifacts-${{ env.MATRIX }}/
       -
         name: Cleanup ginkgo JSON report
         # Delete report.json after the analysis. File should always exist.
@@ -616,6 +646,8 @@ jobs:
     env:
       TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
+      POSTGRES_VERSION: ${{ matrix.postgres_version }}
+      MATRIX: ${{ matrix.id }}
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
@@ -734,6 +766,34 @@ jobs:
           set +x
           chmod +x .github/report-failed-test.sh
           ./.github/report-failed-test.sh
+      - name: Create individual artifact for each E2E test
+        if: always()
+        run: |
+          set +x
+          echo '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
+          python .github/generate-test-artifacts.py \
+            -o testartifacts-${{ env.MATRIX }} \
+            -f tests/e2e/out/report.json \
+            -m '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            python .github/generate-test-artifacts.py \
+              -o testartifacts-${{ env.MATRIX }} \
+              -f tests/e2e/out/upgrade_report.json \
+              -m '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
+          fi
+      -
+        name: Archive test artifacts
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: testartifacts-aks
+          path: testartifacts-${{ env.MATRIX }}/
+          retention-days: 7
+      -
+        name: Cleanup test artifacts
+        if: always()
+        run:
+          rm -rf testartifacts-${{ env.MATRIX }}/
       -
         name: Cleanup ginkgo JSON report
         # Delete report.json after the analysis. File should always exist.
@@ -786,6 +846,8 @@ jobs:
     env:
       TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
+      POSTGRES_VERSION: ${{ matrix.postgres_version }}
+      MATRIX: ${{ matrix.id }}
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
@@ -876,6 +938,34 @@ jobs:
           set +x
           chmod +x .github/report-failed-test.sh
           ./.github/report-failed-test.sh
+      - name: Create individual artifact for each E2E test
+        if: always()
+        run: |
+          set +x
+          echo '{"runner": "eks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
+          python .github/generate-test-artifacts.py \
+            -o testartifacts-${{ env.MATRIX }} \
+            -f tests/e2e/out/report.json \
+            -m '{"runner": "eks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            python .github/generate-test-artifacts.py \
+              -o testartifacts-${{ env.MATRIX }} \
+              -f tests/e2e/out/upgrade_report.json \
+              -m '{"runner": "eks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
+          fi
+      -
+        name: Archive test artifacts
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: testartifacts-eks
+          path: testartifacts-${{ env.MATRIX }}/
+          retention-days: 7
+      -
+        name: Cleanup test artifacts
+        if: always()
+        run:
+          rm -rf testartifacts-${{ env.MATRIX }}/
       -
         name: Cleanup ginkgo JSON report
         # Delete report.json after the analysis. File should always exist.
@@ -976,6 +1066,8 @@ jobs:
     env:
       TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
+      POSTGRES_VERSION: ${{ matrix.postgres_version }}
+      MATRIX: ${{ matrix.id }}
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
@@ -1079,6 +1171,34 @@ jobs:
           set +x
           chmod +x .github/report-failed-test.sh
           ./.github/report-failed-test.sh
+      - name: Create individual artifact for each E2E test
+        if: always()
+        run: |
+          set +x
+          echo '{"runner": "gke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
+          python .github/generate-test-artifacts.py \
+            -o testartifacts-${{ env.MATRIX }} \
+            -f tests/e2e/out/report.json \
+            -m '{"runner": "gke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            python .github/generate-test-artifacts.py \
+              -o testartifacts-${{ env.MATRIX }} \
+              -f tests/e2e/out/upgrade_report.json \
+              -m '{"runner": "gke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
+          fi
+      -
+        name: Archive test artifacts
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: testartifacts-gke
+          path: testartifacts-${{ env.MATRIX }}/
+          retention-days: 7
+      -
+        name: Cleanup test artifacts
+        if: always()
+        run:
+          rm -rf testartifacts-${{ env.MATRIX }}/
       -
         name: Cleanup ginkgo JSON report
         # Delete report.json after the analysis. File should always exist.
@@ -1134,6 +1254,9 @@ jobs:
       runs-on: ubuntu-20.04
       env:
         TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
+        K8S_VERSION: "${{ matrix.k8s_version }}"
+        POSTGRES_VERSION: ${{ matrix.postgres_version }}
+        MATRIX: ${{ matrix.id }}
         POSTGRES_IMG: "${{ matrix.postgres_img }}"
         E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
         CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
@@ -1223,6 +1346,35 @@ jobs:
           set +x
           chmod +x .github/report-failed-test.sh
           ./.github/report-failed-test.sh
+      - name: Create individual artifact for each E2E test
+        if: always()
+        run: |
+          set +x
+          echo '{"runner": "rke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
+          python .github/generate-test-artifacts.py \
+            -o testartifacts-${{ env.MATRIX }} \
+            -f tests/e2e/out/report.json \
+            -m '{"runner": "rke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            python .github/generate-test-artifacts.py \
+              -o testartifacts-${{ env.MATRIX }} \
+              -f tests/e2e/out/upgrade_report.json \
+              -m '{"runner": "rke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
+          fi
+      -
+        name: Archive test artifacts
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: testartifacts-rke
+          # we need a separate folder per matrix branch so we can cleanup with `rm -rf`
+          path: testartifacts-${{ env.MATRIX }}/
+          retention-days: 7
+      -
+        name: Cleanup test artifacts
+        if: always()
+        run:
+          rm -rf testartifacts-${{ env.MATRIX }}/
       -
         name: Cleanup ginkgo JSON report
         # Delete report.json after the analysis. File should always exist.
