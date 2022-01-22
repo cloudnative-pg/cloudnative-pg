@@ -238,8 +238,9 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 	}
 	allErrs = append(allErrs, r.validateImageChange(old.Spec.ImageName)...)
 	allErrs = append(allErrs, r.validateConfigurationChange(old)...)
-	allErrs = append(allErrs, r.validateStorageSizeChange(old)...)
+	allErrs = append(allErrs, r.validateStorageChange(old)...)
 	allErrs = append(allErrs, r.validateReplicaModeChange(old)...)
+	allErrs = append(allErrs, r.validateUnixPermissionIdentifierChange(old)...)
 	return allErrs
 }
 
@@ -740,23 +741,22 @@ func (r *Cluster) validateStorageSize() field.ErrorList {
 	return result
 }
 
-// Validate a change in the storage size
-func (r *Cluster) validateStorageSizeChange(old *Cluster) field.ErrorList {
+// Validate a change in the storage
+func (r *Cluster) validateStorageChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	oldSize, err := resource.ParseQuantity(old.Spec.StorageConfiguration.Size)
 	if err != nil {
-		// Can't read the old size, so can't tell if the new size is great
+		// Can't read the old size, so can't tell if the new size is greater
 		// or less
 		return result
 	}
 
-	newSize, err := resource.ParseQuantity(r.Spec.StorageConfiguration.Size)
-	if err != nil {
-		// Can't read the new size, as this error should already been raised
-		// by the size validation
+	result = append(result, r.validateStorageSize()...)
+	if len(result) != 0 {
 		return result
 	}
+	newSize, _ := resource.ParseQuantity(r.Spec.StorageConfiguration.Size)
 
 	if oldSize.AsDec().Cmp(newSize.AsDec()) == 1 {
 		result = append(result, field.Invalid(
@@ -846,6 +846,26 @@ func (r *Cluster) validateReplicaModeChange(old *Cluster) field.ErrorList {
 			field.NewPath("spec", "replicaCluster"),
 			r.Spec.ReplicaCluster,
 			"Can not enable replication on existing clusters"))
+	}
+
+	return result
+}
+
+func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.PostgresGID != old.Spec.PostgresGID {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "postgresGID"),
+			r.Spec.PostgresGID,
+			"GID is an immutable field in the spec"))
+	}
+
+	if r.Spec.PostgresUID != old.Spec.PostgresUID {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "postgresUID"),
+			r.Spec.PostgresUID,
+			"UID is an immutable field in the spec"))
 	}
 
 	return result
