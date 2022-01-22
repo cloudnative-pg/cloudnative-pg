@@ -837,7 +837,7 @@ var _ = Describe("Number of synchronous replicas", func() {
 	})
 })
 
-var _ = Describe("storage size validation", func() {
+var _ = Describe("storage configuration validation", func() {
 	It("complains if the storage size is not parsable", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
@@ -877,7 +877,23 @@ var _ = Describe("storage size validation", func() {
 			},
 		}
 
-		Expect(clusterNew.validateStorageSizeChange(&clusterOld)).ToNot(BeEmpty())
+		Expect(clusterNew.validateStorageChange(&clusterOld)).ToNot(BeEmpty())
+	})
+
+	It("does not complain if nothing has been changed", func() {
+		one := "one"
+		clusterOld := Cluster{
+			Spec: ClusterSpec{
+				StorageConfiguration: StorageConfiguration{
+					Size:         "1G",
+					StorageClass: &one,
+				},
+			},
+		}
+
+		clusterNew := clusterOld.DeepCopy()
+
+		Expect(clusterNew.validateStorageChange(&clusterOld)).To(BeEmpty())
 	})
 
 	It("works fine is the size is being enlarged", func() {
@@ -897,7 +913,7 @@ var _ = Describe("storage size validation", func() {
 			},
 		}
 
-		Expect(clusterNew.validateStorageSizeChange(&clusterOld)).To(BeEmpty())
+		Expect(clusterNew.validateStorageChange(&clusterOld)).To(BeEmpty())
 	})
 })
 
@@ -1305,6 +1321,52 @@ var _ = Describe("bootstrap base backup validation", func() {
 		}
 		result := recoveryCluster.validateBootstrapPgBaseBackupSource()
 		Expect(result).ToNot(BeEmpty())
+	})
+})
+
+var _ = Describe("unix permissions identifiers change validation", func() {
+	It("complains if the PostgresGID is changed", func() {
+		oldCluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresGID: defaultPostgresGID,
+			},
+		}
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresGID: 53,
+			},
+		}
+		Expect(cluster.validateUnixPermissionIdentifierChange(oldCluster)).NotTo(BeEmpty())
+	})
+
+	It("complains if the PostgresUID is changed", func() {
+		oldCluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresUID: defaultPostgresUID,
+			},
+		}
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresGID: 74,
+			},
+		}
+		Expect(cluster.validateUnixPermissionIdentifierChange(oldCluster)).NotTo(BeEmpty())
+	})
+
+	It("should not complain if the values havn't been changed", func() {
+		oldCluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresUID: 74,
+				PostgresGID: 76,
+			},
+		}
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				PostgresUID: 74,
+				PostgresGID: 76,
+			},
+		}
+		Expect(cluster.validateUnixPermissionIdentifierChange(oldCluster)).To(BeEmpty())
 	})
 })
 
