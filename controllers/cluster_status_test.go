@@ -17,7 +17,6 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 )
@@ -32,22 +31,8 @@ var _ = Describe("cluster_status unit tests", func() {
 		secretName := rand.String(10)
 
 		By("creating the required secret", func() {
-			keyPair, err := certs.CreateRootCA("unittest.com", namespace)
-			Expect(err).To(BeNil())
-			secret := &corev1.Secret{
-				Type: corev1.SecretTypeTLS,
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      secretName,
-					Namespace: namespace,
-				},
-				Data: map[string][]byte{
-					corev1.TLSPrivateKeyKey: keyPair.Private,
-					corev1.TLSCertKey:       keyPair.Certificate,
-				},
-			}
-
-			err = k8sClient.Create(ctx, secret)
-			Expect(err).To(BeNil())
+			secret, keyPair := generateFakeCASecret(secretName, namespace, "unittest.com")
+			Expect(secret.Name).To(Equal(secretName))
 
 			_, expDate, err := keyPair.IsExpiring()
 			Expect(err).To(BeNil())
@@ -56,7 +41,7 @@ var _ = Describe("cluster_status unit tests", func() {
 		})
 		By("making sure that sets the status of the secret correctly", func() {
 			cluster.Status.Certificates.Expirations = map[string]string{}
-			err := clusterReconciler.setCertExpiration(ctx, cluster, secretName, namespace, corev1.TLSCertKey)
+			err := clusterReconciler.setCertExpiration(ctx, cluster, secretName, namespace, certs.CACertKey)
 			Expect(err).To(BeNil())
 			Expect(cluster.Status.Certificates.Expirations[secretName]).To(Equal(certExpirationDate))
 		})
