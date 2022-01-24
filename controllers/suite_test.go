@@ -17,6 +17,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,6 +37,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
@@ -111,7 +113,7 @@ var _ = AfterSuite(func() {
 func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 	pooler := &apiv1.Pooler{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "svcfriendly-" + rand.String(10),
+			Name:      "pooler-" + rand.String(10),
 			Namespace: cluster.Namespace,
 		},
 		Spec: apiv1.PoolerSpec{
@@ -139,7 +141,8 @@ func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 }
 
 func newFakeCNPCluster(namespace string) *apiv1.Cluster {
-	name := "svcfriendly-" + rand.String(10)
+	const instances int32 = 3
+	name := "cluster-" + rand.String(10)
 	caServer := fmt.Sprintf("%s-ca-server", name)
 	caClient := fmt.Sprintf("%s-ca-client", name)
 
@@ -149,7 +152,7 @@ func newFakeCNPCluster(namespace string) *apiv1.Cluster {
 			Namespace: namespace,
 		},
 		Spec: apiv1.ClusterSpec{
-			Instances: int32(1),
+			Instances: instances,
 			Certificates: &apiv1.CertificatesConfiguration{
 				ServerCASecret: caServer,
 				ClientCASecret: caClient,
@@ -159,7 +162,7 @@ func newFakeCNPCluster(namespace string) *apiv1.Cluster {
 			},
 		},
 		Status: apiv1.ClusterStatus{
-			Instances:                3,
+			Instances:                instances,
 			SecretsResourceVersion:   apiv1.SecretsResourceVersion{},
 			ConfigMapResourceVersion: apiv1.ConfigMapResourceVersion{},
 			Certificates: apiv1.CertificatesStatus{
@@ -303,4 +306,44 @@ func createManagerWithReconcilers(ctx context.Context) (*ClusterReconciler, *Poo
 	Expect(err).To(BeNil())
 
 	return clusterRec, poolerRec, mgr
+}
+
+// generateFakeCASecret follows the conventions established by cert.GenerateCASecret
+func generateFakeCASecret(name, namespace, domain string) (*corev1.Secret, *certs.KeyPair) {
+	keyPair, err := certs.CreateRootCA(domain, namespace)
+	Expect(err).To(BeNil())
+	secret := &corev1.Secret{
+		Type: corev1.SecretTypeOpaque,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			certs.CAPrivateKeyKey: keyPair.Private,
+			certs.CACertKey:       keyPair.Certificate,
+		},
+	}
+
+	err = k8sClient.Create(context.Background(), secret)
+	Expect(err).To(BeNil())
+
+	return secret, keyPair
+}
+
+func assertResourceExists(name, namespace string, resource client.Object) {
+	err := k8sClient.Get(
+		context.Background(),
+		types.NamespacedName{Name: name, Namespace: namespace},
+		resource,
+	)
+	Expect(err).ToNot(HaveOccurred())
+}
+
+func assertResourceDoesntExist(name, namespace string, resource client.Object) {
+	err := k8sClient.Get(
+		context.Background(),
+		types.NamespacedName{Name: name, Namespace: namespace},
+		resource,
+	)
+	Expect(apierrors.IsNotFound(err)).To(BeTrue())
 }
