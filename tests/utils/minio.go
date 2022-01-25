@@ -20,6 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // MinioSetup contains the resources needed for a working minio server deployment:
@@ -370,4 +372,25 @@ func CountFilesOnMinio(namespace string, minioClientName string, path string) (v
 // composeFindMinioCmd builds the Minio find command
 func composeFindMinioCmd(path string, serviceName string) string {
 	return fmt.Sprintf("sh -c 'mc find %v --name %v | wc -l'", serviceName, path)
+}
+
+// MinioTestConnectivityUsingBarmanCloudWalArchive returns true if test connection is successful else false
+func MinioTestConnectivityUsingBarmanCloudWalArchive(namespace, clusterName, podName, id, key string) (bool, error) {
+	minioSvc := MinioDefaultSVC(namespace)
+	minioSvcName := minioSvc.GetName()
+	// test connectivity should work with valid sample "000000010000000000000000" wal file
+	// using barman-cloud-wal-archive script
+	cmd := fmt.Sprintf("export AWS_CA_BUNDLE=%s;export AWS_ACCESS_KEY_ID=%s;export AWS_SECRET_ACCESS_KEY=%s;"+
+		"barman-cloud-wal-archive --cloud-provider aws-s3 --endpoint-url https://%s:9000 s3://cluster-backups/ %s "+
+		"000000010000000000000000 --test", postgres.BarmanBackupEndpointCACertificateLocation, id, key,
+		minioSvcName, clusterName)
+	_, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl exec -n %v %v -c postgres -- /bin/bash -c \"%v\"",
+		namespace,
+		podName,
+		cmd))
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
