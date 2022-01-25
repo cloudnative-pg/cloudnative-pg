@@ -107,6 +107,19 @@ var _ = Describe("Backup and restore", func() {
 
 			// Create the cluster
 			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
+
+			By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
+				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() (bool, error) {
+					connectionStatus, err := testUtils.MinioTestConnectivityUsingBarmanCloudWalArchive(
+						namespace, clusterName, primaryPod.GetName(), "minio", "minio123")
+					if err != nil {
+						return false, err
+					}
+					return connectionStatus, nil
+				}, 60).Should(BeTrue())
+			})
 		})
 
 		AfterAll(func() {
@@ -191,13 +204,11 @@ var _ = Describe("Backup and restore", func() {
 		})
 
 		It("backs up and restore a cluster with PITR", func() {
-			clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
-			Expect(err).ToNot(HaveOccurred())
 			restoredClusterName := "restore-cluster-pitr"
 
 			prepareClusterForPITROnMinio(namespace, clusterName, backupFile, 2, currentTimestamp)
 
-			err = testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
+			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
 			Expect(err).NotTo(HaveOccurred())
 
 			AssertClusterRestorePITR(namespace, restoredClusterName, tableName, "00000003")
@@ -242,7 +253,7 @@ var _ = Describe("Backup and restore", func() {
 			azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 			azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
 			namespace = "cluster-backup-azure-blob"
-			clusterName, err := env.GetResourceNameFromYAML(azureBlobSampleFile)
+			clusterName, err = env.GetResourceNameFromYAML(azureBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
@@ -268,8 +279,6 @@ var _ = Describe("Backup and restore", func() {
 		// We backup and restore a cluster, and verify some expected data to
 		// be there
 		It("backs up and restore a cluster", func() {
-			clusterName, err := env.GetResourceNameFromYAML(azureBlobSampleFile)
-			Expect(err).ToNot(HaveOccurred())
 			// Write a table and some data on the "app" database
 			AssertCreateTestData(namespace, clusterName, tableName)
 			AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
@@ -296,8 +305,6 @@ var _ = Describe("Backup and restore", func() {
 
 		// Create a scheduled backup with the 'immediate' option enabled. We expect the backup to be available
 		It("immediately starts a backup using ScheduledBackups 'immediate' option", func() {
-			clusterName, err := env.GetResourceNameFromYAML(azureBlobSampleFile)
-			Expect(err).ToNot(HaveOccurred())
 			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -310,8 +317,6 @@ var _ = Describe("Backup and restore", func() {
 		})
 
 		It("backs up and restore a cluster with PITR", func() {
-			clusterName, err := env.GetResourceNameFromYAML(azureBlobSampleFile)
-			Expect(err).ToNot(HaveOccurred())
 			restoredClusterName := "restore-cluster-azure-pitr"
 
 			prepareClusterForPITROnAzureBlob(namespace, clusterName, backupFile,
@@ -319,7 +324,7 @@ var _ = Describe("Backup and restore", func() {
 
 			AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 
-			err = testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
+			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Restore backup in a new cluster
@@ -333,8 +338,6 @@ var _ = Describe("Backup and restore", func() {
 		It("verifies that scheduled backups can be suspended", func() {
 			const scheduledBackupSampleFile = fixturesDir +
 				"/backup/scheduled_backup_suspend/scheduled-backup-suspend-azure-blob.yaml"
-			clusterName, err := env.GetResourceNameFromYAML(azureBlobSampleFile)
-			Expect(err).ToNot(HaveOccurred())
 			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -373,7 +376,7 @@ var _ = Describe("Backup and restore", func() {
 				Skip("This test is only executed on gke, openshift and local")
 			}
 			namespace = "cluster-backup-azurite"
-			clusterName, err := env.GetResourceNameFromYAML(azuriteBlobSampleFile)
+			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
@@ -411,8 +414,6 @@ var _ = Describe("Backup and restore", func() {
 		// Create a scheduled backup with the 'immediate' option enabled.
 		// We expect the backup to be available
 		It("immediately starts a backup using ScheduledBackups immediate option", func() {
-			clusterName, err := env.GetResourceNameFromYAML(azuriteBlobSampleFile)
-			Expect(err).ToNot(HaveOccurred())
 			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupImmediateSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -426,13 +427,11 @@ var _ = Describe("Backup and restore", func() {
 		})
 
 		It("backs up and restore a cluster with PITR", func() {
-			clusterName, err := env.GetResourceNameFromYAML(azuriteBlobSampleFile)
-			Expect(err).ToNot(HaveOccurred())
 			restoredClusterName := "restore-cluster-pitr"
 
 			prepareClusterForPITROnAzurite(namespace, clusterName, backupFile, currentTimestamp)
 
-			err = testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
+			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
 			Expect(err).NotTo(HaveOccurred())
 
 			AssertClusterRestorePITR(namespace, restoredClusterName, tableName, "00000002")
@@ -443,8 +442,6 @@ var _ = Describe("Backup and restore", func() {
 		// We then patch it again back to its initial state and verify that
 		// the amount of backups keeps increasing again
 		It("verifies that scheduled backups can be suspended", func() {
-			clusterName, err := env.GetResourceNameFromYAML(azuriteBlobSampleFile)
-			Expect(err).ToNot(HaveOccurred())
 			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -512,7 +509,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				Skip("This test is only executed on gke, openshift and local")
 			}
 			namespace = "recovery-barman-object-minio"
-			clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileMinio)
+			clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileMinio)
 			Expect(err).ToNot(HaveOccurred())
 			// Create a cluster in a namespace we'll delete after the test
 			err = env.CreateNamespace(namespace)
@@ -552,6 +549,19 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 			// Create the cluster
 			AssertCreateCluster(namespace, clusterName, clusterSourceFileMinio, env)
+
+			By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
+				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() (bool, error) {
+					connectionStatus, err := testUtils.MinioTestConnectivityUsingBarmanCloudWalArchive(
+						namespace, clusterName, primaryPod.GetName(), "minio", "minio123")
+					if err != nil {
+						return false, err
+					}
+					return connectionStatus, nil
+				}, 60).Should(BeTrue())
+			})
 		})
 
 		AfterAll(func() {
@@ -559,8 +569,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 		It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
-			clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileMinio)
-			Expect(err).ToNot(HaveOccurred())
 			externalClusterName, err := env.GetResourceNameFromYAML(externalClusterFileMinio)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -596,22 +604,17 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
 			" option in 'externalClusters' section", func() {
-			clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileMinio)
-			Expect(err).ToNot(HaveOccurred())
 			externalClusterRestoreName := "restore-external-cluster-pitr"
 
 			prepareClusterForPITROnMinio(namespace, clusterName, sourceBackupFileMinio, 1, currentTimestamp)
 
-			err = testUtils.CreateClusterFromExternalClusterBackupWithPITROnMinio(
+			err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnMinio(
 				namespace, externalClusterRestoreName, clusterName, *currentTimestamp, env)
 
 			Expect(err).NotTo(HaveOccurred())
 			AssertClusterRestorePITR(namespace, externalClusterRestoreName, tableName, "00000002")
 		})
 		It("restore cluster from barman object using replica option in spec", func() {
-			clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileMinio)
-			Expect(err).ToNot(HaveOccurred())
-
 			// Write a table and some data on the "app" database
 			AssertCreateTestData(namespace, clusterName, "for_restore_repl")
 
@@ -641,7 +644,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 				azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
 				namespace = "recovery-barman-object-azure"
-				clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileAzure)
+				clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileAzure)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Create a cluster in a namespace we'll delete after the test
@@ -664,9 +667,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 			It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
-				clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileAzure)
-				Expect(err).ToNot(HaveOccurred())
-
 				// Write a table and some data on the "app" database
 				AssertCreateTestData(namespace, clusterName, tableName)
 				AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
@@ -687,14 +687,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 			It("restores a cluster with 'PITR' from barman object using "+
 				"'barmanObjectStore' option in 'externalClusters' section", func() {
-				clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileAzure)
-				Expect(err).ToNot(HaveOccurred())
 				externalClusterName := "external-cluster-azure-pitr"
 
 				prepareClusterForPITROnAzureBlob(namespace, clusterName,
 					sourceBackupFileAzurePITR, azStorageAccount, azStorageKey, 1, currentTimestamp)
 
-				err = testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(namespace, externalClusterName,
+				err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(namespace, externalClusterName,
 					clusterName, *currentTimestamp, "backup-storage-creds", azStorageAccount, env)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -714,7 +712,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				azStorageAccount = os.Getenv("AZURE_STORAGE_ACCOUNT")
 				azStorageKey = os.Getenv("AZURE_STORAGE_KEY")
 				namespace = "cluster-backup-azure-blob-sas"
-				clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileAzureSAS)
+				clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileAzureSAS)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Create a cluster in a namespace we'll delete after the test
@@ -737,8 +735,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 			It("restores cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
-				clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileAzureSAS)
-				Expect(err).ToNot(HaveOccurred())
 				// Write a table and some data on the "app" database
 				AssertCreateTestData(namespace, clusterName, tableName)
 
@@ -761,14 +757,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 			It("restores a cluster with 'PITR' from barman object using "+
 				"'barmanObjectStore' option in 'externalClusters' section", func() {
-				clusterName, err := env.GetResourceNameFromYAML(clusterSourceFileAzureSAS)
-				Expect(err).ToNot(HaveOccurred())
 				externalClusterName := "external-cluster-azure-pitr"
 
 				prepareClusterForPITROnAzureBlob(namespace, clusterName,
 					sourceBackupFileAzurePITRSAS, azStorageAccount, azStorageKey, 1, currentTimestamp)
 
-				err = testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(namespace, externalClusterName,
+				err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzure(namespace, externalClusterName,
 					clusterName, *currentTimestamp, "backup-storage-creds-sas", azStorageAccount, env)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -787,7 +781,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 				Skip("Test is not run on AKS.")
 			}
 			namespace = "recovery-barman-object-azurite"
-			clusterName, err := env.GetResourceNameFromYAML(azuriteBlobSampleFile)
+			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
@@ -822,14 +816,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", func() {
 
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
 			" option in 'externalClusters' section", func() {
-			clusterName, err := env.GetResourceNameFromYAML(azuriteBlobSampleFile)
-			Expect(err).ToNot(HaveOccurred())
 			externalClusterRestoreName := "restore-external-cluster-pitr"
 
 			prepareClusterForPITROnAzurite(namespace, clusterName, backupFileAzurite, currentTimestamp)
 
 			//  Create a cluster from a particular time using external backup.
-			err = testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzurite(
+			err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 				namespace, externalClusterRestoreName, clusterName, *currentTimestamp, env)
 			Expect(err).NotTo(HaveOccurred())
 
