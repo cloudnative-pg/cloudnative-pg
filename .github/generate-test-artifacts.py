@@ -13,8 +13,12 @@ def flatten(arr):
     """flatten an array of arrays"""
     out = []
     for l in arr:
-        for item in l:
-            out.append(item)
+        if isinstance(l, list):
+            for item in l:
+                out.append(item)
+        else:
+            print("unexpected hierarchy labels")
+            print(arr)
     return out
 
 def convert_ginkgo_test(t, matrix):
