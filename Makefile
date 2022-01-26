@@ -183,7 +183,7 @@ kustomize: ## Download kustomize locally if necessary.
 
 K8S_API_DOCGEN = $(shell pwd)/bin/k8s-api-docgen
 k8s-api-docgen: ## Download k8s-api-docgen locally if necessary.
-	$(call go-get-tool,$(K8S_API_DOCGEN),github.com/EnterpriseDB/k8s-api-docgen/cmd/k8s-api-docgen@v0.0.0-20210520152405-ab1617492c9f)
+	$(call go-get-tool,$(K8S_API_DOCGEN),github.com/EnterpriseDB/k8s-api-docgen/cmd/k8s-api-docgen)
 
 GO_LICENSES = $(shell pwd)/bin/go-licenses
 go-licenses: ## Download go-licenses locally if necessary.
