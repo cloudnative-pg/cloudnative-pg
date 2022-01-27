@@ -29,16 +29,16 @@ affected.
 var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func() {
 	// Define some constants to be used in the test
 	const (
-		clusterName       = "cluster-basic"
-		sampleFile        = fixturesDir + "/base/cluster-basic.yaml"
+		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml"
 		operatorNamespace = "postgresql-operator-system"
 		level             = tests.Highest
 		mutatingWebhook   = "mcluster.kb.io"
 		validatingWebhook = "vcluster.kb.io"
 	)
 
-	var webhookNamespace string
+	var webhookNamespace, clusterName string
 	var clusterIsDefaulted bool
+	var err error
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -54,6 +54,11 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 	})
 	AfterEach(func() {
 		err := env.DeleteNamespace(webhookNamespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	BeforeAll(func() {
+		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
