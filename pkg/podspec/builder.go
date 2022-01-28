@@ -145,8 +145,7 @@ func (builder *Builder) WithContainerEnv(name string, env corev1.EnvVar, overwri
 				}
 			}
 
-			builder.status.Spec.Containers[idxContainer].Env =
-				append(builder.status.Spec.Containers[idxContainer].Env, env)
+			builder.status.Spec.Containers[idxContainer].Env = append(builder.status.Spec.Containers[idxContainer].Env, env)
 			return builder
 		}
 	}

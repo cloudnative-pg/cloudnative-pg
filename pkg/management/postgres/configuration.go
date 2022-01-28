@@ -164,7 +164,7 @@ func configurePostgresAutoConfFile(pgData string, primaryConnInfo string) (chang
 
 // createStandbySignal creates a standby.signal file for PostgreSQL 12 and beyond
 func createStandbySignal(pgData string) error {
-	emptyFile, err := os.Create(filepath.Join(pgData, "standby.signal"))
+	emptyFile, err := os.Create(filepath.Clean(filepath.Join(pgData, "standby.signal")))
 	if emptyFile != nil {
 		_ = emptyFile.Close()
 	}
