@@ -92,6 +92,10 @@ is set to `off` (default: `on` during maintenance windows, `off` otherwise).
 The `PodDisruptionBudget` may prevent the pod from being evicted if there
 is at least another pod that is not ready.
 
+!!! Note
+    Single instance clusters prevent node drain when `reusePVC` is
+    set to `false`. Refer to the [Kubernetes Upgrade section](kubernetes_upgrade.md).
+
 Self-healing will happen as soon as the *apiserver* is notified.
 
 ### Worker node failure

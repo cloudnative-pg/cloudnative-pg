@@ -77,10 +77,49 @@ Pod on a different node with a new PVC by relying on
 PostgreSQL's physical streaming replication, then destroys
 the old PVC together with the Pod. This scenario is generally
 not recommended unless the database's size is small, and re-cloning
-the new PostgreSQL instance takes shorter than waiting.
+the new PostgreSQL instance takes shorter than waiting. This behavior
+does **not** apply to clusters with only one instance and
+reusePVC disabled: see section below.
 
 !!! Note
     When performing the `kubectl drain` command, you will need
     to add the `--delete-local-data` option.
     Don't be afraid: it refers to another volume internally used
     by the operator - not the PostgreSQL data directory.
+
+## Single instance clusters with `reusePVC` set to `false`
+
+!!! Important
+    We recommend to always create clusters with more
+    than one instance in order to guarantee high availability.
+
+Deleting the only PostgreSQL instance in a single instance cluster with
+`reusePVC` set to `false` would imply all data being lost,
+therefore we prevent users from draining nodes such instances might be running
+on, even in maintenance mode.
+
+However, in case maintenance is required for such a node you have two options:
+
+1. Enable `reusePVC`, accepting the downtime
+2. Replicate the instance on a different node and switch over the primary
+
+As long as a database service downtime is acceptable for your environment,
+draining the node is as simple as setting the `nodeMaintenanceWindow` to
+`inProgress: true` and `reusePVC: true`. This will allow the instance to
+be deleted and recreated as soon as the original PVC is available
+(e.g. with node local storage, as soon as the node is back up).
+
+Otherwise you will have to scale up the cluster, creating a new instance
+on a different node and promoting the new instance to primary in order to
+shut down the original one on the node undergoing maintenance. The only
+downtime in this case will be the duration of the switchover.
+
+A possible approach could be:
+
+1. Cordon the node on which the current instance is running.
+2. Scale up the cluster to 2 instances, could take some time depending on the database size.
+3. As soon as the new instance is running, the operator will automatically
+   perform a switchover given that the current primary is running on a cordoned node.
+4. Scale back down the cluster to a single instance, this will delete the old instance
+5. The old primary's node can now be drained successfully, while leaving the new primary
+   running on a new node.
