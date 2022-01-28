@@ -480,10 +480,10 @@ NodeMaintenanceWindow contains information that the operator will use while upgr
 
 This option is only useful when the chosen storage prevents the Pods from being freely moved across nodes.
 
-Name       | Description                                                                                | Type 
----------- | ------------------------------------------------------------------------------------------ | -----
-`inProgress` | Is there a node maintenance activity in progress?                                          - *mandatory*  | bool 
-`reusePVC  ` | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere) - *mandatory*  | *bool
+Name       | Description                                                                                                      | Type 
+---------- | ---------------------------------------------------------------------------------------------------------------- | -----
+`inProgress` | Is there a node maintenance activity in progress?                                                                - *mandatory*  | bool 
+`reusePVC  ` | Reuse the existing PVC (wait for the node to come up again) or not (recreate it elsewhere - when `instances` >1) - *mandatory*  | *bool
 
 <a id='PgBouncerIntegrationStatus'></a>
 

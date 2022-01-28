@@ -1602,7 +1602,7 @@ spec:
                   reusePVC:
                     default: true
                     description: Reuse the existing PVC (wait for the node to come
-                      up again) or not (recreate it elsewhere)
+                      up again) or not (recreate it elsewhere - when `instances` >1)
                     type: boolean
                 required:
                 - inProgress

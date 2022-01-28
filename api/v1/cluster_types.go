@@ -408,7 +408,7 @@ type NodeMaintenanceWindow struct {
 	InProgress bool `json:"inProgress"`
 
 	// Reuse the existing PVC (wait for the node to come
-	// up again) or not (recreate it elsewhere)
+	// up again) or not (recreate it elsewhere - when `instances` >1)
 	// +optional
 	// +kubebuilder:default:=true
 	ReusePVC *bool `json:"reusePVC"`
