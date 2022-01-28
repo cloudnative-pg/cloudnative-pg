@@ -343,7 +343,7 @@ func (env TestingEnvironment) GetCluster(namespace string, name string) (*apiv1.
 
 // DumpOperator logs the JSON for the deployment in an operator namespace, its pods and endpoints
 func (env TestingEnvironment) DumpOperator(namespace string, filename string) {
-	f, err := os.Create(filename)
+	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -373,7 +373,7 @@ func (env TestingEnvironment) DumpOperator(namespace string, filename string) {
 
 // DumpClusterEnv logs the JSON for the a cluster in a namespace, its pods and endpoints
 func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName string, filename string) {
-	f, err := os.Create(filename)
+	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -621,7 +621,7 @@ func (env TestingEnvironment) DumpPoolerResourcesInfo(namespace, currentTestName
 		for _, pooler := range poolerList.Items {
 			// it will create a filename along with pooler name and currentTest name
 			fileName := "out/" + fmt.Sprintf("%v-%v.log", currentTestName, pooler.GetName())
-			f, err := os.Create(fileName)
+			f, err := os.Create(filepath.Clean(fileName))
 			if err != nil {
 				fmt.Println(err)
 				return

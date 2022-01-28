@@ -166,12 +166,12 @@ func addBarmanEndpointCAToJob(cluster apiv1.Cluster, backup *apiv1.Backup, job *
 			},
 		})
 
-		job.Spec.Template.Spec.Containers[0].VolumeMounts =
-			append(job.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts,
+			corev1.VolumeMount{
 				Name:      "barman-endpoint-ca",
 				MountPath: postgres.CertificatesDir,
 			},
-			)
+		)
 
 		var CAEnvVariable string
 		if isAzure {

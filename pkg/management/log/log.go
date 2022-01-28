@@ -72,17 +72,14 @@ func GetLogger() Logger {
 // Logger is a reduced version of logr.Logger
 type Logger interface {
 	Enabled() bool
-
 	Error(err error, msg string, keysAndValues ...interface{})
 	Warning(msg string, keysAndValues ...interface{})
 	Info(msg string, keysAndValues ...interface{})
 	Debug(msg string, keysAndValues ...interface{})
 	Trace(msg string, keysAndValues ...interface{})
-
 	WithCaller() Logger
 	WithValues(keysAndValues ...interface{}) Logger
 	WithName(name string) Logger
-
 	GetLogger() logr.Logger
 }
 

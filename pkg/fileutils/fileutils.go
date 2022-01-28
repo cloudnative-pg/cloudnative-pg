@@ -82,7 +82,7 @@ func CopyFile(source, destination string) (err error) {
 	}()
 
 	var out *os.File
-	out, err = os.Create(destination)
+	out, err = os.Create(filepath.Clean(destination))
 	if err != nil {
 		return err
 	}
@@ -199,7 +199,7 @@ func EnsurePgDataPerms(pgData string) error {
 // CreateEmptyFile create an empty file or return an error if
 // the file already exist
 func CreateEmptyFile(fileName string) error {
-	file, err := os.Create(fileName)
+	file, err := os.Create(filepath.Clean(fileName))
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func MoveFile(sourcePath, destPath string) (err error) {
 		}
 	}()
 
-	outputFile, err = os.Create(destPath)
+	outputFile, err = os.Create(filepath.Clean(destPath))
 	if err != nil {
 		return err
 	}

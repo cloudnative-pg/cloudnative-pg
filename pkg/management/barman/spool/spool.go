@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
@@ -65,7 +66,7 @@ func (spool *WALSpool) Touch(walFile string) (err error) {
 
 	walFile = path.Base(walFile)
 	fileName := path.Join(spool.spoolDirectory, walFile)
-	if f, err = os.Create(fileName); err != nil {
+	if f, err = os.Create(filepath.Clean(fileName)); err != nil {
 		return err
 	}
 	if err = f.Close(); err != nil {
