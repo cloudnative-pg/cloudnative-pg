@@ -243,16 +243,16 @@ func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfig
 	// - by default, return nil.
 	switch config.PodAntiAffinityType {
 	case apiv1.PodAntiAffinityTypeRequired:
-		affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution =
-			[]corev1.PodAffinityTerm{podAffinityTerm}
+		affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []corev1.PodAffinityTerm{
+			podAffinityTerm,
+		}
 	case apiv1.PodAntiAffinityTypePreferred:
-		affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution =
-			[]corev1.WeightedPodAffinityTerm{
-				{
-					Weight:          100,
-					PodAffinityTerm: podAffinityTerm,
-				},
-			}
+		affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = []corev1.WeightedPodAffinityTerm{
+			{
+				Weight:          100,
+				PodAffinityTerm: podAffinityTerm,
+			},
+		}
 	default:
 		return nil
 	}
