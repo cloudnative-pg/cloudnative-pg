@@ -1,9 +1,20 @@
 # jq returns an error code if there are any ginkgo failed test without the "ignore-fails" label.
-[
-    .[].SpecReports[]
-    | select(.State == "failed")
-    | select(.ContainerHierarchyLabels
-        | flatten
-        | any(. == "ignore-fails") 
-        | not)
-] | length | . == 0
+# or if the report.json is malformed and does not contain test reports (e.g. because ginkgo panicked)
+(
+    # does this file contain actual ginkgo SpecReports?
+    [
+        .[].SpecReports[]
+    ] | length | . != 0
+)
+and
+(
+    # are any of them failing without the ignore-fails flag?
+    [
+        .[].SpecReports[]
+        | select(.State == "failed")
+        | select(.ContainerHierarchyLabels
+            | flatten
+            | any(. == "ignore-fails") 
+            | not)
+    ] | length | . == 0
+)
