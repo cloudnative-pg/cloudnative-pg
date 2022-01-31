@@ -7,6 +7,9 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package utils
 
 import (
+	"reflect"
+	"strings"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
@@ -22,6 +25,10 @@ const (
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
 	OperatorVersionAnnotationName = "k8s.enterprisedb.io/operatorVersion"
+
+	// AppArmorAnnotationPrefix will be the name of the AppArmor profile to apply
+	// This is required for Azure but can be set in other environments
+	AppArmorAnnotationPrefix = "container.apparmor.security.beta.kubernetes.io"
 
 	// ReconciliationLoopAnnotationName is the name of the annotation controlling
 	// the status of the reconciliation loop for the cluster
@@ -103,6 +110,40 @@ func InheritLabels(
 		if config.IsLabelInherited(key) {
 			object.Labels[key] = value
 		}
+	}
+}
+
+func getAnnotationAppArmor(annotations map[string]string) map[string]string {
+	appArmorAnnotations := make(map[string]string)
+	for annotation, value := range annotations {
+		if strings.HasPrefix(annotation, AppArmorAnnotationPrefix) {
+			appArmorAnnotations[annotation] = value
+		}
+	}
+	return appArmorAnnotations
+}
+
+// IsAnnotationAppArmorPresent checks if one of the annotations is an AppArmor annotation
+func IsAnnotationAppArmorPresent(annotations map[string]string) bool {
+	annotation := getAnnotationAppArmor(annotations)
+	return len(annotation) != 0
+}
+
+// IsAnnotationAppArmorPresentInObject checks if the AppArmor annotations are present or not in the given Object
+func IsAnnotationAppArmorPresentInObject(object *metav1.ObjectMeta, annotations map[string]string) bool {
+	objAnnotations := getAnnotationAppArmor(object.Annotations)
+	appArmorAnnotations := getAnnotationAppArmor(annotations)
+	return reflect.DeepEqual(objAnnotations, appArmorAnnotations)
+}
+
+// AnnotateAppArmor adds an annotation to the pod
+func AnnotateAppArmor(object *metav1.ObjectMeta, annotations map[string]string) {
+	if object.Annotations == nil {
+		object.Annotations = make(map[string]string)
+	}
+	appArmorAnnotations := getAnnotationAppArmor(annotations)
+	for annotation, value := range appArmorAnnotations {
+		object.Annotations[annotation] = value
 	}
 }
 

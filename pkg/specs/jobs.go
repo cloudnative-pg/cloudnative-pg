@@ -256,6 +256,9 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int32, role string, init
 	utils.LabelJobRole(&job.ObjectMeta, role)
 	utils.LabelClusterName(&job.ObjectMeta, cluster.Name)
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
+	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
+		utils.AnnotateAppArmor(&job.ObjectMeta, cluster.Annotations)
+	}
 
 	return job
 }

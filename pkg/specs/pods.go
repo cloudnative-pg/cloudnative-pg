@@ -310,5 +310,8 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod
 		},
 	}
 
+	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
+		utils.AnnotateAppArmor(&pod.ObjectMeta, cluster.Annotations)
+	}
 	return pod
 }
