@@ -9,6 +9,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	goruntime "runtime"
@@ -57,6 +58,10 @@ type ClusterReconciler struct {
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
 }
+
+// ErrNextLoop is not a real error. It forces the current reconciliation loop to stop
+// and return the associated Result object
+var ErrNextLoop = errors.New("stop this loop and return the associated Result object")
 
 // Alphabetical order to not repeat or miss permissions
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list
@@ -111,13 +116,25 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// Run the inner reconcile loop. Translate any ErrNextLoop to an errorless return
+	result, err := r.reconcile(ctx, cluster)
+	if errors.Is(err, ErrNextLoop) {
+		return result, nil
+	}
+	return result, err
+}
+
+// Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
+func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluster) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
 	if utils.IsReconciliationDisabled(&cluster.ObjectMeta) {
 		contextLogger.Warning("Disable reconciliation loop annotation set, skipping the reconciliation.")
 		return ctrl.Result{}, nil
 	}
 
 	// Make sure default values are populated.
-	err = r.setDefaults(ctx, cluster)
+	err := r.setDefaults(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -550,7 +567,7 @@ func (r *ClusterReconciler) handleRollingUpdate(ctx context.Context, cluster *ap
 	// an instance manager upgrade
 	if instancesStatus.ArePodsUpgradingInstanceManager() {
 		contextLogger.Debug("Waiting for Pods to complete instance manager upgrade")
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	// Execute online update, if enabled
@@ -569,7 +586,7 @@ func (r *ClusterReconciler) handleRollingUpdate(ctx context.Context, cluster *ap
 	if done {
 		// Rolling upgrade is in progress, let's avoid marking stuff as synchronized
 		// (but recheck in one second, just to be sure)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	// When everything is reconciled, update the status
