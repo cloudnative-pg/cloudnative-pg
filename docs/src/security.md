@@ -98,6 +98,47 @@ and SELinux context.
     should not be used to run pods. CNP clusters deployed in those namespaces
     will be unable to start due to missing SCCs.
 
+### Restricting Pod access using AppArmor
+
+You can assign an
+[AppArmor](https://kubernetes.io/docs/tutorials/security/apparmor/) profile to
+the `postgres`, `initdb`, `join`, `full-recovery` and `bootstrap-controller` containers inside every `Cluster` pod through the
+`container.apparmor.security.beta.kubernetes.io` annotation.
+
+!!! Seealso "Example of cluster annotations"
+```
+	kind: Cluster
+	metadata:
+		name: cluster-apparmor
+		annotations:
+			container.apparmor.security.beta.kubernetes.io/postgres: runtime/default
+			container.apparmor.security.beta.kubernetes.io/initdb: runtime/default
+			container.apparmor.security.beta.kubernetes.io/join: runtime/default
+```
+
+!!! Warning
+    Using this kind of annotations can result in your cluster to stop working.
+    If this is the case, the annotation can be safely removed from the `Cluster`.
+
+The AppArmor configuration must be at Kubernetes node level, meaning that the
+underlying operating system must have this option enable and properly
+configured.
+
+In case this is not the situation, and the annotations were added at the
+`Cluster` creation time, pods will not be created. On the other hand, if you
+add the annotations after the `Cluster` was created the pods in the cluster will
+be unable to start and you will get an error like this:
+
+```
+metadata.annotations[container.apparmor.security.beta.kubernetes.io/postgres]: Forbidden: may not add AppArmor annotations]
+```
+
+In such cases, please refer to your Kubernetes administrators and ask for the proper AppArmor profile to use.
+
+!!! Warning "AppArmor and OpenShift"
+    AppArmor is currently available only on Debian distributions like Ubuntu,
+    hence this is not (and will not be) available in OpenShift
+
 ### Network Policies
 
 The pods created by the `Cluster` resource can be controlled by Kubernetes
