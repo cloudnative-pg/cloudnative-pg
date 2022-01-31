@@ -335,6 +335,13 @@ func (r *ClusterReconciler) reconcileResources(
 			"No pods are active, the cluster needs manual intervention ")
 	}
 
+	// When everything is reconciled, update the status
+	if err = r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	r.cleanupCompletedJobs(ctx, resources.jobs)
+
 	return ctrl.Result{}, nil
 }
 
@@ -527,7 +534,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	return r.handleRollingUpdate(ctx, cluster, resources, instancesStatus)
+	return r.handleRollingUpdate(ctx, cluster, instancesStatus)
 }
 
 func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
@@ -559,8 +566,11 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 	return nil
 }
 
-func (r *ClusterReconciler) handleRollingUpdate(ctx context.Context, cluster *apiv1.Cluster,
-	resources *managedResources, instancesStatus postgres.PostgresqlStatusList) (ctrl.Result, error) {
+func (r *ClusterReconciler) handleRollingUpdate(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instancesStatus postgres.PostgresqlStatusList,
+) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	// Stop acting here if there are Pods that are waiting for
@@ -589,12 +599,6 @@ func (r *ClusterReconciler) handleRollingUpdate(ctx context.Context, cluster *ap
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
-	// When everything is reconciled, update the status
-	if err = r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	r.cleanupCompletedJobs(ctx, resources.jobs)
 	return ctrl.Result{}, nil
 }
 
