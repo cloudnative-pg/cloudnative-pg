@@ -333,7 +333,8 @@ func (r *ClusterReconciler) updateClusterAnnotationsOnPods(
 
 		// if all the required annotations are already set and with the correct value,
 		// we proceed to the next item
-		if utils.IsAnnotationSubset(pod.Annotations, cluster.Annotations, configuration.Current) {
+		if utils.IsAnnotationSubset(pod.Annotations, cluster.Annotations, configuration.Current) &&
+			utils.IsAnnotationAppArmorPresentInObject(&pod.ObjectMeta, cluster.Annotations) {
 			contextLogger.Debug(
 				"Skipping cluster annotations reconciliation, because they are already present on pod",
 				"pod", pod.Name,
@@ -347,7 +348,9 @@ func (r *ClusterReconciler) updateClusterAnnotationsOnPods(
 		patch := client.MergeFrom(pod.DeepCopy())
 		utils.InheritAnnotations(&pod.ObjectMeta, cluster.Annotations,
 			cluster.GetFixedInheritedAnnotations(), configuration.Current)
-
+		if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
+			utils.AnnotateAppArmor(&pod.ObjectMeta, cluster.Annotations)
+		}
 		contextLogger.Info("Updating cluster annotations on pod", "pod", pod.Name)
 		if err := r.Patch(ctx, pod, patch); err != nil {
 			return err

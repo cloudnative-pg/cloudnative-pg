@@ -99,3 +99,15 @@ var _ = Describe("Label cluster name management", func() {
 		Expect(podTwo.ObjectMeta.Labels["test"]).To(Equal("toast"))
 	})
 })
+
+var _ = Describe("Annotate pods management", func() {
+	pod := corev1.Pod{}
+	annotations := map[string]string{
+		AppArmorAnnotationPrefix + "/apparmor_profile": "unconfined",
+	}
+
+	It("must annotate empty objects", func() {
+		AnnotateAppArmor(&pod.ObjectMeta, annotations)
+		Expect(pod.ObjectMeta.Annotations[AppArmorAnnotationPrefix+"/apparmor_profile"]).To(Equal("unconfined"))
+	})
+})

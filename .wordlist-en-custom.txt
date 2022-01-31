@@ -5,6 +5,8 @@ AcolumnName
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
+AppArmor
+AppArmorProfile
 AuthQuery
 AuthQuerySecret
 Autoscaler
@@ -222,6 +224,7 @@ Scorsolini
 SecretKeySelector
 SecretVersion
 SecretsResourceVersion
+SecurityProfiles
 Seealso
 ServerCASecret
 ServerTLSSecret
@@ -268,6 +271,7 @@ apiVersion
 apidoc
 apis
 apiserver
+apparmor
 appdb
 appuser
 args
