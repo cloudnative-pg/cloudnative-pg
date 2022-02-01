@@ -16,5 +16,6 @@ type Capabilities struct {
 	HasAzure           bool
 	HasS3              bool
 	HasRetentionPolicy bool
+	HasCheckWalArchive bool
 	Version            *semver.Version
 }

@@ -24,4 +24,7 @@ const (
 
 	// LabelIgnoreFails is the string for labelling tests that should not be considered when failing.
 	LabelIgnoreFails = "ignore-fails"
+
+	// LabelBackupRestore is a label for only selecting backup and restore tests
+	LabelBackupRestore = "backup-restore"
 )

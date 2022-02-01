@@ -20,7 +20,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Backup and restore", func() {
+var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 	const (
 		level = tests.High
 
@@ -203,8 +203,8 @@ var _ = Describe("Backup and restore", func() {
 			}, 30).Should(BeNumerically("==", 2))
 		})
 
-		It("backs up and restore a cluster with PITR", func() {
-			restoredClusterName := "restore-cluster-pitr"
+		It("backs up and restore a cluster with PITR MinIO", func() {
+			restoredClusterName := "restore-cluster-pitr-minio"
 
 			prepareClusterForPITROnMinio(namespace, clusterName, backupFile, 2, currentTimestamp)
 
@@ -426,8 +426,8 @@ var _ = Describe("Backup and restore", func() {
 			}, 30).Should(BeNumerically("==", 2))
 		})
 
-		It("backs up and restore a cluster with PITR", func() {
-			restoredClusterName := "restore-cluster-pitr"
+		It("backs up and restore a cluster with PITR Azurite", func() {
+			restoredClusterName := "restore-cluster-pitr-azurite"
 
 			prepareClusterForPITROnAzurite(namespace, clusterName, backupFile, currentTimestamp)
 
@@ -457,7 +457,7 @@ var _ = Describe("Backup and restore", func() {
 	})
 })
 
-var _ = Describe("Clusters Recovery From Barman Object Store", func() {
+var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.LabelBackupRestore), func() {
 	const (
 		fixturesBackupDir               = fixturesDir + "/backup/recovery_external_clusters/"
 		azuriteBlobSampleFile           = fixturesDir + "/backup/azurite/cluster-backup.yaml"

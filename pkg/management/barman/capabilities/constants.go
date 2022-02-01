@@ -24,4 +24,7 @@ const (
 
 	// BarmanCloudWalRestore is the command name for 'barman-cloud-wal-archive'
 	BarmanCloudWalRestore = "barman-cloud-wal-restore"
+
+	// BarmanCloudCheckWalArchive is the command name for 'barman-cloud-check-wal-archive'
+	BarmanCloudCheckWalArchive = "barman-cloud-check-wal-archive"
 )
