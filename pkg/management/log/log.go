@@ -88,10 +88,10 @@ func SetLogger(logr logr.Logger) {
 	log.Logger = logr
 }
 
-func (l *logger) enrich() logr.Logger {
+func (l *logger) enrich(forceCaller bool) logr.Logger {
 	cl := l.GetLogger()
 
-	if l.printCaller {
+	if l.printCaller || forceCaller {
 		_, fileName, fileLine, ok := runtime.Caller(2)
 		if ok {
 			cl = l.WithValues("caller", fmt.Sprintf("%s:%d", fileName, fileLine)).GetLogger()
@@ -114,23 +114,23 @@ func (l *logger) Enabled() bool {
 }
 
 func (l *logger) Error(err error, msg string, keysAndValues ...interface{}) {
-	l.enrich().V(int(-ErrorLevel)).Error(err, msg, keysAndValues...)
+	l.enrich(false).V(int(-ErrorLevel)).Error(err, msg, keysAndValues...)
 }
 
 func (l *logger) Info(msg string, keysAndValues ...interface{}) {
-	l.enrich().V(int(-InfoLevel)).Info(msg, keysAndValues...)
+	l.enrich(false).V(int(-InfoLevel)).Info(msg, keysAndValues...)
 }
 
 func (l *logger) Warning(msg string, keysAndValues ...interface{}) {
-	l.enrich().V(int(-WarningLevel)).Info(msg, keysAndValues...)
+	l.enrich(false).V(int(-WarningLevel)).Info(msg, keysAndValues...)
 }
 
 func (l *logger) Debug(msg string, keysAndValues ...interface{}) {
-	l.enrich().V(int(-DebugLevel)).Info(msg, keysAndValues...)
+	l.enrich(true).V(int(-DebugLevel)).Info(msg, keysAndValues...)
 }
 
 func (l *logger) Trace(msg string, keysAndValues ...interface{}) {
-	l.enrich().V(int(-TraceLevel)).Info(msg, keysAndValues...)
+	l.enrich(true).V(int(-TraceLevel)).Info(msg, keysAndValues...)
 }
 
 func (l *logger) WithValues(keysAndValues ...interface{}) Logger {
