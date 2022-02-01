@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path"
 	"sync"
 	"time"
 
@@ -162,6 +163,68 @@ func (archiver *WALArchiver) Archive(walName string, baseOptions []string) error
 		)
 		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCapabilities.BarmanCloudWalArchive, err)
 	}
+
+	return nil
+}
+
+// CheckWalArchive checks if the destinationObjectStore is ready perform archiving.
+// Based on this ticket in Barman https://github.com/EnterpriseDB/barman/issues/432
+// and its implementation https://github.com/EnterpriseDB/barman/pull/443
+// The idea here is to check ONLY if we're archiving the wal files for the first time in the bucket
+// since in this case the command barman-cloud-check-wal-archive will fail if the bucket exist and
+// contain wal files inside
+func (archiver *WALArchiver) CheckWalArchive(ctx context.Context, walFilesList, options []string) error {
+	contextLogger := log.FromContext(ctx)
+
+	// If walFileList is empty then, this is a no-op just like the method ArchiveList
+	if len(walFilesList) == 0 {
+		return nil
+	}
+
+	// Get the first wal file from the list
+	walName := path.Base(walFilesList[0])
+	// We check that we have the first wal file of the first timeline, otherwise, there's nothing to do here
+	if walName != "000000010000000000000001" {
+		return nil
+	}
+
+	contextLogger.Info("barman-cloud-check-wal-archive checking the first wal", "walName", walName)
+
+	// Check barman compatibility
+	capabilities, err := barmanCapabilities.CurrentCapabilities()
+	if err != nil {
+		return err
+	}
+
+	if !capabilities.HasCheckWalArchive {
+		contextLogger.Warning("barman-cloud-check-wal-archive cannot be used, is recommended to upgrade" +
+			" to version 2.18 or above.")
+		return nil
+	}
+
+	contextLogger.Trace("Executing "+barmanCapabilities.BarmanCloudCheckWalArchive,
+		"walName", walName,
+		"currentPrimary", archiver.cluster.Status.CurrentPrimary,
+		"targetPrimary", archiver.cluster.Status.TargetPrimary,
+		"options", options,
+	)
+
+	barmanCloudWalArchiveCmd := exec.Command(barmanCapabilities.BarmanCloudCheckWalArchive, options...) // #nosec G204
+	barmanCloudWalArchiveCmd.Env = archiver.env
+
+	err = execlog.RunStreaming(barmanCloudWalArchiveCmd, barmanCapabilities.BarmanCloudCheckWalArchive)
+	if err != nil {
+		contextLogger.Error(err, "Error invoking "+barmanCapabilities.BarmanCloudCheckWalArchive,
+			"walName", walName,
+			"currentPrimary", archiver.cluster.Status.CurrentPrimary,
+			"targetPrimary", archiver.cluster.Status.TargetPrimary,
+			"options", options,
+			"exitCode", barmanCloudWalArchiveCmd.ProcessState.ExitCode(),
+		)
+		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCapabilities.BarmanCloudWalArchive, err)
+	}
+
+	contextLogger.Trace("barman-cloud-check-wal-archive command execution completed")
 
 	return nil
 }

@@ -138,13 +138,26 @@ func run(ctx context.Context, podName string, args []string) error {
 	// Step 3: gather the WAL files names to archive
 	walFilesList := gatherWALFilesToArchive(ctx, walName, maxParallel)
 
+	checkWalOptions, err := barmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
+	if err != nil {
+		log.Error(err, "while getting barman-cloud-wal-archive options")
+		return err
+	}
+
+	// Step 4: Check if the archive location is safe to perform archiving
+	// This will output no error if we're not in the timeline 1 and archiving the wal file 1
+	if err := walArchiver.CheckWalArchive(ctx, walFilesList, checkWalOptions); err != nil {
+		log.Error(err, "while barman-cloud-check-wal-archive")
+		return err
+	}
+
 	options, err := barmanCloudWalArchiveOptions(cluster, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
 		return err
 	}
 
-	// Step 4: archive the WAL files in parallel
+	// Step 5: archive the WAL files in parallel
 	uploadStartTime := time.Now()
 	walStatus := walArchiver.ArchiveList(ctx, walFilesList, options)
 	if len(walStatus) > 1 {
@@ -249,6 +262,36 @@ func barmanCloudWalArchiveOptions(
 				string(configuration.Wal.Encryption))
 		}
 	}
+	if len(configuration.EndpointURL) > 0 {
+		options = append(
+			options,
+			"--endpoint-url",
+			configuration.EndpointURL)
+	}
+
+	options, err := barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
+	if err != nil {
+		return nil, err
+	}
+
+	serverName := clusterName
+	if len(configuration.ServerName) != 0 {
+		serverName = configuration.ServerName
+	}
+	options = append(
+		options,
+		configuration.DestinationPath,
+		serverName)
+	return options, nil
+}
+
+func barmanCloudCheckWalArchiveOptions(
+	cluster *apiv1.Cluster,
+	clusterName string,
+) ([]string, error) {
+	configuration := cluster.Spec.Backup.BarmanObjectStore
+
+	var options []string
 	if len(configuration.EndpointURL) > 0 {
 		options = append(
 			options,
