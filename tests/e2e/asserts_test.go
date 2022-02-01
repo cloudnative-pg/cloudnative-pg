@@ -169,6 +169,7 @@ func AssertCreateCluster(namespace string, clusterName string, sample string, en
 			return namespaceResource.GetName(), err
 		}, timeout).Should(BeEquivalentTo(namespace))
 	})
+
 	By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
 		_, _, err := testsUtils.Run("kubectl create -n " + namespace + " -f " + sample)
 		Expect(err).ToNot(HaveOccurred())
@@ -187,8 +188,10 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 		// amount of instances defined in the cluster and
 		// the cluster status should be in healthy state
 		cluster := &apiv1.Cluster{}
+
 		err := env.Client.Get(env.Ctx, namespacedName, cluster)
 		Expect(err).ToNot(HaveOccurred())
+
 		Eventually(func() (string, error) {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			if err != nil {

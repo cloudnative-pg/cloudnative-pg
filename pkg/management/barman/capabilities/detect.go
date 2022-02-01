@@ -37,6 +37,10 @@ func Detect() (*Capabilities, error) {
 	capabilities.Version = version
 
 	switch {
+	case version.GE(semver.Version{Major: 2, Minor: 18}):
+		// barman-cloud-check-wal-archive added in version >= 2.18
+		capabilities.HasCheckWalArchive = true
+		fallthrough
 	case version.GE(semver.Version{Major: 2, Minor: 14}):
 		// Retention policy support, added in Barman >= 2.14
 		capabilities.HasRetentionPolicy = true

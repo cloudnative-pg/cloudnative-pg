@@ -6,7 +6,9 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 
 package postgres
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+)
 
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {
