@@ -669,14 +669,14 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 // extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
 // the requested Pod, via the instance manager. In case of failure, errors are passed
 // in the result list
-func extractInstancesStatus(
+func (r *ClusterReconciler) extractInstancesStatus(
 	ctx context.Context,
 	filteredPods []corev1.Pod,
 ) postgres.PostgresqlStatusList {
 	var result postgres.PostgresqlStatusList
 
 	for idx := range filteredPods {
-		instanceStatus := getReplicaStatusFromPodViaHTTP(ctx, filteredPods[idx])
+		instanceStatus := r.getReplicaStatusFromPodViaHTTP(ctx, filteredPods[idx])
 		instanceStatus.IsReady = utils.IsPodReady(filteredPods[idx])
 		instanceStatus.Node = filteredPods[idx].Spec.NodeName
 		instanceStatus.Pod = filteredPods[idx]
@@ -688,7 +688,10 @@ func extractInstancesStatus(
 
 // getReplicaStatusFromPodViaHTTP retrieves the status of PostgreSQL pod via HTTP, retrying
 // the request if some communication error is encountered
-func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) (result postgres.PostgresqlStatus) {
+func (r *ClusterReconciler) getReplicaStatusFromPodViaHTTP(
+	ctx context.Context,
+	pod corev1.Pod,
+) (result postgres.PostgresqlStatus) {
 	isErrorRetryable := func(err error) bool {
 		contextLog := log.FromContext(ctx)
 
@@ -714,7 +717,7 @@ func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) (result
 	// online upgrades. It is not intended to wait for recovering from any
 	// other remote failure.
 	_ = retry.OnError(StatusRequestRetry, isErrorRetryable, func() error {
-		result = rawInstanceStatusRequest(ctx, pod)
+		result = rawInstanceStatusRequest(ctx, r.timeoutHTTPClient, pod)
 		return result.Error
 	})
 
@@ -724,11 +727,9 @@ func getReplicaStatusFromPodViaHTTP(ctx context.Context, pod corev1.Pod) (result
 // rawInstanceStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.
 func rawInstanceStatusRequest(
 	ctx context.Context,
+	client *http.Client,
 	pod corev1.Pod,
 ) (result postgres.PostgresqlStatus) {
-	const connectionTimeout = 2 * time.Second
-	const requestTimeout = 30 * time.Second
-
 	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
 	if err != nil {
@@ -736,18 +737,7 @@ func rawInstanceStatusRequest(
 		return result
 	}
 
-	// We want a connection timeout to prevent waiting for the default
-	// TCP connection timeout (30 seconds) on lost SYN packets
-	timeoutClient := &http.Client{
-		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout: connectionTimeout,
-			}).DialContext,
-		},
-		Timeout: requestTimeout,
-	}
-
-	resp, err := timeoutClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		result.Error = err
 		return result
