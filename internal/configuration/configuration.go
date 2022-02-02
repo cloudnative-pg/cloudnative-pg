@@ -70,6 +70,10 @@ type Data struct {
 	// MonitoringQueriesConfigmap is the name of the configmap in the operator namespace which contain
 	// the monitoring queries. The queries will be read from the data key: "queries".
 	MonitoringQueriesConfigmap string `json:"monitoringQueriesConfigmap" env:"MONITORING_QUERIES_CONFIGMAP"`
+
+	// MonitoringQueriesSecret is the name of the secret in the operator namespace which contain
+	// the monitoring queries. The queries will be read from the data key: "queries".
+	MonitoringQueriesSecret string `json:"monitoringQueriesSecret" env:"MONITORING_QUERIES_SECRET"`
 }
 
 // Current is the configuration used by the operator

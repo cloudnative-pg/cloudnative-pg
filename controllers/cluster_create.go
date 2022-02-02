@@ -71,11 +71,11 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
-	if configuration.Current.MonitoringQueriesConfigmap != "" && !cluster.Spec.Monitoring.AreDefaultQueriesDisabled() {
+	if !cluster.Spec.Monitoring.AreDefaultQueriesDisabled() {
 		err = r.createOrPatchDefaultMetrics(ctx, cluster)
-	}
-	if err != nil {
-		return err
+		if err != nil {
+			return nil
+		}
 	}
 
 	err = r.createOrPatchPodMonitor(ctx, cluster)
@@ -574,9 +574,9 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 	return nil
 }
 
-// createOrPatchDefaultMetrics ensures that the required configmap containing default monitoring queries exists and
-// contains the latest queries
-func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, cluster *apiv1.Cluster) error {
+// createOrPatchDefaultMetricsConfigmap ensures that the required configmap containing
+// default monitoring queries exists and contains the latest queries
+func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
 	// we extract the operator configMap that needs to be cloned in the namespace where the cluster lives
@@ -593,9 +593,9 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 		return err
 	}
 
-	if _, ok := sourceConfigmap.Data[apiv1.DefaultMonitoringConfigMapKey]; !ok {
+	if _, ok := sourceConfigmap.Data[apiv1.DefaultMonitoringKey]; !ok {
 		contextLogger.Warning("key not found while checking default metrics configMap", "key",
-			apiv1.DefaultMonitoringConfigMapKey, "configmap_name", sourceConfigmap.Name)
+			apiv1.DefaultMonitoringKey, "configmap_name", sourceConfigmap.Name)
 		return nil
 	}
 
@@ -629,7 +629,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 				},
 			},
 			Data: map[string]string{
-				apiv1.DefaultMonitoringConfigMapKey: sourceConfigmap.Data[apiv1.DefaultMonitoringConfigMapKey],
+				apiv1.DefaultMonitoringKey: sourceConfigmap.Data[apiv1.DefaultMonitoringKey],
 			},
 		}
 		utils.SetOperatorVersion(&newConfigMap.ObjectMeta, versions.Version)
@@ -655,9 +655,112 @@ func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, clu
 	patchedConfigMap.Data = sourceConfigmap.Data
 
 	if err := r.Patch(ctx, patchedConfigMap, client.MergeFrom(&targetConfigMap)); err != nil {
-		return fmt.Errorf("while patching default monitoring queries: %w", err)
+		return fmt.Errorf("while patching default monitoring queries configmap: %w", err)
 	}
 
+	return nil
+}
+
+// createOrPatchDefaultMetricsConfigmap ensures that the required secret containing default
+// monitoring queries exists and contains the latest queries
+func (r *ClusterReconciler) createOrPatchDefaultMetricsSecret(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	// We extract the operator configMap that needs to be cloned in the namespace where the cluster lives
+	var sourceSecret corev1.Secret
+	if err := r.Get(ctx,
+		client.ObjectKey{
+			Name:      configuration.Current.MonitoringQueriesSecret,
+			Namespace: configuration.Current.OperatorNamespace,
+		}, &sourceSecret); err != nil {
+		if apierrs.IsNotFound(err) {
+			contextLogger.Error(err, "while trying to get default metrics secret")
+			return nil
+		}
+		return err
+	}
+
+	if _, ok := sourceSecret.Data[apiv1.DefaultMonitoringKey]; !ok {
+		contextLogger.Warning("key not found while checking default metrics secret", "key",
+			apiv1.DefaultMonitoringKey, "secret_name", sourceSecret.Name)
+		return nil
+	}
+
+	if cluster.Namespace == configuration.Current.OperatorNamespace &&
+		configuration.Current.MonitoringQueriesSecret == apiv1.DefaultMonitoringSecretName {
+		contextLogger.Debug(
+			"skipping default metrics synchronization. The cluster resides in the same namespace of the operator",
+			"clusterNamespace", cluster.Namespace,
+			"clusterName", cluster.Name,
+		)
+		return nil
+	}
+
+	// We clone the secret in the cluster namespace
+	var targetSecret corev1.Secret
+	if err := r.Get(ctx,
+		client.ObjectKey{
+			Name:      apiv1.DefaultMonitoringSecretName,
+			Namespace: cluster.Namespace,
+		}, &targetSecret); err != nil {
+		if !apierrs.IsNotFound(err) {
+			return err
+		}
+		// If the secret does not exist we create it
+		newConfigMap := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      apiv1.DefaultMonitoringSecretName,
+				Namespace: cluster.Namespace,
+				Labels: map[string]string{
+					specs.WatchedLabelName: "true",
+				},
+			},
+			Data: map[string][]byte{
+				apiv1.DefaultMonitoringKey: sourceSecret.Data[apiv1.DefaultMonitoringKey],
+			},
+		}
+		utils.SetOperatorVersion(&newConfigMap.ObjectMeta, versions.Version)
+		return r.Create(ctx, &newConfigMap)
+	}
+
+	// We check that we own the existing configmap
+	if _, ok := targetSecret.Annotations[utils.OperatorVersionAnnotationName]; !ok {
+		contextLogger.Warning("A secret with the same name as the one the operator would have created for "+
+			"default metrics already exists, without the required annotation",
+			"secret", targetSecret.Name, "annotation", utils.OperatorVersionAnnotationName)
+		return nil
+	}
+
+	if reflect.DeepEqual(sourceSecret.Data, targetSecret.Data) {
+		// Everything fine, the two secrets are exactly the same
+		return nil
+	}
+
+	// The configuration changed, and we need the patch the secret we have
+	patchedSecret := targetSecret.DeepCopy()
+	utils.SetOperatorVersion(&patchedSecret.ObjectMeta, versions.Version)
+	patchedSecret.Data = sourceSecret.Data
+
+	if err := r.Patch(ctx, patchedSecret, client.MergeFrom(&targetSecret)); err != nil {
+		return fmt.Errorf("while patching default monitoring queries secret: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, cluster *apiv1.Cluster) (err error) {
+	if configuration.Current.MonitoringQueriesConfigmap != "" {
+		err = r.createOrPatchDefaultMetricsConfigmap(ctx, cluster)
+		if err != nil {
+			return err
+		}
+	}
+	if configuration.Current.MonitoringQueriesSecret != "" {
+		err = r.createOrPatchDefaultMetricsSecret(ctx, cluster)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
