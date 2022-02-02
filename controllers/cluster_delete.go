@@ -18,12 +18,13 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
 )
 
-// deleteDanglingMonitoringConfigMaps deletes the default monitoring configMap if no cluster in the namespace
+// deleteDanglingMonitoringQueries deletes the default monitoring configMap and/or secret if no cluster in the namespace
 // is using it.
-func (r *ClusterReconciler) deleteDanglingMonitoringConfigMaps(ctx context.Context, namespace string) error {
+func (r *ClusterReconciler) deleteDanglingMonitoringQueries(ctx context.Context, namespace string) error {
 	configMapName := configuration.Current.MonitoringQueriesConfigmap
-	if configMapName == "" {
-		// no configmap configured, we can exit.
+	secretName := configuration.Current.MonitoringQueriesSecret
+	if secretName == "" && configMapName == "" {
+		// no configmap or secretName configured, we can exit.
 		return nil
 	}
 
@@ -32,10 +33,10 @@ func (r *ClusterReconciler) deleteDanglingMonitoringConfigMaps(ctx context.Conte
 		return nil
 	}
 
-	clustersUsingConfigMap := apiv1.ClusterList{}
+	clustersUsingDefaultMetrics := apiv1.ClusterList{}
 	err := r.List(
 		ctx,
-		&clustersUsingConfigMap,
+		&clustersUsingDefaultMetrics,
 		client.InNamespace(namespace),
 		// we check if there are any clusters that use the configMap in the namespace
 		client.MatchingFields{disableDefaultQueriesSpecPath: "false"},
@@ -44,18 +45,34 @@ func (r *ClusterReconciler) deleteDanglingMonitoringConfigMaps(ctx context.Conte
 		return err
 	}
 
-	configMap := corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      apiv1.DefaultMonitoringConfigMapName,
-			Namespace: namespace,
-		},
-	}
-	if len(clustersUsingConfigMap.Items) > 0 {
+	if len(clustersUsingDefaultMetrics.Items) > 0 {
 		return nil
 	}
 
-	if err = r.Delete(ctx, &configMap); err != nil && !apierrs.IsNotFound(err) {
-		return err
+	if configMapName != "" {
+		configMap := corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      apiv1.DefaultMonitoringConfigMapName,
+				Namespace: namespace,
+			},
+		}
+
+		if err = r.Delete(ctx, &configMap); err != nil && !apierrs.IsNotFound(err) {
+			return err
+		}
+	}
+
+	if secretName != "" {
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      apiv1.DefaultMonitoringSecretName,
+				Namespace: namespace,
+			},
+		}
+
+		if err = r.Delete(ctx, &secret); err != nil && !apierrs.IsNotFound(err) {
+			return err
+		}
 	}
 
 	return nil

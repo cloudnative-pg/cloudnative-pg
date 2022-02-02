@@ -30,10 +30,15 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
-// DefaultMonitoringConfigMapKey is the key that should be used in the default metrics configmap to store the queries
 const (
-	DefaultMonitoringConfigMapKey  = "queries"
+	// DefaultMonitoringKey is the key that should be used in the default metrics configmap to store the queries
+	DefaultMonitoringKey = "queries"
+	// DefaultMonitoringConfigMapName is the name of the target configmap with the default monitoring queries,
+	// if configured
 	DefaultMonitoringConfigMapName = "postgresql-operator-default-monitoring"
+	// DefaultMonitoringSecretName is the name of the target secret with the default monitoring queries,
+	// if configured
+	DefaultMonitoringSecretName = DefaultMonitoringConfigMapName
 )
 
 // clusterLog is for logging in this package.
@@ -96,44 +101,60 @@ func (r *Cluster) SetDefaults() {
 
 	// we inject the defaultMonitoringQueries if the MonitoringQueriesConfigmap parameter is not empty
 	// and defaultQueries not disabled on cluster crd
-	if configuration.Current.MonitoringQueriesConfigmap != "" && !r.Spec.Monitoring.AreDefaultQueriesDisabled() {
-		r.defaultMonitoringQueries()
+	if !r.Spec.Monitoring.AreDefaultQueriesDisabled() {
+		r.defaultMonitoringQueries(configuration.Current)
 	}
 }
 
 // defaultMonitoringQueries adds the default monitoring queries configMap
 // if not already present in CustomQueriesConfigMap
-func (r *Cluster) defaultMonitoringQueries() {
+func (r *Cluster) defaultMonitoringQueries(config *configuration.Data) {
 	if r.Spec.Monitoring == nil {
 		r.Spec.Monitoring = &MonitoringConfiguration{}
 	}
 
-	var defaultConfigMapQueriesAlreadyPresent bool
+	if config.MonitoringQueriesConfigmap != "" {
+		var defaultConfigMapQueriesAlreadyPresent bool
+		// We check if the default queries are already inserted in the monitoring configuration
+		for _, monitoringConfigMap := range r.Spec.Monitoring.CustomQueriesConfigMap {
+			if monitoringConfigMap.Name == DefaultMonitoringConfigMapName {
+				defaultConfigMapQueriesAlreadyPresent = true
+				break
+			}
+		}
 
-	// we check if they default queries are been already inserted in the monitoring configuration
-	for _, monitoringConfigMap := range r.Spec.Monitoring.CustomQueriesConfigMap {
-		if monitoringConfigMap.Name == DefaultMonitoringConfigMapName {
-			defaultConfigMapQueriesAlreadyPresent = true
-			break
+		// If the default queries are already present there is no need to re-add them.
+		// Please note that in this case that the default configMap could overwrite user existing queries
+		// depending on the order. This is an accepted behavior because the user willingly defined the order of his array
+		if !defaultConfigMapQueriesAlreadyPresent {
+			r.Spec.Monitoring.CustomQueriesConfigMap = append([]ConfigMapKeySelector{
+				{
+					LocalObjectReference: LocalObjectReference{Name: DefaultMonitoringConfigMapName},
+					Key:                  DefaultMonitoringKey,
+				},
+			}, r.Spec.Monitoring.CustomQueriesConfigMap...)
 		}
 	}
 
-	// if the default queries are already present there is no need to re-add them, so we quit the function.
-	// Please note that in this case that the default configMap could overwrite user existing queries
-	// depending on the order. This is an accepted behavior because the user willingly defined the order of his array
-	if defaultConfigMapQueriesAlreadyPresent {
-		return
-	}
+	if config.MonitoringQueriesSecret != "" {
+		var defaultSecretQueriesAlreadyPresent bool
+		// we check if the default queries are already inserted in the monitoring configuration
+		for _, monitoringSecret := range r.Spec.Monitoring.CustomQueriesSecret {
+			if monitoringSecret.Name == DefaultMonitoringSecretName {
+				defaultSecretQueriesAlreadyPresent = true
+				break
+			}
+		}
 
-	// we add the default monitoring queries to the array.
-	// It is important that the DefaultMonitoringConfigMap is the first element of the array
-	// because it should be overwritten by the user defined metrics.
-	r.Spec.Monitoring.CustomQueriesConfigMap = append([]ConfigMapKeySelector{
-		{
-			LocalObjectReference: LocalObjectReference{Name: DefaultMonitoringConfigMapName},
-			Key:                  DefaultMonitoringConfigMapKey,
-		},
-	}, r.Spec.Monitoring.CustomQueriesConfigMap...)
+		if !defaultSecretQueriesAlreadyPresent {
+			r.Spec.Monitoring.CustomQueriesSecret = append([]SecretKeySelector{
+				{
+					LocalObjectReference: LocalObjectReference{Name: DefaultMonitoringSecretName},
+					Key:                  DefaultMonitoringKey,
+				},
+			}, r.Spec.Monitoring.CustomQueriesSecret...)
+		}
+	}
 }
 
 // defaultInitDB enriches the initDB with defaults if not all the required arguments were passed

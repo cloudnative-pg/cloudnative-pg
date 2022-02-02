@@ -136,7 +136,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster == nil {
-		if err := r.deleteDanglingMonitoringConfigMaps(ctx, req.Namespace); err != nil {
+		if err := r.deleteDanglingMonitoringQueries(ctx, req.Namespace); err != nil {
 			contextLogger.Error(
 				err,
 				"error while deleting dangling monitoring configMap",
@@ -795,11 +795,7 @@ func (r *ClusterReconciler) mapSecretsToClusters(ctx context.Context) handler.Ma
 		if !ok {
 			return nil
 		}
-		var clusters apiv1.ClusterList
-		// get all the clusters handled by the operator in the secret namespaces
-		err := r.List(ctx, &clusters,
-			client.InNamespace(secret.Namespace),
-		)
+		clusters, err := r.getClustersForSecretsOrConfigMapsToClustersMapper(ctx, secret)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "while getting cluster list", "namespace", secret.Namespace)
 			return nil
@@ -807,6 +803,43 @@ func (r *ClusterReconciler) mapSecretsToClusters(ctx context.Context) handler.Ma
 		// build requests for cluster referring the secret
 		return filterClustersUsingSecret(clusters, secret)
 	}
+}
+
+func (r *ClusterReconciler) getClustersForSecretsOrConfigMapsToClustersMapper(
+	ctx context.Context,
+	object metav1.Object,
+) (clusters apiv1.ClusterList, err error) {
+	_, isSecret := object.(*corev1.Secret)
+	_, isConfigMap := object.(*corev1.ConfigMap)
+
+	if !isSecret && !isConfigMap {
+		return clusters, fmt.Errorf("unsupported object: %+v", object)
+	}
+
+	// Get all the clusters handled by the operator in the secret namespaces
+	if object.GetNamespace() == configuration.Current.OperatorNamespace &&
+		((isConfigMap && object.GetName() == configuration.Current.MonitoringQueriesConfigmap) ||
+			(isSecret && object.GetName() == configuration.Current.MonitoringQueriesSecret)) {
+		// The events in MonitoringQueriesSecrets impacts all the clusters.
+		// We proceed to fetch all the clusters and create a reconciliation request for them.
+		// This works as long as the replicated MonitoringQueriesConfigmap in the different namespaces
+		// have the same name.
+		//
+		// See cluster.UsesSecret method
+		err = r.List(
+			ctx,
+			&clusters,
+			client.MatchingFields{disableDefaultQueriesSpecPath: "false"},
+		)
+	} else {
+		// This is a configmap that affects only a given namespace, so we fetch only the clusters residing in there.
+		err = r.List(
+			ctx,
+			&clusters,
+			client.InNamespace(object.GetNamespace()),
+		)
+	}
+	return clusters, err
 }
 
 // mapPoolersToClusters returns a function mapping pooler events watched to cluster reconcile requests
@@ -836,32 +869,7 @@ func (r *ClusterReconciler) mapConfigMapsToClusters(ctx context.Context) handler
 		if !ok {
 			return nil
 		}
-		var clusters apiv1.ClusterList
-		var err error
-		const shouldFetchDefaultConfigMap = "false"
-
-		if configuration.Current.MonitoringQueriesConfigmap != "" &&
-			config.Namespace == configuration.Current.OperatorNamespace &&
-			config.Name == configuration.Current.MonitoringQueriesConfigmap {
-			// The events in MonitoringQueriesConfigmap impacts all the clusters.
-			// We proceed to fetch all the clusters and create a reconciliation request for them
-			// This works as long the replicated MonitoringQueriesConfigmap in the different namespaces
-			// have the same name.
-			//
-			// See cluster.UsesConfigMap method
-			err = r.List(
-				ctx,
-				&clusters,
-				client.MatchingFields{disableDefaultQueriesSpecPath: shouldFetchDefaultConfigMap},
-			)
-		} else {
-			// This is a configmap that affects only a given namespace, so we fetch only the clusters residing in there.
-			err = r.List(
-				ctx,
-				&clusters,
-				client.InNamespace(config.Namespace),
-			)
-		}
+		clusters, err := r.getClustersForSecretsOrConfigMapsToClustersMapper(ctx, config)
 		if err != nil {
 			log.FromContext(ctx).Error(err, "while getting cluster list", "namespace", config.Namespace)
 			return nil
@@ -1005,7 +1013,7 @@ func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context,
 	oldCmID := -1
 	for idx, cm := range cluster.Spec.Monitoring.CustomQueriesConfigMap {
 		if cm.Name == configuration.Current.MonitoringQueriesConfigmap &&
-			cm.Key == apiv1.DefaultMonitoringConfigMapKey {
+			cm.Key == apiv1.DefaultMonitoringKey {
 			oldCmID = idx
 			break
 		}
