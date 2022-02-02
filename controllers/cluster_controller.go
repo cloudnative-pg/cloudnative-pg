@@ -11,6 +11,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"reflect"
 	goruntime "runtime"
 	"time"
@@ -29,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -57,6 +60,34 @@ type ClusterReconciler struct {
 	DiscoveryClient *discovery.DiscoveryClient
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
+
+	timeoutHTTPClient *http.Client
+}
+
+// NewClusterReconciler creates a new ClusterReconciler initializing it
+func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *ClusterReconciler {
+	const connectionTimeout = 2 * time.Second
+	const requestTimeout = 30 * time.Second
+
+	// We want a connection timeout to prevent waiting for the default
+	// TCP connection timeout (30 seconds) on lost SYN packets
+	timeoutClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout: connectionTimeout,
+			}).DialContext,
+		},
+		Timeout: requestTimeout,
+	}
+
+	return &ClusterReconciler{
+		timeoutHTTPClient: timeoutClient,
+
+		DiscoveryClient: discoveryClient,
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		Recorder:        mgr.GetEventRecorderFor("cloud-native-postgresql"),
+	}
 }
 
 // ErrNextLoop is not a real error. It forces the current reconciliation loop to stop

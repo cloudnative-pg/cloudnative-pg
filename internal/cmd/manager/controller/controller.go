@@ -181,15 +181,11 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 		}
 	}
 
-	if err = (&controllers.ClusterReconciler{
-		DiscoveryClient: discoveryClient,
-		Client:          mgr.GetClient(),
-		Scheme:          mgr.GetScheme(),
-		Recorder:        mgr.GetEventRecorderFor("cloud-native-postgresql"),
-	}).SetupWithManager(ctx, mgr); err != nil {
+	if err = controllers.NewClusterReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
 	}
+
 	if err = (&controllers.BackupReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
@@ -198,6 +194,7 @@ func RunController(metricsAddr, configMapName, secretName string, enableLeaderEl
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
 	}
+
 	if err = (&controllers.ScheduledBackupReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
