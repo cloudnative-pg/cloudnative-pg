@@ -825,6 +825,7 @@ spec:
                             enum:
                             - gzip
                             - bzip2
+                            - snappy
                             type: string
                           encryption:
                             description: Whenever to force the encryption of files
@@ -925,6 +926,7 @@ spec:
                             enum:
                             - gzip
                             - bzip2
+                            - snappy
                             type: string
                           encryption:
                             description: Whenever to force the encryption of files
@@ -1259,6 +1261,7 @@ spec:
                               enum:
                               - gzip
                               - bzip2
+                              - snappy
                               type: string
                             encryption:
                               description: Whenever to force the encryption of files
@@ -1359,6 +1362,7 @@ spec:
                               enum:
                               - gzip
                               - bzip2
+                              - snappy
                               type: string
                             encryption:
                               description: Whenever to force the encryption of files

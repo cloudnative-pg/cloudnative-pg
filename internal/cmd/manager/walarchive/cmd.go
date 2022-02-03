@@ -24,6 +24,7 @@ import (
 	cacheClient "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache/client"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/archiver"
+	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
@@ -246,10 +247,17 @@ func barmanCloudWalArchiveOptions(
 	cluster *apiv1.Cluster,
 	clusterName string,
 ) ([]string, error) {
+	capabilities, err := barmanCapabilities.CurrentCapabilities()
+	if err != nil {
+		return nil, err
+	}
 	configuration := cluster.Spec.Backup.BarmanObjectStore
 
 	var options []string
 	if configuration.Wal != nil {
+		if configuration.Wal.Compression == apiv1.CompressionTypeSnappy && !capabilities.HasSnappy {
+			return nil, fmt.Errorf("snappy compression is not supported in Barman %v", capabilities.Version)
+		}
 		if len(configuration.Wal.Compression) != 0 {
 			options = append(
 				options,
@@ -269,7 +277,7 @@ func barmanCloudWalArchiveOptions(
 			configuration.EndpointURL)
 	}
 
-	options, err := barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
+	options, err = barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
 	if err != nil {
 		return nil, err
 	}
