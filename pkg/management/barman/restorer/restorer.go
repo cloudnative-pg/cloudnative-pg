@@ -21,6 +21,10 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
+const (
+	endOfWALStreamFlagFilename = "end-of-wal-stream"
+)
+
 // WALRestorer is a structure containing every info needed to restore
 // some WALs from the object storage
 type WALRestorer struct {
@@ -88,6 +92,45 @@ func (restorer *WALRestorer) RestoreFromSpool(walName, destinationPath string) (
 	default:
 		return true, nil
 	}
+}
+
+// SetEndOfWALStream add end-of-wal-stream in the spool directory
+func (restorer *WALRestorer) SetEndOfWALStream() error {
+	contains, err := restorer.IsEndOfWALStream()
+	if err != nil {
+		return err
+	}
+
+	if contains {
+		return nil
+	}
+
+	err = restorer.spool.Touch(endOfWALStreamFlagFilename)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// IsEndOfWALStream check whether end-of-wal-stream flag is presents in the spool directory
+func (restorer *WALRestorer) IsEndOfWALStream() (bool, error) {
+	isEOS, err := restorer.spool.Contains(endOfWALStreamFlagFilename)
+	if err != nil {
+		return false, fmt.Errorf("failed to check end-of-wal-stream flag: %w", err)
+	}
+
+	return isEOS, nil
+}
+
+// ResetEndOfWalStream remove end-of-wal-stream flag from the spool directory
+func (restorer *WALRestorer) ResetEndOfWalStream() error {
+	err := restorer.spool.Remove(endOfWALStreamFlagFilename)
+	if err != nil {
+		return fmt.Errorf("failed to remove end-of-wal-stream flag: %w", err)
+	}
+
+	return nil
 }
 
 // RestoreList restores a list of WALs. The first WAL of the list will go directly into the
