@@ -214,7 +214,7 @@ that starts with `pg_stat_statements.` as in the following example excerpt:
   # ...
   postgresql:
     parameters:
-      pg_stat_statements.max: 10000
+      pg_stat_statements.max: "10000"
       pg_stat_statements.track: all
   # ...
 ```
@@ -240,7 +240,7 @@ to complete):
   # ...
   postgresql:
     parameters:
-      auto_explain.log_min_duration: '10s'
+      auto_explain.log_min_duration: "10s"
   # ...
 ```
 
