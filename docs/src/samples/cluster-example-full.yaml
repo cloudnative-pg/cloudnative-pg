@@ -47,7 +47,7 @@ spec:
   postgresql:
     parameters:
       shared_buffers: 256MB
-      pg_stat_statements.max: 10000
+      pg_stat_statements.max: '10000'
       pg_stat_statements.track: all
       auto_explain.log_min_duration: '10s'
     pg_hba:
