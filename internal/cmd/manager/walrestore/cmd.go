@@ -27,8 +27,12 @@ import (
 )
 
 var (
+	// ErrEndOfWALStreamReached is returned when end of WAL is detected in the cloud archive
+	ErrEndOfWALStreamReached = errors.New("end of WAL reached")
+
 	// ErrNoBackupConfigured is returned when no backup is configured
 	ErrNoBackupConfigured = errors.New("backup not configured")
+
 	// ErrExternalClusterNotFound is returned when the specification refers to
 	// an external cluster which is not defined. This should be prevented
 	// from the validation webhook
@@ -57,11 +61,17 @@ func NewCmd() *cobra.Command {
 				return nil
 			}
 
-			if errors.Is(err, ErrNoBackupConfigured) {
+			switch {
+			case errors.Is(err, ErrNoBackupConfigured):
 				contextLog.Info("tried restoring WALs, but no backup was configured")
-			} else {
+			case errors.Is(err, ErrEndOfWALStreamReached):
+				contextLog.Info(
+					"end-of-wal-stream flag found. " +
+						"Exiting with error once to let Postgres try switching to streaming replication")
+			default:
 				contextLog.Error(err, "failed to run wal-restore command")
 			}
+
 			contextLog.Debug("There was an error in the previous wal-restore command. Waiting 100 ms before retrying.")
 			time.Sleep(100 * time.Millisecond)
 			return err
@@ -113,17 +123,7 @@ func run(ctx context.Context, podName string, args []string) error {
 		return fmt.Errorf("failed to get envs: %w", err)
 	}
 
-	for _, recoverEnvValue := range recoverEnv {
-		splitRecoverEnvValue := strings.Split(recoverEnvValue, "=")
-		if len(splitRecoverEnvValue) != 2 {
-			continue
-		}
-		for idx, envValue := range env {
-			if strings.HasPrefix(envValue, splitRecoverEnvValue[0]) {
-				env[idx] = recoverEnvValue
-			}
-		}
-	}
+	mergeEnv(env, recoverEnv)
 
 	// Create the restorer
 	var walRestorer *restorer.WALRestorer
@@ -144,10 +144,12 @@ func run(ctx context.Context, podName string, args []string) error {
 		return nil
 	}
 
-	// Step 2: gather the WAL files names to restore
-	// is not really a WAL.
-	// To do that we need to implement something like this function
-	// here: https://github.com/EnterpriseDB/barman/blob/749f33bcfdd6ea865390ddb34ece95301c797690/barman/xlog.py#L135
+	// Step 2: return error if the end-of-wal-stream flag is set
+	if err := checkEndOfWALStreamFlag(walRestorer); err != nil {
+		return err
+	}
+
+	// Step 3: gather the WAL files names to restore. If the required file isn't a regular WAL, we download it directly.
 	var walFilesList []string
 	maxParallel := 1
 	if barmanConfiguration.Wal != nil && barmanConfiguration.Wal.MaxParallel > 1 {
@@ -163,31 +165,95 @@ func run(ctx context.Context, podName string, args []string) error {
 		walFilesList = []string{walName}
 	}
 
-	// Step 3: download the WAL files into the required place
+	// Step 4: download the WAL files into the required place
 	downloadStartTime := time.Now()
 	walStatus := walRestorer.RestoreList(ctx, walFilesList, destinationPath, options)
-	if len(walStatus) > 1 {
-		successfulWalRestore := 0
-		for idx := range walStatus {
-			if walStatus[idx].Err == nil {
-				successfulWalRestore++
-			}
+
+	// Step 5: set end-of-wal-stream flag if any download job returned file-not-found
+	// There is no reason to set the flag if the first download returned an error,
+	// as the current execution will exit with error anyway, triggering PostgreSQL to
+	// switch to streaming replication.
+	firstFileSucceeded := walStatus[0].Err == nil
+	endOfWALStream := isEndOfWALStream(walStatus)
+	if firstFileSucceeded && endOfWALStream {
+		contextLog.Info(
+			"Set end-of-wal-stream flag as one of the WAL files to be prefetched was not found")
+
+		err = walRestorer.SetEndOfWALStream()
+		if err != nil {
+			return err
 		}
-		contextLog.Info("Completed restore command (parallel)",
-			"maxParallel", maxParallel,
-			"successfulWalRestore", successfulWalRestore,
-			"failedWalRestore", maxParallel-successfulWalRestore,
-			"startTime", startTime,
-			"downloadStartTime", downloadStartTime,
-			"downloadTotalTime", time.Since(downloadStartTime),
-			"totalTime", time.Since(startTime))
 	}
+
+	successfulWalRestore := 0
+	for idx := range walStatus {
+		if walStatus[idx].Err == nil {
+			successfulWalRestore++
+		}
+	}
+
+	contextLog.Info("WAL restore command completed (parallel)",
+		"maxParallel", maxParallel,
+		"successfulWalRestore", successfulWalRestore,
+		"failedWalRestore", maxParallel-successfulWalRestore,
+		"endOfWALStream", endOfWALStream,
+		"firstFileSucceeded", firstFileSucceeded,
+		"startTime", startTime,
+		"downloadStartTime", downloadStartTime,
+		"downloadTotalTime", time.Since(downloadStartTime),
+		"totalTime", time.Since(startTime))
 
 	// We return only the first error to PostgreSQL, because the first error
 	// is the one raised by the file that PostgreSQL has requested to restore.
 	// The other errors are related to WAL files that were pre-restored in
 	// the spool as a performance optimization and are just logged
 	return walStatus[0].Err
+}
+
+// checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
+func checkEndOfWALStreamFlag(walRestorer *restorer.WALRestorer) error {
+	contain, err := walRestorer.IsEndOfWALStream()
+	if err != nil {
+		return err
+	}
+
+	if contain {
+		err := walRestorer.ResetEndOfWalStream()
+		if err != nil {
+			return err
+		}
+
+		return ErrEndOfWALStreamReached
+	}
+	return nil
+}
+
+// isEndOfWALStream returns true if one of the downloads has returned
+// a file-not-found error
+func isEndOfWALStream(results []restorer.Result) bool {
+	for _, result := range results {
+		// TODO: After barman 2.18, implement error handling for file-not-found
+		if result.Err != nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+// mergeEnv merges all the values inside incomingEnv into env
+func mergeEnv(env []string, incomingEnv []string) {
+	for _, incomingItem := range incomingEnv {
+		incomingKV := strings.SplitAfterN(incomingItem, "=", 2)
+		if len(incomingKV) != 2 {
+			continue
+		}
+		for idx, item := range env {
+			if strings.HasPrefix(item, incomingKV[0]) {
+				env[idx] = incomingItem
+			}
+		}
+	}
 }
 
 // GetRecoverConfiguration get the appropriate recover Configuration for a given cluster
