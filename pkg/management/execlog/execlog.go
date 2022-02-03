@@ -67,8 +67,10 @@ func (se *StreamingCmd) Wait() error {
 	state, err := se.process.Wait()
 
 	// Cleanup any remaining goroutine
-	close(se.waitDone)
-	se.copyPipes.Wait()
+	if se.waitDone != nil && se.copyPipes != nil {
+		close(se.waitDone)
+		se.copyPipes.Wait()
+	}
 
 	// Implements the same interface of Wait method of exec.Cmd struct
 	if err != nil {
