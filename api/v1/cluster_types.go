@@ -737,13 +737,16 @@ type CompressionType string
 
 const (
 	// CompressionTypeNone means no compression is performed
-	CompressionTypeNone = ""
+	CompressionTypeNone = CompressionType("")
 
 	// CompressionTypeGzip means gzip compression is performed
-	CompressionTypeGzip = "gzip"
+	CompressionTypeGzip = CompressionType("gzip")
 
 	// CompressionTypeBzip2 means bzip2 compression is performed
-	CompressionTypeBzip2 = "bzip2"
+	CompressionTypeBzip2 = CompressionType("bzip2")
+
+	// CompressionTypeSnappy means snappy compression is performed
+	CompressionTypeSnappy = CompressionType("snappy")
 )
 
 // EncryptionType encapsulated the available types of encryption
@@ -751,13 +754,13 @@ type EncryptionType string
 
 const (
 	// EncryptionTypeNone means just use the bucket configuration
-	EncryptionTypeNone = ""
+	EncryptionTypeNone = EncryptionType("")
 
 	// EncryptionTypeAES256 means to use AES256 encryption
-	EncryptionTypeAES256 = "AES256"
+	EncryptionTypeAES256 = EncryptionType("AES256")
 
 	// EncryptionTypeNoneAWSKMS means to use aws:kms encryption
-	EncryptionTypeNoneAWSKMS = "aws:kms"
+	EncryptionTypeNoneAWSKMS = EncryptionType("aws:kms")
 )
 
 // BarmanObjectStoreConfiguration contains the backup configuration
@@ -822,7 +825,7 @@ type BackupConfiguration struct {
 type WalBackupConfiguration struct {
 	// Compress a WAL file before sending it to the object store. Available
 	// options are empty string (no compression, default), `gzip` or `bzip2`.
-	// +kubebuilder:validation:Enum=gzip;bzip2
+	// +kubebuilder:validation:Enum=gzip;bzip2;snappy
 	Compression CompressionType `json:"compression,omitempty"`
 
 	// Whenever to force the encryption of files (if the bucket is
@@ -848,7 +851,7 @@ type DataBackupConfiguration struct {
 	// Compress a backup file (a tar file per tablespace) while streaming it
 	// to the object store. Available options are empty string (no
 	// compression, default), `gzip` or `bzip2`.
-	// +kubebuilder:validation:Enum=gzip;bzip2
+	// +kubebuilder:validation:Enum=gzip;bzip2;snappy
 	Compression CompressionType `json:"compression,omitempty"`
 
 	// Whenever to force the encryption of files (if the bucket is

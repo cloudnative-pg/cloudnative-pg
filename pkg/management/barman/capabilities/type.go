@@ -17,5 +17,6 @@ type Capabilities struct {
 	HasS3              bool
 	HasRetentionPolicy bool
 	HasCheckWalArchive bool
+	HasSnappy          bool
 	Version            *semver.Version
 }

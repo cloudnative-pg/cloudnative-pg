@@ -68,42 +68,67 @@ func NewBackupCommand(
 	}
 }
 
+// getDataConfiguration gets the configuration in the `Data` object of the Barman configuration
+func getDataConfiguration(
+	options []string,
+	configuration *apiv1.BarmanObjectStoreConfiguration,
+	capabilities *barmanCapabilities.Capabilities,
+) ([]string, error) {
+	if configuration.Data == nil {
+		return options, nil
+	}
+
+	if configuration.Data.Compression == apiv1.CompressionTypeSnappy && !capabilities.HasSnappy {
+		return nil, fmt.Errorf("snappy compression is not supported in Barman %v", capabilities.Version)
+	}
+
+	if len(configuration.Data.Compression) != 0 {
+		options = append(
+			options,
+			fmt.Sprintf("--%v", configuration.Data.Compression))
+	}
+
+	if len(configuration.Data.Encryption) != 0 {
+		options = append(
+			options,
+			"--encrypt",
+			string(configuration.Data.Encryption))
+	}
+
+	if configuration.Data.ImmediateCheckpoint {
+		options = append(
+			options,
+			"--immediate-checkpoint")
+	}
+
+	if configuration.Data.Jobs != nil {
+		options = append(
+			options,
+			"--jobs",
+			strconv.Itoa(int(*configuration.Data.Jobs)))
+	}
+
+	return options, nil
+}
+
 // getBarmanCloudBackupOptions extract the list of command line options to be used with
 // barman-cloud-backup
 func (b *BackupCommand) getBarmanCloudBackupOptions(
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 	serverName string,
 ) ([]string, error) {
+	capabilities, err := barmanCapabilities.CurrentCapabilities()
+	if err != nil {
+		return nil, err
+	}
+
 	options := []string{
 		"--user", "postgres",
 	}
 
-	if configuration.Data != nil {
-		if len(configuration.Data.Compression) != 0 {
-			options = append(
-				options,
-				fmt.Sprintf("--%v", configuration.Data.Compression))
-		}
-
-		if len(configuration.Data.Encryption) != 0 {
-			options = append(
-				options,
-				"--encrypt",
-				string(configuration.Data.Encryption))
-		}
-
-		if configuration.Data.ImmediateCheckpoint {
-			options = append(
-				options,
-				"--immediate-checkpoint")
-		}
-
-		if configuration.Data.Jobs != nil {
-			options = append(
-				options,
-				"--jobs",
-				strconv.Itoa(int(*configuration.Data.Jobs)))
-		}
+	options, err = getDataConfiguration(options, configuration, capabilities)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(configuration.EndpointURL) > 0 {
@@ -113,7 +138,7 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 			configuration.EndpointURL)
 	}
 
-	options, err := barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
+	options, err = barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
 	if err != nil {
 		return nil, err
 	}
