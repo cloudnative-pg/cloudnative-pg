@@ -869,6 +869,7 @@ jobs:
       E2E_DEFAULT_STORAGE_CLASS: gp2
 
       AWS_REGION: eu-central-1
+      AWS_EKS_ADMIN_IAM_ROLES: ${{ secrets.AWS_EKS_ADMIN_IAM_ROLES}}
     steps:
       -
         name: Set cluster name
@@ -924,7 +925,18 @@ jobs:
       -
         name: Setup EKS
         run: |
+          # Defining variables
+          AWS_ADMIN_ACCESS_ROLE=$(echo "$AWS_EKS_ADMIN_IAM_ROLES" | sed '1q;d')
+          AWS_EDB_POWER_ROLE=$(echo "$AWS_EKS_ADMIN_IAM_ROLES" | sed '2q;d')
+
+          # Masking variables to hide values
+          echo "::add-mask::$AWS_ADMIN_ACCESS_ROLE"
+          echo "::add-mask::$AWS_EDB_POWER_ROLE"
+
+          # Setting up EKS cluster
           eksctl create cluster -f hack/e2e/eks-cluster.yaml
+          eksctl create iamidentitymapping --cluster "${CLUSTER_NAME}" --region="${AWS_REGION}" --arn "${AWS_ADMIN_ACCESS_ROLE}" --group system:masters --username admin
+          eksctl create iamidentitymapping --cluster "${CLUSTER_NAME}" --region="${AWS_REGION}" --arn "${AWS_EDB_POWER_ROLE}" --group system:masters --username admin
       -
         name: Setup log archiving via fluentd and insights
         uses: nick-invision/retry@v2
