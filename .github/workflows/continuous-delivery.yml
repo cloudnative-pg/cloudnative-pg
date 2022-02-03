@@ -723,6 +723,13 @@ jobs:
             echo "AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT}" >> $GITHUB_ENV
             AZURE_STORAGE_KEY=$(az storage account keys list -g "${{ secrets.AZURE_RESOURCEGROUP }}" -n "${AZURE_STORAGE_ACCOUNT}" --query "[0].value" -o tsv)
             echo "AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}" >> $GITHUB_ENV
+
+            # create diagnostic settings for monitoring kube-apiserver logs
+            AKS_CLUSTER_RESOURCE_ID=$(az aks show --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' ) --query id -o tsv --only-show-errors)
+            az monitor diagnostic-settings create --resource ${AKS_CLUSTER_RESOURCE_ID} \
+              --name diagnostic-kube-apiserver-logs \
+              --workspace ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
+              --logs '[ { "category": "kube-apiserver", "enabled": true, "retentionPolicy": { "enabled": true, "days": 30 } } ]'
       -
         # Azure is slow in provisioning disks, and we can't wait two minutes
         # every time we create a pod, otherwise all the tests will time out.
