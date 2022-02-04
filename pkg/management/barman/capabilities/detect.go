@@ -38,6 +38,8 @@ func Detect() (*Capabilities, error) {
 
 	switch {
 	case version.GE(semver.Version{Major: 2, Minor: 18}):
+		// Tags, added in Barman >= 2.18
+		capabilities.HasTags = true
 		// Barman-cloud-check-wal-archive, added in Barman >= 2.18
 		capabilities.HasCheckWalArchive = true
 		// Snappy compression support, added in Barman >= 2.18

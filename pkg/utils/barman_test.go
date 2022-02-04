@@ -30,3 +30,14 @@ var _ = Describe("parsing policy", func() {
 		Expect(err).ToNot(BeNil())
 	})
 })
+
+var _ = Describe("converting map to barman tags format", func() {
+	It("returns an empty slice, if map is missing", func() {
+		Expect(MapToBarmanTagsFormat("test", nil)).To(BeEmpty())
+	})
+
+	It("works properly, given a map of tags", func() {
+		tags := map[string]string{"retentionDays": "90days"}
+		Expect(MapToBarmanTagsFormat("test", tags)).To(BeEquivalentTo([]string{"test", "retentionDays,90days"}))
+	})
+})

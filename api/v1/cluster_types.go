@@ -801,6 +801,14 @@ type BarmanObjectStoreConfiguration struct {
 	// be unencrypted in the object store, according to the bucket default
 	// policy.
 	Data *DataBackupConfiguration `json:"data,omitempty"`
+
+	// Tags is a list of key value pairs that will be passed to the
+	// Barman --tags option.
+	Tags map[string]string `json:"tags,omitempty"`
+
+	// HistoryTags is a list of key value pairs that will be passed to the
+	// Barman --history-tags option.
+	HistoryTags map[string]string `json:"historyTags,omitempty"`
 }
 
 // BackupConfiguration defines how the backup of the cluster are taken.
