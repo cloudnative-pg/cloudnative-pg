@@ -35,6 +35,9 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
+		if env.IsIBM() {
+			Skip("This test is not run on an IBM architecture")
+		}
 		// Sometimes on AKS the promotion itself takes more than 10 seconds.
 		// Nothing to be done operator side, we raise the timeout to avoid
 		// failures in the test.

@@ -478,6 +478,20 @@ func (env TestingEnvironment) IsAKS() (bool, error) {
 	return true, nil
 }
 
+// IsIBM returns true if we are running on IBM architecture. We check that
+// by verifying if IBM_ARCH env is equals to "true"
+func (env TestingEnvironment) IsIBM() bool {
+	ibmArch, ok := os.LookupEnv("IBM_ARCH")
+	if !ok {
+		return false
+	}
+	if ibmArch == "true" {
+		fmt.Println("This is an IBM architecture")
+		return true
+	}
+	return false
+}
+
 // GetPodLogs gathers pod logs
 func (env TestingEnvironment) GetPodLogs(namespace string, podName string) (string, error) {
 	req := env.Interface.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{})

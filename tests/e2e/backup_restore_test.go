@@ -60,7 +60,10 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
 			if isAKS {
-				Skip("Test is not run on AKS.")
+				Skip("This test is not run on AKS")
+			}
+			if env.IsIBM() {
+				Skip("This test is not run on an IBM architecture")
 			}
 			namespace = "cluster-backup-minio"
 			clusterName, err = env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
@@ -393,11 +396,15 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			azuriteTLSSecName = "azurite-tls-secret"
 		)
 
-		BeforeAll(func() {
+		BeforeAll(func() { // nolint:dupl
+			// TODO: fix almost identical duplicate function
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
 			if isAKS {
 				Skip("This test is only executed on gke, openshift and local")
+			}
+			if env.IsIBM() {
+				Skip("This test is not run on an IBM architecture")
 			}
 			namespace = "cluster-backup-azurite"
 			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
@@ -531,6 +538,9 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			Expect(err).ToNot(HaveOccurred())
 			if isAKS {
 				Skip("This test is only executed on gke, openshift and local")
+			}
+			if env.IsIBM() {
+				Skip("This test is not run on an IBM architecture")
 			}
 			namespace = "recovery-barman-object-minio"
 			clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileMinio)
@@ -798,11 +808,15 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	})
 
 	Context("using Azurite blobs as object storage", Ordered, func() {
-		BeforeAll(func() {
+		BeforeAll(func() { // nolint:dupl
+			// TODO: fix almost identical duplicate function
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
 			if isAKS {
-				Skip("Test is not run on AKS.")
+				Skip("This test is not run on AKS")
+			}
+			if env.IsIBM() {
+				Skip("This test is not run on an IBM architecture")
 			}
 			namespace = "recovery-barman-object-azurite"
 			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
