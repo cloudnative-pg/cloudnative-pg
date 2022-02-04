@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -129,6 +131,11 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 	options, err = getDataConfiguration(options, configuration, capabilities)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(configuration.Tags) > 0 {
+		options = append(options,
+			utils.MapToBarmanTagsFormat("--tags", configuration.Tags)...)
 	}
 
 	if len(configuration.EndpointURL) > 0 {

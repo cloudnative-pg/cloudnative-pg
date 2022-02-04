@@ -58,4 +58,8 @@ spec:
           compression: gzip
         data:
           immediateCheckpoint: true
+        tags:
+          retention: "30days"
+        historyTags:
+          retention: "30days"
     retentionPolicy: "30d"

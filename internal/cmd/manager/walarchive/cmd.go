@@ -27,6 +27,7 @@ import (
 	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 const (
@@ -275,6 +276,16 @@ func barmanCloudWalArchiveOptions(
 			options,
 			"--endpoint-url",
 			configuration.EndpointURL)
+	}
+
+	if len(configuration.Tags) > 0 {
+		options = append(options,
+			utils.MapToBarmanTagsFormat("--tags", configuration.Tags)...)
+	}
+
+	if len(configuration.HistoryTags) > 0 {
+		options = append(options,
+			utils.MapToBarmanTagsFormat("--history-tags", configuration.HistoryTags)...)
 	}
 
 	options, err = barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
