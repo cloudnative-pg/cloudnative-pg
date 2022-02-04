@@ -37,6 +37,9 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
+		if env.IsIBM() {
+			Skip("This test is not run on an IBM architecture")
+		}
 	})
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
