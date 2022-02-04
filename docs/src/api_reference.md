@@ -202,6 +202,8 @@ Name             | Description                                                  
 `serverName      ` | The server name on S3, the cluster name is used if this parameter is omitted                                                                                                                               | string                                              
 `wal             ` | The configuration for the backup of the WAL stream. When not defined, WAL files will be stored uncompressed and may be unencrypted in the object store, according to the bucket default policy.            | [*WalBackupConfiguration](#WalBackupConfiguration)  
 `data            ` | The configuration to be used to backup the data files When not defined, base backups files will be stored uncompressed and may be unencrypted in the object store, according to the bucket default policy. | [*DataBackupConfiguration](#DataBackupConfiguration)
+`tags            ` | Tags is a list of key value pairs that will be passed to the Barman --tags option.                                                                                                                         | map[string]string                                   
+`historyTags     ` | HistoryTags is a list of key value pairs that will be passed to the Barman --history-tags option.                                                                                                          | map[string]string                                   
 
 <a id='BootstrapConfiguration'></a>
 

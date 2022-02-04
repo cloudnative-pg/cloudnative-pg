@@ -7,6 +7,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -30,6 +31,11 @@ type MinioSetup struct {
 	PersistentVolumeClaim corev1.PersistentVolumeClaim
 	Deployment            appsv1.Deployment
 	Service               corev1.Service
+}
+
+// TagSet will contain the `tagset` section of the minio output command
+type TagSet struct {
+	Tags map[string]string `json:"tagset"`
 }
 
 // InstallMinio installs minio in a given namespace
@@ -311,6 +317,10 @@ func MinioDefaultClient(namespace string) corev1.Pod {
 							Name:  "MC_HOST_minio",
 							Value: "http://minio:minio123@minio-service:9000",
 						},
+						{
+							Name:  "MC_URL",
+							Value: "https://minio-service:9000",
+						},
 					},
 					Command: []string{"sleep", "3600"},
 				},
@@ -372,6 +382,37 @@ func CountFilesOnMinio(namespace string, minioClientName string, path string) (v
 // composeFindMinioCmd builds the Minio find command
 func composeFindMinioCmd(path string, serviceName string) string {
 	return fmt.Sprintf("sh -c 'mc find %v --name %v | wc -l'", serviceName, path)
+}
+
+// GetFileTagsOnMinio will use the minioClient to retrieve the tags in a specified path
+func GetFileTagsOnMinio(namespace, minioClientName, path string) (TagSet, error) {
+	var output TagSet
+	// Make sure we have a registered backup to access
+	out, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl exec -n %v %v -- sh -c 'mc find minio --name %v | head -n1'",
+		namespace,
+		minioClientName,
+		path))
+	if err != nil {
+		return output, err
+	}
+
+	walFile := strings.Trim(out, "\n")
+
+	stdout, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl exec -n %v %v -- sh -c 'mc --json tag list %v'",
+		namespace,
+		minioClientName,
+		walFile))
+	if err != nil {
+		return output, err
+	}
+
+	err = json.Unmarshal([]byte(stdout), &output)
+	if err != nil {
+		return output, err
+	}
+	return output, nil
 }
 
 // MinioTestConnectivityUsingBarmanCloudWalArchive returns true if test connection is successful else false

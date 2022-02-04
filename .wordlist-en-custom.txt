@@ -101,6 +101,7 @@ GolangCI
 Grafana
 HH
 Hai
+HistoryTags
 INPLACE
 IfNotPresent
 InfoSec

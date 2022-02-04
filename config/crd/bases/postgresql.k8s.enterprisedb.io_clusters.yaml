@@ -876,6 +876,12 @@ spec:
                         description: Endpoint to be used to upload data to the cloud,
                           overriding the automatic endpoint discovery
                         type: string
+                      historyTags:
+                        additionalProperties:
+                          type: string
+                        description: HistoryTags is a list of key value pairs that
+                          will be passed to the Barman --history-tags option.
+                        type: object
                       s3Credentials:
                         description: The credentials to use to upload data to S3
                         properties:
@@ -913,6 +919,12 @@ spec:
                         description: The server name on S3, the cluster name is used
                           if this parameter is omitted
                         type: string
+                      tags:
+                        additionalProperties:
+                          type: string
+                        description: Tags is a list of key value pairs that will be
+                          passed to the Barman --tags option.
+                        type: object
                       wal:
                         description: The configuration for the backup of the WAL stream.
                           When not defined, WAL files will be stored uncompressed
@@ -1312,6 +1324,12 @@ spec:
                           description: Endpoint to be used to upload data to the cloud,
                             overriding the automatic endpoint discovery
                           type: string
+                        historyTags:
+                          additionalProperties:
+                            type: string
+                          description: HistoryTags is a list of key value pairs that
+                            will be passed to the Barman --history-tags option.
+                          type: object
                         s3Credentials:
                           description: The credentials to use to upload data to S3
                           properties:
@@ -1349,6 +1367,12 @@ spec:
                           description: The server name on S3, the cluster name is
                             used if this parameter is omitted
                           type: string
+                        tags:
+                          additionalProperties:
+                            type: string
+                          description: Tags is a list of key value pairs that will
+                            be passed to the Barman --tags option.
+                          type: object
                         wal:
                           description: The configuration for the backup of the WAL
                             stream. When not defined, WAL files will be stored uncompressed

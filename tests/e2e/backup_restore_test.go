@@ -44,7 +44,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
-	Context("using minio as object storage", Ordered, func() {
+	Context("using minio as object storage for backup", Ordered, func() {
 		// This is a set of tests using a minio server deployed in the same
 		// namespace as the cluster. Since each cluster is installed in its
 		// own namespace, they can share the configuration file
@@ -232,6 +232,30 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			})
 
 			AssertSuspendScheduleBackups(namespace, scheduledBackupName)
+		})
+
+		It("verify tags in backed files", func() {
+			AssertArchiveWalOnMinio(namespace, clusterName)
+			tags, err := testUtils.GetFileTagsOnMinio(namespace, minioClientName, "*[0-9].gz")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(tags.Tags).ToNot(BeEmpty())
+
+			currentPrimary, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			oldPrimary := currentPrimary.GetName()
+			// Force-delete the primary
+			zero := int64(0)
+			forceDelete := &ctrlclient.DeleteOptions{
+				GracePeriodSeconds: &zero,
+			}
+			err = env.DeletePod(namespace, currentPrimary.GetName(), forceDelete)
+			Expect(err).ToNot(HaveOccurred())
+
+			AssertNewPrimary(namespace, clusterName, oldPrimary)
+
+			tags, err = testUtils.GetFileTagsOnMinio(namespace, minioClientName, "*.history.gz")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(tags.Tags).ToNot(BeEmpty())
 		})
 	})
 
