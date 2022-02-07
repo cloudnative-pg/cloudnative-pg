@@ -198,13 +198,9 @@ EOF
     agents=(-a "${NODES}")
   fi
 
-  disable="disable"
-  if [[ $k8s_version =~ ^v1\.1[0-6]\. ]]; then
-    disable="no-deploy"
-  fi
-
-  k3d cluster create "${volumes[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" \
-    --k3s-server-arg "--${disable}=traefik" --k3s-server-arg "--${disable}=metrics-server" --no-lb "${cluster_name}"
+  k3d cluster create "${volumes[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
+    --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" \
+    --k3s-arg "--node-taint=node-role.kubernetes.io/master:NoSchedule@server:0" #wokeignore:rule=master
 
   if [ -n "${ENABLE_REGISTRY:-}" ]; then
     docker network connect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
