@@ -14,6 +14,12 @@ on:
 env:
   # Red Hat certification data
   RH_API: "https://catalog.redhat.com/api/containers/v1/projects/certification/id"
+  DIGEST: ${{ github.event.inputs.digest }}
+  CNP_VERSION: ${{ github.event.inputs.version }}
+  IMAGE_REGISTRY: "quay.io/enterprisedb/cloud-native-postgresql"
+  RH_CONNECT_API_KEY: ${{ secrets.RH_CONNECT_API_KEY }}
+  QUAY_JSON_AUTH: ${{ secrets.QUAY_JSON_AUTH }}
+  RH_PROJ_ID: ${{ secrets.RH_PROJ_ID }}
 
 permissions:
   contents: write
@@ -24,10 +30,6 @@ jobs:
     name: Red Hat Certification
     steps:
       - name: Certify Operator Image with Red Hat Connect
-        env:
-          DIGEST: ${{ github.event.inputs.digest }}
-          CNP_VERSION: ${{ github.event.inputs.version }}
-          IMAGE_REGISTRY: "quay.io/enterprisedb/cloud-native-postgresql"
         run: |
           # We create the proper headers files for all the curl commands
           echo "accept: application/json
@@ -80,3 +82,13 @@ jobs:
           fi
 
           rm headers.txt
+
+  redhat_certification_publish_images:
+    runs-on: ubuntu-20.04
+    name: Red Hat Certification Publish Images
+    needs:
+      - redhat_certification
+    if: needs.redhat_certification.result == 'success'
+    steps:
+      - name: Publish Certified Operator Images with Red Hat Connect
+        run: bash .github/publish-certified-images.sh
