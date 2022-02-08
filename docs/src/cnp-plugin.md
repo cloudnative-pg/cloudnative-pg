@@ -66,6 +66,13 @@ Working WAL archiving:          OK
 Last Archived WAL:              00000008000003AE00000079   @   2021-12-14T10:16:29.340047Z
 Last Failed WAL: -
 
+Certificates Status
+Certificate Name             Expiration Date                Days Left Until Expiration
+----------------             ---------------                --------------------------
+cluster-example-ca           2022-05-05 15:02:42 +0000 UTC  87.23
+cluster-example-replication  2022-05-05 15:02:42 +0000 UTC  87.23
+cluster-example-server       2022-05-05 15:02:42 +0000 UTC  87.23
+
 Streaming Replication status
 Name       Sent LSN      Write LSN     Flush LSN     Replay LSN    Write Lag        Flush Lag        Replay Lag       State      Sync State  Sync Priority
 ----       --------      ---------     ---------     ----------    ---------        ---------        ----------       -----      ----------  -------------
