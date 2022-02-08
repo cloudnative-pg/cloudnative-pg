@@ -19,9 +19,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
 	cacheClient "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache/client"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/archiver"
 	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
@@ -56,11 +60,18 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
-			err := run(ctx, podName, args)
+			typedClient, err := management.NewControllerRuntimeClient()
+			if err != nil {
+				contextLog.Error(err, "creating controller-runtine client")
+				return err
+			}
+
+			err = run(ctx, podName, args, typedClient)
 			if err != nil {
 				contextLog.Error(err, logErrorMessage)
 				return err
 			}
+
 			return nil
 		},
 	}
@@ -70,7 +81,7 @@ func NewCmd() *cobra.Command {
 	return &cmd
 }
 
-func run(ctx context.Context, podName string, args []string) error {
+func run(ctx context.Context, podName string, args []string, client client.WithWatch) error {
 	startTime := time.Now()
 	contextLog := log.FromContext(ctx)
 	walName := args[0]
@@ -143,6 +154,10 @@ func run(ctx context.Context, podName string, args []string) error {
 	checkWalOptions, err := barmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
+		if errCond := manager.UpdateCondition(ctx, client,
+			cluster, buildArchiveCondition(err)); errCond != nil {
+			log.Error(errCond, "Error status.UpdateCondition()")
+		}
 		return err
 	}
 
@@ -150,12 +165,21 @@ func run(ctx context.Context, podName string, args []string) error {
 	// This will output no error if we're not in the timeline 1 and archiving the wal file 1
 	if err := walArchiver.CheckWalArchive(ctx, walFilesList, checkWalOptions); err != nil {
 		log.Error(err, "while barman-cloud-check-wal-archive")
+		// Update the condition if needed.
+		if errCond := manager.UpdateCondition(ctx, client,
+			cluster, buildArchiveCondition(err)); errCond != nil {
+			log.Error(errCond, "Error status.UpdateCondition()")
+		}
 		return err
 	}
 
 	options, err := barmanCloudWalArchiveOptions(cluster, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
+		if errCond := manager.UpdateCondition(ctx, client,
+			cluster, buildArchiveCondition(err)); errCond != nil {
+			log.Error(errCond, "Error status.UpdateCondition()")
+		}
 		return err
 	}
 
@@ -171,10 +195,16 @@ func run(ctx context.Context, podName string, args []string) error {
 			"totalTime", time.Since(startTime))
 	}
 
+	// Update the condition if needed.
+	if errCond := manager.UpdateCondition(ctx, client,
+		cluster, buildArchiveCondition(walStatus[0].Err)); errCond != nil {
+		log.Error(errCond, "Error status.UpdateCondition()")
+	}
 	// We return only the first error to PostgreSQL, because the first error
 	// is the one raised by the file that PostgreSQL has requested to archive.
 	// The other errors are related to WAL files that were pre-archived as
 	// a performance optimization and are just logged
+
 	return walStatus[0].Err
 }
 
@@ -332,4 +362,21 @@ func barmanCloudCheckWalArchiveOptions(
 		configuration.DestinationPath,
 		serverName)
 	return options, nil
+}
+
+func buildArchiveCondition(err error) *apiv1.ClusterCondition {
+	if err != nil {
+		return &apiv1.ClusterCondition{
+			Type:    apiv1.ConditionContinuousArchiving,
+			Status:  apiv1.ConditionFalse,
+			Reason:  "Continuous Archiving is Failing",
+			Message: err.Error(),
+		}
+	}
+	return &apiv1.ClusterCondition{
+		Type:    apiv1.ConditionContinuousArchiving,
+		Status:  apiv1.ConditionTrue,
+		Reason:  "Continuous Archiving is Working",
+		Message: "",
+	}
 }

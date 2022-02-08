@@ -1309,6 +1309,17 @@ func AssertClusterRestorePITR(namespace, clusterName, tableName, lsn string) {
 	})
 }
 
+func AssertArchiveConditionMet(namespace, clusterName, timeout string) {
+	By("Waiting for the condition", func() {
+		out, _, err := testsUtils.Run(fmt.Sprintf(
+			"kubectl -n %s wait --for=condition=ContinuousArchiving=true cluster/%s --timeout=%s",
+			namespace, clusterName, timeout))
+		Expect(err).ToNot(HaveOccurred())
+		outPut := strings.TrimSpace(out)
+		Expect(outPut).Should(ContainSubstring("condition met"))
+	})
+}
+
 func AssertArchiveWalOnAzurite(namespace, clusterName string) {
 	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
 	By("archiving WALs and verifying they exist", func() {
@@ -1391,6 +1402,7 @@ func prepareClusterForPITROnMinio(
 		insertRecordIntoTable(namespace, clusterName, tableNamePitr, 3)
 	})
 	AssertArchiveWalOnMinio(namespace, clusterName)
+	AssertArchiveConditionMet(namespace, clusterName, "5m")
 }
 
 func prepareClusterForPITROnAzureBlob(namespace, clusterName, backupSampleFile,
@@ -1424,6 +1436,7 @@ func prepareClusterForPITROnAzureBlob(namespace, clusterName, backupSampleFile,
 		insertRecordIntoTable(namespace, clusterName, tableNamePitr, 3)
 	})
 	AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
+	AssertArchiveConditionMet(namespace, clusterName, "5m")
 }
 
 func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
@@ -1444,6 +1457,8 @@ func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
 
 	// Creating cluster
 	AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
+
+	AssertArchiveConditionMet(namespace, clusterName, "5m")
 }
 
 func prepareClusterBackupOnAzurite(namespace, clusterName, clusterSampleFile, backupFile, tableName string) {
