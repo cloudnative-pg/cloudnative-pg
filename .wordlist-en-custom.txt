@@ -45,6 +45,9 @@ Certmanager
 ClientCASecret
 ClientCertsCASecret
 ClientReplicationSecret
+ClusterCondition
+ClusterConditionType
+ConditionStatus
 ClusterIP
 ClusterList
 ClusterSpec
