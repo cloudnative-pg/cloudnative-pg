@@ -153,6 +153,7 @@ PGDATA
 PGSQL
 PKI
 PODNAME
+PPROF
 PV
 PVCs
 Patroni
@@ -326,6 +327,7 @@ clusterName
 clusterlist
 clusterspec
 clusterstatus
+cmd
 cnp
 codeready
 columnValue
@@ -482,6 +484,7 @@ liveness
 lm
 localeCType
 localeCollate
+localhost
 localobjectreference
 locktype
 lookups
@@ -578,6 +581,7 @@ postgresImageName
 postgresUID
 postgresconfiguration
 postgresql
+pprof
 pre
 preferredDuringSchedulingIgnoredDuringExecution
 preload
