@@ -832,7 +832,7 @@ type BackupConfiguration struct {
 // WAL stream
 type WalBackupConfiguration struct {
 	// Compress a WAL file before sending it to the object store. Available
-	// options are empty string (no compression, default), `gzip` or `bzip2`.
+	// options are empty string (no compression, default), `gzip`, `bzip2` or `snappy`.
 	// +kubebuilder:validation:Enum=gzip;bzip2;snappy
 	Compression CompressionType `json:"compression,omitempty"`
 
@@ -858,7 +858,7 @@ type WalBackupConfiguration struct {
 type DataBackupConfiguration struct {
 	// Compress a backup file (a tar file per tablespace) while streaming it
 	// to the object store. Available options are empty string (no
-	// compression, default), `gzip` or `bzip2`.
+	// compression, default), `gzip`, `bzip2` or `snappy`.
 	// +kubebuilder:validation:Enum=gzip;bzip2;snappy
 	Compression CompressionType `json:"compression,omitempty"`
 
