@@ -393,6 +393,37 @@ kubectl get pod -l k8s.enterprisedb.io/clusterName=<CLUSTER> \
 The latter is important to understand where your pods are distributed - very
 useful if you are using [affinity/anti-affinity rules and/or tolerations](scheduling.md).
 
+## Conditions
+
+Like many native kubernetes
+objects [like here](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions), 
+Cluster exposes `status.conditions` as well. This allows one to 'wait' for a particular 
+event to occur instead of relying on the overall cluster health state. Available conditions as of now are:
+
+- ContinuousArchiving
+
+### How to wait for a particular condition
+
+```bash
+$ kubectl wait --for=condition=ContinuousArchiving cluster/<cluster-name>
+```
+
+Below is a snippet of a `cluster.status` that contains a failing condition.
+
+```bash
+$ kubectl get cluster/<cluster-name> -o yaml
+.
+.
+.
+  status:
+    conditions:
+    - message: 'unexpected failure invoking barman-cloud-wal-archive: exit status
+        4'
+      reason: Continuous Archiving is Failing
+      status: "False"
+      type: ContinuousArchiving
+```
+
 ## Some common issues
 
 ### Storage is full
