@@ -17,11 +17,12 @@ func NewCmd() *cobra.Command {
 	var configMapName string
 	var secretName string
 	var port int
+	var pprofHTTPServer bool
 
 	cmd := cobra.Command{
 		Use: "controller [flags]",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return RunController(metricsAddr, configMapName, secretName, enableLeaderElection, port)
+			return RunController(metricsAddr, configMapName, secretName, enableLeaderElection, pprofHTTPServer, port)
 		},
 	}
 
@@ -35,6 +36,12 @@ func NewCmd() *cobra.Command {
 		"the operator configuration. Values are merged with the ConfigMap's one, overwriting them if already defined")
 	cmd.Flags().IntVar(&port, "webhook-port", 9443, "The port the controller should be listening on."+
 		" If modified, take care to update the service pointing to it")
+	cmd.Flags().BoolVar(
+		&pprofHTTPServer,
+		"pprof-server",
+		false,
+		"If true it will start a pprof debug http server on localhost:6060. Defaults to false.",
+	)
 
 	return &cmd
 }

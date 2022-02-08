@@ -9,8 +9,11 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
+	"time"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -88,12 +91,23 @@ func init() {
 //
 // This code really belongs to app/controller_manager.go but we can't put
 // it here to respect the project layout created by kubebuilder.
-func RunController(metricsAddr, configMapName, secretName string, enableLeaderElection bool, port int) error {
+func RunController(
+	metricsAddr,
+	configMapName,
+	secretName string,
+	enableLeaderElection,
+	pprofDebug bool,
+	port int,
+) error {
 	ctx := context.Background()
 
 	setupLog.Info("Starting Cloud Native PostgreSQL Operator",
 		"version", versions.Version,
 		"build", versions.Info)
+
+	if pprofDebug {
+		startPprofDebugServer(ctx)
+	}
 
 	managerOptions := ctrl.Options{
 		Scheme:             scheme,
@@ -415,4 +429,39 @@ func readSecret(ctx context.Context, namespace, name string) (map[string]string,
 	}
 
 	return data, nil
+}
+
+// startPprofDebugServer exposes pprof debug server if POD_DEBUG env variable is set to 1
+func startPprofDebugServer(ctx context.Context) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	pprofServer := http.Server{
+		Addr:    "localhost:6060",
+		Handler: mux,
+	}
+
+	setupLog.Info("Starting pprof HTTP server", "addr", pprofServer.Addr)
+
+	go func() {
+		go func() {
+			<-ctx.Done()
+
+			setupLog.Info("shutting down pprof HTTP server")
+			ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancelFunc()
+
+			if err := pprofServer.Shutdown(ctx); err != nil {
+				setupLog.Error(err, "Failed to shutdown pprof HTTP server")
+			}
+		}()
+
+		if err := pprofServer.ListenAndServe(); !errors.Is(http.ErrServerClosed, err) {
+			setupLog.Error(err, "Failed to start pprof HTTP server")
+		}
+	}()
 }
