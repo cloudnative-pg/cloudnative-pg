@@ -820,8 +820,8 @@ spec:
                           compression:
                             description: Compress a backup file (a tar file per tablespace)
                               while streaming it to the object store. Available options
-                              are empty string (no compression, default), `gzip` or
-                              `bzip2`.
+                              are empty string (no compression, default), `gzip`,
+                              `bzip2` or `snappy`.
                             enum:
                             - gzip
                             - bzip2
@@ -934,7 +934,7 @@ spec:
                           compression:
                             description: Compress a WAL file before sending it to
                               the object store. Available options are empty string
-                              (no compression, default), `gzip` or `bzip2`.
+                              (no compression, default), `gzip`, `bzip2` or `snappy`.
                             enum:
                             - gzip
                             - bzip2
@@ -1269,7 +1269,7 @@ spec:
                               description: Compress a backup file (a tar file per
                                 tablespace) while streaming it to the object store.
                                 Available options are empty string (no compression,
-                                default), `gzip` or `bzip2`.
+                                default), `gzip`, `bzip2` or `snappy`.
                               enum:
                               - gzip
                               - bzip2
@@ -1382,7 +1382,7 @@ spec:
                             compression:
                               description: Compress a WAL file before sending it to
                                 the object store. Available options are empty string
-                                (no compression, default), `gzip` or `bzip2`.
+                                (no compression, default), `gzip`, `bzip2` or `snappy`.
                               enum:
                               - gzip
                               - bzip2
