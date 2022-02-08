@@ -4,10 +4,11 @@ The operator can orchestrate a continuous backup infrastructure
 that is based on the [Barman](https://pgbarman.org) tool. Instead
 of using the classical architecture with a Barman server, which
 backs up many PostgreSQL instances, the operator relies on the
-`barman-cloud-wal-archive`, `barman-cloud-backup`, `barman-cloud-backup-list`,
-and `barman-cloud-backup-delete` tools.
-As a result, base backups will be *tarballs*. Both base backups and WAL files
-can be compressed and encrypted.
+`barman-cloud-wal-archive`, `barman-cloud-check-wal-archive`, 
+`barman-cloud-backup`, `barman-cloud-backup-list`, and 
+`barman-cloud-backup-delete` tools. As a result, base backups will 
+be *tarballs*. Both base backups and WAL files can be compressed 
+and encrypted.
 
 For this, it is required an image with `barman-cli-cloud` installed.
 You can use the image `quay.io/enterprisedb/postgresql` for this scope,

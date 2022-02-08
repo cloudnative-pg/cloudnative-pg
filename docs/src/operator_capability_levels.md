@@ -291,7 +291,9 @@ action from the user: the operator will automatically and transparently set
 the `archive_command` to rely on `barman-cloud-wal-archive` to ship WAL
 files to the defined endpoint. Users can decide the compression algorithm,
 as well as the number of parallel jobs to concurrently upload WAL files
-in the archive.
+in the archive. In addition to that `Instance Manager` automatically checks 
+the correctness of the archive destination, by performing `barman-cloud-check-wal-archive` 
+command before beginning to ship the very first set of WAL files.
 
 You can define base backups in two ways: on-demand (through the `Backup`
 custom resource definition) or scheduled (through the `ScheduledBackup`
