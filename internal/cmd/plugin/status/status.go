@@ -66,7 +66,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 			nonFatalError = err
 		}
 	}
-
+	status.printCertificatesStatus()
 	status.printBackupStatus()
 	status.printReplicaStatus()
 	status.printInstancesStatus()
@@ -379,6 +379,48 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		continue
 	}
 	status.Print()
+}
+
+func (fullStatus *PostgresqlStatus) printCertificatesStatus() {
+	status := tabby.New()
+
+	status.AddHeader("Certificate Name", "Expiration Date", "Days Left Until Expiration")
+
+	hasExpiringCertificate := false
+	hasExpiredCertificate := false
+
+	for certificateName, expirationDate := range fullStatus.Cluster.Status.Certificates.Expirations {
+		expirationTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", expirationDate)
+		if err != nil {
+			fmt.Printf("\n error while parsing the following certificate: %s, date: %s", certificateName, expirationDate)
+		}
+
+		validityLeft := time.Until(expirationTime)
+
+		validityLeftInDays := fmt.Sprintf("%.2f", validityLeft.Hours()/24)
+
+		if validityLeft < 0 {
+			validityLeftInDays = "Expired"
+			hasExpiredCertificate = true
+		} else if validityLeft < time.Hour*24*7 {
+			validityLeftInDays += " - Expires Soon"
+			hasExpiringCertificate = true
+		}
+
+		status.AddLine(certificateName, expirationDate, validityLeftInDays)
+	}
+
+	color := aurora.Green
+
+	if hasExpiredCertificate {
+		color = aurora.Red
+	} else if hasExpiringCertificate {
+		color = aurora.Yellow
+	}
+
+	fmt.Println(color("Certificates Status"))
+	status.Print()
+	fmt.Println()
 }
 
 func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.PostgresqlStatus {
