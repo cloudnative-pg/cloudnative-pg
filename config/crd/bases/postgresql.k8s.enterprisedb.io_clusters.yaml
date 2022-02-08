@@ -2012,6 +2012,32 @@ spec:
               cloudNativePostgresqlOperatorHash:
                 description: The hash of the binary of the operator
                 type: string
+              conditions:
+                description: Conditions for cluster object
+                items:
+                  description: ClusterCondition describes the state of a cluster object
+                    at a certain point
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of the condition.
+                      type: string
+                  type: object
+                type: array
               configMapResourceVersion:
                 description: The list of resource versions of the configmaps, managed
                   by the operator. Every change here is done in the interest of the

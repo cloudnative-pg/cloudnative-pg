@@ -348,6 +348,46 @@ type ClusterStatus struct {
 
 	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
 	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
+
+	// Conditions for cluster object
+	Conditions []ClusterCondition `json:"conditions,omitempty"`
+}
+
+// These are valid conditions of a Cluster, some of the conditions could be owned by
+// Instance Manager and some of them could be owned by reconciler.
+const (
+	// ConditionContinuousArchiving this condition archiving :owned by InstanceManager.
+	ConditionContinuousArchiving ClusterConditionType = "ContinuousArchiving"
+)
+
+// ConditionStatus defines conditions of resources
+type ConditionStatus string
+
+// These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
+// "ConditionFalse" means a resource is not in the condition; "ConditionUnknown" means kubernetes
+// can't decide if a resource is in the condition or not. In the future, we could add other
+// intermediate conditions, e.g. ConditionDegraded
+const (
+	ConditionTrue    ConditionStatus = "True"
+	ConditionFalse   ConditionStatus = "False"
+	ConditionUnknown ConditionStatus = "Unknown"
+)
+
+// ClusterConditionType is of string type
+type ClusterConditionType string
+
+// ClusterCondition describes the state of a cluster object at a certain point
+type ClusterCondition struct {
+	// Type of the condition.
+	Type ClusterConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	Status ConditionStatus `json:"status,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message string `json:"message,omitempty"`
 }
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster

@@ -8,16 +8,21 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package manager
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"reflect"
 
 	"github.com/spf13/pflag"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/klog/v2"
+
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	mlog "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
@@ -117,4 +122,37 @@ func customDestination(in *zap.Options) {
 	}
 
 	in.DestWriter = logStream
+}
+
+// UpdateCondition will allow instance manager to update a particular condition
+// if the condition was already updated in the correct state then this is a no-op
+func UpdateCondition(ctx context.Context, client client.WithWatch,
+	cluster *apiv1.Cluster, condition *apiv1.ClusterCondition,
+) error {
+	if cluster == nil && condition == nil {
+		// if cluster or condition is nil nothing to do here.
+		return nil
+	}
+
+	existingClusterStatus := cluster.Status
+	var exCondition *apiv1.ClusterCondition
+	for i, c := range cluster.Status.Conditions {
+		if c.Type == condition.Type {
+			exCondition = &cluster.Status.Conditions[i]
+			cluster.Status.Conditions[i] = *condition
+			break
+		}
+	}
+	// If existing condition is not found add
+	if exCondition == nil {
+		cluster.Status.Conditions = append(cluster.Status.Conditions, *condition)
+	}
+
+	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
+		if err := client.Status().Update(ctx, cluster); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
