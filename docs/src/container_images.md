@@ -16,6 +16,7 @@ with the following requirements:
     - `barman-cloud-backup`
     - `barman-cloud-restore`
     - `barman-cloud-backup-list`
+    - `barman-cloud-check-wal-archive`
 - PGAudit extension installed (optional - only if PGAudit is required
   in the deployed clusters)
 - Sensible locale settings
