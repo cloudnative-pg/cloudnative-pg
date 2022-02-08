@@ -572,3 +572,35 @@ spec:
     file, starting from the first valid backup. Base backups that are older
     than the first valid backup will be marked as *obsolete* and permanently
     removed after the next backup is completed.
+
+## Compression algorithms
+
+Cloud Native PostgreSQL by default archives backups and WAL files in an
+uncompressed fashion. However, it also supports the following compression
+algorithms via `barman-cloud-backup` (for backups) and
+`barman-cloud-wal-archive` (for WAL files):
+
+* bzip2
+* gzip
+* snappy
+
+The compression settings for backups and WALs are independent. See the
+[DataBackupConfiguration](api_reference.md#DataBackupConfiguration) and
+[WALBackupConfiguration](api_reference.md#WalBackupConfiguration) sections in
+the API reference.
+
+It is important to note that archival time, restore time, and size change
+between the algorithms, so the compression algorithm should be chosen according
+to your use case.
+
+The Barman team has performed an evaluation of the performance of the supported
+algorithms for Barman Cloud. The following table summarizes a scenario where a
+backup is taken on a local MinIO deployment. The Barman GitHub project includes
+a [deeper analysis](https://github.com/EnterpriseDB/barman/issues/344#issuecomment-992547396).
+
+| Compression | Backup Time (ms) | Restore Time (ms) | Uncompressed size (MB) | Compressed size (MB)  | Approx ratio |
+|-------------|------------------|-------------------|------------------------|-----------------------|--------------|
+| None        | 10927            | 7553              | 395                    | 395                   | 1:1          |
+| bzip2       | 25404            | 13886             | 395                    | 67                    | 5.9:1        |
+| gzip        | 116281           | 3077              | 395                    | 91                    | 4.3:1        |
+| snappy      | 8134             | 8341              | 395                    | 166                   | 2.4:1        |
