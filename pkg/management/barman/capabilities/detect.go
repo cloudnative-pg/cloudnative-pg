@@ -55,7 +55,7 @@ func Detect() (*Capabilities, error) {
 		capabilities.HasS3 = true
 	}
 
-	log.Info("Detected Barman installation", "capabilities", capabilities)
+	log.Debug("Detected Barman installation", "capabilities", capabilities)
 
 	return capabilities, nil
 }
