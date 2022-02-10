@@ -62,14 +62,17 @@ func NewCmd() *cobra.Command {
 			}
 
 			switch {
+			case errors.Is(err, restorer.ErrWALNotFound):
+				// Nothing to log here. The failure has already been logged.
 			case errors.Is(err, ErrNoBackupConfigured):
 				contextLog.Info("tried restoring WALs, but no backup was configured")
 			case errors.Is(err, ErrEndOfWALStreamReached):
 				contextLog.Info(
 					"end-of-wal-stream flag found. " +
 						"Exiting with error once to let Postgres try switching to streaming replication")
+				return nil
 			default:
-				contextLog.Error(err, "failed to run wal-restore command")
+				contextLog.Info("wal-restore command failed", "error", err)
 			}
 
 			contextLog.Debug("There was an error in the previous wal-restore command. Waiting 100 ms before retrying.")
@@ -169,13 +172,16 @@ func run(ctx context.Context, podName string, args []string) error {
 	downloadStartTime := time.Now()
 	walStatus := walRestorer.RestoreList(ctx, walFilesList, destinationPath, options)
 
+	// We return immediately if the first WAL has errors, because the first WAL
+	// is the one that PostgreSQL has requested to restore.
+	// The failure has already been logged in walRestorer.RestoreList method
+	if walStatus[0].Err != nil {
+		return walStatus[0].Err
+	}
+
 	// Step 5: set end-of-wal-stream flag if any download job returned file-not-found
-	// There is no reason to set the flag if the first download returned an error,
-	// as the current execution will exit with error anyway, triggering PostgreSQL to
-	// switch to streaming replication.
-	firstFileSucceeded := walStatus[0].Err == nil
 	endOfWALStream := isEndOfWALStream(walStatus)
-	if firstFileSucceeded && endOfWALStream {
+	if endOfWALStream {
 		contextLog.Info(
 			"Set end-of-wal-stream flag as one of the WAL files to be prefetched was not found")
 
@@ -193,21 +199,17 @@ func run(ctx context.Context, podName string, args []string) error {
 	}
 
 	contextLog.Info("WAL restore command completed (parallel)",
+		"walName", walName,
 		"maxParallel", maxParallel,
 		"successfulWalRestore", successfulWalRestore,
 		"failedWalRestore", maxParallel-successfulWalRestore,
 		"endOfWALStream", endOfWALStream,
-		"firstFileSucceeded", firstFileSucceeded,
 		"startTime", startTime,
 		"downloadStartTime", downloadStartTime,
 		"downloadTotalTime", time.Since(downloadStartTime),
 		"totalTime", time.Since(startTime))
 
-	// We return only the first error to PostgreSQL, because the first error
-	// is the one raised by the file that PostgreSQL has requested to restore.
-	// The other errors are related to WAL files that were pre-restored in
-	// the spool as a performance optimization and are just logged
-	return walStatus[0].Err
+	return nil
 }
 
 // checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
@@ -232,8 +234,7 @@ func checkEndOfWALStreamFlag(walRestorer *restorer.WALRestorer) error {
 // a file-not-found error
 func isEndOfWALStream(results []restorer.Result) bool {
 	for _, result := range results {
-		// TODO: After barman 2.18, implement error handling for file-not-found
-		if result.Err != nil {
+		if errors.Is(result.Err, restorer.ErrWALNotFound) {
 			return true
 		}
 	}

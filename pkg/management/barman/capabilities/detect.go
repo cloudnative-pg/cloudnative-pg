@@ -27,37 +27,39 @@ func Detect() (*Capabilities, error) {
 		return nil, err
 	}
 
-	capabilities := new(Capabilities)
+	newCapabilities := new(Capabilities)
 
 	if version == nil {
 		log.Info("Missing Barman Cloud installation in the operand image")
-		return capabilities, nil
+		return newCapabilities, nil
 	}
 
-	capabilities.Version = version
+	newCapabilities.Version = version
 
 	switch {
 	case version.GE(semver.Version{Major: 2, Minor: 18}):
 		// Tags, added in Barman >= 2.18
-		capabilities.HasTags = true
+		newCapabilities.HasTags = true
 		// Barman-cloud-check-wal-archive, added in Barman >= 2.18
-		capabilities.HasCheckWalArchive = true
+		newCapabilities.HasCheckWalArchive = true
 		// Snappy compression support, added in Barman >= 2.18
-		capabilities.HasSnappy = true
+		newCapabilities.HasSnappy = true
+		// error codes for wal-restore command added in Barman >= 2.18
+		newCapabilities.HasErrorCodesForWALRestore = true
 		fallthrough
 	case version.GE(semver.Version{Major: 2, Minor: 14}):
 		// Retention policy support, added in Barman >= 2.14
-		capabilities.HasRetentionPolicy = true
+		newCapabilities.HasRetentionPolicy = true
 		fallthrough
 	case version.GE(semver.Version{Major: 2, Minor: 13}):
 		// Cloud providers support, added in Barman >= 2.13
-		capabilities.HasAzure = true
-		capabilities.HasS3 = true
+		newCapabilities.HasAzure = true
+		newCapabilities.HasS3 = true
 	}
 
-	log.Debug("Detected Barman installation", "capabilities", capabilities)
+	log.Debug("Detected Barman installation", "newCapabilities", newCapabilities)
 
-	return capabilities, nil
+	return newCapabilities, nil
 }
 
 // barmanCloudVersionRegex is a regular expression to parse the output of

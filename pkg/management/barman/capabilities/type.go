@@ -13,11 +13,12 @@ import (
 
 // Capabilities collects a set of boolean values that shows the possible capabilities of Barman and the version
 type Capabilities struct {
-	HasAzure           bool
-	HasS3              bool
-	HasRetentionPolicy bool
-	HasTags            bool
-	HasCheckWalArchive bool
-	HasSnappy          bool
-	Version            *semver.Version
+	HasAzure                   bool
+	HasS3                      bool
+	HasRetentionPolicy         bool
+	HasTags                    bool
+	HasCheckWalArchive         bool
+	HasSnappy                  bool
+	HasErrorCodesForWALRestore bool
+	Version                    *semver.Version
 }
