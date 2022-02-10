@@ -366,6 +366,11 @@ func (r *ClusterReconciler) reconcileResources(
 			"No pods are active, the cluster needs manual intervention ")
 	}
 
+	// If we still need more instances, we need to wait before setting healthy status
+	if cluster.Status.ReadyInstances != cluster.Spec.Instances {
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
 	// When everything is reconciled, update the status
 	if err = r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
 		return ctrl.Result{}, err
@@ -500,7 +505,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 			"clusterName", cluster.Name,
 			"namespace", cluster.Namespace,
 			"jobs", len(resources.jobs.Items))
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	r.markPVCReadyForCompletedJobs(ctx, resources)
@@ -530,11 +535,11 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	}
 
 	// Stop acting here if there are non-ready Pods unless in maintenance reusing PVCs.
-	// The user have choose to wait for the missing nodes to come up
+	// The user have chosen to wait for the missing nodes to come up
 	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
 		cluster.Status.ReadyInstances < cluster.Status.Instances {
 		contextLogger.Debug("Waiting for Pods to be ready")
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	// Are there missing nodes? Let's create one
@@ -562,7 +567,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 		cluster.Status.ReadyInstances != int32(len(instancesStatus.Items)) ||
 		!instancesStatus.IsComplete() {
 		contextLogger.Debug("Waiting for Pods to be ready")
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	return r.handleRollingUpdate(ctx, cluster, instancesStatus)
