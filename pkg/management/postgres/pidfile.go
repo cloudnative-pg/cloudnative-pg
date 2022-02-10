@@ -91,9 +91,13 @@ func (instance *Instance) CheckForExistingPostmaster(postgresExecutable string) 
 // cleanUpStalePid is called to clean up the files left around by a crashed PostgreSQL instance.
 // It removes the PostgreSQL pid file and the content of the socket directory.
 func (instance *Instance) cleanUpStalePid(pidFile string) error {
-	if err := os.Remove(pidFile); err != nil {
+	if err := os.Remove(pidFile); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
-	return fileutils.RemoveDirectoryContent(instance.SocketDirectory)
+	if err := fileutils.RemoveDirectoryContent(instance.SocketDirectory); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
 }
