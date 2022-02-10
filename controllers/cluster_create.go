@@ -987,7 +987,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
 }
 
 // getOriginBackup gets the backup that is used to bootstrap a new PostgreSQL cluster
@@ -1063,7 +1063,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		if apierrs.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			contextLogger.Info("Job already exist, maybe the cache is stale", "pod", job.Name)
-			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
 		}
 
 		contextLogger.Error(err, "Unable to create Job", "job", job)
@@ -1079,7 +1079,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 			contextLogger.Info("The size specified for the cluster is not valid",
 				"size",
 				cluster.Spec.StorageConfiguration.Size)
-			return ctrl.Result{RequeueAfter: time.Minute}, nil
+			return ctrl.Result{RequeueAfter: time.Minute}, ErrNextLoop
 		}
 		return ctrl.Result{}, fmt.Errorf("unable to create a PVC spec for node with serial %v: %w", nodeSerial, err)
 	}
@@ -1092,7 +1092,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 			err)
 	}
 
-	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
 }
 
 // reconcilePVCs reattaches a dangling PVC
@@ -1106,7 +1106,7 @@ func (r *ClusterReconciler) reconcilePVCs(
 	if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
 		// A pod is not ready, let's retry
 		contextLogger.Debug("Waiting for node to be ready before attaching PVCs")
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	pvcToReattach := electPvcToReattach(cluster)
@@ -1116,7 +1116,7 @@ func (r *ClusterReconciler) reconcilePVCs(
 		contextLogger.Debug("Impossible to elect a PVC to reattach",
 			"danglingPVCs", cluster.Status.DanglingPVC,
 			"initializingPVCs", cluster.Status.InitializingPVC)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	if len(cluster.Status.DanglingPVC) > 0 {
@@ -1141,7 +1141,7 @@ func (r *ClusterReconciler) reconcilePVCs(
 		contextLogger.Info("Selected PVC is not ready yet, waiting for 1 second",
 			"pvc", pvc.Name,
 			"status", pvcStatus)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	nodeSerial, err := specs.GetNodeSerial(pvc.ObjectMeta)
@@ -1156,7 +1156,7 @@ func (r *ClusterReconciler) reconcilePVCs(
 			// This code works on the assumption that the PVC have the same name as the pod using it.
 			if resizingPVC == pvc.Name {
 				contextLogger.Info("PVC is in resizing status, retrying in 5 seconds", "pod", pod.Name)
-				return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+				return ctrl.Result{RequeueAfter: 5 * time.Second}, ErrNextLoop
 			}
 		}
 	}
@@ -1188,7 +1188,7 @@ func (r *ClusterReconciler) reconcilePVCs(
 			// This Pod was already created, maybe the cache is stale.
 			// Let's reconcile another time
 			contextLogger.Info("Pod already exist, maybe the cache is stale", "pod", pod.Name)
-			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 		}
 
 		return ctrl.Result{}, fmt.Errorf("unable to create Pod: %w", err)
