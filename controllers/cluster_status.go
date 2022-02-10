@@ -57,14 +57,14 @@ type managedResources struct {
 }
 
 // Count the number of jobs that are still running
-func (resources managedResources) countRunningJobs() int {
+func (resources *managedResources) countRunningJobs() int {
 	jobCount := len(resources.jobs.Items)
 	completeJobs := utils.CountCompleteJobs(resources.jobs.Items)
 	return jobCount - completeJobs
 }
 
 // Check if every managed Pod is active and will be schedules
-func (resources managedResources) allPodsAreActive() bool {
+func (resources *managedResources) allPodsAreActive() bool {
 	for idx := range resources.pods.Items {
 		if !utils.IsPodActive(resources.pods.Items[idx]) {
 			return false
@@ -74,7 +74,7 @@ func (resources managedResources) allPodsAreActive() bool {
 }
 
 // Check if at least one Pod is alive (active and not crash-looping)
-func (resources managedResources) noPodsAreAlive() bool {
+func (resources *managedResources) noPodsAreAlive() bool {
 	for idx := range resources.pods.Items {
 		if utils.IsPodAlive(resources.pods.Items[idx]) {
 			return false
@@ -84,7 +84,7 @@ func (resources managedResources) noPodsAreAlive() bool {
 }
 
 // Retrieve a PVC by name
-func (resources managedResources) getPVC(name string) *corev1.PersistentVolumeClaim {
+func (resources *managedResources) getPVC(name string) *corev1.PersistentVolumeClaim {
 	for _, pvc := range resources.pvcs.Items {
 		if name == pvc.Name {
 			return &pvc
