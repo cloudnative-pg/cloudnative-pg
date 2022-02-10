@@ -508,7 +508,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	// Work on the PVCs we currently have
 	pvcNeedingMaintenance := len(cluster.Status.DanglingPVC) + len(cluster.Status.InitializingPVC)
 	if pvcNeedingMaintenance > 0 {
-		return r.reconcilePVCs(ctx, cluster)
+		return r.reconcilePVCs(ctx, cluster, resources)
 	}
 
 	if err := r.ensureHealthyPVCsAnnotation(ctx, cluster, resources); err != nil {
@@ -980,7 +980,6 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 				break
 			}
 		}
-		roleName := job.Labels[utils.JobRoleLabelName]
 		if pvcName == "" {
 			continue
 		}
@@ -988,6 +987,7 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 		// finding the PVC having the same name as pod
 		pvc := resources.getPVC(pvcName)
 
+		roleName := job.Labels[utils.JobRoleLabelName]
 		contextLogger.Info("job has been finished, setting PVC as ready", "pod", pvcName, "role", roleName)
 		err := r.setPVCStatusReady(ctx, pvc)
 		if err != nil {
