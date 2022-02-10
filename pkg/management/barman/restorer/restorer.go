@@ -9,6 +9,7 @@ package restorer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"sync"
@@ -24,6 +25,9 @@ import (
 const (
 	endOfWALStreamFlagFilename = "end-of-wal-stream"
 )
+
+// ErrWALNotFound is returned when the WAL is not found in the cloud archive
+var ErrWALNotFound = errors.New("WAL not found")
 
 // WALRestorer is a structure containing every info needed to restore
 // some WALs from the object storage
@@ -176,14 +180,24 @@ func (restorer *WALRestorer) RestoreList(
 				//
 				// The implemented prefetch is speculative and this WAL may just
 				// not exist, this means that this may not be a real error.
-				contextLog.Warning(
-					"Failed restoring WAL: PostgreSQL will retry if needed",
-					"walName", result.WalName,
-					"options", options,
-					"startTime", result.StartTime,
-					"endTime", result.EndTime,
-					"elapsedWalTime", elapsedWalTime,
-					"error", result.Err)
+				if errors.Is(result.Err, ErrWALNotFound) {
+					contextLog.Info(
+						"WAL file not found in the recovery object store",
+						"walName", result.WalName,
+						"options", options,
+						"startTime", result.StartTime,
+						"endTime", result.EndTime,
+						"elapsedWalTime", elapsedWalTime)
+				} else {
+					contextLog.Warning(
+						"Failed restoring WAL file (Postgres might retry)",
+						"walName", result.WalName,
+						"options", options,
+						"startTime", result.StartTime,
+						"endTime", result.EndTime,
+						"elapsedWalTime", elapsedWalTime,
+						"error", result.Err)
+				}
 			}
 			waitGroup.Done()
 		}(idx)
@@ -204,9 +218,25 @@ func (restorer *WALRestorer) Restore(walName, destinationPath string, baseOption
 		options...) // #nosec G204
 	barmanCloudWalRestoreCmd.Env = restorer.env
 	err := execlog.RunStreaming(barmanCloudWalRestoreCmd, barmanCapabilities.BarmanCloudWalRestore)
-	if err != nil {
-		return fmt.Errorf("unexpected failure invoking %s: %w", barmanCapabilities.BarmanCloudWalRestore, err)
+	if err == nil {
+		return nil
 	}
 
-	return nil
+	var currentCapabilities *barmanCapabilities.Capabilities
+	var barmanError error
+	currentCapabilities, barmanError = barmanCapabilities.CurrentCapabilities()
+	if barmanError != nil {
+		return barmanError
+	}
+
+	if currentCapabilities.HasErrorCodesForWALRestore {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			if exitError.ExitCode() == 1 {
+				return fmt.Errorf("file not found %s: %w", walName, ErrWALNotFound)
+			}
+		}
+	}
+
+	return fmt.Errorf("unexpected failure invoking %s: %w", barmanCapabilities.BarmanCloudWalRestore, err)
 }
