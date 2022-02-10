@@ -1096,7 +1096,11 @@ func (r *ClusterReconciler) joinReplicaInstance(
 }
 
 // reconcilePVCs reattaches a dangling PVC
-func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cluster) (ctrl.Result, error) {
+func (r *ClusterReconciler) reconcilePVCs(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
@@ -1128,11 +1132,7 @@ func (r *ClusterReconciler) reconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 		}
 	}
 
-	pvc := corev1.PersistentVolumeClaim{}
-	err := r.Get(ctx, client.ObjectKey{Name: pvcToReattach, Namespace: cluster.Namespace}, &pvc)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("error while reattaching PVC: %v", err)
-	}
+	pvc := resources.getPVC(pvcToReattach)
 
 	// This should not happen. However, we put this guard here
 	// as an assertion to catch unexpected events.
