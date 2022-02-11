@@ -7,6 +7,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configfile"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
@@ -46,6 +49,15 @@ var (
 		// Steps is declared as an "int", so we are capping
 		// to int32 to support ARM-based 32 bit architectures
 		Steps: math.MaxInt32,
+	}
+
+	enforcedParametersRegex          = regexp.MustCompile(`(?P<PARAM>[a-z_]+) setting:\s+(?P<VALUE>[a-z0-9]+)`)
+	pgControldataSettingsToParamsMap = map[string]string{
+		"max_connections":      "max_connections",
+		"max_wal_senders":      "max_wal_senders",
+		"max_worker_processes": "max_worker_processes",
+		"max_prepared_xacts":   "max_prepared_transactions",
+		"max_locks_per_xact":   "max_locks_per_transaction",
 	}
 )
 
@@ -307,13 +319,29 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		info.RecoveryTarget)
 
 	log.Info("Generated recovery configuration", "configuration", recoveryFileContents)
-
 	// Disable archiving
 	err = fileutils.AppendStringToFile(
 		path.Join(info.PgData, PostgresqlCustomConfigurationFile),
 		"archive_command = 'cd .'\n")
 	if err != nil {
 		return fmt.Errorf("cannot write recovery config: %w", err)
+	}
+
+	enforcedParams, err := getEnforcedParametersThroughPgControldata(info)
+	if err != nil {
+		return err
+	}
+	if enforcedParams != nil {
+		changed, err := configfile.UpdatePostgresConfigurationFile(
+			path.Join(info.PgData, PostgresqlCustomConfigurationFile),
+			enforcedParams,
+		)
+		if changed {
+			log.Info("enforcing parameters found in pg_controldata", "parameters", enforcedParams)
+		}
+		if err != nil {
+			return fmt.Errorf("cannot write recovery config for enforced parameters: %w", err)
+		}
 	}
 
 	if major >= 12 {
@@ -346,6 +374,37 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		path.Join(info.PgData, "recovery.conf"),
 		[]byte(recoveryFileContents),
 		0o600)
+}
+
+func getEnforcedParametersThroughPgControldata(info InitInfo) (map[string]string, error) {
+	var stdoutBuffer bytes.Buffer
+	var stderrBuffer bytes.Buffer
+	pgControlDataCmd := exec.Command(pgControlDataName, "-D",
+		info.PgData) // #nosec G204
+	pgControlDataCmd.Stdout = &stdoutBuffer
+	pgControlDataCmd.Stderr = &stderrBuffer
+	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "LANG=C", "LC_MESSAGES=C")
+	err := pgControlDataCmd.Run()
+	if err != nil {
+		log.Error(err, "while reading pg_controldata",
+			"stderr", stderrBuffer.String(),
+			"stdout", stdoutBuffer.String())
+		return nil, err
+	}
+
+	log.Debug("pg_controldata stdout", "stdout", stdoutBuffer.String())
+
+	enforcedParams := map[string]string{}
+	for _, line := range strings.Split(stdoutBuffer.String(), "\n") {
+		matches := enforcedParametersRegex.FindStringSubmatch(line)
+		if len(matches) < 3 {
+			continue
+		}
+		if param, ok := pgControldataSettingsToParamsMap[matches[1]]; ok {
+			enforcedParams[param] = matches[2]
+		}
+	}
+	return enforcedParams, nil
 }
 
 // WriteInitialPostgresqlConf resets the postgresql.conf that there is in the instance using
