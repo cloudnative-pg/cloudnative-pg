@@ -32,12 +32,13 @@ import (
 )
 
 const (
-	postgresName     = "postgres"
-	pgCtlName        = "pg_ctl"
-	pgRewindName     = "pg_rewind"
-	pgBaseBackupName = "pg_basebackup"
-	pgIsReady        = "pg_isready"
-	pgCtlTimeout     = "40000000" // greater than one year in seconds, big enough to simulate an infinite timeout
+	postgresName      = "postgres"
+	pgCtlName         = "pg_ctl"
+	pgRewindName      = "pg_rewind"
+	pgBaseBackupName  = "pg_basebackup"
+	pgIsReady         = "pg_isready"
+	pgCtlTimeout      = "40000000" // greater than one year in seconds, big enough to simulate an infinite timeout
+	pgControlDataName = "pg_controldata"
 
 	pqPingOk         = 0 // server is accepting connections
 	pqPingReject     = 1 // server is alive but rejecting connections
@@ -662,7 +663,6 @@ func (instance *Instance) PgIsReady() error {
 
 // LogPgControldata logs the content of PostgreSQL control data, for debugging and tracing
 func (instance *Instance) LogPgControldata() {
-	const pgControlDataName = "pg_controldata"
 	pgControlDataCmd := exec.Command(pgControlDataName)
 	pgControlDataCmd.Env = os.Environ()
 	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+instance.PgData)
