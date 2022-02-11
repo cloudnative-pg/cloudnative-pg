@@ -124,6 +124,9 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 }
 
 func (fullStatus *PostgresqlStatus) printBasicInfo() {
+	fmt.Println(aurora.Green("Cluster Summary"))
+	summary := tabby.New()
+
 	cluster := fullStatus.Cluster
 
 	primaryInstance := cluster.Status.CurrentPrimary
@@ -132,19 +135,18 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 			cluster.Status.CurrentPrimary, cluster.Status.TargetPrimary)
 	}
 
+	var status string
 	switch cluster.Status.Phase {
 	case apiv1.PhaseHealthy, apiv1.PhaseFirstPrimary, apiv1.PhaseCreatingReplica:
-		fmt.Println(aurora.Green(cluster.Status.Phase), " ", cluster.Status.PhaseReason)
-
+		status = fmt.Sprintf("%v %v", aurora.Green(cluster.Status.Phase), cluster.Status.PhaseReason)
 	case apiv1.PhaseUpgrade, apiv1.PhaseWaitingForUser:
-		fmt.Println(aurora.Yellow(cluster.Status.Phase), " ", cluster.Status.PhaseReason)
-
+		status = fmt.Sprintf("%v %v", aurora.Yellow(cluster.Status.Phase), cluster.Status.PhaseReason)
 	default:
-		fmt.Println(aurora.Red(cluster.Status.Phase), " ", cluster.Status.PhaseReason)
+		status = fmt.Sprintf("%v %v", aurora.Red(cluster.Status.Phase), cluster.Status.PhaseReason)
 	}
 
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
-	summary := tabby.New()
+
 	summary.AddLine("Name:", cluster.Name)
 	summary.AddLine("Namespace:", cluster.Namespace)
 	if primaryInstanceStatus != nil {
@@ -152,6 +154,7 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	}
 	summary.AddLine("PostgreSQL Image:", cluster.GetImageName())
 	summary.AddLine("Primary instance:", primaryInstance)
+	summary.AddLine("Status:", status)
 	if cluster.Spec.Instances == cluster.Status.Instances {
 		summary.AddLine("Instances:", aurora.Green(cluster.Spec.Instances))
 	} else {
