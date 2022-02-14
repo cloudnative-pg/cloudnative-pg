@@ -274,7 +274,7 @@ check_registry() {
 }
 
 deploy_fluentd() {
-  local FLUENTD_IMAGE=fluent/fluentd-kubernetes-daemonset:v1-debian-forward
+  local FLUENTD_IMAGE=fluent/fluentd-kubernetes-daemonset:v1.14.3-debian-forward-1.0
   local FLUENTD_LOCAL_IMAGE="${registry_name}:5000/fluentd-kubernetes-daemonset:local"
 
   docker pull "${FLUENTD_IMAGE}"
