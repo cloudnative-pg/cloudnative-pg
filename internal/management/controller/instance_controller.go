@@ -1028,7 +1028,7 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 	}
 
 	if cluster.GetEnableSuperuserAccess() {
-		err = r.reconcileUser(ctx, cluster.GetSuperuserSecretName(), tx)
+		err = r.reconcileUser(ctx, "postgres", cluster.GetSuperuserSecretName(), tx)
 		if err != nil {
 			return err
 		}
@@ -1039,14 +1039,17 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 		}
 	}
 
-	if err = r.reconcileUser(ctx, cluster.GetApplicationSecretName(), tx); err != nil {
-		return err
+	if cluster.ShouldCreateApplicationDatabase() {
+		err = r.reconcileUser(ctx, cluster.Spec.Bootstrap.InitDB.Owner, cluster.GetApplicationSecretName(), tx)
+		if err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit()
 }
 
-func (r *InstanceReconciler) reconcileUser(ctx context.Context, secretName string, tx *sql.Tx) error {
+func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string, secretName string, tx *sql.Tx) error {
 	var secret corev1.Secret
 	err := r.GetClient().Get(
 		ctx,
@@ -1064,9 +1067,13 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, secretName strin
 		return nil
 	}
 
-	username, password, err := utils.GetUserPasswordFromSecret(&secret)
+	usernameFromSecret, password, err := utils.GetUserPasswordFromSecret(&secret)
 	if err != nil {
 		return err
+	}
+
+	if username != usernameFromSecret {
+		return fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, username)
 	}
 
 	_, err = tx.Exec(fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
@@ -1074,7 +1081,10 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, secretName strin
 		pq.QuoteLiteral(password)))
 	if err == nil {
 		r.secretVersions[secret.Name] = secret.ResourceVersion
+	} else {
+		err = fmt.Errorf("while running ALTER ROLE %v WITH PASSWORD", username)
 	}
+
 	return err
 }
 
