@@ -31,8 +31,7 @@ Native PostgreSQL overrides it with its instance manager.
 
 EnterpriseDB provides and supports public container images for Cloud Native
 PostgreSQL and publishes them on
-[Quay.io](https://quay.io/repository/enterprisedb/postgresql) and
-[DockerHub](https://hub.docker.com/r/enterprisedb/postgresql).
+[Quay.io](https://quay.io/repository/enterprisedb/postgresql).
 
 ## Image tag requirements
 
