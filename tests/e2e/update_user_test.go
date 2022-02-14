@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Update user password", func() {
+var _ = Describe("Update user and superuser password", func() {
 	const (
 		namespace   = "cluster-update-user-password"
 		sampleFile  = fixturesDir + "/base/cluster-basic.yaml"
@@ -73,14 +73,32 @@ var _ = Describe("Update user password", func() {
 			const secretName = clusterName + "-app"
 			const newPassword = "eeh2Zahohx" //nolint:gosec
 
-			AssertUpdateSecret(newPassword, secretName, namespace, clusterName, 30, env)
+			AssertUpdateSecret("password", newPassword, secretName, namespace, clusterName, 30, env)
 			AssertConnection(rwService, "app", "app", newPassword, pod, 60, env)
+		})
+
+		By("fail updating user application password with wrong user in secret", func() {
+			const secretName = clusterName + "-app"
+			const newUser = "postgres"
+			const newPassword = "newpassword"
+
+			AssertUpdateSecret("password", newPassword, secretName, namespace, clusterName, 30, env)
+			AssertUpdateSecret("username", newUser, secretName, namespace, clusterName, 30, env)
+
+			dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
+				rwService, newUser, "app", newPassword)
+			timeout := time.Second * 2
+			_, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &timeout,
+				"psql", dsn, "-tAc", "SELECT 1")
+			Expect(err).ToNot(BeNil())
+
+			AssertUpdateSecret("username", "app", secretName, namespace, clusterName, 30, env)
 		})
 
 		By("update superuser password", func() {
 			const secretName = clusterName + "-superuser"
 			const newPassword = "fi6uCae7" //nolint:gosec
-			AssertUpdateSecret(newPassword, secretName, namespace, clusterName, 30, env)
+			AssertUpdateSecret("password", newPassword, secretName, namespace, clusterName, 30, env)
 			AssertConnection(rwService, "postgres", "postgres", newPassword, pod, 60, env)
 		})
 	})

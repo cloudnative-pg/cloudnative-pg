@@ -248,7 +248,7 @@ func AssertWebhookEnabled(env *testsUtils.TestingEnvironment, mutating, validati
 }
 
 // Update the secrets and verify cluster reference the updated resource version of secrets
-func AssertUpdateSecret(newPassword string, secretName string, namespace string,
+func AssertUpdateSecret(field string, value string, secretName string, namespace string,
 	clusterName string, timeout int, env *testsUtils.TestingEnvironment) {
 	var secret corev1.Secret
 	err := env.Client.Get(env.Ctx,
@@ -256,7 +256,7 @@ func AssertUpdateSecret(newPassword string, secretName string, namespace string,
 		&secret)
 	Expect(err).ToNot(HaveOccurred())
 
-	secret.Data["password"] = []byte(newPassword)
+	secret.Data[field] = []byte(value)
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return env.Client.Update(env.Ctx, &secret)
 	})
