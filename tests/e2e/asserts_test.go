@@ -1021,6 +1021,26 @@ func CreateAndAssertClientCertificatesSecrets(
 	Expect(err).ToNot(HaveOccurred())
 }
 
+func CreateAndAssertCertificateSecretsOnAzurite(
+	namespace,
+	clusterName,
+	azuriteCaSecName,
+	azuriteTLSSecName string) {
+	By("creating ca and tls certificate secrets", func() {
+		// create CA certificates
+		_, caPair := testsUtils.CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
+
+		// sign and create secret using CA certificate and key
+		serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,
+			[]string{"azurite.internal.mydomain.net, azurite.default.svc, azurite.default,"},
+		)
+		Expect(err).ToNot(HaveOccurred())
+		serverSecret := serverPair.GenerateCertificateSecret(namespace, azuriteTLSSecName)
+		err = env.Client.Create(env.Ctx, serverSecret)
+		Expect(err).ToNot(HaveOccurred())
+	})
+}
+
 func AssertSSLVerifyFullDBConnectionFromAppPod(namespace string, clusterName string, appPod corev1.Pod) {
 	By("creating an app Pod and connecting to DB, using Certificate authentication", func() {
 		// Connecting to DB, using Certificate authentication
