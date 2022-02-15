@@ -706,8 +706,11 @@ jobs:
           command: |
             az extension add --name aks-preview
             az account set --subscription "Cloud Native Development"
+
+            AZURE_AKS="${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )"
+            echo "AZURE_AKS=${AZURE_AKS}" >> $GITHUB_ENV
             az aks create --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
-              --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' ) \
+              --name ${AZURE_AKS} \
               --node-count 3 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
               --workspace-resource-id ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
               --aks-custom-headers EnableAzureDiskFileCSIDriver=true
@@ -717,7 +720,7 @@ jobs:
               --name ${AZURE_STORAGE_ACCOUNT} \
               --sku Standard_LRS -o none
             az aks get-credentials --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
-              --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )
+              --name ${AZURE_AKS}
 
             # get Storage Account credentials
             echo "AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT}" >> $GITHUB_ENV
@@ -725,7 +728,7 @@ jobs:
             echo "AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}" >> $GITHUB_ENV
 
             # create diagnostic settings for monitoring kube-apiserver logs
-            AKS_CLUSTER_RESOURCE_ID=$(az aks show --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' ) --query id -o tsv --only-show-errors)
+            AKS_CLUSTER_RESOURCE_ID=$(az aks show --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${AZURE_AKS} --query id -o tsv --only-show-errors)
             az monitor diagnostic-settings create --resource ${AKS_CLUSTER_RESOURCE_ID} \
               --name diagnostic-kube-apiserver-logs \
               --workspace ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
@@ -828,10 +831,34 @@ jobs:
         with:
           inlineScript: |
             az account set --subscription "Cloud Native Development"
-            az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y \
-              --name ${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )
-            az storage account delete -y --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ env.AZURE_STORAGE_ACCOUNT }}
-
+            attempt=1
+            max_attempts=3
+            while [ "${attempt}" -le "${max_attempts}" ]; do
+               echo "Deleting cluster. Attempt ${attempt} of ${max_attempts}"
+               az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y  --name ${{env.AZURE_AKS}}
+               status=$?
+               if [[ $status == 0 ]]; then
+                  echo "AKS cluster deleted"
+                  break
+               fi
+               echo "Failed deleting cluster ${{env.AZURE_AKS}}, retrying"
+               sleep 5
+               attempt=$((attempt+1))
+            done
+            attempt=1
+            max_attempts=3
+            while [ "${attempt}" -le "${max_attempts}" ]; do
+               echo "Deleting storage account. Attempt ${attempt} of ${max_attempts}"
+               az storage account delete -y --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ env.AZURE_STORAGE_ACCOUNT }}
+               status=$?
+               if [[ $status == 0 ]]; then
+                  echo "Storage account deleted"
+                  break
+               fi
+               echo "Failed deleting storage account ${{ env.AZURE_STORAGE_ACCOUNT }}, retrying"
+               sleep 5
+               attempt=$((attempt+1))
+            done
   e2e-eks:
     name: Run E2E on Amazon EKS
     if: |
