@@ -396,8 +396,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			azuriteTLSSecName = "azurite-tls-secret"
 		)
 
-		BeforeAll(func() { // nolint:dupl
-			// TODO: fix almost identical duplicate function
+		BeforeAll(func() {
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
 			if isAKS {
@@ -413,21 +412,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
-
-			By("creating ca and tls certificate secrets", func() {
-				// create CA certificates
-				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
-
-				// sign and create secret using CA certificate and key
-				serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,
-					[]string{"azurite.internal.mydomain.net, azurite.default.svc, azurite.default,"},
-				)
-				Expect(err).ToNot(HaveOccurred())
-				serverSecret := serverPair.GenerateCertificateSecret(namespace, azuriteTLSSecName)
-				err = env.Client.Create(env.Ctx, serverSecret)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
+			// Create and assert ca and tls certificate secrets on Azurite
+			CreateAndAssertCertificateSecretsOnAzurite(namespace, clusterName, azuriteCaSecName, azuriteTLSSecName)
 			// Setup Azurite and az cli along with Postgresql cluster
 			prepareClusterBackupOnAzurite(namespace, clusterName, azuriteBlobSampleFile, backupFile, tableName)
 		})
@@ -808,8 +794,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	})
 
 	Context("using Azurite blobs as object storage", Ordered, func() {
-		BeforeAll(func() { // nolint:dupl
-			// TODO: fix almost identical duplicate function
+		BeforeAll(func() {
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
 			if isAKS {
@@ -825,21 +810,8 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			// Create a cluster in a namespace we'll delete after the test
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
-
-			By("creating ca and tls certificate secrets", func() {
-				// create CA certificates
-				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
-
-				// sign and create secret using CA certificate and key
-				serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,
-					[]string{"azurite.internal.mydomain.net, azurite.default.svc, azurite.default,"},
-				)
-				Expect(err).ToNot(HaveOccurred())
-				serverSecret := serverPair.GenerateCertificateSecret(namespace, azuriteTLSSecName)
-				err = env.Client.Create(env.Ctx, serverSecret)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
+			// Create and assert ca and tls certificate secrets on Azurite
+			CreateAndAssertCertificateSecretsOnAzurite(namespace, clusterName, azuriteCaSecName, azuriteTLSSecName)
 			// Setup Azurite and az cli along with PostgreSQL cluster
 			prepareClusterBackupOnAzurite(namespace, clusterName, azuriteBlobSampleFile, backupFileAzurite, tableName)
 		})
