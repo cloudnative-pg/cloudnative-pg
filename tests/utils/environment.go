@@ -20,12 +20,13 @@ import (
 	"strings"
 	"time"
 
+	eventsv1 "k8s.io/api/events/v1"
+
 	"github.com/go-logr/logr"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -319,8 +320,8 @@ func (env TestingEnvironment) GetServiceAccountList(namespace string) (*corev1.S
 }
 
 // GetEventList gathers the current list of events in a namespace
-func (env TestingEnvironment) GetEventList(namespace string) (*eventsv1beta1.EventList, error) {
-	eventList := &eventsv1beta1.EventList{}
+func (env TestingEnvironment) GetEventList(namespace string) (*eventsv1.EventList, error) {
+	eventList := &eventsv1.EventList{}
 	err := env.Client.List(
 		env.Ctx, eventList, client.InNamespace(namespace),
 	)
