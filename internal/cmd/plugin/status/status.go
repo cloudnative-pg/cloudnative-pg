@@ -23,7 +23,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
-	management "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/constants"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
@@ -196,7 +196,7 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 		specs.PostgresContainerName,
 		&timeout,
 		"cat",
-		path.Join(specs.PgDataPath, management.PostgresqlCustomConfigurationFile))
+		path.Join(specs.PgDataPath, constants.PostgresqlCustomConfigurationFile))
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 	// Read PostgreSQL HBA Rules from pg_hba.conf
 	pgHBAConf, _, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
 		specs.PostgresContainerName,
-		&timeout, "cat", path.Join(specs.PgDataPath, management.PostgresqlHBARulesFile))
+		&timeout, "cat", path.Join(specs.PgDataPath, constants.PostgresqlHBARulesFile))
 	if err != nil {
 		return err
 	}

@@ -35,6 +35,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/external"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/constants"
 	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
@@ -321,7 +322,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 	log.Info("Generated recovery configuration", "configuration", recoveryFileContents)
 	// Disable archiving
 	err = fileutils.AppendStringToFile(
-		path.Join(info.PgData, PostgresqlCustomConfigurationFile),
+		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
 		"archive_command = 'cd .'\n")
 	if err != nil {
 		return fmt.Errorf("cannot write recovery config: %w", err)
@@ -333,7 +334,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 	}
 	if enforcedParams != nil {
 		changed, err := configfile.UpdatePostgresConfigurationFile(
-			path.Join(info.PgData, PostgresqlCustomConfigurationFile),
+			path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
 			enforcedParams,
 		)
 		if changed {
@@ -348,7 +349,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		// Append restore_command to the end of the
 		// custom configs file
 		err = fileutils.AppendStringToFile(
-			path.Join(info.PgData, PostgresqlCustomConfigurationFile),
+			path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
 			recoveryFileContents)
 		if err != nil {
 			return fmt.Errorf("cannot write recovery config: %w", err)
@@ -453,8 +454,8 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	}
 
 	err = fileutils.CopyFile(
-		path.Join(temporaryInitInfo.PgData, PostgresqlCustomConfigurationFile),
-		path.Join(info.PgData, PostgresqlCustomConfigurationFile))
+		path.Join(temporaryInitInfo.PgData, constants.PostgresqlCustomConfigurationFile),
+		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile))
 	if err != nil {
 		return fmt.Errorf("while creating custom.conf: %w", err)
 	}
@@ -468,7 +469,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 
 	// Disable SSL as we still don't have the required certificates
 	err = fileutils.AppendStringToFile(
-		path.Join(info.PgData, PostgresqlCustomConfigurationFile),
+		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
 		"ssl = 'off'\n")
 	if err != nil {
 		return fmt.Errorf("cannot write recovery config: %w", err)
@@ -483,7 +484,7 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 	// We allow every access from localhost, and this is needed to correctly restore
 	// the database
 	_, err := fileutils.WriteStringToFile(
-		path.Join(info.PgData, PostgresqlHBARulesFile),
+		path.Join(info.PgData, constants.PostgresqlHBARulesFile),
 		"local all all peer map=local\n")
 	if err != nil {
 		return err

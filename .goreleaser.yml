@@ -28,6 +28,7 @@ builds:
   goos:
   - darwin
   - linux
+  - windows
   goarch:
   - amd64
   - 386
@@ -42,6 +43,10 @@ builds:
   ignore:
   - goos: darwin
     goarch: 386
+  - goos: windows
+    goarch: ppc64le
+  - goos: windows
+    goarch: s390x
 
 archives:
 - replacements:

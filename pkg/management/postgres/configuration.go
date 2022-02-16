@@ -16,6 +16,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configfile"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/constants"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
@@ -56,7 +57,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cl
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
 		instance.PgData,
 		postgresConfiguration,
-		PostgresqlCustomConfigurationFile)
+		constants.PostgresqlCustomConfigurationFile)
 	if err != nil {
 		return postgresConfigurationChanged, fmt.Errorf(
 			"installing postgresql configuration: %w",
@@ -66,7 +67,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cl
 	postgresHBAChanged, err := InstallPgDataFileContent(
 		instance.PgData,
 		postgresHBA,
-		PostgresqlHBARulesFile)
+		constants.PostgresqlHBARulesFile)
 	if err != nil {
 		return postgresConfigurationChanged || postgresHBAChanged, fmt.Errorf(
 			"installing postgresql HBA rules: %w",

@@ -15,6 +15,7 @@ import (
 	"runtime/debug"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils/compatibility"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 )
 
@@ -68,7 +69,7 @@ func (p *lineLogPipe) start() error {
 					continue
 				}
 
-				if err := fileutils.CreateFifo(p.fileName); err != nil {
+				if err := compatibility.CreateFifo(p.fileName); err != nil {
 					log.WithValues("fileName", p.fileName).Error(err, "Error creating log FIFO")
 					continue
 				}
