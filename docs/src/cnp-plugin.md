@@ -13,6 +13,26 @@ curl -sSfL \
   sudo sh -s -- -b /usr/local/bin
 ```
 
+### Supported Architectures
+
+Cloud Native PostgreSQL Plugin is currently build for the following operating system and architectures:
+
+* Linux
+  * amd64
+  * arm 5/6/7
+  * arm64
+  * s390x
+  * ppc64le
+* macOS
+  * amd64
+  * arm64
+* Windows
+  * 386
+  * amd64
+  * arm 5/6/7
+  * arm64
+
+
 ## Use
 
 Once the plugin was installed and deployed, you can start using it like this:

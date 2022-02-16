@@ -13,6 +13,7 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/constants"
 )
 
 // WritePostgresUserMaps creates a pg_ident.conf file containing only one map called "local" that
@@ -28,7 +29,7 @@ func WritePostgresUserMaps(pgData string) error {
 		username = currentUser.Username
 	}
 
-	_, err = fileutils.WriteStringToFile(filepath.Join(pgData, PostgresqlIdentFile),
+	_, err = fileutils.WriteStringToFile(filepath.Join(pgData, constants.PostgresqlIdentFile),
 		fmt.Sprintf("local %s postgres\n", username))
 	if err != nil {
 		return err
