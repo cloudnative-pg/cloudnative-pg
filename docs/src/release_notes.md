@@ -508,7 +508,7 @@ Features:
 
 Security Enhancements:
 
-- Support for restricted security context constraint on RedHat OpenShift to
+- Support for restricted security context constraint on Red Hat OpenShift to
   limit pod execution to a namespace allocated UID and SELinux context
 - Pod security contexts explicitly defined by the operator to run as
   non-root, non-privileged and without privilege escalation
