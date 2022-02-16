@@ -176,42 +176,42 @@ Here is an example using AWS S3 as Cloud Object Storage:
 apiVersion: apps/v1
 kind: Deployment
 [...]
-    spec:
-      containers:
-      - name: minio
-        image: minio/minio:RELEASE.2020-06-03T22-13-49Z
-        args:
-        - gateway
-        - s3
-        env:
-        # MinIO access key and secret key
-        - name: MINIO_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: minio-creds
-              key: MINIO_ACCESS_KEY
-        - name: MINIO_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: minio-creds
-              key: MINIO_SECRET_KEY
-        # AWS credentials
-        - name: AWS_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              name: aws-creds
-              key: ACCESS_KEY_ID
-        - name: AWS_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: aws-creds
-              key: ACCESS_SECRET_KEY
+spec:
+  containers:
+  - name: minio
+    image: minio/minio:RELEASE.2020-06-03T22-13-49Z
+    args:
+    - gateway
+    - s3
+    env:
+    # MinIO access key and secret key
+    - name: MINIO_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: minio-creds
+          key: MINIO_ACCESS_KEY
+    - name: MINIO_SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: minio-creds
+          key: MINIO_SECRET_KEY
+    # AWS credentials
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: aws-creds
+          key: ACCESS_KEY_ID
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: aws-creds
+          key: ACCESS_SECRET_KEY
 # Uncomment the below section if session token is required
-#        - name: AWS_SESSION_TOKEN
-#          valueFrom:
-#            secretKeyRef:
-#              name: aws-creds
-#              key: ACCESS_SESSION_TOKEN
+#   - name: AWS_SESSION_TOKEN
+#     valueFrom:
+#       secretKeyRef:
+#         name: aws-creds
+#         key: ACCESS_SESSION_TOKEN
         ports:
         - containerPort: 9000
 ```
@@ -604,3 +604,35 @@ a [deeper analysis](https://github.com/EnterpriseDB/barman/issues/344#issuecomme
 | bzip2       | 25404            | 13886             | 395                    | 67                    | 5.9:1        |
 | gzip        | 116281           | 3077              | 395                    | 91                    | 4.3:1        |
 | snappy      | 8134             | 8341              | 395                    | 166                   | 2.4:1        |
+
+## Tagging of backup objects
+
+Barman 2.18 introduces support for tagging backup resources when saving them in
+object stores via `barman-cloud-backup` and `barman-cloud-wal-archive`. As a
+result, if your PostgreSQL container image includes Barman with version 2.18 or
+higher, Cloud Native PostgreSQL enables you to specify tags as key-value pairs
+for backup objects, namely base backups, WAL files and history files.
+
+You can use two properties in the `.spec.backup.barmanObjectStore` definition:
+
+- `tags`: key-value pair tags to be added to backup objects and archived WAL
+  file in the backup object store
+- `historyTags`: key-value pair tags to be added to archived history files in
+  the backup object store
+
+The excerpt of a YAML manifest below provides an example of usage of this
+feature:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      [...]
+      tags:
+        backupRetentionPolicy: "expire"
+      historyTags:
+        backupRetentionPolicy: "keep"
+```
