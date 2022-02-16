@@ -29,7 +29,7 @@ Cloud Native PostgreSQL works with PostgreSQL and is available under the
 
 ## Supported Kubernetes distributions
 
-Cloud Native PostgreSQL requires Kubernetes 1.18 or higher.
+Cloud Native PostgreSQL requires Kubernetes 1.19 or higher.
 
 Cloud Native PostgreSQL has also been certified for
 [RedHat OpenShift Container Platform (OCP)](https://www.openshift.com/products/container-platform)

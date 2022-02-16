@@ -26,7 +26,7 @@ jobs:
         run: |
           DOC_URL="https://raw.githubusercontent.com/awsdocs/amazon-eks-user-guide/master/doc_source/kubernetes-versions.md" #wokeignore:rule=master
           curl --silent "${DOC_URL}" | grep -E '^\+ [0-9]\\\.[0-9]{2}\\\.[0-9]' | sed -e 's/[\ +]//g; s/\.[1-9]\+$//' | \
-            grep -v '^1.1[67]' | \
+            grep -v '^1.1[678]' | \
             jq -Rn '[inputs]' > .github/eks_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'eks'
       -
