@@ -544,7 +544,7 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Prepare the environment
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_seconds: 30
           max_attempts: 3
@@ -672,7 +672,7 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Prepare the environment
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_seconds: 30
           max_attempts: 3
@@ -681,7 +681,7 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name:  Install ginkgo
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -699,7 +699,7 @@ jobs:
           version: v${{ env.K8S_VERSION }}
       -
         name: Create AKS cluster
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 10
           max_attempts: 3
@@ -740,7 +740,7 @@ jobs:
         # use rook to get the small PV we use in the tests.
         # It can still take a while to deploy rook.
         name: Set up Rook
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 27
           max_attempts: 1
@@ -912,7 +912,7 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Prepare the environment
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_seconds: 30
           max_attempts: 3
@@ -921,7 +921,7 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name:  Install ginkgo
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -936,7 +936,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       -
         name: Install eksctl
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -966,7 +966,7 @@ jobs:
           eksctl create iamidentitymapping --cluster "${CLUSTER_NAME}" --region="${AWS_REGION}" --arn "${AWS_EDB_POWER_ROLE}" --group system:masters --username admin
       -
         name: Setup log archiving via fluentd and insights
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -1139,7 +1139,7 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Prepare the environment
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_seconds: 30
           max_attempts: 3
@@ -1148,7 +1148,7 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name: Install ginkgo
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_seconds: 30
           max_attempts: 3
@@ -1172,7 +1172,7 @@ jobs:
           export_default_credentials: true
       -
         name: Install kubectl
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_seconds: 30
           max_attempts: 3
@@ -1337,7 +1337,7 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name:  Install ginkgo
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_seconds: 30
           max_attempts: 3
