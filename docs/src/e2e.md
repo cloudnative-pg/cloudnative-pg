@@ -13,7 +13,6 @@ process:
 * 1.21
 * 1.20
 * 1.19
-* 1.18
 
 The following PostgreSQL versions are tested:
 
