@@ -32,15 +32,15 @@ Cloud Native PostgreSQL works with PostgreSQL and is available under the
 Cloud Native PostgreSQL requires Kubernetes 1.19 or higher.
 
 Cloud Native PostgreSQL has also been certified for
-[RedHat OpenShift Container Platform (OCP)](https://www.openshift.com/products/container-platform)
-4.6+ and is available directly from the [RedHat Catalog](https://catalog.redhat.com/).
+[Red Hat OpenShift Container Platform (OCP)](https://www.openshift.com/products/container-platform)
+4.6+ and is available directly from the [Red Hat Catalog](https://catalog.redhat.com/).
 OpenShift Container Platform is an open-source distribution of Kubernetes which is
 [maintained and commercially supported](https://access.redhat.com/support/policy/updates/openshift#ocp4)
 by Red Hat.
 
 !!! Important
     Please take into account that some delay may occur when releasing Cloud
-    Native PostgreSQL on RedHat's OpenShift Container Platform, as the process is
+    Native PostgreSQL on Red Hat's OpenShift Container Platform, as the process is
     not entirely under our control.
 
 Please refer to the
