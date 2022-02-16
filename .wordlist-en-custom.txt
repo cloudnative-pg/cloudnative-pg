@@ -262,6 +262,7 @@ VOLNAME
 Valerio
 VirtualBox
 WAL
+WALBackupConfiguration
 WALs
 Wadle
 WalBackupConfiguration
@@ -477,6 +478,7 @@ io
 ip
 ipcs
 ips
+issuecomment
 jobCount
 jq
 json
