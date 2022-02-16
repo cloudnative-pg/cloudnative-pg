@@ -81,7 +81,7 @@ The PostgreSQL containers run with a read-only root filesystem (i.e. no writable
 
 The operator explicitly sets the required security contexts.
 
-On RedHat OpenShift, Cloud Native PostgreSQL runs in `restricted` security context constraint,
+On Red Hat OpenShift, Cloud Native PostgreSQL runs in `restricted` security context constraint,
 the most restrictive one. The goal is to limit the execution of a pod to a namespace allocated UID
 and SELinux context.
 

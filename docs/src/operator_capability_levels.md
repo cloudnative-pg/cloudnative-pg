@@ -125,7 +125,7 @@ any container and enforces read only root filesystem to guarantee containers
 immutability for both the operator and the operand pods. It also explicitly
 sets the required security contexts.
 
-On RedHat OpenShift, Cloud Native PostgreSQL runs in [`restricted` security
+On Red Hat OpenShift, Cloud Native PostgreSQL runs in [`restricted` security
 context constraint
 (SCC)](https://www.openshift.com/blog/managing-sccs-in-openshift), the most
 restrictive one - with the goal to limit the execution of a pod to a namespace
@@ -206,7 +206,7 @@ The operator can be installed through a Kubernetes manifest via `kubectl
 apply`, to be used in a traditional Kubernetes installation in public
 and private cloud environments. Additionally, it can be deployed through
 the Operator Lifecycle Manager (OLM) from OperatorHub.io and the OpenShift
-Container Platform by RedHat. A Helm Chart for the operator is also available.
+Container Platform by Red Hat. A Helm Chart for the operator is also available.
 
 ### Convention over configuration
 

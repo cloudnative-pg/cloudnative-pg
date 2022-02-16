@@ -5,7 +5,7 @@ using Cloud Native PostgreSQL on a local Kubernetes cluster in
 [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/) or
 [Kind](https://kind.sigs.k8s.io/).
 
-RedHat OpenShift Container Platform users can test the certified operator for
+Red Hat OpenShift Container Platform users can test the certified operator for
 Cloud Native PostgreSQL on the [Red Hat CodeReady Containers (CRC)](https://developers.redhat.com/products/codeready-containers/overview)
 for OpenShift.
 
@@ -74,7 +74,7 @@ kind create cluster --name pg
 
 ### CodeReady Containers (CRC)
 
-[Download RedHat CRC](https://developers.redhat.com/products/codeready-containers/overview)
+[Download Red Hat CRC](https://developers.redhat.com/products/codeready-containers/overview)
 and move the binary inside a directory in your `PATH`.
 
 You can then run the following commands:

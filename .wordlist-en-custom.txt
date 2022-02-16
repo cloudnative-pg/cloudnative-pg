@@ -37,6 +37,7 @@ CRC
 CRD
 CRDs
 CSV
+CSVs
 Canovai
 Cecchi
 CertificatesConfiguration
@@ -47,14 +48,17 @@ ClientCertsCASecret
 ClientReplicationSecret
 ClusterCondition
 ClusterConditionType
-ConditionStatus
 ClusterIP
 ClusterList
+ClusterRole
+ClusterRole's
+ClusterServiceVersion
 ClusterSpec
 ClusterStatus
 CodeReady
 ColumnName
 CompressionType
+ConditionStatus
 ConfigMap
 ConfigMapKeySelector
 ConfigMapResourceVersion
@@ -66,6 +70,7 @@ CronJobs
 CustomResourceDefinition
 CustomResourceDefinitions
 Customizations
+DDTHH
 DISA
 DNS
 DataBackupConfiguration
@@ -151,6 +156,7 @@ ObjectMeta
 OnlineUpdateEnabled
 OpenShift
 Openshift
+OperatorGroup
 OperatorHub
 PGAudit
 PGDATA
@@ -220,6 +226,7 @@ SELinux
 SHA
 SQLQuery
 SSL
+SSZ
 STORAGEACCOUNTNAME
 ScheduledBackup
 ScheduledBackupList
@@ -235,6 +242,7 @@ Seealso
 ServerCASecret
 ServerTLSSecret
 ServiceAccount
+ServiceAccount's
 ServiceMonitor
 Silvela
 StorageClass
@@ -258,7 +266,9 @@ WALs
 Wadle
 WalBackupConfiguration
 YXBw
+YY
 YYYY
+abd
 accessKeyId
 accessModes
 adc
@@ -267,12 +277,15 @@ addons
 affinityconfiguration
 aks
 albert
+allnamespaces
 alloc
 allocator
 allowPrivilegeEscalation
 allowVolumeExpansion
 angus
 api
+apiGroup
+apiGroups
 apiVersion
 apidoc
 apis
@@ -320,6 +333,7 @@ ce
 cheatsheet
 checksums
 chmod
+cioni
 cisecurity
 claimRef
 clair
@@ -329,6 +343,7 @@ clientCASecret
 clusterBackup
 clusterName
 clusterlist
+clusterrole
 clusterspec
 clusterstatus
 cmd
@@ -357,6 +372,8 @@ coverity
 cp
 cpu
 crc
+crds
+crdview
 createuser
 creationTimestamp
 creds
@@ -364,6 +381,7 @@ cron
 crt
 cryptographic
 csvlog
+csvs
 ctl
 currentPrimary
 customQueriesConfigMap
@@ -379,12 +397,14 @@ datacenters
 datallowconn
 datistemplate
 datname
+dbe
 dbname
 ddl
 de
 declaratively
 defaultMode
 defaultPoolSize
+deployer
 destinationPath
 dev
 devel
@@ -412,6 +432,7 @@ externalClusters
 facto
 failover
 fastpath
+fb
 fd
 ffd
 filesystem
@@ -496,6 +517,7 @@ lsn
 lt
 malcolm
 mallocs
+mario
 matchExpressions
 matchLabels
 maxClientConnections
@@ -518,6 +540,7 @@ monitoringconfiguration
 mountPath
 msg
 mspan
+multinamespace
 myAKSCluster
 myResourceGroup
 namespace
@@ -545,8 +568,12 @@ ol
 olm
 openshift
 operatorframework
+operatorgorup
+operatorgroup
 operatorgroups
 operatorhub
+osdk
+packagemanifests
 parseable
 passwd
 pc
@@ -593,6 +620,7 @@ prepended
 primaryUpdateStrategy
 proc
 programmatically
+proj
 prometheus
 provisioner
 psql
@@ -623,6 +651,7 @@ resourcerequirements
 retentionPolicy
 reusePVC
 robfig
+roleRef
 rollingupdatestatus
 rollout
 runonserver
@@ -649,12 +678,15 @@ securityContext
 serverCASecret
 serverName
 serverTLSSecret
+serviceaccount
 sha
 shm
 shmall
 shmmax
 sig
 sigs
+singlenamespace
+sourceNamespace
 specificities
 sql
 src
@@ -701,6 +733,7 @@ tablespaces
 targetImmediate
 targetLSN
 targetName
+targetNamespaces
 targetPort
 targetPrimary
 targetTLI
@@ -736,6 +769,7 @@ walSegmentSize
 walbackupconfiguration
 walkthrough
 walsender
+webconsole
 webhook
 webhooks
 webtest

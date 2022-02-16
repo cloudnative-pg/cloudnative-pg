@@ -1,5 +1,10 @@
 # Installation and upgrades
 
+!!! Seealso "OpenShift"
+    For instructions on how to install Cloud Native PostgreSQL on Red Hat
+    OpenShift Container Platform, please refer to the ["OpenShift"](openshift.md)
+    section.
+
 ## Installation on Kubernetes
 
 ### Directly using the operator manifest
@@ -37,41 +42,6 @@ from the [OperatorHub.io website](https://operatorhub.io), following the install
 
 The operator can be installed using the provided [Helm chart](https://github.com/EnterpriseDB/cloud-native-postgresql-helm).
 
-## Installation on Openshift
-
-### Via the web interface
-
-Log in to the console as `kubeadmin` and navigate to the  `Operator → OperatorHub` page.
-
-Find the `Cloud Native PostgreSQL` box scrolling or using the search filter.
-
-Select the operator and click `Install`. Click `Install` again in the following
-`Install Operator`, using the default settings. For an in-depth explanation of
-those settings, see the [Openshift documentation](https://docs.openshift.com/container-platform/4.6/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster).
-
-The operator will soon be available in all the namespaces.
-
-Depending on the security levels applied to the OpenShift cluster you may be
-required to create a proper set of roles and permissions for the operator to
-be used in different namespaces.
-For more information on this matter see the
-[Openshift documentation](https://docs.openshift.com/container-platform/4.6/operators/understanding/olm/olm-understanding-operatorgroups.html).
-
-### Via the `oc` command line
-
-You can add the [`subscription`](samples/subscription.yaml) to install the operator in all the namespaces
-as follows:
-
-```sh
-oc apply -f \
-  https://docs.enterprisedb.io/cloud-native-postgresql/latest/samples/subscription.yaml
-```
-
-The operator will soon be available in all the namespaces.
-
-More information on
-[how to install operators via CLI](https://docs.openshift.com/container-platform/4.6/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-operator-from-operatorhub-using-cli_olm-adding-operators-to-a-cluster)
-is available in the Openshift documentation.
 
 ## Details about the deployment
 
@@ -96,9 +66,6 @@ operator supports leader election. Also, you can take advantage of taints and
 tolerations to make sure that the operator does not run on the same nodes where
 the actual PostgreSQL clusters are running (this might even include the control
 plane for self-managed Kubernetes installations).
-
-As far as OpenShift is concerned, details might differ depending on the
-selected installation method.
 
 !!! Seealso "Operator configuration"
     You can change the default behavior of the operator by overriding
