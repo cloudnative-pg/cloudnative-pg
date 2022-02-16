@@ -11,6 +11,7 @@ on:
       version:
         description: 'CNP released version'
         required: true
+  
 env:
   # Red Hat certification data
   RH_API: "https://catalog.redhat.com/api/containers/v1/projects/certification/id"
@@ -92,3 +93,24 @@ jobs:
     steps:
       - name: Publish Certified Operator Images with Red Hat Connect
         run: bash .github/publish-certified-images.sh
+
+  trigger-openshift-release:
+    name: Trigger Openshift Container Platform Release Workflow
+    runs-on: ubuntu-20.04
+    needs:
+      - redhat_certification_publish_images
+    if:
+      needs.redhat_certification_publish_images.result == 'success'
+    steps:
+      - name: trigger workflow-dispatch
+        id: trigger-ocp-workflow
+        uses: aurelien-baudet/workflow-dispatch@v2.1.1
+        with:
+          repo: enterprisedb/cloud-native-postgresql-ocp-certified
+          workflow: create-release
+          token: ${{ secrets.REPO_GHA_PAT }}
+          ref: main
+          display-workflow-run-url: true
+          wait-for-completion: true
+          inputs: >
+            {"version":"${{ env.CNP_VERSION }}"}
