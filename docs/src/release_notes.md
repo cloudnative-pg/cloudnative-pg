@@ -2,6 +2,61 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.13.0
+
+**Release date:** 17 February 2022
+
+Features:
+
+- Support for Snappy compression. Snappy is a fast compression option for backups that increase
+  the speed of uploads to the object store using a lower compression ratio
+- Support for tagging files uploaded to the Barman object store. This feature requires
+  Barman 2.18 in the operand image.
+  of backups after Cluster deletion
+- Extension of the status of a Cluster with `status.conditions`. The condition `ContinuousArchiving`
+  indicates that the Cluster has started to archive WAL files
+- Improve the status command of the `cnp` plugin for `kubectl` with additional information:
+  add a `Cluster Summary` section showing the status of the Cluster and a `Certificates Status`
+  section including the status of the certificates used in the Cluster along
+  with the time left to expire
+- Support the new `barman-cloud-check-wal-archive` command to detect a non-empty backup destination
+  when creating a new cluster
+- Add support for using a `Secret` to add default monitoring queries through
+  `MONITORING_QUERIES_SECRET` configuration variable.
+- Allow the user to restrict container’s permissions using AppArmor (on Kubernetes clusters deployed
+  with AppArmor support)
+- Add Windows platform support to `cnp` plugin for `kubectl`, now the plugin is available
+  on Windows x86 and ARM
+- Drop support for Kubernetes 1.18 and deprecated API versions
+
+Container Images:
+
+- PostgreSQL containers include Barman 2.18
+
+Security Fix:
+
+- Add coherence check of username field inside owner and superuser secrets;
+  previously, a malicious user could have used the secrets to change the password
+  of any PostgreSQL user
+
+Fixes:
+
+- Fix a memory leak in code fetching status from Postgres pods
+- Disable PostgreSQL self-restart after a crash. The instance controller handles
+  the lifecycle of the PostgreSQL instance
+- Prevent modification of `spec.postgresUID` and `spec.postgresGID` fields
+  in validation webhook. Changing these fields after Cluster creation makes PostgreSQL unable to start
+- Reduce the log verbosity from the backup and WAL archiving handling code
+- Correct a bug resulting in a Cluster being marked as `Healthy` when not initialized yet
+- Allows standby servers in clusters with a very high WAL production rate to switch to streaming
+  once they are aligned
+- Fix a race condition during the startup of a PostgreSQL pod that could seldom lead to a crash
+- Fix a race condition that could lead to a failure initializing the first PVC in a Cluster
+- Remove an extra restart of a just demoted primary Pod before joining the Cluster as a replica
+- Correctly handle replication-sensitive PostgreSQL configuration parameters when recovering
+  from a backup
+- Fix missing validation of PostgreSQL configurations during Cluster creation
+
 ## Version 1.12.0
 
 **Release date:** 11 January 2022
