@@ -187,8 +187,16 @@ type ConfigurationInfo struct {
 	// The list of user-level settings
 	UserSettings map[string]string
 
-	// If we need to include mandatory settings or not
+	// Whether we need to include mandatory settings that are
+	// not meant to be seen by users. Should be set to
+	// true only when writing the configuration to disk
 	IncludingMandatory bool
+
+	// Whether we preserve user settings even when they are fixed parameters.
+	// This setting is ignored if IncludingMandatory is true.
+	// This should be set to true only in the defaulting webhook,
+	// to allow the validating webhook to return an error
+	PreserveFixedSettingsFromUser bool
 
 	// The list of replicas
 	Replicas []string
@@ -409,6 +417,11 @@ type PgConfiguration struct {
 	configs map[string]string
 }
 
+// GetConfigurationParameters returns the generated configuration parameters
+func (p *PgConfiguration) GetConfigurationParameters() map[string]string {
+	return p.configs
+}
+
 // OverwriteConfig overwrites a configuration in the map, given the key/value pair.
 // If the map is nil, it is created and the pair is added
 func (p *PgConfiguration) OverwriteConfig(key, value string) {
@@ -458,11 +471,18 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	// Start from scratch
 	configuration := &PgConfiguration{}
 
+	ignoreFixedSettingsFromUser := info.IncludingMandatory || !info.PreserveFixedSettingsFromUser
+
 	// Set all the default settings
 	setDefaultConfigurations(info, configuration)
 
-	// Apply all the values from the user, overriding defaults
+	// Apply all the values from the user, overriding defaults,
+	// ignoring those which are fixed if ignoreFixedSettingsFromUser is true
 	for key, value := range info.UserSettings {
+		_, isFixed := FixedConfigurationParameters[key]
+		if isFixed && ignoreFixedSettingsFromUser {
+			continue
+		}
 		configuration.OverwriteConfig(key, value)
 	}
 
@@ -565,25 +585,6 @@ func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConf
 		// Apply the cluster name
 		configuration.OverwriteConfig("cluster_name", info.ClusterName)
 	}
-}
-
-// FillCNPConfiguration creates the actual PostgreSQL configuration
-// for CNP given the user settings and the major version. This is
-// useful during the configuration validation
-func FillCNPConfiguration(
-	majorVersion int,
-	userSettings map[string]string,
-	isReplicaCluster bool,
-) map[string]string {
-	info := ConfigurationInfo{
-		Settings:         CnpConfigurationSettings,
-		MajorVersion:     majorVersion,
-		UserSettings:     userSettings,
-		Replicas:         nil,
-		IsReplicaCluster: isReplicaCluster,
-	}
-	pgConfig := CreatePostgresqlConfiguration(info)
-	return pgConfig.configs
 }
 
 // CreatePostgresqlConfFile creates the contents of the postgresql.conf file

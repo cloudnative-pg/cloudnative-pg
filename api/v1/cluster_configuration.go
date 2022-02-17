@@ -7,54 +7,10 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package v1
 
 import (
-	"sort"
-
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
-
-// CreatePostgresqlConfiguration creates the PostgreSQL configuration to be
-// used for this cluster and return it and its sha256 checksum
-func (cluster *Cluster) CreatePostgresqlConfiguration() (string, string, error) {
-	// Extract the PostgreSQL major version
-	fromVersion, err := cluster.GetPostgresqlVersion()
-	if err != nil {
-		return "", "", err
-	}
-
-	info := postgres.ConfigurationInfo{
-		Settings:                         postgres.CnpConfigurationSettings,
-		MajorVersion:                     fromVersion,
-		UserSettings:                     cluster.Spec.PostgresConfiguration.Parameters,
-		IncludingMandatory:               true,
-		IncludingSharedPreloadLibraries:  true,
-		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
-		IsReplicaCluster:                 cluster.IsReplica(),
-	}
-
-	// We need to include every replica inside the list of possible synchronous standbys
-	info.Replicas = nil
-	for _, instances := range cluster.Status.InstancesStatus {
-		for _, instance := range instances {
-			if cluster.Status.CurrentPrimary != instance {
-				info.Replicas = append(info.Replicas, instance)
-			}
-		}
-	}
-
-	// Ensure a consistent ordering to avoid spurious configuration changes
-	sort.Strings(info.Replicas)
-
-	// Compute the actual number of sync replicas
-	info.SyncReplicas = cluster.GetSyncReplicasNumber()
-
-	// Set cluster name
-	info.ClusterName = cluster.Name
-
-	conf, sha256 := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
-	return conf, sha256, nil
-}
 
 // GetSyncReplicasNumber computes the actual number of required synchronous replicas
 // given the requested min, max and the number of ready replicas in the cluster
