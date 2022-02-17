@@ -546,6 +546,7 @@ multinamespace
 myAKSCluster
 myResourceGroup
 namespace
+namespaced
 namespaces
 natively
 newers
