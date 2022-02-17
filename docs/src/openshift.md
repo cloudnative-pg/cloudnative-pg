@@ -593,42 +593,9 @@ interventions. Such operations also include security related matters at RBAC
 (e.g. service accounts), pod (e.g. security context constraints) and Postgres
 levels (e.g. TLS certificates).
 
-Below we provide some examples and, most importantly, the reasons why Cloud
-Native PostgreSQL requires full or partial management of the most relevant
-resources listed above.
-
-`configmaps`
-: The operator needs to create and manage default config maps for
-  the Prometheus exporter monitoring metrics.
-
-`deployments`
-: The operator needs to manage a PgBouncer connection pooler
-  using a standard Kubernetes `Deployment` resource.
-
-`persistentvolumeclaims`
-: The volume where the `PGDATA` resides is the
-  central element of a PostgreSQL `Cluster` resource; the operator needs
-  to interact with the selected storage class to dynamically provision
-  the requested volumes, based on the defined scheduling policies.
-
-`secrets`
-: Unless you provide certificates and passwords to your `Cluster`
-  objects, the operator adopts the "convention over configuration" paradigm by
-  self-provisioning random generated passwords and TLS certificates, and by
-  storing them in secrets.
-
-`serviceaccounts`
-: The operator needs to create a service account that
-  enables the instance manager (which is the *PID 1* process of the container
-  that controls the PostgreSQL server) to safely communicate with the
-  Kubernetes API server to coordinate actions and continuously provide
-  a reliable status of the `Cluster`.
-
-`services`
-: The operator needs to control network access to the PostgreSQL cluster
-  (or the connection pooler) from applications, and properly manage
-  failover/switchover operations in an automated way (by assigning, for example,
-  the correct end-point of a service to the proper primary PostgreSQL instance).
+For more information about the reasons why the operator needs these elevated
+permissions, please refer to the
+["Security / Cluster / RBAC" section](security.md#role-based-access-control-rbac).
 
 ## Users and Permissions
 

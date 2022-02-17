@@ -65,6 +65,66 @@ Security at the cluster level takes into account all Kubernetes components that
 form both the control plane and the nodes, as well as the applications that run in
 the cluster (PostgreSQL included).
 
+### Role Based Access Control (RBAC)
+
+The operator interacts with the Kubernetes API server with a dedicated service
+account called `postgresql-operator-manager`. In Kubernetes this is installed
+by default in the `postgresql-operator-system` namespace, with a cluster role
+binding between this service account and the `postgresql-operator-manager`
+cluster role which defines the set of rules/resources/verbs granted to the operator.
+For OpenShift specificities on this matter, please consult the
+["Red Hat OpenShift" section](openshift.md#predefined-rbac-objects), in particular
+["Pre-defined RBAC objects" section](openshift.md#predefined-rbac-objects).
+
+!!! Important
+    The above permissions are exclusively reserved for the operator's service
+    account to interact with the Kubernetes API server.  They are not directly
+    accessible by the users of the operator that interact only with `Cluster`,
+    `Pooler`, `Backup`, and `ScheduledBackup` resources.
+
+Below we provide some examples and, most importantly, the reasons why Cloud
+Native PostgreSQL requires full or partial management of standard Kubernetes
+namespaced resources.
+
+`configmaps`
+: The operator needs to create and manage default config maps for
+  the Prometheus exporter monitoring metrics.
+
+`deployments`
+: The operator needs to manage a PgBouncer connection pooler
+  using a standard Kubernetes `Deployment` resource.
+
+`jobs`
+: The operator needs to handle jobs to manage different `Cluster`'s phases.
+
+`persistentvolumeclaims`
+: The volume where the `PGDATA` resides is the
+  central element of a PostgreSQL `Cluster` resource; the operator needs
+  to interact with the selected storage class to dynamically provision
+  the requested volumes, based on the defined scheduling policies.
+
+`pods`
+: The operator needs to manage `Cluster`'s instances.
+
+`secrets`
+: Unless you provide certificates and passwords to your `Cluster`
+  objects, the operator adopts the "convention over configuration" paradigm by
+  self-provisioning random generated passwords and TLS certificates, and by
+  storing them in secrets.
+
+`serviceaccounts`
+: The operator needs to create a service account that
+  enables the instance manager (which is the *PID 1* process of the container
+  that controls the PostgreSQL server) to safely communicate with the
+  Kubernetes API server to coordinate actions and continuously provide
+  a reliable status of the `Cluster`.
+
+`services`
+: The operator needs to control network access to the PostgreSQL cluster
+  (or the connection pooler) from applications, and properly manage
+  failover/switchover operations in an automated way (by assigning, for example,
+  the correct end-point of a service to the proper primary PostgreSQL instance).
+
 ### Pod Security Policies
 
 A [Pod Security Policy](https://kubernetes.io/docs/concepts/policy/pod-security-policy/)
