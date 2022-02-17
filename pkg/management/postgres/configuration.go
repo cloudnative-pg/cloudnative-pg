@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configfile"
@@ -44,7 +45,7 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 // function will return "true" if the configuration has been really changed.
 // Important: this will not send a SIGHUP to the server
 func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cluster) (bool, error) {
-	postgresConfiguration, sha256, err := cluster.CreatePostgresqlConfiguration()
+	postgresConfiguration, sha256, err := createPostgresqlConfiguration(cluster)
 	if err != nil {
 		return false, err
 	}
@@ -183,4 +184,46 @@ func RemoveArchiveModeFromPostgresAutoConf(pgData string) (changed bool, err err
 
 	updatedContent := configfile.RemoveOptionFromConfigurationContents(string(currentContent), "archive_mode")
 	return fileutils.WriteStringToFile(targetFile, updatedContent)
+}
+
+// createPostgresqlConfiguration creates the PostgreSQL configuration to be
+// used for this cluster and return it and its sha256 checksum
+func createPostgresqlConfiguration(cluster *apiv1.Cluster) (string, string, error) {
+	// Extract the PostgreSQL major version
+	fromVersion, err := cluster.GetPostgresqlVersion()
+	if err != nil {
+		return "", "", err
+	}
+
+	info := postgres.ConfigurationInfo{
+		Settings:                         postgres.CnpConfigurationSettings,
+		MajorVersion:                     fromVersion,
+		UserSettings:                     cluster.Spec.PostgresConfiguration.Parameters,
+		IncludingMandatory:               true,
+		IncludingSharedPreloadLibraries:  true,
+		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
+		IsReplicaCluster:                 cluster.IsReplica(),
+	}
+
+	// We need to include every replica inside the list of possible synchronous standbys
+	info.Replicas = nil
+	for _, instances := range cluster.Status.InstancesStatus {
+		for _, instance := range instances {
+			if cluster.Status.CurrentPrimary != instance {
+				info.Replicas = append(info.Replicas, instance)
+			}
+		}
+	}
+
+	// Ensure a consistent ordering to avoid spurious configuration changes
+	sort.Strings(info.Replicas)
+
+	// Compute the actual number of sync replicas
+	info.SyncReplicas = cluster.GetSyncReplicasNumber()
+
+	// Set cluster name
+	info.ClusterName = cluster.Name
+
+	conf, sha256 := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
+	return conf, sha256, nil
 }

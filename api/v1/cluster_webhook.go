@@ -59,11 +59,15 @@ var _ webhook.Defaulter = &Cluster{}
 func (r *Cluster) Default() {
 	clusterLog.Info("default", "name", r.Name, "namespace", r.Namespace)
 
-	r.SetDefaults()
+	r.setDefaults(true)
 }
 
 // SetDefaults apply the defaults to undefined values in a Cluster
 func (r *Cluster) SetDefaults() {
+	r.setDefaults(false)
+}
+
+func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	// Defaulting the image name if not specified
 	if r.Spec.ImageName == "" {
 		r.Spec.ImageName = configuration.Current.PostgresImageName
@@ -89,10 +93,15 @@ func (r *Cluster) SetDefaults() {
 	if err == nil {
 		// The validation error will be already raised by the
 		// validateImageName function
-		r.Spec.PostgresConfiguration.Parameters = postgres.FillCNPConfiguration(
-			psqlVersion,
-			r.Spec.PostgresConfiguration.Parameters,
-			r.IsReplica())
+		info := postgres.ConfigurationInfo{
+			Settings:                      postgres.CnpConfigurationSettings,
+			MajorVersion:                  psqlVersion,
+			UserSettings:                  r.Spec.PostgresConfiguration.Parameters,
+			IsReplicaCluster:              r.IsReplica(),
+			PreserveFixedSettingsFromUser: preserveUserSettings,
+		}
+		sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
+		r.Spec.PostgresConfiguration.Parameters = sanitizedParameters
 	}
 
 	if r.Spec.LogLevel == "" {
@@ -223,6 +232,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 	allErrs = append(allErrs, r.validateAntiAffinity()...)
 	allErrs = append(allErrs, r.validateReplicaMode()...)
 	allErrs = append(allErrs, r.validateBackupConfiguration()...)
+	allErrs = append(allErrs, r.validateConfiguration()...)
 
 	return allErrs
 }
@@ -532,6 +542,40 @@ func (r *Cluster) validateImagePullPolicy() field.ErrorList {
 	}
 }
 
+// validateConfiguration determines whether a PostgreSQL configuration is valid
+func (r *Cluster) validateConfiguration() field.ErrorList {
+	var result field.ErrorList
+
+	psqlVersion, err := r.GetPostgresqlVersion()
+	if err != nil {
+		// The validation error will be already raised by the
+		// validateImageName function
+		return result
+	}
+	info := postgres.ConfigurationInfo{
+		Settings:         postgres.CnpConfigurationSettings,
+		MajorVersion:     psqlVersion,
+		UserSettings:     r.Spec.PostgresConfiguration.Parameters,
+		IsReplicaCluster: r.IsReplica(),
+	}
+	sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
+
+	for key, value := range r.Spec.PostgresConfiguration.Parameters {
+		_, isFixed := postgres.FixedConfigurationParameters[key]
+		sanitizedValue, presentInSanitizedConfiguration := sanitizedParameters[key]
+		if isFixed && (!presentInSanitizedConfiguration || value != sanitizedValue) {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", key),
+					value,
+					"Can't set fixed configuration parameter"))
+		}
+	}
+
+	return result
+}
+
 // validateConfigurationChange determines whether a PostgreSQL configuration
 // change can be applied
 func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
@@ -550,35 +594,6 @@ func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
 					fmt.Sprintf("Can't change image name and configuration at the same time. "+
 						"There are differences in PostgreSQL configuration parameters: %s", jsonDiff)))
 			return result
-		}
-	}
-
-	psqlVersion, err := r.GetPostgresqlVersion()
-	if err != nil {
-		// The validation error will be already raised by the
-		// validateImageName function
-		return result
-	}
-
-	r.Spec.PostgresConfiguration.Parameters = postgres.FillCNPConfiguration(
-		psqlVersion,
-		r.Spec.PostgresConfiguration.Parameters,
-		r.IsReplica())
-	oldParameters := postgres.FillCNPConfiguration(
-		psqlVersion,
-		old.Spec.PostgresConfiguration.Parameters,
-		r.IsReplica())
-
-	for key, value := range r.Spec.PostgresConfiguration.Parameters {
-		_, isFixed := postgres.FixedConfigurationParameters[key]
-		oldValue, presentInOldConfiguration := oldParameters[key]
-		if isFixed && (!presentInOldConfiguration || value != oldValue) {
-			result = append(
-				result,
-				field.Invalid(
-					field.NewPath("spec", "postgresql", "parameters", key),
-					value,
-					"Can't change fixed configuration parameter"))
 		}
 	}
 

@@ -174,7 +174,7 @@ func newFakeCNPCluster(namespace string) *apiv1.Cluster {
 		},
 	}
 
-	cluster.Default()
+	cluster.SetDefaults()
 
 	err := k8sClient.Create(context.Background(), cluster)
 	Expect(err).To(BeNil())
