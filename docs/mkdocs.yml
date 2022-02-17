@@ -39,6 +39,7 @@ nav:
   - expose_pg_services.md
   - cnp-plugin.md
   - openshift.md
+  - failover.md
   - troubleshooting.md
   - e2e.md
   - container_images.md
