@@ -507,25 +507,6 @@ var _ = Describe("configuration change validation", func() {
 		Expect(len(clusterNew.validateConfigurationChange(&clusterOld))).To(Equal(0))
 	})
 
-	It("complains when we changed a fixed setting", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:10.4",
-			},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:10.4",
-				PostgresConfiguration: PostgresConfiguration{
-					Parameters: map[string]string{
-						"data_directory": "/var/pgdata/here",
-					},
-				},
-			},
-		}
-		Expect(len(clusterNew.validateConfigurationChange(&clusterOld))).To(Equal(1))
-	})
-
 	It("doesn't complain when we change a setting which is not fixed", func() {
 		clusterOld := Cluster{
 			Spec: ClusterSpec{
@@ -553,7 +534,7 @@ var _ = Describe("configuration change validation", func() {
 		}
 		clusterNew := Cluster{
 			Spec: ClusterSpec{
-				ImageName: "postgres:11.0",
+				ImageName: "postgres:10.5",
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
 						"shared_buffers": "4G",

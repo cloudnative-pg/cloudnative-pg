@@ -13,12 +13,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+
+	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
 )
 
 var _ = Describe("cluster_status unit tests", func() {
@@ -132,9 +133,12 @@ var _ = Describe("cluster_status unit tests", func() {
 		By("starting the manager", func() {
 			wg.Add(1)
 			go func() {
-				err := (mgr).Start(ctx)
+				defer func() {
+					GinkgoRecover()
+					wg.Done()
+				}()
+				err := mgr.Start(ctx)
 				Expect(err).To(BeNil())
-				wg.Done()
 			}()
 		})
 

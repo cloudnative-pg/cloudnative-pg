@@ -609,6 +609,18 @@ func (r *ClusterReconciler) handleRollingUpdate(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
+	// If we need to roll out a restart of any instance, this is the right moment
+	// Do I have to roll out a new image?
+	done, err := r.rolloutDueToCondition(ctx, cluster, &instancesStatus, IsPodNeedingRollout)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if done {
+		// Rolling upgrade is in progress, let's avoid marking stuff as synchronized
+		// (but recheck in one second, just to be sure)
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
 	// Stop acting here if there are Pods that are waiting for
 	// an instance manager upgrade
 	if instancesStatus.ArePodsUpgradingInstanceManager() {
@@ -621,18 +633,6 @@ func (r *ClusterReconciler) handleRollingUpdate(
 		if err := r.upgradeInstanceManager(ctx, cluster, &instancesStatus); err != nil {
 			return ctrl.Result{}, err
 		}
-	}
-
-	// If we need to roll out a restart of any instance, this is the right moment
-	// Do I have to roll out a new image?
-	done, err := r.rolloutDueToCondition(ctx, cluster, &instancesStatus, IsPodNeedingRollout)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if done {
-		// Rolling upgrade is in progress, let's avoid marking stuff as synchronized
-		// (but recheck in one second, just to be sure)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	return ctrl.Result{}, nil

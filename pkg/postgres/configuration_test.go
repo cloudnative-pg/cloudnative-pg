@@ -170,6 +170,49 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 				To(Equal("ANY 2 (\"one\",\"two\",\"three\")"))
 		})
 	})
+
+	It("checks if PreserveFixedSettingsFromUser works properly", func() {
+		info := ConfigurationInfo{
+			Settings:     CnpConfigurationSettings,
+			MajorVersion: 100000,
+			UserSettings: map[string]string{
+				"ssl":                  "off",
+				"recovery_target_name": "test",
+			},
+			Replicas:     nil,
+			SyncReplicas: 0,
+		}
+		By("making sure it enforces fixed parameters if false", func() {
+			info.PreserveFixedSettingsFromUser = false
+			info.IncludingMandatory = false
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig("ssl")).To(Equal(""))
+			Expect(config.GetConfig("recovery_target_name")).To(Equal(""))
+		})
+
+		By("making sure it doesn't enforce fixed parameters if true", func() {
+			info.PreserveFixedSettingsFromUser = true
+			info.IncludingMandatory = false
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig("ssl")).To(Equal("off"))
+			Expect(config.GetConfig("recovery_target_name")).To(Equal("test"))
+		})
+		By("making sure it enforces fixed parameters if IncludingMandatory is true too", func() {
+			info.PreserveFixedSettingsFromUser = true
+			info.IncludingMandatory = true
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig("ssl")).To(Equal("on"))
+			Expect(config.GetConfig("recovery_target_name")).To(Equal(""))
+		})
+		By("making sure it enforces fixed parameters if IncludingMandatory is true, "+
+			"but PreserveFixedSettingsFromUser is false ", func() {
+			info.PreserveFixedSettingsFromUser = false
+			info.IncludingMandatory = true
+			config := CreatePostgresqlConfiguration(info)
+			Expect(config.GetConfig("ssl")).To(Equal("on"))
+			Expect(config.GetConfig("recovery_target_name")).To(Equal(""))
+		})
+	})
 })
 
 var _ = Describe("pg_hba.conf generation", func() {
