@@ -88,3 +88,8 @@ an infinite delay and therefore preserve data durability.
     but lead to data loss at cluster level and/or backup level. On the contrary,
     setting it to a high value, might remove the risk of data loss while leaving
     the cluster without an active primary for a longer time during the switchover.
+
+## Failover
+
+In case of primary pod failure, the cluster will go into failover mode.
+Please refer to the ["Failover" section](failover.md) for details.
