@@ -7,7 +7,6 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package utils
 
 import (
-	. "github.com/onsi/gomega" // nolint
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,17 +22,21 @@ func CreateSecretCA(
 	caSecName string,
 	includeCAPrivateKey bool,
 	env *TestingEnvironment) (
-	*apiv1.Cluster, *certs.KeyPair) {
+	*apiv1.Cluster, *certs.KeyPair, error) {
 	// creating root CA certificates
 	cluster := &apiv1.Cluster{}
 	cluster.Namespace = namespace
 	cluster.Name = clusterName
 	secret := &corev1.Secret{}
 	err := env.Client.Get(env.Ctx, client.ObjectKey{Namespace: namespace, Name: caSecName}, secret)
-	Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	if !apierrors.IsNotFound(err) {
+		return cluster, nil, err
+	}
 
 	caPair, err := certs.CreateRootCA(cluster.Name, namespace)
-	Expect(err).ToNot(HaveOccurred())
+	if err != nil {
+		return cluster, nil, err
+	}
 
 	caSecret := caPair.GenerateCASecret(namespace, caSecName)
 	// delete the key from the CA, as it is not needed in this case
@@ -41,6 +44,8 @@ func CreateSecretCA(
 		delete(caSecret.Data, certs.CAPrivateKeyKey)
 	}
 	err = env.Client.Create(env.Ctx, caSecret)
-	Expect(err).ToNot(HaveOccurred())
-	return cluster, caPair
+	if err != nil {
+		return cluster, caPair, err
+	}
+	return cluster, caPair, nil
 }

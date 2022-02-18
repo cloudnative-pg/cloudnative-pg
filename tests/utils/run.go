@@ -24,7 +24,6 @@ type PodCommandResult struct {
 }
 
 // RunUnchecked executes a command and process the information
-//nolint:unparam,gosec
 func RunUnchecked(command string) (stdout string, stderr string, err error) {
 	tokens, err := shlex.Split(command)
 	if err != nil {
@@ -33,7 +32,7 @@ func RunUnchecked(command string) (stdout string, stderr string, err error) {
 	}
 
 	var outBuffer, errBuffer bytes.Buffer
-	cmd := exec.Command(tokens[0], tokens[1:]...)
+	cmd := exec.Command(tokens[0], tokens[1:]...) // #nosec G204
 	cmd.Stdout, cmd.Stderr = &outBuffer, &errBuffer
 	err = cmd.Run()
 	stdout = outBuffer.String()
