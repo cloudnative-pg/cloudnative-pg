@@ -53,7 +53,8 @@ var _ = Describe("Verify storage", func() {
 			// Initializing namespace variable to be used in test case
 			namespace = "storage-expansion-true"
 			// Extracting bool value of AllowVolumeExpansion
-			allowExpansion := utils.GetStorageAllowExpansion(defaultStorageClass, env)
+			allowExpansion, err := utils.GetStorageAllowExpansion(defaultStorageClass, env)
+			Expect(err).ToNot(HaveOccurred())
 			if (allowExpansion == nil) || (*allowExpansion == false) {
 				Skip(fmt.Sprintf("AllowedVolumeExpansion is false on %v", defaultStorageClass))
 			}
@@ -74,7 +75,8 @@ var _ = Describe("Verify storage", func() {
 			// Initializing namespace variable to be used in test case
 			namespace = "storage-expansion-false"
 			// Extracting bool value of AllowVolumeExpansion
-			allowExpansion := utils.GetStorageAllowExpansion(defaultStorageClass, env)
+			allowExpansion, err := utils.GetStorageAllowExpansion(defaultStorageClass, env)
+			Expect(err).ToNot(HaveOccurred())
 			if (allowExpansion != nil) && (*allowExpansion == true) {
 				Skip(fmt.Sprintf("AllowedVolumeExpansion is true on %v", defaultStorageClass))
 			}

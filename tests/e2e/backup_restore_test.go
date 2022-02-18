@@ -74,7 +74,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			By("creating ca and tls certificate secrets", func() {
 				// create CA certificates
-				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, minioCaSecName, true, env)
+				_, caPair, err := testUtils.CreateSecretCA(namespace, clusterName, minioCaSecName, true, env)
+				Expect(err).ToNot(HaveOccurred())
 
 				// sign and create secret using CA certificate and key
 				serverPair, err := caPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
@@ -536,7 +537,8 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			Expect(err).ToNot(HaveOccurred())
 			By("creating ca and tls certificate secrets", func() {
 				// create CA certificate
-				_, caPair := testUtils.CreateSecretCA(namespace, clusterName, minioCaSecName, true, env)
+				_, caPair, err := testUtils.CreateSecretCA(namespace, clusterName, minioCaSecName, true, env)
+				Expect(err).ToNot(HaveOccurred())
 
 				// sign and create secret using CA certificate and key
 				serverPair, err := caPair.CreateAndSignPair("minio-service", certs.CertTypeServer,

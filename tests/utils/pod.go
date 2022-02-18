@@ -7,8 +7,13 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package utils
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"time"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/avast/retry-go/v4"
 	v1 "k8s.io/api/core/v1"
@@ -48,17 +53,6 @@ func PodWaitForReady(env *TestingEnvironment, pod *v1.Pod, timeoutSeconds uint) 
 	return err
 }
 
-// GetPodsWithLabels returns a PodList of all the pods with the requested labels
-// in a certain namespace
-func GetPodsWithLabels(env *TestingEnvironment, namespace string, labels map[string]string) (*v1.PodList, error) {
-	podList := &v1.PodList{}
-	err := env.Client.List(
-		env.Ctx, podList, client.InNamespace(namespace),
-		client.MatchingLabels(labels),
-	)
-	return podList, err
-}
-
 // PodHasLabels verifies that the labels of a pod contain a specified
 // labels map
 func PodHasLabels(pod v1.Pod, labels map[string]string) bool {
@@ -83,4 +77,50 @@ func PodHasAnnotations(pod v1.Pod, annotations map[string]string) bool {
 		}
 	}
 	return true
+}
+
+// DeletePod deletes a pod if existent
+func (env TestingEnvironment) DeletePod(namespace string, name string, opts ...client.DeleteOption) error {
+	u := &unstructured.Unstructured{}
+	u.SetName(name)
+	u.SetNamespace(namespace)
+	u.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "Pod",
+	})
+
+	return env.Client.Delete(env.Ctx, u, opts...)
+}
+
+// GetPodLogs gathers pod logs
+func (env TestingEnvironment) GetPodLogs(namespace string, podName string) (string, error) {
+	req := env.Interface.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{})
+	podLogs, err := req.Stream(env.Ctx)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		innerErr := podLogs.Close()
+		if err == nil && innerErr != nil {
+			err = innerErr
+		}
+	}()
+
+	// Create a buffer to hold JSON data
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// GetPodList gathers the current list of pods in a namespace
+func (env TestingEnvironment) GetPodList(namespace string) (*v1.PodList, error) {
+	podList := &v1.PodList{}
+	err := env.Client.List(
+		env.Ctx, podList, client.InNamespace(namespace),
+	)
+	return podList, err
 }
