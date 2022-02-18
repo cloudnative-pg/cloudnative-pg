@@ -226,7 +226,7 @@ Features:
 - Drop support for deprecated API version
   `postgresql.k8s.enterprisedb.io/v1alpha1` on the `Cluster`, `Backup`, and
   `ScheduledBackup` kinds
-- Set default operand image to PostgreSQL 14.1
+- Set default operand image to PostgreSQL 14.2
 
 Security:
 
