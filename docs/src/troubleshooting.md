@@ -125,7 +125,7 @@ Cluster in healthy state
 Name:               cluster-example
 Namespace:          default
 System ID:          7044925089871458324
-PostgreSQL Image:   quay.io/enterprisedb/postgresql:14.1-3
+PostgreSQL Image:   quay.io/enterprisedb/postgresql:14.2-3
 Primary instance:   cluster-example-1
 Instances:          3
 Ready instances:    3
@@ -201,7 +201,7 @@ kubectl describe cluster <CLUSTER_NAME> -n <NAMESPACE> | grep "Image Name"
 Output:
 
 ```shell
-  Image Name:    quay.io/enterprisedb/postgresql:14.1-3
+  Image Name:    quay.io/enterprisedb/postgresql:14.2-3
 ```
 
 !!! Note

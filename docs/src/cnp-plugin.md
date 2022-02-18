@@ -74,7 +74,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   quay.io/enterprisedb/postgresql:14.1
+PostgreSQL Image:   quay.io/enterprisedb/postgresql:14.2
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
@@ -118,7 +118,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   quay.io/enterprisedb/postgresql:14.1
+PostgreSQL Image:   quay.io/enterprisedb/postgresql:14.2
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
