@@ -468,6 +468,7 @@ imagePullSecrets
 img
 immediateCheckpoint
 inProgress
+inheritFromIAMRole
 init
 initdb
 initialise

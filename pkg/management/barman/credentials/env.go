@@ -82,10 +82,17 @@ func envSetAWSCredentials(
 		return nil, fmt.Errorf("missing S3 credentials")
 	}
 
+	if configuration.S3Credentials.InheritFromIAMRole {
+		return env, nil
+	}
+
 	var accessKeyIDSecret corev1.Secret
 	var secretAccessKeySecret corev1.Secret
 
 	// Get access key ID
+	if configuration.S3Credentials.AccessKeyIDReference == nil {
+		return nil, fmt.Errorf("missing access key ID")
+	}
 	secretName := configuration.S3Credentials.AccessKeyIDReference.Name
 	secretKey := configuration.S3Credentials.AccessKeyIDReference.Key
 	err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &accessKeyIDSecret)
@@ -99,6 +106,9 @@ func envSetAWSCredentials(
 	}
 
 	// Get secret access key
+	if configuration.S3Credentials.SecretAccessKeyReference == nil {
+		return nil, fmt.Errorf("missing secret access key")
+	}
 	secretName = configuration.S3Credentials.SecretAccessKeyReference.Name
 	secretKey = configuration.S3Credentials.SecretAccessKeyReference.Key
 	err = c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &secretAccessKeySecret)

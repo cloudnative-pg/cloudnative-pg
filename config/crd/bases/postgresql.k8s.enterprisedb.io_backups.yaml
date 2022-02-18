@@ -204,6 +204,10 @@ spec:
                     - key
                     - name
                     type: object
+                  inheritFromIAMRole:
+                    description: Use the role based authentication without providing
+                      explicitly the keys.
+                    type: boolean
                   secretAccessKey:
                     description: The reference to the secret access key
                     properties:
@@ -217,9 +221,6 @@ spec:
                     - key
                     - name
                     type: object
-                required:
-                - accessKeyId
-                - secretAccessKey
                 type: object
               serverName:
                 description: The server name on S3, the cluster name is used if this

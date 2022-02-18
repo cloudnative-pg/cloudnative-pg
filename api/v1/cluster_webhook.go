@@ -1060,6 +1060,8 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 	}
 	if r.Spec.Backup.BarmanObjectStore.S3Credentials != nil {
 		credentialsCount++
+		allErrors = r.Spec.Backup.BarmanObjectStore.S3Credentials.validateAwsCredentials(
+			field.NewPath("spec", "backupConfiguration", "s3Credentials"))
 	}
 
 	if credentialsCount != 1 {
@@ -1114,6 +1116,52 @@ func (azure *AzureCredentials) validateAzureCredentials(path *field.Path) field.
 				azure,
 				"when connection string is specified, the other parameters "+
 					"must be empty"))
+	}
+
+	return allErrors
+}
+
+func (s3 *S3Credentials) validateAwsCredentials(path *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	credentials := 0
+
+	if s3.InheritFromIAMRole {
+		credentials++
+	}
+	if s3.AccessKeyIDReference != nil && s3.SecretAccessKeyReference != nil {
+		credentials++
+	} else if s3.AccessKeyIDReference != nil || s3.SecretAccessKeyReference != nil {
+		credentials++
+		allErrors = append(
+			allErrors,
+			field.Invalid(
+				path,
+				s3,
+				"when using AWS credentials both accessKeyId and secretAccessKey must be provided",
+			),
+		)
+	}
+
+	if credentials == 0 {
+		allErrors = append(
+			allErrors,
+			field.Invalid(
+				path,
+				s3,
+				"at least one AWS authentication method should be supplied",
+			),
+		)
+	}
+
+	if credentials > 1 {
+		allErrors = append(
+			allErrors,
+			field.Invalid(
+				path,
+				s3,
+				"only one AWS authentication method should be supplied",
+			),
+		)
 	}
 
 	return allErrors
