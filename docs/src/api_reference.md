@@ -689,12 +689,17 @@ Name      | Description                         | Type
 
 ## S3Credentials
 
-S3Credentials is the type for the credentials to be used to upload files to S3
+S3Credentials is the type for the credentials to be used to upload files to S3. It can be provided in two alternative ways:
 
-Name            | Description                            | Type                                   
---------------- | -------------------------------------- | ---------------------------------------
-`accessKeyId    ` | The reference to the access key id     - *mandatory*  | [SecretKeySelector](#SecretKeySelector)
-`secretAccessKey` | The reference to the secret access key - *mandatory*  | [SecretKeySelector](#SecretKeySelector)
+- explicitly passing accessKeyId and secretAccessKey
+
+- inheriting the role from the pod environment by setting inheritFromIAMRole to true
+
+Name               | Description                                                              | Type                                    
+------------------ | ------------------------------------------------------------------------ | ----------------------------------------
+`accessKeyId       ` | The reference to the access key id                                       | [*SecretKeySelector](#SecretKeySelector)
+`secretAccessKey   ` | The reference to the secret access key                                   | [*SecretKeySelector](#SecretKeySelector)
+`inheritFromIAMRole` | Use the role based authentication without providing explicitly the keys. - *mandatory*  | bool                                    
 
 <a id='ScheduledBackup'></a>
 

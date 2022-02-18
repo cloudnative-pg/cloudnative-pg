@@ -115,12 +115,12 @@ var _ = Describe("Roles", func() {
 				},
 			},
 			S3Credentials: &apiv1.S3Credentials{
-				SecretAccessKeyReference: apiv1.SecretKeySelector{
+				SecretAccessKeyReference: &apiv1.SecretKeySelector{
 					LocalObjectReference: apiv1.LocalObjectReference{
 						Name: "testS3Secret",
 					},
 				},
-				AccessKeyIDReference: apiv1.SecretKeySelector{
+				AccessKeyIDReference: &apiv1.SecretKeySelector{
 					LocalObjectReference: apiv1.LocalObjectReference{
 						Name: "testS3Access",
 					},
@@ -140,8 +140,8 @@ var _ = Describe("Roles", func() {
 		serviceAccount := CreateRole(cluster, &backupOrigin)
 		Expect(serviceAccount.Name).To(Equal(cluster.Name))
 		Expect(serviceAccount.Namespace).To(Equal(cluster.Namespace))
-		Expect([]string{"thisTest", "testConfigMapKeySelector"}).To(BeEquivalentTo(serviceAccount.Rules[0].ResourceNames))
-		Expect([]string{
+		Expect(serviceAccount.Rules[0].ResourceNames).To(ConsistOf("thisTest", "testConfigMapKeySelector"))
+		Expect(serviceAccount.Rules[1].ResourceNames).To(ConsistOf(
 			"testReplicationTLSSecret",
 			"testClientCASecret",
 			"testServerCASecret",
@@ -158,8 +158,7 @@ var _ = Describe("Roles", func() {
 			"testSSLRootCert",
 			"testSSLKey",
 			"testPassword",
-		},
-		).To(BeEquivalentTo(serviceAccount.Rules[1].ResourceNames))
+		))
 	})
 })
 
@@ -179,10 +178,10 @@ var _ = Describe("Secrets", func() {
 			Backup: &apiv1.BackupConfiguration{
 				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
 					S3Credentials: &apiv1.S3Credentials{
-						SecretAccessKeyReference: apiv1.SecretKeySelector{
+						SecretAccessKeyReference: &apiv1.SecretKeySelector{
 							LocalObjectReference: apiv1.LocalObjectReference{Name: "test-secret"},
 						},
-						AccessKeyIDReference: apiv1.SecretKeySelector{
+						AccessKeyIDReference: &apiv1.SecretKeySelector{
 							LocalObjectReference: apiv1.LocalObjectReference{Name: "test-access"},
 						},
 					},
@@ -194,8 +193,6 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 		secrets = backupSecrets(cluster, nil)
-		Expect(secrets[0]).To(BeEquivalentTo("test-secret"))
-		Expect(secrets[1]).To(BeEquivalentTo("test-access"))
-		Expect(secrets[2]).To(BeEquivalentTo("test-endpoint-ca-name"))
+		Expect(secrets).To(ConsistOf("test-secret", "test-access", "test-endpoint-ca-name"))
 	})
 })
