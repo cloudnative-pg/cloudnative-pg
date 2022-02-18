@@ -91,6 +91,8 @@ jobs:
       - redhat_certification
     if: needs.redhat_certification.result == 'success'
     steps:
+      - name: Checkout
+        uses: actions/checkout@v2.4.0
       - name: Publish Certified Operator Images with Red Hat Connect
         run: bash .github/publish-certified-images.sh
 
