@@ -989,7 +989,8 @@ func AssertMetricsData(namespace, clusterName, targetOne, targetTwo, targetSecre
 
 func CreateAndAssertServerCertificatesSecrets(
 	namespace, clusterName, caSecName, tlsSecName string, includeCAPrivateKey bool) {
-	cluster, caPair := testsUtils.CreateSecretCA(namespace, clusterName, caSecName, includeCAPrivateKey, env)
+	cluster, caPair, err := testsUtils.CreateSecretCA(namespace, clusterName, caSecName, includeCAPrivateKey, env)
+	Expect(err).ToNot(HaveOccurred())
 
 	serverPair, err := caPair.CreateAndSignPair(cluster.GetServiceReadWriteName(), certs.CertTypeServer,
 		cluster.GetClusterAltDNSNames(),
@@ -1002,7 +1003,8 @@ func CreateAndAssertServerCertificatesSecrets(
 
 func CreateAndAssertClientCertificatesSecrets(
 	namespace, clusterName, caSecName, tlsSecName, userSecName string, includeCAPrivateKey bool) {
-	_, caPair := testsUtils.CreateSecretCA(namespace, clusterName, caSecName, includeCAPrivateKey, env)
+	_, caPair, err := testsUtils.CreateSecretCA(namespace, clusterName, caSecName, includeCAPrivateKey, env)
+	Expect(err).ToNot(HaveOccurred())
 
 	// Sign tls certificates for streaming_replica user
 	serverPair, err := caPair.CreateAndSignPair("streaming_replica", certs.CertTypeClient, nil)
@@ -1028,7 +1030,8 @@ func CreateAndAssertCertificateSecretsOnAzurite(
 	azuriteTLSSecName string) {
 	By("creating ca and tls certificate secrets", func() {
 		// create CA certificates
-		_, caPair := testsUtils.CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
+		_, caPair, err := testsUtils.CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
+		Expect(err).ToNot(HaveOccurred())
 
 		// sign and create secret using CA certificate and key
 		serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,

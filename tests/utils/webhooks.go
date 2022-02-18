@@ -165,3 +165,12 @@ func CheckWebhookReady(env *TestingEnvironment, namespace string) error {
 	}
 	return nil
 }
+
+// GetCNPsMutatingWebhookConf get the MutatingWebhook linked to the operator
+func (env TestingEnvironment) GetCNPsMutatingWebhookConf() (
+	*admissionregistrationv1.MutatingWebhookConfiguration, error) {
+	ctx := context.Background()
+	return env.Interface.AdmissionregistrationV1().
+		MutatingWebhookConfigurations().
+		Get(ctx, controller.MutatingWebhookConfigurationName, metav1.GetOptions{})
+}

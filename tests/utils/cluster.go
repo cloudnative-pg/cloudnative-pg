@@ -7,7 +7,17 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package utils
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+
+	corev1 "k8s.io/api/core/v1"
+
+	"k8s.io/apimachinery/pkg/types"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 )
@@ -94,4 +104,113 @@ func ClusterHasAnnotations(
 		}
 	}
 	return true
+}
+
+// DumpClusterEnv logs the JSON for the a cluster in a namespace, its pods and endpoints
+func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName string, filename string) {
+	f, err := os.Create(filepath.Clean(filename))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	w := bufio.NewWriter(f)
+	cluster, _ := env.GetCluster(namespace, clusterName)
+
+	out, _ := json.MarshalIndent(cluster, "", "    ")
+	_, _ = fmt.Fprintf(w, "Dumping %v/%v cluster\n", namespace, clusterName)
+	_, _ = fmt.Fprintln(w, string(out))
+
+	podList, _ := env.GetPodList(namespace)
+	for _, pod := range podList.Items {
+		out, _ := json.MarshalIndent(pod, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
+
+	pvcList, _ := env.GetPVCList(namespace)
+	for _, pvc := range pvcList.Items {
+		out, _ := json.MarshalIndent(pvc, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v PVC\n", namespace, pvc.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
+
+	jobList, _ := env.GetJobList(namespace)
+	for _, job := range jobList.Items {
+		out, _ := json.MarshalIndent(job, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v job\n", namespace, job.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
+
+	eventList, _ := env.GetEventList(namespace)
+	out, _ = json.MarshalIndent(eventList.Items, "", "    ")
+	_, _ = fmt.Fprintf(w, "Dumping events for namespace %v\n", namespace)
+	_, _ = fmt.Fprintln(w, string(out))
+
+	serviceAccountList, _ := env.GetServiceAccountList(namespace)
+	for _, sa := range serviceAccountList.Items {
+		out, _ := json.MarshalIndent(sa, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v serviceaccount\n", namespace, sa.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
+
+	suffixes := []string{"-r", "-rw", "-any"}
+	for _, suffix := range suffixes {
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName + suffix,
+		}
+		endpoint := &corev1.Endpoints{}
+		_ = env.Client.Get(env.Ctx, namespacedName, endpoint)
+		out, _ := json.MarshalIndent(endpoint, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
+	err = w.Flush()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	_ = f.Sync()
+	_ = f.Close()
+}
+
+// GetCluster gets a cluster given name and namespace
+func (env TestingEnvironment) GetCluster(namespace string, name string) (*v1.Cluster, error) {
+	namespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}
+	cluster := &v1.Cluster{}
+	err := env.Client.Get(env.Ctx, namespacedName, cluster)
+	if err != nil {
+		return nil, err
+	}
+	return cluster, nil
+}
+
+// GetClusterPodList gathers the current list of pods for a cluster in a namespace
+func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName string) (*corev1.PodList, error) {
+	podList := &corev1.PodList{}
+	err := env.Client.List(
+		env.Ctx, podList, client.InNamespace(namespace),
+		client.MatchingLabels{"postgresql": clusterName},
+	)
+	return podList, err
+}
+
+// GetClusterPrimary gets the primary pod of a cluster
+func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName string) (*corev1.Pod, error) {
+	podList := &corev1.PodList{}
+	err := env.Client.List(
+		env.Ctx, podList, client.InNamespace(namespace),
+		client.MatchingLabels{"postgresql": clusterName, "role": "primary"},
+	)
+	if err != nil {
+		return &corev1.Pod{}, err
+	}
+	if len(podList.Items) > 0 {
+		return &(podList.Items[0]), nil
+	}
+	err = fmt.Errorf("no primary found")
+	return &corev1.Pod{}, err
 }
