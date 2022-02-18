@@ -923,13 +923,21 @@ type DataBackupConfiguration struct {
 }
 
 // S3Credentials is the type for the credentials to be used to upload
-// files to S3
+// files to S3. It can be provided in two alternative ways:
+//
+// - explicitly passing accessKeyId and secretAccessKey
+//
+// - inheriting the role from the pod environment by setting inheritFromIAMRole to true
 type S3Credentials struct {
 	// The reference to the access key id
-	AccessKeyIDReference SecretKeySelector `json:"accessKeyId"`
+	AccessKeyIDReference *SecretKeySelector `json:"accessKeyId,omitempty"`
 
 	// The reference to the secret access key
-	SecretAccessKeyReference SecretKeySelector `json:"secretAccessKey"`
+	SecretAccessKeyReference *SecretKeySelector `json:"secretAccessKey,omitempty"`
+
+	// Use the role based authentication without providing explicitly the keys.
+	// +optional
+	InheritFromIAMRole bool `json:"inheritFromIAMRole"`
 }
 
 // AzureCredentials is the type for the credentials to be used to upload

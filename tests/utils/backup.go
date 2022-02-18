@@ -242,13 +242,13 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 							Key: "ca.crt",
 						},
 						S3Credentials: &apiv1.S3Credentials{
-							AccessKeyIDReference: apiv1.SecretKeySelector{
+							AccessKeyIDReference: &apiv1.SecretKeySelector{
 								LocalObjectReference: apiv1.LocalObjectReference{
 									Name: "backup-storage-creds",
 								},
 								Key: "ID",
 							},
-							SecretAccessKeyReference: apiv1.SecretKeySelector{
+							SecretAccessKeyReference: &apiv1.SecretKeySelector{
 								LocalObjectReference: apiv1.LocalObjectReference{
 									Name: "backup-storage-creds",
 								},

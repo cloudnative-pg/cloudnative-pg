@@ -249,8 +249,15 @@ func s3CredentialsSecrets(s3Credentials *apiv1.S3Credentials) []string {
 		return nil
 	}
 
-	return []string{
-		s3Credentials.SecretAccessKeyReference.Name,
-		s3Credentials.AccessKeyIDReference.Name,
+	var secrets []string
+
+	if s3Credentials.AccessKeyIDReference != nil {
+		secrets = append(secrets, s3Credentials.AccessKeyIDReference.Name)
 	}
+
+	if s3Credentials.SecretAccessKeyReference != nil {
+		secrets = append(secrets, s3Credentials.SecretAccessKeyReference.Name)
+	}
+
+	return secrets
 }
