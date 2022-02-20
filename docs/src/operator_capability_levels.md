@@ -55,7 +55,7 @@ The operator is designed to support any operand container image with
 PostgreSQL inside.
 By default, the operator uses the latest available minor
 version of the latest stable major version supported by the PostgreSQL
-Community and published on Quay.io by EnterpriseDB.
+Community and published on Quay.io by EDB.
 You can use any compatible image of PostgreSQL supporting the
 primary/standby architecture directly by setting the `imageName`
 attribute in the CR. The operator also supports `imagePullSecrets`
