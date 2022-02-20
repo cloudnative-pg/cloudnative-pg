@@ -5,7 +5,7 @@ PostgreSQL can face on a Kubernetes cluster during its lifetime.
 
 !!! Important
     In case the failure scenario you are experiencing is not covered by this
-    section, please immediately contact EnterpriseDB for support and assistance.
+    section, please immediately contact EDB for support and assistance.
 
 !!! Seealso "Postgres instance manager"
     Please refer to the ["Postgres instance manager" section](instance_manager.md)
@@ -136,7 +136,7 @@ to solve the problem manually.
 
 !!! Important
     In such cases, please do not perform any manual operation without the
-    support and assistance of EnterpriseDB engineering team.
+    support and assistance of EDB engineering team.
 
 From version 1.11.0 of the operator, you can use the
 `k8s.enterprisedb.io/reconciliationLoop` annotation to temporarily disable the

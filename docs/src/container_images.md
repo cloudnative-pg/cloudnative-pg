@@ -29,7 +29,7 @@ Native PostgreSQL overrides it with its instance manager.
     in a **Primary with multiple/optional Hot Standby Servers Architecture**
     only.
 
-EnterpriseDB provides and supports public container images for Cloud Native
+EDB provides and supports public container images for Cloud Native
 PostgreSQL and publishes them on
 [Quay.io](https://quay.io/repository/enterprisedb/postgresql).
 

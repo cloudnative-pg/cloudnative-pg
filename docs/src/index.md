@@ -1,7 +1,7 @@
 # Cloud Native PostgreSQL
 
 **Cloud Native PostgreSQL** is an [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
-designed by [EnterpriseDB](https://www.enterprisedb.com)
+designed by [EDB](https://www.enterprisedb.com)
 to manage [PostgreSQL](https://www.postgresql.org/) workloads on any supported [Kubernetes](https://kubernetes.io)
 cluster running in private, public, hybrid, or multi-cloud environments.
 Cloud Native PostgreSQL adheres to DevOps principles and concepts
@@ -16,13 +16,13 @@ Applications that reside in the same Kubernetes cluster can access the
 PostgreSQL database using a service which is solely managed by the operator,
 without having to worry about changes of the primary role following a failover
 or a switchover. Applications that reside outside the Kubernetes cluster, need
-to configure an Ingress object to expose the service via TCP.
+to configure a Service or Ingress object to expose the Postgres via TCP.
 Web applications can take advantage of the native connection pooler based on PgBouncer.
 
 Cloud Native PostgreSQL works with PostgreSQL and is available under the
-[EnterpriseDB Limited Use License](https://www.enterprisedb.com/limited-use-license).
+[EDB Limited Use License](https://www.enterprisedb.com/limited-use-license).
 
-!!! Important
+!!! Note
     Based on the [Operator Capability Levels model](operator_capability_levels.md),
     users can expect a **"Level V - Auto Pilot"** set of capabilities from the
     Cloud Native PostgreSQL Operator.
