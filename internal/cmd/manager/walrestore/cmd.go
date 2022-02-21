@@ -147,9 +147,12 @@ func run(ctx context.Context, podName string, args []string) error {
 		return nil
 	}
 
-	// Step 2: return error if the end-of-wal-stream flag is set
-	if err := checkEndOfWALStreamFlag(walRestorer); err != nil {
-		return err
+	// Step 2: return error if the end-of-wal-stream flag is set.
+	// We skip this step if streaming connection is not available
+	if isStreamingAvailable(cluster, podName) {
+		if err := checkEndOfWALStreamFlag(walRestorer); err != nil {
+			return err
+		}
 	}
 
 	// Step 3: gather the WAL files names to restore. If the required file isn't a regular WAL, we download it directly.
@@ -180,8 +183,9 @@ func run(ctx context.Context, podName string, args []string) error {
 	}
 
 	// Step 5: set end-of-wal-stream flag if any download job returned file-not-found
+	// We skip this step if streaming connection is not available
 	endOfWALStream := isEndOfWALStream(walStatus)
-	if endOfWALStream {
+	if isStreamingAvailable(cluster, podName) && endOfWALStream {
 		contextLog.Info(
 			"Set end-of-wal-stream flag as one of the WAL files to be prefetched was not found")
 
@@ -363,4 +367,31 @@ func barmanCloudWalRestoreOptions(
 		configuration.DestinationPath,
 		serverName)
 	return options, nil
+}
+
+// isStreamingAvailable checks if this pod can replicate via streaming connection
+func isStreamingAvailable(cluster *apiv1.Cluster, podName string) bool {
+	if cluster == nil {
+		return false
+	}
+
+	// Easy case: If this pod is a replica, the streaming is always available
+	if cluster.Status.CurrentPrimary != podName {
+		return true
+	}
+
+	// Designated primary in a replica cluster: return true if the external cluster has streaming connection
+	if cluster.IsReplica() {
+		externalCluster, found := cluster.ExternalCluster(cluster.Spec.ReplicaCluster.Source)
+
+		// This is a configuration error
+		if !found {
+			return false
+		}
+
+		return externalCluster.ConnectionParameters != nil
+	}
+
+	// Primary, we do not replicate from nobody
+	return false
 }
