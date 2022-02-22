@@ -1508,7 +1508,6 @@ spec:
                   and digests for deterministic and repeatable deployments (`<image>:<tag>@sha256:<digestValue>`)
                 type: string
               imagePullPolicy:
-                default: IfNotPresent
                 description: 'Image pull policy. One of `Always`, `Never` or `IfNotPresent`.
                   If not defined, it defaults to `IfNotPresent`. Cannot be updated.
                   More info: https://kubernetes.io/docs/concepts/containers/images#updating-images'
