@@ -109,7 +109,6 @@ type ClusterSpec struct {
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
 	// +optional
-	// +kubebuilder:default:=IfNotPresent
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// The UID of the `postgres` user inside the image, defaults to `26`
