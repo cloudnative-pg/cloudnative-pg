@@ -9,14 +9,17 @@ package run
 
 import (
 	"context"
-	"errors"
 	"os"
-	"os/exec"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
-	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
@@ -27,6 +30,13 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
+
+var scheme = runtime.NewScheme()
+
+func init() {
+	_ = clientgoscheme.AddToScheme(scheme)
+	_ = apiv1.AddToScheme(scheme)
+}
 
 // NewCmd creates the "instance run" subcommand
 func NewCmd() *cobra.Command {
@@ -63,115 +73,86 @@ func NewCmd() *cobra.Command {
 
 func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	var err error
+	setupLog := log.WithName("setup")
 
-	log.Info("Starting Cloud Native PostgreSQL Instance Manager",
+	setupLog.Info("Starting Cloud Native PostgreSQL Instance Manager",
 		"version", versions.Version,
 		"build", versions.Info)
 
-	reconciler, err := controller.NewInstanceReconciler(instance)
+	mgr, err := ctrl.NewManager(config.GetConfigOrDie(), ctrl.Options{
+		Scheme:    scheme,
+		Namespace: instance.Namespace,
+		NewCache: cache.BuilderWithOptions(cache.Options{
+			SelectorsByObject: cache.SelectorsByObject{
+				&apiv1.Cluster{}: {
+					Field: fields.OneTermEqualSelector("metadata.name", instance.ClusterName),
+				},
+			},
+		}),
+		// We don't need a cache for secrets and configmap, as all reloads
+		// should be driven by changes in the Cluster we are watching
+		ClientDisableCacheFor: []client.Object{
+			&corev1.Secret{},
+			&corev1.ConfigMap{},
+		},
+		MetricsBindAddress: "0", // TODO: merge metrics to the manager one
+	})
 	if err != nil {
-		log.Error(err, "Error while creating reconciler")
-		return err
-	}
-	var cluster apiv1.Cluster
-	err = reconciler.GetClient().Get(ctx,
-		ctrl.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName},
-		&cluster)
-	if err != nil {
-		log.Error(err, "Error while getting cluster")
-		return err
-	}
-
-	err = reconciler.UpdateCacheFromCluster(ctx, &cluster)
-	if err != nil {
-		log.Error(err, "Error while initializing cache")
-		return err
-	}
-
-	_, err = instance.RefreshConfigurationFilesFromCluster(&cluster)
-	if err != nil {
-		log.Error(err, "Error while writing the bootstrap configuration")
+		setupLog.Error(err, "unable to set up overall controller manager")
 		return err
 	}
 
+	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient())
+	err = ctrl.NewControllerManagedBy(mgr).
+		For(&apiv1.Cluster{}).
+		Complete(reconciler)
+	if err != nil {
+		setupLog.Error(err, "unable to create controller")
+		return err
+	}
+
+	instanceRunnable := NewInstanceRunnable(ctx, instance, reconciler.GetInitialized())
+	err = mgr.Add(instanceRunnable)
+	if err != nil {
+		setupLog.Error(err, "unable to create instance runnable")
+		return err
+	}
+
+	// TODO move to separate runnable
 	if err = logpipe.Start(); err != nil {
 		log.Error(err, "Error while starting the logging collector routine")
 		return err
 	}
 
+	// TODO move to separate runnable
 	if err = startWebServer(instance); err != nil {
 		log.Error(err, "Error while starting the web server")
 		return err
 	}
 
-	_, err = reconciler.RefreshServerCertificateFiles(ctx, &cluster)
-	if err != nil {
-		log.Error(err, "Error while writing the TLS server certificates")
+	setupLog.Info("starting manager")
+	if err := mgr.Start(instanceRunnable.setupSignalHandler()); err != nil {
+		setupLog.Error(err, "unable to run manager")
 		return err
 	}
 
-	_, err = reconciler.RefreshReplicationUserCertificate(ctx, &cluster)
+	setupLog.Info("Shutting down the metrics server")
+	err = metricsserver.Shutdown()
 	if err != nil {
-		log.Error(err, "Error while writing the TLS server certificates")
-		return err
+		setupLog.Error(err, "Error while shutting down the metrics server")
+	} else {
+		setupLog.Info("Metrics server shut down")
 	}
 
-	_, err = reconciler.RefreshClientCA(ctx, &cluster)
+	setupLog.Info("Shutting down web server")
+	err = webserver.Shutdown()
 	if err != nil {
-		log.Error(err, "Error while writing the TLS CA Client certificates")
-		return err
+		setupLog.Error(err, "Error while shutting down the web server")
+	} else {
+		setupLog.Info("Web server shut down")
 	}
 
-	_, err = reconciler.RefreshServerCA(ctx, &cluster)
-	if err != nil {
-		log.Error(err, "Error while writing the TLS CA Server certificates")
-		return err
-	}
-
-	err = reconciler.VerifyPgDataCoherence(ctx, &cluster)
-	if err != nil {
-		log.Error(err, "Error while checking Kubernetes cluster status")
-		return err
-	}
-
-	primary, err := instance.IsPrimary()
-	if err != nil {
-		log.Error(err, "Error while getting the primary status")
-		return err
-	}
-
-	if !primary {
-		err = reconciler.RefreshReplicaConfiguration(ctx)
-		if err != nil {
-			log.Error(err, "Error while creating the replica configuration")
-			return err
-		}
-	}
-
-	startReconciler(ctx, reconciler)
-
-	instance.LogPgControldata()
-
-	streamingCmd, err := instance.Run()
-	if err != nil {
-		log.Error(err, "Unable to start PostgreSQL up")
-		return err
-	}
-
-	registerSignalHandler(reconciler, cluster.GetMaxStopDelay())
-
-	if err = streamingCmd.Wait(); err != nil {
-		var exitError *exec.ExitError
-		if !errors.As(err, &exitError) {
-			log.Error(err, "Error waiting on PostgreSQL process")
-		} else {
-			log.Error(exitError, "PostgreSQL process exited with errors")
-		}
-	}
-
-	instance.LogPgControldata()
-
-	return err
+	return nil
 }
 
 // startWebServer start the web server for handling probes given
@@ -204,70 +185,4 @@ func startWebServer(instance *postgres.Instance) error {
 	}()
 
 	return nil
-}
-
-// startReconciler start the reconciliation loop
-func startReconciler(ctx context.Context, reconciler *controller.InstanceReconciler) {
-	go reconciler.Run(ctx)
-}
-
-// registerSignalHandler handles signals from k8s, notifying postgres as
-// needed
-func registerSignalHandler(reconciler *controller.InstanceReconciler, maxStopDelay int32) {
-	// We need to shut down the postmaster in a certain time (dictated by `cluster.GetMaxStopDelay()`).
-	// For half of this time, we are waiting for connections to go down, the other half
-	// we just handle the shutdown procedure itself.
-	smartShutdownTimeout := int(maxStopDelay) / 2
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		var err error
-
-		sig := <-signals
-		log.Info("Received termination signal", "signal", sig)
-
-		log.Info("Shutting down the metrics server")
-		err = metricsserver.Shutdown()
-		if err != nil {
-			log.Error(err, "Error while shutting down the metrics server")
-		} else {
-			log.Info("Metrics server shut down")
-		}
-
-		log.Info("Shutting down controller")
-		reconciler.Stop()
-
-		log.Info("Requesting smart shutdown of the PostgreSQL instance")
-		err = reconciler.Instance().Shutdown(postgres.ShutdownOptions{
-			Mode:    postgres.ShutdownModeSmart,
-			Wait:    true,
-			Timeout: &smartShutdownTimeout,
-		})
-		if err != nil {
-			log.Warning("Error while handling the smart shutdown request: requiring fast shutdown",
-				"err", err)
-			err = reconciler.Instance().Shutdown(postgres.ShutdownOptions{
-				Mode: postgres.ShutdownModeFast,
-				Wait: true,
-			})
-		}
-		if err != nil {
-			log.Error(err, "Error while shutting down the PostgreSQL instance")
-		} else {
-			log.Info("PostgreSQL instance shut down")
-		}
-
-		// We can't shut down the web server before shutting down PostgreSQL.
-		// PostgreSQL need it because the wal-archive process need to be able
-		// to his job doing the PostgreSQL shut down.
-		log.Info("Shutting down web server")
-		err = webserver.Shutdown()
-		if err != nil {
-			log.Error(err, "Error while shutting down the web server")
-		} else {
-			log.Info("Web server shut down")
-		}
-	}()
 }
