@@ -36,9 +36,7 @@ func Start() error {
 		record:          NewPgAuditLoggingDecorator(),
 		fieldsValidator: LogFieldValidator,
 	}
-	if err := p.start(); err != nil {
-		return err
-	}
+	p.start()
 
 	textLogging := newRawLogFile(filepath.Join(postgres.LogPath, postgres.LogFileName), LoggingCollectorRecordName)
 	if err := textLogging.start(); err != nil {

@@ -952,13 +952,14 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, err
 	}
 
-	if err = r.setPrimaryInstance(ctx, cluster, fmt.Sprintf("%v-%v", cluster.Name, nodeSerial)); err != nil {
+	podName := fmt.Sprintf("%v-%v", cluster.Name, nodeSerial)
+	if err = r.setPrimaryInstance(ctx, cluster, podName); err != nil {
 		contextLogger.Error(err, "Unable to set the primary instance name")
 		return ctrl.Result{}, err
 	}
 
 	err = r.RegisterPhase(ctx, cluster, apiv1.PhaseFirstPrimary,
-		fmt.Sprintf("Creating primary instance %v", job.Name))
+		fmt.Sprintf("Creating primary instance %v", podName))
 	if err != nil {
 		return ctrl.Result{}, err
 	}

@@ -10,29 +10,15 @@ import (
 	"context"
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/external"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
 
-// RefreshReplicaConfiguration gets the latest cluster status from Kubernetes and then
-// writes the correct replication configuration
-func (r *InstanceReconciler) RefreshReplicaConfiguration(ctx context.Context) error {
-	var cluster apiv1.Cluster
-	err := r.client.Get(ctx, client.ObjectKey{Namespace: r.instance.Namespace, Name: r.instance.ClusterName}, &cluster)
-	if err != nil {
-		return err
-	}
-
-	_, err = r.WriteReplicaConfiguration(ctx, &cluster)
-	return err
-}
-
-// WriteReplicaConfiguration writes the PostgreSQL replica configuration for connecting to the
-// right primary server, depending on the cluster replica mode
-func (r *InstanceReconciler) WriteReplicaConfiguration(
+// refreshReplicaConfiguration writes the PostgreSQL correct
+// replication configuration for connecting to the right primary server,
+// depending on the cluster replica mode
+func (r *InstanceReconciler) refreshReplicaConfiguration(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (changed bool, err error) {

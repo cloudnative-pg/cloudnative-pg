@@ -16,6 +16,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 )
@@ -69,9 +70,15 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		return err
 	}
 
+	client, err := management.NewControllerRuntimeClient()
+	if err != nil {
+		log.Error(err, "Error creating Kubernetes client")
+		return err
+	}
+
 	// Let's download the crypto material from the cluster
 	// secrets.
-	reconciler, err := controller.NewInstanceReconciler(instance)
+	reconciler := controller.NewInstanceReconciler(instance, client)
 	if err != nil {
 		log.Error(err, "Error creating reconciler to download certificates")
 		return err
@@ -86,23 +93,7 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		return err
 	}
 
-	_, err = reconciler.RefreshReplicationUserCertificate(ctx, &cluster)
-	if err != nil {
-		log.Error(err, "Error while writing the TLS server certificates")
-		return err
-	}
-
-	_, err = reconciler.RefreshClientCA(ctx, &cluster)
-	if err != nil {
-		log.Error(err, "Error while writing the TLS Client CA certificates")
-		return err
-	}
-
-	_, err = reconciler.RefreshServerCA(ctx, &cluster)
-	if err != nil {
-		log.Error(err, "Error while writing the TLS Server CA certificates")
-		return err
-	}
+	reconciler.RefreshSecrets(ctx, &cluster)
 
 	err = info.Join()
 	if err != nil {

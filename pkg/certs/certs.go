@@ -125,7 +125,7 @@ func (pair KeyPair) IsValid(caPair *KeyPair, opts *x509.VerifyOptions) error {
 	opts.Roots = roots
 
 	if _, err = serverCert.Verify(*opts); err != nil {
-		return fmt.Errorf("failed to verify certificate: %s", err)
+		return fmt.Errorf("failed to verify certificate: %w", err)
 	}
 	return nil
 }

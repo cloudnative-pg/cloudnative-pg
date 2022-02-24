@@ -36,11 +36,15 @@ var (
 )
 
 func isServerHealthy(w http.ResponseWriter, r *http.Request) {
-	err := instance.IsServerHealthy()
-	if err != nil {
-		log.Info("Liveness probe failing", "err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	// If `pg_rewind` is running the Pod is starting up.
+	// We need to report it healthy to avoid being killed by the kubelet.
+	if !instance.PgRewindIsRunning {
+		err := instance.IsServerHealthy()
+		if err != nil {
+			log.Info("Liveness probe failing", "err", err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	log.Trace("Liveness probe succeeding")
