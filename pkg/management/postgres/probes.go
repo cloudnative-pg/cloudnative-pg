@@ -26,12 +26,6 @@ import (
 
 // IsServerHealthy check if the instance is healthy
 func (instance *Instance) IsServerHealthy() error {
-	// If `pg_rewind` is running the Pod is starting up.
-	// We need to report it healthy to avoid being killed by the kubelet.
-	if instance.PgRewindIsRunning {
-		return nil
-	}
-
 	err := instance.PgIsReady()
 
 	// A healthy server can also be actively rejecting connections.

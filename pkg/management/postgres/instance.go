@@ -143,6 +143,9 @@ type Instance struct {
 
 	// PgRewindIsRunning tells if there is a `pg_rewind` process running
 	PgRewindIsRunning bool
+
+	// MaxStopDelay is the current MaxStopDelay of the cluster
+	MaxStopDelay int32
 }
 
 // NewInstance creates a new Instance object setting the defaults

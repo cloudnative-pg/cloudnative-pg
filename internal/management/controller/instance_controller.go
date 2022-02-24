@@ -20,10 +20,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/controllers"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walrestore"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
@@ -53,64 +54,196 @@ var RetryUntilWalReceiverDown = wait.Backoff{
 }
 
 // Reconcile is the main reconciliation loop for the instance
-func (r *InstanceReconciler) Reconcile(ctx context.Context, event *watch.Event) error {
+func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	// set up a convenient contextLog object so we don't have to type request over and over again
 	contextLogger, ctx := log.SetupLogger(ctx)
-	contextLogger.Debug(
-		"Reconciliation loop",
-		"eventType", event.Type,
-		"type", event.Object.GetObjectKind().GroupVersionKind())
+	result := reconcile.Result{}
 
-	if event.Type == watch.Deleted {
-		// The cluster has been deleted.
-		// We just need to wait for this instance manager to be terminated
-		return nil
+	// Fetch the Cluster from the cache
+	cluster, err := r.GetCluster(ctx)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// The cluster has been deleted.
+			// We just need to wait for this instance manager to be terminated
+			contextLogger.Debug("Could not find Cluster")
+			return result, nil
+		}
+
+		return result, fmt.Errorf("could not fetch Cluster: %w", err)
 	}
 
-	if event.Type == watch.Error {
-		// We can't decode the cluster anymore. This may happen because
-		// the cluster is being deleted while we are watching it.
-		// Nothing to do here beside waiting for another loop
-		return nil
-	}
-
-	cluster, ok := event.Object.(*apiv1.Cluster)
-	if !ok {
-		return fmt.Errorf("error decoding cluster resource")
-	}
-
-	r.reconcileMetrics(cluster)
-
-	// Reconcile monitoring section
-	r.reconcileMonitoringQueries(ctx, cluster)
-
-	// Reconcile replica role
-	if err := r.reconcileClusterRole(ctx, event, cluster); err != nil {
-		return err
-	}
-
-	// Reconcile PostgreSQL configuration
-	if err := r.reconcileConfiguration(ctx, cluster); err != nil {
-		return fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
-	}
-
-	if err := r.reconcileDatabases(ctx, cluster); err != nil {
-		return fmt.Errorf("cannot reconcile database configurations: %w", err)
-	}
+	// Print the Cluster
+	contextLogger.Debug("Reconciling Cluster", "cluster", cluster)
 
 	// Reconcile PostgreSQL instance parameters
 	r.reconcileInstance(cluster)
 
-	err := r.UpdateCacheFromCluster(ctx, cluster)
-	if err != nil {
-		return fmt.Errorf("cannot update the cache: %w", err)
+	// Refresh the cache
+	r.updateCacheFromCluster(ctx, cluster)
+
+	// Reconcile monitoring section
+	exporter := metricsserver.GetExporter()
+	if exporter != nil {
+		r.reconcileMetrics(cluster)
+		r.reconcileMonitoringQueries(ctx, cluster)
+	} else {
+		result.RequeueAfter = 1 * time.Second
 	}
 
 	// Reconcile secrets and cryptographic material
-	return r.reconcileSecrets(ctx, cluster)
+	// This doesn't need the PG connection, but it needs to reload it in case of changes
+	reloadNeeded := r.RefreshSecrets(ctx, cluster)
+
+	// Reconcile PostgreSQL configuration
+	// This doesn't need the PG connection, but it needs to reload it in case of changes
+	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(cluster)
+	if err != nil {
+		return result, err
+	}
+	reloadNeeded = reloadNeeded || reloadConfig
+
+	reloadReplicaConfig, err := r.refreshReplicaConfiguration(ctx, cluster)
+	if err != nil {
+		return result, err
+	}
+	reloadNeeded = reloadNeeded || reloadReplicaConfig
+
+	// here we execute initialization tasks that need to be executed only verifiedPrimaryPgDataCoherence successfully
+	if !r.verifiedPrimaryPgDataCoherence.Load() {
+		if err = r.verifyPgDataCoherenceForPrimary(ctx, cluster); err != nil {
+			return handleErrNextLoop(err, result)
+		}
+		r.verifiedPrimaryPgDataCoherence.Store(true)
+	}
+
+	// Reconcile cluster role without DB
+	reloadClusterRoleConfig, err := r.reconcileClusterRoleWithoutDB(ctx, cluster)
+	if err != nil {
+		return reconcile.Result{RequeueAfter: time.Second}, err
+	}
+	reloadNeeded = reloadNeeded || reloadClusterRoleConfig
+
+	r.systemInitialization.Broadcast()
+
+	err = r.instance.IsServerHealthy()
+	if err != nil {
+		return reconcile.Result{RequeueAfter: time.Second}, nil
+	}
+
+	restarted, err := r.reconcileOldPrimary(ctx, cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	err = r.IsDBUp(ctx)
+	if err != nil {
+		return reconcile.Result{RequeueAfter: time.Second}, nil
+	}
+
+	// from now on the database can be assumed as running
+
+	if reloadNeeded && !restarted {
+		contextLogger.Info("reloading the instance")
+		err = r.instance.Reload()
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("while reloading the instance: %w", err)
+		}
+		if err := r.waitForConfigurationReload(ctx, cluster); err != nil {
+			return reconcile.Result{}, fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
+		}
+	}
+
+	err = r.refreshCredentialsFromSecret(ctx, cluster)
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("while updating database owner password: %w", err)
+	}
+
+	if err := r.reconcileDatabases(ctx, cluster); err != nil {
+		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
+	}
+
+	return result, nil
 }
 
-// UpdateCacheFromCluster refreshes the reconciler internal cache using the provided cluster
-func (r *InstanceReconciler) UpdateCacheFromCluster(ctx context.Context, cluster *apiv1.Cluster) error {
+func handleErrNextLoop(err error, result reconcile.Result) (reconcile.Result, error) {
+	if errors.Is(err, controllers.ErrNextLoop) {
+		return reconcile.Result{RequeueAfter: time.Second}, nil
+	}
+	return result, err
+}
+
+// reconcileOldPrimary shuts down the instance in case it is an old primary
+func (r *InstanceReconciler) reconcileOldPrimary(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (restarted bool, err error) {
+	contextLogger := log.FromContext(ctx)
+	// db needed
+	if cluster.Status.TargetPrimary == r.instance.PodName {
+		if !cluster.IsReplica() {
+			return r.reconcilePrimary(ctx, cluster)
+		}
+		return false, nil
+	}
+
+	isPrimary, err := r.instance.IsPrimary()
+	if err != nil || !isPrimary {
+		return false, err
+	}
+
+	contextLogger.Info("This is an old primary node. Requesting a checkpoint before demotion")
+
+	db, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		contextLogger.Error(err, "Cannot connect to primary server")
+	} else {
+		_, err = db.Exec("CHECKPOINT")
+		if err != nil {
+			contextLogger.Error(err, "Error while requesting a checkpoint")
+		}
+	}
+
+	contextLogger.Info("This is an old primary node. Shutting it down to get it demoted to a replica")
+
+	// Here we need to invoke a fast shutdown on the instance, and wait the pod
+	// restart to demote as a replica of the new primary
+	timeout := int(cluster.GetMaxSwitchoverDelay())
+	err = r.instance.Shutdown(postgresManagement.ShutdownOptions{
+		Mode:    postgresManagement.ShutdownModeFast,
+		Wait:    true,
+		Timeout: &timeout,
+	})
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
+			"exitCode", exitError.ExitCode())
+		err = r.instance.Shutdown(postgresManagement.ShutdownOptions{
+			Mode: postgresManagement.ShutdownModeImmediate,
+			Wait: true,
+		})
+	}
+
+	return true, err
+}
+
+// IsDBUp checks whether the superuserdb is reachable and returns an error if that's not the case
+func (r *InstanceReconciler) IsDBUp(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+	db, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		contextLogger.Warning(fmt.Sprintf("while getting a connection to the instance: %s", err))
+		return err
+	}
+
+	if err := db.Ping(); err != nil {
+		contextLogger.Info("DB not available, will retry", "err", err)
+		return err
+	}
+	return nil
+}
+
+// updateCacheFromCluster refreshes the reconciler internal cache using the provided cluster
+func (r *InstanceReconciler) updateCacheFromCluster(ctx context.Context, cluster *apiv1.Cluster) {
 	cache.Store(cache.ClusterKey, cluster)
 
 	// Populate the cache with the backup configuration
@@ -134,11 +267,11 @@ func (r *InstanceReconciler) UpdateCacheFromCluster(ctx context.Context, cluster
 	_, env, barmanConfiguration, err := walrestore.GetRecoverConfiguration(cluster, r.instance.PodName)
 	if errors.Is(err, walrestore.ErrNoBackupConfigured) {
 		cache.Delete(cache.WALRestoreKey)
-		return nil
+		return
 	}
 	if err != nil {
 		log.Error(err, "while getting recover configuration")
-		return nil
+		return
 	}
 	env = append(env, os.Environ()...)
 
@@ -153,8 +286,6 @@ func (r *InstanceReconciler) UpdateCacheFromCluster(ctx context.Context, cluster
 		log.Error(err, "while getting recover credentials")
 	}
 	cache.Store(cache.WALRestoreKey, envRestore)
-
-	return nil
 }
 
 // reconcileDatabases reconciles all the existing databases
@@ -347,31 +478,31 @@ func (r *InstanceReconciler) reconcilePoolers(
 	return nil
 }
 
-// reconcileClusterRole applies the role written in the cluster status to this instance
-func (r *InstanceReconciler) reconcileClusterRole(
-	ctx context.Context, event *watch.Event, cluster *apiv1.Cluster) error {
+// reconcileClusterRoleWithoutDB updates this instance's configuration files
+// according to the role written in the cluster status
+func (r *InstanceReconciler) reconcileClusterRoleWithoutDB(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (changed bool, err error) {
+	isPrimary, err := r.instance.IsPrimary()
+	if err != nil {
+		return false, err
+	}
 	// Reconcile replica role
 	if cluster.Status.TargetPrimary != r.instance.PodName {
-		return r.reconcileReplica(ctx, cluster)
+		if !isPrimary {
+			// We need to ensure that this instance is replicating from the correct server
+			return r.refreshReplicaConfiguration(ctx, cluster)
+		}
+		return false, nil
 	}
 
 	// Reconcile designated primary role
 	if cluster.IsReplica() {
 		return r.reconcileDesignatedPrimary(ctx, cluster)
 	}
-
 	// This is a primary server
-	err := r.reconcilePrimary(ctx, cluster)
-	if err != nil {
-		return err
-	}
-
-	// Apply all the settings required by the operator
-	if event.Type == watch.Added {
-		return r.configureInstancePermissions()
-	}
-
-	return nil
+	return false, nil
 }
 
 // reconcileMetrics updates any required metrics
@@ -479,93 +610,91 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	metricsserver.GetExporter().SetCustomQueries(queriesCollector)
 }
 
-// reconcileSecret is called when the PostgreSQL secrets are changes
-func (r *InstanceReconciler) reconcileSecrets(
+// RefreshSecrets is called when the PostgreSQL secrets are changed
+// and will refresh the contents of the file inside the Pod, without
+// reloading the actual PostgreSQL instance.
+//
+// It returns a boolean flag telling if something changed. Usually
+// the invoker will check that flag and reload the PostgreSQL
+// instance it is up.
+//
+// This function manages its own errors by logging them, so the
+// user cannot easily tell if the operation has been done completely.
+// The rationale behind this is:
+//
+// 1. when invoked at the startup of the instance manager, PostgreSQL
+//    is not up. If this raise an error, then PostgreSQL won't
+//    be able to start correctly (TLS certs are missing, i.e.),
+//    making no difference between returning an error or not
+//
+// 2. when invoked inside the reconciliation loop, if the operation
+//    raise an error, it's pointless to retry. The only way to recover
+//    from such an error is wait for the CNP operator to refresh the
+//    resource version of the secrets to be used, and in that case a
+//    reconciliation loop will be started again.
+func (r *InstanceReconciler) RefreshSecrets(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-) error {
+) bool {
 	contextLogger := log.FromContext(ctx)
 
 	changed := false
 
-	serverSecretChanged, err := r.RefreshServerCertificateFiles(ctx, cluster)
+	serverSecretChanged, err := r.refreshServerCertificateFiles(ctx, cluster)
 	if err == nil {
 		changed = changed || serverSecretChanged
 	} else if !apierrors.IsNotFound(err) {
 		contextLogger.Error(err, "Error while getting server secret")
 	}
 
-	replicationSecretChanged, err := r.RefreshReplicationUserCertificate(ctx, cluster)
+	replicationSecretChanged, err := r.refreshReplicationUserCertificate(ctx, cluster)
 	if err == nil {
 		changed = changed || replicationSecretChanged
 	} else if !apierrors.IsNotFound(err) {
 		contextLogger.Error(err, "Error while getting streaming replication secret")
 	}
 
-	clientCaSecretChanged, err := r.RefreshClientCA(ctx, cluster)
+	clientCaSecretChanged, err := r.refreshClientCA(ctx, cluster)
 	if err == nil {
 		changed = changed || clientCaSecretChanged
 	} else if !apierrors.IsNotFound(err) {
 		contextLogger.Error(err, "Error while getting cluster CA Client secret")
 	}
 
-	serverCaSecretChanged, err := r.RefreshServerCA(ctx, cluster)
+	serverCaSecretChanged, err := r.refreshServerCA(ctx, cluster)
 	if err == nil {
 		changed = changed || serverCaSecretChanged
 	} else if !apierrors.IsNotFound(err) {
 		contextLogger.Error(err, "Error while getting cluster CA Server secret")
 	}
 
-	barmanEndpointCaSecretChanged, err := r.RefreshBarmanEndpointCA(ctx, cluster)
+	barmanEndpointCaSecretChanged, err := r.refreshBarmanEndpointCA(ctx, cluster)
 	if err == nil {
 		changed = changed || barmanEndpointCaSecretChanged
 	} else if !apierrors.IsNotFound(err) {
 		contextLogger.Error(err, "Error while getting barman endpoint CA secret")
 	}
 
-	if changed {
-		contextLogger.Info("reloading the TLS crypto material")
-		err = r.instance.Reload()
-		if err != nil {
-			return fmt.Errorf("while applying new certificates: %w", err)
-		}
-	}
-
-	err = r.refreshCredentialsFromSecret(ctx, cluster)
-	if err != nil {
-		return fmt.Errorf("while updating database owner password: %w", err)
-	}
-
-	return nil
+	return changed
 }
 
 // reconcileInstance sets PostgreSQL instance parameters to current values
 func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.PgCtlTimeoutForPromotion = cluster.GetPgCtlTimeoutForPromotion()
+	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
 }
 
-// reconcileConfiguration reconcile the PostgreSQL configuration from
-// the cluster object to the instance
-func (r *InstanceReconciler) reconcileConfiguration(ctx context.Context, cluster *apiv1.Cluster) error {
-	changed, err := r.instance.RefreshConfigurationFilesFromCluster(cluster)
-	if err != nil {
-		return err
-	}
-
-	if !changed {
-		return nil
-	}
-
+// waitForConfigurationReload waits for the db to be up and
+// the new configuration to be reloaded
+func (r *InstanceReconciler) waitForConfigurationReload(ctx context.Context, cluster *apiv1.Cluster) error {
 	// This function could also be called while the server is being
 	// started up, so we are not sure that the server is really active.
 	// Let's wait for that.
-	err = r.instance.WaitForSuperuserConnectionAvailable()
-	if err != nil {
-		return fmt.Errorf("while applying new configuration: %w", err)
+	if r.instance.ConfigSha256 == "" {
+		return nil
 	}
 
-	// Ok, now we're ready to SIGHUP this server
-	err = r.instance.Reload()
+	err := r.instance.WaitForSuperuserConnectionAvailable()
 	if err != nil {
 		return fmt.Errorf("while applying new configuration: %w", err)
 	}
@@ -699,31 +828,21 @@ func (r *InstanceReconciler) refreshFileFromSecret(
 }
 
 // Reconciler primary logic
-func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (restarted bool, err error) {
 	contextLogger := log.FromContext(ctx)
 	oldCluster := cluster.DeepCopy()
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	// If I'm not the primary, let's promote myself
 	if !isPrimary {
-		contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
-		if r.instance.PodName != cluster.Status.CurrentPrimary {
-			// if the cluster is not replicating it means it's doing a failover and
-			// we have to wait for wal receivers to be down
-			err = r.waitForWalReceiverDown()
-			if err != nil {
-				return err
-			}
-		}
-		contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
-		// I must promote my instance here
-		err = r.instance.PromoteAndWait()
+		// If I'm not the primary, let's promote myself
+		err := r.promoteAndWait(ctx, cluster)
 		if err != nil {
-			return fmt.Errorf("error promoting instance: %w", err)
+			return false, err
 		}
+		restarted = true
 	}
 
 	// If it is already the current primary, everything is ok
@@ -731,22 +850,47 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		cluster.Status.CurrentPrimary = r.instance.PodName
 		cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
 		contextLogger.Info("Setting myself as the current primary")
-		return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
+		return restarted, r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 	}
 
+	return restarted, nil
+}
+
+func (r *InstanceReconciler) promoteAndWait(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
+	if r.instance.PodName != cluster.Status.CurrentPrimary {
+		// if the cluster is not replicating it means it's doing a failover and
+		// we have to wait for wal receivers to be down
+		err := r.waitForWalReceiverDown()
+		if err != nil {
+			return err
+		}
+	}
+
+	contextLogger.Info("I'm the target primary, applying WALs and promoting my instance")
+	// I must promote my instance here
+	err := r.instance.PromoteAndWait()
+	if err != nil {
+		return fmt.Errorf("error promoting instance: %w", err)
+	}
 	return nil
 }
 
 // Reconciler designated primary logic for replica clusters
-func (r *InstanceReconciler) reconcileDesignatedPrimary(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) reconcileDesignatedPrimary(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (changed bool, err error) {
 	// If I'm already the current designated primary everything is ok.
 	if cluster.Status.CurrentPrimary == r.instance.PodName {
-		return nil
+		return false, nil
 	}
 
 	// We need to ensure that this instance is replicating from the correct server
-	if err := r.refreshParentServer(ctx, cluster); err != nil {
-		return err
+	changed, err = r.refreshReplicaConfiguration(ctx, cluster)
+	if err != nil {
+		return changed, err
 	}
 
 	// I'm the primary, need to inform the operator
@@ -755,74 +899,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(ctx context.Context, clu
 	oldCluster := cluster.DeepCopy()
 	cluster.Status.CurrentPrimary = r.instance.PodName
 	cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
-	return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
-}
-
-// Reconciler replica logic
-func (r *InstanceReconciler) reconcileReplica(ctx context.Context, cluster *apiv1.Cluster) error {
-	contextLogger := log.FromContext(ctx)
-
-	isPrimary, err := r.instance.IsPrimary()
-	if err != nil {
-		return err
-	}
-
-	if !isPrimary {
-		// We need to ensure that this instance is replicating from the correct server
-		return r.refreshParentServer(ctx, cluster)
-	}
-
-	contextLogger.Info("This is an old primary node. Requesting a checkpoint before demotion")
-
-	db, err := r.instance.GetSuperUserDB()
-	if err != nil {
-		contextLogger.Error(err, "Cannot connect to primary server")
-	} else {
-		_, err = db.Exec("CHECKPOINT")
-		if err != nil {
-			contextLogger.Error(err, "Error while requesting a checkpoint")
-		}
-	}
-
-	contextLogger.Info("This is an old primary node. Shutting it down to get it demoted to a replica")
-
-	// Here we need to invoke a fast shutdown on the instance, and wait the pod
-	// restart to demote as a replica of the new primary
-	timeout := int(cluster.GetMaxSwitchoverDelay())
-	err = r.instance.Shutdown(postgresManagement.ShutdownOptions{
-		Mode:    postgresManagement.ShutdownModeFast,
-		Wait:    true,
-		Timeout: &timeout,
-	})
-	var exitError *exec.ExitError
-	if errors.As(err, &exitError) {
-		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
-			"exitCode", exitError.ExitCode())
-		err = r.instance.Shutdown(postgresManagement.ShutdownOptions{
-			Mode: postgresManagement.ShutdownModeImmediate,
-			Wait: true,
-		})
-	}
-
-	return err
-}
-
-// refreshParentServer will ensure that this replica instance is actually replicating from the correct
-// parent server, which is the external cluster for the designated primary and the designated primary
-// for the replicas
-func (r *InstanceReconciler) refreshParentServer(ctx context.Context, cluster *apiv1.Cluster) error {
-	// Let's update the replication configuration
-	changed, err := r.WriteReplicaConfiguration(ctx, cluster)
-	if err != nil {
-		return err
-	}
-
-	// Reload the replication configuration if configuration is changed
-	if changed {
-		return r.instance.Reload()
-	}
-
-	return nil
+	return changed, r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 }
 
 // waitForWalReceiverDown wait until the wal receiver is down, and it's used
@@ -843,154 +920,6 @@ func (r *InstanceReconciler) waitForWalReceiverDown() error {
 		log.Info("WAL receiver is still active, waiting")
 		return false, nil
 	})
-}
-
-// configureInstancePermissions creates the expected users and databases in a new
-// PostgreSQL instance
-func (r *InstanceReconciler) configureInstancePermissions() error {
-	var err error
-
-	majorVersion, err := postgres.GetMajorVersion(r.instance.PgData)
-	if err != nil {
-		return fmt.Errorf("while getting major version: %w", err)
-	}
-
-	db, err := r.instance.GetSuperUserDB()
-	if err != nil {
-		return fmt.Errorf("while getting a connection to the instance: %w", err)
-	}
-
-	log.Debug("Verifying connection to DB")
-	err = r.instance.WaitForSuperuserConnectionAvailable()
-	if err != nil {
-		log.Error(err, "DB not available")
-		os.Exit(1)
-	}
-
-	log.Debug("Validating DB configuration")
-
-	// A transaction is required to temporarily disable synchronous replication
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("creating a new transaction to setup the instance: %w", err)
-	}
-
-	_, err = tx.Exec("SET LOCAL synchronous_commit TO LOCAL")
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-
-	hasSuperuser, err := r.configureStreamingReplicaUser(tx)
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-
-	err = r.configurePgRewindPrivileges(majorVersion, hasSuperuser, tx)
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-
-	return tx.Commit()
-}
-
-// configureStreamingReplicaUser makes sure the the streaming replication user exists
-// and has the required rights
-func (r *InstanceReconciler) configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
-	var hasLoginRight, hasReplicationRight, hasSuperuser bool
-	row := tx.QueryRow("SELECT rolcanlogin, rolreplication, rolsuper FROM pg_roles WHERE rolname = $1",
-		apiv1.StreamingReplicationUser)
-	err := row.Scan(&hasLoginRight, &hasReplicationRight, &hasSuperuser)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			_, err = tx.Exec(fmt.Sprintf(
-				"CREATE USER %v REPLICATION",
-				pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
-			if err != nil {
-				return false, fmt.Errorf("CREATE USER %v error: %w", apiv1.StreamingReplicationUser, err)
-			}
-		} else {
-			return false, fmt.Errorf("while creating streaming replication user: %w", err)
-		}
-	}
-
-	if !hasLoginRight || !hasReplicationRight {
-		_, err = tx.Exec(fmt.Sprintf(
-			"ALTER USER %v LOGIN REPLICATION",
-			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
-		if err != nil {
-			return false, fmt.Errorf("ALTER USER %v error: %w", apiv1.StreamingReplicationUser, err)
-		}
-	}
-	return hasSuperuser, nil
-}
-
-// configurePgRewindPrivileges ensures that the StreamingReplicationUser has enough rights to execute pg_rewind
-func (r *InstanceReconciler) configurePgRewindPrivileges(majorVersion int, hasSuperuser bool, tx *sql.Tx) error {
-	// We need the superuser bit for the streaming-replication user since pg_rewind in PostgreSQL <= 10
-	// will require it.
-	if majorVersion <= 10 {
-		if !hasSuperuser {
-			_, err := tx.Exec(fmt.Sprintf(
-				"ALTER USER %v SUPERUSER",
-				pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
-			if err != nil {
-				return fmt.Errorf("ALTER USER %v error: %w", apiv1.StreamingReplicationUser, err)
-			}
-		}
-		return nil
-	}
-
-	// Ensure the user has rights to execute the functions needed for pg_rewind
-	var hasPgRewindPrivileges bool
-	row := tx.QueryRow(
-		`
-			SELECT has_function_privilege($1, 'pg_ls_dir(text, boolean, boolean)', 'execute') AND
-			       has_function_privilege($2, 'pg_stat_file(text, boolean)', 'execute') AND
-			       has_function_privilege($3, 'pg_read_binary_file(text)', 'execute') AND
-			       has_function_privilege($4, 'pg_read_binary_file(text, bigint, bigint, boolean)', 'execute')`,
-		apiv1.StreamingReplicationUser,
-		apiv1.StreamingReplicationUser,
-		apiv1.StreamingReplicationUser,
-		apiv1.StreamingReplicationUser)
-	err := row.Scan(&hasPgRewindPrivileges)
-	if err != nil {
-		return fmt.Errorf("while getting streaming replication user privileges: %w", err)
-	}
-
-	if !hasPgRewindPrivileges {
-		_, err = tx.Exec(fmt.Sprintf(
-			"GRANT EXECUTE ON function pg_catalog.pg_ls_dir(text, boolean, boolean) TO %v",
-			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
-		if err != nil {
-			return fmt.Errorf("while granting pgrewind privileges: %w", err)
-		}
-
-		_, err = tx.Exec(fmt.Sprintf(
-			"GRANT EXECUTE ON function pg_catalog.pg_stat_file(text, boolean) TO %v",
-			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
-		if err != nil {
-			return fmt.Errorf("while granting pgrewind privileges: %w", err)
-		}
-
-		_, err = tx.Exec(fmt.Sprintf(
-			"GRANT EXECUTE ON function pg_catalog.pg_read_binary_file(text) TO %v",
-			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
-		if err != nil {
-			return fmt.Errorf("while granting pgrewind privileges: %w", err)
-		}
-
-		_, err = tx.Exec(fmt.Sprintf(
-			"GRANT EXECUTE ON function pg_catalog.pg_read_binary_file(text, bigint, bigint, boolean) TO %v",
-			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
-		if err != nil {
-			return fmt.Errorf("while granting pgrewind privileges: %w", err)
-		}
-	}
-
-	return nil
 }
 
 // refreshCredentialsFromSecret updates the PostgreSQL users credentials

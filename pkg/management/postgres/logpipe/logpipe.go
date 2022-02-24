@@ -60,7 +60,7 @@ type FieldsValidator func(int) *ErrFieldCountExtended
 // from a process logging in CSV to a file and redirecting its content to stdout in JSON format.
 // The goroutine is started just once for a given file.
 // All successive calls, that are referencing the same filename, will just check its existence
-func (p *logPipe) start() error {
+func (p *logPipe) start() {
 	_, alreadyStarted := consumedLogFiles.LoadOrStore(p.fileName, true)
 
 	if !alreadyStarted {
@@ -94,8 +94,6 @@ func (p *logPipe) start() error {
 			}
 		}()
 	}
-
-	return nil
 }
 
 // collectLogsFromFile opens (blocking) the FIFO file, then starts reading the csv file line by line
