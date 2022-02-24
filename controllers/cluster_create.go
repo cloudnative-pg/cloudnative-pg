@@ -422,16 +422,15 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 		return nil
 	}
 
-	generatedServiceAccount, err := r.generateServiceAccountForCluster(cluster, generatedPullSecretNames)
+	origSa := sa.DeepCopy()
+	err = specs.UpdateServiceAccount(generatedPullSecretNames, &sa)
 	if err != nil {
-		return fmt.Errorf("while generating service accouynt: %w", err)
+		return fmt.Errorf("while generating service account: %w", err)
 	}
 
 	r.Recorder.Event(cluster, "Normal", "UpdatingServiceAccount", "Updating ServiceAccount")
-	patchedServiceAccount := sa
-	patchedServiceAccount.Annotations = generatedServiceAccount.Annotations
-	patchedServiceAccount.ImagePullSecrets = generatedServiceAccount.ImagePullSecrets
-	if err := r.Patch(ctx, &patchedServiceAccount, client.MergeFrom(&sa)); err != nil {
+	SetClusterOwnerAnnotationsAndLabels(&sa.ObjectMeta, cluster)
+	if err := r.Patch(ctx, &sa, client.MergeFrom(origSa)); err != nil {
 		return fmt.Errorf("while patching service account: %w", err)
 	}
 
@@ -445,29 +444,24 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 		return fmt.Errorf("while generating pull secret names: %w", err)
 	}
 
-	serviceAccount, err := r.generateServiceAccountForCluster(cluster, generatedPullSecretNames)
+	serviceAccount := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name,
+		},
+	}
+	err = specs.UpdateServiceAccount(generatedPullSecretNames, serviceAccount)
 	if err != nil {
 		return fmt.Errorf("while creating new ServiceAccount: %w", err)
 	}
 
+	SetClusterOwnerAnnotationsAndLabels(&serviceAccount.ObjectMeta, cluster)
 	err = r.Create(ctx, serviceAccount)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
 		return err
 	}
 
 	return nil
-}
-
-// generateServiceAccountForCluster creates a serviceAccount entity for the cluster
-func (r *ClusterReconciler) generateServiceAccountForCluster(
-	cluster *apiv1.Cluster, pullSecretNames []string) (*corev1.ServiceAccount, error) {
-	serviceAccount, err := specs.CreateServiceAccount(cluster.ObjectMeta, pullSecretNames)
-	if err != nil {
-		return nil, err
-	}
-	SetClusterOwnerAnnotationsAndLabels(&serviceAccount.ObjectMeta, cluster)
-
-	return serviceAccount, nil
 }
 
 // generateServiceAccountPullSecretsNames extracts the list of pull secret names given

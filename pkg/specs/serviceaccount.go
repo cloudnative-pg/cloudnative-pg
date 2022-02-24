@@ -11,7 +11,6 @@ import (
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -20,34 +19,41 @@ const (
 	OperatorManagedSecretsName = "k8s.enterprisedb.io/managedSecrets" // #nosec
 )
 
-// CreateServiceAccount create the ServiceAccount that will be used in every Pod
-func CreateServiceAccount(cluster metav1.ObjectMeta, imagePullSecretsNames []string) (*corev1.ServiceAccount, error) {
-	imagePullSecrets := make([]corev1.LocalObjectReference, len(imagePullSecretsNames))
-
-	for idx, name := range imagePullSecretsNames {
-		imagePullSecrets[idx] = corev1.LocalObjectReference{Name: name}
+// UpdateServiceAccount sets the needed values in the ServiceAccount that will be used in every Pod
+func UpdateServiceAccount(imagePullSecretsNames []string, serviceAccount *corev1.ServiceAccount) error {
+	if serviceAccount.ImagePullSecrets == nil {
+		serviceAccount.ImagePullSecrets = []corev1.LocalObjectReference{}
 	}
+
+	var newReferences []corev1.LocalObjectReference
+	for _, name := range imagePullSecretsNames {
+		found := false
+		for _, existing := range serviceAccount.ImagePullSecrets {
+			if name == existing.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			newReferences = append(newReferences, corev1.LocalObjectReference{Name: name})
+		}
+	}
+	serviceAccount.ImagePullSecrets = append(serviceAccount.ImagePullSecrets, newReferences...)
 
 	annotationValue, err := CreateManagedSecretsAnnotationValue(imagePullSecretsNames)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	serviceAccount := corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Name,
-			Annotations: map[string]string{
-				OperatorManagedSecretsName: annotationValue,
-			},
-		},
-		ImagePullSecrets: imagePullSecrets,
+	if serviceAccount.Annotations == nil {
+		serviceAccount.Annotations = map[string]string{}
 	}
+	serviceAccount.Annotations[OperatorManagedSecretsName] = annotationValue
 
-	return &serviceAccount, nil
+	return nil
 }
 
-// CreateManagedSecretsAnnotationValue create the value of the annotations that stores
+// CreateManagedSecretsAnnotationValue creates the value of the annotations that stores
 // the names of the secrets managed by the operator inside a ServiceAccount
 func CreateManagedSecretsAnnotationValue(imagePullSecretsNames []string) (string, error) {
 	result, err := json.Marshal(imagePullSecretsNames)
@@ -58,7 +64,7 @@ func CreateManagedSecretsAnnotationValue(imagePullSecretsNames []string) (string
 	return string(result), nil
 }
 
-// IsServiceAccountAligned compare the given list of pull secrets with the
+// IsServiceAccountAligned compares the given list of pull secrets with the
 // ones managed by the operator inside the given ServiceAccount and returns
 // true when everything is aligned
 func IsServiceAccountAligned(sa *corev1.ServiceAccount, imagePullSecretsNames []string) (bool, error) {
