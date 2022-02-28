@@ -10,18 +10,21 @@ import (
 	"fmt"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configfile"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // buildPrimaryConnInfo builds the connection string to connect to primaryHostname
 func buildPrimaryConnInfo(primaryHostname, applicationName string) string {
-	primaryConnInfo := fmt.Sprintf("host=%v ", primaryHostname) +
-		fmt.Sprintf("user=%v ", apiv1.StreamingReplicationUser) +
-		fmt.Sprintf("port=%v ", GetServerPort()) +
-		fmt.Sprintf("sslkey=%v ", postgres.StreamingReplicaKeyLocation) +
-		fmt.Sprintf("sslcert=%v ", postgres.StreamingReplicaCertificateLocation) +
-		fmt.Sprintf("sslrootcert=%v ", postgres.ServerCACertificateLocation) +
-		fmt.Sprintf("application_name=%v ", applicationName) +
-		"sslmode=verify-ca"
-	return primaryConnInfo
+	primaryConnInfoParameters := map[string]string{
+		"host":             primaryHostname,
+		"user":             apiv1.StreamingReplicationUser,
+		"port":             fmt.Sprintf("%d", GetServerPort()),
+		"sslkey":           postgres.StreamingReplicaKeyLocation,
+		"sslcert":          postgres.StreamingReplicaCertificateLocation,
+		"sslrootcert":      postgres.ServerCACertificateLocation,
+		"application_name": applicationName,
+		"sslmode":          "verify-ca",
+	}
+	return configfile.CreateConnectionString(primaryConnInfoParameters)
 }

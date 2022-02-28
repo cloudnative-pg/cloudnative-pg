@@ -8,6 +8,7 @@ package configfile
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/lib/pq"
@@ -18,8 +19,15 @@ import (
 func CreateConnectionString(parameters map[string]string) string {
 	wr := strings.Builder{}
 
-	for key, value := range parameters {
-		wr.WriteString(escapeConnectionStringParameter(key, value))
+	keys := make([]string, 0, len(parameters))
+	for k := range parameters {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		wr.WriteString(escapeConnectionStringParameter(key, parameters[key]))
 		wr.WriteString(" ")
 	}
 
