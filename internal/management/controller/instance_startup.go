@@ -204,6 +204,12 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 			return err
 		}
 
+		// Clean up any stale pid file before executing pg_rewind
+		err = r.instance.CleanUpStalePid()
+		if err != nil {
+			return err
+		}
+
 		// pg_rewind could require a clean shutdown of the old primary to
 		// work. Unfortunately, if the old primary is already clean starting
 		// it up may make it advance in respect to the new one.
