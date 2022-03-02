@@ -60,7 +60,7 @@ jobs:
       go-code-changed: ${{ steps.filter.outputs.go-code-changed }}
     steps:
     - name: Checkout
-      uses: actions/checkout@v2.3.5
+      uses: actions/checkout@v3
 
     - name: Check for changes
       uses: dorny/paths-filter@v2.10.2
@@ -114,7 +114,7 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
       -
         name: Checkout code
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       -
         name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -136,7 +136,7 @@ jobs:
         SHELLCHECK_OPTS: -a -S style
     steps:
     -
-      uses: actions/checkout@v2.3.5
+      uses: actions/checkout@v3
     -
       name: Run ShellCheck
       uses: ludeeus/action-shellcheck@1.1.0
@@ -165,7 +165,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       -
         name: Install Go
         uses: actions/setup-go@v2
@@ -193,7 +193,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2.3.5
+      uses: actions/checkout@v3
 
     - name: Install Go
       uses: actions/setup-go@v2.1.3
@@ -222,7 +222,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
 
       - name: Install Go
         uses: actions/setup-go@v2.1.3
@@ -278,7 +278,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
@@ -450,7 +450,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       -
         id: generate-jobs
         name: Generate Jobs
@@ -541,7 +541,7 @@ jobs:
           echo "-----------------------------------------------------"
       -
         name: Checkout code
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       -
         name: Install Go
         uses: actions/setup-go@v2.1.3
@@ -669,7 +669,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       -
         name: Install Go
         uses: actions/setup-go@v2.1.3
@@ -909,7 +909,7 @@ jobs:
           echo "CLUSTER_NAME=cnp-test-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       -
         name: Install Go
         uses: actions/setup-go@v2.1.3
@@ -1136,7 +1136,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       -
         name: Install Go
         uses: actions/setup-go@v2.1.3
@@ -1334,7 +1334,7 @@ jobs:
           echo "TF_VAR_cluster_name=cnp-test-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )" >> $GITHUB_ENV
       -
         name: Checkout code
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       -
         name: Install Go
         uses: actions/setup-go@v2
@@ -1523,7 +1523,7 @@ jobs:
     steps:
       -
         name: Checkout code
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       -
         name: Get PR number
         id: get_pr_number
@@ -1556,7 +1556,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v3
       - name: Get PR number
         id: get_pr_number
         env:
