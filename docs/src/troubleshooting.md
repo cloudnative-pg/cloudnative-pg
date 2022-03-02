@@ -88,7 +88,7 @@ kubectl describe pod -n postgresql-operator-system <POD>
 Then get the logs from the same pod by running:
 
 ```shell
-kubectl get logs -n postgresql-operator-system <POD>
+kubectl logs -n postgresql-operator-system <POD>
 ```
 
 ### Gather more information about the operator
