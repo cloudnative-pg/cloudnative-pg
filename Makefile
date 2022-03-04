@@ -22,7 +22,7 @@ LDFLAGS= "-X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildV
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/enterprisedb/postgresql:13
-KUSTOMIZE_VERSION ?= v4.3.0
+KUSTOMIZE_VERSION ?= v4.5.2
 KIND_CLUSTER_NAME ?= pg
 KIND_CLUSTER_VERSION ?= v1.23.1
 
@@ -179,35 +179,30 @@ apidoc: k8s-api-docgen ## Update the API Reference section of the documentation.
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0)
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0)
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@$(KUSTOMIZE_VERSION))
+	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@$(KUSTOMIZE_VERSION))
 
 K8S_API_DOCGEN = $(shell pwd)/bin/k8s-api-docgen
 k8s-api-docgen: ## Download k8s-api-docgen locally if necessary.
-	$(call go-get-tool,$(K8S_API_DOCGEN),github.com/EnterpriseDB/k8s-api-docgen/cmd/k8s-api-docgen)
+	$(call go-install-tool,$(K8S_API_DOCGEN),github.com/EnterpriseDB/k8s-api-docgen/cmd/k8s-api-docgen@latest)
 
 GO_LICENSES = $(shell pwd)/bin/go-licenses
 go-licenses: ## Download go-licenses locally if necessary.
-	$(call go-get-tool,$(GO_LICENSES),github.com/google/go-licenses)
+	$(call go-install-tool,$(GO_LICENSES),github.com/google/go-licenses@latest)
 
 GO_RELEASER = $(shell pwd)/bin/goreleaser
 go-releaser: ## Download go-releaser locally if necessary.
-	$(call go-get-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser)
+	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser@latest)
 
-
-# go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-define go-get-tool
+# go-install-tool will 'go install' any package $2 and install it to $1.
+define go-install-tool
 @[ -f $(1) ] || { \
 set -e ;\
-TMP_DIR=$$(mktemp -d) ;\
-cd $$TMP_DIR ;\
-go mod init tmp 2>/dev/null;\
 echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
-rm -rf $$TMP_DIR ;\
+GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
 }
 endef
