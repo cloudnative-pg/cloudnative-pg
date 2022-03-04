@@ -146,14 +146,15 @@ var _ = Describe("Disabling superuser password", func() {
 			}, 60).Should(Not(HaveOccurred()))
 
 			// Setting to false, now we should not have a secret or password
-			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			Eventually(func() error {
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
-				Expect(err).ToNot(HaveOccurred())
+				if err != nil {
+					return err
+				}
 				falseValue := false
 				cluster.Spec.EnableSuperuserAccess = &falseValue
 				return env.Client.Update(env.Ctx, cluster)
-			})
-			Expect(err).ToNot(HaveOccurred())
+			}, 60, 5).Should(BeNil())
 
 			Eventually(func() bool {
 				err = env.Client.Get(env.Ctx,
@@ -186,14 +187,15 @@ var _ = Describe("Disabling superuser password", func() {
 			}, 60).Should(Equal("t\n"))
 
 			// Setting to true, so we have a secret and a new password
-			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			Eventually(func() error {
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
-				Expect(err).ToNot(HaveOccurred())
+				if err != nil {
+					return err
+				}
 				trueValue := true
 				cluster.Spec.EnableSuperuserAccess = &trueValue
 				return env.Client.Update(env.Ctx, cluster)
-			})
-			Expect(err).ToNot(HaveOccurred())
+			}, 60, 5).Should(BeNil())
 
 			Eventually(func() error {
 				err = env.Client.Get(env.Ctx,
@@ -256,40 +258,46 @@ var _ = Describe("Creating a cluster without superuser password", func() {
 
 		By("enabling superuser access", func() {
 			// Setting to true, now we should have a secret with the password
-			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				err := env.Client.Get(env.Ctx, namespacedName, &cluster)
-				Expect(err).ToNot(HaveOccurred())
-				trueValue := true
-				cluster.Spec.EnableSuperuserAccess = &trueValue
-				return env.Client.Update(env.Ctx, &cluster)
-			})
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		By("waiting for the superuser secret to be created", func() {
 			Eventually(func() error {
-				err = env.Client.Get(env.Ctx,
-					client.ObjectKey{Namespace: namespace, Name: secretName},
-					&secret)
+				err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					err := env.Client.Get(env.Ctx, namespacedName, &cluster)
+					Expect(err).ToNot(HaveOccurred())
+					trueValue := true
+					cluster.Spec.EnableSuperuserAccess = &trueValue
+					err = env.Client.Update(env.Ctx, &cluster)
+					if err != nil {
+						return err
+					}
+					return nil
+				})
 				return err
-			}, 60).Should(Not(HaveOccurred()))
-		})
+			}, 60, 5).Should(BeNil())
 
-		By("verifying that the password is really set", func() {
-			// We test that the password is set in pod 1
-			pod, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			timeout := time.Second * 10
-			// We should have the `postgres` user with a null password
-			Eventually(func() string {
-				stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &timeout,
-					"psql", "-U", "postgres", "-tAc",
-					"SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres'")
-				if err != nil {
-					return ""
-				}
-				return stdout
-			}, 60).Should(Equal("f\n"))
+			By("waiting for the superuser secret to be created", func() {
+				Eventually(func() error {
+					err = env.Client.Get(env.Ctx,
+						client.ObjectKey{Namespace: namespace, Name: secretName},
+						&secret)
+					return err
+				}, 60).Should(Not(HaveOccurred()))
+			})
+
+			By("verifying that the password is really set", func() {
+				// We test that the password is set in pod 1
+				pod, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				timeout := time.Second * 10
+				// We should have the `postgres` user with a null password
+				Eventually(func() string {
+					stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &timeout,
+						"psql", "-U", "postgres", "-tAc",
+						"SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres'")
+					if err != nil {
+						return ""
+					}
+					return stdout
+				}, 60).Should(Equal("f\n"))
+			})
 		})
 	})
 })
