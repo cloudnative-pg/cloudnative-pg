@@ -85,11 +85,16 @@ var _ = Describe("Replica Mode", func() {
 				replicaClusterName, replicaClusterSampleBasicAuth, checkQuery)
 
 			By("disabling the replica mode", func() {
-				_, _, err = utils.Run(fmt.Sprintf(
-					"kubectl patch cluster %v -n %v  -p '{\"spec\":{\"replica\":{\"enabled\":false}}}'"+
-						" --type='merge'",
-					replicaClusterName, replicaNamespace))
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					_, _, err = utils.RunUnchecked(fmt.Sprintf(
+						"kubectl patch cluster %v -n %v  -p '{\"spec\":{\"replica\":{\"enabled\":false}}}'"+
+							" --type='merge'",
+						replicaClusterName, replicaNamespace))
+					if err != nil {
+						return err
+					}
+					return nil
+				}, 60, 5).Should(BeNil())
 			})
 
 			By("verifying write operation on the replica cluster primary pod", func() {

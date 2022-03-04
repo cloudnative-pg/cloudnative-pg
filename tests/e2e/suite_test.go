@@ -59,7 +59,7 @@ var _ = BeforeEach(func() {
 
 func TestE2ESuite(t *testing.T) {
 	RegisterFailHandler(Fail)
-	SetDefaultEventuallyPollingInterval(200 * time.Millisecond)
+	SetDefaultEventuallyPollingInterval(1 * time.Second)
 	RunSpecs(t, "Cloud Native PostgreSQL Operator E2E")
 }
 
