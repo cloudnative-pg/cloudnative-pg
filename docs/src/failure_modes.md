@@ -121,9 +121,9 @@ pod will be created from a backup of the current primary. The pod
 will be added again to the `-r` service and to the `-ro` service when ready.
 
 If the failed pod is the primary, the operator will promote the active pod
-with status ready and the lowest replication lag, then point the `-rw`service
+with status ready and the lowest replication lag, then point the `-rw` service
 to it. The failed pod will be removed from the `-r` service and from the
-`-ro` service.
+`-rw` service.
 Other standbys will start replicating from the new primary. The former
 primary will use `pg_rewind` to synchronize itself with the new one if its
 PVC is available; otherwise, a new standby will be created from a backup of the
