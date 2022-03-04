@@ -23,11 +23,13 @@ import (
 func ExecuteBackup(namespace string, backupFile string, env *TestingEnvironment) {
 	backupName, err := env.GetResourceNameFromYAML(backupFile)
 	Expect(err).ToNot(HaveOccurred())
-
-	_, _, err = Run(fmt.Sprintf(
-		"kubectl apply -n %v -f %v",
-		namespace, backupFile))
-	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() error {
+		_, _, err := RunUnchecked("kubectl apply -n " + namespace + " -f " + backupFile)
+		if err != nil {
+			return err
+		}
+		return nil
+	}, 60, 5).Should(BeNil())
 
 	// After a while the Backup should be completed
 	timeout := 180

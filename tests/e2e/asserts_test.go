@@ -154,7 +154,7 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 
 // AssertCreateCluster tests that the pods that should have been created by the sample
 // exist and are in ready state
-func AssertCreateCluster(namespace string, clusterName string, sample string, env *testsUtils.TestingEnvironment) {
+func AssertCreateCluster(namespace string, clusterName string, sampleFile string, env *testsUtils.TestingEnvironment) {
 	By(fmt.Sprintf("having a %v namespace", namespace), func() {
 		// Creating a namespace should be quick
 		timeout := 20
@@ -171,8 +171,7 @@ func AssertCreateCluster(namespace string, clusterName string, sample string, en
 	})
 
 	By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
-		_, _, err := testsUtils.Run("kubectl create -n " + namespace + " -f " + sample)
-		Expect(err).ToNot(HaveOccurred())
+		CreateResourceFromFile(namespace, sampleFile)
 	})
 	// Setting up a cluster with three pods is slow, usually 200-600s
 	AssertClusterIsReady(namespace, clusterName, 600, env)
@@ -581,11 +580,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string) {
 }
 
 func AssertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string, timeout int) {
-	_, _, err := testsUtils.Run(fmt.Sprintf(
-		"kubectl apply -n %v -f %v",
-		namespace, backupYAMLPath))
-	Expect(err).NotTo(HaveOccurred())
-
+	CreateResourceFromFile(namespace, backupYAMLPath)
 	scheduledBackupName, err := env.GetResourceNameFromYAML(backupYAMLPath)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -800,11 +795,8 @@ func AssertFastFailOver(
 		}, timeout).Should(BeEquivalentTo(namespace))
 	})
 
-	By(fmt.Sprintf("creating a Cluster in the %v namespace",
-		namespace), func() {
-		_, _, err = testsUtils.Run(
-			"kubectl create -n " + namespace + " -f " + sampleFile)
-		Expect(err).ToNot(HaveOccurred())
+	By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
+		CreateResourceFromFile(namespace, sampleFile)
 	})
 
 	By("having a Cluster with three instances ready", func() {
@@ -1131,11 +1123,7 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 	By("Async Replication into external cluster", func() {
 		restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
 		Expect(err).ToNot(HaveOccurred())
-		_, _, err = testsUtils.Run(fmt.Sprintf(
-			"kubectl apply -n %v -f %v",
-			namespace, restoreClusterFile))
-		Expect(err).ToNot(HaveOccurred())
-
+		CreateResourceFromFile(namespace, restoreClusterFile)
 		// We give more time than the usual 600s, since the recovery is slower
 		AssertClusterIsReady(namespace, restoredClusterName, 800, env)
 
@@ -1178,10 +1166,7 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
 	By("Restoring a backup in a new cluster", func() {
 		restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
 		Expect(err).ToNot(HaveOccurred())
-		_, _, err = testsUtils.Run(fmt.Sprintf(
-			"kubectl apply -n %v -f %v",
-			namespace, restoreClusterFile))
-		Expect(err).ToNot(HaveOccurred())
+		CreateResourceFromFile(namespace, restoreClusterFile)
 
 		// We give more time than the usual 600s, since the recovery is slower
 		AssertClusterIsReady(namespace, restoredClusterName, 800, env)
@@ -1208,10 +1193,7 @@ func AssertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupN
 	By("scheduling immediate backups", func() {
 		var err error
 		// Create the ScheduledBackup
-		_, _, err = testsUtils.Run(fmt.Sprintf(
-			"kubectl apply -n %v -f %v",
-			namespace, backupYAMLPath))
-		Expect(err).NotTo(HaveOccurred())
+		CreateResourceFromFile(namespace, backupYAMLPath)
 
 		// We expect the scheduled backup to be scheduled after creation
 		scheduledBackupNamespacedName := types.NamespacedName{
@@ -1242,10 +1224,15 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 	var err error
 	By("suspending the scheduled backup", func() {
 		// update suspend status to true
-		cmd := fmt.Sprintf("kubectl patch ScheduledBackup %v -n %v -p '{\"spec\":{\"suspend\":true}}' "+
-			"--type='merge'", scheduledBackupName, namespace)
-		_, _, err = testsUtils.Run(cmd)
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			cmd := fmt.Sprintf("kubectl patch ScheduledBackup %v -n %v -p '{\"spec\":{\"suspend\":true}}' "+
+				"--type='merge'", scheduledBackupName, namespace)
+			_, _, err = testsUtils.RunUnchecked(cmd)
+			if err != nil {
+				return err
+			}
+			return nil
+		}, 60, 5).Should(BeNil())
 		scheduledBackupNamespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      scheduledBackupName,
@@ -1285,11 +1272,15 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 		// take current backup count before suspend the schedule backup
 		completedBackupsCount, err = getScheduledBackupCompleteBackupsCount(namespace, scheduledBackupName)
 		Expect(err).ToNot(HaveOccurred())
-
-		cmd := fmt.Sprintf("kubectl patch ScheduledBackup %v -n %v -p '{\"spec\":{\"suspend\":false}}' "+
-			"--type='merge'", scheduledBackupName, namespace)
-		_, _, err = testsUtils.Run(cmd)
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			cmd := fmt.Sprintf("kubectl patch ScheduledBackup %v -n %v -p '{\"spec\":{\"suspend\":false}}' "+
+				"--type='merge'", scheduledBackupName, namespace)
+			_, _, err = testsUtils.RunUnchecked(cmd)
+			if err != nil {
+				return err
+			}
+			return nil
+		}, 60, 5).Should(BeNil())
 	})
 	By("verifying backup has resumed", func() {
 		Eventually(func() (int, error) {
@@ -1584,9 +1575,7 @@ func installAzCli(namespace string) {
 }
 
 func createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerYamlFilePath string, expectedInstanceCount int) {
-	_, _, err := testsUtils.Run("kubectl create -n " + namespace + " -f " + poolerYamlFilePath)
-	Expect(err).ToNot(HaveOccurred())
-
+	CreateResourceFromFile(namespace, poolerYamlFilePath)
 	Eventually(func() (int32, error) {
 		poolerName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
 		Expect(err).ToNot(HaveOccurred())
@@ -1836,9 +1825,14 @@ func OnlineResizePVC(namespace, clusterName string) {
 	})
 	By("expanding Cluster storage", func() {
 		// Patching cluster to expand storage size from 1Gi to 2Gi
-		_, _, err := testsUtils.Run("kubectl patch cluster " + clusterName + " -n " + namespace +
-			" -p '{\"spec\":{\"storage\":{\"size\":\"2Gi\"}}}' --type=merge")
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			_, _, err := testsUtils.RunUnchecked("kubectl patch cluster " + clusterName + " -n " + namespace +
+				" -p '{\"spec\":{\"storage\":{\"size\":\"2Gi\"}}}' --type=merge")
+			if err != nil {
+				return err
+			}
+			return nil
+		}, 60, 5).Should(BeNil())
 	})
 	By("verifying Cluster storage is expanded", func() {
 		// Gathering and verifying the new size of PVC after update on cluster
@@ -1873,9 +1867,14 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 	})
 	By("expanding Cluster storage", func() {
 		// Expanding cluster storage
-		_, _, err := testsUtils.Run("kubectl patch cluster " + clusterName + " -n " + namespace +
-			" -p '{\"spec\":{\"storage\":{\"size\":\"2Gi\"}}}' --type=merge")
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			_, _, err := testsUtils.RunUnchecked("kubectl patch cluster " + clusterName + " -n " + namespace +
+				" -p '{\"spec\":{\"storage\":{\"size\":\"2Gi\"}}}' --type=merge")
+			if err != nil {
+				return err
+			}
+			return nil
+		}, 60, 5).Should(BeNil())
 	})
 	By("deleting Pod and pPVC", func() {
 		// Gathering cluster primary
@@ -2003,4 +2002,14 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName strin
 			}
 		}
 	})
+}
+
+func CreateResourceFromFile(namespace, sampleFilePath string) {
+	Eventually(func() error {
+		_, _, err := testsUtils.RunUnchecked("kubectl apply -n " + namespace + " -f " + sampleFilePath)
+		if err != nil {
+			return err
+		}
+		return nil
+	}, 60, 5).Should(BeNil())
 }

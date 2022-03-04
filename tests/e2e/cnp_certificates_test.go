@@ -77,8 +77,7 @@ var _ = Describe("Certificates", func() {
 		})
 		AfterEach(func() {
 			// deleting root CA certificates
-			_, _, err := utils.Run(fmt.Sprintf("kubectl apply -n %v -f %v", namespace, sampleFile))
-			Expect(err).ToNot(HaveOccurred())
+			CreateResourceFromFile(namespace, sampleFile)
 		})
 
 		It("can authenticate using a Certificate that is generated from the 'kubectl-cnp' plugin", func() {
@@ -113,12 +112,17 @@ var _ = Describe("Certificates", func() {
 			)
 			// Updating defaults certificates entries with user provided certificates,
 			// i.e server CA and TLS secrets inside the cluster
-			_, _, err = utils.Run(fmt.Sprintf(
-				"kubectl patch cluster %v -n %v -p "+
-					"'{\"spec\":{\"certificates\":{\"serverCASecret\":\"%v\","+
-					"\"serverTLSSecret\":\"%v\"}}}'"+
-					" --type='merge'", clusterName, namespace, serverCASecretName, serverCertSecretName))
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				_, _, err = utils.RunUnchecked(fmt.Sprintf(
+					"kubectl patch cluster %v -n %v -p "+
+						"'{\"spec\":{\"certificates\":{\"serverCASecret\":\"%v\","+
+						"\"serverTLSSecret\":\"%v\"}}}'"+
+						" --type='merge'", clusterName, namespace, serverCASecretName, serverCertSecretName))
+				if err != nil {
+					return err
+				}
+				return nil
+			}, 60, 5).Should(BeNil())
 			Eventually(func() (bool, error) {
 				certUpdateStatus := false
 				cluster := &apiv1.Cluster{}
@@ -153,23 +157,28 @@ var _ = Describe("Certificates", func() {
 
 			// Updating defaults certificates entries with user provided certificates,
 			// i.e client CA and TLS secrets inside the cluster
-			_, _, err := utils.Run(fmt.Sprintf(
-				"kubectl patch cluster %v -n %v -p "+
-					"'{\"spec\":{\"certificates\":{\"clientCASecret\":\"%v\","+
-					"\"replicationTLSSecret\":\"%v\"}}}'"+
-					" --type='merge'", clusterName, namespace, clientCASecretName, replicaCertSecretName))
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				_, _, err := utils.RunUnchecked(fmt.Sprintf(
+					"kubectl patch cluster %v -n %v -p "+
+						"'{\"spec\":{\"certificates\":{\"clientCASecret\":\"%v\","+
+						"\"replicationTLSSecret\":\"%v\"}}}'"+
+						" --type='merge'", clusterName, namespace, clientCASecretName, replicaCertSecretName))
+				if err != nil {
+					return err
+				}
+				return nil
+			}, 60, 5).Should(BeNil())
 
 			Eventually(func() (bool, error) {
 				cluster := &apiv1.Cluster{}
-				err = env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)
+				err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)
 
 				return cluster.Spec.Certificates.ClientCASecret == clientCASecretName &&
 					cluster.Status.Certificates.ReplicationTLSSecret == replicaCertSecretName, err
 			}, 120, 5).Should(BeTrue())
 
 			pod := utils.DefaultWebapp(namespace, "app-pod-cert-3", defaultCASecretName, clientCertSecretName)
-			err = utils.PodCreateAndWaitForReady(env, &pod, 240)
+			err := utils.PodCreateAndWaitForReady(env, &pod, 240)
 			Expect(err).ToNot(HaveOccurred())
 			AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
 		})
@@ -177,24 +186,29 @@ var _ = Describe("Certificates", func() {
 		It("can connect after switching both server and client certificates to user-supplied mode", func() {
 			// Updating defaults certificates entries with user provided certificates,
 			// i.e server and client CA and TLS secrets inside the cluster
-			_, _, err := utils.Run(fmt.Sprintf(
-				"kubectl patch cluster %v -n %v -p "+
-					"'{\"spec\":{\"certificates\":{\"serverCASecret\":\"%v\","+
-					"\"serverTLSSecret\":\"%v\",\"clientCASecret\":\"%v\","+
-					"\"replicationTLSSecret\":\"%v\"}}}'"+
-					" --type='merge'",
-				clusterName,
-				namespace,
-				serverCASecretName,
-				serverCertSecretName,
-				clientCASecretName,
-				replicaCertSecretName,
-			))
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				_, _, err := utils.RunUnchecked(fmt.Sprintf(
+					"kubectl patch cluster %v -n %v -p "+
+						"'{\"spec\":{\"certificates\":{\"serverCASecret\":\"%v\","+
+						"\"serverTLSSecret\":\"%v\",\"clientCASecret\":\"%v\","+
+						"\"replicationTLSSecret\":\"%v\"}}}'"+
+						" --type='merge'",
+					clusterName,
+					namespace,
+					serverCASecretName,
+					serverCertSecretName,
+					clientCASecretName,
+					replicaCertSecretName,
+				))
+				if err != nil {
+					return err
+				}
+				return nil
+			}, 60, 5).Should(BeNil())
 
 			Eventually(func() (bool, error) {
 				cluster := &apiv1.Cluster{}
-				err = env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)
+				err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName}, cluster)
 
 				return cluster.Status.Certificates.ServerCASecret == serverCASecretName &&
 					cluster.Status.Certificates.ClientCASecret == clientCASecretName &&
@@ -203,7 +217,7 @@ var _ = Describe("Certificates", func() {
 			}, 120, 5).Should(BeTrue())
 
 			pod := utils.DefaultWebapp(namespace, "app-pod-cert-4", serverCASecretName, clientCertSecretName)
-			err = utils.PodCreateAndWaitForReady(env, &pod, 240)
+			err := utils.PodCreateAndWaitForReady(env, &pod, 240)
 			Expect(err).ToNot(HaveOccurred())
 			AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
 		})
