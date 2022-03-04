@@ -24,3 +24,4 @@ matrix:
             close: '(?P=open)'
           - open: '(?P<open><!--)'
             close: '(?P<close>-->)'
+    - pyspelling.filters.url:
