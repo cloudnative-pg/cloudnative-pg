@@ -90,9 +90,14 @@ var _ = Describe("Verify storage", func() {
 			By("update cluster for resizeInUseVolumes as false", func() {
 				// Updating cluster with 'resizeInUseVolumes' sets to 'false' in storage.
 				// Check if operator does not return error
-				_, _, err = utils.Run("kubectl patch cluster " + clusterName + " -n " + namespace +
-					" -p '{\"spec\":{\"storage\":{\"resizeInUseVolumes\":false}}}' --type=merge")
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					_, _, err = utils.RunUnchecked("kubectl patch cluster " + clusterName + " -n " + namespace +
+						" -p '{\"spec\":{\"storage\":{\"resizeInUseVolumes\":false}}}' --type=merge")
+					if err != nil {
+						return err
+					}
+					return nil
+				}, 60, 5).Should(BeNil())
 			})
 			OfflineResizePVC(namespace, clusterName, 600)
 		})

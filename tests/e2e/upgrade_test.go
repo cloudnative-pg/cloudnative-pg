@@ -408,10 +408,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		By("uploading a backup on minio", func() {
 			// We create a Backup
-			_, _, err := testsUtils.Run(fmt.Sprintf(
-				"kubectl apply -n %v -f %v",
-				upgradeNamespace, backupFile))
-			Expect(err).ToNot(HaveOccurred())
+			CreateResourceFromFile(upgradeNamespace, backupFile)
 		})
 
 		By("verifying that a backup has actually completed", func() {
@@ -439,10 +436,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		By("creating a ScheduledBackup", func() {
 			// We create a ScheduledBackup
-			_, _, err := testsUtils.Run(fmt.Sprintf(
-				"kubectl apply -n %v -f %v",
-				upgradeNamespace, scheduledBackupFile))
-			Expect(err).ToNot(HaveOccurred())
+			CreateResourceFromFile(upgradeNamespace, scheduledBackupFile)
 		})
 		AssertScheduledBackupsAreScheduled()
 
@@ -524,9 +518,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		AssertConfUpgrade(clusterName1, updateConfFile)
 
 		By("installing a second Cluster on the upgraded operator", func() {
-			_, _, err := testsUtils.Run(
-				"kubectl create -n " + upgradeNamespace + " -f " + sampleFile2)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				_, _, err := testsUtils.Run(
+					"kubectl create -n " + upgradeNamespace + " -f " + sampleFile2)
+				if err != nil {
+					return err
+				}
+				return nil
+			}, 60, 5).Should(BeNil())
 
 			AssertClusterIsReady(upgradeNamespace, clusterName2, 600, env)
 		})
@@ -537,11 +536,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// create a v1 cluster
 		By("restoring the backup taken from the first Cluster in a new cluster", func() {
 			restoredClusterName := "cluster-restore"
-			_, _, err := testsUtils.Run(fmt.Sprintf(
-				"kubectl apply -n %v -f %v",
-				upgradeNamespace, restoreFile))
-			Expect(err).ToNot(HaveOccurred())
-
+			CreateResourceFromFile(upgradeNamespace, restoreFile)
 			AssertClusterIsReady(upgradeNamespace, restoredClusterName, 800, env)
 
 			// Test data should be present on restored primary

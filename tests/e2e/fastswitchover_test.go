@@ -79,11 +79,8 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 				return namespaceResource.GetName(), err
 			}, timeout).Should(BeEquivalentTo(namespace))
 		})
-		By(fmt.Sprintf("creating a Cluster in the %v namespace",
-			namespace), func() {
-			_, _, err := utils.Run(
-				"kubectl create -n " + namespace + " -f " + sampleFile)
-			Expect(err).ToNot(HaveOccurred())
+		By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
+			CreateResourceFromFile(namespace, sampleFile)
 		})
 		By("having a Cluster with three instances ready", func() {
 			AssertClusterIsReady(namespace, clusterName, 600, env)

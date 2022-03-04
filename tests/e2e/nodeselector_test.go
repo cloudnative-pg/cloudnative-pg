@@ -63,8 +63,7 @@ var _ = Describe("nodeSelector", func() {
 			})
 
 			By(fmt.Sprintf("creating a cluster in the %v namespace", namespace), func() {
-				_, _, err := utils.Run("kubectl create -n " + namespace + " -f " + sampleFile)
-				Expect(err).ToNot(HaveOccurred())
+				CreateResourceFromFile(namespace, sampleFile)
 			})
 
 			// The cluster should be created but the pods shouldn't be scheduled

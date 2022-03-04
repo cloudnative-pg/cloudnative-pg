@@ -58,8 +58,7 @@ var _ = Describe("Configuration update", func() {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			// Update the configuration
-			_, _, err = utils.Run("kubectl apply -n " + namespace + " -f " + sample)
-			Expect(err).ToNot(HaveOccurred())
+			CreateResourceFromFile(namespace, sample)
 			timeout := 60
 			commandtimeout := time.Second * 2
 			// Check that the parameter has been modified in every pod
@@ -85,8 +84,7 @@ var _ = Describe("Configuration update", func() {
 				"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1")
 			Expect(err).To(HaveOccurred())
 			// Update the configuration
-			_, _, err = utils.Run("kubectl apply -n " + namespace + " -f " + sample)
-			Expect(err).ToNot(HaveOccurred())
+			CreateResourceFromFile(namespace, sample)
 			// The new pg_hba rule should be present in every pod
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
@@ -119,8 +117,7 @@ var _ = Describe("Configuration update", func() {
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
 			// Update the configuration
-			_, _, err = utils.Run("kubectl apply -n " + namespace + " -f " + sample)
-			Expect(err).ToNot(HaveOccurred())
+			CreateResourceFromFile(namespace, sample)
 			timeout := 300
 			commandtimeout := time.Second * 2
 			// Check that the new parameter has been modified in every pod
@@ -154,8 +151,7 @@ var _ = Describe("Configuration update", func() {
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 			oldPrimary := cluster.Status.CurrentPrimary
 			// Update the configuration
-			_, _, err = utils.Run("kubectl apply -n " + namespace + " -f " + sample)
-			Expect(err).ToNot(HaveOccurred())
+			CreateResourceFromFile(namespace, sample)
 			timeout := 300
 			commandtimeout := time.Second * 2
 			// Check that both parameters have been modified in each pod
