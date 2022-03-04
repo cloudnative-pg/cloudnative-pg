@@ -484,6 +484,7 @@ jobCount
 jq
 json
 jsonpath
+kbytes
 kms
 kube
 kubebuilder
@@ -679,6 +680,7 @@ secretName
 secretkeyselector
 securego
 securityContext
+seg
 serverCASecret
 serverName
 serverTLSSecret
