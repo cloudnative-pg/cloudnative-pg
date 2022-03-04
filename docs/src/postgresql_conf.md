@@ -182,6 +182,7 @@ As anticipated in the previous section, Cloud Native PostgreSQL automatically
 manages the content in `shared_preload_libraries` for some well-known and
 supported extensions. The current list includes:
 
+- `auto_explain`
 - `pg_stat_statements`
 - `pgaudit`
 
@@ -200,6 +201,30 @@ SELECT datname FROM pg_database WHERE datallowconn
 
 !!! Note
     The above query also includes template databases like `template1`.
+
+#### Enabling `auto_explain`
+
+The [`auto_explain`](https://www.postgresql.org/docs/current/auto-explain.html)
+extension provides a means for logging execution plans of slow statements
+automatically, without having to manually run `EXPLAIN` (helpful for tracking
+down un-optimized queries).
+
+You can enable `auto_explain` by adding to the configuration a parameter
+that starts with `auto_explain.` as in the following example excerpt (which
+automatically logs execution plans of queries that take longer than 10 seconds
+to complete):
+
+```yaml
+  # ...
+  postgresql:
+    parameters:
+      auto_explain.log_min_duration: "10s"
+  # ...
+```
+
+!!! Note
+    Enabling auto_explain can lead to performance issues. Please refer to [`the auto explain documentation`](https://www.postgresql.org/docs/current/auto-explain.html)
+
 
 #### Enabling `pg_stat_statements`
 
@@ -224,24 +249,25 @@ As explained previously, the operator will automatically add
 NOT EXISTS pg_stat_statements` on each database, enabling you to run queries
 against the `pg_stat_statements` view.
 
-#### Enabling `auto_explain`
+#### Enabling `pgaudit`
 
-The [`auto_explain`](https://www.postgresql.org/docs/current/auto-explain.html)
-extension provides a means for logging execution plans of slow statements
-automatically, without having to manually run `EXPLAIN` (helpful for tracking
-down un-optimized queries).
+The `pgaudit` extension provides detailed session and/or object audit logging via the standard PostgreSQL logging facility.
 
-You can enable `auto_explain` by adding to the configuration a parameter
-that starts with `auto_explain.` as in the following example excerpt (which
-automatically logs execution plans of queries that take longer than 10 seconds
-to complete):
+Cloud Native PostgreSQL has transparent and native support for
+[PGAudit](https://www.pgaudit.org/) on PostgreSQL clusters. For further information, please refer to the ["PGAudit" logs section.](logging.md#pgaudit-logs)
+
+You can enable `pgaudit` by adding to the configuration a parameter
+that starts with `pgaudit.` as in the following example excerpt:
 
 ```yaml
-  # ...
-  postgresql:
-    parameters:
-      auto_explain.log_min_duration: "10s"
-  # ...
+#
+postgresql:
+  parameters:
+    pgaudit.log: "all, -misc"
+    pgaudit.log_catalog: "off"
+    pgaudit.log_parameter: "on"
+    pgaudit.log_relation: "on"
+#
 ```
 
 ## The `pg_hba` section
