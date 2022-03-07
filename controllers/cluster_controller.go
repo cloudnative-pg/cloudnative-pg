@@ -633,7 +633,10 @@ func (r *ClusterReconciler) handleRollingUpdate(
 		if err := r.upgradeInstanceManager(ctx, cluster, &instancesStatus); err != nil {
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, ErrNextLoop
+		// Stop the reconciliation loop if upgradeInstanceManager initiated an upgrade
+		if cluster.Status.Phase == apiv1.PhaseOnlineUpgrading {
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, ErrNextLoop
+		}
 	}
 
 	return ctrl.Result{}, nil
