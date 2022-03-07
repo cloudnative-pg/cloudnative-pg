@@ -332,9 +332,13 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				"pod", postgresqlStatus.Pod.Name,
 				"oldVersion", postgresqlStatus.ExecutableHash)
 
-			if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseOnlineUpgrading, ""); err != nil {
-				return err
+			if cluster.Status.Phase != apiv1.PhaseOnlineUpgrading {
+				err := r.RegisterPhase(ctx, cluster, apiv1.PhaseOnlineUpgrading, "")
+				if err != nil {
+					return err
+				}
 			}
+
 			err = upgradeInstanceManagerOnPod(ctx, postgresqlStatus.Pod)
 			if err != nil {
 				enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
