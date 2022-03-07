@@ -699,7 +699,7 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
         name: Install kubectl
-        uses: azure/setup-kubectl@v2.0
+        uses: azure/setup-kubectl@v2.1
         with:
           version: v${{ env.K8S_VERSION }}
       -
@@ -1367,7 +1367,7 @@ jobs:
           echo "TF_VAR_source_ip_address=$(curl -s showip.net)" >> $GITHUB_ENV
       -
         name: Install kubectl
-        uses: azure/setup-kubectl@v2.0
+        uses: azure/setup-kubectl@v2.1
         with:
           version: v${{ env.K8S_VERSION }}
       -
