@@ -628,11 +628,12 @@ func (r *ClusterReconciler) handleRollingUpdate(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
-	// Execute online update, if enabled
-	if cluster.Status.OnlineUpdateEnabled {
+	// Execute online update, if enabled and if not already executing
+	if cluster.Status.OnlineUpdateEnabled && cluster.Status.Phase != apiv1.PhaseOnlineUpgrading {
 		if err := r.upgradeInstanceManager(ctx, cluster, &instancesStatus); err != nil {
 			return ctrl.Result{}, err
 		}
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, ErrNextLoop
 	}
 
 	return ctrl.Result{}, nil
