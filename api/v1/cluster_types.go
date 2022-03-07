@@ -252,6 +252,9 @@ const (
 	// PhaseUnrecoverable for an unrecoverable cluster
 	PhaseUnrecoverable = "Cluster is in an unrecoverable state, needs manual intervention"
 
+	// PhaseOnlineUpgrading for when the instance manager is being upgraded in place
+	PhaseOnlineUpgrading = "Restarting for Online Upgrade"
+
 	// PhaseApplyingConfiguration is set by the instance manager when a configuration
 	// change is being detected
 	PhaseApplyingConfiguration = "Applying configuration"
