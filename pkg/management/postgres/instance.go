@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/blang/semver"
+	"go.uber.org/atomic"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
@@ -73,7 +74,7 @@ type ShutdownOptions struct {
 
 	// Timeout is the maximum number of seconds to wait for the shutdown to complete
 	// Used only if Wait is true. Defaulted by PostgreSQL to 60 seconds.
-	Timeout *int
+	Timeout *int32
 }
 
 // DefaultShutdownOptions are the default shutdown options. That is:
@@ -135,6 +136,9 @@ type Instance struct {
 	// PgCtlTimeoutForPromotion specifies the maximum number of seconds to wait when waiting for promotion to complete
 	PgCtlTimeoutForPromotion int32
 
+	// specifies the maximum number of seconds to wait when shutting down for a switchover
+	MaxSwitchoverDelay int32
+
 	// pgVersion is the PostgreSQL version
 	pgVersion *semver.Version
 
@@ -144,14 +148,37 @@ type Instance struct {
 	// PgRewindIsRunning tells if there is a `pg_rewind` process running
 	PgRewindIsRunning bool
 
+	// instanceCommandChan is a channel for requesting actions on the instance
+	instanceCommandChan chan InstanceCommand
+
+	// FencingOn specifies whether fencing is on for the instance
+	FencingOn atomic.Bool
+
+	// CanCheckReadiness specifies whether the instance can start being checked for readiness
+	CanCheckReadiness atomic.Bool
+
 	// MaxStopDelay is the current MaxStopDelay of the cluster
 	MaxStopDelay int32
 }
 
+// InstanceCommand are commands for the goroutine managing postgres
+type InstanceCommand string
+
+const (
+	// RestartSmartFast means the instance has to be restarted by first issuing
+	// a smart shutdown and in case it doesn't work, a fast shutdown
+	RestartSmartFast InstanceCommand = "RestartSmartFast"
+
+	// ShutDownFastImmediate means the instance has to be shut down by first
+	// issuing a fast shut down and in case of errors an immediate one
+	ShutDownFastImmediate InstanceCommand = "ShutDownFastImmediate"
+)
+
 // NewInstance creates a new Instance object setting the defaults
 func NewInstance() *Instance {
 	return &Instance{
-		SocketDirectory: postgres.SocketDirectory,
+		SocketDirectory:     postgres.SocketDirectory,
+		instanceCommandChan: make(chan InstanceCommand),
 	}
 }
 
@@ -594,7 +621,7 @@ func (instance *Instance) Rewind(postgresMajorVersion int) error {
 		instance.PgRewindIsRunning = false
 	}()
 
-	instance.LogPgControldata()
+	instance.LogPgControldata("before pg_rewind")
 
 	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
 	options := []string{
@@ -665,7 +692,9 @@ func (instance *Instance) PgIsReady() error {
 }
 
 // LogPgControldata logs the content of PostgreSQL control data, for debugging and tracing
-func (instance *Instance) LogPgControldata() {
+func (instance *Instance) LogPgControldata(reason string) {
+	log.Info("Extracting pg_controldata information", "reason", reason)
+
 	pgControlDataCmd := exec.Command(pgControlDataName)
 	pgControlDataCmd.Env = os.Environ()
 	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+instance.PgData)
@@ -673,4 +702,62 @@ func (instance *Instance) LogPgControldata() {
 	if err != nil {
 		log.Error(err, "Error printing the control information of this PostgreSQL instance")
 	}
+}
+
+// GetInstanceCommandChan is the channel where the lifecycle manager will
+// wait for the operations requested on the instance
+func (instance *Instance) GetInstanceCommandChan() <-chan InstanceCommand {
+	return instance.instanceCommandChan
+}
+
+// RequestFastImmediateShutdown request the lifecycle manager to shut down
+// PostegreSQL using the fast strategy and then the immediate strategy.
+func (instance *Instance) RequestFastImmediateShutdown() {
+	instance.instanceCommandChan <- ShutDownFastImmediate
+}
+
+// RequestAndWaitRestartSmartFast requests the lifecycle manager to
+// restart the postmaster, and wait for the postmaster to be restarted
+func (instance *Instance) RequestAndWaitRestartSmartFast() error {
+	instance.FencingOn.Store(true)
+	defer instance.FencingOn.Store(false)
+
+	now := time.Now()
+	instance.RequestRestartSmartFast()
+	err := instance.WaitForInstanceRestarted(now)
+	if err != nil {
+		return fmt.Errorf("while waiting for instance restart: %w", err)
+	}
+
+	return nil
+}
+
+// RequestRestartSmartFast request the lifecycle manager to restart
+// the postmaster
+func (instance *Instance) RequestRestartSmartFast() {
+	instance.instanceCommandChan <- RestartSmartFast
+}
+
+// WaitForInstanceRestarted waits until the instance reports being started
+// after the given time
+func (instance *Instance) WaitForInstanceRestarted(after time.Time) error {
+	retryOnEveryError := func(err error) bool {
+		return true
+	}
+	return retry.OnError(RetryUntilServerAvailable, retryOnEveryError, func() error {
+		db, err := instance.GetSuperUserDB()
+		if err != nil {
+			return err
+		}
+		var startTime time.Time
+		row := db.QueryRow("SELECT pg_postmaster_start_time()")
+		err = row.Scan(&startTime)
+		if err != nil {
+			return err
+		}
+		if !startTime.After(after) {
+			return fmt.Errorf("instance not yet restarted: %v <= %v", startTime, after)
+		}
+		return nil
+	})
 }

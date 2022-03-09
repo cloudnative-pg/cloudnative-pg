@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
@@ -111,9 +112,8 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	instanceRunnable := NewInstanceRunnable(ctx, instance, reconciler.GetInitialized())
-	err = mgr.Add(instanceRunnable)
-	if err != nil {
+	postgresLifecycleManager := lifecycle.NewPostgres(ctx, instance, reconciler.GetInitialized())
+	if err = mgr.Add(postgresLifecycleManager); err != nil {
 		setupLog.Error(err, "unable to create instance runnable")
 		return err
 	}
@@ -130,26 +130,10 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	setupLog.Info("starting manager")
-	if err := mgr.Start(instanceRunnable.setupSignalHandler()); err != nil {
-		setupLog.Error(err, "unable to run manager")
+	setupLog.Info("starting controller-runtime manager")
+	if err := mgr.Start(postgresLifecycleManager.GetContext()); err != nil {
+		setupLog.Error(err, "unable to run controller-runtime manager")
 		return err
-	}
-
-	setupLog.Info("Shutting down the metrics server")
-	err = metricsserver.Shutdown()
-	if err != nil {
-		setupLog.Error(err, "Error while shutting down the metrics server")
-	} else {
-		setupLog.Info("Metrics server shut down")
-	}
-
-	setupLog.Info("Shutting down web server")
-	err = webserver.Shutdown()
-	if err != nil {
-		setupLog.Error(err, "Error while shutting down the web server")
-	} else {
-		setupLog.Info("Web server shut down")
 	}
 
 	return nil

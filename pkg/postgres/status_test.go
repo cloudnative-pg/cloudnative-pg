@@ -103,6 +103,26 @@ var _ = Describe("PostgreSQL status", func() {
 		Expect(podList.ArePodsUpgradingInstanceManager()).To(BeTrue())
 	})
 
+	It("checks for pods on which fencing is enabled", func() {
+		podList := PostgresqlStatusList{
+			Items: []PostgresqlStatus{
+				{
+					Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
+					IsPrimary: false,
+					IsReady:   true,
+				},
+				{
+					Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+					IsPrimary: true,
+					IsReady:   true,
+				},
+			},
+		}
+		Expect(podList.ShouldSkipReconcile()).To(BeFalse())
+		podList.Items[0].IsFencingOn = true
+		Expect(podList.ShouldSkipReconcile()).To(BeTrue())
+	})
+
 	Describe("when sorted", func() {
 		sort.Sort(&list)
 
