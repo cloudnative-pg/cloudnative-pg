@@ -12,18 +12,20 @@ import (
 
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {
-	CurrentLsn          LSN        `json:"currentLsn,omitempty"`
-	ReceivedLsn         LSN        `json:"receivedLsn,omitempty"`
-	ReplayLsn           LSN        `json:"replayLsn,omitempty"`
-	SystemID            string     `json:"systemID"`
-	IsPrimary           bool       `json:"isPrimary"`
-	ReplayPaused        bool       `json:"replayPaused"`
-	PendingRestart      bool       `json:"pendingRestart"`
-	IsWalReceiverActive bool       `json:"isWalReceiverActive"`
-	Node                string     `json:"node"`
-	Pod                 corev1.Pod `json:"pod"`
-	IsPgRewindRunning   bool       `json:"isPgRewindRunning"`
-	TotalInstanceSize   string     `json:"totalInstanceSize"`
+	CurrentLsn                LSN        `json:"currentLsn,omitempty"`
+	ReceivedLsn               LSN        `json:"receivedLsn,omitempty"`
+	ReplayLsn                 LSN        `json:"replayLsn,omitempty"`
+	SystemID                  string     `json:"systemID"`
+	IsPrimary                 bool       `json:"isPrimary"`
+	ReplayPaused              bool       `json:"replayPaused"`
+	PendingRestart            bool       `json:"pendingRestart"`
+	PendingRestartForDecrease bool       `json:"pendingRestartForDecrease"`
+	IsWalReceiverActive       bool       `json:"isWalReceiverActive"`
+	Node                      string     `json:"node"`
+	Pod                       corev1.Pod `json:"pod"`
+	IsPgRewindRunning         bool       `json:"isPgRewindRunning"`
+	TotalInstanceSize         string     `json:"totalInstanceSize"`
+	IsFencingOn               bool       `json:"isFencingOn"`
 
 	// WAL Status
 	// SELECT
@@ -182,10 +184,33 @@ func (list PostgresqlStatusList) IsComplete() bool {
 	return true
 }
 
-// ArePodsUpgradingInstanceManager checks if there pods on which we are upgrading the instance manager
+// ArePodsUpgradingInstanceManager checks if there are pods on which we are upgrading the instance manager
 func (list PostgresqlStatusList) ArePodsUpgradingInstanceManager() bool {
 	for _, item := range list.Items {
 		if item.IsInstanceManagerUpgrading {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ArePodsWaitingForDecreasedSettings checks if a rollout due to hot standby
+// sensible parameters being decreased is ongoing
+func (list PostgresqlStatusList) ArePodsWaitingForDecreasedSettings() bool {
+	for _, item := range list.Items {
+		if item.PendingRestartForDecrease {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ShouldSkipReconcile checks whether at least an instance is asking for the reconciliation loop to be skipped
+func (list PostgresqlStatusList) ShouldSkipReconcile() bool {
+	for _, item := range list.Items {
+		if item.IsFencingOn {
 			return true
 		}
 	}

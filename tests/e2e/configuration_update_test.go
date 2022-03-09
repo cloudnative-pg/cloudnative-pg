@@ -102,6 +102,7 @@ var _ = Describe("Configuration update", func() {
 				return value, err, atoiErr
 			}, timeout).Should(BeEquivalentTo(1))
 		})
+		// nolint:dupl
 		By("restarting and switching Pg when a parameter requiring restart is modified", func() {
 			sample := fixturesDir + "/config_update/03-restart.yaml"
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -218,5 +219,44 @@ var _ = Describe("Configuration update", func() {
 				}, timeout).ShouldNot(BeEquivalentTo(4))
 			}
 		})
+
+		// nolint:dupl
+		By("restarting and not switching Pg when a hot standby sensible parameter requiring "+
+			"to restart first the primary instance is decreased",
+			func() {
+				sample := fixturesDir + "/config_update/07-restart-decrease.yaml"
+				podList, err := env.GetClusterPodList(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				// Gather current primary
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      clusterName,
+				}
+				cluster := &apiv1.Cluster{}
+				err = env.Client.Get(env.Ctx, namespacedName, cluster)
+				Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
+				oldPrimary := cluster.Status.CurrentPrimary
+				// Update the configuration
+				_, _, err = utils.Run("kubectl apply -n " + namespace + " -f " + sample)
+				Expect(err).ToNot(HaveOccurred())
+				timeout := 300
+				commandtimeout := time.Second * 2
+				// Check that the new parameter has been modified in every pod
+				for _, pod := range podList.Items {
+					pod := pod
+					Eventually(func() (int, error, error) {
+						stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandtimeout,
+							"psql", "-U", "postgres", "-tAc", "show max_connections")
+						value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
+						return value, err, atoiErr
+					}, timeout).Should(BeEquivalentTo(90),
+						"Pod %v should have updated its configuration", pod.Name)
+				}
+				// Check that a switchover did not happen
+				Eventually(func() (string, error) {
+					err := env.Client.Get(env.Ctx, namespacedName, cluster)
+					return cluster.Status.CurrentPrimary, err
+				}, timeout).Should(BeEquivalentTo(oldPrimary))
+			})
 	})
 })

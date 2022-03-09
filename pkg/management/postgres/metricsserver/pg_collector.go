@@ -80,6 +80,7 @@ type metrics struct {
 	PgWALDirectory           *prometheus.GaugeVec
 	PgVersion                *prometheus.GaugeVec
 	FirstRecoverabilityPoint prometheus.Gauge
+	FencingOn                prometheus.Gauge
 }
 
 // NewExporter creates an exporter
@@ -169,6 +170,12 @@ func newMetrics() *metrics {
 			Name:      "first_recoverability_point",
 			Help:      "The first point of recoverability for the cluster as a unix timestamp",
 		}),
+		FencingOn: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "fencing_on",
+			Help:      "1 if the instance is fenced, 0 otherwise",
+		}),
 	}
 }
 
@@ -186,6 +193,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.Metrics.PgWALDirectory.Describe(ch)
 	e.Metrics.PgVersion.Describe(ch)
 	e.Metrics.FirstRecoverabilityPoint.Describe(ch)
+	e.Metrics.FencingOn.Describe(ch)
 
 	if e.queries != nil {
 		e.queries.Describe(ch)
@@ -214,6 +222,13 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	e.Metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
+	if e.instance.FencingOn.Load() {
+		e.Metrics.FencingOn.Set(1)
+		log.Info("metrics collection skipped due to fencing")
+		return
+	}
+
+	e.Metrics.FencingOn.Set(0)
 	db, err := e.instance.GetSuperUserDB()
 	if err != nil {
 		log.Error(err, "Error opening connection to PostgreSQL")

@@ -328,7 +328,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
 
-	enforcedParams, err := getEnforcedParametersThroughPgControldata(info)
+	enforcedParams, err := getEnforcedParametersThroughPgControldata(info.PgData)
 	if err != nil {
 		return err
 	}
@@ -377,11 +377,12 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		0o600)
 }
 
-func getEnforcedParametersThroughPgControldata(info InitInfo) (map[string]string, error) {
+func getEnforcedParametersThroughPgControldata(pgData string) (map[string]string, error) {
 	var stdoutBuffer bytes.Buffer
 	var stderrBuffer bytes.Buffer
-	pgControlDataCmd := exec.Command(pgControlDataName, "-D",
-		info.PgData) // #nosec G204
+	pgControlDataCmd := exec.Command(pgControlDataName,
+		"-D",
+		pgData) // #nosec G204
 	pgControlDataCmd.Stdout = &stdoutBuffer
 	pgControlDataCmd.Stderr = &stderrBuffer
 	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "LANG=C", "LC_MESSAGES=C")
