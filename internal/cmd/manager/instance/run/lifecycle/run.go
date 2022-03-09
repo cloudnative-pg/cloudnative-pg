@@ -4,90 +4,66 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-package run
+package lifecycle
 
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"os/signal"
-	"syscall"
 
 	"github.com/lib/pq"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/concurrency"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
 	postgresUtils "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
-// InstanceRunnable implements the manager.Runnable interface for an postgres.Instance
-// TODO split in signalHandler (to be renamed)
-type InstanceRunnable struct {
-	instance *postgres.Instance
-
-	ctx                  context.Context
-	cancel               context.CancelFunc
-	systemInitialization *concurrency.Executed
-}
-
-// NewInstanceRunnable creates a new InstanceRunnable
-func NewInstanceRunnable(
-	ctx context.Context,
-	instance *postgres.Instance,
-	inizialization *concurrency.Executed,
-) *InstanceRunnable {
-	ctx, cancel := context.WithCancel(ctx)
-	return &InstanceRunnable{instance: instance, ctx: ctx, cancel: cancel, systemInitialization: inizialization}
-}
-
-// Start starts running the InstanceRunnable
-// nolint:gocognit
-func (i *InstanceRunnable) Start(ctx context.Context) error {
-	contextLog := log.FromContext(ctx)
-
-	err := VerifyPgDataCoherence(ctx, i.instance)
-	if err != nil {
-		return err
-	}
-
-	// here we need to wait for initialization to be finished before proceeding
-	i.systemInitialization.Wait()
-
-	i.instance.LogPgControldata()
-
-	streamingCmd, err := i.instance.Run()
-	if err != nil {
-		contextLog.Error(err, "Unable to start PostgreSQL up")
-		return err
-	}
-
-	err = configureInstancePermissions(i.instance)
-	if err != nil {
-		log.Error(err, "Unable to update PostgreSQL roles and permissions")
-		return err
-	}
-
-	if err = streamingCmd.Wait(); err != nil {
-		var exitError *exec.ExitError
-		if !errors.As(err, &exitError) {
-			contextLog.Error(err, "Error waiting on PostgreSQL process")
-		} else {
-			contextLog.Error(exitError, "PostgreSQL process exited with errors")
+// runPostgresAndWait runs a goroutine which will run, configure and run Postgres itself,
+// returnin any error via the returned channel
+func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) chan error {
+	contextLogger := log.FromContext(ctx)
+	errChan := make(chan error, 1)
+	go func() {
+		defer close(errChan)
+		err := verifyPgDataCoherence(ctx, i.instance)
+		if err != nil {
+			errChan <- err
+			return
 		}
-	}
 
-	i.instance.LogPgControldata()
+		// here we need to wait for initialization to be executed before
+		// being able to start the instance
+		i.systemInitialization.Wait()
 
-	i.cancel()
+		i.instance.LogPgControldata("postmaster start up")
+		defer i.instance.LogPgControldata("postmaster has exited")
 
-	return nil
+		streamingCmd, err := i.instance.Run()
+		if err != nil {
+			contextLogger.Error(err, "Unable to start PostgreSQL up")
+			errChan <- err
+			return
+		}
+
+		// once the database will be up we'll connect and setup everything required
+		err = configureInstancePermissions(i.instance)
+		if err != nil {
+			contextLogger.Error(err, "Unable to update PostgreSQL roles and permissions")
+			errChan <- err
+			return
+		}
+
+		// from now on the instance can be considered ready
+		i.instance.CanCheckReadiness.Store(true)
+		defer i.instance.CanCheckReadiness.Store(false)
+
+		errChan <- streamingCmd.Wait()
+	}()
+
+	return errChan
 }
 
 // ConfigureInstancePermissions creates the expected users and databases in a new
@@ -245,9 +221,9 @@ func configurePgRewindPrivileges(majorVersion int, hasSuperuser bool, tx *sql.Tx
 	return nil
 }
 
-// VerifyPgDataCoherence checks if this cluster exists in K8s. It panics if this
-// pod belongs to a primary but the cluster status is not coherent with that
-func VerifyPgDataCoherence(ctx context.Context, instance *postgres.Instance) error {
+// verifyPgDataCoherence checks the PGDATA is correctly configured in terms
+// of file rights and users
+func verifyPgDataCoherence(ctx context.Context, instance *postgres.Instance) error {
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Debug("Checking PGDATA coherence")
@@ -261,55 +237,4 @@ func VerifyPgDataCoherence(ctx context.Context, instance *postgres.Instance) err
 	}
 
 	return nil
-}
-
-// registerSignalHandler handles signals from k8s, notifying postgres as
-// needed
-func (i *InstanceRunnable) setupSignalHandler() context.Context {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		var err error
-
-		sig := <-signals
-		log.Info("Received termination signal", "signal", sig)
-
-		// We need to shut down the postmaster in a certain time (dictated by `cluster.GetMaxStopDelay()`).
-		// For half of this time, we are waiting for connections to go down, the other half
-		// we just handle the shutdown procedure itself.
-		smartShutdownTimeout := int(i.instance.MaxStopDelay) / 2
-
-		log.Info("Shutting down the metrics server")
-		err = metricsserver.Shutdown()
-		if err != nil {
-			log.Error(err, "Error while shutting down the metrics server")
-		} else {
-			log.Info("Metrics server shut down")
-		}
-
-		log.Info("Requesting smart shutdown of the PostgreSQL instance")
-		err = i.instance.Shutdown(postgres.ShutdownOptions{
-			Mode:    postgres.ShutdownModeSmart,
-			Wait:    true,
-			Timeout: &smartShutdownTimeout,
-		})
-		if err != nil {
-			log.Warning("Error while handling the smart shutdown request: requiring fast shutdown",
-				"err", err)
-			err = i.instance.Shutdown(postgres.ShutdownOptions{
-				Mode: postgres.ShutdownModeFast,
-				Wait: true,
-			})
-		}
-		if err != nil {
-			log.Error(err, "Error while shutting down the PostgreSQL instance")
-		} else {
-			log.Info("PostgreSQL instance shut down")
-		}
-
-		i.cancel()
-	}()
-
-	return i.ctx
 }

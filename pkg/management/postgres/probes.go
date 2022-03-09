@@ -7,8 +7,10 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package postgres
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -19,6 +21,7 @@ import (
 	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/executablehash"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/constants"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
@@ -40,6 +43,9 @@ func (instance *Instance) IsServerHealthy() error {
 
 // IsServerReady check if the instance is healthy and can really accept connections
 func (instance *Instance) IsServerReady() error {
+	if !instance.CanCheckReadiness.Load() {
+		return fmt.Errorf("instance is not ready yet")
+	}
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return err
@@ -63,7 +69,7 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 	}
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
-		return nil, err
+		return &result, err
 	}
 
 	row := superUserDB.QueryRow(
@@ -77,24 +83,121 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 			(SELECT pg_size_pretty(SUM(pg_database_size(oid))) FROM pg_database)`)
 	err = row.Scan(&result.SystemID, &result.IsPrimary, &result.PendingRestart, &result.TotalInstanceSize)
 	if err != nil {
-		return nil, err
+		return &result, err
+	}
+
+	if result.PendingRestart {
+		err = updateResultForDecrease(instance, superUserDB, &result)
+		if err != nil {
+			return &result, err
+		}
 	}
 
 	err = instance.fillStatus(&result)
 	if err != nil {
-		return nil, err
+		return &result, err
 	}
 
 	result.InstanceArch = runtime.GOARCH
 
 	result.ExecutableHash, err = executablehash.Get()
 	if err != nil {
-		return nil, err
+		return &result, err
 	}
 
 	result.IsInstanceManagerUpgrading = instance.InstanceManagerIsUpgrading
 
 	return &result, nil
+}
+
+// updateResultForDecrease updates the given postgres.PostgresqlStatus
+// in case of pending restart, by checking whether the restart is due to hot standby
+// sensible parameters being decreased
+func updateResultForDecrease(
+	instance *Instance,
+	superUserDB *sql.DB,
+	result *postgres.PostgresqlStatus,
+) error {
+	// get all the hot standby sensible parameters being decreased
+	decreasedValues, err := instance.GetDecreasedSensibleSettings(superUserDB)
+	if err != nil {
+		return err
+	}
+
+	if len(decreasedValues) == 0 {
+		return nil
+	}
+
+	// if there is at least one hot standby sensible parameter decreased
+	// mark the pending restart as due to a decrease
+	result.PendingRestartForDecrease = true
+	if !result.IsPrimary {
+		// in case of hot standby parameters being decreased,
+		// followers need to wait for the new value to be present in the PGDATA before being restarted.
+		pgControldataParams, err := getEnforcedParametersThroughPgControldata(instance.PgData)
+		if err != nil {
+			return err
+		}
+		// So, we set PendingRestart according to whether all decreased
+		// hot standby sensible parameters have been updated in the PGDATA
+		result.PendingRestart = areAllParamsUpdated(decreasedValues, pgControldataParams)
+	}
+	return nil
+}
+
+func areAllParamsUpdated(decreasedValues map[string]string, pgControldataParams map[string]string) bool {
+	var readyParams int
+	for setting, newValue := range decreasedValues {
+		if pgControldataParams[setting] == newValue {
+			readyParams++
+		}
+	}
+	return readyParams == len(decreasedValues)
+}
+
+// GetDecreasedSensibleSettings tries to get all decreased hot standby sensible parameters from the instance.
+// Returns a map containing all the decreased hot standby sensible parameters with their new value.
+// See https://www.postgresql.org/docs/current/hot-standby.html#HOT-STANDBY-ADMIN for more details.
+func (instance *Instance) GetDecreasedSensibleSettings(superUserDB *sql.DB) (map[string]string, error) {
+	// We check whether all parameters with a pending restart from pg_settings
+	// have a decreased value reported as not applied from pg_file_settings.
+	rows, err := superUserDB.Query(
+		fmt.Sprintf(
+			`SELECT name, setting
+				FROM pg_file_settings
+				WHERE NOT applied
+				AND sourcefile = '%s'
+				AND name IN (
+					'max_connections',
+					'max_prepared_transactions',
+					'max_wal_senders',
+					'max_worker_processes',
+					'max_locks_per_transaction'
+				)
+				AND CAST(current_setting(name) AS INTEGER) > CAST(setting AS INTEGER)`,
+			path.Join(instance.PgData, constants.PostgresqlCustomConfigurationFile)))
+	if err != nil || rows.Err() != nil {
+		return nil, err
+	}
+	defer func() {
+		exitErr := rows.Close()
+		if err != nil {
+			return
+		}
+		if exitErr != nil {
+			err = exitErr
+		}
+	}()
+
+	decreasedSensibleValues := make(map[string]string)
+	for rows.Next() {
+		var newValue, name string
+		if err = rows.Scan(&name, &newValue); err != nil {
+			return nil, err
+		}
+		decreasedSensibleValues[name] = newValue
+	}
+	return decreasedSensibleValues, err
 }
 
 // fillStatus extract the current instance information into the PostgresqlStatus

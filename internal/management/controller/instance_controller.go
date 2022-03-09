@@ -13,13 +13,13 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -57,6 +57,13 @@ var RetryUntilWalReceiverDown = wait.Backoff{
 func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	// set up a convenient contextLog object so we don't have to type request over and over again
 	contextLogger, ctx := log.SetupLogger(ctx)
+
+	// if the context has already been cancelled,
+	// trying to reconcile would just lead to misleading errors being reported
+	if err := ctx.Err(); err != nil {
+		contextLogger.Warning("Context cancelled, will not reconcile", "err", err)
+		return ctrl.Result{}, nil
+	}
 	result := reconcile.Result{}
 
 	// Fetch the Cluster from the cache
@@ -205,25 +212,17 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 
 	contextLogger.Info("This is an old primary node. Shutting it down to get it demoted to a replica")
 
-	// Here we need to invoke a fast shutdown on the instance, and wait the pod
-	// restart to demote as a replica of the new primary
-	timeout := int(cluster.GetMaxSwitchoverDelay())
-	err = r.instance.Shutdown(postgresManagement.ShutdownOptions{
-		Mode:    postgresManagement.ShutdownModeFast,
-		Wait:    true,
-		Timeout: &timeout,
-	})
-	var exitError *exec.ExitError
-	if errors.As(err, &exitError) {
-		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
-			"exitCode", exitError.ExitCode())
-		err = r.instance.Shutdown(postgresManagement.ShutdownOptions{
-			Mode: postgresManagement.ShutdownModeImmediate,
-			Wait: true,
-		})
-	}
+	// Here we need to invoke a fast shutdown on the instance, and wait the instance
+	// manager to be stopped.
+	// When the Pod will restart, we will demote as a replica of the new primary
+	r.Instance().RequestFastImmediateShutdown()
 
-	return true, err
+	// We wait for the lifecycle manager to have received the immediate shutdown request
+	// and, having processed it, to request the termination of the instance manager.
+	// When the termination has been requested, this context will be cancelled.
+	<-ctx.Done()
+
+	return true, nil
 }
 
 // IsDBUp checks whether the superuserdb is reachable and returns an error if that's not the case
@@ -681,12 +680,15 @@ func (r *InstanceReconciler) RefreshSecrets(
 // reconcileInstance sets PostgreSQL instance parameters to current values
 func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.PgCtlTimeoutForPromotion = cluster.GetPgCtlTimeoutForPromotion()
+	r.instance.MaxSwitchoverDelay = cluster.GetMaxSwitchoverDelay()
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
 }
 
 // waitForConfigurationReload waits for the db to be up and
 // the new configuration to be reloaded
 func (r *InstanceReconciler) waitForConfigurationReload(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
 	// This function could also be called while the server is being
 	// started up, so we are not sure that the server is really active.
 	// Let's wait for that.
@@ -714,13 +716,24 @@ func (r *InstanceReconciler) waitForConfigurationReload(ctx context.Context, clu
 		return nil
 	}
 
-	// I'm not the first instance spotting the configuration
-	// change, everything if fine and there is no need to signal
-	// the operator again
+	// if there is a pending restart, the instance is a primary and
+	// the restart is due to a decrease of sensible parameters,
+	// we will need to restart the primary instance in place
+	if status.IsPrimary && status.PendingRestartForDecrease {
+		contextLogger.Info("Restarting primary inplace due to hot standby sensible parameters decrease")
+		if err := r.Instance().RequestAndWaitRestartSmartFast(); err != nil {
+			return err
+		}
+	}
+
 	if cluster.Status.Phase == apiv1.PhaseApplyingConfiguration ||
-		// don't trigger the reconciliation loop from the primary,
-		// let's wait for replicas to trigger it first
 		(status.IsPrimary && cluster.Spec.Instances > 1) {
+		// I'm not the first instance spotting the configuration
+		// change, everything is fine and there is no need to signal
+		// the operator again.
+		// We also don't want to trigger the reconciliation loop from the primary
+		// for parameters which are not to be considered sensible for hot standbys,
+		// so, we will wait for replicas to trigger it first.
 		return nil
 	}
 

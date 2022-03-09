@@ -9,8 +9,10 @@ spec:
   postgresql:
     parameters:
       work_mem: "8MB"
-      max_connections: "100"
+      max_connections: "90"
       shared_buffers: "256MB"
+      max_replication_slots: "16"
+      maintenance_work_mem: "128MB"
       log_checkpoints: "on"
       log_lock_waits: "on"
       log_min_duration_statement: '1000'
