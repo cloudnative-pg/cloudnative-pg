@@ -206,6 +206,17 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// Get the replication status
 	instancesStatus := r.getStatusFromInstances(ctx, resources.pods)
 
+	// If at least one Pod reports a fenced status, we skip the
+	// reconcile loop.
+	//
+	// This is equivalent of a cluster-level fencing, but we should
+	// keep in mind that the logic handled by the instance manager
+	// is still working in the Pods which are not fenced.
+	if instancesStatus.ShouldSkipReconcile() {
+		log.Info("An instance asked to skip reconciliation, will retry")
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
 	// Verify the architecture of all the instances and update the OnlineUpdateEnabled
 	// field in the status
 	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
@@ -618,6 +629,12 @@ func (r *ClusterReconciler) handleRollingUpdate(
 	if done {
 		// Rolling upgrade is in progress, let's avoid marking stuff as synchronized
 		// (but recheck in one second, just to be sure)
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
+	if instancesStatus.ArePodsWaitingForDecreasedSettings() {
+		// requeue and wait for the pods to be ready to be restarted,
+		// which will be handled by rolloutDueToCondition
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 

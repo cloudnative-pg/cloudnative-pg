@@ -38,7 +38,8 @@ var (
 func isServerHealthy(w http.ResponseWriter, r *http.Request) {
 	// If `pg_rewind` is running the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
-	if !instance.PgRewindIsRunning {
+	// Same goes for instances with fencing on.
+	if !instance.PgRewindIsRunning && !instance.FencingOn.Load() {
 		err := instance.IsServerHealthy()
 		if err != nil {
 			log.Info("Liveness probe failing", "err", err.Error())
@@ -68,17 +69,35 @@ func isServerReady(w http.ResponseWriter, r *http.Request) {
 
 // This probe is for the instance status, including replication
 func pgStatus(w http.ResponseWriter, r *http.Request) {
+	// Extract the status of the current instance
 	status, err := instance.GetStatus()
-	if err != nil {
+	switch {
+	case err != nil && !instance.FencingOn.Load():
 		log.Info(
 			"Instance status probe failing",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+
+	case err != nil && instance.FencingOn.Load():
+		log.Info("fencing enabled, will fake status")
+		// force reporting fencing as enabled
+		status.IsFencingOn = true
+		// force reporting the instance as primary if required
+		status.IsPrimary, err = instance.IsPrimary()
+		if err != nil {
+			log.Info(
+				"Internal error checking if primary",
+				"err", err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// force the instance to be reported as ready
+		status.IsReady = true
 	}
 
+	// Marshal the status back to the operator
 	log.Trace("Instance status probe succeeding")
-
 	js, err := json.Marshal(status)
 	if err != nil {
 		log.Info(
