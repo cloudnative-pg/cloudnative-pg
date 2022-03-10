@@ -19,6 +19,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver/metricserver"
 )
 
 // NewCmd creates the new "join" command
@@ -76,9 +77,13 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		return err
 	}
 
+	metricServer, err := metricserver.New(instance)
+	if err != nil {
+		return err
+	}
 	// Let's download the crypto material from the cluster
 	// secrets.
-	reconciler := controller.NewInstanceReconciler(instance, client)
+	reconciler := controller.NewInstanceReconciler(instance, client, metricServer)
 	if err != nil {
 		log.Error(err, "Error creating reconciler to download certificates")
 		return err
