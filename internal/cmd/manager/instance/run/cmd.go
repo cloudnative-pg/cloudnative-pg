@@ -27,8 +27,8 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver/metricserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
@@ -103,7 +103,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient())
+	metricsServer, err := metricserver.New(instance)
+	if err != nil {
+		return err
+	}
+
+	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsServer)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
 		Complete(reconciler)
@@ -124,9 +129,26 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	// TODO move to separate runnable
-	if err = startWebServer(instance); err != nil {
-		log.Error(err, "Error while starting the web server")
+	if err = mgr.Add(metricsServer); err != nil {
+		setupLog.Error(err, "unable to add metrics webserver runnable")
+		return err
+	}
+
+	remoteSrv, err := webserver.NewRemoteWebServer(instance)
+	if err != nil {
+		return err
+	}
+	if err = mgr.Add(remoteSrv); err != nil {
+		setupLog.Error(err, "unable to add remote webserver runnable")
+		return err
+	}
+
+	localSrv, err := webserver.NewLocalWebServer(instance)
+	if err != nil {
+		return err
+	}
+	if err = mgr.Add(localSrv); err != nil {
+		setupLog.Error(err, "unable to add local webserver runnable")
 		return err
 	}
 
@@ -135,38 +157,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		setupLog.Error(err, "unable to run controller-runtime manager")
 		return err
 	}
-
-	return nil
-}
-
-// startWebServer start the web server for handling probes given
-// a certain PostgreSQL instance
-func startWebServer(instance *postgres.Instance) error {
-	webserver.Setup(instance)
-	if err := metricsserver.Setup(instance); err != nil {
-		return err
-	}
-
-	go func() {
-		err := webserver.ListenAndServe()
-		if err != nil {
-			log.Error(err, "Error while starting the status web server")
-		}
-	}()
-
-	go func() {
-		err := webserver.LocalListenAndServe()
-		if err != nil {
-			log.Error(err, "Error while starting the local server")
-		}
-	}()
-
-	go func() {
-		err := metricsserver.ListenAndServe()
-		if err != nil {
-			log.Error(err, "Error while starting the metrics server")
-		}
-	}()
 
 	return nil
 }

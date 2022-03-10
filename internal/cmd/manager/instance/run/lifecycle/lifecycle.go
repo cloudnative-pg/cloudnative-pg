@@ -94,7 +94,9 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 			// a SIGKILL by the Kubelet, which is not informed about what's
 			// happening.
 			log.Info("Context has been cancelled, shutting down and exiting")
-			fullShutDownSequence(i.instance, tryShuttingDownSmartFast(i.instance.MaxStopDelay))
+			if err := tryShuttingDownSmartFast(i.instance.MaxStopDelay, i.instance); err != nil {
+				log.Error(err, "error shutting down instance, proceeding")
+			}
 			return nil
 
 		case sig := <-signals:
@@ -106,7 +108,9 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 			// This is why we are trying a smart shutdown for half-time
 			// of our stop delay, and then we proceed.
 			log.Info("Received termination signal", "signal", sig)
-			fullShutDownSequence(i.instance, tryShuttingDownSmartFast(i.instance.MaxStopDelay/2))
+			if err := tryShuttingDownSmartFast(i.instance.MaxStopDelay/2, i.instance); err != nil {
+				log.Error(err, "error shutting down instance, proceeding")
+			}
 			return nil
 
 		case req := <-i.instance.GetInstanceCommandChan():
@@ -136,9 +140,11 @@ func (i *PostgresLifecycle) handleInstanceCommandRequests(
 ) (restartNeeded bool, err error) {
 	switch req {
 	case postgres.RestartSmartFast:
-		return true, tryShuttingDownSmartFast(i.instance.MaxSwitchoverDelay)(i.instance)
+		return true, tryShuttingDownSmartFast(i.instance.MaxSwitchoverDelay, i.instance)
 	case postgres.ShutDownFastImmediate:
-		fullShutDownSequence(i.instance, tryShuttingDownFastImmediate(i.instance.MaxStopDelay))
+		if err := tryShuttingDownFastImmediate(i.instance.MaxStopDelay, i.instance); err != nil {
+			log.Error(err, "error shutting down instance, proceeding")
+		}
 		return false, nil
 	default:
 		return false, fmt.Errorf("unrecognized request: %s", req)
