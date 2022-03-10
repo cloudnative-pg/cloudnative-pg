@@ -12,12 +12,10 @@ spec:
         envFrom:
         - configMapRef:
             name: controller-manager-env
-        env:
-          - name: POD_DEBUG
-            value: "1"
         args:
         - controller
         - --enable-leader-election
         - --config-map-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --secret-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --log-level=info
+        - --pprof-server=true

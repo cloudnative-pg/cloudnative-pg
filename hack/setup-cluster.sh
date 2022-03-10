@@ -18,6 +18,7 @@ K8S_VERSION=${K8S_VERSION:-v1.23.1}
 KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 ENGINE=${CLUSTER_ENGINE:-kind}
 ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
+ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 NODES=${NODES:-3}
 
 # Define the directories used by the script
@@ -303,6 +304,45 @@ deploy_fluentd() {
   done
 }
 
+deploy_pyroscope() {
+  helm repo add pyroscope-io https://pyroscope-io.github.io/helm-chart
+
+  values_file="${TEMP_DIR}/pyroscope_values.yaml"
+  cat >"${values_file}" <<-EOF
+pyroscopeConfigs:
+  log-level: "debug"
+  scrape-configs:
+    - job-name: cnp
+      enabled-profiles: [cpu, mem]
+      static-configs:
+        - application: cloud-native-postgresql
+          targets:
+            - cnp-pprof:6060
+          labels:
+            cnp: cnp
+EOF
+  helm -n postgresql-operator-system install pyroscope pyroscope-io/pyroscope -f "${values_file}"
+
+  service_file="${TEMP_DIR}/pyroscope_service.yaml"
+
+  cat >"${service_file}" <<-EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: cnp-pprof
+spec:
+  ports:
+  - targetPort: 6060
+    port: 6060
+  selector:
+    app: cnp-pprof
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: cloud-native-postgresql
+EOF
+  kubectl -n postgresql-operator-system apply -f "${service_file}"
+}
+
 load_image_registry() {
   local image=$1
 
@@ -323,6 +363,7 @@ load_image() {
 
 deploy_operator() {
   kubectl delete ns postgresql-operator-system 2> /dev/null || :
+
   make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
 }
 
@@ -340,6 +381,7 @@ Commands:
     export-logs           Export the logs from the cluster inside the directory
                           ${LOG_DIR}
     destroy               Destroy the cluster
+    pyroscope             Deploy Pyroscope inside operator namespace
 
 Options:
     -e|--engine
@@ -357,6 +399,8 @@ Options:
                           Env: NODES
 
     -r|--registry         Enable local registry. Env: ENABLE_REGISTRY
+
+    -p|--pyroscope        Enable Pyroscope in the operator namespace
 
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
@@ -446,6 +490,12 @@ destroy() {
   echo "${bright}Done destroying ${ENGINE} cluster ${CLUSTER_NAME}${reset}"
 }
 
+pyroscope() {
+  echo "${bright} Deploying Pyroscope${reset}"
+  deploy_pyroscope
+  echo "${bright} Done deploying Pyroscope${reset}"
+}
+
 ##
 ## MAIN
 ##
@@ -530,7 +580,7 @@ main() {
       prepare "${dest_dir}"
       ;;
 
-    create | load | deploy | print-image | export-logs | destroy)
+    create | load | deploy | print-image | export-logs | destroy | pyroscope)
       ensure_registry
       "${command//-/_}"
       ;;
