@@ -34,7 +34,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	postgresManagement "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metricsserver"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver/metricserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	pkgUtils "github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
@@ -89,8 +89,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	r.updateCacheFromCluster(ctx, cluster)
 
 	// Reconcile monitoring section
-	exporter := metricsserver.GetExporter()
-	if exporter != nil {
+	if r.metricsServerExporter != nil {
 		r.reconcileMetrics(cluster)
 		r.reconcileMonitoringQueries(ctx, cluster)
 	} else {
@@ -508,7 +507,7 @@ func (r *InstanceReconciler) reconcileClusterRoleWithoutDB(
 func (r *InstanceReconciler) reconcileMetrics(
 	cluster *apiv1.Cluster,
 ) {
-	exporter := metricsserver.GetExporter()
+	exporter := r.metricsServerExporter
 	// We should never reset the SwitchoverRequired metrics as it needs the primary instance restarts,
 	// however, if the cluster is healthy we make sure it is set to 0.
 	if cluster.Status.CurrentPrimary == r.instance.PodName {
@@ -544,10 +543,10 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	}
 
 	queriesCollector := metrics.NewQueriesCollector("cnp", r.instance, dbname)
-	queriesCollector.InjectUserQueries(metricsserver.DefaultQueries)
+	queriesCollector.InjectUserQueries(metricserver.DefaultQueries)
 
 	if cluster.Spec.Monitoring == nil {
-		metricsserver.GetExporter().SetCustomQueries(queriesCollector)
+		r.metricsServerExporter.SetCustomQueries(queriesCollector)
 		return
 	}
 
@@ -606,7 +605,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		}
 	}
 
-	metricsserver.GetExporter().SetCustomQueries(queriesCollector)
+	r.metricsServerExporter.SetCustomQueries(queriesCollector)
 }
 
 // RefreshSecrets is called when the PostgreSQL secrets are changed

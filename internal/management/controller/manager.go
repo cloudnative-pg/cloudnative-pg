@@ -18,6 +18,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/concurrency"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver/metricserver"
 )
 
 // InstanceReconciler can reconcile the status of the PostgreSQL cluster with
@@ -32,16 +33,22 @@ type InstanceReconciler struct {
 
 	systemInitialization           *concurrency.Executed
 	verifiedPrimaryPgDataCoherence atomic.Bool
+	metricsServerExporter          *metricserver.Exporter
 }
 
 // NewInstanceReconciler creates a new instance reconciler
-func NewInstanceReconciler(instance *postgres.Instance, client ctrl.Client) *InstanceReconciler {
+func NewInstanceReconciler(
+	instance *postgres.Instance,
+	client ctrl.Client,
+	server *metricserver.MetricsServer,
+) *InstanceReconciler {
 	return &InstanceReconciler{
-		instance:             instance,
-		client:               client,
-		secretVersions:       make(map[string]string),
-		extensionStatus:      make(map[string]bool),
-		systemInitialization: concurrency.NewExecuted(),
+		instance:              instance,
+		client:                client,
+		secretVersions:        make(map[string]string),
+		extensionStatus:       make(map[string]bool),
+		systemInitialization:  concurrency.NewExecuted(),
+		metricsServerExporter: server.GetExporter(),
 	}
 }
 
