@@ -441,7 +441,7 @@ func startPprofDebugServer(ctx context.Context) {
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	pprofServer := http.Server{
-		Addr:    "localhost:6060",
+		Addr:    "0.0.0.0:6060",
 		Handler: mux,
 	}
 
