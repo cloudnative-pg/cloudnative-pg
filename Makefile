@@ -112,7 +112,7 @@ deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cl
 	    $(KUSTOMIZE) edit add patch --path manager_image_pull_secret.yaml ;\
 	    cd $$CONFIG_TMP_DIR/manager ;\
 	    $(KUSTOMIZE) edit set image controller=${CONTROLLER_IMG} ;\
-	    $(KUSTOMIZE) edit add patch --path env_override.yaml ;\
+	    $(KUSTOMIZE) edit add patch --path env_override.yaml ; \
 	    $(KUSTOMIZE) edit add configmap controller-manager-env \
 	        --from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME} ;\
 	} ;\
