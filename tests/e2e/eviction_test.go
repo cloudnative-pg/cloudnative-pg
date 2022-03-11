@@ -100,6 +100,14 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
+			// limit the case running on local kind env as we are using taint to simulate the eviction
+			// we do not know if other cloud vendor crd controller is running on the node been evicted
+			isIBM := env.IsIBM()
+			isAKS, _ := env.IsAKS()
+			isGKE, _ := env.IsGKE()
+			if isIBM || isAKS || isGKE {
+				Skip("Test runs only on local")
+			}
 		})
 		JustAfterEach(func() {
 			clusterName, err := env.GetResourceNameFromYAML(singleInstanceSampleFile)
@@ -125,7 +133,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("evicts the primary pod", func() {
+		It("evicts the primary pod in single instance cluster", func() {
 			clusterName, err := env.GetResourceNameFromYAML(singleInstanceSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			podName := clusterName + "-1"
@@ -140,12 +148,15 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 				Eventually(func() (bool, error) {
 					pod := corev1.Pod{}
 					err := env.Client.Get(env.Ctx, namespacedName, &pod)
+					if err != nil {
+						return false, nil
+					}
 					return utils.IsPodActive(pod) && utils.IsPodReady(pod), err
-				}, 30).Should(BeTrue())
+				}, 60).Should(BeTrue())
 			})
 
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, 30, env)
+				AssertClusterIsReady(namespace, clusterName, 120, env)
 			})
 		})
 	})
@@ -160,6 +171,12 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		BeforeEach(func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
+			}
+			isIBM := env.IsIBM()
+			isAKS, _ := env.IsAKS()
+			isGKE, _ := env.IsGKE()
+			if isIBM || isAKS || isGKE {
+				Skip("Test runs only on local")
 			}
 		})
 		JustAfterEach(func() {
@@ -203,7 +220,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			}
 		})
 
-		It("evicts the replica pod", func() {
+		It("evicts the replica pod in multiple instance cluster", func() {
 			var podName string
 
 			clusterName, err := env.GetResourceNameFromYAML(multiInstanceSampleFile)
@@ -234,16 +251,19 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 				Eventually(func() (bool, error) {
 					pod := corev1.Pod{}
 					err := env.Client.Get(env.Ctx, namespacedName, &pod)
+					if err != nil {
+						return false, nil
+					}
 					return utils.IsPodActive(pod) && utils.IsPodReady(pod), err
-				}, 30).Should(BeTrue())
+				}, 60).Should(BeTrue())
 			})
 
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, 30, env)
+				AssertClusterIsReady(namespace, clusterName, 120, env)
 			})
 		})
 
-		It("evicts the primary pod", func() {
+		It("evicts the primary pod in multiple instance cluster", func() {
 			var primaryPod *corev1.Pod
 
 			clusterName, err := env.GetResourceNameFromYAML(multiInstanceSampleFile)
@@ -254,11 +274,18 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			// We can not use patch to simulate the eviction of a primary pod;
 			// so that we use taint to simulate the real eviction
 
-			By("tainting the node to make pod been evicted", func() {
+			By("taint the node to simulate pod been evicted", func() {
 				cmd := fmt.Sprintf("kubectl taint nodes %v node.kubernetes.io/memory-pressure:NoExecute", taintNodeName)
 				_, _, err = testsUtils.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 				needRemoveTaint = true
+
+				time.Sleep(3 * time.Second)
+
+				cmd = fmt.Sprintf("kubectl taint nodes %v node.kubernetes.io/memory-pressure:NoExecute-", taintNodeName)
+				_, _, err = testsUtils.Run(cmd)
+				Expect(err).ToNot(HaveOccurred())
+				needRemoveTaint = false
 			})
 
 			By("checking switchover happens", func() {
@@ -271,13 +298,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 						}
 					}
 					return false
-				}, 30).Should(BeTrue())
-			})
-			By("removing the taint on the node", func() {
-				cmd := fmt.Sprintf("kubectl taint nodes %v node.kubernetes.io/memory-pressure:NoExecute-", taintNodeName)
-				_, _, err = testsUtils.Run(cmd)
-				Expect(err).ToNot(HaveOccurred())
-				needRemoveTaint = false
+				}, 60).Should(BeTrue())
 			})
 
 			// Pod need rejoin, need more time
