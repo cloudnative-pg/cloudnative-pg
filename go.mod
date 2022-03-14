@@ -23,7 +23,7 @@ require (
 	github.com/sethvargo/go-password v0.2.0
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
-	github.com/thoas/go-funk v0.9.1
+	github.com/thoas/go-funk v0.9.2
 	go.uber.org/atomic v1.9.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
