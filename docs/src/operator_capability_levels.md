@@ -195,10 +195,8 @@ replication connections from the standby servers, instead of relying on a passwo
 The operator enables you to apply changes to the `Cluster` resource YAML
 section of the PostgreSQL configuration and makes sure that all instances
 are properly reloaded or restarted, depending on the configuration option.
-*Current limitations:* changes with `ALTER SYSTEM` are not detected, meaning
-that the cluster state is not enforced; proper restart order is not implemented
-with [hot standby sensitive parameters](https://www.postgresql.org/docs/current/hot-standby.html#HOT-STANDBY-ADMIN)
-such as `max_connections` and `max_wal_senders`.
+*Current limitation:* changes with `ALTER SYSTEM` are not detected, meaning
+that the cluster state is not enforced.
 
 ### Multiple installation methods
 
