@@ -4,7 +4,6 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2021 EnterpriseDB Corporation.
 */
 
-// Package config contains the code related to the generation of the PgBouncer configuration
 package config
 
 import (
@@ -125,7 +124,12 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 
 	// if no user is provided we have to check the secret for a username, and we must be using basic auth
 	// if a user is provided it will overwrite the user in the secret, or we could be using cert auth
-	switch secrets.AuthQuery.Type {
+	authQuerySecretType, err := detectSecretType(secrets.AuthQuery)
+	if err != nil {
+		return nil, fmt.Errorf("while detecting auth user secret type: %w", err)
+	}
+
+	switch authQuerySecretType {
 	case corev1.SecretTypeBasicAuth:
 		authQueryUser = string(secrets.AuthQuery.Data["username"])
 		authQueryPassword = strings.ReplaceAll(string(secrets.AuthQuery.Data["password"]), "\"", "\"\"")
@@ -180,7 +184,7 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		Parameters: stringifyPgBouncerParameters(parameters),
 	}
 
-	err := pgBouncerIniTemplate.Execute(&pgbouncerIni, templateData)
+	err = pgBouncerIniTemplate.Execute(&pgbouncerIni, templateData)
 	if err != nil {
 		return nil, fmt.Errorf("while executing %s template: %w", PgBouncerIniFileName, err)
 	}
