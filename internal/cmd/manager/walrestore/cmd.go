@@ -68,9 +68,9 @@ func NewCmd() *cobra.Command {
 				contextLog.Info("tried restoring WALs, but no backup was configured")
 			case errors.Is(err, ErrEndOfWALStreamReached):
 				contextLog.Info(
-					"end-of-wal-stream flag found. " +
+					"end-of-wal-stream flag found." +
 						"Exiting with error once to let Postgres try switching to streaming replication")
-				return nil
+				return err
 			default:
 				contextLog.Info("wal-restore command failed", "error", err)
 			}
