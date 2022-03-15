@@ -101,6 +101,24 @@ authentication (see the ["Authentication" section](#authentication) below).
 Containers run as the `pgbouncer` system user, and access to the `pgbouncer`
 database is only allowed via local connections, through `peer` authentication.
 
+### Certificates
+
+By default, PgBouncer pooler will use the same certificates that are used by the
+cluster itself, but if the user provides those certificates the pooler will accept
+secrets with the following format:
+
+1. Basic Auth
+2. TLS
+3. Opaque
+
+In the Opaque case, it will look for specific keys that needs to be used, those keys
+are the following:
+
+* tls.crt
+* tls.key
+
+So we can treat this secret as a TLS secret, and start from there.
+
 ## Authentication
 
 **Password based authentication** is the only supported method for clients of
