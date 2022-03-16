@@ -126,7 +126,7 @@ func customDestination(in *zap.Options) {
 
 // UpdateCondition will allow instance manager to update a particular condition
 // if the condition was already updated in the correct state then this is a no-op
-func UpdateCondition(ctx context.Context, client client.WithWatch,
+func UpdateCondition(ctx context.Context, c client.Client,
 	cluster *apiv1.Cluster, condition *apiv1.ClusterCondition,
 ) error {
 	if cluster == nil && condition == nil {
@@ -134,7 +134,7 @@ func UpdateCondition(ctx context.Context, client client.WithWatch,
 		return nil
 	}
 
-	existingClusterStatus := cluster.Status
+	oriCluster := cluster.DeepCopy()
 	var exCondition *apiv1.ClusterCondition
 	for i, c := range cluster.Status.Conditions {
 		if c.Type == condition.Type {
@@ -148,8 +148,9 @@ func UpdateCondition(ctx context.Context, client client.WithWatch,
 		cluster.Status.Conditions = append(cluster.Status.Conditions, *condition)
 	}
 
-	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
-		if err := client.Status().Update(ctx, cluster); err != nil {
+	if !reflect.DeepEqual(oriCluster.Status, cluster.Status) {
+		// To avoid conflict using patch instead of update
+		if err := c.Status().Patch(ctx, cluster, client.MergeFrom(oriCluster)); err != nil {
 			return err
 		}
 	}

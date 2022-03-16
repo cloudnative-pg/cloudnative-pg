@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
@@ -165,7 +166,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		"pod", pod.Name)
 
 	// This backup has been started
-	err = StartBackup(ctx, r.Client, &backup, pod)
+	err = StartBackup(ctx, r.Client, &backup, pod, &cluster)
 	if err != nil {
 		r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
 	}
@@ -180,13 +181,14 @@ func StartBackup(
 	client client.Client,
 	backup *apiv1.Backup,
 	pod corev1.Pod,
+	cluster *apiv1.Cluster,
 ) error {
 	// This backup has been started
 	status := backup.GetStatus()
 	status.Phase = apiv1.BackupPhaseStarted
 	status.InstanceID = &apiv1.InstanceID{PodName: pod.Name, ContainerID: pod.Status.ContainerStatuses[0].ContainerID}
 	if err := postgres.UpdateBackupStatusAndRetry(ctx, client, backup); err != nil {
-		backup.GetStatus().SetAsFailed(fmt.Errorf("can't update backup: %w", err))
+		status.SetAsFailed(fmt.Errorf("can't update backup: %w", err))
 		return err
 	}
 	config := ctrl.GetConfigOrDie()
@@ -204,15 +206,21 @@ func StartBackup(
 			nil,
 			"/controller/manager",
 			"backup",
-			backup.GetName())
+			backup.GetName(),
+		)
 		return err
 	})
+
 	if err != nil {
 		log.FromContext(ctx).Error(err, "executing backup", "stdout", stdout, "stderr", stderr)
-		status := backup.GetStatus()
 		status.SetAsFailed(fmt.Errorf("can't execute backup: %w", err))
 		status.CommandError = stderr
 		status.CommandError = stdout
+
+		// Update backup status in cluster conditions
+		if errCond := manager.UpdateCondition(ctx, client, cluster, postgres.BuildBackupCondition(err)); errCond != nil {
+			log.FromContext(ctx).Error(err, "Error status.UpdateCondition()")
+		}
 		return postgres.UpdateBackupStatusAndRetry(ctx, client, backup)
 	}
 
