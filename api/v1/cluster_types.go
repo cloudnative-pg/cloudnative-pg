@@ -360,6 +360,8 @@ type ClusterStatus struct {
 const (
 	// ConditionContinuousArchiving this condition archiving :owned by InstanceManager.
 	ConditionContinuousArchiving ClusterConditionType = "ContinuousArchiving"
+	// ConditionBackup this condition looking backup status :owned by InstanceManager.
+	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
 )
 
 // ConditionStatus defines conditions of resources

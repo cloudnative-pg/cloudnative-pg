@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
@@ -279,6 +280,13 @@ func (b *BackupCommand) run(ctx context.Context) {
 		b.Log.Error(err, "Backup failed")
 		backupStatus.SetAsFailed(err)
 		b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
+
+		// Update backup status in cluster conditions
+		if errCond := manager.UpdateCondition(ctx, b.Client,
+			b.Cluster, BuildBackupCondition(err)); errCond != nil {
+			b.Log.Error(errCond, "Error status.UpdateCondition()")
+		}
+
 		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 			b.Log.Error(err, "Can't mark backup as failed")
 		}
@@ -289,6 +297,12 @@ func (b *BackupCommand) run(ctx context.Context) {
 	b.Log.Info("Backup completed")
 	backupStatus.SetAsCompleted()
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
+
+	// Update backup status in cluster conditions
+	if errCond := manager.UpdateCondition(ctx, b.Client,
+		b.Cluster, BuildBackupCondition(nil)); errCond != nil {
+		b.Log.Error(errCond, "Error status.UpdateCondition()")
+	}
 
 	// Delete backups per policy
 	if b.Cluster.Spec.Backup.RetentionPolicy != "" {
@@ -412,4 +426,22 @@ func (b *BackupCommand) updateCompletedBackupStatus(backupList *catalog.Catalog)
 	backupStatus.EndWal = latestBackup.EndWal
 	backupStatus.BeginLSN = latestBackup.BeginLSN
 	backupStatus.EndLSN = latestBackup.EndLSN
+}
+
+// BuildBackupCondition build a backup conditions
+func BuildBackupCondition(err error) *apiv1.ClusterCondition {
+	if err != nil {
+		return &apiv1.ClusterCondition{
+			Type:    apiv1.ConditionBackup,
+			Status:  apiv1.ConditionFalse,
+			Reason:  "Last backup failed",
+			Message: err.Error(),
+		}
+	}
+	return &apiv1.ClusterCondition{
+		Type:    apiv1.ConditionBackup,
+		Status:  apiv1.ConditionTrue,
+		Reason:  "Last backup succeeded",
+		Message: "",
+	}
 }

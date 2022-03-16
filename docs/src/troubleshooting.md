@@ -400,12 +400,19 @@ objects [like here](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifec
 Cluster exposes `status.conditions` as well. This allows one to 'wait' for a particular 
 event to occur instead of relying on the overall cluster health state. Available conditions as of now are:
 
+- LastBackupSucceeded
 - ContinuousArchiving
 
 ### How to wait for a particular condition
 
+- Backup:
 ```bash
-$ kubectl wait --for=condition=ContinuousArchiving cluster/<cluster-name>
+$ kubectl wait --for=condition=LastBackupSucceeded cluster/<CLUSTER-NAME> -n <NAMESPACE>
+```
+
+- ContinuousArchiving:
+```bash
+$ kubectl wait --for=condition=ContinuousArchiving cluster/<CLUSTER-NAME> -n <NAMESPACE>
 ```
 
 Below is a snippet of a `cluster.status` that contains a failing condition.
@@ -418,10 +425,15 @@ $ kubectl get cluster/<cluster-name> -o yaml
   status:
     conditions:
     - message: 'unexpected failure invoking barman-cloud-wal-archive: exit status
-        4'
+        2'
       reason: Continuous Archiving is Failing
       status: "False"
       type: ContinuousArchiving
+
+    - message: exit status 2
+      reason: Backup is failed
+      status: "False"
+      type: LastBackupSucceeded
 ```
 
 ## Some common issues
