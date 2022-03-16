@@ -157,7 +157,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
 				testUtils.ExecuteBackup(namespace, backupFile, env)
-
+				AssertBackupConditionInClusterStatus(namespace, clusterName)
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
 				}, 30).Should(BeEquivalentTo(1))
@@ -313,6 +313,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			By("uploading a backup", func() {
 				// We create a backup
 				testUtils.ExecuteBackup(namespace, backupFile, env)
+				AssertBackupConditionInClusterStatus(namespace, clusterName)
 
 				// Verifying file called data.tar should be available on Azure blob storage
 				Eventually(func() (int, error) {
@@ -602,6 +603,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
 				testUtils.ExecuteBackup(namespace, sourceBackupFileMinio, env)
+				AssertBackupConditionInClusterStatus(namespace, clusterName)
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
 				}, 30).Should(BeEquivalentTo(1))
@@ -645,6 +647,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
 				testUtils.ExecuteBackup(namespace, sourceBackupFileMinio, env)
+				AssertBackupConditionInClusterStatus(namespace, clusterName)
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
 				}, 30).Should(BeEquivalentTo(1))
@@ -696,6 +699,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				By("backing up a cluster and verifying it exists on azure blob storage", func() {
 					// Create the backup
 					testUtils.ExecuteBackup(namespace, sourceBackupFileAzure, env)
+					AssertBackupConditionInClusterStatus(namespace, clusterName)
 					// Verifying file called data.tar should be available on Azure blob storage
 					Eventually(func() (int, error) {
 						return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")
@@ -767,6 +771,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				By("backing up a cluster and verifying it exists on azure blob storage", func() {
 					// We create a Backup
 					testUtils.ExecuteBackup(namespace, sourceBackupFileAzureSAS, env)
+					AssertBackupConditionInClusterStatus(namespace, clusterName)
 					// Verifying file called data.tar should be available on Azure blob storage
 					Eventually(func() (int, error) {
 						return testUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, "data.tar")

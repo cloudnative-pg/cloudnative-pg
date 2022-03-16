@@ -385,3 +385,25 @@ func CountFilesOnAzuriteBlobStorage(
 	err = json.Unmarshal([]byte(out), &arr)
 	return len(arr), err
 }
+
+// GetConditionsInClusterStatus get conditions values as given type from cluster object status
+func GetConditionsInClusterStatus(
+	namespace,
+	clusterName string,
+	env *TestingEnvironment,
+	conditionType apiv1.ClusterConditionType) (*apiv1.ClusterCondition, error) {
+	var cluster *apiv1.Cluster
+	var err error
+	var backupConditionInCluster *apiv1.ClusterCondition
+	cluster, err = env.GetCluster(namespace, clusterName)
+	if err != nil {
+		return &apiv1.ClusterCondition{}, nil
+	}
+	for index, cond := range cluster.Status.Conditions {
+		if cond.Type == conditionType {
+			backupConditionInCluster = &cluster.Status.Conditions[index]
+			break
+		}
+	}
+	return backupConditionInCluster, nil
+}

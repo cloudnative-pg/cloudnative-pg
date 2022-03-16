@@ -1416,6 +1416,7 @@ func prepareClusterForPITROnMinio(
 	})
 	AssertArchiveWalOnMinio(namespace, clusterName)
 	AssertArchiveConditionMet(namespace, clusterName, "5m")
+	AssertBackupConditionInClusterStatus(namespace, clusterName)
 }
 
 func prepareClusterForPITROnAzureBlob(namespace, clusterName, backupSampleFile,
@@ -1450,6 +1451,7 @@ func prepareClusterForPITROnAzureBlob(namespace, clusterName, backupSampleFile,
 	})
 	AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azStorageKey)
 	AssertArchiveConditionMet(namespace, clusterName, "5m")
+	AssertBackupConditionInClusterStatus(namespace, clusterName)
 }
 
 func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
@@ -1496,6 +1498,7 @@ func prepareClusterBackupOnAzurite(namespace, clusterName, clusterSampleFile, ba
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
 	})
+	AssertBackupConditionInClusterStatus(namespace, clusterName)
 }
 
 func prepareClusterForPITROnAzurite(namespace, clusterName, backupSampleFile string, currentTimestamp *string) {
@@ -2012,4 +2015,17 @@ func CreateResourceFromFile(namespace, sampleFilePath string) {
 		}
 		return nil
 	}, 60, 5).Should(BeNil())
+}
+
+func AssertBackupConditionInClusterStatus(namespace, clusterName string) {
+	By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
+		Eventually(func() (string, error) {
+			getBackupCondition, err := testsUtils.GetConditionsInClusterStatus(
+				namespace, clusterName, env, apiv1.ConditionBackup)
+			if err != nil {
+				return "", err
+			}
+			return string(getBackupCondition.Status), nil
+		}, 300, 5).Should(BeEquivalentTo("True"))
+	})
 }
