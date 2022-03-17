@@ -73,7 +73,8 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
       cd "${CONFIG_TMP_DIR}/manager"
       "${KUSTOMIZE}" edit set image "controller=${CONTROLLER_IMG}"
       "${KUSTOMIZE}" edit add patch --path env_override.yaml
-      "${KUSTOMIZE}" edit add configmap controller-manager-env "--from-literal=POSTGRES_IMAGE_NAME=${POSTGRES_IMG}"
+      "${KUSTOMIZE}" edit add configmap controller-manager-env \
+        --from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMG}"
   )
   "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml"
   # Run the upgrade tests
