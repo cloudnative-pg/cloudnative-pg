@@ -262,7 +262,7 @@ if __name__ == "__main__":
         engines = required_engines
     else:
         # Do not run `gke` and `rke` by default
-        engines = engines - {"gke", "rke"}
+        engines = engines - {"rke"}
 
     matrix = {}
     for engine in ENGINE_MODES:
