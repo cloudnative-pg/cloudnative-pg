@@ -299,3 +299,15 @@ func GetDirectoryContent(dir string) (files []string, err error) {
 
 	return
 }
+
+// GetFileSize returns the size of a file or an error
+func GetFileSize(fileName string) (int64, error) {
+	stat, err := os.Stat(fileName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return stat.Size(), nil
+}
