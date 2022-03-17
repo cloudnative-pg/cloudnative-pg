@@ -1169,20 +1169,17 @@ jobs:
           SHORT_ID=$( echo ${{ matrix.id }} | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
           echo "CLUSTER_NAME=cnp-test-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
       -
-        name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@master #wokeignore:rule=master
+        name: Authenticate to Google Cloud
+        id: 'auth'
+        uses: google-github-actions/auth@v0.6.0
+        with:
+          credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
+      -
+        name: Set up Cloud SDK and kubectl
+        uses: google-github-actions/setup-gcloud@v0.6.0
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-          export_default_credentials: true
-      -
-        name: Install kubectl
-        uses: nick-fields/retry@v2
-        with:
-          timeout_seconds: 30
-          max_attempts: 3
-          command: |
-           gcloud components install --quiet kubectl
+          install_components: kubectl
       -
         name: Create GKE cluster
         run: |
