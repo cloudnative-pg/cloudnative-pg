@@ -612,6 +612,60 @@ func waitForStreamingConnectionAvailable(db *sql.DB) error {
 	})
 }
 
+// managePgControlFileBackup ensures we have a useful pg_control file all the time
+// even if pg_rewind fails for any possible reason.
+// One of the possible situations is because of pg_rewind failures could end up
+// in global/pg_control been replaced with a zero length file.
+func (instance *Instance) managePgControlFileBackup() error {
+	pgControlFilePath := filepath.Join(instance.PgData, "global", "pg_control")
+	pgControlBackupFilePath := pgControlFilePath + ".old"
+
+	pgControlSize, err := fileutils.GetFileSize(pgControlFilePath)
+	if err != nil {
+		return fmt.Errorf("while getting pg_control size: %w", err)
+	}
+
+	if pgControlSize != 0 {
+		// We copy the current pg_control file into the pg_control.old as backup, even if we already know that
+		// it was copy before, this could prevent any error in the future.
+		err = fileutils.CopyFile(pgControlFilePath, pgControlBackupFilePath)
+		if err != nil {
+			return fmt.Errorf("while copying pg_control file for backup before pg_rewind: %w", err)
+		}
+		return os.Chmod(pgControlBackupFilePath, 0o600)
+	}
+
+	pgControlBackupExists, err := fileutils.FileExists(pgControlBackupFilePath)
+	if err != nil {
+		return fmt.Errorf("while checking for pg_control.old: %w", err)
+	}
+
+	// If the current pg_control file is zero-size and the pg_control.old file exist
+	// we can copy the old pg_control file to the new one
+	if pgControlBackupExists {
+		err = fileutils.CopyFile(pgControlBackupFilePath, pgControlFilePath)
+		if err != nil {
+			return fmt.Errorf("while copying old pg_contorl to new pg_control: %w", err)
+		}
+		return os.Chmod(pgControlFilePath, 0o600)
+	}
+
+	return fmt.Errorf("pg_control file is zero and we don't have a pg_control.old")
+}
+
+// removePgControlFileBackup cleans up the pg_control backup after pg_rewind has successfully completed.
+func (instance *Instance) removePgControlFileBackup() error {
+	pgControlFilePath := filepath.Join(instance.PgData, "global", "pg_control")
+	pgControlBackupFilePath := pgControlFilePath + ".old"
+
+	err := os.Remove(pgControlBackupFilePath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}
+
 // Rewind uses pg_rewind to align this data directory with the contents of the primary node.
 // If postgres major version is >= 13, add "--restore-target-wal" option
 func (instance *Instance) Rewind(postgresMajorVersion int) error {
@@ -636,15 +690,28 @@ func (instance *Instance) Rewind(postgresMajorVersion int) error {
 		options = append(options, "--restore-target-wal")
 	}
 
+	// Make sure PostgreSQL control file is not empty
+	err := instance.managePgControlFileBackup()
+	if err != nil {
+		return err
+	}
+
 	log.Info("Starting up pg_rewind",
 		"pgdata", instance.PgData,
 		"options", options)
 
 	pgRewindCmd := exec.Command(pgRewindName, options...) // #nosec
 	pgRewindCmd.Env = instance.Env
-	err := execlog.RunStreaming(pgRewindCmd, pgRewindName)
+	err = execlog.RunStreaming(pgRewindCmd, pgRewindName)
 	if err != nil {
+		log.Error(err, "Failed to execute pg_rewind", "options", options)
 		return fmt.Errorf("error executing pg_rewind: %w", err)
+	}
+
+	// Clean up the pg_control backup after pg_rewind has successfully completed
+	err = instance.removePgControlFileBackup()
+	if err != nil {
+		return err
 	}
 
 	return nil
