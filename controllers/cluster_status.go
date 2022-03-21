@@ -363,6 +363,13 @@ func (r *ClusterReconciler) getPoolerIntegrationsNeeded(ctx context.Context,
 	}
 
 	pgbouncerPoolerIntegrations, err := r.getPgbouncerIntegrationStatus(ctx, cluster, poolers)
+
+	for _, pooler := range poolers.Items {
+		if !slices.Contains(pgbouncerPoolerIntegrations.Secrets, pooler.Name) {
+			log.Info("pooler not automatically configured, manual configuration required",
+				"cluster", pooler.Spec.Cluster.Name, "pooler", pooler.Name)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("while getting integration status for pgbouncer poolers in cluster %s: %w",
 			cluster.Name, err)
