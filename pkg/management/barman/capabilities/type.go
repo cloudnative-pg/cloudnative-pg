@@ -15,6 +15,7 @@ import (
 type Capabilities struct {
 	HasAzure                   bool
 	HasS3                      bool
+	HasGoogle                  bool
 	HasRetentionPolicy         bool
 	HasTags                    bool
 	HasCheckWalArchive         bool

@@ -197,6 +197,9 @@ func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 		result = append(
 			result,
 			azureCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.AzureCredentials)...)
+		result = append(
+			result,
+			googleCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.GoogleCredentials)...)
 	}
 
 	// Secrets needed by Barman, if set
@@ -258,6 +261,19 @@ func s3CredentialsSecrets(s3Credentials *apiv1.S3Credentials) []string {
 
 	if s3Credentials.SecretAccessKeyReference != nil {
 		secrets = append(secrets, s3Credentials.SecretAccessKeyReference.Name)
+	}
+
+	return secrets
+}
+
+func googleCredentialsSecrets(googleCredentials *apiv1.GoogleCredentials) []string {
+	if googleCredentials == nil {
+		return nil
+	}
+	var secrets []string
+
+	if googleCredentials.ApplicationCredentials != nil {
+		return append(secrets, googleCredentials.ApplicationCredentials.Name)
 	}
 
 	return secrets

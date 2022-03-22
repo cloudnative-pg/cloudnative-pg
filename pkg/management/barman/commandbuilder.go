@@ -22,7 +22,8 @@ func AppendCloudProviderOptionsFromConfiguration(
 ) ([]string, error) {
 	return appendCloudProviderOptions(options,
 		barmanConfiguration.S3Credentials != nil,
-		barmanConfiguration.AzureCredentials != nil)
+		barmanConfiguration.AzureCredentials != nil,
+		barmanConfiguration.GoogleCredentials != nil)
 }
 
 // AppendCloudProviderOptionsFromBackup takes an options array and adds the cloud provider specified
@@ -33,24 +34,30 @@ func AppendCloudProviderOptionsFromBackup(
 ) ([]string, error) {
 	return appendCloudProviderOptions(options,
 		backup.Status.S3Credentials != nil,
-		backup.Status.AzureCredentials != nil)
+		backup.Status.AzureCredentials != nil,
+		backup.Status.GoogleCredentials != nil)
 }
 
 // appendCloudProviderOptions takes an options array and adds the cloud provider specified as arguments
-func appendCloudProviderOptions(options []string, s3Credentials, azureCredentials bool) ([]string, error) {
+func appendCloudProviderOptions(
+	options []string,
+	s3Credentials,
+	azureCredentials,
+	googleCredentials bool) ([]string, error) {
 	capabilities, err := barmanCapabilities.CurrentCapabilities()
 	if err != nil {
 		return nil, err
 	}
 
-	if s3Credentials && capabilities.HasS3 {
-		options = append(
-			options,
-			"--cloud-provider",
-			"aws-s3")
-	}
-
-	if azureCredentials {
+	switch {
+	case s3Credentials:
+		if capabilities.HasS3 {
+			options = append(
+				options,
+				"--cloud-provider",
+				"aws-s3")
+		}
+	case azureCredentials:
 		if capabilities.HasAzure {
 			options = append(
 				options,
@@ -59,6 +66,19 @@ func appendCloudProviderOptions(options []string, s3Credentials, azureCredential
 		} else {
 			err := fmt.Errorf(
 				"barman >= 2.13 is required to use Azure object storage, current: %v",
+				capabilities.Version)
+			log.Error(err, "Barman version not supported")
+			return nil, err
+		}
+	case googleCredentials:
+		if capabilities.HasGoogle {
+			options = append(
+				options,
+				"--cloud-provider",
+				"google-cloud-storage")
+		} else {
+			err := fmt.Errorf(
+				"barman >= 2.19 is required to use Google Cloud Storage, current: %v",
 				capabilities.Version)
 			log.Error(err, "Barman version not supported")
 			return nil, err

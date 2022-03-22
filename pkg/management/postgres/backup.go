@@ -242,7 +242,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		b.Cluster.Spec.Backup.BarmanObjectStore,
 		b.Env)
 	if err != nil {
-		return fmt.Errorf("cannot recover AWS credentials: %w", err)
+		return fmt.Errorf("cannot recover backup credentials: %w", err)
 	}
 
 	// Run the actual backup process
@@ -396,6 +396,7 @@ func (b *BackupCommand) setupBackupStatus() {
 
 	backupStatus.S3Credentials = barmanConfiguration.S3Credentials
 	backupStatus.AzureCredentials = barmanConfiguration.AzureCredentials
+	backupStatus.GoogleCredentials = barmanConfiguration.GoogleCredentials
 	backupStatus.EndpointCA = barmanConfiguration.EndpointCA
 	backupStatus.EndpointURL = barmanConfiguration.EndpointURL
 	backupStatus.DestinationPath = barmanConfiguration.DestinationPath
