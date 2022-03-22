@@ -31,7 +31,8 @@ You can archive the backup files in any service that is supported
 by the Barman Cloud infrastructure. That is:
 
 - [AWS S3](https://aws.amazon.com/s3/)
-- [Microsoft Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/).
+- [Microsoft Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/)
+- [Google Cloud Storage](https://cloud.google.com/storage/)
 
 You can also use any compatible implementation of the
 supported services.
@@ -313,6 +314,71 @@ In that case, `<account-name>` is the first component of the path.
 
 This is required if you are testing the Azure support via the Azure Storage
 Emulator or [Azurite](https://github.com/Azure/Azurite).
+
+### Google Cloud Storage
+
+Currently, the operator supports two authentication methods for Google Cloud Storage,
+one assumes the pod is running inside a Google Kubernetes Engine cluster, the other one leverages
+the environment variable `GOOGLE_APPLICATION_CREDENTIALS`.
+
+#### Running inside Google Kubernetes Engine
+
+This could be one of the easiest way to create a backup, and only requires
+the following configuration:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "gs://<destination path here>"
+      googleCredentials:
+        gkeEnvironment: true
+```
+
+This, will tell the operator that the cluster is running inside a Google Kubernetes
+Engine meaning that no credentials are needed to upload the files
+
+!!! Important
+    This method will require carefully defined permissions for cluster
+    and pods, which have to be defined by a cluster administrator.
+
+#### Using authentication
+
+Following the [instruction from Google](https://cloud.google.com/docs/authentication/getting-started)
+you will get a JSON file that contains all the required information to authenticate.
+
+The content of the JSON file must be provided using a `Secret` that can be created
+with the following command:
+
+```shell
+kubectl create secret generic backup-creds --from-file=gcsCredentials=gcs_credentials_file.json
+```
+
+This will create the `Secret` with the name `backup-creds` to be used in the yaml file like this:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "gs://<destination path here>"
+      googleCredentials:
+        applicationCredentials:
+          name: backup-creds
+          key: gcsCredentials
+```
+
+Now the operator will use the credentials to authenticate against Google Cloud Storage.
+
+!!! Important
+    This way of authentication will create a JSON file inside the container with all the needed
+    information to access your Google Cloud Storage bucket, meaning that if someone gets access to the pod
+    will also have write permissions to the bucket.
 
 ## On-demand backups
 

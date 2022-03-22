@@ -11,6 +11,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,6 +34,7 @@ func EnvSetBackupCloudCredentials(
 	} else if configuration.EndpointCA != nil && configuration.AzureCredentials != nil {
 		env = append(env, fmt.Sprintf("REQUESTS_CA_BUNDLE=%s", postgres.BarmanBackupEndpointCACertificateLocation))
 	}
+
 	return envSetCloudCredentials(ctx, c, namespace, configuration, env)
 }
 
@@ -63,6 +66,10 @@ func envSetCloudCredentials(
 ) (envs []string, err error) {
 	if configuration.S3Credentials != nil {
 		return envSetAWSCredentials(ctx, c, namespace, configuration, env)
+	}
+
+	if configuration.GoogleCredentials != nil {
+		return envSetGoogleCredentials(ctx, c, namespace, configuration.GoogleCredentials, env)
 	}
 
 	return envSetAzureCredentials(ctx, c, namespace, configuration, env)
@@ -213,4 +220,55 @@ func envSetAzureCredentials(
 	}
 
 	return env, nil
+}
+
+func envSetGoogleCredentials(
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+	googleCredentials *apiv1.GoogleCredentials,
+	env []string,
+) ([]string, error) {
+	var applicationCredentialsContent []byte
+
+	if googleCredentials.GKEEnvironment &&
+		googleCredentials.ApplicationCredentials == nil {
+		return env, reconcileGoogleCredentials(googleCredentials, applicationCredentialsContent)
+	}
+
+	var applicationCredentialsSecret corev1.Secret
+
+	secretName := googleCredentials.ApplicationCredentials.Name
+	secretKey := googleCredentials.ApplicationCredentials.Key
+	err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &applicationCredentialsSecret)
+	if err != nil {
+		return nil, fmt.Errorf("while getting application credentials secret: %w", err)
+	}
+
+	applicationCredentialsContent, ok := applicationCredentialsSecret.Data[secretKey]
+	if !ok {
+		return nil, fmt.Errorf("missing key `%v` in application credentials secret", secretKey)
+	}
+
+	if err := reconcileGoogleCredentials(googleCredentials, applicationCredentialsContent); err != nil {
+		return nil, err
+	}
+
+	env = append(env, "GOOGLE_APPLICATION_CREDENTIALS=/controller/.application_credentials.json")
+
+	return env, nil
+}
+
+func reconcileGoogleCredentials(
+	googleCredentials *apiv1.GoogleCredentials,
+	applicationCredentialsContent []byte) error {
+	credentialsPath := "/controller/.application_credentials.json"
+
+	if googleCredentials == nil {
+		return fileutils.RemoveFile(credentialsPath)
+	}
+
+	_, err := fileutils.WriteFileAtomic(credentialsPath, applicationCredentialsContent, 0o600)
+
+	return err
 }
