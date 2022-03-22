@@ -813,8 +813,11 @@ type BarmanObjectStoreConfiguration struct {
 	// The credentials to use to upload data to S3
 	S3Credentials *S3Credentials `json:"s3Credentials,omitempty"`
 
-	// The credentials to use to upload data in Azure Blob Storage
+	// The credentials to use to upload data to Azure Blob Storage
 	AzureCredentials *AzureCredentials `json:"azureCredentials,omitempty"`
+
+	// The credentials to use to upload data to Google Cloud Storage
+	GoogleCredentials *GoogleCredentials `json:"googleCredentials,omitempty"`
 
 	// Endpoint to be used to upload data to the cloud,
 	// overriding the automatic endpoint discovery
@@ -965,6 +968,18 @@ type AzureCredentials struct {
 	// A shared-access-signature to be used in conjunction with
 	// the storage account name
 	StorageSasToken *SecretKeySelector `json:"storageSasToken,omitempty"`
+}
+
+// GoogleCredentials is the type for the Google Cloud Storage credentials.
+// This needs to be specified even if we run inside a GKE environment.
+type GoogleCredentials struct {
+	// If set to true, will presume that it's running inside a GKE environment,
+	// default to false.
+	// +optional
+	GKEEnvironment bool `json:"gkeEnvironment"`
+
+	// The secret containing the Google Cloud Storage JSON file with the credentials
+	ApplicationCredentials *SecretKeySelector `json:"applicationCredentials,omitempty"`
 }
 
 // MonitoringConfiguration is the type containing all the monitoring
