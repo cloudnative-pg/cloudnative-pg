@@ -753,7 +753,7 @@ spec:
                     description: The configuration for the barman-cloud tool suite
                     properties:
                       azureCredentials:
-                        description: The credentials to use to upload data in Azure
+                        description: The credentials to use to upload data to Azure
                           Blob Storage
                         properties:
                           connectionString:
@@ -876,6 +876,29 @@ spec:
                         description: Endpoint to be used to upload data to the cloud,
                           overriding the automatic endpoint discovery
                         type: string
+                      googleCredentials:
+                        description: The credentials to use to upload data to Google
+                          Cloud Storage
+                        properties:
+                          applicationCredentials:
+                            description: The secret containing the Google Cloud Storage
+                              JSON file with the credentials
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
+                          gkeEnvironment:
+                            description: If set to true, will presume that it's running
+                              inside a GKE environment, default to false.
+                            type: boolean
+                        type: object
                       historyTags:
                         additionalProperties:
                           type: string
@@ -1202,7 +1225,7 @@ spec:
                       description: The configuration for the barman-cloud tool suite
                       properties:
                         azureCredentials:
-                          description: The credentials to use to upload data in Azure
+                          description: The credentials to use to upload data to Azure
                             Blob Storage
                           properties:
                             connectionString:
@@ -1325,6 +1348,29 @@ spec:
                           description: Endpoint to be used to upload data to the cloud,
                             overriding the automatic endpoint discovery
                           type: string
+                        googleCredentials:
+                          description: The credentials to use to upload data to Google
+                            Cloud Storage
+                          properties:
+                            applicationCredentials:
+                              description: The secret containing the Google Cloud
+                                Storage JSON file with the credentials
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            gkeEnvironment:
+                              description: If set to true, will presume that it's
+                                running inside a GKE environment, default to false.
+                              type: boolean
+                          type: object
                         historyTags:
                           additionalProperties:
                             type: string

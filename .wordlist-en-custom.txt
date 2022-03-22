@@ -107,6 +107,7 @@ Gabriele
 Gi
 Golang
 GolangCI
+GoogleCredentials
 Grafana
 HH
 Hai
@@ -293,6 +294,7 @@ apis
 apiserver
 apparmor
 appdb
+applicationCredentials
 appuser
 archiver
 args
@@ -310,6 +312,7 @@ ba
 backend
 backends
 backupId
+backupRetentionPolicy
 backupconfiguration
 backuplist
 backupspec
@@ -443,16 +446,20 @@ freddie
 gc
 gcc
 gce
+gcsCredentials
 github
+gkeEnvironment
 gmail
 golangci
 goodwithtech
+googleCredentials
 goroutines
 gosec
 gzip
 hba
 hdr
 healthz
+historyTags
 horikyota
 hostPort
 hostaddr

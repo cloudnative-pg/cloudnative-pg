@@ -1063,7 +1063,11 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 		allErrors = r.Spec.Backup.BarmanObjectStore.S3Credentials.validateAwsCredentials(
 			field.NewPath("spec", "backupConfiguration", "s3Credentials"))
 	}
-
+	if r.Spec.Backup.BarmanObjectStore.GoogleCredentials != nil {
+		credentialsCount++
+		allErrors = r.Spec.Backup.BarmanObjectStore.GoogleCredentials.validateGCSCredentials(
+			field.NewPath("spec", "backupConfiguration", "googleCredentials"))
+	}
 	if credentialsCount != 1 {
 		allErrors = append(allErrors, field.Invalid(
 			field.NewPath("spec", "backupConfiguration"),
@@ -1162,6 +1166,32 @@ func (s3 *S3Credentials) validateAwsCredentials(path *field.Path) field.ErrorLis
 				"only one AWS authentication method should be supplied",
 			),
 		)
+	}
+
+	return allErrors
+}
+
+func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	if !gcs.GKEEnvironment && gcs.ApplicationCredentials == nil {
+		allErrors = append(
+			allErrors,
+			field.Invalid(
+				path,
+				gcs,
+				"if gkeEnvironment is false, secret with credentials must be provided",
+			))
+	}
+
+	if gcs.GKEEnvironment && gcs.ApplicationCredentials != nil {
+		allErrors = append(
+			allErrors,
+			field.Invalid(
+				path,
+				gcs,
+				"if gkeEnvironment is true, secret with credentials must not be provided",
+			))
 	}
 
 	return allErrors

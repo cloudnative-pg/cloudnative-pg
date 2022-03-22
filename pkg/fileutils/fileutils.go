@@ -280,6 +280,16 @@ func RemoveDirectoryContent(dir string) (err error) {
 	return
 }
 
+// RemoveFile removes a specified file. Also works if a directory is empty.
+func RemoveFile(fileName string) error {
+	err := os.Remove(fileName)
+	if os.IsNotExist(err) {
+		return nil
+	}
+
+	return err
+}
+
 // GetDirectoryContent return a slice of string with the name of the files
 // in the dir directory
 func GetDirectoryContent(dir string) (files []string, err error) {

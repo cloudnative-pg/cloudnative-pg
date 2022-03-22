@@ -55,6 +55,10 @@ func Detect() (*Capabilities, error) {
 		// Cloud providers support, added in Barman >= 2.13
 		newCapabilities.HasAzure = true
 		newCapabilities.HasS3 = true
+		fallthrough
+	case version.GE(semver.Version{Major: 2, Minor: 19}):
+		// Google Cloud Storage support, added in Barman >= 2.19
+		newCapabilities.HasGoogle = true
 	}
 
 	log.Debug("Detected Barman installation", "newCapabilities", newCapabilities)
