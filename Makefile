@@ -195,7 +195,7 @@ go-licenses: ## Download go-licenses locally if necessary.
 
 GO_RELEASER = $(shell pwd)/bin/goreleaser
 go-releaser: ## Download go-releaser locally if necessary.
-	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser@latest)
+	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser@v1.6.3)
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 # go-install-tool will 'go install' any package $2 and install it to $1.
