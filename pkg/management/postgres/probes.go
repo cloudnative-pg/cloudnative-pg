@@ -10,7 +10,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -21,7 +20,6 @@ import (
 	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/executablehash"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/constants"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
@@ -162,28 +160,24 @@ func (instance *Instance) GetDecreasedSensibleSettings(superUserDB *sql.DB) (map
 	// We check whether all parameters with a pending restart from pg_settings
 	// have a decreased value reported as not applied from pg_file_settings.
 	rows, err := superUserDB.Query(
-		fmt.Sprintf(
-			`SELECT name, setting
-				FROM pg_file_settings
-				WHERE NOT applied
-				AND sourcefile = '%s'
-				AND name IN (
-					'max_connections',
-					'max_prepared_transactions',
-					'max_wal_senders',
-					'max_worker_processes',
-					'max_locks_per_transaction'
-				)
-				AND CAST(current_setting(name) AS INTEGER) > CAST(setting AS INTEGER)`,
-			path.Join(instance.PgData, constants.PostgresqlCustomConfigurationFile)))
-	if err != nil || rows.Err() != nil {
+		`SELECT name, setting
+				FROM
+				(SELECT name, setting, rank() OVER (PARTITION BY name ORDER BY seqno DESC) as rank
+					FROM pg_file_settings
+					WHERE name IN (
+						'max_connections',
+						'max_prepared_transactions',
+						'max_wal_senders',
+						'max_worker_processes',
+						'max_locks_per_transaction'
+					) AND not applied
+				) a
+				WHERE CAST(current_setting(name) AS INTEGER) > CAST(setting AS INTEGER) AND rank = 1`)
+	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		exitErr := rows.Close()
-		if err != nil {
-			return
-		}
 		if exitErr != nil {
 			err = exitErr
 		}
@@ -197,7 +191,10 @@ func (instance *Instance) GetDecreasedSensibleSettings(superUserDB *sql.DB) (map
 		}
 		decreasedSensibleValues[name] = newValue
 	}
-	return decreasedSensibleValues, err
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return decreasedSensibleValues, nil
 }
 
 // fillStatus extract the current instance information into the PostgresqlStatus
