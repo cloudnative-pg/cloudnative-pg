@@ -1498,7 +1498,7 @@ func (target RecoveryTarget) BuildPostgresOptions() string {
 	if target.TargetLSN != "" {
 		result += fmt.Sprintf(
 			"recovery_target_lsn = '%v'\n",
-			target.TargetName)
+			target.TargetLSN)
 	}
 	if target.TargetTime != "" {
 		result += fmt.Sprintf(
