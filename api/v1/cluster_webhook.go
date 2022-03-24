@@ -318,6 +318,15 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 				"You need to specify the database name"))
 	}
 
+	if initDBOptions.WalSegmentSize != 0 && !utils.IsPowerOfTwo(initDBOptions.WalSegmentSize) {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "walSegmentSize"),
+				initDBOptions.WalSegmentSize,
+				"WAL segment size must be a power of 2"))
+	}
+
 	return result
 }
 
