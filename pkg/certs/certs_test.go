@@ -7,6 +7,7 @@ Copyright (C) 2019-2021 EnterpriseDB Corporation.
 package certs
 
 import (
+	"bytes"
 	"crypto/x509"
 	"time"
 
@@ -196,6 +197,52 @@ var _ = Describe("Keypair generation", func() {
 
 			err = pair.IsValid(otherRootCA, nil)
 			Expect(err).ToNot(BeNil())
+		})
+
+		It("should validate using the full certificate chain", func() {
+			rootCA, err := CreateRootCA("ROOT", "root certificate")
+			Expect(err).ShouldNot(HaveOccurred())
+
+			intermediate1, err := rootCA.CreateDerivedCA("L1", "intermediate 1")
+			Expect(err).ShouldNot(HaveOccurred())
+
+			intermediate2, err := intermediate1.CreateDerivedCA("L2", "intermediate 2")
+			Expect(err).ShouldNot(HaveOccurred())
+
+			server, err := intermediate2.CreateAndSignPair("this.host.name.com", CertTypeServer, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			var caBuffer bytes.Buffer
+			caBuffer.Write(intermediate1.Certificate)
+			caBuffer.Write(rootCA.Certificate)
+
+			caBundle := &KeyPair{
+				Certificate: caBuffer.Bytes(),
+			}
+
+			var tlsBuffer bytes.Buffer
+			tlsBuffer.Write(server.Certificate)
+			tlsBuffer.Write(intermediate2.Certificate)
+
+			tlsCert := &KeyPair{
+				Private:     server.Private,
+				Certificate: tlsBuffer.Bytes(),
+			}
+
+			err = tlsCert.IsValid(caBundle, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			opts := x509.VerifyOptions{KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+
+			err = tlsCert.IsValid(caBundle, &opts)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			caBundleIncomplete := &KeyPair{
+				Certificate: rootCA.Certificate,
+			}
+
+			err = tlsCert.IsValid(caBundleIncomplete, nil)
+			Expect(err).Should(HaveOccurred())
 		})
 	})
 })
