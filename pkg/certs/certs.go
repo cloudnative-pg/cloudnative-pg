@@ -94,19 +94,13 @@ func (pair KeyPair) ParseCertificate() (*x509.Certificate, error) {
 
 // IsValid checks if given CA and verify options match the server
 func (pair KeyPair) IsValid(caPair *KeyPair, opts *x509.VerifyOptions) error {
-	blockCa, _ := pem.Decode(caPair.Certificate)
-	if blockCa == nil || blockCa.Type != certificatePEMBlockType {
-		return fmt.Errorf("invalid public key PEM block type")
+	if opts == nil {
+		opts = &x509.VerifyOptions{}
 	}
 
-	blockServer, _ := pem.Decode(pair.Certificate)
+	blockServer, intermediatesPEM := pem.Decode(pair.Certificate)
 	if blockServer == nil || blockServer.Type != certificatePEMBlockType {
 		return fmt.Errorf("invalid public key PEM block type")
-	}
-
-	caCert, err := x509.ParseCertificate(blockCa.Bytes)
-	if err != nil {
-		return err
 	}
 
 	serverCert, err := x509.ParseCertificate(blockServer.Bytes)
@@ -114,15 +108,23 @@ func (pair KeyPair) IsValid(caPair *KeyPair, opts *x509.VerifyOptions) error {
 		return err
 	}
 
-	roots := x509.NewCertPool()
-	roots.AddCert(caCert)
+	if len(intermediatesPEM) > 0 {
+		if opts.Intermediates == nil {
+			opts.Intermediates = x509.NewCertPool()
+		}
 
-	// init opts if nil
-	if opts == nil {
-		opts = &x509.VerifyOptions{}
+		if !opts.Intermediates.AppendCertsFromPEM(intermediatesPEM) {
+			return fmt.Errorf("invalid intermediate certificates")
+		}
 	}
 
-	opts.Roots = roots
+	if opts.Roots == nil {
+		opts.Roots = x509.NewCertPool()
+	}
+
+	if !opts.Roots.AppendCertsFromPEM(caPair.Certificate) {
+		return fmt.Errorf("invalid CA certificates")
+	}
 
 	if _, err = serverCert.Verify(*opts); err != nil {
 		return fmt.Errorf("failed to verify certificate: %w", err)
