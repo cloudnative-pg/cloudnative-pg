@@ -2,6 +2,55 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.14.0
+
+**Release date:** 25 March 2022
+
+Features:
+
+- Natively support Google Cloud Storage for backup and recovery, by taking
+  advantage of the features introduced in Barman Cloud 2.19
+- Improved observability of backups through the introduction of the
+  `LastBackupSucceeded` condition for the `Cluster` object
+- Support update of Hot Standby sensitive parameters: `max_connections`,
+  `max_prepared_transactions`, `max_locks_per_transaction`, `max_wal_senders`,
+  `max_worker_processes`
+- Add the `Online upgrade in progress` phase in the `Cluster` object to show
+  when an online upgrade of the operator is in progress
+- Ability to inherit an AWS IAM Role as an alternative way to provide
+  credentials for the S3 object storage
+- Support for Opaque secrets for Pooler’s authQuerySecret and certificates
+- Updated default PostgreSQL version to 14.2
+- Add a new command to `kubectl cnp` plugin named `maintenance` to set
+  maintenance window to cluster(s) in one or all namespaces across the Kubernetes
+  cluster
+
+Container Images:
+
+- Latest PostgreSQL containers include Barman Cloud 2.19
+
+Security Enhancements:
+
+- Stronger RBAC enforcement for namespaced operator installations with Operator
+  Lifecycle Manager, including OpenShift. OpenShift users are recommended to
+  update to this version.
+
+Fixes:
+
+- Allow the instance manager to retry an interrupted `pg_rewind` by preserving a
+  copy of the original `pg_control` file
+- Clean up stale PID files before running `pg_rewind`
+- Force sorting by key in `primary_conninfo` to avoid random restarts with
+  PostgreSQL versions prior to 13
+- Preserve `ServiceAccount` changes (e.g., labels, annotations) upon
+  reconciliation
+- Disable enforcement of the imagePullPolicy default value
+- Improve initDB validation for WAL segment size
+- Properly handle the `targetLSN` option when recovering a cluster with the LSN
+  specified
+- Fix custom TLS certificates validation by allowing a certificates chain both
+  in the server and CA certificates
+
 ## Version 1.13.0
 
 **Release date:** 17 February 2022
