@@ -68,8 +68,8 @@ method or the `recovery` one. An external cluster needs to have:
       cluster - that is, base backups and WAL archives.
 
 !!! Note
-    A recovery object store is normally an AWS S3 or an Azure Blob Storage
-    compatible source that is managed by Barman Cloud.
+    A recovery object store is normally an AWS S3, or an Azure Blob Storage,
+    or a Google Cloud Storage source that is managed by Barman Cloud.
 
 When only the streaming connection is defined, the source can be used for the
 `pg_basebackup` method. When only the recovery object store is defined, the
