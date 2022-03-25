@@ -29,7 +29,7 @@ func ExecuteBackup(namespace string, backupFile string, env *TestingEnvironment)
 			return err
 		}
 		return nil
-	}, 60, 5).Should(BeNil())
+	}, RetryTimeout, PollingTime).Should(BeNil())
 
 	// After a while the Backup should be completed
 	timeout := 180
@@ -109,7 +109,7 @@ func CreateClusterFromBackupUsingPITR(
 			},
 		},
 	}
-	return env.Client.Create(env.Ctx, restoreCluster)
+	return CreateObject(env, restoreCluster)
 }
 
 // CreateClusterFromExternalClusterBackupWithPITROnAzure creates a cluster on Azure, starting from an external cluster
@@ -183,8 +183,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 			},
 		},
 	}
-
-	return env.Client.Create(env.Ctx, restoreCluster)
+	return CreateObject(env, restoreCluster)
 }
 
 // CreateClusterFromExternalClusterBackupWithPITROnMinio creates a cluster on Minio, starting from an external cluster
@@ -262,8 +261,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 			},
 		},
 	}
-
-	return env.Client.Create(env.Ctx, restoreCluster)
+	return CreateObject(env, restoreCluster)
 }
 
 // CreateClusterFromExternalClusterBackupWithPITROnAzurite creates a cluster with Azurite, starting from an external
@@ -335,8 +333,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 			},
 		},
 	}
-
-	return env.Client.Create(env.Ctx, restoreCluster)
+	return CreateObject(env, restoreCluster)
 }
 
 // ComposeAzBlobListAzuriteCmd builds the Azure storage blob list command for Azurite

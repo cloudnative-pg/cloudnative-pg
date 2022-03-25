@@ -20,6 +20,7 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 )
@@ -50,8 +51,8 @@ var _ = Describe("JSON log output", func() {
 		clusterName = "postgresql-json-logs"
 		const sampleFile = fixturesDir + "/json_logs/cluster-json-logs.yaml"
 		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
+		namespaceErr := env.CreateNamespace(namespace)
+		Expect(namespaceErr).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("verifying the presence of possible logger values", func() {
@@ -78,24 +79,29 @@ var _ = Describe("JSON log output", func() {
 			timeout := 300
 
 			for _, pod := range podList.Items {
+				var queryError error
 				// Run a wrong query and save its result
 				commandTimeout := time.Second * 5
-				_, _, err = env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName,
-					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", errorTestQuery)
-				Expect(err).To(HaveOccurred())
-				expectedResult := err.Error()
+				Eventually(func(g Gomega) error {
+					_, _, queryError = utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, pod,
+						specs.PostgresContainerName, &commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
+						errorTestQuery)
+					return queryError
+				}, RetryTimeout, PollingTime).ShouldNot(BeNil())
 
 				// Eventually the error log line will be logged
-				Eventually(func() (bool, error) {
+				Eventually(func(g Gomega) bool {
 					// Gather pod logs in the form of a Json Array
 					logEntries, err := testsUtils.ParseJSONLogs(namespace, pod.GetName(), env)
-					if err != nil {
-						return false, err
-					}
+					g.Expect(err).ToNot(HaveOccurred())
 
 					// Gather the record containing the wrong query result
-					return testsUtils.AssertQueryRecord(logEntries, errorTestQuery, expectedResult,
-						logpipe.LoggingCollectorRecordName), nil
+					return testsUtils.AssertQueryRecord(
+						logEntries,
+						errorTestQuery,
+						queryError.Error(),
+						logpipe.LoggingCollectorRecordName,
+					)
 				}, timeout).Should(BeTrue())
 			}
 		})
@@ -105,12 +111,15 @@ var _ = Describe("JSON log output", func() {
 			primaryPod, _ := env.GetClusterPrimary(namespace, clusterName)
 			timeout := 300
 
+			var queryError error
 			// Run a wrong query on just the primary and save its result
 			commandTimeout := time.Second * 5
-			_, _, err = env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", errorTestQuery)
-			Expect(err).To(HaveOccurred())
-			expectedResult := err.Error()
+			Eventually(func() error {
+				_, _, queryError = utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig,
+					*primaryPod, specs.PostgresContainerName,
+					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", errorTestQuery)
+				return queryError
+			}, RetryTimeout, PollingTime).ShouldNot(BeNil())
 
 			// Expect the query to be eventually logged on the primary
 			Eventually(func() (bool, error) {
@@ -122,17 +131,17 @@ var _ = Describe("JSON log output", func() {
 				}
 
 				// Gather the record containing the wrong query result
-				return testsUtils.AssertQueryRecord(logEntries, errorTestQuery, expectedResult,
+				return testsUtils.AssertQueryRecord(logEntries, errorTestQuery, queryError.Error(),
 					logpipe.LoggingCollectorRecordName), nil
 			}, timeout).Should(BeTrue())
 
 			// Retrieve cluster replicas
 			podList := &corev1.PodList{}
-			err = env.Client.List(
+			listError := env.Client.List(
 				env.Ctx, podList, client.InNamespace(namespace),
 				client.MatchingLabels{"postgresql": clusterName, "role": "replica"},
 			)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(listError).ToNot(HaveOccurred())
 
 			// Expect the query not to be logged on replicas
 			for _, pod := range podList.Items {
@@ -142,8 +151,14 @@ var _ = Describe("JSON log output", func() {
 				Expect(len(logEntries) > 0).To(BeTrue())
 
 				// No record should be returned in this case
-				Expect(testsUtils.AssertQueryRecord(logEntries, expectedResult, errorTestQuery,
-					logpipe.LoggingCollectorRecordName)).Should(BeFalse())
+				isQueryRecordContained := testsUtils.AssertQueryRecord(
+					logEntries,
+					queryError.Error(),
+					errorTestQuery,
+					logpipe.LoggingCollectorRecordName,
+				)
+
+				Expect(isQueryRecordContained).Should(BeFalse())
 			}
 		})
 
@@ -154,8 +169,9 @@ var _ = Describe("JSON log output", func() {
 			forceDelete := &client.DeleteOptions{
 				GracePeriodSeconds: &zero,
 			}
-			err = env.DeletePod(namespace, currentPrimary.GetName(), forceDelete)
-			Expect(err).ToNot(HaveOccurred())
+
+			deletePodError := env.DeletePod(namespace, currentPrimary.GetName(), forceDelete)
+			Expect(deletePodError).ToNot(HaveOccurred())
 
 			// Expect a new primary to be elected
 			timeout := 180

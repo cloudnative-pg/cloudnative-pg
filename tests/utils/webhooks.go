@@ -25,7 +25,7 @@ import (
 func GetCNPsMutatingWebhookByName(env *TestingEnvironment, name string) (
 	*admissionregistrationv1.MutatingWebhookConfiguration, int, error) {
 	var mWebhooks admissionregistrationv1.MutatingWebhookConfigurationList
-	err := env.Client.List(env.Ctx, &mWebhooks)
+	err := GetObjectList(env, &mWebhooks)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -69,7 +69,7 @@ func GetCNPsValidatingWebhookConf(env *TestingEnvironment) (
 func GetCNPsValidatingWebhookByName(env *TestingEnvironment, name string) (
 	*admissionregistrationv1.ValidatingWebhookConfiguration, int, error) {
 	var vWebhooks admissionregistrationv1.ValidatingWebhookConfigurationList
-	err := env.Client.List(env.Ctx, &vWebhooks)
+	err := GetObjectList(env, &vWebhooks)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -104,7 +104,7 @@ func CheckWebhookReady(env *TestingEnvironment, namespace string) error {
 		Namespace: namespace,
 		Name:      controller.WebhookSecretName,
 	}
-	err := env.Client.Get(env.Ctx, secretNamespacedName, secret)
+	err := GetObject(env, secretNamespacedName, secret)
 	if err != nil {
 		return err
 	}

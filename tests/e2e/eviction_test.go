@@ -100,14 +100,6 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
-			// limit the case running on local kind env as we are using taint to simulate the eviction
-			// we do not know if other cloud vendor crd controller is running on the node been evicted
-			isIBM := env.IsIBM()
-			isAKS, _ := env.IsAKS()
-			isGKE, _ := env.IsGKE()
-			if isIBM || isAKS || isGKE {
-				Skip("Test runs only on local")
-			}
 		})
 		JustAfterEach(func() {
 			clusterName, err := env.GetResourceNameFromYAML(singleInstanceSampleFile)
@@ -118,6 +110,14 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			}
 		})
 		BeforeAll(func() {
+			// limit the case running on local kind env as we are using taint to simulate the eviction
+			// we do not know if other cloud vendor crd controller is running on the node been evicted
+			isIBM := env.IsIBM()
+			isAKS, _ := env.IsAKS()
+			isGKE, _ := env.IsGKE()
+			if isIBM || isAKS || isGKE {
+				Skip("Test runs only on local")
+			}
 			namespace = "single-instance-pod-eviction"
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())

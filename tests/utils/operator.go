@@ -90,9 +90,8 @@ func (env TestingEnvironment) DumpOperator(namespace string, filename string) {
 func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error) {
 	const operatorDeploymentName = "postgresql-operator-controller-manager"
 	deploymentList := &appsv1.DeploymentList{}
-
-	if err := env.Client.List(
-		env.Ctx, deploymentList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloud-native-postgresql"},
+	if err := GetObjectList(&env, deploymentList,
+		ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloud-native-postgresql"},
 	); err != nil {
 		return appsv1.Deployment{}, err
 	}
@@ -105,8 +104,8 @@ func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error)
 		return deploymentList.Items[0], nil
 	}
 
-	if err := env.Client.List(
-		env.Ctx,
+	if err := GetObjectList(
+		&env,
 		deploymentList,
 		ctrlclient.HasLabels{"operators.coreos.com/cloud-native-postgresql.openshift-operators"},
 	); err != nil {
@@ -123,8 +122,9 @@ func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error)
 	}
 
 	// This is for deployments created before 1.4.0
-	if err := env.Client.List(
-		env.Ctx, deploymentList, ctrlclient.MatchingFields{"metadata.name": operatorDeploymentName},
+
+	if err := GetObjectList(
+		&env, deploymentList, ctrlclient.MatchingFields{"metadata.name": operatorDeploymentName},
 	); err != nil {
 		return appsv1.Deployment{}, err
 	}
@@ -142,8 +142,8 @@ func (env TestingEnvironment) GetOperatorPod() (corev1.Pod, error) {
 
 	// This will work for newer version of the operator, which are using
 	// our custom label
-	if err := env.Client.List(
-		env.Ctx, podList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloud-native-postgresql"}); err != nil {
+	if err := GetObjectList(
+		&env, podList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloud-native-postgresql"}); err != nil {
 		return corev1.Pod{}, err
 	}
 	switch {
@@ -162,8 +162,8 @@ func (env TestingEnvironment) GetOperatorPod() (corev1.Pod, error) {
 
 	// This will work for older version of the operator, which are using
 	// the default label from kube-builder
-	if err := env.Client.List(
-		env.Ctx, podList,
+	if err := GetObjectList(
+		&env, podList,
 		ctrlclient.MatchingLabels{"control-plane": "controller-manager"},
 		ctrlclient.InNamespace(operatorNamespace)); err != nil {
 		return corev1.Pod{}, err
@@ -228,7 +228,7 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 			},
 		},
 	}
-	err = env.Client.Create(env.Ctx, testCluster, &ctrlclient.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	err = CreateObject(&env, testCluster, &ctrlclient.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		return false, err
 	}

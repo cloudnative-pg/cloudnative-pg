@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	. "github.com/onsi/gomega" // nolint
+
 	eventsv1 "k8s.io/api/events/v1"
 
 	"github.com/go-logr/logr"
@@ -40,6 +42,13 @@ import (
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+)
+
+const (
+	// RetryTimeout retry time when client api call or kubectl cli request get failed
+	RetryTimeout = 60
+	// PollingTime polling between retry
+	PollingTime = 5
 )
 
 // TestingEnvironment struct for operator testing
@@ -85,7 +94,17 @@ func (env TestingEnvironment) ExecCommand(
 	containerName string,
 	timeout *time.Duration,
 	command ...string) (string, string, error) {
-	return utils.ExecCommand(ctx, env.Interface, env.RestClientConfig, pod, containerName, timeout, command...)
+	var stdOut, stdErr string
+	var err error
+	Eventually(func() error {
+		stdOut, stdErr, err = utils.ExecCommand(ctx, env.Interface, env.RestClientConfig,
+			pod, containerName, timeout, command...)
+		if err != nil {
+			return err
+		}
+		return nil
+	}, RetryTimeout, PollingTime).Should(BeNil())
+	return stdOut, stdErr, err
 }
 
 // GetPVCList gathers the current list of PVCs in a namespace
@@ -135,7 +154,7 @@ func (env TestingEnvironment) GetNodeList() (*corev1.NodeList, error) {
 // by verifying if all the node names start with "gke-"
 func (env TestingEnvironment) IsGKE() (bool, error) {
 	nodeList := &corev1.NodeList{}
-	if err := env.Client.List(env.Ctx, nodeList, client.InNamespace("")); err != nil {
+	if err := GetObjectList(&env, nodeList, client.InNamespace("")); err != nil {
 		return false, err
 	}
 	for _, node := range nodeList.Items {
@@ -151,7 +170,7 @@ func (env TestingEnvironment) IsGKE() (bool, error) {
 // by verifying if all the node names start with "aks-"
 func (env TestingEnvironment) IsAKS() (bool, error) {
 	nodeList := &corev1.NodeList{}
-	if err := env.Client.List(env.Ctx, nodeList, client.InNamespace("")); err != nil {
+	if err := GetObjectList(&env, nodeList, client.InNamespace("")); err != nil {
 		return false, err
 	}
 	for _, node := range nodeList.Items {
