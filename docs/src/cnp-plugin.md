@@ -273,3 +273,36 @@ The following command will reload all configurations for a given cluster:
 ```shell
 kubectl cnp reload [cluster_name]
 ```
+
+### Maintenance
+
+The `kubectl cnp maintenance` command helps to modify one or more clusters across namespaces
+and set the maintenance window values, it will change the following fields:
+
+* .spec.nodeMaintenanceWindow.inProgress
+* .spec.nodeMaintenanceWindow.reusePVC
+
+Accepts as argument `set` and `unset` using this to set the `inProgress` to `true` in case `set`
+and to `false` in case of `unset`.
+
+By default, `reusePVC` is always set to `false` unless the `--reusePVC` flag is passed.
+
+The plugin will ask for a confirmation with a list of the cluster to modify and their new values,
+if this is accepted this action will be applied to all the cluster in the list.
+
+If you want to set in maintenance all the PostgreSQL in your Kubernetes cluster, just need to
+write the following command:
+
+```shell
+kubectl cnp maintenance set --all-namespaces
+```
+And you'll have the list of all the cluster to update
+```shell
+The following are the new values for the clusters
+Namespace  Cluster Name     Maintenance  reusePVC
+---------  ------------     -----------  --------
+default    cluster-example  true         false
+default    pg-backup        true         false
+test       cluster-example  true         false
+Do you want to proceed? [y/n]: y
+```

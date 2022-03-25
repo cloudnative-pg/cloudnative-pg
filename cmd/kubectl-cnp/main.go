@@ -9,6 +9,8 @@ package main
 import (
 	"os"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/maintenance"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -42,6 +44,7 @@ func main() {
 	rootCmd.AddCommand(restart.NewCmd())
 	rootCmd.AddCommand(reload.NewCmd())
 	rootCmd.AddCommand(versions.NewCmd())
+	rootCmd.AddCommand(maintenance.NewCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
