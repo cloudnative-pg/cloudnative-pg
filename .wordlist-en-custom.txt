@@ -112,6 +112,7 @@ Grafana
 HH
 Hai
 HistoryTags
+IAM
 INPLACE
 IfNotPresent
 InfoSec
@@ -187,6 +188,7 @@ PodSpec
 PodStatus
 PodTemplateSpec
 Pooler
+Pooler's
 PoolerIntegrations
 PoolerList
 PoolerSecrets
@@ -300,6 +302,7 @@ args
 archiver
 async
 auth
+authQuerySecret
 authn
 authz
 autoscaler
@@ -471,12 +474,14 @@ http
 httpGet
 https
 imageName
+imagePullPolicy
 imagePullSecrets
 img
 immediateCheckpoint
 inProgress
 inheritFromIAMRole
 init
+initDB
 initdb
 initialise
 initializingPVC
