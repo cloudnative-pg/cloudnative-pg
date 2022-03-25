@@ -24,7 +24,7 @@ import (
 
 // PodCreateAndWaitForReady creates a given pod object and wait for it to be ready
 func PodCreateAndWaitForReady(env *TestingEnvironment, pod *v1.Pod, timeoutSeconds uint) error {
-	err := env.Client.Create(env.Ctx, pod)
+	err := CreateObject(env, pod)
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (env TestingEnvironment) DeletePod(namespace string, name string, opts ...c
 		Kind:    "Pod",
 	})
 
-	return env.Client.Delete(env.Ctx, u, opts...)
+	return DeleteObject(&env, u, opts...)
 }
 
 // GetPodLogs gathers pod logs
@@ -119,8 +119,8 @@ func (env TestingEnvironment) GetPodLogs(namespace string, podName string) (stri
 // GetPodList gathers the current list of pods in a namespace
 func (env TestingEnvironment) GetPodList(namespace string) (*v1.PodList, error) {
 	podList := &v1.PodList{}
-	err := env.Client.List(
-		env.Ctx, podList, client.InNamespace(namespace),
+	err := GetObjectList(
+		&env, podList, client.InNamespace(namespace),
 	)
 	return podList, err
 }

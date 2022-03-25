@@ -21,8 +21,7 @@ func GetLeaderInfoFromConfigMap(operatorNamespace string, env *TestingEnvironmen
 	// Leader election id is referred as configMap name for store leader details
 	leaderElectionID := controller.LeaderElectionID
 	configMapList := &corev1.ConfigMapList{}
-	err := env.Client.List(
-		env.Ctx, configMapList, ctrlclient.InNamespace(operatorNamespace),
+	err := GetObjectList(env, configMapList, ctrlclient.InNamespace(operatorNamespace),
 		ctrlclient.MatchingFields{"metadata.name": leaderElectionID},
 	)
 	if err != nil {

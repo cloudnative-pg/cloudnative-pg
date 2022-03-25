@@ -18,6 +18,7 @@ import (
 
 	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -88,7 +89,8 @@ var _ = Describe("Update user and superuser password", func() {
 			dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
 				rwService, newUser, "app", newPassword)
 			timeout := time.Second * 2
-			_, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &timeout,
+			_, _, err := utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig,
+				pod, specs.PostgresContainerName, &timeout,
 				"psql", dsn, "-tAc", "SELECT 1")
 			Expect(err).ToNot(BeNil())
 

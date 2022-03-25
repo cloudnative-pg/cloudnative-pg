@@ -23,8 +23,7 @@ func (env TestingEnvironment) CreateNamespace(name string, opts ...client.Create
 		Version: "v1",
 		Kind:    "Namespace",
 	})
-
-	return env.Client.Create(env.Ctx, u, opts...)
+	return CreateObject(&env, u, opts...)
 }
 
 // DeleteNamespace deletes a namespace if existent
@@ -44,7 +43,7 @@ func (env TestingEnvironment) DeleteNamespace(name string, opts ...client.Delete
 		Kind:    "Namespace",
 	})
 
-	return env.Client.Delete(env.Ctx, u, opts...)
+	return DeleteObject(&env, u, opts...)
 }
 
 // DeleteNamespaceAndWait deletes a namespace if existent and returns when deletion is completed

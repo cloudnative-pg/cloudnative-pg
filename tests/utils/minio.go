@@ -388,7 +388,7 @@ func composeFindMinioCmd(path string, serviceName string) string {
 func GetFileTagsOnMinio(namespace, minioClientName, path string) (TagSet, error) {
 	var output TagSet
 	// Make sure we have a registered backup to access
-	out, _, err := RunUnchecked(fmt.Sprintf(
+	out, _, err := RunUncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- sh -c 'mc find minio --name %v | head -n1'",
 		namespace,
 		minioClientName,
@@ -399,7 +399,7 @@ func GetFileTagsOnMinio(namespace, minioClientName, path string) (TagSet, error)
 
 	walFile := strings.Trim(out, "\n")
 
-	stdout, _, err := RunUnchecked(fmt.Sprintf(
+	stdout, _, err := RunUncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- sh -c 'mc --json tag list %v'",
 		namespace,
 		minioClientName,

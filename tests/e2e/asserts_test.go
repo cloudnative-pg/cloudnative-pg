@@ -551,11 +551,13 @@ func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 }
 
 func AssertStorageCredentialsAreCreated(namespace string, name string, id string, key string) {
-	_, _, err := testsUtils.Run(fmt.Sprintf("kubectl create secret generic %v -n %v "+
-		"--from-literal='ID=%v' "+
-		"--from-literal='KEY=%v'",
-		name, namespace, id, key))
-	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() error {
+		_, _, err := testsUtils.Run(fmt.Sprintf("kubectl create secret generic %v -n %v "+
+			"--from-literal='ID=%v' "+
+			"--from-literal='KEY=%v'",
+			name, namespace, id, key))
+		return err
+	}, 60, 5).Should(BeNil())
 }
 
 // AssertArchiveWalOnMinio to archive walls and verify that exists
@@ -735,7 +737,8 @@ func AssertWritesToReplicaFails(
 			Expect(value, err).To(Equal("t"))
 
 			// Expect to be in a read-only transaction
-			_, _, err = env.ExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
+			_, _, err = utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, *connectingPod,
+				specs.PostgresContainerName, &timeout,
 				"psql", dsn, "-tAc", "CREATE TABLE table1(var1 text);")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).Should(
@@ -2015,7 +2018,7 @@ func CreateResourceFromFile(namespace, sampleFilePath string) {
 			return err
 		}
 		return nil
-	}, 60, 5).Should(BeNil())
+	}, RetryTimeout, PollingTime).Should(BeNil())
 }
 
 func AssertBackupConditionInClusterStatus(namespace, clusterName string) {

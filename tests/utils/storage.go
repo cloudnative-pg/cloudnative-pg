@@ -14,6 +14,6 @@ import (
 // GetStorageAllowExpansion returns the boolean value of the 'AllowVolumeExpansion' value of the storage class
 func GetStorageAllowExpansion(defaultStorageClass string, env *TestingEnvironment) (*bool, error) {
 	storageClass := &v1.StorageClass{}
-	err := env.Client.Get(env.Ctx, client.ObjectKey{Name: defaultStorageClass}, storageClass)
+	err := GetObject(env, client.ObjectKey{Name: defaultStorageClass}, storageClass)
 	return storageClass.AllowVolumeExpansion, err
 }

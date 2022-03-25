@@ -15,6 +15,7 @@ import (
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	devUtils "github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
 	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
 
@@ -24,11 +25,41 @@ import (
 
 var _ = Describe("Configuration update", func() {
 	const (
-		clusterName = "postgresql-storage-class"
-		namespace   = "cluster-update-config-e2e"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml"
-		level       = tests.High
+		clusterName          = "postgresql-storage-class"
+		namespace            = "cluster-update-config-e2e"
+		sampleFile           = fixturesDir + "/base/cluster-storage-class.yaml"
+		level                = tests.High
+		autoVacuumMaxWorkers = 4
 	)
+
+	checkErrorOutFixedAndBlockedConfigurationParameter := func(sample string) {
+		// Update the configuration
+		Eventually(func() error {
+			_, _, err := utils.RunUnchecked("kubectl apply -n " + namespace + " -f " + sample)
+			return err
+			// Expecting an error when a blockedConfigurationParameter is modified
+		}, RetryTimeout, PollingTime).ShouldNot(BeNil())
+
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		const timeout = 60
+		commandTimeout := time.Second * 2
+		// Expect other config parameters applied together with a blockedParameter to not have changed
+		for idx := range podList.Items {
+			pod := podList.Items[idx]
+			Eventually(func(g Gomega) int {
+				stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
+					"psql", "-U", "postgres", "-tAc", "show autovacuum_max_workers")
+				g.Expect(err).ToNot(HaveOccurred())
+
+				value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
+				g.Expect(atoiErr).ToNot(HaveOccurred())
+
+				return value
+			}, timeout).ShouldNot(BeEquivalentTo(autoVacuumMaxWorkers))
+		}
+	}
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -80,8 +111,15 @@ var _ = Describe("Configuration update", func() {
 			// Connection should fail now because we are not supplying a password
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			stdout, _, err := env.ExecCommand(env.Ctx, podList.Items[0], specs.PostgresContainerName, &commandtimeout,
-				"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1")
+			stdout, _, err := devUtils.ExecCommand(
+				env.Ctx,
+				env.Interface,
+				env.RestClientConfig,
+				podList.Items[0],
+				specs.PostgresContainerName,
+				&commandtimeout,
+				"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1",
+			)
 			Expect(err).To(HaveOccurred())
 			// Update the configuration
 			CreateResourceFromFile(namespace, sample)
@@ -180,45 +218,11 @@ var _ = Describe("Configuration update", func() {
 		})
 		By("Erroring out when a fixedConfigurationParameter is modified", func() {
 			sample := fixturesDir + "/config_update/05-fixed-params.yaml"
-			// Update the configuration
-			_, _, err := utils.RunUnchecked("kubectl apply -n " + namespace + " -f " + sample)
-			// Expecting an error when a fixedConfigurationParameter is modified
-			Expect(err).To(HaveOccurred())
-			podList, err := env.GetClusterPodList(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			timeout := 60
-			commandtimeout := time.Second * 2
-			// Expect other config parameters applied together with a fixedParameter to not have changed
-			for _, pod := range podList.Items {
-				pod := pod // pin the variable
-				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandtimeout,
-						"psql", "-U", "postgres", "-tAc", "show autovacuum_max_workers")
-					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
-					return value, err, atoiErr
-				}, timeout).ShouldNot(BeEquivalentTo(4))
-			}
+			checkErrorOutFixedAndBlockedConfigurationParameter(sample)
 		})
 		By("Erroring out when a blockedConfigurationParameter is modified", func() {
 			sample := fixturesDir + "/config_update/06-blocked-params.yaml"
-			// Update the configuration
-			_, _, err := utils.RunUnchecked("kubectl apply -n " + namespace + " -f " + sample)
-			// Expecting an error when a blockedConfigurationParameter is modified
-			Expect(err).To(HaveOccurred())
-			podList, err := env.GetClusterPodList(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			timeout := 60
-			commandtimeout := time.Second * 2
-			// Expect other config parameters applied together with a blockedParameter to not have changed
-			for _, pod := range podList.Items {
-				pod := pod
-				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandtimeout,
-						"psql", "-U", "postgres", "-tAc", "show autovacuum_max_workers")
-					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
-					return value, err, atoiErr
-				}, timeout).ShouldNot(BeEquivalentTo(4))
-			}
+			checkErrorOutFixedAndBlockedConfigurationParameter(sample)
 		})
 
 		// nolint:dupl
@@ -238,8 +242,7 @@ var _ = Describe("Configuration update", func() {
 				Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 				oldPrimary := cluster.Status.CurrentPrimary
 				// Update the configuration
-				_, _, err = utils.Run("kubectl apply -n " + namespace + " -f " + sample)
-				Expect(err).ToNot(HaveOccurred())
+				CreateResourceFromFile(namespace, sample)
 				timeout := 300
 				commandtimeout := time.Second * 2
 				// Check that the new parameter has been modified in every pod

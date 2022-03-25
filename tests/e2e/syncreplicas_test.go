@@ -14,7 +14,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 
 	clusterv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
@@ -89,16 +88,15 @@ var _ = Describe("Synchronous Replicas", func() {
 				Namespace: namespace,
 				Name:      clusterName,
 			}
-
 			// Set MaxSyncReplicas to 1
-			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			Eventually(func(g Gomega) error {
 				cluster := &clusterv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
-				Expect(err).ToNot(HaveOccurred())
+				g.Expect(err).ToNot(HaveOccurred())
+
 				cluster.Spec.MaxSyncReplicas = 1
 				return env.Client.Update(env.Ctx, cluster)
-			})
-			Expect(err).ToNot(HaveOccurred())
+			}, 60, 5).Should(BeNil())
 
 			// Scale the cluster down to 2 pods
 			_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace, clusterName))
