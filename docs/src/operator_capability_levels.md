@@ -277,8 +277,9 @@ failover and switchover operations. This area includes enhancements in:
 The operator has been designed to provide application-level backups using
 PostgreSQL’s native continuous backup technology based on
 physical base backups and continuous WAL archiving. Specifically,
-the operator currently supports only backups on AWS S3 or S3-compatible
-object stores and gateways like MinIO.
+the operator currently supports only backups on object stores (AWS S3 and
+S3-compatible, Azure Blob Storage, Google Cloud Storage, and gateways like
+MinIO).
 
 WAL archiving and base backups are defined at the cluster level, declaratively,
 through the `backup` parameter in the cluster definition, by specifying

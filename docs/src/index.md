@@ -88,9 +88,9 @@ architectures on OpenShift only.
 * In-place or rolling updates for operator upgrades
 * TLS connections and client certificate authentication
 * Support for custom TLS certificates (including integration with cert-manager)
-* Continuous backup to an S3 compatible object store
+* Continuous backup to an object store  (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
 * Backup retention policies (based on recovery window)
-* Full recovery and Point-In-Time recovery from an S3 compatible object store backup
+* Full recovery and Point-In-Time recovery from an existing backup in an object store
 * Replica clusters for PostgreSQL deployments across multiple Kubernetes
   clusters, enabling private, public, hybrid, and multi-cloud architectures
 * Support for Synchronous Replicas
