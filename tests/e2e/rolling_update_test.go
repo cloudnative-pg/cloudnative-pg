@@ -14,7 +14,6 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
@@ -75,13 +74,13 @@ var _ = Describe("Rolling updates", func() {
 			Namespace: namespace,
 			Name:      clusterName,
 		}
-		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		Eventually(func(g Gomega) error {
 			err := env.Client.Get(env.Ctx, namespacedName, cluster)
-			Expect(err).ToNot(HaveOccurred())
+			g.Expect(err).ToNot(HaveOccurred())
+
 			cluster.Spec.ImageName = updatedImageName
 			return env.Client.Update(env.Ctx, cluster)
-		})
-		Expect(err).ToNot(HaveOccurred())
+		}, RetryTimeout, PollingTime).Should(BeNil())
 
 		// All the postgres containers should have the updated image
 		Eventually(func() (int32, error) {

@@ -290,14 +290,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		// Create the secrets used by the clusters and minio
 		By("creating the postgres secrets", func() {
-			_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-				upgradeNamespace, pgSecrets))
-			Expect(err).ToNot(HaveOccurred())
+			CreateResourceFromFile(upgradeNamespace, pgSecrets)
 		})
 		By("creating the cloud storage credentials", func() {
-			_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-				upgradeNamespace, minioSecret))
-			Expect(err).ToNot(HaveOccurred())
+			CreateResourceFromFile(upgradeNamespace, minioSecret)
 		})
 
 		// Create the cluster. Since it will take a while, we'll do more stuff

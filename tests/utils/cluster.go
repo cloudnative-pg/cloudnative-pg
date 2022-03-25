@@ -181,7 +181,7 @@ func (env TestingEnvironment) GetCluster(namespace string, name string) (*v1.Clu
 		Name:      name,
 	}
 	cluster := &v1.Cluster{}
-	err := env.Client.Get(env.Ctx, namespacedName, cluster)
+	err := GetObject(&env, namespacedName, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -191,8 +191,7 @@ func (env TestingEnvironment) GetCluster(namespace string, name string) (*v1.Clu
 // GetClusterPodList gathers the current list of pods for a cluster in a namespace
 func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
-	err := env.Client.List(
-		env.Ctx, podList, client.InNamespace(namespace),
+	err := GetObjectList(&env, podList, client.InNamespace(namespace),
 		client.MatchingLabels{"postgresql": clusterName},
 	)
 	return podList, err
@@ -201,8 +200,7 @@ func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName st
 // GetClusterPrimary gets the primary pod of a cluster
 func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName string) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
-	err := env.Client.List(
-		env.Ctx, podList, client.InNamespace(namespace),
+	err := GetObjectList(&env, podList, client.InNamespace(namespace),
 		client.MatchingLabels{"postgresql": clusterName, "role": "primary"},
 	)
 	if err != nil {
