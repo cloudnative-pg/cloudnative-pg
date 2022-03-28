@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Run E2E on OpenShift
-        uses: peter-evans/slash-command-dispatch@v2
+        uses: peter-evans/slash-command-dispatch@v3
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           issue-type: pull-request
@@ -27,7 +27,7 @@ jobs:
             test
             test-ocp
       - name: Run E2E on CNP
-        uses: peter-evans/slash-command-dispatch@v2
+        uses: peter-evans/slash-command-dispatch@v3
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           issue-type: pull-request
