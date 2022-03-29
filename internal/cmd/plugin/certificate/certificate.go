@@ -10,6 +10,7 @@ package certificate
 import (
 	"context"
 	"fmt"
+	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -59,7 +60,7 @@ func Generate(ctx context.Context, params Params, dryRun bool, format plugin.Out
 	}
 
 	userSecret := userPair.GenerateCertificateSecret(params.Namespace, params.Name)
-	err = plugin.Print(userSecret, format)
+	err = plugin.Print(userSecret, format, os.Stdout)
 	if err != nil {
 		return err
 	}
