@@ -2020,6 +2020,34 @@ func CreateResourceFromFile(namespace, sampleFilePath string) {
 	}, RetryTimeout, PollingTime).Should(BeNil())
 }
 
+// Assert in the giving cluster, all the postgres db has no pending restart
+func AssertPostgresNoPendingRestart(namespace, clusterName string, cmdTimeout time.Duration, timeout int) {
+	By("waiting for all pods have no pending restart", func() {
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		// Check that the new parameter has been modified in every pod
+		Eventually(func() (bool, error) {
+			noPendingRestart := true
+			for _, pod := range podList.Items {
+				pod := pod
+				stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &cmdTimeout,
+					"psql", "-U", "postgres", "-tAc", "SELECT EXISTS(SELECT 1 FROM pg_settings WHERE pending_restart)")
+				if err != nil {
+					return false, nil
+				}
+				if strings.Trim(stdout, "\n") == "f" {
+					continue
+				} else {
+					noPendingRestart = false
+					break
+				}
+			}
+			return noPendingRestart, nil
+		}, timeout, 1*time.Second).Should(BeEquivalentTo(true),
+			"all pods in cluster has no pending restart")
+	})
+}
+
 func AssertBackupConditionInClusterStatus(namespace, clusterName string) {
 	By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
 		Eventually(func() (string, error) {
