@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path"
 	"time"
 
@@ -49,7 +50,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 		return err
 	}
 
-	err = plugin.Print(status, format)
+	err = plugin.Print(status, format, os.Stdout)
 	if err != nil {
 		return err
 	}

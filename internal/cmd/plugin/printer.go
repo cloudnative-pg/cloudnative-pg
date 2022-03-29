@@ -8,13 +8,13 @@ package plugin
 
 import (
 	"encoding/json"
-	"os"
+	"io"
 
 	"sigs.k8s.io/yaml"
 )
 
-// Print output an object to stdout in a machine-readable way
-func Print(o interface{}, format OutputFormat) error {
+// Print output an object via an io.Writer in a machine-readable way
+func Print(o interface{}, format OutputFormat, writer io.Writer) error {
 	switch format {
 	case OutputFormatJSON:
 		data, err := json.MarshalIndent(o, "", "  ")
@@ -22,7 +22,7 @@ func Print(o interface{}, format OutputFormat) error {
 			return err
 		}
 
-		_, err = os.Stdout.Write(data)
+		_, err = writer.Write(data)
 		if err != nil {
 			return err
 		}
@@ -33,7 +33,7 @@ func Print(o interface{}, format OutputFormat) error {
 			return err
 		}
 
-		_, err = os.Stdout.Write(data)
+		_, err = writer.Write(data)
 		if err != nil {
 			return err
 		}
