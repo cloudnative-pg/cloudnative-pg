@@ -15,7 +15,8 @@ curl -sSfL \
 
 ### Supported Architectures
 
-Cloud Native PostgreSQL Plugin is currently build for the following operating system and architectures:
+Cloud Native PostgreSQL Plugin is currently build for the following
+operating system and architectures:
 
 * Linux
   * amd64
@@ -32,7 +33,6 @@ Cloud Native PostgreSQL Plugin is currently build for the following operating sy
   * arm 5/6/7
   * arm64
 
-
 ## Use
 
 Once the plugin was installed and deployed, you can start using it like this:
@@ -46,14 +46,14 @@ kubectl cnp <command> <args...>
 The `status` command provides an overview of the current status of your
 cluster, including:
 
-- **general information**: name of the cluster, PostgreSQL's system ID, number of
+* **general information**: name of the cluster, PostgreSQL's system ID, number of
   instances, current timeline and position in the WAL
-- **backup**: point of recoverability, and WAL archiving status as returned by
+* **backup**: point of recoverability, and WAL archiving status as returned by
   the `pg_stat_archiver` view from the primary - or designated primary in the
   case of a replica cluster
-- **streaming replication**: information taken directly from the `pg_stat_replication`
+* **streaming replication**: information taken directly from the `pg_stat_replication`
   view on the primary instance
-- **instances**: information about each Postgres instance, taken directly by each
+* **instances**: information about each Postgres instance, taken directly by each
   instance manager; in the case of a standby, the `Current LSN` field corresponds
   to the latest write-ahead log location that has been replayed during recovery
   (replay LSN).
@@ -107,7 +107,8 @@ sandbox-2  302 GB         3AF/EAFA6168  Primary           OK      Guaranteed  1.
 sandbox-3  302 GB         3AF/EBAD5D18  Standby (sync)    OK      Guaranteed  1.11.0
 ```
 
-You can also get a more verbose version of the status by adding `--verbose` or just `-v`
+You can also get a more verbose version of the status by adding
+`--verbose` or just `-v`
 
 ```shell
 kubectl cnp status sandbox --verbose
@@ -216,7 +217,9 @@ can start with maintenance work or test a switch-over situation in your cluster
 ```shell
 kubectl cnp promote cluster-example cluster-example-2
 ```
+
 Or you can use the instance node number to promote
+
 ```shell
 kubectl cnp promote cluster-example 2
 ```
@@ -259,8 +262,8 @@ kubectl cnp restart [cluster_name]
 ```
 
 !!! Note
-    If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
-    add a label with key `k8s.enterprisedb.io/reload` to it.
+    If you want ConfigMaps and Secrets to be **automatically** reloaded
+    by instances, you can add a label with key `k8s.enterprisedb.io/reload` to it.
 
 ### Reload
 
@@ -276,27 +279,31 @@ kubectl cnp reload [cluster_name]
 
 ### Maintenance
 
-The `kubectl cnp maintenance` command helps to modify one or more clusters across namespaces
-and set the maintenance window values, it will change the following fields:
+The `kubectl cnp maintenance` command helps to modify one or more clusters
+across namespaces and set the maintenance window values, it will change
+the following fields:
 
 * .spec.nodeMaintenanceWindow.inProgress
 * .spec.nodeMaintenanceWindow.reusePVC
 
-Accepts as argument `set` and `unset` using this to set the `inProgress` to `true` in case `set`
-and to `false` in case of `unset`.
+Accepts as argument `set` and `unset` using this to set the
+`inProgress` to `true` in case `set`and to `false` in case of `unset`.
 
 By default, `reusePVC` is always set to `false` unless the `--reusePVC` flag is passed.
 
-The plugin will ask for a confirmation with a list of the cluster to modify and their new values,
-if this is accepted this action will be applied to all the cluster in the list.
+The plugin will ask for a confirmation with a list of the cluster to modify
+and their new values, if this is accepted this action will be applied to
+all the cluster in the list.
 
-If you want to set in maintenance all the PostgreSQL in your Kubernetes cluster, just need to
-write the following command:
+If you want to set in maintenance all the PostgreSQL in your Kubernetes cluster,
+just need to write the following command:
 
 ```shell
 kubectl cnp maintenance set --all-namespaces
 ```
+
 And you'll have the list of all the cluster to update
+
 ```shell
 The following are the new values for the clusters
 Namespace  Cluster Name     Maintenance  reusePVC
@@ -305,4 +312,100 @@ default    cluster-example  true         false
 default    pg-backup        true         false
 test       cluster-example  true         false
 Do you want to proceed? [y/n]: y
+```
+
+### Report
+
+The `kubectl cnp report` command requests the operator to provide information
+regarding the operator deployment, configuration and events.
+It aims to provide the needed context to debug problems
+with clusters in production.
+
+!!! Important
+    All confidential information in Secrets and ConfigMaps is REDACTED.
+    The Data map will show the **keys** but the values will be empty.
+    The flag `-S` / `--stopRedaction` will defeat the redaction and show the
+    values. Use only at your own risk, this will share private data.
+
+* **deployment information**: the operator Deployment and operator Pod
+* **configuration**: the Secrets and ConfigMaps in the operator namespace
+* **events**: the Events in the operator namespace
+
+The command will generate a ZIP file containing various manifest in YAML format
+(by default, but settable to `json` with the `-o` flag).
+You can use the `-f` flag to name a result file explicitly.
+Without an explicit filename, the command will print to StdOUT, which you can
+redirect as needed.
+
+```shell
+kubectl cnp report operator > reportRedacted.zip
+```
+
+or
+
+```shell
+kubectl cnp report operator -f reportRedacted.zip
+```
+
+Unzipping the file will produce the various manifests:
+
+```shell
+unzip reportRedacted.zip
+```
+
+will result in:
+
+```
+Archive:  reportRedacted.zip
+  inflating: deployment.yaml
+  inflating: operator-pod.yaml
+  inflating: postgresql-operator-ca-secret.yaml
+  inflating: postgresql-operator-webhook-cert.yaml
+  inflating: events.yaml
+```
+
+You can verify that the confidential information is REDACTED:
+
+```shell
+head postgresql-operator-ca-secret.yaml
+```
+
+```yaml
+data:
+  ca.crt: ""
+  ca.key: ""
+metadata:
+  creationTimestamp: "2022-03-22T10:42:28Z"
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+```
+
+With the `-S` (`--stopRedaction`) option activated, secrets are shown:
+
+```shell
+kubectl cnp report operator -f reportNonRedacted.zip -S
+```
+
+You'll get a reminder that you're about to view confidential information:
+
+``` shell
+WARNING: secret Redaction is OFF. Use caution
+```
+
+``` shell
+unzip reportNonRedacted.zip
+head postgresql-operator-ca-secret.yaml
+```
+
+```yaml
+data:
+  ca.crt: LS0tLS1CRUdJTiBD…
+  ca.key: LS0tLS1CRUdJTiBF…
+metadata:
+  creationTimestamp: "2022-03-22T10:42:28Z"
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
 ```
