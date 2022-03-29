@@ -661,6 +661,8 @@ recv
 redhat
 relatime
 replicationTLSSecret
+reportNonRedacted
+reportRedacted
 req
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
