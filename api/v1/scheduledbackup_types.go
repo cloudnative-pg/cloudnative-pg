@@ -22,7 +22,8 @@ type ScheduledBackupSpec struct {
 	// If the first backup has to be immediately start after creation or not
 	Immediate *bool `json:"immediate,omitempty"`
 
-	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+	// The schedule follows the same format used in Kubernetes CronJobs,
+	// see https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format
 	Schedule string `json:"schedule"`
 
 	// The cluster to backup
