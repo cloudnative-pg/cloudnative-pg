@@ -9,7 +9,7 @@ spec:
   postgresql:
     parameters:
       work_mem: "8MB"
-      max_connections: "100"
+      max_connections: "110"
       shared_buffers: "256MB"
       log_checkpoints: "on"
       log_lock_waits: "on"
