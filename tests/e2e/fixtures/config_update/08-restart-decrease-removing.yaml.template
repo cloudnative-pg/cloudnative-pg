@@ -9,12 +9,9 @@ spec:
   postgresql:
     parameters:
       work_mem: "8MB"
-      max_connections: "110"
       shared_buffers: "256MB"
       max_replication_slots: "16"
       maintenance_work_mem: "128MB"
-      cluster_name: "Setting this parameter is not allowed"
-      autovacuum_max_workers: "4"
       log_checkpoints: "on"
       log_lock_waits: "on"
       log_min_duration_statement: '1000'
@@ -35,6 +32,7 @@ spec:
     initdb:
       database: app
       owner: app
+      redwood: ${E2E_ENABLE_REDWOOD}
 
   # Persistent storage configuration
   storage:

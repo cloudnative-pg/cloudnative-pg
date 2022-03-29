@@ -160,19 +160,38 @@ func (instance *Instance) GetDecreasedSensibleSettings(superUserDB *sql.DB) (map
 	// We check whether all parameters with a pending restart from pg_settings
 	// have a decreased value reported as not applied from pg_file_settings.
 	rows, err := superUserDB.Query(
-		`SELECT name, setting
-				FROM
-				(SELECT name, setting, rank() OVER (PARTITION BY name ORDER BY seqno DESC) as rank
-					FROM pg_file_settings
-					WHERE name IN (
-						'max_connections',
-						'max_prepared_transactions',
-						'max_wal_senders',
-						'max_worker_processes',
-						'max_locks_per_transaction'
-					) AND not applied
-				) a
-				WHERE CAST(current_setting(name) AS INTEGER) > CAST(setting AS INTEGER) AND rank = 1`)
+		`
+SELECT pending_settings.name, coalesce(new_setting,default_setting) as new_setting
+FROM
+   (
+	  SELECT name,
+			setting as current_setting,
+			boot_val as default_setting
+	  FROM pg_settings
+	  WHERE pending_restart
+   ) pending_settings
+LEFT OUTER JOIN
+	(
+		SELECT * FROM
+		(
+			SELECT name,
+				setting as new_setting,
+				rank() OVER (PARTITION BY name ORDER BY seqno DESC) as rank,
+				applied
+			FROM pg_file_settings
+		) c
+	    WHERE rank = 1 AND not applied
+	) file_settings
+ON pending_settings.name = file_settings.name
+WHERE pending_settings.name IN (
+	'max_connections',
+	'max_prepared_transactions',
+	'max_wal_senders',
+	'max_worker_processes',
+	'max_locks_per_transaction'
+		  )
+	AND CAST(coalesce(new_setting,default_setting) AS INTEGER) < CAST(current_setting AS INTEGER)
+					`)
 	if err != nil {
 		return nil, err
 	}
