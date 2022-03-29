@@ -61,7 +61,8 @@ spec:
                   creation or not
                 type: boolean
               schedule:
-                description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+                description: The schedule follows the same format used in Kubernetes
+                  CronJobs, see https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format
                 type: string
               suspend:
                 description: If this backup is suspended or not
