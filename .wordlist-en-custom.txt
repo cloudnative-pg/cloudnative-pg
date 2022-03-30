@@ -449,6 +449,7 @@ destinationPath
 dev
 devel
 devsecops
+dir
 distro
 distroless
 distros
