@@ -17,6 +17,7 @@ import (
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/certificate"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/fence"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/promote"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/reload"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/report"
@@ -42,6 +43,7 @@ func main() {
 	rootCmd.AddCommand(status.NewCmd())
 	rootCmd.AddCommand(promote.NewCmd())
 	rootCmd.AddCommand(certificate.NewCmd())
+	rootCmd.AddCommand(fence.NewCmd())
 	rootCmd.AddCommand(restart.NewCmd())
 	rootCmd.AddCommand(reload.NewCmd())
 	rootCmd.AddCommand(versions.NewCmd())

@@ -119,7 +119,7 @@ var _ = Describe("PostgreSQL status", func() {
 			},
 		}
 		Expect(podList.ShouldSkipReconcile()).To(BeFalse())
-		podList.Items[0].IsFencingOn = true
+		podList.Items[0].MightBeUnavailable = true
 		Expect(podList.ShouldSkipReconcile()).To(BeTrue())
 	})
 

@@ -41,7 +41,7 @@ func (instance *Instance) IsServerHealthy() error {
 
 // IsServerReady check if the instance is healthy and can really accept connections
 func (instance *Instance) IsServerReady() error {
-	if !instance.CanCheckReadiness.Load() {
+	if !instance.CanCheckReadiness() {
 		return fmt.Errorf("instance is not ready yet")
 	}
 	superUserDB, err := instance.GetSuperUserDB()
@@ -53,21 +53,41 @@ func (instance *Instance) IsServerReady() error {
 }
 
 // GetStatus Extract the status of this PostgreSQL database
-func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
-	result := postgres.PostgresqlStatus{
+func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
+	result = &postgres.PostgresqlStatus{
 		Pod:                    corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
 		InstanceManagerVersion: versions.Version,
+		MightBeUnavailable:     instance.MightBeUnavailable(),
 	}
+
+	// this deferred function may override the error returned. Take extra care.
+	defer func() {
+		if !result.MightBeUnavailable {
+			return
+		}
+		if result.MightBeUnavailable && err == nil {
+			return
+		}
+		// we save the error that we are masking
+		result.MightBeUnavailableMaskedError = err.Error()
+		// We override the error. We only care about checking if isPrimary is correctly detected
+		result.IsPrimary, err = instance.IsPrimary()
+		if err != nil {
+			return
+		}
+		// force the instance to be reported as ready
+		result.IsReady = true
+	}()
 
 	if instance.PgRewindIsRunning {
 		// We know that pg_rewind is running, so we exit with the proper status
 		// updated, and we can provide that information to the user.
 		result.IsPgRewindRunning = true
-		return &result, nil
+		return result, nil
 	}
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
-		return &result, err
+		return result, err
 	}
 
 	row := superUserDB.QueryRow(
@@ -81,31 +101,31 @@ func (instance *Instance) GetStatus() (*postgres.PostgresqlStatus, error) {
 			(SELECT pg_size_pretty(SUM(pg_database_size(oid))) FROM pg_database)`)
 	err = row.Scan(&result.SystemID, &result.IsPrimary, &result.PendingRestart, &result.TotalInstanceSize)
 	if err != nil {
-		return &result, err
+		return result, err
 	}
 
 	if result.PendingRestart {
-		err = updateResultForDecrease(instance, superUserDB, &result)
+		err = updateResultForDecrease(instance, superUserDB, result)
 		if err != nil {
-			return &result, err
+			return result, err
 		}
 	}
 
-	err = instance.fillStatus(&result)
+	err = instance.fillStatus(result)
 	if err != nil {
-		return &result, err
+		return result, err
 	}
 
 	result.InstanceArch = runtime.GOARCH
 
 	result.ExecutableHash, err = executablehash.Get()
 	if err != nil {
-		return &result, err
+		return result, err
 	}
 
 	result.IsInstanceManagerUpgrading = instance.InstanceManagerIsUpgrading
 
-	return &result, nil
+	return result, nil
 }
 
 // updateResultForDecrease updates the given postgres.PostgresqlStatus

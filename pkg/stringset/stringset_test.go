@@ -30,4 +30,14 @@ var _ = Describe("String set", func() {
 		Expect(set.Has("test")).To(BeTrue())
 		Expect(set.Has("test2")).To(BeFalse())
 	})
+
+	It("removes string keys", func() {
+		set := From([]string{"one", "two"})
+		set.Delete("one")
+		Expect(set.ToList()).To(Equal([]string{"two"}))
+	})
+
+	It("constructs a string slice given a set", func() {
+		Expect(From([]string{"one", "two"}).ToList()).To(ContainElements("one", "two"))
+	})
 })

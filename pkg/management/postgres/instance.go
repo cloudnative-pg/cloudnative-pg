@@ -30,6 +30,7 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/pool"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
 const (
@@ -142,23 +143,62 @@ type Instance struct {
 	// pgVersion is the PostgreSQL version
 	pgVersion *semver.Version
 
+	// instanceCommandChan is a channel for requesting actions on the instance
+	instanceCommandChan chan InstanceCommand
+
 	// InstanceManagerIsUpgrading tells if there is an instance manager upgrade in process
 	InstanceManagerIsUpgrading bool
 
 	// PgRewindIsRunning tells if there is a `pg_rewind` process running
 	PgRewindIsRunning bool
 
-	// instanceCommandChan is a channel for requesting actions on the instance
-	instanceCommandChan chan InstanceCommand
-
-	// FencingOn specifies whether fencing is on for the instance
-	FencingOn atomic.Bool
-
-	// CanCheckReadiness specifies whether the instance can start being checked for readiness
-	CanCheckReadiness atomic.Bool
-
 	// MaxStopDelay is the current MaxStopDelay of the cluster
 	MaxStopDelay int32
+
+	// canCheckReadiness specifies whether the instance can start being checked for readiness
+	// Is set to true before the instance is run and to false once it exits,
+	// it's used by the readiness probe to know whether it should be short-circuited
+	canCheckReadiness atomic.Bool
+
+	// mightBeUnavailable specifies whether we expect the instance to be down
+	mightBeUnavailable atomic.Bool
+
+	// fenced specifies whether fencing is on for the instance
+	// fenced entails mightBeUnavailable ( entails as in logical consequence)
+	fenced atomic.Bool
+}
+
+// IsFenced checks whether the instance is marked as fenced
+func (instance *Instance) IsFenced() bool {
+	return instance.fenced.Load()
+}
+
+// CanCheckReadiness checks whether the instance should be checked for readiness
+func (instance *Instance) CanCheckReadiness() bool {
+	return instance.canCheckReadiness.Load()
+}
+
+// MightBeUnavailable checks whether we expect the instance to be down
+func (instance *Instance) MightBeUnavailable() bool {
+	return instance.mightBeUnavailable.Load()
+}
+
+// SetFencing marks whether the instance is fenced, if enabling, marks also any down to be tolerated
+func (instance *Instance) SetFencing(enabled bool) {
+	instance.fenced.Store(enabled)
+	if enabled {
+		instance.SetMightBeUnavailable(true)
+	}
+}
+
+// SetCanCheckReadiness marks whether the instance should be checked for readiness
+func (instance *Instance) SetCanCheckReadiness(enabled bool) {
+	instance.canCheckReadiness.Store(enabled)
+}
+
+// SetMightBeUnavailable marks whether the instance being down should be tolerated
+func (instance *Instance) SetMightBeUnavailable(enabled bool) {
+	instance.mightBeUnavailable.Store(enabled)
 }
 
 // InstanceCommand are commands for the goroutine managing postgres
@@ -168,6 +208,14 @@ const (
 	// RestartSmartFast means the instance has to be restarted by first issuing
 	// a smart shutdown and in case it doesn't work, a fast shutdown
 	RestartSmartFast InstanceCommand = "RestartSmartFast"
+
+	// FenceOn means the instance has to be restarted by first issuing
+	// a smart shutdown and in case it doesn't work, a fast shutdown
+	FenceOn InstanceCommand = "FenceOn"
+
+	// FenceOff means the instance has to be restarted by first issuing
+	// a smart shutdown and in case it doesn't work, a fast shutdown
+	FenceOff InstanceCommand = "FenceOff"
 
 	// ShutDownFastImmediate means the instance has to be shut down by first
 	// issuing a fast shut down and in case of errors an immediate one
@@ -223,7 +271,7 @@ func GetServerPort() int {
 
 // Startup starts up a PostgreSQL instance and wait for the instance to be
 // started
-func (instance Instance) Startup() error {
+func (instance *Instance) Startup() error {
 	socketDir := GetSocketDir()
 	if err := fileutils.EnsureDirectoryExist(socketDir); err != nil {
 		return fmt.Errorf("while creating socket directory: %w", err)
@@ -786,12 +834,11 @@ func (instance *Instance) RequestFastImmediateShutdown() {
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
 // restart the postmaster, and wait for the postmaster to be restarted
 func (instance *Instance) RequestAndWaitRestartSmartFast() error {
-	instance.FencingOn.Store(true)
-	defer instance.FencingOn.Store(false)
-
+	instance.SetMightBeUnavailable(true)
+	defer instance.SetMightBeUnavailable(false)
 	now := time.Now()
-	instance.RequestRestartSmartFast()
-	err := instance.WaitForInstanceRestarted(now)
+	instance.requestRestartSmartFast()
+	err := instance.waitForInstanceRestarted(now)
 	if err != nil {
 		return fmt.Errorf("while waiting for instance restart: %w", err)
 	}
@@ -799,15 +846,42 @@ func (instance *Instance) RequestAndWaitRestartSmartFast() error {
 	return nil
 }
 
-// RequestRestartSmartFast request the lifecycle manager to restart
+// requestRestartSmartFast request the lifecycle manager to restart
 // the postmaster
-func (instance *Instance) RequestRestartSmartFast() {
+func (instance *Instance) requestRestartSmartFast() {
 	instance.instanceCommandChan <- RestartSmartFast
 }
 
-// WaitForInstanceRestarted waits until the instance reports being started
+// RequestFencingOn request the lifecycle manager to shut down postgres and enable fencing
+func (instance *Instance) RequestFencingOn() {
+	instance.instanceCommandChan <- FenceOn
+}
+
+// RequestAndWaitFencingOff will request to remove the fencing
+// and wait for the instance to be restarted
+func (instance *Instance) RequestAndWaitFencingOff() error {
+	defer instance.SetMightBeUnavailable(false)
+	now := time.Now()
+	instance.requestFencingOff()
+	err := instance.waitForInstanceRestarted(now)
+	if err != nil {
+		return fmt.Errorf("while waiting for instance restart: %w", err)
+	}
+
+	// sleep enough for the pod to be ready again
+	time.Sleep(2 * specs.ReadinessProbePeriod * time.Second)
+
+	return nil
+}
+
+// requestFencingOff request the lifecycle manager to remove the fencing and restart postgres if needed
+func (instance *Instance) requestFencingOff() {
+	instance.instanceCommandChan <- FenceOff
+}
+
+// waitForInstanceRestarted waits until the instance reports being started
 // after the given time
-func (instance *Instance) WaitForInstanceRestarted(after time.Time) error {
+func (instance *Instance) waitForInstanceRestarted(after time.Time) error {
 	retryOnEveryError := func(err error) bool {
 		return true
 	}

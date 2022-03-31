@@ -9,6 +9,8 @@ package v1
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -582,5 +584,53 @@ var _ = Describe("Barman Endpoint CA for replica cluster", func() {
 	}
 	It("is defined if source name matches external cluster name", func() {
 		Expect(cluster3.GetBarmanEndpointCAForReplicaCluster()).To(Not(BeNil()))
+	})
+})
+
+var _ = Describe("Fencing annotation", func() {
+	When("one instance is fenced", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.FencedInstanceAnnotation: "[\"one\"]",
+				},
+			},
+		}
+
+		It("detect when an instance is fenced", func() {
+			Expect(cluster.IsInstanceFenced("one")).To(BeTrue())
+		})
+
+		It("detect when an instance is not fenced", func() {
+			Expect(cluster.IsInstanceFenced("two")).To(BeFalse())
+		})
+	})
+
+	When("the whole cluster is fenced", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.FencedInstanceAnnotation: "[\"*\"]",
+				},
+			},
+		}
+
+		It("detect when an instance is fenced", func() {
+			Expect(cluster.IsInstanceFenced("one")).To(BeTrue())
+			Expect(cluster.IsInstanceFenced("two")).To(BeTrue())
+			Expect(cluster.IsInstanceFenced("three")).To(BeTrue())
+		})
+	})
+
+	When("the annotation doesn't exist", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Annotations: map[string]string{},
+			},
+		}
+
+		It("ensure no instances are fenced", func() {
+			Expect(cluster.IsInstanceFenced("one")).To(BeFalse())
+		})
 	})
 })
