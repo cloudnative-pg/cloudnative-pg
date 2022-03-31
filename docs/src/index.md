@@ -100,6 +100,7 @@ architectures on OpenShift only.
 * Standard output logging of PostgreSQL error messages in JSON format
 * Support for the `restricted` security context constraint (SCC) in Red Hat OpenShift
 * `cnp` plugin for `kubectl`
+* Fencing of an entire PostgreSQL cluster, or a subset of the instances
 * Multi-arch format container images
 
 ## About this guide

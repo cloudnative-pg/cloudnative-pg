@@ -1316,6 +1316,19 @@ func (cluster *Cluster) IsReusePVCEnabled() bool {
 	return reusePVC
 }
 
+// IsInstanceFenced check if in a given instance should be fenced
+func (cluster *Cluster) IsInstanceFenced(instance string) bool {
+	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
+	if err != nil {
+		return false
+	}
+
+	if fencedInstances.Has(utils.FenceAllServers) {
+		return true
+	}
+	return fencedInstances.Has(instance)
+}
+
 // ShouldResizeInUseVolumes is true when we should resize PVC we already
 // created
 func (cluster *Cluster) ShouldResizeInUseVolumes() bool {

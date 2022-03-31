@@ -684,7 +684,10 @@ func (r *ClusterReconciler) extractInstancesStatus(
 
 	for idx := range filteredPods {
 		instanceStatus := r.getReplicaStatusFromPodViaHTTP(ctx, filteredPods[idx])
-		instanceStatus.IsReady = utils.IsPodReady(filteredPods[idx])
+
+		// Here we need to have pod marked as ready even when they are fenced. We want this
+		// to avoid a fenced primary to cause a failover to a different Pod.
+		instanceStatus.IsReady = instanceStatus.IsReady || utils.IsPodReady(filteredPods[idx])
 		instanceStatus.Node = filteredPods[idx].Spec.NodeName
 		instanceStatus.Pod = filteredPods[idx]
 
