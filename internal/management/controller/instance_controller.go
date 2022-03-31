@@ -54,6 +54,7 @@ var RetryUntilWalReceiverDown = wait.Backoff{
 }
 
 // Reconcile is the main reconciliation loop for the instance
+//nolint:gocognit
 func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	// set up a convenient contextLog object so we don't have to type request over and over again
 	contextLogger, ctx := log.SetupLogger(ctx)
@@ -64,7 +65,6 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		contextLogger.Warning("Context cancelled, will not reconcile", "err", err)
 		return ctrl.Result{}, nil
 	}
-	result := reconcile.Result{}
 
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
@@ -73,10 +73,10 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Re
 			// The cluster has been deleted.
 			// We just need to wait for this instance manager to be terminated
 			contextLogger.Debug("Could not find Cluster")
-			return result, nil
+			return reconcile.Result{}, nil
 		}
 
-		return result, fmt.Errorf("could not fetch Cluster: %w", err)
+		return reconcile.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
 	}
 
 	// Print the Cluster
@@ -89,12 +89,8 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	r.updateCacheFromCluster(ctx, cluster)
 
 	// Reconcile monitoring section
-	if r.metricsServerExporter != nil {
-		r.reconcileMetrics(cluster)
-		r.reconcileMonitoringQueries(ctx, cluster)
-	} else {
-		result.RequeueAfter = 1 * time.Second
-	}
+	r.reconcileMetrics(cluster)
+	r.reconcileMonitoringQueries(ctx, cluster)
 
 	// Reconcile secrets and cryptographic material
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
@@ -104,35 +100,46 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
 	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(cluster)
 	if err != nil {
-		return result, err
+		return reconcile.Result{}, err
 	}
 	reloadNeeded = reloadNeeded || reloadConfig
 
 	reloadReplicaConfig, err := r.refreshReplicaConfiguration(ctx, cluster)
 	if err != nil {
-		return result, err
+		return reconcile.Result{}, err
 	}
 	reloadNeeded = reloadNeeded || reloadReplicaConfig
 
-	// here we execute initialization tasks that need to be executed only verifiedPrimaryPgDataCoherence successfully
-	if !r.verifiedPrimaryPgDataCoherence.Load() {
+	// here we execute initialization tasks that need to be executed only on the first reconciliation loop
+	if !r.firstReconcileDone.Load() {
 		if err = r.verifyPgDataCoherenceForPrimary(ctx, cluster); err != nil {
-			return handleErrNextLoop(err, result)
+			return handleErrNextLoop(err)
 		}
-		r.verifiedPrimaryPgDataCoherence.Store(true)
+		r.instance.SetFencing(cluster.IsInstanceFenced(r.instance.PodName))
+		r.firstReconcileDone.Store(true)
 	}
 
 	// Reconcile cluster role without DB
 	reloadClusterRoleConfig, err := r.reconcileClusterRoleWithoutDB(ctx, cluster)
 	if err != nil {
-		return reconcile.Result{RequeueAfter: time.Second}, err
+		return reconcile.Result{}, err
 	}
 	reloadNeeded = reloadNeeded || reloadClusterRoleConfig
 
 	r.systemInitialization.Broadcast()
 
-	err = r.instance.IsServerHealthy()
-	if err != nil {
+	if result := r.reconcileFencing(cluster); result != nil {
+		contextLogger.Info("Fencing status changed, will not proceed with the reconciliation loop")
+		return *result, nil
+	}
+
+	if r.instance.IsFenced() || r.instance.MightBeUnavailable() {
+		contextLogger.Info("Instance could be down, will not proceed with the reconciliation loop")
+		return reconcile.Result{}, nil
+	}
+
+	if r.instance.IsServerHealthy() != nil {
+		contextLogger.Info("Instance is still down, will retry in 1 second")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
@@ -141,8 +148,7 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	err = r.IsDBUp(ctx)
-	if err != nil {
+	if r.IsDBUp(ctx) != nil {
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
@@ -168,14 +174,33 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
 
-	return result, nil
+	return reconcile.Result{}, nil
 }
 
-func handleErrNextLoop(err error, result reconcile.Result) (reconcile.Result, error) {
+func (r *InstanceReconciler) reconcileFencing(cluster *apiv1.Cluster) *reconcile.Result {
+	fencingRequired := cluster.IsInstanceFenced(r.instance.PodName)
+	isFenced := r.instance.IsFenced()
+	switch {
+	case !isFenced && fencingRequired:
+		// fencing required and not enabled yet, request fencing and stop
+		r.instance.RequestFencingOn()
+		return &reconcile.Result{}
+	case isFenced && !fencingRequired:
+		// fencing enabled and not required anymore, request to disable fencing and continue
+		err := r.instance.RequestAndWaitFencingOff()
+		if err != nil {
+			log.Error(err, "while waiting for the instance to be restarted after lifting the fence")
+		}
+		return &reconcile.Result{}
+	}
+	return nil
+}
+
+func handleErrNextLoop(err error) (reconcile.Result, error) {
 	if errors.Is(err, controllers.ErrNextLoop) {
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
-	return result, err
+	return reconcile.Result{}, err
 }
 
 // reconcileOldPrimary shuts down the instance in case it is an old primary
@@ -708,6 +733,12 @@ func (r *InstanceReconciler) waitForConfigurationReload(ctx context.Context, clu
 	status, err := r.instance.GetStatus()
 	if err != nil {
 		return fmt.Errorf("while applying new configuration: %w", err)
+	}
+	if status.MightBeUnavailableMaskedError != "" {
+		return fmt.Errorf(
+			"while applying new configuration encountered an error masked by mightBeUnavailable: %s",
+			status.MightBeUnavailableMaskedError,
+		)
 	}
 
 	if !status.PendingRestart {

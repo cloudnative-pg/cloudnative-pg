@@ -51,17 +51,17 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, r *ht
 	// If `pg_rewind` is running the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
 	// Same goes for instances with fencing on.
-	if !ws.instance.PgRewindIsRunning && !ws.instance.FencingOn.Load() {
+	if !ws.instance.PgRewindIsRunning && !ws.instance.MightBeUnavailable() {
 		err := ws.instance.IsServerHealthy()
 		if err != nil {
 			log.Info("Liveness probe failing", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		log.Trace("Liveness probe succeeding")
+	} else {
+		log.Trace("Liveness probe skipped")
 	}
-
-	log.Trace("Liveness probe succeeding")
-
 	_, _ = fmt.Fprint(w, "OK")
 }
 
@@ -83,29 +83,12 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http
 func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, r *http.Request) {
 	// Extract the status of the current instance
 	status, err := ws.instance.GetStatus()
-	switch {
-	case err != nil && !ws.instance.FencingOn.Load():
+	if err != nil {
 		log.Info(
 			"Instance status probe failing",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-
-	case err != nil && ws.instance.FencingOn.Load():
-		log.Info("fencing enabled, will fake status")
-		// force reporting fencing as enabled
-		status.IsFencingOn = true
-		// force reporting the instance as primary if required
-		status.IsPrimary, err = ws.instance.IsPrimary()
-		if err != nil {
-			log.Info(
-				"Internal error checking if primary",
-				"err", err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		// force the instance to be reported as ready
-		status.IsReady = true
 	}
 
 	// Marshal the status back to the operator

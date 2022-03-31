@@ -74,6 +74,9 @@ const (
 
 	// PgWalArchiveStatusPath is the path to the archive status directory
 	PgWalArchiveStatusPath = PgWalPath + "/archive_status"
+
+	// ReadinessProbePeriod is the period set for the postgres instance readiness probe
+	ReadinessProbePeriod = 10
 )
 
 func createEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []corev1.EnvVar {
@@ -122,6 +125,7 @@ func createPostgresContainers(
 			VolumeMounts:    createPostgresVolumeMounts(cluster),
 			ReadinessProbe: &corev1.Probe{
 				TimeoutSeconds: 5,
+				PeriodSeconds:  ReadinessProbePeriod,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathReady,
