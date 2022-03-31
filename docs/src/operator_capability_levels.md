@@ -399,6 +399,16 @@ in the maintenance window section enables to specify the strategy to be used:
 allocate new storage in a different PVC for the evicted instance or wait
 for the underlying node to be available again.
 
+### Fencing
+
+Fencing is the process of protecting the data in one, more, or even all
+instances of a PostgreSQL cluster when they appear to be malfunctioning.
+When an instance is fenced, the PostgreSQL server process is
+guaranteed to be shut down, while the pod is kept running. This makes sure
+that, until the fence is lifted, data on the pod is not modified by PostgreSQL
+and that the file system can be investigated for debugging and troubleshooting
+purposes.
+
 ### Reuse of Persistent Volumes storage in Pods
 
 When the operator needs to create a pod that has been deleted by the user or

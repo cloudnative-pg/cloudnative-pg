@@ -31,9 +31,9 @@ type InstanceReconciler struct {
 	secretVersions  map[string]string
 	extensionStatus map[string]bool
 
-	systemInitialization           *concurrency.Executed
-	verifiedPrimaryPgDataCoherence atomic.Bool
-	metricsServerExporter          *metricserver.Exporter
+	systemInitialization  *concurrency.Executed
+	firstReconcileDone    atomic.Bool
+	metricsServerExporter *metricserver.Exporter
 }
 
 // NewInstanceReconciler creates a new instance reconciler
