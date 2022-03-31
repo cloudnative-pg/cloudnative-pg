@@ -198,13 +198,19 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	e.Metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
-	if e.instance.FencingOn.Load() {
+	if e.instance.IsFenced() {
 		e.Metrics.FencingOn.Set(1)
 		log.Info("metrics collection skipped due to fencing")
 		return
 	}
-
 	e.Metrics.FencingOn.Set(0)
+
+	if e.instance.MightBeUnavailable() {
+		log.Info("metrics collection skipped due to instance still being down")
+		e.Metrics.Error.Set(0)
+		return
+	}
+
 	db, err := e.instance.GetSuperUserDB()
 	if err != nil {
 		log.Error(err, "Error opening connection to PostgreSQL")

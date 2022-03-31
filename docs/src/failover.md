@@ -73,4 +73,3 @@ Failover may result in the service being impacted and/or data being lost:
     level. On the contrary, setting it to a high value, might remove the risk of
     data loss while leaving the cluster without an active primary for a longer time
     during the switchover.
-

@@ -22,10 +22,11 @@ import (
 )
 
 // runPostgresAndWait runs a goroutine which will run, configure and run Postgres itself,
-// returnin any error via the returned channel
-func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) chan error {
+// returning any error via the returned channel
+func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error {
 	contextLogger := log.FromContext(ctx)
 	errChan := make(chan error, 1)
+
 	go func() {
 		defer close(errChan)
 		err := verifyPgDataCoherence(ctx, i.instance)
@@ -37,6 +38,12 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) chan error {
 		// here we need to wait for initialization to be executed before
 		// being able to start the instance
 		i.systemInitialization.Wait()
+
+		// if the instance is marked as fenced we don't need to start it at all
+		if i.instance.IsFenced() {
+			log.Info("Instance is fenced, won't start postgres right now")
+			return
+		}
 
 		i.instance.LogPgControldata("postmaster start up")
 		defer i.instance.LogPgControldata("postmaster has exited")
@@ -57,8 +64,8 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) chan error {
 		}
 
 		// from now on the instance can be considered ready
-		i.instance.CanCheckReadiness.Store(true)
-		defer i.instance.CanCheckReadiness.Store(false)
+		i.instance.SetCanCheckReadiness(true)
+		defer i.instance.SetCanCheckReadiness(false)
 
 		errChan <- streamingCmd.Wait()
 	}()

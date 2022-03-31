@@ -41,6 +41,7 @@ nav:
   - openshift.md
   - failover.md
   - troubleshooting.md
+  - fencing.md
   - e2e.md
   - container_images.md
   - operator_capability_levels.md

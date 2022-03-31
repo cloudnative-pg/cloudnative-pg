@@ -25,7 +25,9 @@ type PostgresqlStatus struct {
 	Pod                       corev1.Pod `json:"pod"`
 	IsPgRewindRunning         bool       `json:"isPgRewindRunning"`
 	TotalInstanceSize         string     `json:"totalInstanceSize"`
-	IsFencingOn               bool       `json:"isFencingOn"`
+	MightBeUnavailable        bool       `json:"mightBeUnavailable"`
+	// populated when MightBeUnavailable reported a healthy status even if it found an error
+	MightBeUnavailableMaskedError string `json:"mightBeUnavailableMaskedError,omitempty"`
 
 	// WAL Status
 	// SELECT
@@ -210,7 +212,7 @@ func (list PostgresqlStatusList) ArePodsWaitingForDecreasedSettings() bool {
 // ShouldSkipReconcile checks whether at least an instance is asking for the reconciliation loop to be skipped
 func (list PostgresqlStatusList) ShouldSkipReconcile() bool {
 	for _, item := range list.Items {
-		if item.IsFencingOn {
+		if item.MightBeUnavailable {
 			return true
 		}
 	}

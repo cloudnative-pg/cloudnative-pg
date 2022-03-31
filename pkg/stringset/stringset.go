@@ -34,6 +34,12 @@ func (set *Data) Put(key string) {
 	set.innerMap[key] = struct{}{}
 }
 
+// Delete deletes a string from the set. If the string doesn't exist
+// this is a no-op
+func (set *Data) Delete(key string) {
+	delete(set.innerMap, key)
+}
+
 // Has check if a string is in the set or not
 func (set *Data) Has(key string) bool {
 	_, ok := set.innerMap[key]
@@ -43,4 +49,14 @@ func (set *Data) Has(key string) bool {
 // Len returns the map of the set
 func (set *Data) Len() int {
 	return len(set.innerMap)
+}
+
+// ToList returns the strings contained in this set as
+// a string slice
+func (set *Data) ToList() (result []string) {
+	result = make([]string, 0, len(set.innerMap))
+	for key := range set.innerMap {
+		result = append(result, key)
+	}
+	return
 }
