@@ -482,7 +482,8 @@ func (r *ClusterReconciler) refreshCertsExpirations(ctx context.Context, cluster
 
 // setCertExpiration check the expiration date of a certificates used by the cluster
 func (r *ClusterReconciler) setCertExpiration(ctx context.Context, cluster *apiv1.Cluster, secretName string,
-	namespace string, certKey string) error {
+	namespace string, certKey string,
+) error {
 	var secret corev1.Secret
 	err := r.Get(ctx, client.ObjectKey{
 		Namespace: namespace,

@@ -23,7 +23,8 @@ import (
 // GetCNPsMutatingWebhookByName get the MutatingWebhook filtered by the name of one
 // of the webhooks
 func GetCNPsMutatingWebhookByName(env *TestingEnvironment, name string) (
-	*admissionregistrationv1.MutatingWebhookConfiguration, int, error) {
+	*admissionregistrationv1.MutatingWebhookConfiguration, int, error,
+) {
 	var mWebhooks admissionregistrationv1.MutatingWebhookConfigurationList
 	err := GetObjectList(env, &mWebhooks)
 	if err != nil {
@@ -42,7 +43,8 @@ func GetCNPsMutatingWebhookByName(env *TestingEnvironment, name string) (
 
 // UpdateCNPsMutatingWebhookConf update MutatingWebhookConfiguration object
 func UpdateCNPsMutatingWebhookConf(env *TestingEnvironment,
-	wh *admissionregistrationv1.MutatingWebhookConfiguration) error {
+	wh *admissionregistrationv1.MutatingWebhookConfiguration,
+) error {
 	ctx := context.Background()
 	_, err := env.Interface.AdmissionregistrationV1().
 		MutatingWebhookConfigurations().Update(ctx, wh, metav1.UpdateOptions{})
@@ -54,7 +56,8 @@ func UpdateCNPsMutatingWebhookConf(env *TestingEnvironment,
 
 // GetCNPsValidatingWebhookConf get the ValidatingWebhook linked to the operator
 func GetCNPsValidatingWebhookConf(env *TestingEnvironment) (
-	*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
+	*admissionregistrationv1.ValidatingWebhookConfiguration, error,
+) {
 	ctx := context.Background()
 	validatingWebhookConfig, err := env.Interface.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
 		ctx, controller.ValidatingWebhookConfigurationName, metav1.GetOptions{})
@@ -67,7 +70,8 @@ func GetCNPsValidatingWebhookConf(env *TestingEnvironment) (
 // GetCNPsValidatingWebhookByName get ValidatingWebhook by the name of one
 // of the webhooks
 func GetCNPsValidatingWebhookByName(env *TestingEnvironment, name string) (
-	*admissionregistrationv1.ValidatingWebhookConfiguration, int, error) {
+	*admissionregistrationv1.ValidatingWebhookConfiguration, int, error,
+) {
 	var vWebhooks admissionregistrationv1.ValidatingWebhookConfigurationList
 	err := GetObjectList(env, &vWebhooks)
 	if err != nil {
@@ -86,7 +90,8 @@ func GetCNPsValidatingWebhookByName(env *TestingEnvironment, name string) (
 
 // UpdateCNPsValidatingWebhookConf update the ValidatingWebhook object
 func UpdateCNPsValidatingWebhookConf(env *TestingEnvironment,
-	wh *admissionregistrationv1.ValidatingWebhookConfiguration) error {
+	wh *admissionregistrationv1.ValidatingWebhookConfiguration,
+) error {
 	ctx := context.Background()
 	_, err := env.Interface.AdmissionregistrationV1().
 		ValidatingWebhookConfigurations().Update(ctx, wh, metav1.UpdateOptions{})
@@ -168,7 +173,8 @@ func CheckWebhookReady(env *TestingEnvironment, namespace string) error {
 
 // GetCNPsMutatingWebhookConf get the MutatingWebhook linked to the operator
 func (env TestingEnvironment) GetCNPsMutatingWebhookConf() (
-	*admissionregistrationv1.MutatingWebhookConfiguration, error) {
+	*admissionregistrationv1.MutatingWebhookConfiguration, error,
+) {
 	ctx := context.Background()
 	return env.Interface.AdmissionregistrationV1().
 		MutatingWebhookConfigurations().

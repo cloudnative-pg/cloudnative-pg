@@ -43,7 +43,8 @@ func appendCloudProviderOptions(
 	options []string,
 	s3Credentials,
 	azureCredentials,
-	googleCredentials bool) ([]string, error) {
+	googleCredentials bool,
+) ([]string, error) {
 	capabilities, err := barmanCapabilities.CurrentCapabilities()
 	if err != nil {
 		return nil, err

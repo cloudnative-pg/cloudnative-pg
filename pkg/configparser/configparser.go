@@ -139,7 +139,8 @@ func ensurePointerToStruct(name string, data interface{}) {
 }
 
 func ensurePointerToCompatibleStruct(
-	firstName string, firstValue interface{}, secondName string, secondValue interface{}) {
+	firstName string, firstValue interface{}, secondName string, secondValue interface{},
+) {
 	errMsg := fmt.Sprintf(
 		"%v and %v are different structs",
 		reflect.TypeOf(firstValue).String(),

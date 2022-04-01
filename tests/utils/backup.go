@@ -64,7 +64,8 @@ func CreateClusterFromBackupUsingPITR(
 	clusterName,
 	backupFilePath,
 	targetTime string,
-	env *TestingEnvironment) error {
+	env *TestingEnvironment,
+) error {
 	backupName, err := env.GetResourceNameFromYAML(backupFilePath)
 	if err != nil {
 		return err
@@ -121,7 +122,8 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 	targetTime,
 	storageCredentialsSecretName,
 	azStorageAccount string,
-	env *TestingEnvironment) error {
+	env *TestingEnvironment,
+) error {
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/", azStorageAccount, sourceClusterName)
 
@@ -193,7 +195,8 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 	externalClusterName,
 	sourceClusterName,
 	targetTime string,
-	env *TestingEnvironment) error {
+	env *TestingEnvironment,
+) error {
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 
 	restoreCluster := &apiv1.Cluster{
@@ -271,7 +274,8 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 	externalClusterName,
 	sourceClusterName,
 	targetTime string,
-	env *TestingEnvironment) error {
+	env *TestingEnvironment,
+) error {
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	DestinationPath := fmt.Sprintf("https://azurite:10000/storageaccountname/%v", sourceClusterName)
 
@@ -356,7 +360,8 @@ func CountFilesOnAzureBlobStorage(
 	azStorageAccount string,
 	azStorageKey string,
 	clusterName string,
-	path string) (int, error) {
+	path string,
+) (int, error) {
 	azBlobListCmd := ComposeAzBlobListCmd(azStorageAccount, azStorageKey, clusterName, path)
 	out, _, err := RunUnchecked(azBlobListCmd)
 	if err != nil {
@@ -371,7 +376,8 @@ func CountFilesOnAzureBlobStorage(
 func CountFilesOnAzuriteBlobStorage(
 	namespace,
 	clusterName string,
-	path string) (int, error) {
+	path string,
+) (int, error) {
 	azBlobListCmd := ComposeAzBlobListAzuriteCmd(clusterName, path)
 	out, _, err := RunUnchecked(fmt.Sprintf("kubectl exec -n %v az-cli "+
 		"-- /bin/bash -c '%v'", namespace, azBlobListCmd))
@@ -388,7 +394,8 @@ func GetConditionsInClusterStatus(
 	namespace,
 	clusterName string,
 	env *TestingEnvironment,
-	conditionType apiv1.ClusterConditionType) (*apiv1.ClusterCondition, error) {
+	conditionType apiv1.ClusterConditionType,
+) (*apiv1.ClusterCondition, error) {
 	var cluster *apiv1.Cluster
 	var err error
 	var backupConditionInCluster *apiv1.ClusterCondition
