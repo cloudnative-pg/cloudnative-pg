@@ -23,7 +23,8 @@ import (
 // to be used, and an error state
 func ConfigureConnectionToServer(
 	ctx context.Context, client ctrl.Client,
-	namespace string, server *apiv1.ExternalCluster) (string, string, error) {
+	namespace string, server *apiv1.ExternalCluster,
+) (string, string, error) {
 	connectionParameters := make(map[string]string, len(server.ConnectionParameters))
 	pgpassfile := ""
 

@@ -391,7 +391,8 @@ func (r *InstanceReconciler) getAllAccessibleDatabases(
 // ReconcileExtensions reconciles the expected extensions for this
 // PostgreSQL instance
 func (r *InstanceReconciler) reconcileExtensions(
-	ctx context.Context, db *sql.DB, userSettings map[string]string) (err error) {
+	ctx context.Context, db *sql.DB, userSettings map[string]string,
+) (err error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -428,7 +429,8 @@ func (r *InstanceReconciler) reconcileExtensions(
 // ReconcileExtensions reconciles the expected extensions for this
 // PostgreSQL instance
 func (r *InstanceReconciler) reconcilePoolers(
-	ctx context.Context, db *sql.DB, dbName string, integrations *apiv1.PoolerIntegrations) (err error) {
+	ctx context.Context, db *sql.DB, dbName string, integrations *apiv1.PoolerIntegrations,
+) (err error) {
 	if integrations == nil || len(integrations.PgBouncerIntegration.Secrets) == 0 {
 		return
 	}
@@ -969,7 +971,8 @@ func (r *InstanceReconciler) waitForWalReceiverDown() error {
 // in the primary pod with the content from the secrets
 func (r *InstanceReconciler) refreshCredentialsFromSecret(
 	ctx context.Context,
-	cluster *apiv1.Cluster) error {
+	cluster *apiv1.Cluster,
+) error {
 	// We only update the password in the primary pod
 	primary, err := r.instance.IsPrimary()
 	if err != nil {

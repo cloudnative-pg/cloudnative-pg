@@ -54,7 +54,8 @@ func (r *InstanceReconciler) refreshServerCertificateFiles(ctx context.Context, 
 // refreshReplicationUserCertificate gets the latest replication certificates from the
 // secrets. Returns true if configuration has been changed
 func (r *InstanceReconciler) refreshReplicationUserCertificate(ctx context.Context,
-	cluster *apiv1.Cluster) (bool, error) {
+	cluster *apiv1.Cluster,
+) (bool, error) {
 	var secret corev1.Secret
 	err := r.GetClient().Get(
 		ctx,
@@ -138,7 +139,8 @@ func (r *InstanceReconciler) refreshBarmanEndpointCA(ctx context.Context, cluste
 // one from the PGDATA viewpoint, but is not classified as the target nor the
 // current primary
 func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
-	ctx context.Context, cluster *apiv1.Cluster) error {
+	ctx context.Context, cluster *apiv1.Cluster,
+) error {
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
 		return err

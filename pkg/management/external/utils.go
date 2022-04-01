@@ -26,7 +26,8 @@ const (
 // using 0600 as permission bits
 func ReadSecretKeyRef(
 	ctx context.Context, client ctrl.Client,
-	namespace string, selector *corev1.SecretKeySelector) (string, error) {
+	namespace string, selector *corev1.SecretKeySelector,
+) (string, error) {
 	var secret corev1.Secret
 	err := client.Get(ctx, ctrl.ObjectKey{Namespace: namespace, Name: selector.Name}, &secret)
 	if err != nil {
@@ -49,7 +50,8 @@ func ReadSecretKeyRef(
 // We also need to have more control over when the secret content is updated.
 func DumpSecretKeyRefToFile(
 	ctx context.Context, client ctrl.Client,
-	namespace string, serverName string, selector *corev1.SecretKeySelector) (string, error) {
+	namespace string, serverName string, selector *corev1.SecretKeySelector,
+) (string, error) {
 	var secret corev1.Secret
 
 	err := client.Get(ctx, ctrl.ObjectKey{Namespace: namespace, Name: selector.Name}, &secret)

@@ -62,7 +62,8 @@ func SetAsOwnedByOperatorDeployment(ctx context.Context,
 func GetOperatorDeployment(
 	ctx context.Context,
 	client kubernetes.Interface,
-	namespace, operatorLabelSelector string) (*v1.Deployment, error) {
+	namespace, operatorLabelSelector string,
+) (*v1.Deployment, error) {
 	deploymentList, err := client.AppsV1().Deployments(namespace).List(
 		ctx, metav1.ListOptions{LabelSelector: operatorLabelSelector})
 	if err != nil {

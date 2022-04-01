@@ -261,7 +261,8 @@ func envSetGoogleCredentials(
 
 func reconcileGoogleCredentials(
 	googleCredentials *apiv1.GoogleCredentials,
-	applicationCredentialsContent []byte) error {
+	applicationCredentialsContent []byte,
+) error {
 	credentialsPath := "/controller/.application_credentials.json"
 
 	if googleCredentials == nil {

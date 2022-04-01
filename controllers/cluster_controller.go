@@ -394,7 +394,8 @@ func (r *ClusterReconciler) reconcileResources(
 
 // deleteEvictedPods will delete the Pods that the Kubelet has evicted
 func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv1.Cluster,
-	resources *managedResources) (*ctrl.Result, error) {
+	resources *managedResources,
+) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 	deletedPods := false
 
@@ -458,7 +459,8 @@ func (r *ClusterReconciler) checkPodsArchitecture(ctx context.Context, status *p
 
 // ReconcilePVCs align the PVCs that are backing our cluster with the user specifications
 func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cluster,
-	resources *managedResources) error {
+	resources *managedResources,
+) error {
 	contextLogger := log.FromContext(ctx)
 	if !cluster.ShouldResizeInUseVolumes() {
 		return nil
@@ -507,7 +509,8 @@ func (r *ClusterReconciler) ReconcilePVCs(ctx context.Context, cluster *apiv1.Cl
 
 // ReconcilePods decides when to create, scale up/down or wait for pods
 func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cluster,
-	resources *managedResources, instancesStatus postgres.PostgresqlStatusList) (ctrl.Result, error) {
+	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
+) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	// If we are joining a node, we should wait for the process to finish
@@ -587,7 +590,8 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	resources *managedResources) error {
+	resources *managedResources,
+) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Make sure that all healthy PVCs are marked as ready

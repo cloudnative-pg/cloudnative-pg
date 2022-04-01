@@ -65,7 +65,8 @@ func (c *multiNamespaceCache) GetInformer(ctx context.Context, obj client.Object
 }
 
 func (c *multiNamespaceCache) GetInformerForKind(
-	ctx context.Context, gvk schema.GroupVersionKind) (cache.Informer, error) {
+	ctx context.Context, gvk schema.GroupVersionKind,
+) (cache.Informer, error) {
 	return c.multiCache.GetInformerForKind(ctx, gvk)
 }
 
@@ -104,7 +105,8 @@ func (c *multiNamespaceCache) WaitForCacheSync(ctx context.Context) bool {
 }
 
 func (c *multiNamespaceCache) IndexField(
-	ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
+	ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc,
+) error {
 	return c.multiCache.IndexField(ctx, obj, field, extractValue)
 }
 

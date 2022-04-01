@@ -36,7 +36,8 @@ func ExecCommand(
 	pod corev1.Pod,
 	containerName string,
 	timeout *time.Duration,
-	command ...string) (string, string, error) {
+	command ...string,
+) (string, string, error) {
 	// iterate through all containers looking for the one running PostgreSQL.
 	targetContainer := -1
 	for i, cr := range pod.Spec.Containers {
