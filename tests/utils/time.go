@@ -19,7 +19,7 @@ func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment)
 		return "", err
 	}
 
-	query := "select CURRENT_TIMESTAMP;"
+	query := "select TO_CHAR(CURRENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS');"
 	stdOut, _, err := env.ExecCommand(env.Ctx, *primaryPodInfo, "postgres",
 		&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 	if err != nil {
