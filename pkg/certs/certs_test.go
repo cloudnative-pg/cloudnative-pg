@@ -9,6 +9,7 @@ package certs
 import (
 	"bytes"
 	"crypto/x509"
+	"encoding/pem"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -197,6 +198,27 @@ var _ = Describe("Keypair generation", func() {
 
 			err = pair.IsValid(otherRootCA, nil)
 			Expect(err).ToNot(BeNil())
+		})
+
+		It("should be able to handle new lines at the end of server certificates", func() {
+			rootCA, err := CreateRootCA("test", "namespace")
+			Expect(err).To(BeNil())
+
+			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil)
+			Expect(err).To(BeNil())
+
+			blockServer, intermediatesPEM := pem.Decode(pair.Certificate)
+			Expect(blockServer).NotTo(BeNil())
+			Expect(intermediatesPEM).To(BeEmpty())
+
+			pair.Certificate = append(pair.Certificate, []byte("\n")...)
+			blockServer, intermediatesPEM = pem.Decode(pair.Certificate)
+			Expect(blockServer).NotTo(BeNil())
+			Expect(intermediatesPEM).NotTo(BeEmpty())
+
+			opts := x509.VerifyOptions{KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+			err = pair.IsValid(pair, &opts)
+			Expect(err).To(BeNil())
 		})
 
 		It("should validate using the full certificate chain", func() {

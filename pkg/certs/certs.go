@@ -108,15 +108,14 @@ func (pair KeyPair) IsValid(caPair *KeyPair, opts *x509.VerifyOptions) error {
 		return err
 	}
 
-	if len(intermediatesPEM) > 0 {
-		if opts.Intermediates == nil {
-			opts.Intermediates = x509.NewCertPool()
-		}
-
-		if !opts.Intermediates.AppendCertsFromPEM(intermediatesPEM) {
-			return fmt.Errorf("invalid intermediate certificates")
-		}
+	if opts.Intermediates == nil {
+		opts.Intermediates = x509.NewCertPool()
 	}
+
+	// We can ignore the returned bool, because it is perfectly fine
+	// not to have an intermediate certificate if the server certificate
+	// is directly signed by the CA
+	opts.Intermediates.AppendCertsFromPEM(intermediatesPEM)
 
 	if opts.Roots == nil {
 		opts.Roots = x509.NewCertPool()
