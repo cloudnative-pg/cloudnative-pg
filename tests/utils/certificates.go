@@ -20,7 +20,8 @@ func CreateClientCertificatesViaKubectlPlugin(
 	cluster apiv1.Cluster,
 	certName string,
 	userName string,
-	env *TestingEnvironment) error {
+	env *TestingEnvironment,
+) error {
 	// clientCertName := "cluster-cert"
 	// user := "app"
 	// Create the certificate

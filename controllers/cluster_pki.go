@@ -178,7 +178,8 @@ func (r *ClusterReconciler) verifyCAValidity(secret v1.Secret, cluster *apiv1.Cl
 }
 
 func (r *ClusterReconciler) ensureCASecret(ctx context.Context, cluster *apiv1.Cluster,
-	secretName string) (*v1.Secret, error) {
+	secretName string,
+) (*v1.Secret, error) {
 	var secret v1.Secret
 	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.GetNamespace(), Name: secretName}, &secret)
 	if err == nil {

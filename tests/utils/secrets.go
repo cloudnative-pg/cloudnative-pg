@@ -22,7 +22,8 @@ func CreateSecretCA(
 	caSecName string,
 	includeCAPrivateKey bool,
 	env *TestingEnvironment) (
-	*apiv1.Cluster, *certs.KeyPair, error) {
+	*apiv1.Cluster, *certs.KeyPair, error,
+) {
 	// creating root CA certificates
 	cluster := &apiv1.Cluster{}
 	cluster.Namespace = namespace

@@ -81,7 +81,8 @@ func (userQuery UserQuery) ToMetricMap(namespace string) (result MetricMapSet, v
 // from the user can result in multiple metrics being generated (histograms are an example
 // of this behavior), we are returning a mapping, which therefore should be collected together
 func (columnMapping ColumnMapping) ToMetricMap(
-	columnName, namespace string, variableLabels []string) MetricMapSet {
+	columnName, namespace string, variableLabels []string,
+) MetricMapSet {
 	result := make(MetricMapSet)
 	// Determine how to convert the column based on its usage.
 	// nolint: dupl

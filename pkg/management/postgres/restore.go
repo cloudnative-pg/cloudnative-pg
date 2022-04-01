@@ -182,7 +182,8 @@ func (info InitInfo) loadBackup(
 func (info InitInfo) loadBackupObjectFromExternalCluster(
 	ctx context.Context,
 	typedClient client.Client,
-	cluster *apiv1.Cluster) (*apiv1.Backup, []string, error) {
+	cluster *apiv1.Cluster,
+) (*apiv1.Backup, []string, error) {
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 	log.Info("Recovering from external cluster", "sourceName", sourceName)
 
@@ -259,7 +260,8 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 func (info InitInfo) loadBackupFromReference(
 	ctx context.Context,
 	typedClient client.Client,
-	cluster *apiv1.Cluster) (*apiv1.Backup, []string, error) {
+	cluster *apiv1.Cluster,
+) (*apiv1.Backup, []string, error) {
 	var backup apiv1.Backup
 	err := typedClient.Get(
 		ctx,
