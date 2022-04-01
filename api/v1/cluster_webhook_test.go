@@ -593,7 +593,73 @@ var _ = Describe("recovery target", func() {
 							TargetXID:       "3",
 							TargetName:      "",
 							TargetLSN:       "",
-							TargetTime:      "2020-01-01 01:01",
+							TargetTime:      "2021-09-01 10:22:47.000000+06",
+							TargetImmediate: nil,
+							Exclusive:       nil,
+						},
+					},
+				},
+			},
+		}
+
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
+	})
+
+	It("TargetTime's format as `YYYY-MM-DD HH24:MI:SS.FF6TZH` is valid", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						RecoveryTarget: &RecoveryTarget{
+							TargetTLI:       "",
+							TargetXID:       "",
+							TargetName:      "",
+							TargetLSN:       "",
+							TargetTime:      "2021-09-01 10:22:47.000000+06",
+							TargetImmediate: nil,
+							Exclusive:       nil,
+						},
+					},
+				},
+			},
+		}
+
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
+	})
+
+	It("TargetTime's format as YYYY-MM-DD HH24:MI:SS.FF6TZH:TZM` is valid", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						RecoveryTarget: &RecoveryTarget{
+							TargetTLI:       "",
+							TargetXID:       "",
+							TargetName:      "",
+							TargetLSN:       "",
+							TargetTime:      "2021-09-01 10:22:47.000000+06:00",
+							TargetImmediate: nil,
+							Exclusive:       nil,
+						},
+					},
+				},
+			},
+		}
+
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
+	})
+
+	It("TargetTime's format as YYYY-MM-DD HH24:MI:SS.FF6 TZH:TZM` is invalid", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						RecoveryTarget: &RecoveryTarget{
+							TargetTLI:       "",
+							TargetXID:       "",
+							TargetName:      "",
+							TargetLSN:       "",
+							TargetTime:      "2021-09-01 10:22:47.000000 +06:00",
 							TargetImmediate: nil,
 							Exclusive:       nil,
 						},
@@ -611,7 +677,7 @@ var _ = Describe("recovery target", func() {
 				Bootstrap: &BootstrapConfiguration{
 					Recovery: &BootstrapRecovery{
 						RecoveryTarget: &RecoveryTarget{
-							TargetTime: "2020-01-01 01:01",
+							TargetTime: "2020-01-01 01:01:00",
 						},
 					},
 				},

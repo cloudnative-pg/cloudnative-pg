@@ -8,6 +8,8 @@ package utils
 
 import (
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // ConvertToPostgresFormat converts timestamps to PostgreSQL time format, if needed.
@@ -25,4 +27,18 @@ func ConvertToPostgresFormat(timestamp string) string {
 func GetCurrentTimestamp() string {
 	t := time.Now()
 	return t.Format(time.RFC3339)
+}
+
+// ParseTargetTime returns the parsed targetTime which is used for point-in-time-recovery
+// Currently, we support formats of targetTime as follows:
+// YYYY-MM-DD HH24:MI:SS
+// YYYY-MM-DD HH24:MI:SS.FF6TZH
+// YYYY-MM-DD HH24:MI:SS.FF6TZH:TZM
+func ParseTargetTime(currentLocation *time.Location, targetTime string) (time.Time, error) {
+	t, err := pq.ParseTimestamp(currentLocation, targetTime)
+	if err == nil {
+		return t, nil
+	}
+
+	return t, err
 }
