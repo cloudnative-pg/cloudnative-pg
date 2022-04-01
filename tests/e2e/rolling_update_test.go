@@ -112,7 +112,8 @@ var _ = Describe("Rolling updates", func() {
 
 	// Verify that the pod name changes amount to an expected number
 	AssertChangedNames := func(namespace string, clusterName string,
-		originalPodNames []string, expectedUnchangedNames int) {
+		originalPodNames []string, expectedUnchangedNames int,
+	) {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		matchingNames := 0
@@ -130,7 +131,8 @@ var _ = Describe("Rolling updates", func() {
 
 	// Verify that the pod UIDs changes are the expected number
 	AssertNewPodsUID := func(namespace string, clusterName string,
-		originalPodUID []types.UID, expectedUnchangedUIDs int) {
+		originalPodUID []types.UID, expectedUnchangedUIDs int,
+	) {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		matchingUID := 0
@@ -148,7 +150,8 @@ var _ = Describe("Rolling updates", func() {
 
 	// Verify that the PVC UIDs changes are the expected number
 	AssertChangedPvcUID := func(namespace string, clusterName string,
-		originalPVCUID []types.UID, expectedUnchangedPvcUIDs int) {
+		originalPVCUID []types.UID, expectedUnchangedPvcUIDs int,
+	) {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		matchingPVC := 0
@@ -223,7 +226,8 @@ var _ = Describe("Rolling updates", func() {
 	}
 
 	AssertRollingUpdate := func(namespace string, clusterName string,
-		sampleFile string, expectedPrimaryIdx int) {
+		sampleFile string, expectedPrimaryIdx int,
+	) {
 		var originalPodNames []string
 		var originalPodUID []types.UID
 		var originalPVCUID []types.UID

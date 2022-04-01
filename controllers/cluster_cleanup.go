@@ -20,7 +20,8 @@ import (
 // cleanupCompletedJobs remove all the Jobs which are completed
 func (r *ClusterReconciler) cleanupCompletedJobs(
 	ctx context.Context,
-	jobs batchv1.JobList) {
+	jobs batchv1.JobList,
+) {
 	contextLogger := log.FromContext(ctx)
 
 	completeJobs := utils.FilterCompleteJobs(jobs.Items)

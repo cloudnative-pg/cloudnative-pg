@@ -50,7 +50,8 @@ type namedObject struct {
 //  - events in the operator namespace
 //  - kubernetes environment information (server part of `kubectl version`)
 func Operator(ctx context.Context, format plugin.OutputFormat,
-	file string, stopRedaction bool) error {
+	file string, stopRedaction bool,
+) error {
 	secretRedactor := redactSecret
 	configMapRedactor := redactConfigMap
 	if stopRedaction {

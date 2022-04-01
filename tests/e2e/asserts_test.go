@@ -207,7 +207,8 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 }
 
 func AssertClusterDefault(namespace string, clusterName string,
-	isExpectedToDefault bool, env *testsUtils.TestingEnvironment) {
+	isExpectedToDefault bool, env *testsUtils.TestingEnvironment,
+) {
 	By("having a Cluster object populated with default values", func() {
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
@@ -248,7 +249,8 @@ func AssertWebhookEnabled(env *testsUtils.TestingEnvironment, mutating, validati
 
 // Update the secrets and verify cluster reference the updated resource version of secrets
 func AssertUpdateSecret(field string, value string, secretName string, namespace string,
-	clusterName string, timeout int, env *testsUtils.TestingEnvironment) {
+	clusterName string, timeout int, env *testsUtils.TestingEnvironment,
+) {
 	var secret corev1.Secret
 	err := env.Client.Get(env.Ctx,
 		ctrlclient.ObjectKey{Namespace: namespace, Name: secretName},
@@ -287,7 +289,8 @@ func AssertUpdateSecret(field string, value string, secretName string, namespace
 // AssertConnection is used if a connection from a pod to a postgresql
 // database works
 func AssertConnection(host string, user string, dbname string,
-	password string, queryingPod corev1.Pod, timeout int, env *testsUtils.TestingEnvironment) {
+	password string, queryingPod corev1.Pod, timeout int, env *testsUtils.TestingEnvironment,
+) {
 	By(fmt.Sprintf("connecting to the %v service as %v", host, user), func() {
 		Eventually(func() string {
 			dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require", host, user, dbname, password)
@@ -656,7 +659,8 @@ func AssertReplicaModeCluster(
 	srcClusterSample,
 	replicaClusterName,
 	replicaClusterSample,
-	checkQuery string) {
+	checkQuery string,
+) {
 	var primarySrcCluster, primaryReplicaCluster *corev1.Pod
 	var err error
 	commandTimeout := time.Second * 5
@@ -722,7 +726,8 @@ func AssertWritesToReplicaFails(
 	service string,
 	appDBName string,
 	appDBUser string,
-	appDBPass string) {
+	appDBPass string,
+) {
 	By(fmt.Sprintf("Verifying %v service doesn't allow writes", service),
 		func() {
 			timeout := time.Second * 2
@@ -751,7 +756,8 @@ func AssertWritesToPrimarySucceeds(
 	service string,
 	appDBName string,
 	appDBUser string,
-	appDBPass string) {
+	appDBPass string,
+) {
 	By(fmt.Sprintf("Verifying %v service correctly manages writes", service),
 		func() {
 			timeout := time.Second * 2
@@ -779,7 +785,8 @@ func AssertFastFailOver(
 	webTestFile,
 	webTestJob string,
 	maxReattachTime,
-	maxFailoverTime int32) {
+	maxFailoverTime int32,
+) {
 	// Create a cluster in a namespace we'll delete after the test
 	err := env.CreateNamespace(namespace)
 	Expect(err).ToNot(HaveOccurred())
@@ -983,7 +990,8 @@ func AssertMetricsData(namespace, clusterName, targetOne, targetTwo, targetSecre
 }
 
 func CreateAndAssertServerCertificatesSecrets(
-	namespace, clusterName, caSecName, tlsSecName string, includeCAPrivateKey bool) {
+	namespace, clusterName, caSecName, tlsSecName string, includeCAPrivateKey bool,
+) {
 	cluster, caPair, err := testsUtils.CreateSecretCA(namespace, clusterName, caSecName, includeCAPrivateKey, env)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -997,7 +1005,8 @@ func CreateAndAssertServerCertificatesSecrets(
 }
 
 func CreateAndAssertClientCertificatesSecrets(
-	namespace, clusterName, caSecName, tlsSecName, userSecName string, includeCAPrivateKey bool) {
+	namespace, clusterName, caSecName, tlsSecName, userSecName string, includeCAPrivateKey bool,
+) {
 	_, caPair, err := testsUtils.CreateSecretCA(namespace, clusterName, caSecName, includeCAPrivateKey, env)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -1022,7 +1031,8 @@ func CreateAndAssertCertificateSecretsOnAzurite(
 	namespace,
 	clusterName,
 	azuriteCaSecName,
-	azuriteTLSSecName string) {
+	azuriteTLSSecName string,
+) {
 	By("creating ca and tls certificate secrets", func() {
 		// create CA certificates
 		_, caPair, err := testsUtils.CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
@@ -1388,7 +1398,8 @@ func prepareClusterForPITROnMinio(
 	clusterName,
 	backupSampleFile string,
 	expectedVal int,
-	currentTimestamp *string) {
+	currentTimestamp *string,
+) {
 	const tableNamePitr = "for_restore"
 
 	By("backing up a cluster and verifying it exists on minio", func() {
@@ -1424,7 +1435,8 @@ func prepareClusterForPITROnMinio(
 }
 
 func prepareClusterForPITROnAzureBlob(namespace, clusterName, backupSampleFile,
-	azStorageAccount, azStorageKey string, expectedVal int, currentTimestamp *string) {
+	azStorageAccount, azStorageKey string, expectedVal int, currentTimestamp *string,
+) {
 	const tableNamePitr = "for_restore"
 	By("backing up a cluster and verifying it exists on Azure Blob", func() {
 		testsUtils.ExecuteBackup(namespace, backupSampleFile, env)
@@ -1944,7 +1956,8 @@ func DeleteTableUsingPgBouncerService(
 	namespace,
 	clusterName,
 	poolerYamlFilePath string,
-	env *testsUtils.TestingEnvironment) {
+	env *testsUtils.TestingEnvironment,
+) {
 	poolerServiceName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
 	podName := clusterName + "-1"

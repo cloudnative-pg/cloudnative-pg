@@ -511,7 +511,8 @@ func getReplicaStatusFromPodViaExec(
 	ctx context.Context,
 	config *rest.Config,
 	pod corev1.Pod,
-	postgresContainerName string) postgres.PostgresqlStatus {
+	postgresContainerName string,
+) postgres.PostgresqlStatus {
 	result := postgres.PostgresqlStatus{
 		Pod: pod,
 	}
