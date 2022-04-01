@@ -2,7 +2,7 @@
 ##
 ## This file is part of Cloud Native PostgreSQL.
 ##
-## Copyright (C) 2019-2021 EnterpriseDB Corporation.
+## Copyright (C) 2019-2022 EnterpriseDB Corporation.
 ##
 
 set -o errexit -o nounset -o pipefail

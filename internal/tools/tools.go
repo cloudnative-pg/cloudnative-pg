@@ -4,7 +4,7 @@
 /*
 This file is part of Cloud Native PostgreSQL.
 
-Copyright (C) 2019-2021 EnterpriseDB Corporation.
+Copyright (C) 2019-2022 EnterpriseDB Corporation.
 */
 
 // Package tools is used to track dependencies of tools
