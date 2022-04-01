@@ -32,11 +32,13 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
 	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
 	barmanCredentials "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/credentials"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/catalog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/external"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/constants"
 	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 var (
@@ -200,24 +202,30 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		return nil, nil, err
 	}
 
-	catalog, err := barman.GetBackupList(server.BarmanObjectStore, serverName, env)
+	backupCatalog, err := barman.GetBackupList(server.BarmanObjectStore, serverName, env)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Here we are simply loading the latest backup from the object store but
-	// since we have a catalog we could easily find the required backup to
-	// restore given a certain point in time, and we have it into
-	// cluster.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTime
-	//
-	// TODO: we need to think about the API or just simply use the stated
-	// property to do the job
-	latestBackup := catalog.LatestBackupInfo()
-	if latestBackup == nil {
-		return nil, nil, fmt.Errorf("no backup found")
+	// We are now choosing the right backup to restore
+	var targetBackup *catalog.BarmanBackup
+	if cluster.Spec.Bootstrap.Recovery != nil &&
+		cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil &&
+		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTime != "" {
+		targetTime, err := utils.ParseTargetTime(nil, cluster.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTime)
+		if err != nil {
+			log.Error(err, "while parsing recovery target targetTime")
+			return nil, nil, err
+		}
+		targetBackup = backupCatalog.FindClosestBackupInfo(targetTime)
+	} else {
+		targetBackup = backupCatalog.LatestBackupInfo()
+	}
+	if targetBackup == nil {
+		return nil, nil, fmt.Errorf("no target backup found")
 	}
 
-	log.Info("Latest backup found", "backup", latestBackup)
+	log.Info("Target backup found", "backup", targetBackup)
 
 	return &apiv1.Backup{
 		Spec: apiv1.BackupSpec{
@@ -232,15 +240,15 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 			EndpointURL:      server.BarmanObjectStore.EndpointURL,
 			DestinationPath:  server.BarmanObjectStore.DestinationPath,
 			ServerName:       serverName,
-			BackupID:         latestBackup.ID,
+			BackupID:         targetBackup.ID,
 			Phase:            apiv1.BackupPhaseCompleted,
-			StartedAt:        &metav1.Time{Time: latestBackup.BeginTime},
-			StoppedAt:        &metav1.Time{Time: latestBackup.EndTime},
-			BeginWal:         latestBackup.BeginWal,
-			EndWal:           latestBackup.EndWal,
-			BeginLSN:         latestBackup.BeginLSN,
-			EndLSN:           latestBackup.EndLSN,
-			Error:            latestBackup.Error,
+			StartedAt:        &metav1.Time{Time: targetBackup.BeginTime},
+			StoppedAt:        &metav1.Time{Time: targetBackup.EndTime},
+			BeginWal:         targetBackup.BeginWal,
+			EndWal:           targetBackup.EndWal,
+			BeginLSN:         targetBackup.BeginLSN,
+			EndLSN:           targetBackup.EndLSN,
+			Error:            targetBackup.Error,
 			CommandOutput:    "",
 			CommandError:     "",
 		},
