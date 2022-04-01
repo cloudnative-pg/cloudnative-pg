@@ -109,7 +109,8 @@ func updateInstanceManagerBinary(r io.Reader) (string, error) {
 // within the passed hash code with the one listed in the cluster status.
 // It returns true if everything is fine, false otherwise
 func validateInstanceManagerHash(
-	typedClient client.Client, instance *postgres.Instance, hashCode string) (bool, error) {
+	typedClient client.Client, instance *postgres.Instance, hashCode string,
+) (bool, error) {
 	var cluster apiv1.Cluster
 
 	ctx := context.Background()

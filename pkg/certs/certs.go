@@ -394,7 +394,8 @@ func createCAWithValidity(
 	parentCertificate *x509.Certificate,
 	parentPrivateKey interface{},
 	commonName string,
-	organizationalUnit string) (*KeyPair, error) {
+	organizationalUnit string,
+) (*KeyPair, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {

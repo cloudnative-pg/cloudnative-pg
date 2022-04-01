@@ -44,7 +44,8 @@ type poolerManagedResources struct {
 // getManagedResources detects the list of the resources created and manager
 // by this pooler
 func (r *PoolerReconciler) getManagedResources(ctx context.Context,
-	pooler *apiv1.Pooler) (result *poolerManagedResources, err error) {
+	pooler *apiv1.Pooler,
+) (result *poolerManagedResources, err error) {
 	result = &poolerManagedResources{}
 
 	// Get the auth query secret if any
@@ -98,7 +99,8 @@ func (r *PoolerReconciler) getManagedResources(ctx context.Context,
 
 // getDeploymentOrNil gets a deployment with a certain name, returning nil when it doesn't exist
 func getDeploymentOrNil(
-	ctx context.Context, r client.Client, objectKey client.ObjectKey) (*appsv1.Deployment, error) {
+	ctx context.Context, r client.Client, objectKey client.ObjectKey,
+) (*appsv1.Deployment, error) {
 	var deployment appsv1.Deployment
 	err := r.Get(ctx, objectKey, &deployment)
 	if err != nil {

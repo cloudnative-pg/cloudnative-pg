@@ -107,7 +107,8 @@ func (builder *Builder) WithContainerImage(name, image string, overwrite bool) *
 // WithContainerVolumeMount ensure that the passed the volume mount exist in
 // the current status, overriding the present one when needed
 func (builder *Builder) WithContainerVolumeMount(
-	name string, volumeMount *corev1.VolumeMount, overwrite bool) *Builder {
+	name string, volumeMount *corev1.VolumeMount, overwrite bool,
+) *Builder {
 	builder.WithContainer(name)
 
 	for idxContainer, container := range builder.status.Spec.Containers {
@@ -275,7 +276,8 @@ func (builder *Builder) WithInitContainerImage(name, image string, overwrite boo
 // WithInitContainerVolumeMount ensure that the passed the volume mount exist in
 // the current status, overriding the present one when needed
 func (builder *Builder) WithInitContainerVolumeMount(
-	name string, volumeMount *corev1.VolumeMount, overwrite bool) *Builder {
+	name string, volumeMount *corev1.VolumeMount, overwrite bool,
+) *Builder {
 	builder.WithInitContainer(name)
 
 	for idxContainer, container := range builder.status.Spec.InitContainers {

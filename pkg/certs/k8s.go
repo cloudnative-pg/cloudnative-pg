@@ -65,7 +65,8 @@ type PublicKeyInfrastructure struct {
 // EnsureRootCACertificate ensure that in the cluster there is a root CA Certificate
 func EnsureRootCACertificate(
 	ctx context.Context, client kubernetes.Interface, namespace, name,
-	operatorLabelSelector string) (*v1.Secret, error) {
+	operatorLabelSelector string,
+) (*v1.Secret, error) {
 	// Checking if the root CA already exist
 	secret, err := client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err == nil {
@@ -156,7 +157,8 @@ func (pki PublicKeyInfrastructure) Cleanup(ctx context.Context, client *kubernet
 func (pki PublicKeyInfrastructure) Setup(
 	ctx context.Context,
 	client kubernetes.Interface,
-	apiClient apiextensionsclientset.Interface) error {
+	apiClient apiextensionsclientset.Interface,
+) error {
 	caSecret, err := EnsureRootCACertificate(
 		ctx,
 		client,
@@ -216,7 +218,8 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 func (pki PublicKeyInfrastructure) SchedulePeriodicMaintenance(
 	ctx context.Context,
 	client kubernetes.Interface,
-	apiClient apiextensionsclientset.Interface) error {
+	apiClient apiextensionsclientset.Interface,
+) error {
 	maintenance := func() {
 		pkiLog.Info("Periodic TLS certificates maintenance")
 		err := pki.Setup(ctx, client, apiClient)
@@ -238,7 +241,8 @@ func (pki PublicKeyInfrastructure) SchedulePeriodicMaintenance(
 
 // EnsureCertificate will ensure that a webhook certificate exists and is usable
 func (pki PublicKeyInfrastructure) EnsureCertificate(
-	ctx context.Context, client kubernetes.Interface, caSecret *v1.Secret) (*v1.Secret, error) {
+	ctx context.Context, client kubernetes.Interface, caSecret *v1.Secret,
+) (*v1.Secret, error) {
 	// Checking if the secret already exist
 	secret, err := client.CoreV1().Secrets(
 		pki.OperatorNamespace).Get(ctx, pki.SecretName, metav1.GetOptions{})
@@ -326,7 +330,8 @@ func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) 
 // renewServerCertificate renews a server certificate if needed
 // Returns the renewed secret or the original one if unchanged
 func renewServerCertificate(
-	ctx context.Context, client kubernetes.Interface, caSecret v1.Secret, secret *v1.Secret) (*v1.Secret, error) {
+	ctx context.Context, client kubernetes.Interface, caSecret v1.Secret, secret *v1.Secret,
+) (*v1.Secret, error) {
 	hasBeenRenewed, err := RenewLeafCertificate(&caSecret, secret)
 	if err != nil {
 		return nil, err
@@ -396,7 +401,8 @@ func DumpSecretToDir(secret *v1.Secret, certDir string, basename string) error {
 // InjectPublicKeyIntoMutatingWebhook inject the TLS public key into the admitted
 // ones for a certain mutating webhook configuration
 func (pki PublicKeyInfrastructure) InjectPublicKeyIntoMutatingWebhook(
-	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret) error {
+	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret,
+) error {
 	config, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
 		ctx, pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
 	if err != nil {
@@ -416,7 +422,8 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoMutatingWebhook(
 // InjectPublicKeyIntoValidatingWebhook inject the TLS public key into the admitted
 // ones for a certain validating webhook configuration
 func (pki PublicKeyInfrastructure) InjectPublicKeyIntoValidatingWebhook(
-	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret) error {
+	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret,
+) error {
 	config, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
 		ctx, pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
 	if err != nil {
@@ -439,7 +446,8 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoCRD(
 	ctx context.Context,
 	apiClient apiextensionsclientset.Interface,
 	name string,
-	tlsSecret *v1.Secret) error {
+	tlsSecret *v1.Secret,
+) error {
 	crd, err := apiClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return err

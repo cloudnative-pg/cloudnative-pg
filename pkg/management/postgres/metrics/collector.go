@@ -388,7 +388,8 @@ func (c QueryCollector) collectLabels(columns []string, columnData []interface{}
 
 // Collect the metrics from the database columns
 func (c QueryCollector) collectColumns(columns []string, columnData []interface{},
-	labels []string, ch chan<- prometheus.Metric) {
+	labels []string, ch chan<- prometheus.Metric,
+) {
 	for idx, columnName := range columns {
 		mapping, ok := c.columnMapping[columnName]
 		if !ok {
@@ -456,7 +457,8 @@ func (c QueryCollector) describe(ch chan<- *prometheus.Desc) {
 
 // collectConstMetric reports to the prometheus library a constant metric
 func (c QueryCollector) collectConstMetric(
-	mapping MetricMap, value interface{}, variableLabels []string, ch chan<- prometheus.Metric) {
+	mapping MetricMap, value interface{}, variableLabels []string, ch chan<- prometheus.Metric,
+) {
 	floatData, ok := postgres.DBToFloat64(value)
 	if !ok {
 		log.Warning("Error while parsing value",
@@ -480,7 +482,8 @@ func (c QueryCollector) collectHistogramMetric(
 	mapping MetricMap,
 	columnData *histogram.Value,
 	variableLabels []string,
-	ch chan<- prometheus.Metric) {
+	ch chan<- prometheus.Metric,
+) {
 	metric, err := prometheus.NewConstHistogram(
 		mapping.Desc,
 		columnData.Count, columnData.Sum, columnData.Buckets,

@@ -93,7 +93,8 @@ func (env TestingEnvironment) ExecCommand(
 	pod corev1.Pod,
 	containerName string,
 	timeout *time.Duration,
-	command ...string) (string, string, error) {
+	command ...string,
+) (string, string, error) {
 	var stdOut, stdErr string
 	var err error
 	Eventually(func() error {

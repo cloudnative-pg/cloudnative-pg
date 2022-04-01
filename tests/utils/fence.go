@@ -29,7 +29,8 @@ func FencingOn(
 	serverName,
 	namespace,
 	clusterName string,
-	fencingMethod FencingMethod) error {
+	fencingMethod FencingMethod,
+) error {
 	switch fencingMethod {
 	case UsingPlugin:
 		_, _, err := Run(fmt.Sprintf("kubectl cnp fencing on %v %v -n %v",
@@ -54,7 +55,8 @@ func FencingOff(
 	serverName,
 	namespace,
 	clusterName string,
-	fencingMethod FencingMethod) error {
+	fencingMethod FencingMethod,
+) error {
 	switch fencingMethod {
 	case UsingPlugin:
 		_, _, err := Run(fmt.Sprintf("kubectl cnp fencing off %v %v -n %v",

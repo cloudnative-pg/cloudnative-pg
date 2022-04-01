@@ -467,7 +467,8 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 // generateServiceAccountPullSecretsNames extracts the list of pull secret names given
 // the cluster configuration
 func (r *ClusterReconciler) generateServiceAccountPullSecretsNames(
-	ctx context.Context, cluster *apiv1.Cluster) ([]string, error) {
+	ctx context.Context, cluster *apiv1.Cluster,
+) ([]string, error) {
 	pullSecretNames := make([]string, 0, len(cluster.Spec.ImagePullSecrets))
 
 	// Try to copy the secret from the operator
