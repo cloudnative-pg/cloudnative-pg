@@ -646,7 +646,8 @@ func (r *Cluster) validateImageChange(old string) field.ErrorList {
 }
 
 // Validate the recovery target to ensure that the mutual exclusivity
-// of options is respected
+// of options is respected and plus validating the format of targetTime
+// if specified
 func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil {
 		return nil
@@ -681,6 +682,16 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 			recoveryTarget,
 			"Recovery target options are mutually exclusive"))
+	}
+
+	// validate format of TargetTime
+	if recoveryTarget.TargetTime != "" {
+		if _, err := utils.ParseTargetTime(nil, recoveryTarget.TargetTime); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
+				recoveryTarget.TargetTime,
+				"The format of TargetTime is invalid"))
+		}
 	}
 
 	switch recoveryTarget.TargetTLI {
