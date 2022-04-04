@@ -34,7 +34,7 @@ func RunQueryFromPod(
 	dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
 		host, user, dbname, password)
 
-	stdout, stderr, err := env.ExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
+	stdout, stderr, err := env.EventuallyExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
 		"psql", dsn, "-tAc", query)
 	return stdout, stderr, err
 }
@@ -43,7 +43,7 @@ func RunQueryFromPod(
 func CountReplicas(env *TestingEnvironment, pod *corev1.Pod) (int, error) {
 	query := "SELECT count(*) FROM pg_stat_replication"
 	commandTimeout := time.Second * 2
-	stdOut, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+	stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
 		&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 	if err != nil {
 		return 0, nil

@@ -86,9 +86,9 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	return &env, nil
 }
 
-// ExecCommand wraps the utils.ExecCommand pre-setting values constant during
-// tests
-func (env TestingEnvironment) ExecCommand(
+// EventuallyExecCommand wraps the utils.ExecCommand pre-setting values constant during
+// tests, wrapping it with an Eventually clause
+func (env TestingEnvironment) EventuallyExecCommand(
 	ctx context.Context,
 	pod corev1.Pod,
 	containerName string,
@@ -106,6 +106,19 @@ func (env TestingEnvironment) ExecCommand(
 		return nil
 	}, RetryTimeout, PollingTime).Should(BeNil())
 	return stdOut, stdErr, err
+}
+
+// ExecCommand wraps the utils.ExecCommand pre-setting values constant during
+// tests
+func (env TestingEnvironment) ExecCommand(
+	ctx context.Context,
+	pod corev1.Pod,
+	containerName string,
+	timeout *time.Duration,
+	command ...string,
+) (string, string, error) {
+	return utils.ExecCommand(ctx, env.Interface, env.RestClientConfig,
+		pod, containerName, timeout, command...)
 }
 
 // GetPVCList gathers the current list of PVCs in a namespace
