@@ -235,3 +235,19 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 
 	return true, err
 }
+
+// OperatorPodRenamed checks if the operator pod was renamed
+func OperatorPodRenamed(operatorPod corev1.Pod, expectedOperatorPodName string) bool {
+	return operatorPod.GetName() != expectedOperatorPodName
+}
+
+// OperatorPodRestarted checks if the operator pod was restarted
+func OperatorPodRestarted(operatorPod corev1.Pod) bool {
+	restartCount := 0
+	for _, containerStatus := range operatorPod.Status.ContainerStatuses {
+		if containerStatus.Name == "manager" {
+			restartCount = int(containerStatus.RestartCount)
+		}
+	}
+	return restartCount != 0
+}
