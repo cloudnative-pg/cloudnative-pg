@@ -157,7 +157,8 @@ var _ = Describe("Configuration update", func() {
 				}
 				// The connection should work now
 				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, podList.Items[0], specs.PostgresContainerName, &commandTimeout,
+					stdout, _, err := env.ExecCommand(env.Ctx, podList.Items[0],
+						specs.PostgresContainerName, &commandTimeout,
 						"psql", "-U", "postgres", "-h", endpointName, "-tAc", "select 1")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
 					return value, err, atoiErr

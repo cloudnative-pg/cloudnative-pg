@@ -127,7 +127,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 			}
 			err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
 			Expect(err).ToNot(HaveOccurred())
-			_, _, err = env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 			Expect(err).ToNot(HaveOccurred())
 		})

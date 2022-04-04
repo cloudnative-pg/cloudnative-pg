@@ -68,7 +68,7 @@ var _ = Describe("Cluster setup", func() {
 			// Put something in the database. We'll check later if it
 			// still exists
 			query := "CREATE TABLE test (id bigserial PRIMARY KEY, t text)"
-			_, _, err = env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
 				"psql", "-U", "postgres", "app", "-tAc", query)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -81,7 +81,7 @@ var _ = Describe("Cluster setup", func() {
 					restart = data.RestartCount
 				}
 			}
-			_, _, err = env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &aSecond,
 				"sh", "-c", "kill 1")
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int32, error) {

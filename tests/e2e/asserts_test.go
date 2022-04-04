@@ -325,7 +325,7 @@ func AssertCreateTestData(namespace, clusterName, tableName string) {
 		Expect(err).NotTo(HaveOccurred())
 		commandTimeout := time.Second * 5
 		query := fmt.Sprintf("CREATE TABLE %v AS VALUES (1), (2);", tableName)
-		_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, specs.PostgresContainerName,
+		_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPodInfo, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -339,7 +339,7 @@ func insertRecordIntoTable(namespace, clusterName, tableName string, value int) 
 	Expect(err).NotTo(HaveOccurred())
 
 	query := fmt.Sprintf("INSERT INTO %v VALUES (%v);", tableName, value)
-	_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, specs.PostgresContainerName,
+	_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPodInfo, specs.PostgresContainerName,
 		&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 	Expect(err).ToNot(HaveOccurred())
 }
@@ -389,7 +389,7 @@ func assertClusterStandbysAreStreaming(namespace string, clusterName string) {
 			}
 
 			timeout := time.Second
-			out, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &timeout,
+			out, _, err := env.EventuallyExecCommand(env.Ctx, pod, specs.PostgresContainerName, &timeout,
 				"psql", "-U", "postgres", "-tAc", "SELECT count(*) FROM pg_stat_wal_receiver")
 			if err != nil {
 				return err
@@ -485,7 +485,7 @@ func AssertWritesResumedBeforeTimeout(namespace string, clusterName string, time
 		pod := &corev1.Pod{}
 		err := env.Client.Get(env.Ctx, namespacedName, pod)
 		Expect(err).ToNot(HaveOccurred())
-		out, _, _ := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+		out, _, _ := env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		switchTime, err = strconv.ParseFloat(strings.TrimSpace(out), 64)
 		fmt.Printf("Write activity resumed in %v seconds\n", switchTime)
@@ -532,7 +532,7 @@ func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 		Expect(err).ToNot(HaveOccurred())
 		// Expect write operation to succeed
 		query := "create table assert_new_primary(var1 text)"
-		_, _, err = env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+		_, _, err = env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -662,7 +662,7 @@ func AssertReplicaModeCluster(
 
 	By("creating test data in source cluster", func() {
 		cmd := "CREATE TABLE test_replica AS VALUES (1), (2);"
-		_, _, err = env.ExecCommand(env.Ctx, *primarySrcCluster, specs.PostgresContainerName,
+		_, _, err = env.EventuallyExecCommand(env.Ctx, *primarySrcCluster, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", cmd)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -721,7 +721,7 @@ func AssertWritesToReplicaFails(
 				service, appDBUser, appDBName, appDBPass)
 
 			// Expect to be connected to a replica
-			stdout, _, err := env.ExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
+			stdout, _, err := env.EventuallyExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
 				"psql", dsn, "-tAc", "select pg_is_in_recovery()")
 			value := strings.Trim(stdout, "\n")
 			Expect(value, err).To(Equal("t"))
@@ -751,13 +751,13 @@ func AssertWritesToPrimarySucceeds(
 				service, appDBUser, appDBName, appDBPass)
 
 			// Expect to be connected to a primary
-			stdout, _, err := env.ExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
+			stdout, _, err := env.EventuallyExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
 				"psql", dsn, "-tAc", "select pg_is_in_recovery()")
 			value := strings.Trim(stdout, "\n")
 			Expect(value, err).To(Equal("f"))
 
 			// Expect to be able to write
-			_, _, err = env.ExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
 				"psql", dsn, "-tAc", "CREATE TABLE table1(var1 text);")
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -844,7 +844,7 @@ func AssertFastFailOver(
 
 		err = env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
 		Expect(err).ToNot(HaveOccurred())
-		_, _, err = env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
+		_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -934,18 +934,18 @@ func AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBName, t
 		timeout := time.Second * 2
 		// Create database
 		createDBQuery := fmt.Sprintf("create database %v;", targetDBName)
-		_, _, err = env.ExecCommand(env.Ctx, *primaryPodName, specs.PostgresContainerName, &timeout,
+		_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPodName, specs.PostgresContainerName, &timeout,
 			"psql", "-U", "postgres", "-tAc", createDBQuery)
 		Expect(err).ToNot(HaveOccurred())
 		// Create table on target database
 		dsn := fmt.Sprintf("user=postgres port=5432 dbname=%v ", targetDBName)
 		createTableQuery := fmt.Sprintf("create table %v (id int);", tableName)
-		_, _, err = env.ExecCommand(env.Ctx, *primaryPodName, specs.PostgresContainerName, &timeout,
+		_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPodName, specs.PostgresContainerName, &timeout,
 			"psql", dsn, "-tAc", createTableQuery)
 		Expect(err).ToNot(HaveOccurred())
 		// Grant a permission
 		grantRoleQuery := "GRANT SELECT ON all tables in schema public to pg_monitor;"
-		_, _, err = env.ExecCommand(env.Ctx, *primaryPodName, specs.PostgresContainerName, &timeout,
+		_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPodName, specs.PostgresContainerName, &timeout,
 			"psql", "-U", "postgres", dsn, "-tAc", grantRoleQuery)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -1306,7 +1306,7 @@ func AssertClusterRestorePITR(namespace, clusterName, tableName, lsn string) {
 
 		// Restored primary should be on timeline 3
 		query := "select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)"
-		stdOut, _, err := env.ExecCommand(env.Ctx, *primaryInfo, specs.PostgresContainerName,
+		stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *primaryInfo, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(strings.Trim(stdOut, "\n"), err).To(Equal(lsn))
