@@ -13,7 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestPostgres(t *testing.T) {
+func TestReport(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Report test suite")
 }
