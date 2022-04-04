@@ -104,14 +104,14 @@ var _ = Describe("Failover", func() {
 			// Get the walreceiver pid
 			timeout := time.Second * 2
 			query := "SELECT pid FROM pg_stat_activity WHERE backend_type = 'walreceiver'"
-			out, _, err := env.ExecCommand(
+			out, _, err := env.EventuallyExecCommand(
 				env.Ctx, pausedPod, specs.PostgresContainerName, &timeout,
 				"psql", "-U", "postgres", "-tAc", query)
 			Expect(err).ToNot(HaveOccurred())
 			pid = strings.Trim(out, "\n")
 
 			// Send the SIGSTOP
-			_, _, err = env.ExecCommand(env.Ctx, pausedPod, specs.PostgresContainerName, &timeout,
+			_, _, err = env.EventuallyExecCommand(env.Ctx, pausedPod, specs.PostgresContainerName, &timeout,
 				"kill", "-STOP", pid)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -126,7 +126,7 @@ var _ = Describe("Failover", func() {
 			Expect(err).ToNot(HaveOccurred())
 			query = fmt.Sprintf("SELECT pg_terminate_backend(pid) FROM pg_stat_replication "+
 				"WHERE application_name = '%v'", pausedReplica)
-			_, _, err = env.ExecCommand(
+			_, _, err = env.EventuallyExecCommand(
 				env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
 				"psql", "-U", "postgres", "-tAc", query)
 			Expect(err).ToNot(HaveOccurred())
@@ -158,12 +158,12 @@ var _ = Describe("Failover", func() {
 
 			// Get the current lsn
 			timeout := time.Second * 2
-			initialLSN, _, err := env.ExecCommand(
+			initialLSN, _, err := env.EventuallyExecCommand(
 				env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
 				"psql", "-U", "postgres", "-tAc", "SELECT pg_current_wal_lsn()")
 			Expect(err).ToNot(HaveOccurred())
 
-			_, _, err = env.ExecCommand(
+			_, _, err = env.EventuallyExecCommand(
 				env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
 				"psql", "-U", "postgres", "-c", "CHECKPOINT")
 			Expect(err).ToNot(HaveOccurred())
@@ -217,7 +217,7 @@ var _ = Describe("Failover", func() {
 			err = env.Client.Get(env.Ctx, namespacedPausedPodName, &pausedPod)
 			Expect(err).ToNot(HaveOccurred())
 			commandTimeout := time.Second * 2
-			_, _, err = env.ExecCommand(env.Ctx, pausedPod, specs.PostgresContainerName,
+			_, _, err = env.EventuallyExecCommand(env.Ctx, pausedPod, specs.PostgresContainerName,
 				&commandTimeout, "kill", "-CONT", pid)
 			Expect(err).ToNot(HaveOccurred())
 

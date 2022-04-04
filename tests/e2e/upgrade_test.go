@@ -204,7 +204,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).ToNot(HaveOccurred())
 
 			commandTimeout := time.Second * 2
-			_, _, err = env.ExecCommand(env.Ctx, *primary, specs.PostgresContainerName, &commandTimeout,
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *primary, specs.PostgresContainerName, &commandTimeout,
 				"psql", "-U", "postgres", "appdb", "-tAc", "CREATE TABLE postswitch(i int)")
 			Expect(err).ToNot(HaveOccurred())
 
