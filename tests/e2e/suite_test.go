@@ -35,6 +35,8 @@ var (
 	env                     *utils.TestingEnvironment
 	testLevelEnv            *tests.TestEnvLevel
 	expectedOperatorPodName string
+	operatorPodWasRenamed   bool
+	operatorWasRestarted    bool
 )
 
 var _ = BeforeSuite(func() {
@@ -55,11 +57,22 @@ var _ = BeforeEach(func() {
 	labelsForTestsBreakingTheOperator := []string{"upgrade", "disruptive"}
 	breakingLabelsInCurrentTest := funk.Join(CurrentSpecReport().Labels(),
 		labelsForTestsBreakingTheOperator, funk.InnerJoin)
-	if len(breakingLabelsInCurrentTest.([]string)) == 0 {
-		operatorPod, err := env.GetOperatorPod()
-		Expect(err).NotTo(HaveOccurred())
-		expectedOperatorPodName = operatorPod.GetName()
+
+	if len(breakingLabelsInCurrentTest.([]string)) != 0 {
+		return
 	}
+
+	operatorPod, err := env.GetOperatorPod()
+	Expect(err).ToNot(HaveOccurred())
+
+	if operatorPodWasRenamed {
+		Skip("Skipping test. Operator was renamed")
+	}
+	if operatorWasRestarted {
+		Skip("Skipping test. Operator was restarted")
+	}
+
+	expectedOperatorPodName = operatorPod.GetName()
 })
 
 func TestE2ESuite(t *testing.T) {
@@ -70,11 +83,26 @@ func TestE2ESuite(t *testing.T) {
 
 // Before the end of the tests we should verify that the operator never restarted
 // and that the operator pod name didn't change.
+// If either of those things happened, the test will fail, and all subsequent
+// tests will be SKIPPED, as they would always fail in this node.
 var _ = AfterEach(func() {
 	labelsForTestsBreakingTheOperator := []string{"upgrade", "disruptive"}
 	breakingLabelsInCurrentTest := funk.Join(CurrentSpecReport().Labels(),
 		labelsForTestsBreakingTheOperator, funk.InnerJoin)
-	if len(breakingLabelsInCurrentTest.([]string)) == 0 {
-		AssertOperatorPodUnchanged(expectedOperatorPodName)
+	if len(breakingLabelsInCurrentTest.([]string)) != 0 {
+		return
+	}
+	operatorPod, err := env.GetOperatorPod()
+	Expect(err).ToNot(HaveOccurred())
+
+	wasRenamed := utils.OperatorPodRenamed(operatorPod, expectedOperatorPodName)
+	if wasRenamed {
+		operatorPodWasRenamed = true
+		Fail("operator was renamed")
+	}
+	wasRestarted := utils.OperatorPodRestarted(operatorPod)
+	if wasRestarted {
+		operatorWasRestarted = true
+		Fail("operator was restarted")
 	}
 })
