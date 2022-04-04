@@ -7,6 +7,7 @@ Copyright (C) 2019-2022 EnterpriseDB Corporation.
 package report
 
 import (
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,5 +35,21 @@ var _ = Describe("Redact ConfigMap", func() {
 
 		Expect(redactedConfigMap).ToNot(BeEquivalentTo(configMap))
 		Expect(redactedConfigMap.Data["test"]).Should(BeEquivalentTo([]byte("")))
+	})
+})
+
+var _ = Describe("Redact WebhookClientConfig", func() {
+	It("should override CABundle if present", func() {
+		webhookClientConfig := admissionv1.WebhookClientConfig{CABundle: []byte("test")}
+		redactedWebhookClientConfig := redactWebhookClientConfig(webhookClientConfig)
+		Expect(redactedWebhookClientConfig).ToNot(BeEquivalentTo(webhookClientConfig))
+		Expect(redactedWebhookClientConfig.CABundle).Should(BeEquivalentTo([]byte("-")))
+	})
+
+	It("should not create CABundle if missing", func() {
+		webhookClientConfig := admissionv1.WebhookClientConfig{}
+		redactedWebhookClientConfig := redactWebhookClientConfig(webhookClientConfig)
+		Expect(redactedWebhookClientConfig).To(BeEquivalentTo(webhookClientConfig))
+		Expect(redactedWebhookClientConfig.CABundle).Should(BeEmpty())
 	})
 })
