@@ -7,12 +7,14 @@ Copyright (C) 2019-2022 EnterpriseDB Corporation.
 package webserver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/concurrency"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
@@ -26,7 +28,11 @@ type remoteWebserverEndpoints struct {
 }
 
 // NewRemoteWebServer returns a webserver that allows connection from external clients
-func NewRemoteWebServer(instance *postgres.Instance) (*Webserver, error) {
+func NewRemoteWebServer(
+	instance *postgres.Instance,
+	cancelFunc context.CancelFunc,
+	exitedConditions concurrency.MultipleExecuted,
+) (*Webserver, error) {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return nil, fmt.Errorf("creating controller-runtine client: %v", err)
@@ -40,7 +46,8 @@ func NewRemoteWebServer(instance *postgres.Instance) (*Webserver, error) {
 	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
 	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
 	serveMux.HandleFunc(url.PathPgStatus, endpoints.pgStatus)
-	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager)
+	serveMux.HandleFunc(url.PathUpdate,
+		endpoints.updateInstanceManager(cancelFunc, exitedConditions))
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", url.StatusPort), Handler: serveMux}
 
@@ -108,27 +115,32 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, r *http.Requ
 
 // updateInstanceManager replace the instance with one in the
 // new binary
-func (ws *remoteWebserverEndpoints) updateInstanceManager(w http.ResponseWriter, r *http.Request) {
-	// No need to handle this request if it is not a put
-	if r.Method != http.MethodPut {
-		http.Error(w, "wrong method used", http.StatusMethodNotAllowed)
-		return
-	}
+func (ws *remoteWebserverEndpoints) updateInstanceManager(
+	cancelFunc context.CancelFunc,
+	exitedCondition concurrency.MultipleExecuted,
+) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// No need to handle this request if it is not a put
+		if r.Method != http.MethodPut {
+			http.Error(w, "wrong method used", http.StatusMethodNotAllowed)
+			return
+		}
 
-	// No need to do anything if we are already upgrading
-	if ws.instance.InstanceManagerIsUpgrading {
-		http.Error(w, "instance manager is already upgrading", http.StatusTeapot)
-		return
-	}
+		// No need to do anything if we are already upgrading
+		if ws.instance.InstanceManagerIsUpgrading {
+			http.Error(w, "instance manager is already upgrading", http.StatusTeapot)
+			return
+		}
 
-	err := upgrade.FromReader(ws.typedClient, ws.instance, r.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+		err := upgrade.FromReader(cancelFunc, exitedCondition, ws.typedClient, ws.instance, r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-	// Unfortunately this point, if everything is right, will not be reached.
-	// At this stage we are running the new version of the instance manager
-	// and not the old one.
-	_, _ = fmt.Fprint(w, "OK")
+		// Unfortunately this point, if everything is right, will not be reached.
+		// At this stage we are running the new version of the instance manager
+		// and not the old one.
+		_, _ = fmt.Fprint(w, "OK")
+	}
 }

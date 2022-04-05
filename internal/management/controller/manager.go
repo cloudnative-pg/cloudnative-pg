@@ -52,9 +52,9 @@ func NewInstanceReconciler(
 	}
 }
 
-// GetInitialized returns the a condition that can be checked in order to
+// GetExecutedCondition returns the condition that can be checked in order to
 // be sure initialization has been done
-func (r *InstanceReconciler) GetInitialized() *concurrency.Executed {
+func (r *InstanceReconciler) GetExecutedCondition() *concurrency.Executed {
 	return r.systemInitialization
 }
 
