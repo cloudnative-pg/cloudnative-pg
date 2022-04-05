@@ -18,6 +18,7 @@ func NewCmd() *cobra.Command {
 	}
 
 	reportCmd.AddCommand(operatorCmd())
+	reportCmd.AddCommand(clusterCmd())
 
 	return reportCmd
 }
