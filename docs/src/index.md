@@ -114,3 +114,7 @@ please consult the ["Before you start" section](before_you_start.md).
 !!! Note
     Although the guide primarily addresses Kubernetes, all concepts can
     be extended to OpenShift as well.
+
+*[Postgres, PostgreSQL and the Slonik Logo](https://www.postgresql.org/about/policies/trademarks/)
+are trademarks or registered trademarks of the PostgreSQL Community Association
+of Canada, and used with their permission.*
