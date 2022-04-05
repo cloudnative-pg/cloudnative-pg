@@ -51,3 +51,9 @@ developed, and tested by the EnterpriseDB Cloud Native team:
 - Jaime Silvela
 - Jitendra Wadle
 - Adam Wright
+
+# Trademarks
+
+*[Postgres, PostgreSQL and the Slonik Logo](https://www.postgresql.org/about/policies/trademarks/)
+are trademarks or registered trademarks of the PostgreSQL Community Association
+of Canada, and used with their permission.*
