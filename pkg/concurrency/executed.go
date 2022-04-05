@@ -6,7 +6,9 @@ Copyright (C) 2019-2022 EnterpriseDB Corporation.
 
 package concurrency
 
-import "sync"
+import (
+	"sync"
+)
 
 // Executed can be used to wait for something to be executed,
 // it has a similar semantics to sync.Cond,
@@ -15,6 +17,17 @@ import "sync"
 type Executed struct {
 	done bool
 	cond sync.Cond
+}
+
+// MultipleExecuted can be used to wrap multiple Executed conditions that
+// should all be waited
+type MultipleExecuted []*Executed
+
+// Wait waits for the execution for all the conditions in a MultipleExecuted
+func (m MultipleExecuted) Wait() {
+	for _, cond := range m {
+		cond.Wait()
+	}
 }
 
 // NewExecuted creates a new Executed

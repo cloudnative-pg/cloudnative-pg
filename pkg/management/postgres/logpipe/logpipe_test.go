@@ -40,7 +40,7 @@ var _ = Describe("CSV file reader", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			spy := SpyRecordWriter{}
-			p := logPipe{
+			p := LogPipe{
 				record:          &LoggingRecord{},
 				fieldsValidator: LogFieldValidator,
 			}
@@ -56,7 +56,7 @@ var _ = Describe("CSV file reader", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			spy := SpyRecordWriter{}
-			p := logPipe{
+			p := LogPipe{
 				record:          &LoggingRecord{},
 				fieldsValidator: LogFieldValidator,
 			}
@@ -72,7 +72,7 @@ var _ = Describe("CSV file reader", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			spy := SpyRecordWriter{}
-			p := logPipe{
+			p := LogPipe{
 				record:          &LoggingRecord{},
 				fieldsValidator: LogFieldValidator,
 			}
@@ -88,7 +88,7 @@ var _ = Describe("CSV file reader", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			spy := SpyRecordWriter{}
-			p := logPipe{
+			p := LogPipe{
 				record:          NewPgAuditLoggingDecorator(),
 				fieldsValidator: LogFieldValidator,
 			}
@@ -106,7 +106,7 @@ var _ = Describe("CSV file reader", func() {
 
 				longerInput := input + ",test"
 				reader := strings.NewReader(longerInput)
-				p := logPipe{
+				p := LogPipe{
 					record:          &LoggingRecord{},
 					fieldsValidator: LogFieldValidator,
 				}
@@ -124,7 +124,7 @@ var _ = Describe("CSV file reader", func() {
 
 				shorterInput := "one,two,three"
 				reader := strings.NewReader(shorterInput)
-				p := logPipe{
+				p := LogPipe{
 					record:          &LoggingRecord{},
 					fieldsValidator: LogFieldValidator,
 				}
@@ -142,7 +142,7 @@ var _ = Describe("CSV file reader", func() {
 
 				trailingCommaInput := input + ","
 				reader := strings.NewReader(trailingCommaInput)
-				p := logPipe{
+				p := LogPipe{
 					record:          &LoggingRecord{},
 					fieldsValidator: LogFieldValidator,
 				}
@@ -160,7 +160,7 @@ var _ = Describe("CSV file reader", func() {
 
 				longerInput := input + "\none,two,three"
 				reader := strings.NewReader(longerInput)
-				p := logPipe{
+				p := LogPipe{
 					record:          &LoggingRecord{},
 					fieldsValidator: LogFieldValidator,
 				}
@@ -176,7 +176,7 @@ var _ = Describe("CSV file reader", func() {
 
 		It("correctly handles an empty stream", func() {
 			spy := SpyRecordWriter{}
-			p := logPipe{
+			p := LogPipe{
 				record:          &LoggingRecord{},
 				fieldsValidator: LogFieldValidator,
 			}

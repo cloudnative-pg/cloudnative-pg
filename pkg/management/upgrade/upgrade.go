@@ -19,9 +19,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/concurrency"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
 )
 
 // InstanceManagerPath is the location of the instance manager executable
@@ -36,7 +36,13 @@ var ErrorInvalidInstanceManagerBinary = errors.New("invalid instance manager bin
 
 // FromReader updates in place the binary of the instance manager, replacing itself
 // with a new version with the new binary
-func FromReader(typedClient client.Client, instance *postgres.Instance, r io.Reader) error {
+func FromReader(
+	cancelFunc context.CancelFunc,
+	exitedCondition concurrency.MultipleExecuted,
+	typedClient client.Client,
+	instance *postgres.Instance,
+	r io.Reader,
+) error {
 	// Mark this instance manager as upgrading
 	instance.InstanceManagerIsUpgrading = true
 	defer func() {
@@ -67,7 +73,17 @@ func FromReader(typedClient client.Client, instance *postgres.Instance, r io.Rea
 		return fmt.Errorf("while replacing instance manager binary: %w", err)
 	}
 
-	// Reload the instance manager
+	// We are ready to reload the instance manager
+	// First we are going to cancel the context, this will trigger the shutdown of all
+	// the Runnables handled by the manager.
+	// Only the postgres process will not be actually killed, as the postgres lifecycle
+	// manager will not kill it if InstanceManagerIsUpgrading is set to true.
+	cancelFunc()
+	log.Info("Waiting for log goroutines to exit before proceeding")
+	// We have to wait for all the necessary component to exit gracefully first
+	exitedCondition.Wait()
+	log.Info("All log goroutines exited, will reload the instance manager")
+	// Now we are actually ready to reload the instance manager
 	err = reloadInstanceManager()
 	if err != nil {
 		return fmt.Errorf("while replacing instance manager process: %w", err)
@@ -129,9 +145,6 @@ func validateInstanceManagerHash(
 // replace this process with a new one executing the new binary.
 // This function never return in case of success.
 func reloadInstanceManager() error {
-	log.Info("Stopping log processing")
-	logpipe.Stop()
-
 	log.Info("Replacing current instance")
 	err := syscall.Exec(os.Args[0], os.Args, os.Environ()) // #nosec
 	if err != nil {
