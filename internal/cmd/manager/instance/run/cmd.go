@@ -10,6 +10,7 @@ package run
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -24,11 +25,13 @@ import (
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/concurrency"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver/metricserver"
+	pg "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
 )
 
@@ -108,6 +111,9 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
+	postgresStartConditions := concurrency.MultipleExecuted{}
+	exitedConditions := concurrency.MultipleExecuted{}
+
 	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsServer)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
@@ -116,16 +122,36 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		setupLog.Error(err, "unable to create controller")
 		return err
 	}
+	postgresStartConditions = append(postgresStartConditions, reconciler.GetExecutedCondition())
 
-	postgresLifecycleManager := lifecycle.NewPostgres(ctx, instance, reconciler.GetInitialized())
-	if err = mgr.Add(postgresLifecycleManager); err != nil {
-		setupLog.Error(err, "unable to create instance runnable")
+	// postgres CSV logs handler (PGAudit too)
+	postgresLogPipe := logpipe.NewLogPipe()
+	if err := mgr.Add(postgresLogPipe); err != nil {
 		return err
 	}
+	postgresStartConditions = append(postgresStartConditions, postgresLogPipe.GetInitializedCondition())
+	exitedConditions = append(exitedConditions, postgresLogPipe.GetExitedCondition())
 
-	// TODO move to separate runnable
-	if err = logpipe.Start(); err != nil {
-		log.Error(err, "Error while starting the logging collector routine")
+	// raw logs handler
+	rawPipe := logpipe.NewRawLineLogPipe(filepath.Join(pg.LogPath, pg.LogFileName),
+		logpipe.LoggingCollectorRecordName)
+	if err := mgr.Add(rawPipe); err != nil {
+		return err
+	}
+	postgresStartConditions = append(postgresStartConditions, rawPipe.GetExecutedCondition())
+	exitedConditions = append(exitedConditions, rawPipe.GetExitedCondition())
+
+	// json logs handler
+	jsonPipe := logpipe.NewJSONLineLogPipe(filepath.Join(pg.LogPath, pg.LogFileName+".json"))
+	if err := mgr.Add(jsonPipe); err != nil {
+		return err
+	}
+	postgresStartConditions = append(postgresStartConditions, jsonPipe.GetExecutedCondition())
+	exitedConditions = append(exitedConditions, jsonPipe.GetExitedCondition())
+
+	postgresLifecycleManager := lifecycle.NewPostgres(ctx, instance, postgresStartConditions)
+	if err = mgr.Add(postgresLifecycleManager); err != nil {
+		setupLog.Error(err, "unable to create instance runnable")
 		return err
 	}
 
@@ -134,7 +160,15 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	remoteSrv, err := webserver.NewRemoteWebServer(instance)
+	// onlineUpgradeCtx is a child context of the postgres context.
+	// onlineUpgradeCtx will be the context passed to all the manager handled Runnables via Start(ctx),
+	// its deletion will imply all Runnables to stop, but will be handled
+	// appropriately by the Postgres Lifecycle Manager, which won't terminate Postgres in this case.
+	// The parent GlobalContext will only be deleted by the Postgres Lifecycle Manager itself when required,
+	// which will imply the deletion of the child onlineUpgradeCtx too, again, terminating all the Runnables.
+	onlineUpgradeCtx, onlineUpgradeCancelFunc := context.WithCancel(postgresLifecycleManager.GetGlobalContext())
+	defer onlineUpgradeCancelFunc()
+	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions)
 	if err != nil {
 		return err
 	}
@@ -153,7 +187,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	}
 
 	setupLog.Info("starting controller-runtime manager")
-	if err := mgr.Start(postgresLifecycleManager.GetContext()); err != nil {
+	if err := mgr.Start(onlineUpgradeCtx); err != nil {
 		setupLog.Error(err, "unable to run controller-runtime manager")
 		return err
 	}

@@ -8,9 +8,6 @@ package logpipe
 
 import (
 	"fmt"
-	"path/filepath"
-
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
 // FieldsPerRecord12 is the number of fields in a CSV log line
@@ -27,25 +24,6 @@ const FieldsPerRecord14 int = 26
 
 // LoggingCollectorRecordName is the value of the logger field for logging_collector
 const LoggingCollectorRecordName = "postgres"
-
-// Start starts a new goroutine running the logging collector core, reading
-// from the logging_collector process and translating its content to JSON
-func Start() error {
-	p := logPipe{
-		fileName:        filepath.Join(postgres.LogPath, postgres.LogFileName+".csv"),
-		record:          NewPgAuditLoggingDecorator(),
-		fieldsValidator: LogFieldValidator,
-	}
-	p.start()
-
-	textLogging := newRawLogFile(filepath.Join(postgres.LogPath, postgres.LogFileName), LoggingCollectorRecordName)
-	if err := textLogging.start(); err != nil {
-		return err
-	}
-
-	jsonLogging := newJSONLineLogPipe(filepath.Join(postgres.LogPath, postgres.LogFileName+".json"))
-	return jsonLogging.start()
-}
 
 // LogFieldValidator checks if the provided number of fields is valid or not for logging_collector logs
 func LogFieldValidator(fields int) *ErrFieldCountExtended {

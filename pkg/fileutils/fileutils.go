@@ -10,6 +10,7 @@ package fileutils
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -320,4 +321,22 @@ func GetFileSize(fileName string) (int64, error) {
 		return 0, err
 	}
 	return stat.Size(), nil
+}
+
+// OpenFileAsync opens a file exiting in case the given context.Context
+// is closed while waiting for the OpenFile to terminate, this can be useful with FIFO files,
+// as Open will not return until the File is not opened with write permissions by another process or goroutine.
+func OpenFileAsync(ctx context.Context, fileName string, flag int, perm os.FileMode) (f *os.File, err error) {
+	errChan := make(chan error, 1)
+	go func() {
+		defer close(errChan)
+		f, err = os.OpenFile(fileName, flag, perm) // #nosec
+		errChan <- err
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case err := <-errChan:
+		return f, err
+	}
 }
