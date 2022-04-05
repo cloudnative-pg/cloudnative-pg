@@ -17,130 +17,147 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
-	"sync"
 	"time"
 
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/concurrency"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils/compatibility"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 )
 
-type logPipe struct {
+// LogPipe creates a pipe for a given file
+type LogPipe struct {
 	fileName        string
 	record          CSVRecordParser
 	fieldsValidator FieldsValidator
+
+	initialized *concurrency.Executed
+	exited      *concurrency.Executed
 }
 
 var tagRegex = regexp.MustCompile(`(?s)(?P<Tag>^[a-zA-Z]+): (?P<Record>.*)$`)
-
-var consumedLogFiles sync.Map
-
-var (
-	pipeContext   context.Context
-	pipeCancel    context.CancelFunc
-	pipeWaitGroup sync.WaitGroup
-)
-
-func init() {
-	pipeContext, pipeCancel = context.WithCancel(context.Background())
-}
-
-// Stop cancels every log reading process and blocks until the log reading processes
-// is stopped
-func Stop() {
-	pipeCancel()
-	pipeWaitGroup.Wait()
-}
 
 // FieldsValidator is a function validating the number of fields
 // for a specific log line to be parsed
 type FieldsValidator func(int) *ErrFieldCountExtended
 
-// Starts a new goroutine running the logging collector core, reading
+// NewLogPipe returns a new LogPipe
+func NewLogPipe() *LogPipe {
+	return &LogPipe{
+		fileName:        filepath.Join(postgres.LogPath, postgres.LogFileName+".csv"),
+		record:          NewPgAuditLoggingDecorator(),
+		fieldsValidator: LogFieldValidator,
+
+		initialized: concurrency.NewExecuted(),
+		exited:      concurrency.NewExecuted(),
+	}
+}
+
+// GetInitializedCondition returns the condition that can be checked in order to
+// be sure initialization has been done
+func (p *LogPipe) GetInitializedCondition() *concurrency.Executed {
+	return p.initialized
+}
+
+// GetExitedCondition returns the condition that can be checked in order to
+// be sure initialization has been done
+func (p *LogPipe) GetExitedCondition() *concurrency.Executed {
+	return p.exited
+}
+
+// Start a new goroutine running the logging collector core, reading
 // from a process logging in CSV to a file and redirecting its content to stdout in JSON format.
 // The goroutine is started just once for a given file.
 // All successive calls, that are referencing the same filename, will just check its existence
-func (p *logPipe) start() {
-	_, alreadyStarted := consumedLogFiles.LoadOrStore(p.fileName, true)
+//nolint:dupl
+func (p *LogPipe) Start(ctx context.Context) error {
+	filenameLog := log.FromContext(ctx).WithValues("fileName", p.fileName)
+	defer filenameLog.Info("Exited log pipe")
+	go func() {
+		defer p.exited.Broadcast()
+		for {
+			// If the context has been cancelled, let's avoid starting reading
+			// again from the log file
+			if err := ctx.Err(); err != nil {
+				return
+			}
 
-	if !alreadyStarted {
-		pipeWaitGroup.Add(1)
-		go func() {
-			defer pipeWaitGroup.Done()
+			// check if the directory exists
+			if err := fileutils.EnsureDirectoryExist(filepath.Dir(p.fileName)); err != nil {
+				filenameLog.Error(err, "Error checking if the directory exists")
+				continue
+			}
 
-			for {
-				// If the context has been cancelled, let's avoid starting reading
-				// again from the log file
-				if pipeContext.Err() != nil {
+			if err := compatibility.CreateFifo(p.fileName); err != nil {
+				filenameLog.Error(err, "Error creating log FIFO")
+				continue
+			}
+			p.initialized.Broadcast()
+
+			if err := p.collectLogsFromFile(ctx); err != nil {
+				if errors.Is(err, context.Canceled) {
 					return
 				}
-
-				filenameLog := log.WithValues("fileName", p.fileName)
-
-				// check if the directory exists
-				if err := fileutils.EnsureDirectoryExist(filepath.Dir(p.fileName)); err != nil {
-					filenameLog.Error(err, "Error checking if the directory exists")
-					continue
-				}
-
-				if err := compatibility.CreateFifo(p.fileName); err != nil {
-					filenameLog.Error(err, "Error creating log FIFO")
-					continue
-				}
-
-				if err := p.collectLogsFromFile(pipeContext); err != nil {
-					filenameLog.Error(err, "Error consuming log stream")
-				}
+				filenameLog.Error(err, "Error consuming log stream")
+				continue
 			}
-		}()
-	}
+		}
+	}()
+	<-ctx.Done()
+	return nil
 }
 
 // collectLogsFromFile opens (blocking) the FIFO file, then starts reading the csv file line by line
 // until the end of the file or an error.
-func (p *logPipe) collectLogsFromFile(ctx context.Context) error {
+func (p *LogPipe) collectLogsFromFile(ctx context.Context) error {
+	filenameLog := log.FromContext(ctx).WithValues("fileName", p.fileName)
+
 	defer func() {
 		if condition := recover(); condition != nil {
-			log.Info("Recover from panic condition while collecting PostgreSQL logs",
-				"condition", condition, "fileName", p.fileName, "stacktrace", debug.Stack())
+			filenameLog.Info("Recover from panic condition while collecting PostgreSQL logs",
+				"condition", condition, "stacktrace", debug.Stack())
 		}
 	}()
 
-	f, err := os.OpenFile(p.fileName, os.O_RDONLY, 0o600) // #nosec
+	f, err := fileutils.OpenFileAsync(ctx, p.fileName, os.O_RDONLY, 0o600)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
 		if err := f.Close(); err != nil {
-			log.Error(err, "Error while closing FIFO file for logs")
-			return
+			filenameLog.Error(err, "Error while closing FIFO file for logs")
 		}
 	}()
 
+	errChan := make(chan error, 1)
 	// Ensure we terminate our read operations when
 	// the cancellation signal happened
 	go func() {
-		<-ctx.Done()
-
-		log.Info("Terminating log reading process", "fileName", p.fileName)
+		defer close(errChan)
+		errChan <- p.streamLogFromCSVFile(ctx, f, &LogRecordWriter{})
+	}()
+	select {
+	case <-ctx.Done():
+		filenameLog.Info("Terminating log reading process")
 		err := f.SetDeadline(time.Now())
 		if err != nil {
-			log.Error(err,
+			filenameLog.Error(err,
 				"Error while setting the deadline for log reading. The instance manager may not refresh "+
-					"until a new log line is read",
-				"fileName", p.fileName)
+					"until a new log line is read")
 		}
-	}()
-
-	return p.streamLogFromCSVFile(ctx, f, &LogRecordWriter{})
+		return ctx.Err()
+	case err := <-errChan:
+		return err
+	}
 }
 
 // streamLogFromCSVFile is a function reading csv lines from an io.Reader and
 // writing them to the passed RecordWriter. This function can return
 // ErrFieldCountExtended which enrich the csv.ErrFieldCount with the
 // decoded invalid line
-func (p *logPipe) streamLogFromCSVFile(ctx context.Context, inputFile io.Reader, writer RecordWriter) error {
+func (p *LogPipe) streamLogFromCSVFile(ctx context.Context, inputFile io.Reader, writer RecordWriter) error {
 	var (
 		content []string
 		err     error

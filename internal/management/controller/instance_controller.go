@@ -54,7 +54,6 @@ var RetryUntilWalReceiverDown = wait.Backoff{
 }
 
 // Reconcile is the main reconciliation loop for the instance
-//nolint:gocognit
 func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	// set up a convenient contextLog object so we don't have to type request over and over again
 	contextLogger, ctx := log.SetupLogger(ctx)

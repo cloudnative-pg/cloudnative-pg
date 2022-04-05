@@ -24,29 +24,29 @@ import (
 type PostgresLifecycle struct {
 	instance *postgres.Instance
 
-	ctx                  context.Context
-	cancel               context.CancelFunc
-	systemInitialization *concurrency.Executed
+	globalCtx            context.Context
+	globalCancel         context.CancelFunc
+	systemInitialization concurrency.MultipleExecuted
 }
 
 // NewPostgres creates a new PostgresLifecycle
 func NewPostgres(
 	ctx context.Context,
 	instance *postgres.Instance,
-	initialization *concurrency.Executed,
+	initialization concurrency.MultipleExecuted,
 ) *PostgresLifecycle {
-	childCtx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(ctx)
 	return &PostgresLifecycle{
 		instance:             instance,
-		ctx:                  childCtx,
-		cancel:               cancel,
+		globalCtx:            ctx,
+		globalCancel:         cancel,
 		systemInitialization: initialization,
 	}
 }
 
-// GetContext returns the PostgresLifecycle's context
-func (i *PostgresLifecycle) GetContext() context.Context {
-	return i.ctx
+// GetGlobalContext returns the PostgresLifecycle's context
+func (i *PostgresLifecycle) GetGlobalContext() context.Context {
+	return i.globalCtx
 }
 
 // Start starts running the PostgresLifecycle
@@ -58,7 +58,7 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 
 	// Ensure that at the end of this runnable the instance
 	// manager will shut down
-	defer i.cancel()
+	defer i.globalCancel()
 
 	// Every cycle correspond to the lifespan of a postmaster process
 	for {
@@ -98,6 +98,11 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				// stop delay. We are doing that because we are not going to receive
 				// a SIGKILL by the Kubelet, which is not informed about what's
 				// happening.
+				if i.instance.InstanceManagerIsUpgrading {
+					log.Info("Context has been cancelled, but an instance manager online upgrade is in progress, " +
+						"will just exit")
+					return nil
+				}
 				log.Info("Context has been cancelled, shutting down and exiting")
 				if err := tryShuttingDownSmartFast(i.instance.MaxStopDelay, i.instance); err != nil {
 					log.Error(err, "error shutting down instance, proceeding")

@@ -27,7 +27,6 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/pool"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
@@ -275,11 +274,6 @@ func (instance *Instance) Startup() error {
 	socketDir := GetSocketDir()
 	if err := fileutils.EnsureDirectoryExist(socketDir); err != nil {
 		return fmt.Errorf("while creating socket directory: %w", err)
-	}
-
-	// start consuming csv logs
-	if err := logpipe.Start(); err != nil {
-		return err
 	}
 
 	options := []string{
