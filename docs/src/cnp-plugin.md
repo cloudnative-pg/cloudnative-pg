@@ -316,10 +316,17 @@ Do you want to proceed? [y/n]: y
 
 ### Report
 
-The `kubectl cnp report` command requests the operator to provide information
-regarding the operator deployment, configuration and events.
+The `kubectl cnp report` command bundles various pieces
+of information into a ZIP file.
 It aims to provide the needed context to debug problems
 with clusters in production.
+
+It has two sub-commands: `operator` and `cluster`.
+
+#### report Operator
+
+The `operator` sub-command requests the operator to provide information
+regarding the operator deployment, configuration and events.
 
 !!! Important
     All confidential information in Secrets and ConfigMaps is REDACTED.
@@ -333,15 +340,7 @@ with clusters in production.
 
 The command will generate a ZIP file containing various manifest in YAML format
 (by default, but settable to `json` with the `-o` flag).
-You can use the `-f` flag to name a result file explicitly.
-Without an explicit filename, the command will print to StdOUT, which you can
-redirect as needed.
-
-```shell
-kubectl cnp report operator > reportRedacted.zip
-```
-
-or
+Use the `-f` flag to name a result file explicitly.
 
 ```shell
 kubectl cnp report operator -f reportRedacted.zip
@@ -355,7 +354,7 @@ unzip reportRedacted.zip
 
 will result in:
 
-```
+```shell
 Archive:  reportRedacted.zip
   inflating: deployment.yaml
   inflating: operator-pod.yaml
@@ -370,7 +369,7 @@ You can verify that the confidential information is REDACTED:
 head postgresql-operator-ca-secret.yaml
 ```
 
-```yaml
+``` yaml
 data:
   ca.crt: ""
   ca.key: ""
@@ -399,7 +398,7 @@ unzip reportNonRedacted.zip
 head postgresql-operator-ca-secret.yaml
 ```
 
-```yaml
+``` yaml
 data:
   ca.crt: LS0tLS1CRUdJTiBD…
   ca.key: LS0tLS1CRUdJTiBF…
@@ -408,4 +407,45 @@ metadata:
   managedFields:
   - apiVersion: v1
     fieldsType: FieldsV1
+```
+
+#### report Cluster
+
+The `cluster` sub-command gathers the following:
+
+* **cluster resources**: the cluster information, same as `kubectl get cluster -o yaml`
+* **cluster pods**: pods in the cluster namespace matching the cluster name
+* **cluster jobs**: jobs, if any, in the cluster namespace matching the cluster name
+* **events**: events in the cluster namespace
+
+The `cluster` sub-command accepts the `-f` and `-o` flags, as the `operator` does.
+Note that the cluster information does not contain configuration Secrets / ConfigMaps,
+so the `-S` is disabled.
+
+Usage:
+
+``` shell
+kubectl-cnp report cluster [clusterName] -f <filename.zip> [flags]
+```
+
+Note that, unlike the `operator` sub-command, for the `cluster` sub-command you
+need to provide the cluster name, and very likely the namespace, unless the cluster
+is in the default one.
+
+``` shell
+kubectl cnp report cluster cluster-example-full -f report.zip -n example2
+```
+
+and then:
+
+``` shell
+unzip report.zip
+```
+
+``` shell
+Archive:  report.zip
+  inflating: cluster.yaml            
+  inflating: cluster-pods.yaml       
+  inflating: cluster-jobs.yaml       
+  inflating: events.yaml
 ```

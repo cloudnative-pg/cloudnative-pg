@@ -11,13 +11,8 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 
 	v12 "k8s.io/api/admissionregistration/v1"
-
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,8 +25,8 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/report/deployments"
 )
 
-// report contains the data to be printed by the `report` plugin
-type report struct {
+// operatorReport contains the data to be printed by the `report operator` plugin
+type operatorReport struct {
 	deployment              appsv1.Deployment
 	operatorPod             corev1.Pod
 	secrets                 []namedObject
@@ -42,9 +37,29 @@ type report struct {
 	validatingWebhookConfig *v12.ValidatingWebhookConfigurationList
 }
 
-type namedObject struct {
-	Name   string
-	Object interface{}
+func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputFormat) (err error) {
+	err = addContentToZip(or.deployment, "deployment", zipper, format)
+	if err != nil {
+		return
+	}
+	err = addContentToZip(or.operatorPod, "operator-pod", zipper, format)
+	if err != nil {
+		return
+	}
+	err = addObjectsToZip(or.configs, zipper, format)
+	if err != nil {
+		return
+	}
+	err = addObjectsToZip(or.secrets, zipper, format)
+	if err != nil {
+		return
+	}
+	err = addContentToZip(or.events, "events", zipper, format)
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 // Operator implements the "report operator" subcommand
@@ -132,7 +147,7 @@ func Operator(ctx context.Context, format plugin.OutputFormat,
 		return fmt.Errorf("could not get webhook service: %w", err)
 	}
 
-	rep := report{
+	rep := operatorReport{
 		deployment:              operatorDeployment,
 		operatorPod:             operatorPod,
 		secrets:                 secrets,
@@ -143,117 +158,12 @@ func Operator(ctx context.Context, format plugin.OutputFormat,
 		webhookService:          webhookService,
 	}
 
-	err = writeReport(rep, format, file)
+	err = writeZippedReport(rep, format, file)
 	if err != nil {
 		return fmt.Errorf("could not write report: %w", err)
 	}
 
-	fmt.Printf("Successfully written report to \"%s\" (format: \"%s\")", file, format)
+	fmt.Printf("Successfully written report to \"%s\" (format: \"%s\")\n", file, format)
 
-	return nil
-}
-
-// writerReport writes a zip with the various report parts to file
-func writeReport(rep report, format plugin.OutputFormat, file string) (err error) {
-	var outputFile *os.File
-
-	if exist, _ := fileutils.FileExists(file); exist {
-		return fmt.Errorf("file already exist will not overwrite")
-	}
-
-	outputFile, err = os.Create(filepath.Clean(file))
-	if err != nil {
-		return fmt.Errorf("could not create zip file: %w", err)
-	}
-
-	defer func() {
-		errF := outputFile.Sync()
-		if errF != nil && err == nil {
-			err = fmt.Errorf("could not flush the zip file: %w", errF)
-		}
-
-		errF = outputFile.Close()
-		if errF != nil && err == nil {
-			err = fmt.Errorf("could not close the zip file: %w", errF)
-		}
-	}()
-
-	zipper := zip.NewWriter(outputFile)
-	defer func() {
-		var errZ error
-		if errZ = zipper.Flush(); errZ != nil {
-			if err == nil {
-				err = fmt.Errorf("could not flush the zip: %w", errZ)
-			}
-		}
-
-		if errZ = zipper.Close(); errZ != nil {
-			if err == nil {
-				err = fmt.Errorf("could not close the zip: %w", errZ)
-			}
-		}
-	}()
-
-	err = generateZipContent(rep, zipper, format)
-
-	return err
-}
-
-func generateZipContent(rep report, zipper *zip.Writer, format plugin.OutputFormat) error {
-	singleObjects := []struct {
-		content interface{}
-		name    string
-	}{
-		{content: rep.deployment, name: "deployment"},
-		{content: rep.operatorPod, name: "operator-pod"},
-		{content: rep.events, name: "events"},
-		{content: rep.validatingWebhookConfig, name: "validating-webhook-configuration"},
-		{content: rep.mutatingWebhookConfig, name: "mutating-webhook-configuration"},
-		{content: rep.webhookService, name: "webhook-service"},
-	}
-
-	for _, object := range singleObjects {
-		err := addContentToZip(object.content, object.name, zipper, format)
-		if err != nil {
-			return err
-		}
-	}
-
-	multiObjects := [][]namedObject{rep.configs, rep.secrets}
-	for _, obj := range multiObjects {
-		err := addObjectsToZip(obj, zipper, format)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func addContentToZip(c interface{}, name string, zipper *zip.Writer, format plugin.OutputFormat) error {
-	var writer io.Writer
-	writer, err := zipper.Create(name + "." + string(format))
-	if err != nil {
-		return fmt.Errorf("could not add '%s' to zip: %w", name, err)
-	}
-
-	if err = plugin.Print(c, format, writer); err != nil {
-		return fmt.Errorf("could not print '%s': %w", name, err)
-	}
-	return nil
-}
-
-func addObjectsToZip(objects []namedObject, zipper *zip.Writer, format plugin.OutputFormat) error {
-	for _, obj := range objects {
-		var objF io.Writer
-		objF, err := zipper.Create(obj.Name + "." + string(format))
-		if err != nil {
-			return fmt.Errorf("could not add object '%s' to zip: %w", obj, err)
-		}
-
-		if err = plugin.Print(obj.Object, format, objF); err != nil {
-			return fmt.Errorf("could not print: %w", err)
-		}
-	}
 	return nil
 }
