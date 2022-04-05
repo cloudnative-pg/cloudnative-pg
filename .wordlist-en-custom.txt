@@ -248,6 +248,7 @@ ServiceAccount
 ServiceAccount's
 ServiceMonitor
 Silvela
+Slonik
 StorageClass
 StorageConfiguration
 Storages
