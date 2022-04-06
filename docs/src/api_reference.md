@@ -713,6 +713,7 @@ Name               | Description                                                
 ------------------ | ------------------------------------------------------------------------ | ----------------------------------------
 `accessKeyId       ` | The reference to the access key id                                       | [*SecretKeySelector](#SecretKeySelector)
 `secretAccessKey   ` | The reference to the secret access key                                   | [*SecretKeySelector](#SecretKeySelector)
+`sessionToken      ` | The references to the session key                                        | [*SecretKeySelector](#SecretKeySelector)
 `inheritFromIAMRole` | Use the role based authentication without providing explicitly the keys. - *mandatory*  | bool                                    
 
 <a id='ScheduledBackup'></a>

@@ -65,7 +65,7 @@ func envSetCloudCredentials(
 	env []string,
 ) (envs []string, err error) {
 	if configuration.S3Credentials != nil {
-		return envSetAWSCredentials(ctx, c, namespace, configuration, env)
+		return envSetAWSCredentials(ctx, c, namespace, configuration.S3Credentials, env)
 	}
 
 	if configuration.GoogleCredentials != nil {
@@ -81,27 +81,28 @@ func envSetAWSCredentials(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
-	configuration *apiv1.BarmanObjectStoreConfiguration,
+	s3credentials *apiv1.S3Credentials,
 	env []string,
 ) ([]string, error) {
 	// check if AWS credentials are defined
-	if configuration.S3Credentials == nil {
+	if s3credentials == nil {
 		return nil, fmt.Errorf("missing S3 credentials")
 	}
 
-	if configuration.S3Credentials.InheritFromIAMRole {
+	if s3credentials.InheritFromIAMRole {
 		return env, nil
 	}
 
 	var accessKeyIDSecret corev1.Secret
 	var secretAccessKeySecret corev1.Secret
+	var sessionSecret corev1.Secret
 
 	// Get access key ID
-	if configuration.S3Credentials.AccessKeyIDReference == nil {
+	if s3credentials.AccessKeyIDReference == nil {
 		return nil, fmt.Errorf("missing access key ID")
 	}
-	secretName := configuration.S3Credentials.AccessKeyIDReference.Name
-	secretKey := configuration.S3Credentials.AccessKeyIDReference.Key
+	secretName := s3credentials.AccessKeyIDReference.Name
+	secretKey := s3credentials.AccessKeyIDReference.Key
 	err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &accessKeyIDSecret)
 	if err != nil {
 		return nil, fmt.Errorf("while getting access key ID secret: %w", err)
@@ -113,11 +114,11 @@ func envSetAWSCredentials(
 	}
 
 	// Get secret access key
-	if configuration.S3Credentials.SecretAccessKeyReference == nil {
+	if s3credentials.SecretAccessKeyReference == nil {
 		return nil, fmt.Errorf("missing secret access key")
 	}
-	secretName = configuration.S3Credentials.SecretAccessKeyReference.Name
-	secretKey = configuration.S3Credentials.SecretAccessKeyReference.Key
+	secretName = s3credentials.SecretAccessKeyReference.Name
+	secretKey = s3credentials.SecretAccessKeyReference.Key
 	err = c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &secretAccessKeySecret)
 	if err != nil {
 		return nil, fmt.Errorf("while getting secret access key secret: %w", err)
@@ -126,6 +127,23 @@ func envSetAWSCredentials(
 	secretAccessKey, ok := secretAccessKeySecret.Data[secretKey]
 	if !ok {
 		return nil, fmt.Errorf("missing key inside secret access key secret")
+	}
+
+	// Get session token secret
+	if s3credentials.SessionToken != nil {
+		secretName = s3credentials.SessionToken.Name
+		secretKey = s3credentials.SessionToken.Key
+
+		err = c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &sessionSecret)
+		if err != nil {
+			return nil, fmt.Errorf("while getting session secret: %w", err)
+		}
+
+		sessionKey, ok := sessionSecret.Data[secretKey]
+		if !ok {
+			return nil, fmt.Errorf("missing key inside session secret")
+		}
+		env = append(env, fmt.Sprintf("AWS_SESSION_TOKEN=%s", sessionKey))
 	}
 
 	env = append(env, fmt.Sprintf("AWS_ACCESS_KEY_ID=%s", accessKeyID))
