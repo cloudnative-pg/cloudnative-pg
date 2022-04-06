@@ -942,6 +942,9 @@ type S3Credentials struct {
 	// The reference to the secret access key
 	SecretAccessKeyReference *SecretKeySelector `json:"secretAccessKey,omitempty"`
 
+	// The references to the session key
+	SessionToken *SecretKeySelector `json:"sessionToken,omitempty"`
+
 	// Use the role based authentication without providing explicitly the keys.
 	// +optional
 	InheritFromIAMRole bool `json:"inheritFromIAMRole"`

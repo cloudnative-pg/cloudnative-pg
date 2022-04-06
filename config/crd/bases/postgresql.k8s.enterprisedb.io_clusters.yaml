@@ -938,6 +938,19 @@ spec:
                             - key
                             - name
                             type: object
+                          sessionToken:
+                            description: The references to the session key
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
                         type: object
                       serverName:
                         description: The server name on S3, the cluster name is used
@@ -1399,6 +1412,19 @@ spec:
                               type: boolean
                             secretAccessKey:
                               description: The reference to the secret access key
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            sessionToken:
+                              description: The references to the session key
                               properties:
                                 key:
                                   description: The key to select
