@@ -1748,6 +1748,16 @@ spec:
                       type: string
                     type: array
                 type: object
+              primaryUpdateMethod:
+                default: switchover
+                description: 'Method to follow to upgrade the primary server during
+                  a rolling update procedure, after all replicas have been successfully
+                  updated: it can be with a switchover (`switchover` - default) or
+                  in-place (`restart`)'
+                enum:
+                - switchover
+                - restart
+                type: string
               primaryUpdateStrategy:
                 default: unsupervised
                 description: 'Strategy to follow to upgrade the primary server during

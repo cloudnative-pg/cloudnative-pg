@@ -7,7 +7,8 @@ Copyright (C) 2019-2022 EnterpriseDB Corporation.
 package restart
 
 import (
-	"context"
+	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 )
@@ -15,14 +16,24 @@ import (
 // NewCmd creates the new "reset" command
 func NewCmd() *cobra.Command {
 	restartCmd := &cobra.Command{
-		Use:   "restart [clusterName]",
-		Short: `Restart the cluster`,
-		Long:  `The cluster will be restarted, rolling out new configurations if present.`,
-		Args:  cobra.ExactArgs(1),
+		Use:   "restart clusterName [instance]",
+		Short: `Restart a cluster or a single instance in a cluster`,
+		Long: `If only the cluster name is specified, the whole cluster will be restarted, 
+rolling out new configurations if present.
+If a specific instance is specified, only that instance will be restarted, 
+in-place if it is a primary, deleting the pod if it is a replica.`,
+		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := context.Background()
+			ctx := cmd.Context()
 			clusterName := args[0]
-			return Restart(ctx, clusterName)
+			if len(args) == 1 {
+				return restart(ctx, clusterName)
+			}
+			node := args[1]
+			if _, err := strconv.Atoi(args[1]); err == nil {
+				node = fmt.Sprintf("%s-%s", clusterName, node)
+			}
+			return instanceRestart(ctx, clusterName, node)
 		},
 	}
 

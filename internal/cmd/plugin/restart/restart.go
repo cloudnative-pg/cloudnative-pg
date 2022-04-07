@@ -4,7 +4,7 @@ This file is part of Cloud Native PostgreSQL.
 Copyright (C) 2019-2022 EnterpriseDB Corporation.
 */
 
-// Package restart implements a command to rollout restart a cluster
+// Package restart implements a command to rollout restart a cluster or restart a single instance
 package restart
 
 import (
@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
@@ -19,14 +20,14 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
 )
 
-// Restart marks the cluster as needing to restart
-func Restart(ctx context.Context, clusterName string) error {
+// restart marks the cluster as needing to restart
+func restart(ctx context.Context, clusterName string) error {
 	var cluster apiv1.Cluster
 
 	// Get the Cluster object
 	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("while trying to get cluster %v: %w", clusterName, err)
 	}
 
 	clusterRestarted := cluster.DeepCopy()
@@ -38,9 +39,41 @@ func Restart(ctx context.Context, clusterName string) error {
 
 	err = plugin.Client.Patch(ctx, clusterRestarted, client.MergeFrom(&cluster))
 	if err != nil {
-		return err
+		return fmt.Errorf("while patching cluster %v: %w", clusterName, err)
 	}
 
 	fmt.Printf("%s restarted\n", clusterRestarted.Name)
+	return nil
+}
+
+// instanceRestart restarts a given instance, in-place if a primary, deleting the pod if it's a replica
+func instanceRestart(ctx context.Context, clusterName, node string) error {
+	var cluster apiv1.Cluster
+
+	// Get the Cluster object
+	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
+	if err != nil {
+		return err
+	}
+	originalCluster := cluster.DeepCopy()
+
+	if cluster.Status.CurrentPrimary == node {
+		cluster.Status.Phase = apiv1.PhaseInplacePrimaryRestart
+		cluster.Status.PhaseReason = "Requested by the user"
+		cluster.ManagedFields = nil
+		if err := plugin.Client.Status().Patch(ctx, &cluster, client.MergeFrom(originalCluster)); err != nil {
+			return fmt.Errorf("while requesting restart on primary POD for cluster %v: %w", clusterName, err)
+		}
+	} else {
+		var pod corev1.Pod
+		err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: node}, &pod)
+		if err != nil {
+			return fmt.Errorf("while getting POD %v: %w", node, err)
+		}
+		if err := plugin.Client.Delete(ctx, &pod); err != nil {
+			return fmt.Errorf("while deleting POD %v: %w", node, err)
+		}
+	}
+	fmt.Printf("instance %s restarted\n", node)
 	return nil
 }
