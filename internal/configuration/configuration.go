@@ -60,7 +60,7 @@ type Data struct {
 	// the owning Cluster
 	InheritedLabels []string `json:"inheritedLabels" env:"INHERITED_LABELS"`
 
-	// EnableInstanceManagerInplaceUpdates enables the instance manager to apply inplace updates,
+	// EnableInstanceManagerInplaceUpdates enables the instance manager to apply in-place updates,
 	// replacing the executable in a pod without restarting
 	EnableInstanceManagerInplaceUpdates bool `json:"enableInstanceManagerInplaceUpdates" env:"ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES"` //nolint
 

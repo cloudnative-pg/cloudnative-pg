@@ -250,16 +250,26 @@ kubectl get secret cluster-cert -o json | jq -r '.data | map(@base64d) | .[]'
 
 ### Restart
 
-The `kubectl cnp restart` command requests the operator to orchestrate
-a rollout restart for a certain cluster. This is useful to apply
-configuration changes to cluster dependent objects, such as ConfigMaps
-containing custom monitoring queries.
-
-The following command will restart a given cluster in a rollout fashion:
+The `kubectl cnp restart` command can be used in two cases:
+- requesting the operator to orchestrate a rollout restart
+  for a certain cluster. This is useful to apply
+  configuration changes to cluster dependent objects, such as ConfigMaps
+  containing custom monitoring queries.
+- request a single instance restart, either in-place if the instance is
+  the cluster's primary or deleting and recreating the pod if
+  it is a replica.
 
 ```shell
-kubectl cnp restart [cluster_name]
+# this command will restart a whole cluster in a rollout fashion
+kubectl cnp restart [clusterName]
+
+# this command will restart a single instance, according to the policy above
+kubectl cnp restart [clusterName] [pod]
 ```
+
+If the in-place restart is requested but the change cannot be applied without
+a switchover, the switchover will take precedence over the in-place restart. A
+common case for this will be a minor upgrade of PostgreSQL image.
 
 !!! Note
     If you want ConfigMaps and Secrets to be **automatically** reloaded

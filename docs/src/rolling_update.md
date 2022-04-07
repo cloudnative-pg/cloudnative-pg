@@ -24,19 +24,30 @@ The operator starts upgrading all the replicas, one Pod at a time, starting
 from the one with the highest serial.
 
 The primary is the last node to be upgraded. This operation is configurable and
-managed by the `primaryUpdateStrategy` option, accepting these two values:
+managed by the `primaryUpdateStrategy` and `primaryUpdateMethod` options as follows:
 
-- `unsupervised`: the rolling update process is managed by Kubernetes
-  and is entirely automated, with the *switchover* operation
-  starting once all the replicas have been upgraded
-- `supervised`: the rolling update process is suspended immediately
-  after all replicas have been upgraded and can only be completed
-  with a manual switchover triggered by an administrator with
-  `kubectl cnp promote [cluster] [pod]`. The plugin can be downloaded from the
-  [`kubectl-cnp` project page](https://github.com/EnterpriseDB/kubectl-cnp)
-  on GitHub.
+- `primaryUpdateStrategy` accepts the two following values:
+  - `unsupervised`: the rolling update process is managed by Kubernetes
+    and is entirely automated, with the selected `primaryUpdateMethod` operation
+    starting once all the replicas have been upgraded
+  - `supervised`: the rolling update process is suspended immediately
+    after all replicas have been upgraded and can only be completed
+    with a manual switchover with `kubectl cnp promote [cluster] [new_primary]` or
+    an in-place restart with `kubectl cnp restart [cluster] [old_primary]` triggered 
+    by an administrator. The plugin can be downloaded from the
+    [`kubectl-cnp` project page](https://github.com/EnterpriseDB/kubectl-cnp)
+    on GitHub.
+- `primaryUpdateMethod` accepts the two following values which will be taken into
+  consideration if `primaryUpdateStrategy` is set to `unsupervised`:
+  - `switchover`: once only the primary instance is missing to be updated, first a
+    switchover will be performed to another already updated instance and then the
+    old primary will be restarted.
+  - `restart`: once only the primary instance is missing to be updated, the primary
+    instance will be restarted in-place, without requiring a switchover. In case the
+    change requires a switchover because the changes cannot be applied without it,
+    the restart in-place will be ignored and the switchover will take precedence.
 
-The default and recommended value is `unsupervised`.
+The default and recommended values are respectively `unsupervised` and `switchover`.
 
 The upgrade keeps the Cloud Native PostgreSQL identity and does not
 re-clone the data. Pods will be deleted and created again with the same PVCs.
