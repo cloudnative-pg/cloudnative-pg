@@ -20,38 +20,61 @@ Rolling upgrades are started when:
 - after the operator is updated, to ensure the Pods run the latest instance
   manager (unless [in-place updates are enabled](installation_upgrade.md#in-place-updates-of-the-instance-manager)).
 
-The operator starts upgrading all the replicas, one Pod at a time, starting
+The operator starts upgrading all the replicas, one Pod at a time, and begins
 from the one with the highest serial.
 
-The primary is the last node to be upgraded. This operation is configurable and
-managed by the `primaryUpdateStrategy` and `primaryUpdateMethod` options as follows:
+The primary is the last node to be upgraded.
 
-- `primaryUpdateStrategy` accepts the two following values:
-  - `unsupervised`: the rolling update process is managed by Kubernetes
-    and is entirely automated, with the selected `primaryUpdateMethod` operation
-    starting once all the replicas have been upgraded
-  - `supervised`: the rolling update process is suspended immediately
-    after all replicas have been upgraded and can only be completed
-    with a manual switchover with `kubectl cnp promote [cluster] [new_primary]` or
-    an in-place restart with `kubectl cnp restart [cluster] [old_primary]` triggered 
-    by an administrator. The plugin can be downloaded from the
-    [`kubectl-cnp` project page](https://github.com/EnterpriseDB/kubectl-cnp)
-    on GitHub.
-- `primaryUpdateMethod` accepts the two following values which will be taken into
-  consideration if `primaryUpdateStrategy` is set to `unsupervised`:
-  - `switchover`: once only the primary instance is missing to be updated, first a
-    switchover will be performed to another already updated instance and then the
-    old primary will be restarted.
-  - `restart`: once only the primary instance is missing to be updated, the primary
-    instance will be restarted in-place, without requiring a switchover. In case the
-    change requires a switchover because the changes cannot be applied without it,
-    the restart in-place will be ignored and the switchover will take precedence.
+Rolling updates are configurable and can be either entirely automated
+(`unsupervised`) or requiring human intervention (`supervised`).
 
-The default and recommended values are respectively `unsupervised` and `switchover`.
+The upgrade keeps the Cloud Native PostgreSQL identity, without re-cloning the
+data. Pods will be deleted and created again with the same PVCs and a new
+image, if required.
 
-The upgrade keeps the Cloud Native PostgreSQL identity and does not
-re-clone the data. Pods will be deleted and created again with the same PVCs.
+During the rolling update procedure, each service endpoints move to reflect the
+cluster's status, so that applications can ignore the node that is being
+updated.
 
-During the rolling update procedure, the services endpoints move to reflect
-the cluster's status, so the applications ignore the node that
-is updating.
+## Automated updates (`unsupervised`)
+
+When `primaryUpdateStrategy` is set to `unsupervised`, the rolling update
+process is managed by Kubernetes and is entirely automated. Once the replicas
+have been upgraded, the selected `primaryUpdateMethod` operation will initiate
+on the primary. This is the default behavior.
+
+The `primaryUpdateMethod` option accepts one of the following values:
+
+- `switchover`: a switchover operation is automatically performed, setting the
+  most aligned replica as the new target primary, and shutting down the former
+  primary pod (default).
+
+- `restart`: if possible, perform an automated restart of the pod where the
+  primary instance is running. Otherwise, the restart request is ignored and a
+  switchover issued.
+
+!!! IMPORTANT
+    A current limitation is that `restart` is only possible with rolling
+    updates that involve configuration changes.
+
+## Manual updates (`supervised`)
+
+When `primaryUpdateStrategy` is set to `supervised`, the rolling update process
+is suspended immediately after all replicas have been upgraded.
+
+This phase can only be completed with either a manual switchover or an in-place
+restart.
+
+You can trigger a switchover with:
+
+```bash
+kubectl cnp promote [cluster] [new_primary]
+```
+
+You can trigger a restart with:
+
+```bash
+kubectl cnp restart [cluster] [current_primary]
+```
+
+You can find more information in the [`cnp` plugin page](cnp-plugin.md).

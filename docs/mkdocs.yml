@@ -28,7 +28,6 @@ nav:
   - operator_conf.md
   - storage.md
   - labels_annotations.md
-  - samples.md
   - monitoring.md
   - logging.md
   - certificates.md
@@ -45,5 +44,6 @@ nav:
   - e2e.md
   - container_images.md
   - operator_capability_levels.md
+  - samples.md
   - api_reference.md
   - release_notes.md

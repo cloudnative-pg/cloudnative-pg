@@ -251,10 +251,12 @@ kubectl get secret cluster-cert -o json | jq -r '.data | map(@base64d) | .[]'
 ### Restart
 
 The `kubectl cnp restart` command can be used in two cases:
+
 - requesting the operator to orchestrate a rollout restart
   for a certain cluster. This is useful to apply
   configuration changes to cluster dependent objects, such as ConfigMaps
   containing custom monitoring queries.
+
 - request a single instance restart, either in-place if the instance is
   the cluster's primary or deleting and recreating the pod if
   it is a replica.
@@ -454,8 +456,8 @@ unzip report.zip
 
 ``` shell
 Archive:  report.zip
-  inflating: cluster.yaml            
-  inflating: cluster-pods.yaml       
-  inflating: cluster-jobs.yaml       
+  inflating: cluster.yaml
+  inflating: cluster-pods.yaml
+  inflating: cluster-jobs.yaml
   inflating: events.yaml
 ```
