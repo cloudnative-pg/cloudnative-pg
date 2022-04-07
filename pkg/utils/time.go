@@ -34,8 +34,21 @@ func GetCurrentTimestamp() string {
 // YYYY-MM-DD HH24:MI:SS
 // YYYY-MM-DD HH24:MI:SS.FF6TZH
 // YYYY-MM-DD HH24:MI:SS.FF6TZH:TZM
+// YYYY-MM-DDTHH24:MI:SSZ            (time.RFC3339)
+// YYYY-MM-DDTHH24:MI:SS±TZH:TZM     (time.RFC3339)
+// YYYY-MM-DDTHH24:MI:SS             (modified time.RFC3339)
 func ParseTargetTime(currentLocation *time.Location, targetTime string) (time.Time, error) {
 	t, err := pq.ParseTimestamp(currentLocation, targetTime)
+	if err == nil {
+		return t, nil
+	}
+
+	t, err = time.Parse(time.RFC3339, targetTime)
+	if err == nil {
+		return t, nil
+	}
+
+	t, err = time.Parse("2006-01-02T15:04:05", targetTime)
 	if err == nil {
 		return t, nil
 	}
