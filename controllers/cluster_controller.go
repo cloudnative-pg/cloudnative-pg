@@ -632,8 +632,7 @@ func (r *ClusterReconciler) handleRollingUpdate(
 	}
 	if done {
 		// Rolling upgrade is in progress, let's avoid marking stuff as synchronized
-		// (but recheck in one second, just to be sure)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+		return ctrl.Result{}, ErrNextLoop
 	}
 
 	if instancesStatus.ArePodsWaitingForDecreasedSettings() {

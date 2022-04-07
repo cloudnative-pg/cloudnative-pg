@@ -63,18 +63,21 @@ var _ = Describe("Pod upgrade", func() {
 	It("checks when a rollout is being needed for any reason", func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		status := postgres.PostgresqlStatus{Pod: *pod, PendingRestart: true}
-		needRollout, reason := IsPodNeedingRollout(status, &cluster)
+		needRollout, inplacePossible, reason := IsPodNeedingRollout(status, &cluster)
 		Expect(needRollout).To(BeFalse())
+		Expect(inplacePossible).To(BeFalse())
 		Expect(reason).To(BeEmpty())
 
 		status.IsReady = true
-		needRollout, reason = IsPodNeedingRollout(status, &cluster)
+		needRollout, inplacePossible, reason = IsPodNeedingRollout(status, &cluster)
 		Expect(needRollout).To(BeTrue())
+		Expect(inplacePossible).To(BeFalse())
 		Expect(reason).To(BeEmpty())
 
 		status.ExecutableHash = "test_hash"
-		needRollout, reason = IsPodNeedingRollout(status, &cluster)
+		needRollout, inplacePossible, reason = IsPodNeedingRollout(status, &cluster)
 		Expect(needRollout).To(BeTrue())
+		Expect(inplacePossible).To(BeTrue())
 		Expect(reason).To(BeEquivalentTo("configuration needs a restart to apply some configuration changes"))
 	})
 })
