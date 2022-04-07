@@ -1,0 +1,7 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Backup
+metadata:
+  name: cluster-backup-04
+spec:
+  cluster:
+    name: source-cluster-minio
