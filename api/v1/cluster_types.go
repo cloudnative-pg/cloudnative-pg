@@ -209,6 +209,13 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Enum:=unsupervised;supervised
 	PrimaryUpdateStrategy PrimaryUpdateStrategy `json:"primaryUpdateStrategy,omitempty"`
 
+	// Method to follow to upgrade the primary server during a rolling
+	// update procedure, after all replicas have been successfully updated:
+	// it can be with a switchover (`switchover` - default) or in-place (`restart`)
+	// +kubebuilder:default:=switchover
+	// +kubebuilder:validation:Enum:=switchover;restart
+	PrimaryUpdateMethod PrimaryUpdateMethod `json:"primaryUpdateMethod,omitempty"`
+
 	// The configuration to be used for backups
 	Backup *BackupConfiguration `json:"backup,omitempty"`
 
@@ -245,6 +252,9 @@ const (
 
 	// PhaseWaitingForUser set the status to wait for an action from the user
 	PhaseWaitingForUser = "Waiting for user action"
+
+	// PhaseInplacePrimaryRestart for a cluster restarting the primary instance in-place
+	PhaseInplacePrimaryRestart = "Primary instance is being restarted in-place"
 
 	// PhaseHealthy for a cluster doing nothing
 	PhaseHealthy = "Cluster in healthy state"
@@ -462,16 +472,28 @@ type NodeMaintenanceWindow struct {
 // the primary server of the cluster as part of rolling updates
 type PrimaryUpdateStrategy string
 
+// PrimaryUpdateMethod contains the method to use when upgrading
+// the primary server of the cluster as part of rolling updates
+type PrimaryUpdateMethod string
+
 const (
 	// PrimaryUpdateStrategySupervised means that the operator need to wait for the
 	// user to manually issue a switchover request before updating the primary
 	// server (`supervised`)
-	PrimaryUpdateStrategySupervised = "supervised"
+	PrimaryUpdateStrategySupervised PrimaryUpdateStrategy = "supervised"
 
-	// PrimaryUpdateStrategyUnsupervised means that the operator will switchover
-	// to another updated replica and then automatically update the primary server
-	// (`unsupervised`, default)
-	PrimaryUpdateStrategyUnsupervised = "unsupervised"
+	// PrimaryUpdateStrategyUnsupervised means that the operator will proceed with the
+	// selected PrimaryUpdateMethod to another updated replica and then automatically update
+	// the primary server (`unsupervised`, default)
+	PrimaryUpdateStrategyUnsupervised PrimaryUpdateStrategy = "unsupervised"
+
+	// PrimaryUpdateMethodSwitchover means that the operator will switchover to another updated
+	// replica when it needs to upgrade the primary instance
+	PrimaryUpdateMethodSwitchover PrimaryUpdateMethod = "switchover"
+
+	// PrimaryUpdateMethodRestart means that the operator will restart the primary instance in-place
+	// when it needs to upgrade it
+	PrimaryUpdateMethodRestart PrimaryUpdateMethod = "restart"
 
 	// DefaultPgCtlTimeoutForPromotion is the default for the pg_ctl timeout when a promotion is performed.
 	// It is greater than one year in seconds, big enough to simulate an infinite timeout
@@ -1285,11 +1307,22 @@ func (cluster *Cluster) GetMaxSwitchoverDelay() int32 {
 }
 
 // GetPrimaryUpdateStrategy get the cluster primary update strategy,
-// defaulting to switchover
+// defaulting to unsupervised
 func (cluster *Cluster) GetPrimaryUpdateStrategy() PrimaryUpdateStrategy {
 	strategy := cluster.Spec.PrimaryUpdateStrategy
 	if strategy == "" {
 		return PrimaryUpdateStrategyUnsupervised
+	}
+
+	return strategy
+}
+
+// GetPrimaryUpdateMethod get the cluster primary update method,
+// defaulting to switchover
+func (cluster *Cluster) GetPrimaryUpdateMethod() PrimaryUpdateMethod {
+	strategy := cluster.Spec.PrimaryUpdateMethod
+	if strategy == "" {
+		return PrimaryUpdateMethodSwitchover
 	}
 
 	return strategy

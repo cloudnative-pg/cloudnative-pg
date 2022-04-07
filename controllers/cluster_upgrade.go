@@ -17,6 +17,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
@@ -32,7 +33,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	podList *postgres.PostgresqlStatusList,
-	conditionFunc func(postgres.PostgresqlStatus, *apiv1.Cluster) (bool, string),
+	conditionFunc func(postgres.PostgresqlStatus, *apiv1.Cluster) (bool, bool, string),
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -50,7 +51,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 			continue
 		}
 
-		shouldRestart, reason := conditionFunc(postgresqlStatus, cluster)
+		shouldRestart, _, reason := conditionFunc(postgresqlStatus, cluster)
 		if !shouldRestart {
 			continue
 		}
@@ -70,21 +71,33 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		return false, fmt.Errorf("expected 1 primary PostgreSQL but none found")
 	}
 
-	shouldRestart, reason := conditionFunc(*primaryPostgresqlStatus, cluster)
+	shouldRestart, inPlacePossible, reason := conditionFunc(*primaryPostgresqlStatus, cluster)
 	if !shouldRestart {
 		return false, nil
 	}
 
 	// we need to check whether a manual switchover is required
+	primaryPod := primaryPostgresqlStatus.Pod
 	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
 		contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
-			"reason", reason, "primaryPod", primaryPostgresqlStatus.Pod.Name)
+			"reason", reason, "primaryPod", primaryPod.Name)
 		err := r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser, "User must issue a supervised switchover")
 		if err != nil {
 			return false, err
 		}
 
 		return true, nil
+	}
+
+	// if restart has been selected as primary update method we will trigger an in-place update
+	if inPlacePossible && cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart {
+		if err := r.updateRestartAnnotation(ctx, cluster, primaryPod); err != nil {
+			return false, err
+		}
+		contextLogger.Info("Restarting primary instance in-place",
+			"reason", reason, "primaryPod", primaryPod.Name)
+		err := r.RegisterPhase(ctx, cluster, apiv1.PhaseInplacePrimaryRestart, reason)
+		return err == nil, err
 	}
 
 	// if the cluster has more than one instance, we should trigger a switchover before upgrading
@@ -98,29 +111,50 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		// If this is a replica cluster, the target primary we chose may be
 		// the one we're trying to upgrade, as the list isn't sorted. In
 		// this case, we promote the first instance of the list
-		if targetPrimary == primaryPostgresqlStatus.Pod.Name {
+		if targetPrimary == primaryPod.Name {
 			targetPrimary = podList.Items[0].Pod.Name
 		}
 
 		contextLogger.Info("The primary needs to be restarted, we'll trigger a switchover to do that",
 			"reason", reason,
-			"currentPrimary", primaryPostgresqlStatus.Pod.Name,
+			"currentPrimary", primaryPod.Name,
 			"targetPrimary", targetPrimary,
 			"podList", podList)
 		r.Recorder.Eventf(cluster, "Normal", "Switchover",
-			"Initiating switchover to %s to upgrade %s", targetPrimary, primaryPostgresqlStatus.Pod.Name)
+			"Initiating switchover to %s to upgrade %s", targetPrimary, primaryPod.Name)
 		return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)
 	}
 
 	// if there is only one instance in the cluster, we should upgrade it even if it's a primary
 	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseUpgrade,
 		fmt.Sprintf("The primary instance needs to be restarted: %s, reason: %s",
-			primaryPostgresqlStatus.Pod.Name, reason),
+			primaryPod.Name, reason),
 	); err != nil {
-		return false, fmt.Errorf("postgresqlStatus pod name: %s, %w", primaryPostgresqlStatus.Pod.Name, err)
+		return false, fmt.Errorf("postgresqlStatus for pod %s: %w", primaryPod.Name, err)
 	}
 
-	return true, r.upgradePod(ctx, cluster, &primaryPostgresqlStatus.Pod)
+	return true, r.upgradePod(ctx, cluster, &primaryPod)
+}
+
+func (r *ClusterReconciler) updateRestartAnnotation(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	primaryPod v1.Pod,
+) error {
+	contextLogger := log.FromContext(ctx)
+	if clusterRestart, ok := cluster.Annotations[specs.ClusterRestartAnnotationName]; ok &&
+		(primaryPod.Annotations == nil || primaryPod.Annotations[specs.ClusterRestartAnnotationName] != clusterRestart) {
+		contextLogger.Info("Setting restart annotation on primary pod as needed", "label", specs.ClusterReloadAnnotationName)
+		original := primaryPod.DeepCopy()
+		if primaryPod.Annotations == nil {
+			primaryPod.Annotations = make(map[string]string)
+		}
+		primaryPod.Annotations[specs.ClusterRestartAnnotationName] = clusterRestart
+		if err := r.Client.Patch(ctx, &primaryPod, client.MergeFrom(original)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // IsPodNeedingRollout checks if a given cluster instance needs a rollout by comparing its actual state
@@ -136,24 +170,30 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 //
 // - a boolean indicating if a rollout is needed.
 //
+// - a boolean indicating if an in-place restart is possible
+//
 // - a string indicating the reason of the rollout.
-func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluster) (bool, string) {
+func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluster) (
+	needsRollout bool,
+	inPlacePossible bool,
+	reason string,
+) {
 	if !status.IsReady {
-		return false, ""
+		return false, false, ""
 	}
 
 	// check if the pod is reporting his instance manager version
 	if status.ExecutableHash == "" {
 		// This is an old instance manager.
 		// We need to replace it with one supporting the online operator upgrade feature
-		return true, ""
+		return true, false, ""
 	}
 
 	if configuration.Current.EnableAzurePVCUpdates {
 		for _, pvc := range cluster.Status.ResizingPVC {
 			// This code works on the assumption that the PVC have the same name as the pod using it.
 			if status.Pod.Name == pvc {
-				return true, fmt.Sprintf("rebooting pod to complete resizing %s", pvc)
+				return true, false, fmt.Sprintf("rebooting pod to complete resizing %s", pvc)
 			}
 		}
 	}
@@ -162,10 +202,10 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	oldImage, newImage, err := isPodNeedingUpgradedImage(cluster, status.Pod)
 	if err != nil {
 		log.Error(err, "while checking if image could be upgraded")
-		return false, ""
+		return false, false, ""
 	}
 	if newImage != "" {
-		return true, fmt.Sprintf("the instance is using an old image: %s -> %s",
+		return true, false, fmt.Sprintf("the instance is using an old image: %s -> %s",
 			oldImage, newImage)
 	}
 
@@ -173,11 +213,11 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 		oldImage, newImage, err = isPodNeedingUpgradedInitContainerImage(status.Pod)
 		if err != nil {
 			log.Error(err, "while checking if init container image could be upgraded")
-			return false, ""
+			return false, false, ""
 		}
 
 		if newImage != "" {
-			return true, fmt.Sprintf("the instance is using an old init container image: %s -> %s",
+			return true, false, fmt.Sprintf("the instance is using an old init container image: %s -> %s",
 				oldImage, newImage)
 		}
 	}
@@ -191,7 +231,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 
 		// Check if there is a change in the resource requirements
 		if !utils.IsResourceSubset(container.Resources, cluster.Spec.Resources) {
-			return true, fmt.Sprintf("resources changed, old: %+v, new: %+v",
+			return true, false, fmt.Sprintf("resources changed, old: %+v, new: %+v",
 				cluster.Spec.Resources,
 				container.Resources)
 		}
@@ -199,7 +239,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 
 	// check if pod needs to be restarted because of some config requiring it
 	return isPodNeedingRestart(cluster, status),
-		"configuration needs a restart to apply some configuration changes"
+		true, "configuration needs a restart to apply some configuration changes"
 }
 
 // isPodNeedingUpgradedImage checks whether an image in a pod has to be changed

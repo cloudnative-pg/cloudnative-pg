@@ -198,6 +198,7 @@ PoolerStatus
 PoolerType
 Postgres
 PostgresConfiguration
+PrimaryUpdateMethod
 PrimaryUpdateStrategy
 PullPolicy
 Quaresima

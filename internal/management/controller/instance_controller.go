@@ -54,7 +54,12 @@ var RetryUntilWalReceiverDown = wait.Backoff{
 }
 
 // Reconcile is the main reconciliation loop for the instance
-func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+// TODO this function needs to be refactor
+//nolint:gocognit
+func (r *InstanceReconciler) Reconcile(
+	ctx context.Context,
+	request reconcile.Request,
+) (reconcile.Result, error) {
 	// set up a convenient contextLog object so we don't have to type request over and over again
 	contextLogger, ctx := log.SetupLogger(ctx)
 
@@ -151,21 +156,25 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Re
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
+	restartedInplace, err := r.restartPrimaryInplaceIfRequested(ctx, cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	restarted = restarted || restartedInplace
+
 	// from now on the database can be assumed as running
 
 	if reloadNeeded && !restarted {
 		contextLogger.Info("reloading the instance")
-		err = r.instance.Reload()
-		if err != nil {
+		if err = r.instance.Reload(); err != nil {
 			return reconcile.Result{}, fmt.Errorf("while reloading the instance: %w", err)
 		}
-		if err := r.waitForConfigurationReload(ctx, cluster); err != nil {
+		if err = r.waitForConfigurationReload(ctx, cluster); err != nil {
 			return reconcile.Result{}, fmt.Errorf("cannot apply new PostgreSQL configuration: %w", err)
 		}
 	}
 
-	err = r.refreshCredentialsFromSecret(ctx, cluster)
-	if err != nil {
+	if err = r.refreshCredentialsFromSecret(ctx, cluster); err != nil {
 		return reconcile.Result{}, fmt.Errorf("while updating database owner password: %w", err)
 	}
 
@@ -174,6 +183,26 @@ func (r *InstanceReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (bool, error) {
+	isPrimary, err := r.instance.IsPrimary()
+	if err != nil {
+		return false, err
+	}
+	if isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart {
+		if err := r.instance.RequestAndWaitRestartSmartFast(); err != nil {
+			return true, err
+		}
+		oldCluster := cluster.DeepCopy()
+		cluster.Status.Phase = apiv1.PhaseHealthy
+		cluster.Status.PhaseReason = "Primary instance restarted in-place"
+		return true, r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
+	}
+	return false, nil
 }
 
 func (r *InstanceReconciler) reconcileFencing(cluster *apiv1.Cluster) *reconcile.Result {
@@ -747,15 +776,25 @@ func (r *InstanceReconciler) waitForConfigurationReload(ctx context.Context, clu
 	// if there is a pending restart, the instance is a primary and
 	// the restart is due to a decrease of sensible parameters,
 	// we will need to restart the primary instance in place
+	phase := apiv1.PhaseApplyingConfiguration
+	phaseReason := "PostgreSQL configuration changed"
 	if status.IsPrimary && status.PendingRestartForDecrease {
-		contextLogger.Info("Restarting primary inplace due to hot standby sensible parameters decrease")
-		if err := r.Instance().RequestAndWaitRestartSmartFast(); err != nil {
-			return err
+		if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategyUnsupervised {
+			contextLogger.Info("Restarting primary in-place due to hot standby sensible parameters decrease")
+			if err := r.Instance().RequestAndWaitRestartSmartFast(); err != nil {
+				return err
+			}
 		}
+		reason := "decrease of hot standby sensitive parameters"
+		contextLogger.Info("Waiting for the user to request a restart of the primary instance or a switchover "+
+			"to complete the rolling update",
+			"cluster", cluster.Name, "primaryPod", status.Pod.Name, "reason", reason)
+		phase = apiv1.PhaseWaitingForUser
+		phaseReason = "User must issue a supervised switchover"
 	}
-
-	if cluster.Status.Phase == apiv1.PhaseApplyingConfiguration ||
-		(status.IsPrimary && cluster.Spec.Instances > 1) {
+	if phase == apiv1.PhaseApplyingConfiguration &&
+		(cluster.Status.Phase == apiv1.PhaseApplyingConfiguration ||
+			(status.IsPrimary && cluster.Spec.Instances > 1)) {
 		// I'm not the first instance spotting the configuration
 		// change, everything is fine and there is no need to signal
 		// the operator again.
@@ -766,8 +805,8 @@ func (r *InstanceReconciler) waitForConfigurationReload(ctx context.Context, clu
 	}
 
 	oldCluster := cluster.DeepCopy()
-	cluster.Status.Phase = apiv1.PhaseApplyingConfiguration
-	cluster.Status.PhaseReason = "PostgreSQL configuration changed"
+	cluster.Status.Phase = phase
+	cluster.Status.PhaseReason = phaseReason
 	return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 }
 
