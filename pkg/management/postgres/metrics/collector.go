@@ -205,8 +205,8 @@ func (q QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
 		return nil, fmt.Errorf("while creating monitoring tx to retrieve accessible databases list: %w", err)
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Error(err, "Error while rolling back monitoring tx to retrieve accessible databases list")
+		if err := tx.Commit(); err != nil {
+			log.Error(err, "Error while committing monitoring tx to retrieve accessible databases list")
 		}
 	}()
 	databases, errors := postgres.GetAllAccessibleDatabases(tx, "datallowconn AND NOT datistemplate")
@@ -314,8 +314,8 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 	}
 
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Error(err, "Error while rolling back metrics extraction")
+		if err := tx.Commit(); err != nil {
+			log.Error(err, "Error while committing metrics extraction")
 		}
 	}()
 
@@ -437,6 +437,12 @@ func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
 
 	_, err = tx.Exec("SET application_name TO cnp_metrics_exporter")
 	if err != nil {

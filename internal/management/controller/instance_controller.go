@@ -378,7 +378,7 @@ func (r *InstanceReconciler) getAllAccessibleDatabases(
 	}
 
 	defer func() {
-		if err := tx.Rollback(); err != nil {
+		if err := tx.Commit(); err != nil {
 			errors = append(errors, err)
 		}
 	}()
@@ -496,10 +496,7 @@ func (r *InstanceReconciler) reconcilePoolers(
 		}
 	}
 
-	if !existsRole || !existsFunction {
-		return tx.Commit()
-	}
-	return nil
+	return tx.Commit()
 }
 
 // reconcileClusterRoleWithoutDB updates this instance's configuration files
