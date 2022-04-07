@@ -8,10 +8,12 @@
 )
 and
 (
-    # are any of them failing without the ignore-fails flag?
+    # are any of the specs failing without the ignore-fails flag?
+    # note that failing states, as of ginkgo2, include: panicked, aborted, interrupted
+    # better to flag anything that is not `passed` or `skipped`
     [
         .[].SpecReports[]
-        | select(.State == "failed")
+        | select(.State != "passed" and .State != "skipped")
         | select(.ContainerHierarchyLabels
             | flatten
             | any(. == "ignore-fails") 
