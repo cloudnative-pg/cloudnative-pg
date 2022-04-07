@@ -7,6 +7,7 @@ Copyright (C) 2019-2022 EnterpriseDB Corporation.
 package e2e
 
 import (
+	"fmt"
 	"os"
 
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -482,7 +483,9 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 		azuriteBlobSampleFile           = fixturesDir + "/backup/azurite/cluster-backup.yaml"
 		externalClusterFileMinio        = fixturesBackupDir + "external-clusters-minio-03.yaml"
 		externalClusterFileMinioReplica = fixturesBackupDir + "external-clusters-minio-replica-04.yaml"
-		sourceBackupFileMinio           = fixturesBackupDir + "backup-minio-02.yaml"
+		sourceTakeFirstBackupFileMinio  = fixturesBackupDir + "backup-minio-02.yaml"
+		sourceTakeSecondBackupFileMinio = fixturesBackupDir + "backup-minio-03.yaml"
+		sourceTakeThirdBackupFileMinio  = fixturesBackupDir + "backup-minio-04.yaml"
 		clusterSourceFileMinio          = fixturesBackupDir + "source-cluster-minio-01.yaml"
 		sourceBackupFileAzure           = fixturesBackupDir + "backup-azure-blob-02.yaml"
 		clusterSourceFileAzure          = fixturesBackupDir + "source-cluster-azure-blob-01.yaml"
@@ -602,7 +605,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
-				testUtils.ExecuteBackup(namespace, sourceBackupFileMinio, env)
+				testUtils.ExecuteBackup(namespace, sourceTakeFirstBackupFileMinio, env)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
@@ -629,15 +632,34 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
 			" option in 'externalClusters' section", func() {
 			externalClusterRestoreName := "restore-external-cluster-pitr"
+			// We have already written 2 rows in test table 'to_restore' in above test now we will take current
+			// timestamp. It will use to restore cluster from source using PITR
 
-			prepareClusterForPITROnMinio(namespace, clusterName, sourceBackupFileMinio, 1, currentTimestamp)
-
-			err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnMinio(
-				namespace, externalClusterRestoreName, clusterName, *currentTimestamp, env)
-
-			Expect(err).NotTo(HaveOccurred())
+			By("getting currentTimestamp", func() {
+				ts, err := testUtils.GetCurrentTimestamp(namespace, clusterName, env)
+				*currentTimestamp = ts
+				Expect(err).ToNot(HaveOccurred())
+			})
+			By(fmt.Sprintf("writing 2 more entries in table '%v'", tableName), func() {
+				// insert 2 more rows entries 3,4 on the "app" database
+				insertRecordIntoTable(namespace, clusterName, tableName, 3)
+				insertRecordIntoTable(namespace, clusterName, tableName, 4)
+			})
+			By("creating second backup and verifying it exists on minio", func() {
+				testUtils.ExecuteBackup(namespace, sourceTakeSecondBackupFileMinio, env)
+				AssertBackupConditionInClusterStatus(namespace, clusterName)
+				Eventually(func() (int, error) {
+					return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
+				}, 30).Should(BeEquivalentTo(2))
+			})
+			By("create a cluster from backup with PITR", func() {
+				err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnMinio(
+					namespace, externalClusterRestoreName, clusterName, *currentTimestamp, env)
+				Expect(err).NotTo(HaveOccurred())
+			})
 			AssertClusterRestorePITR(namespace, externalClusterRestoreName, tableName, "00000002")
 		})
+
 		It("restore cluster from barman object using replica option in spec", func() {
 			// Write a table and some data on the "app" database
 			AssertCreateTestData(namespace, clusterName, "for_restore_repl")
@@ -646,11 +668,11 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
-				testUtils.ExecuteBackup(namespace, sourceBackupFileMinio, env)
+				testUtils.ExecuteBackup(namespace, sourceTakeThirdBackupFileMinio, env)
 				AssertBackupConditionInClusterStatus(namespace, clusterName)
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
-				}, 30).Should(BeEquivalentTo(1))
+				}, 30).Should(BeEquivalentTo(3))
 			})
 
 			// Replicating a cluster with asynchronous replication
