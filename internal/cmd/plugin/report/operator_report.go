@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package report implements the kubectl-cnp report command
+// Package report implements the kubectl-cnpg report command
 package report
 
 import (
@@ -23,9 +23,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/report/deployments"
-
 	v12 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +30,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/report/deployments"
 )
 
 // operatorReport contains the data to be printed by the `report operator` plugin
@@ -118,9 +118,9 @@ func Operator(ctx context.Context, format plugin.OutputFormat,
 	// may have overridden the defaults.
 	// Currently we're getting the defaults only
 	defaultSecrets := []string{
-		"postgresql-operator-ca-secret",
-		"postgresql-operator-webhook-cert",
-		"postgresql-operator-controller-manager-config",
+		"cnpg-ca-secret",
+		"cnpg-webhook-cert",
+		"cnpg-controller-manager-config",
 	}
 	secrets := make([]namedObject, 0, len(defaultSecrets))
 	for _, ss := range defaultSecrets {
@@ -137,7 +137,7 @@ func Operator(ctx context.Context, format plugin.OutputFormat,
 		secrets = append(secrets, namedObject{Name: ss, Object: secretRedactor(secret)})
 	}
 
-	configMaps := []string{"postgresql-operator-controller-manager-config"}
+	configMaps := []string{"cnpg-controller-manager-config"}
 	configs := make([]namedObject, 0, len(configMaps))
 	for _, cm := range configMaps {
 		var config corev1.ConfigMap

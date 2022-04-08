@@ -25,11 +25,11 @@ import (
 	"sync"
 	"time"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/spool"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/spool"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 const (

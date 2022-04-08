@@ -33,17 +33,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/run/lifecycle"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/controller"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/concurrency"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/logpipe"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver/metricserver"
-	pg "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
+	pg "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 var scheme = runtime.NewScheme()
@@ -92,7 +92,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	var err error
 	setupLog := log.WithName("setup")
 
-	setupLog.Info("Starting Cloud Native PostgreSQL Instance Manager",
+	setupLog.Info("Starting CloudNativePG Instance Manager",
 		"version", versions.Version,
 		"build", versions.Info)
 

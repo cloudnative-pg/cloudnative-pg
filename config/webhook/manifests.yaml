@@ -12,12 +12,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-postgresql-k8s-enterprisedb-io-v1-backup
+      path: /mutate-postgresql-cnpg-io-v1-backup
   failurePolicy: Fail
   name: mbackup.kb.io
   rules:
   - apiGroups:
-    - postgresql.k8s.enterprisedb.io
+    - postgresql.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -32,12 +32,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-postgresql-k8s-enterprisedb-io-v1-cluster
+      path: /mutate-postgresql-cnpg-io-v1-cluster
   failurePolicy: Fail
   name: mcluster.kb.io
   rules:
   - apiGroups:
-    - postgresql.k8s.enterprisedb.io
+    - postgresql.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -52,12 +52,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-postgresql-k8s-enterprisedb-io-v1-scheduledbackup
+      path: /mutate-postgresql-cnpg-io-v1-scheduledbackup
   failurePolicy: Fail
   name: mscheduledbackup.kb.io
   rules:
   - apiGroups:
-    - postgresql.k8s.enterprisedb.io
+    - postgresql.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -80,12 +80,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-postgresql-k8s-enterprisedb-io-v1-backup
+      path: /validate-postgresql-cnpg-io-v1-backup
   failurePolicy: Fail
   name: vbackup.kb.io
   rules:
   - apiGroups:
-    - postgresql.k8s.enterprisedb.io
+    - postgresql.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -100,12 +100,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-postgresql-k8s-enterprisedb-io-v1-cluster
+      path: /validate-postgresql-cnpg-io-v1-cluster
   failurePolicy: Fail
   name: vcluster.kb.io
   rules:
   - apiGroups:
-    - postgresql.k8s.enterprisedb.io
+    - postgresql.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -120,12 +120,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-postgresql-k8s-enterprisedb-io-v1-pooler
+      path: /validate-postgresql-cnpg-io-v1-pooler
   failurePolicy: Fail
   name: vpooler.kb.io
   rules:
   - apiGroups:
-    - postgresql.k8s.enterprisedb.io
+    - postgresql.cnpg.io
     apiVersions:
     - v1
     operations:
@@ -140,12 +140,12 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-postgresql-k8s-enterprisedb-io-v1-scheduledbackup
+      path: /validate-postgresql-cnpg-io-v1-scheduledbackup
   failurePolicy: Fail
   name: vscheduledbackup.kb.io
   rules:
   - apiGroups:
-    - postgresql.k8s.enterprisedb.io
+    - postgresql.cnpg.io
     apiVersions:
     - v1
     operations:

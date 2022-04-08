@@ -22,8 +22,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,7 +36,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive)
 		clusterWithInheritedLabelsFile = fixturesDir + "/configmap-support/config-support.yaml"
 		configMapFile                  = fixturesDir + "/configmap-support/configmap.yaml"
 		secretFile                     = fixturesDir + "/configmap-support/secret.yaml"
-		configName                     = "postgresql-operator-controller-manager-config"
+		configName                     = "cnpg-controller-manager-config"
 		clusterName                    = "configmap-support"
 		namespace                      = "configmap-support-e2e"
 		level                          = tests.Low

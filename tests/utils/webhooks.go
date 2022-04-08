@@ -27,12 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
 )
 
-// GetCNPsMutatingWebhookByName get the MutatingWebhook filtered by the name of one
+// GetCNPGsMutatingWebhookByName get the MutatingWebhook filtered by the name of one
 // of the webhooks
-func GetCNPsMutatingWebhookByName(env *TestingEnvironment, name string) (
+func GetCNPGsMutatingWebhookByName(env *TestingEnvironment, name string) (
 	*admissionregistrationv1.MutatingWebhookConfiguration, int, error,
 ) {
 	var mWebhooks admissionregistrationv1.MutatingWebhookConfigurationList
@@ -51,8 +51,8 @@ func GetCNPsMutatingWebhookByName(env *TestingEnvironment, name string) (
 	return nil, 0, fmt.Errorf("mutating webhook not found")
 }
 
-// UpdateCNPsMutatingWebhookConf update MutatingWebhookConfiguration object
-func UpdateCNPsMutatingWebhookConf(env *TestingEnvironment,
+// UpdateCNPGsMutatingWebhookConf update MutatingWebhookConfiguration object
+func UpdateCNPGsMutatingWebhookConf(env *TestingEnvironment,
 	wh *admissionregistrationv1.MutatingWebhookConfiguration,
 ) error {
 	ctx := context.Background()
@@ -64,8 +64,8 @@ func UpdateCNPsMutatingWebhookConf(env *TestingEnvironment,
 	return nil
 }
 
-// GetCNPsValidatingWebhookConf get the ValidatingWebhook linked to the operator
-func GetCNPsValidatingWebhookConf(env *TestingEnvironment) (
+// GetCNPGsValidatingWebhookConf get the ValidatingWebhook linked to the operator
+func GetCNPGsValidatingWebhookConf(env *TestingEnvironment) (
 	*admissionregistrationv1.ValidatingWebhookConfiguration, error,
 ) {
 	ctx := context.Background()
@@ -77,9 +77,9 @@ func GetCNPsValidatingWebhookConf(env *TestingEnvironment) (
 	return validatingWebhookConfig, nil
 }
 
-// GetCNPsValidatingWebhookByName get ValidatingWebhook by the name of one
+// GetCNPGsValidatingWebhookByName get ValidatingWebhook by the name of one
 // of the webhooks
-func GetCNPsValidatingWebhookByName(env *TestingEnvironment, name string) (
+func GetCNPGsValidatingWebhookByName(env *TestingEnvironment, name string) (
 	*admissionregistrationv1.ValidatingWebhookConfiguration, int, error,
 ) {
 	var vWebhooks admissionregistrationv1.ValidatingWebhookConfigurationList
@@ -98,8 +98,8 @@ func GetCNPsValidatingWebhookByName(env *TestingEnvironment, name string) (
 	return nil, 0, fmt.Errorf("validating webhook not found")
 }
 
-// UpdateCNPsValidatingWebhookConf update the ValidatingWebhook object
-func UpdateCNPsValidatingWebhookConf(env *TestingEnvironment,
+// UpdateCNPGsValidatingWebhookConf update the ValidatingWebhook object
+func UpdateCNPGsValidatingWebhookConf(env *TestingEnvironment,
 	wh *admissionregistrationv1.ValidatingWebhookConfiguration,
 ) error {
 	ctx := context.Background()
@@ -126,7 +126,7 @@ func CheckWebhookReady(env *TestingEnvironment, namespace string) error {
 
 	ca := secret.Data["tls.crt"]
 
-	mutatingWebhookConfig, err := env.GetCNPsMutatingWebhookConf()
+	mutatingWebhookConfig, err := env.GetCNPGsMutatingWebhookConf()
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func CheckWebhookReady(env *TestingEnvironment, namespace string) error {
 		}
 	}
 
-	validatingWebhookConfig, err := GetCNPsValidatingWebhookConf(env)
+	validatingWebhookConfig, err := GetCNPGsValidatingWebhookConf(env)
 	if err != nil {
 		return err
 	}
@@ -151,9 +151,9 @@ func CheckWebhookReady(env *TestingEnvironment, namespace string) error {
 	}
 
 	customResourceDefinitionsName := []string{
-		"backups.postgresql.k8s.enterprisedb.io",
-		"clusters.postgresql.k8s.enterprisedb.io",
-		"scheduledbackups.postgresql.k8s.enterprisedb.io",
+		"backups.postgresql.cnpg.io",
+		"clusters.postgresql.cnpg.io",
+		"scheduledbackups.postgresql.cnpg.io",
 	}
 
 	ctx := context.Background()
@@ -181,8 +181,8 @@ func CheckWebhookReady(env *TestingEnvironment, namespace string) error {
 	return nil
 }
 
-// GetCNPsMutatingWebhookConf get the MutatingWebhook linked to the operator
-func (env TestingEnvironment) GetCNPsMutatingWebhookConf() (
+// GetCNPGsMutatingWebhookConf get the MutatingWebhook linked to the operator
+func (env TestingEnvironment) GetCNPGsMutatingWebhookConf() (
 	*admissionregistrationv1.MutatingWebhookConfiguration, error,
 ) {
 	ctx := context.Background()

@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
 )
 
 // GetLeaderInfoFromConfigMap gathers leader holderIdentity annotation the operator configMap

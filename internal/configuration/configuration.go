@@ -22,15 +22,15 @@ import (
 	"path"
 	"strings"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configparser"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configparser"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 var configurationLog = log.WithName("configuration")
 
 // DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
-const DefaultOperatorPullSecretName = "postgresql-operator-pull-secret" // #nosec
+const DefaultOperatorPullSecretName = "cnpg-pull-secret" // #nosec
 
 // Data is the struct containing the configuration of the operator.
 // Usually the operator code will use the "Current" configuration.
@@ -98,7 +98,7 @@ func newDefaultConfig() *Data {
 	}
 }
 
-// NewConfiguration create a new CNP configuration by reading
+// NewConfiguration create a new CNPG configuration by reading
 // the environment variables
 func NewConfiguration() *Data {
 	configuration := newDefaultConfig()

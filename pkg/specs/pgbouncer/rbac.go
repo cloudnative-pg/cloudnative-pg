@@ -21,8 +21,8 @@ import (
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 // ServiceAccount creates a service account for a given pooler
@@ -54,7 +54,7 @@ func Role(pooler *apiv1.Pooler) *v1.Role {
 	}, Rules: []v1.PolicyRule{
 		{
 			APIGroups: []string{
-				"postgresql.k8s.enterprisedb.io",
+				"postgresql.cnpg.io",
 			},
 			Resources: []string{
 				"poolers",
@@ -69,7 +69,7 @@ func Role(pooler *apiv1.Pooler) *v1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.k8s.enterprisedb.io",
+				"postgresql.cnpg.io",
 			},
 			Resources: []string{
 				"poolers/status",

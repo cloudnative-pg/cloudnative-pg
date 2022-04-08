@@ -19,7 +19,7 @@ package utils
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	config "github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 // CollectDifferencesFromMaps returns a map of the differences (as slice of strings) of the values of two given maps.

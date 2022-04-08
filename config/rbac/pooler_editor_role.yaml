@@ -5,7 +5,7 @@ metadata:
   name: pooler-editor-role
 rules:
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - poolers
   verbs:
@@ -17,7 +17,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - poolers/status
   verbs:

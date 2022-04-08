@@ -1,4 +1,4 @@
-module github.com/EnterpriseDB/cloud-native-postgresql
+module github.com/cloudnative-pg/cloudnative-pg
 
 go 1.17
 

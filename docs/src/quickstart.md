@@ -1,38 +1,28 @@
 # Quickstart
 
 This section describes how to test a PostgreSQL cluster on your laptop/computer
-using Cloud Native PostgreSQL on a local Kubernetes cluster in
-[Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/) or
-[Kind](https://kind.sigs.k8s.io/).
-
-Red Hat OpenShift Container Platform users can test the certified operator for
-Cloud Native PostgreSQL on the [Red Hat CodeReady Containers (CRC)](https://developers.redhat.com/products/codeready-containers/overview)
-for OpenShift.
+using CloudNativePG on a local Kubernetes cluster in [Kind](https://kind.sigs.k8s.io/) or
+[Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/).
 
 !!! Warning
     The instructions contained in this section are for demonstration,
     testing, and practice purposes only and must not be used in production.
 
-Like any other Kubernetes application, Cloud Native PostgreSQL is deployed using
+Like any other Kubernetes application, CloudNativePG is deployed using
 regular manifests written in YAML.
 
 By following the instructions on this page you should be able to start a PostgreSQL
-cluster on your local Kubernetes/Openshift installation and experiment with it.
+cluster on your local Kubernetes installation and experiment with it.
 
 !!! Important
     Make sure that you have `kubectl` installed on your machine in order
-    to connect to the Kubernetes cluster, or `oc` if using CRC for OpenShift.
-    Please follow the Kubernetes documentation on [how to install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-    or the Openshift one on [how to install `oc`](https://docs.openshift.com/container-platform/4.6/cli_reference/openshift_cli/getting-started-cli.html).
+    to connect to the Kubernetes cluster. Please follow the Kubernetes documentation
+    on [how to install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
 
 
-!!! Note
-    If you are running Openshift, use `oc` every time `kubectl` is mentioned
-    in this documentation. `kubectl` commands are compatible with `oc` ones.
+## Part 1 - Setup the local Kubernetes playground
 
-## Part 1 - Setup the local Kubernetes/Openshift playground
-
-The first part is about installing Minikube, Kind, or CRC. Please spend some time
+The first part is about installing Minikube or Kind. Please spend some time
 reading about the systems and decide which one to proceed with.
 After setting up one of them, please proceed with part 2.
 
@@ -72,31 +62,10 @@ then create a Kubernetes cluster with:
 kind create cluster --name pg
 ```
 
-### CodeReady Containers (CRC)
+## Part 2 - Install CloudNativePG
 
-[Download Red Hat CRC](https://developers.redhat.com/products/codeready-containers/overview)
-and move the binary inside a directory in your `PATH`.
-
-You can then run the following commands:
-```
-crc setup
-crc start
-```
-
-The `crc start` output will explain how to proceed. You'll then need to
-execute the output of the `crc oc-env` command.
-After that, you can log in as `kubeadmin` with the printed `oc login`
-command. You can also open the web console running `crc console`.
-User and password are the same as for the `oc login` command.
-
-CRC doesn't come with a StorageClass, so one has to be configured.
-You can follow the [Dynamic volume provisioning wiki page](https://github.com/code-ready/crc/wiki/Dynamic-volume-provisioning)
-and install `rancher/local-path-provisioner`.
-
-## Part 2 - Install Cloud Native PostgreSQL
-
-Now that you have a Kubernetes or OpenShift installation up and running
-on your laptop, you can proceed with Cloud Native PostgreSQL installation.
+Now that you have a Kubernetes installation up and running
+on your laptop, you can proceed with CloudNativePG installation.
 
 Please refer to the ["Installation"](installation_upgrade.md) section and then proceed
 with the deployment of a PostgreSQL cluster.
@@ -112,7 +81,7 @@ disk space:
 
 ```yaml
 # Example of PostgreSQL cluster
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
@@ -150,16 +119,16 @@ kubectl get pods
 By default, the operator will install the latest available minor version
 of the latest major version of PostgreSQL when the operator was released.
 You can override this by setting the `imageName` key in the `spec` section of
-the `Cluster` definition. For example, to install PostgreSQL 12.5:
+the `Cluster` definition. For example, to install PostgreSQL 13.6:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
    # [...]
 spec:
    # [...]
-   imageName: quay.io/enterprisedb/postgresql:12.5
+   imageName: ghcr.io/cloudnative-pg/postgresql:13.6
    #[...]
 ```
 

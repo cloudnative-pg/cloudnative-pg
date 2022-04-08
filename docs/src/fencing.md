@@ -1,6 +1,6 @@
 # Fencing
 
-Fencing in Cloud Native PostgreSQL is the ultimate process of protecting the
+Fencing in CloudNativePG is the ultimate process of protecting the
 data in one, more, or even all instances of a PostgreSQL cluster when they
 appear to be malfunctioning. When an instance is fenced, the PostgreSQL server
 process (`postmaster`) is guaranteed to be shut down, while the pod is kept running.
@@ -10,13 +10,13 @@ troubleshooting purposes.
 
 ## How to fence instances
 
-In Cloud Native PostgreSQL you can fence:
+In CloudNativePG you can fence:
 
 - a specific instance
 - a list of instances
 - an entire Postgres `Cluster`
 
-Fencing is controlled through the content of the `k8s.enterprisedb.io/fencedInstances`
+Fencing is controlled through the content of the `cnpg.io/fencedInstances`
 annotation, which expects a JSON formatted list of instance names.
 If the annotation is set to `'["*"]'`, a singleton list with a wildcard, the
 whole cluster is fenced.
@@ -25,35 +25,35 @@ annotation was not set.
 
 For example:
 
-- `k8s.enterprisedb.io/fencedInstances: '["cluster-example-1"]'` will fence just
+- `cnpg.io/fencedInstances: '["cluster-example-1"]'` will fence just
   the `cluster-example-1` instance
 
-- `k8s.enterprisedb.io/fencedInstances: '["cluster-example-1","cluster-example-2"]'`
+- `cnpg.io/fencedInstances: '["cluster-example-1","cluster-example-2"]'`
   will fence the `cluster-example-1` and `cluster-example-2` instances
 
-- `k8s.enterprisedb.io/fencedInstances: '["*"]'` will fence every instance in
+- `cnpg.io/fencedInstances: '["*"]'` will fence every instance in
   the cluster.
 
 The annotation can be manually set on the Kubernetes object, for example via
 the `kubectl annotate` command, or in a transparent way using the
-`kubectl cnp fencing on` subcommand:
+`kubectl cnpg fencing on` subcommand:
 
 ```shell
 # to fence only one instance
-kubectl cnp fencing on cluster-example 1
+kubectl cnpg fencing on cluster-example 1
 
 # to fence all the instances in a Cluster
-kubectl cnp fencing on cluster-example "*"
+kubectl cnpg fencing on cluster-example "*"
 ```
 
 Here is an example of a `Cluster` with an instance that was previously fenced:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
     annotations:
-      k8s.enterprisedb.io/fencedInstances: '["cluster-example-1"]'
+      cnpg.io/fencedInstances: '["cluster-example-1"]'
 [...]
 ```
 
@@ -62,16 +62,16 @@ metadata:
 Fencing can be lifted by clearing the annotation, or set it to a different value.
 
 As for fencing, this can be done either manually with `kubectl annotate`, or
-using the `kubectl cnp fencing` subcommand as follows:
+using the `kubectl cnpg fencing` subcommand as follows:
 
 ```shell
 # to lift the fencing only for one instance
 # N.B.: at the moment this won't work if the whole cluster was fenced previously,
 #       in that case you will have to manually set the annotation as explained above
-kubectl cnp fencing off cluster-example 1
+kubectl cnpg fencing off cluster-example 1
 
 # to lift the fencing for all the instances in a Cluster
-kubectl cnp fencing off cluster-example "*"
+kubectl cnpg fencing off cluster-example "*"
 ```
 
 ## How fencing works
@@ -90,7 +90,7 @@ required. Then:
     - configuration files
     - certificates and all the cryptographic material
 
-- metrics will not be collected, except `cnp_collector_fencing_on` which will be
+- metrics will not be collected, except `cnpg_collector_fencing_on` which will be
   set to 1
 
 !!! Warning

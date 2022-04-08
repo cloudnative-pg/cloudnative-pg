@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // CreateClientCertificatesViaKubectlPlugin creates a certificate for a given user on a given cluster
@@ -36,7 +36,7 @@ func CreateClientCertificatesViaKubectlPlugin(
 	// user := "app"
 	// Create the certificate
 	_, _, err := Run(fmt.Sprintf(
-		"kubectl cnp certificate %v --cnp-cluster %v --cnp-user %v -n %v",
+		"kubectl cnpg certificate %v --cnpg-cluster %v --cnpg-user %v -n %v",
 		certName,
 		cluster.Name,
 		userName,

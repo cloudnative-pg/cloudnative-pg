@@ -17,23 +17,23 @@
 # Image URL to use all building/pushing image targets
 
 # Prevent e2e tests to proceed with empty tag which
-# will be considered as "latest" (#CNP-289).
+# will be considered as "latest".
 ifeq (,$(CONTROLLER_IMG))
 IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
 ifneq (,${IMAGE_TAG})
-CONTROLLER_IMG = quay.io/enterprisedb/cloud-native-postgresql-testing:${IMAGE_TAG}
+CONTROLLER_IMG = ghcr.io/cloudnative-pg/cloudnative-pg-testing:${IMAGE_TAG}
 endif
 endif
 
 COMMIT := $(shell git rev-parse --short HEAD || echo unknown)
 DATE := $(shell git log -1 --pretty=format:'%ad' --date short)
 VERSION := $(shell git describe --tags --match 'v*' | sed -e 's/^v//; s/-g[0-9a-f]\+$$//; s/-\([0-9]\+\)$$/+dev\1/')
-LDFLAGS= "-X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion=${VERSION} $\
--X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit=${COMMIT} $\
--X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate=${DATE}"
+LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=${VERSION} $\
+-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit=${COMMIT} $\
+-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
 
 BUILD_IMAGE ?= true
-POSTGRES_IMAGE_NAME ?= quay.io/enterprisedb/postgresql:13
+POSTGRES_IMAGE_NAME ?= ghcr.io/cloudnative-pg/postgresql:14
 KUSTOMIZE_VERSION ?= v4.5.2
 KIND_CLUSTER_NAME ?= pg
 KIND_CLUSTER_VERSION ?= v1.23.1
@@ -95,14 +95,14 @@ e2e-test-k3d: ## Run e2e tests locally using k3d.
 ##@ Build
 build: generate fmt vet ## Build binaries.
 	go build -o bin/manager -ldflags ${LDFLAGS} ./cmd/manager
-	go build -o bin/kubectl-cnp -ldflags ${LDFLAGS} ./cmd/kubectl-cnp
+	go build -o bin/kubectl-cnpg -ldflags ${LDFLAGS} ./cmd/kubectl-cnpg
 
 run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config.
 	go run ./cmd/manager
 
 docker-build: go-releaser ## Build the docker image.
 	GOOS=linux GOARCH=amd64 DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
-	  $(GO_RELEASER) build -f .goreleaser-multiarch.yml --skip-validate --rm-dist --single-target
+	  $(GO_RELEASER) build --skip-validate --rm-dist --single-target
 	DOCKER_BUILDKIT=1 docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION}
 
 docker-push: ## Push the docker image.
@@ -171,7 +171,7 @@ checks: generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint 
 licenses: go-licenses ## Generate the licenses folder.
 	# The following statement is expected to fail because our license is unrecognised
 	GOPRIVATE="https://github.com/EnterpriseDB/*" $(GO_LICENSES) \
-		save github.com/EnterpriseDB/cloud-native-postgresql \
+		save github.com/cloudnative-pg/cloudnative-pg \
 		--save_path licenses/go-licenses --force || true
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete

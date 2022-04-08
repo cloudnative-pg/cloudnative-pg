@@ -23,8 +23,8 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,7 +34,7 @@ var _ = Describe("cluster_create unit tests", func() {
 	It("should make sure that reconcilePostgresSecrets works correctly", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		poolerSecretName := pooler.Name
 		cluster.Status.PoolerIntegrations = &apiv1.PoolerIntegrations{
@@ -86,7 +86,7 @@ var _ = Describe("cluster_create unit tests", func() {
 	It("should make sure that createPostgresServices works correctly", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 
 		By("executing createPostgresServices", func() {
 			err := clusterReconciler.createPostgresServices(ctx, cluster)
@@ -104,7 +104,7 @@ var _ = Describe("cluster_create unit tests", func() {
 	It("should make sure that createOrPatchServiceAccount works correctly", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 
 		By("executing createOrPatchServiceAccount (create)", func() {
 			err := clusterReconciler.createOrPatchServiceAccount(ctx, cluster)
@@ -168,7 +168,7 @@ var _ = Describe("cluster_create unit tests", func() {
 	It("should make sure that reconcilePodDisruptionBudget works correctly", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pdbReplicaName := specs.BuildReplicasPodDisruptionBudget(cluster).Name
 		pdbPrimaryName := specs.BuildPrimaryPodDisruptionBudget(cluster).Name
 		reconcilePDB := func() {

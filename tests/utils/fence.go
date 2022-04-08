@@ -19,8 +19,8 @@ package utils
 import (
 	"fmt"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/fence"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // FencingMethod will be one of the supported ways to trigger an instance fencing
@@ -43,7 +43,7 @@ func FencingOn(
 ) error {
 	switch fencingMethod {
 	case UsingPlugin:
-		_, _, err := Run(fmt.Sprintf("kubectl cnp fencing on %v %v -n %v",
+		_, _, err := Run(fmt.Sprintf("kubectl cnpg fencing on %v %v -n %v",
 			clusterName, serverName, namespace))
 		if err != nil {
 			return err
@@ -69,7 +69,7 @@ func FencingOff(
 ) error {
 	switch fencingMethod {
 	case UsingPlugin:
-		_, _, err := Run(fmt.Sprintf("kubectl cnp fencing off %v %v -n %v",
+		_, _, err := Run(fmt.Sprintf("kubectl cnpg fencing off %v %v -n %v",
 			clusterName, serverName, namespace))
 		if err != nil {
 			return err

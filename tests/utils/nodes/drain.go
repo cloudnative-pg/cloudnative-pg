@@ -20,7 +20,7 @@ package nodes
 import (
 	"fmt"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2" //nolint
 	. "github.com/onsi/gomega"    //nolint

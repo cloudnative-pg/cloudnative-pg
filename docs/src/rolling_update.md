@@ -28,7 +28,7 @@ The primary is the last node to be upgraded.
 Rolling updates are configurable and can be either entirely automated
 (`unsupervised`) or requiring human intervention (`supervised`).
 
-The upgrade keeps the Cloud Native PostgreSQL identity, without re-cloning the
+The upgrade keeps the CloudNativePG identity, without re-cloning the
 data. Pods will be deleted and created again with the same PVCs and a new
 image, if required.
 
@@ -80,13 +80,13 @@ restart.
 You can trigger a switchover with:
 
 ```bash
-kubectl cnp promote [cluster] [new_primary]
+kubectl cnpg promote [cluster] [new_primary]
 ```
 
 You can trigger a restart with:
 
 ```bash
-kubectl cnp restart [cluster] [current_primary]
+kubectl cnpg restart [cluster] [current_primary]
 ```
 
-You can find more information in the [`cnp` plugin page](cnp-plugin.md).
+You can find more information in the [`cnpg` plugin page](cnpg-plugin.md).

@@ -31,11 +31,11 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/config"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 )
 
 // PgBouncerReconciler can reconcile the status of the PostgreSQL cluster with

@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var _ = Describe("pooler_controller unit tests", func() {
@@ -39,7 +39,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 		var expectedAuthSecretName string
 
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 
 		By("creating expected poolers", func() {
 			pooler1 := *newFakePooler(cluster)
@@ -57,7 +57,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 		})
 
 		By("creating pooler that should be skipped", func() {
-			cluster := newFakeCNPCluster(namespace)
+			cluster := newFakeCNPGCluster(namespace)
 			pooler := *newFakePooler(cluster)
 			nn := types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace}
 			nonExpectedContent = append(nonExpectedContent, nn)
@@ -86,7 +86,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 
 		ctx := context.Background()
 		namespace1 := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace1)
+		cluster := newFakeCNPGCluster(namespace1)
 
 		By("creating expected poolers", func() {
 			pooler1 := *newFakePooler(cluster)
@@ -125,7 +125,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 
 		By("creating a pooler in a different namespace that should be skipped", func() {
 			namespace2 := newFakeNamespace()
-			cluster2 := newFakeCNPCluster(namespace2)
+			cluster2 := newFakeCNPGCluster(namespace2)
 			pooler := *newFakePooler(cluster2)
 			req := reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -158,7 +158,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 
 	It("should make sure that isOwnedByPooler works correctly", func() {
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := *newFakePooler(cluster)
 
 		By("making sure it returns true when the resource is owned by a pooler", func() {

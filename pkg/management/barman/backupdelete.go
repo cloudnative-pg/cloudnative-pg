@@ -25,10 +25,10 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/catalog"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // DeleteBackupsByPolicy executes a command that deletes backups, given the Barman object store configuration,

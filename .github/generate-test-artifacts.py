@@ -20,6 +20,7 @@ import re
 import os
 import hashlib
 
+
 def flatten(arr):
     """flatten an array of arrays"""
     out = []
@@ -32,6 +33,7 @@ def flatten(arr):
             print(arr)
     return out
 
+
 def convert_ginkgo_test(t, matrix):
     """converts a test spec in ginkgo JSON format into a normalized JSON object.
     The matrix arg will be passed from the GH Actions, and is expected to be
@@ -42,8 +44,8 @@ def convert_ginkgo_test(t, matrix):
         "postgres": , # version of PostgreSQL eg. 13.5
         "kubernetes": , # version of K8s eg. v1.22.2
         "runid": , # the GH Action run-id -> ${{ github.run_id }}
-        "repo": , # EnterpriseDB/cloud-native-postgresql -> you get this from GH with ${{github.repository}}
-        "branch": , # dev/cnp-1666 -> you get this with "${{github.head_ref}}" ... EXCEPT
+        "repo": , # cloudnative-pg/cloudnative-pg -> you get this from GH with ${{github.repository}}
+        "branch": , # dev/cnpg-1666 -> you get this with "${{github.head_ref}}" ... EXCEPT
         "refname": , # depending on how the job was triggered, the above may be blank, and then we want: "${{github.ref_name}}"
     }
     """
@@ -58,7 +60,11 @@ def convert_ginkgo_test(t, matrix):
     state = t["State"]
     # if the test failed but it had an Ignore label, mark it as ignoreFailed
     # so it doesn't count as FAILED but we can still see how much it's failing
-    if state == "failed" and "ContainerHierarchyLabels" in t and "ignore-fails" in flatten(t["ContainerHierarchyLabels"]):
+    if (
+        state == "failed"
+        and "ContainerHierarchyLabels" in t
+        and "ignore-fails" in flatten(t["ContainerHierarchyLabels"])
+    ):
         state = "ignoreFailed"
 
     kind = "PostgreSQL"
@@ -68,10 +74,12 @@ def convert_ginkgo_test(t, matrix):
         branch = matrix["refname"]
 
     x = {
-        "name": " - ".join(t["ContainerHierarchyTexts"]) + " -- "  + t["LeafNodeText"],
+        "name": " - ".join(t["ContainerHierarchyTexts"]) + " -- " + t["LeafNodeText"],
         "state": state,
         "start_time": t["StartTime"],
-        "end_time": t["EndTime"], # NOTE: Grafana will need a default timestamp field. This is a good candidate
+        "end_time": t[
+            "EndTime"
+        ],  # NOTE: Grafana will need a default timestamp field. This is a good candidate
         "error": err,
         "error_file": errFile,
         "error_line": errLine,
@@ -89,7 +97,9 @@ def convert_ginkgo_test(t, matrix):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Create JSON artifacts from E2E JSON report")
+    parser = argparse.ArgumentParser(
+        description="Create JSON artifacts from E2E JSON report"
+    )
     parser.add_argument(
         "-f",
         "--file",
@@ -104,10 +114,7 @@ if __name__ == "__main__":
         help="directory where we write the artifiacts",
     )
     parser.add_argument(
-        "-m",
-        "--matrix",
-        type=str,
-        help="the matrix with GH execution variables"
+        "-m", "--matrix", type=str, help="the matrix with GH execution variables"
     )
 
     args = parser.parse_args()
@@ -122,11 +129,10 @@ if __name__ == "__main__":
         dir = args.outdir
         if not os.path.exists(dir):
             os.makedirs(dir)
-            print("Directory " , dir ,  " Created ")
+            print("Directory ", dir, " Created ")
 
     # MAIN LOOP: go over each `SpecReport` in the Ginkgo JSON output, convert
-    # each to the normalized JSON format: https://enterprisedb.atlassian.net/wiki/spaces/PD/pages/2927591425/Generic+JSON+format+for+Test+Errors+in+Dashboard
-    # And create a JSON file for each of those
+    # each to the normalized JSON format and create a JSON file for each of those
     whitespace = re.compile("\s")
     with open(args.file) as json_file:
         testResults = json.load(json_file)
@@ -141,7 +147,7 @@ if __name__ == "__main__":
                 # Repository, and with Repo + Run ID + MatrixID + Test Hash, gives a unique
                 # ID in Elastic to each object.
                 slug = whitespace.sub("_", test1["name"])
-                h = hashlib.sha224(slug.encode('utf-8')).hexdigest()
+                h = hashlib.sha224(slug.encode("utf-8")).hexdigest()
                 filename = matrix["id"] + "_" + h + ".json"
                 if dir != "":
                     filename = dir + "/" + filename

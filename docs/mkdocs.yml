@@ -1,5 +1,5 @@
-site_name: Cloud Native PostgreSQL
-site_author: EnterpriseDB Corporation
+site_name: CloudNativePG
+site_author: The CloudNativePG Contributors
 docs_dir: src
 
 theme: readthedocs
@@ -36,8 +36,7 @@ nav:
   - connection_pooling.md
   - kubernetes_upgrade.md
   - expose_pg_services.md
-  - cnp-plugin.md
-  - openshift.md
+  - cnpg-plugin.md
   - failover.md
   - troubleshooting.md
   - fencing.md
@@ -45,5 +44,7 @@ nav:
   - container_images.md
   - operator_capability_levels.md
   - samples.md
+  - commercial_support.md
   - api_reference.md
+  - supported_releases.md
   - release_notes.md
