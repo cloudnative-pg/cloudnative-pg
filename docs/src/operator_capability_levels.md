@@ -1,6 +1,6 @@
 # Operator Capability Levels
 
-This section provides a summary of the capabilities implemented by Cloud Native PostgreSQL,
+This section provides a summary of the capabilities implemented by CloudNativePG,
 classified using the
 ["Operator SDK definition of Capability Levels"](https://operatorframework.io/operator-capabilities/)
 framework.
@@ -10,7 +10,7 @@ framework.
 !!! Important
     Based on the [Operator Capability Levels model](operator_capability_levels.md),
     You can expect a **"Level V - Auto Pilot"** set of capabilities from the
-    Cloud Native PostgreSQL Operator.
+    CloudNativePG Operator.
 
 Each capability level is associated with a certain set of management features the operator offers:
 
@@ -55,7 +55,7 @@ The operator is designed to support any operand container image with
 PostgreSQL inside.
 By default, the operator uses the latest available minor
 version of the latest stable major version supported by the PostgreSQL
-Community and published on Quay.io by EDB.
+Community and published on ghcr.io.
 You can use any compatible image of PostgreSQL supporting the
 primary/standby architecture directly by setting the `imageName`
 attribute in the CR. The operator also supports `imagePullSecrets`
@@ -66,7 +66,7 @@ tags for finer control of container image immutability.
 
 The operator can be configured to support inheritance of labels and annotations
 that are defined in a cluster's metadata, with the goal to improve organizations
-of Cloud Native PostgreSQL deployment in your Kubernetes infrastructure.
+of CloudNativePG deployment in your Kubernetes infrastructure.
 
 ### Self-contained instance manager
 
@@ -125,12 +125,6 @@ any container and enforces read only root filesystem to guarantee containers
 immutability for both the operator and the operand pods. It also explicitly
 sets the required security contexts.
 
-On Red Hat OpenShift, Cloud Native PostgreSQL runs in [`restricted` security
-context constraint
-(SCC)](https://www.openshift.com/blog/managing-sccs-in-openshift), the most
-restrictive one - with the goal to limit the execution of a pod to a namespace
-allocated UID and SELinux context.
-
 ### Affinity
 
 The cluster's `affinity` section enables fine-tuning of how pods and related
@@ -143,9 +137,9 @@ Kubernetes cluster. In particular, the operator supports:
 
 ### Command line interface
 
-Cloud Native PostgreSQL does not have its own command line interface.
+CloudNativePG does not have its own command line interface.
 It simply relies on the best command line interface for Kubernetes, `kubectl`,
-by providing a plugin called `cnp` to enhance and simplify your PostgreSQL
+by providing a plugin called `cnpg` to enhance and simplify your PostgreSQL
 cluster management experience.
 
 ### Current status of the cluster
@@ -157,8 +151,8 @@ instance manager is responsible for applying the required changes to the
 controlled PostgreSQL instance to converge to the required status of
 the cluster (for example: if the cluster status reports that pod `-1` is the
 primary, pod `-1` needs to promote itself while the other pods need to follow
-pod `-1`). The same status is used by Kubernetes client applications to
-provide details, including the `cnp` plugin for `kubectl` and the OpenShift dashboard.
+pod `-1`). The same status is used by the `cnpg` plugin for `kubectl` to provide
+details.
 
 ### Operator's certification authority
 
@@ -174,7 +168,7 @@ cluster, which is used to issue and renew TLS certificates for clients' authenti
 including streaming replication standby servers (instead of passwords).
 Support for a custom certification authority for client certificates is
 available through secrets: this also includes integration with cert-manager.
-Certificates can be issued with the `cnp` plugin for `kubectl`.
+Certificates can be issued with the `cnpg` plugin for `kubectl`.
 
 ### TLS connections
 
@@ -202,9 +196,8 @@ that the cluster state is not enforced.
 
 The operator can be installed through a Kubernetes manifest via `kubectl
 apply`, to be used in a traditional Kubernetes installation in public
-and private cloud environments. Additionally, it can be deployed through
-the Operator Lifecycle Manager (OLM) from OperatorHub.io and the OpenShift
-Container Platform by Red Hat. A Helm Chart for the operator is also available.
+and private cloud environments. Additionally, a Helm Chart for the operator is
+also available.
 
 ### Convention over configuration
 
@@ -226,7 +219,7 @@ You can upgrade the operator seamlessly as a new deployment. A change in the
 operator does not require a change in the operand - thanks to the instance
 manager's injection. The operator can manage older versions of the operand.
 
-Cloud Native PostgreSQL also supports [in-place updates of the instance manager](installation_upgrade.md#in-place-updates-of-the-instance-manager)
+CloudNativePG also supports [in-place updates of the instance manager](installation_upgrade.md#in-place-updates-of-the-instance-manager)
 following an upgrade of the operator: in-place updates do not require a rolling
 update - and subsequent switchover - of the cluster.
 
@@ -244,7 +237,7 @@ one with the new requested operand image that reuses the underlying storage.
 Depending on the value of the `primaryUpdateStrategy`, the operator proceeds
 with a switchover before updating the former primary (`unsupervised`) or waits
 for the user to manually issue the switchover procedure (`supervised`) via the
-`cnp` plugin for `kubectl`.
+`cnpg` plugin for `kubectl`.
 Which setting to use depends on the business requirements as the operation
 might generate some downtime for the applications, from a few seconds to
 minutes based on the actual database workload.
@@ -312,7 +305,7 @@ initiates the instance in recovery mode and replays all available WAL files
 from the specified archive, exiting recovery and starting as a primary.
 Subsequently, the operator will clone the requested number of standby instances
 from the primary.
-Cloud Native PostgreSQL supports parallel WAL fetching from the archive.
+CloudNativePG supports parallel WAL fetching from the archive.
 
 ### Point-In-Time Recovery (PITR) from a backup
 
@@ -324,7 +317,7 @@ one and supports all the options available in
 
 ### Zero Data Loss clusters through synchronous replication
 
-Achieve  *Zero Data Loss* (RPO=0) in your local High Availability Cloud Native PostgreSQL
+Achieve  *Zero Data Loss* (RPO=0) in your local High Availability CloudNativePG
 cluster through quorum based synchronous replication support. The operator provides
 two configuration options that control the minimum and maximum number of
 expected synchronous standby replicas available at any time. The operator will
@@ -424,7 +417,7 @@ particular `requests` and `limits` values can be set for both CPU and RAM.
 
 ### Connection pooling with PgBouncer
 
-Cloud Native PostgreSQL provides native support for connection pooling with
+CloudNativePG provides native support for connection pooling with
 [PgBouncer](connection_pooling.md), one of the most popular open source
 connection poolers for PostgreSQL. From an architectural point of view, the
 native implementation of a PgBouncer connection pooler introduces a new layer
@@ -440,7 +433,7 @@ alerting, trending, log processing. This might involve the use of external tools
 such as Prometheus, Grafana, Fluent Bit, as well as extensions in the
 PostgreSQL engine for the output of error logs directly in JSON format.
 
-Cloud Native PostgreSQL has been designed to provide everything that is needed
+CloudNativePG has been designed to provide everything that is needed
 to easily integrate with industry-standard and community accepted tools for
 flexible monitoring and logging.
 
@@ -452,10 +445,10 @@ for the [Prometheus](https://prometheus.io/) monitoring and alerting tool.
 The operator supports custom monitoring queries defined as `ConfigMap`
 and/or `Secret` objects using a syntax that is compatible with the
 [`postgres_exporter` for Prometheus](https://github.com/prometheus-community/postgres_exporter).
-Cloud Native PostgreSQL provides a set of basic monitoring queries for
+CloudNativePG provides a set of basic monitoring queries for
 PostgreSQL that can be integrated and adapted to your context.
 The [cnp-sandbox project] is an open source Helm chart that demonstrates
-how to integrate Cloud Native PostgreSQL with Prometheus and Grafana, by providing
+how to integrate CloudNativePG with Prometheus and Grafana, by providing
 some basic metrics and an example of dashboard.
 
 ### Standard output logging of PostgreSQL error messages in JSON format
@@ -463,13 +456,13 @@ some basic metrics and an example of dashboard.
 Every log message is delivered to standard output in JSON format, with the first level
 definition of the timestamp, the log level and the type of log entry, such as
 `postgres` for the canonical PostgreSQL error message channel.
-As a result, every Pod managed by Cloud Native PostgreSQL can be easily and directly
+As a result, every Pod managed by CloudNativePG can be easily and directly
 integrated with any downstream log processing stack that supports JSON as source
 data type.
 
 ### Real-time query monitoring
 
-Cloud Native PostgreSQL transparently and natively supports:
+CloudNativePG transparently and natively supports:
 
 - the essential [`pg_stat_statements` extension](https://www.postgresql.org/docs/current/pgstatstatements.html),
   which enables tracking of planning and execution statistics of all SQL
@@ -481,7 +474,7 @@ Cloud Native PostgreSQL transparently and natively supports:
 
 ### Audit
 
-Cloud Native PostgreSQL allows database and security administrators, auditors,
+CloudNativePG allows database and security administrators, auditors,
 and operators to track and analyze database activities using PGAudit (for
 PostgreSQL).
 Such activities flow directly in the JSON log and can be properly routed to the

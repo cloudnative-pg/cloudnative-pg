@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // CreateSecret create a secret with the PostgreSQL and the owner passwords

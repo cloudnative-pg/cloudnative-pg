@@ -20,4 +20,4 @@ jobs:
         with:
           any_of: ok-to-merge
           none_of: do not merge
-          repo_token: ${{ secrets.REPO_GHA_PAT }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}

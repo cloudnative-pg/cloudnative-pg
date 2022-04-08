@@ -122,17 +122,17 @@ type PgBouncerSpec struct {
 	// The credentials of the user that need to be used for the authentication
 	// query. In case it is specified, also an AuthQuery
 	// (e.g. "SELECT usename, passwd FROM pg_shadow WHERE usename=$1")
-	// has to be specified and no automatic CNP Cluster integration will be triggered.
+	// has to be specified and no automatic CNPG Cluster integration will be triggered.
 	AuthQuerySecret *LocalObjectReference `json:"authQuerySecret,omitempty"`
 
 	// The query that will be used to download the hash of the password
 	// of a certain user. Default: "SELECT usename, passwd FROM user_search($1)".
 	// In case it is specified, also an AuthQuerySecret has to be specified and
-	// no automatic CNP Cluster integration will be triggered.
+	// no automatic CNPG Cluster integration will be triggered.
 	AuthQuery string `json:"authQuery,omitempty"`
 
 	// Additional parameters to be passed to PgBouncer - please check
-	// the CNP documentation for a list of options you can configure
+	// the CNPG documentation for a list of options you can configure
 	Parameters map[string]string `json:"parameters,omitempty"`
 
 	// When set to `true`, PgBouncer will disconnect from the PostgreSQL

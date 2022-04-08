@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/external"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 // refreshReplicaConfiguration writes the PostgreSQL correct

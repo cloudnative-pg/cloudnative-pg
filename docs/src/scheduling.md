@@ -10,7 +10,7 @@ the best node possible, based on several criteria.
     this page we assume you are familiar with concepts like affinity,
     anti-affinity, node selectors, and so on.
 
-You can control how the Cloud Native PostgreSQL cluster's instances should be
+You can control how the CloudNativePG cluster's instances should be
 scheduled through the [`affinity`](api_reference.md#AffinityConfiguration)
 section in the definition of the cluster, which supports:
 
@@ -19,10 +19,10 @@ section in the definition of the cluster, which supports:
 - tolerations
 
 !!! Info
-    Cloud Native PostgreSQL does not support pod templates for finer control
+    CloudNativePG does not support pod templates for finer control
     on the scheduling of workloads. While they were part of the initial concept,
     the development team decided to postpone their introduction in a newer
-    version of the API (most likely v2 of CNP).
+    version of the API (most likely v2 of CNPG).
 
 ## Pod affinity and anti-affinity
 
@@ -31,7 +31,7 @@ should not (*anti-affinity*) be scheduled, based on the actual workloads already
 running in those nodes.
 This is technically known as **inter-pod affinity/anti-affinity**.
 
-Cloud Native PostgreSQL by default will configure the cluster's instances
+CloudNativePG by default will configure the cluster's instances
 preferably on different nodes, resulting in the following `affinity` definition:
 
 ```yaml
@@ -52,13 +52,13 @@ affinity:
 As a result of the following Cluster spec:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
 spec:
   instances: 3
-  imageName: quay.io/enterprisedb/postgresql:14.2
+  imageName: ghcr.io/cloudnative-pg/postgresql:14.2
 
   affinity:
     enablePodAntiAffinity: true #default value
@@ -126,7 +126,7 @@ key-value pairs) to select the nodes on which a pod can run. Specifically,
 the node must have each indicated key-value pair as labels for the
 pod to be scheduled and run.
 
-Similarly, Cloud Native PostgreSQL consents you to define a `nodeSelector` in the
+Similarly, CloudNativePG consents you to define a `nodeSelector` in the
 `affinity` section, so that you can request a PostgreSQL cluster to run only
 on nodes that have those labels.
 

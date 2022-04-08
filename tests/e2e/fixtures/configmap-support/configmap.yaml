@@ -6,4 +6,4 @@ data:
   MONITORING_QUERIES_CONFIGMAP: ""
 kind: ConfigMap
 metadata:
-  name: postgresql-operator-controller-manager-config
+  name: cnpg-controller-manager-config

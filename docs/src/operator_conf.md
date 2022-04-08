@@ -1,6 +1,6 @@
 # Operator configuration
 
-The operator for Cloud Native PostgreSQL is installed from a standard
+The operator for CloudNativePG is installed from a standard
 deployment manifest and follows the convention over configuration paradigm.
 While this is fine in most cases, there are some scenarios where you want
 to change the default behavior, such as:
@@ -9,15 +9,15 @@ to change the default behavior, such as:
   by the operator and that are set in the cluster resource
 - defining a different default image for PostgreSQL or an additional pull secret
 
-By default, the operator is installed in the `postgresql-operator-system`
-namespace as a Kubernetes `Deployment` called `postgresql-operator-controller-manager`.
+By default, the operator is installed in the `cnpg-system`
+namespace as a Kubernetes `Deployment` called `cnpg-controller-manager`.
 
 !!! Note
     In the examples below we assume the default name and namespace for the operator deployment.
 
 The behavior of the operator can be customized through a `ConfigMap`/`Secret` that
 is located in the same namespace of the operator deployment and with
-`postgresql-operator-controller-manager-config` as the name.
+`cnpg-controller-manager-config` as the name.
 
 !!! Important
     Any change to the config's `ConfigMap`/`Secret` will not be automatically
@@ -72,8 +72,8 @@ manager](installation_upgrade.md#in-place-updates-of-the-instance-manager).
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgresql-operator-controller-manager-config
-  namespace: postgresql-operator-system
+  name: cnpg-controller-manager-config
+  namespace: cnpg-system
 data:
   INHERITED_ANNOTATIONS: categories
   INHERITED_LABELS: environment, workload, app
@@ -92,8 +92,8 @@ manager](installation_upgrade.md#in-place-updates-of-the-instance-manager).
 apiVersion: v1
 kind: Secret
 metadata:
-  name: postgresql-operator-controller-manager-config
-  namespace: postgresql-operator-system
+  name: cnpg-controller-manager-config
+  namespace: cnpg-system
 type: Opaque
 stringData:
   INHERITED_ANNOTATIONS: categories
@@ -109,17 +109,16 @@ using the manifest you can do that by issuing:
 
 ```shell
 kubectl rollout restart deployment \
-    -n postgresql-operator-system \
-    postgresql-operator-controller-manager
+    -n cnpg-system \
+    cnpg-controller-manager
 ```
 
-Otherwise, If you have installed the operator using OLM, or you are running on
-Openshift, run the following command specifying the namespace the operator is
-installed in:
+In general, given a specific namespace, you can delete the operator pods with
+the following command:
 
 ```shell
 kubectl delete pods -n [NAMESPACE_NAME_HERE] \
-  -l app.kubernetes.io/name=cloud-native-postgresql
+  -l app.kubernetes.io/name=cloudnative-pg
 ```
 
 !!! Warning
@@ -146,7 +145,7 @@ To enable the operator you need to edit the operator deployment add the flag `--
 
 You can do this by executing these commands:
 ```
-kubectl edit deployment -n postgresql-operator-system postgresql-operator-controller-manager 
+kubectl edit deployment -n cnpg-system cnpg-controller-manager
 ```
 
 Then on the edit page scroll down the container args and add `--pprof-server=true`, example:
@@ -155,8 +154,8 @@ Then on the edit page scroll down the container args and add `--pprof-server=tru
       - args:
         - controller
         - --enable-leader-election
-        - --config-map-name=postgresql-operator-controller-manager-config
-        - --secret-name=postgresql-operator-controller-manager-config
+        - --config-map-name=cnpg-controller-manager-config
+        - --secret-name=cnpg-controller-manager-config
         - --log-level=info
         - --pprof-server=true # relevant line
         command:
@@ -166,7 +165,7 @@ Save the changes, the deployment now will execute a rollout and the new pod will
 
 Once the pod is running you can exec inside the container by doing:
 ```
-kubectl exec -ti -n postgresql-operator-system <pod name> -- bash
+kubectl exec -ti -n cnpg-system <pod name> -- bash
 ```
 Once inside execute:
 

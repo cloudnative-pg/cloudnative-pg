@@ -1,4 +1,4 @@
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
   name: scheduled-backups-immediate-azurite

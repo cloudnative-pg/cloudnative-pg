@@ -4,7 +4,7 @@
 purposes and deploy the current branch of this repo.
 
 Before moving forward, please follow the instructions found in the
-[prerequisites](../../DEVELOPERS.md#setting-up-your-workstation-for-cnp-development) section. Below is the intended sequence
+[prerequisites](../../contribute/developer_environment_setup.md#setting-up-your-workstation-for-cnpg-development) section. Below is the intended sequence
 of commands.
 
 Create the cluster:

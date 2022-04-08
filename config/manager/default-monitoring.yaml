@@ -4,7 +4,7 @@ kind: ConfigMap
 metadata:
   name: default-monitoring
   labels:
-    k8s.enterprisedb.io/reload: ""
+    cnpg.io/reload: ""
 data:
   queries: |
     backends:

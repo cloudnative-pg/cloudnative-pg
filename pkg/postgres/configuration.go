@@ -35,11 +35,13 @@ local all all peer map=local
 # Require client certificate authentication for the streaming_replica user
 hostssl postgres streaming_replica all cert
 hostssl replication streaming_replica all cert
-hostssl all cnp_pooler_pgbouncer all cert
+hostssl all cnpg_pooler_pgbouncer all cert
+
 {{ range $rule := .UserRules }}
 {{ $rule -}}
 {{ end }}
 {{ if .LDAPConfiguration }}
+
 # LDAP Configuration
 {{.LDAPConfiguration}}
 {{ end }}
@@ -133,9 +135,9 @@ host all all all {{.DefaultAuthenticationMethod}}
 	// `.csv` and `.log` as needed.
 	LogFileName = "postgres"
 
-	// CNPConfigSha256 is the parameter to be used to inject the sha256 of the
+	// CNPGConfigSha256 is the parameter to be used to inject the sha256 of the
 	// config in the custom.conf file
-	CNPConfigSha256 = "cnp.config_sha256"
+	CNPGConfigSha256 = "cnpg.config_sha256"
 
 	// SharedPreloadLibraries shared preload libraries key in the config
 	SharedPreloadLibraries = "shared_preload_libraries"
@@ -144,7 +146,7 @@ host all all all {{.DefaultAuthenticationMethod}}
 	SynchronousStandbyNames = "synchronous_standby_names"
 
 	// PGBouncerPoolerUserName is the name of the role to be used for
-	PGBouncerPoolerUserName = "cnp_pooler_pgbouncer"
+	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 )
 
 // hbaTemplate is the template used to create the HBA configuration
@@ -350,9 +352,9 @@ var (
 		"syslog_split_messages":                  blockedConfigurationParameter,
 	}
 
-	// CnpConfigurationSettings contains the settings that represent the
+	// CnpgConfigurationSettings contains the settings that represent the
 	// default and the mandatory behavior of CNP
-	CnpConfigurationSettings = ConfigurationSettings{
+	CnpgConfigurationSettings = ConfigurationSettings{
 		GlobalDefaultSettings: SettingsCollection{
 			"max_parallel_workers":       "32",
 			"max_worker_processes":       "32",
@@ -621,7 +623,7 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 	}
 
 	sha256sum := fmt.Sprintf("%x", sha256.Sum256([]byte(postgresConf)))
-	postgresConf += fmt.Sprintf("%v = %v", CNPConfigSha256,
+	postgresConf += fmt.Sprintf("%v = %v", CNPGConfigSha256,
 		escapePostgresConfValue(sha256sum))
 
 	return postgresConf, sha256sum

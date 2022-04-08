@@ -20,7 +20,7 @@ import (
 	"context"
 	"reflect"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // updatePoolerStatus sets the status of the pooler and writes it inside kubernetes

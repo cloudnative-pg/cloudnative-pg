@@ -1,6 +1,6 @@
 # Security
 
-This section contains information about security for Cloud Native PostgreSQL,
+This section contains information about security for CloudNativePG,
 that are analyzed at 3 different layers: Code, Container and Cluster.
 
 !!! Warning
@@ -12,11 +12,11 @@ that are analyzed at 3 different layers: Code, Container and Cluster.
 !!! Seealso "About the 4C's Security Model"
     Please refer to ["The 4C’s Security Model in Kubernetes"](https://www.enterprisedb.com/blog/4cs-security-model-kubernetes)
     blog article to get a better understanding and context of the approach EDB
-    has taken with security in Cloud Native PostgreSQL.
+    has taken with security in CloudNativePG.
 
 ## Code
 
-Source code of Cloud Native PostgreSQL is *systematically scanned* for static analysis purposes,
+Source code of CloudNativePG is *systematically scanned* for static analysis purposes,
 including **security problems**, using a popular open-source linter for Go called
 [GolangCI-Lint](https://github.com/golangci/golangci-lint) directly in the CI/CD pipeline.
 GolangCI-Lint can run several *linters* on the same source code.
@@ -28,19 +28,17 @@ the code such as hard-coded credentials, integer overflows and SQL injections - 
 
 !!! Important
     A failure in the static code analysis phase of the CI/CD pipeline is a blocker
-    for the entire delivery of Cloud Native PostgreSQL, meaning that each commit is validated
+    for the entire delivery of CloudNativePG, meaning that each commit is validated
     against all the linters defined by GolangCI-Lint.
 
 ## Container
 
-Every container image that is part of Cloud Native PostgreSQL is automatically built via CI/CD pipelines following every commit.
+Every container image that is part of CloudNativePG is automatically built via CI/CD pipelines following every commit.
 Such images include not only the operator's, but also the operands' - specifically every supported PostgreSQL version.
 Within the pipelines, images are scanned with:
 
 - [Dockle](https://github.com/goodwithtech/dockle): for best practices in terms
   of the container build process
-- [Clair](https://github.com/quay/clair): for vulnerabilities found in both the
-  underlying operating system as well as libraries and applications that they run
 
 !!! Important
     All operand images are automatically rebuilt once a day by our pipelines in case
@@ -55,9 +53,9 @@ The following guidelines and frameworks have been taken into account for contain
   developed by the Center for Internet Security (CIS)
 
 !!! Seealso "About the Container level security"
-    Please refer to ["Security and Containers in Cloud Native PostgreSQL"](https://www.enterprisedb.com/blog/security-and-containers-cloud-native-postgresql)
+    Please refer to ["Security and Containers in CloudNativePG"](https://www.enterprisedb.com/blog/security-and-containers-cloud-native-postgresql)
     blog article for more information about the approach that EDB has taken on
-    security at the container level in Cloud Native PostgreSQL.
+    security at the container level in CloudNativePG.
 
 ## Cluster
 
@@ -68,13 +66,10 @@ the cluster (PostgreSQL included).
 ### Role Based Access Control (RBAC)
 
 The operator interacts with the Kubernetes API server with a dedicated service
-account called `postgresql-operator-manager`. In Kubernetes this is installed
-by default in the `postgresql-operator-system` namespace, with a cluster role
-binding between this service account and the `postgresql-operator-manager`
+account called `cnpg-manager`. In Kubernetes this is installed
+by default in the `cnpg-system` namespace, with a cluster role
+binding between this service account and the `cnpg-manager`
 cluster role which defines the set of rules/resources/verbs granted to the operator.
-For OpenShift specificities on this matter, please consult the
-["Red Hat OpenShift" section](openshift.md#predefined-rbac-objects), in particular
-["Pre-defined RBAC objects" section](openshift.md#predefined-rbac-objects).
 
 !!! Important
     The above permissions are exclusively reserved for the operator's service
@@ -82,8 +77,8 @@ For OpenShift specificities on this matter, please consult the
     accessible by the users of the operator that interact only with `Cluster`,
     `Pooler`, `Backup`, and `ScheduledBackup` resources.
 
-Below we provide some examples and, most importantly, the reasons why Cloud
-Native PostgreSQL requires full or partial management of standard Kubernetes
+Below we provide some examples and, most importantly, the reasons why
+CloudNativePG requires full or partial management of standard Kubernetes
 namespaced resources.
 
 `configmaps`
@@ -132,7 +127,7 @@ is the Kubernetes way to define security rules and specifications that a pod nee
 to run in a cluster.
 For InfoSec reasons, every Kubernetes platform should implement them.
 
-Cloud Native PostgreSQL does not require *privileged* mode for containers execution.
+CloudNativePG does not require *privileged* mode for containers execution.
 The PostgreSQL containers run as `postgres` system user. No component whatsoever requires running as `root`.
 
 Likewise, Volumes access does not require *privileges* mode or `root` privileges either.
@@ -140,23 +135,6 @@ Proper permissions must be properly assigned by the Kubernetes platform and/or a
 The PostgreSQL containers run with a read-only root filesystem (i.e. no writable layer).
 
 The operator explicitly sets the required security contexts.
-
-On Red Hat OpenShift, Cloud Native PostgreSQL runs in `restricted` security context constraint,
-the most restrictive one. The goal is to limit the execution of a pod to a namespace allocated UID
-and SELinux context.
-
-!!! Seealso "Security Context Constraints in OpenShift"
-    For further information on Security Context Constraints (SCC) in
-    OpenShift, please refer to the
-    ["Managing SCC in OpenShift"](https://www.openshift.com/blog/managing-sccs-in-openshift)
-    article.
-
-!!! Warning "Security Context Constraints and namespaces"
-    As stated by [Openshift documentation](https://docs.openshift.com/container-platform/latest/authentication/managing-security-context-constraints.html#role-based-access-to-ssc_configuring-internal-oauth)
-    SCCs are not applied in the default namespaces (`default`, `kube-system`,
-    `kube-public`, `openshift-node`, `openshift-infra`, `openshift`) and those
-    should not be used to run pods. CNP clusters deployed in those namespaces
-    will be unable to start due to missing SCCs.
 
 ### Restricting Pod access using AppArmor
 
@@ -193,11 +171,8 @@ be unable to start and you will get an error like this:
 metadata.annotations[container.apparmor.security.beta.kubernetes.io/postgres]: Forbidden: may not add AppArmor annotations]
 ```
 
-In such cases, please refer to your Kubernetes administrators and ask for the proper AppArmor profile to use.
-
-!!! Warning "AppArmor and OpenShift"
-    AppArmor is currently available only on Debian distributions like Ubuntu,
-    hence this is not (and will not be) available in OpenShift
+In such cases, please refer to your Kubernetes administrators and ask for the
+proper AppArmor profile to use.
 
 ### Network Policies
 
@@ -210,7 +185,7 @@ to enable/disable inbound and outbound network access at IP and TCP level.
     to get information about the status of the PostgreSQL server. Please
     make sure you keep this in mind in case you add any network policy,
     and refer to the "Exposed Ports" section below for a list of ports used by
-    Cloud Native PostgreSQL for finer control.
+    CloudNativePG for finer control.
 
 Network policies are beyond the scope of this document.
 Please refer to the ["Network policies"](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
@@ -218,7 +193,7 @@ section of the Kubernetes documentation for further information.
 
 #### Exposed Ports
 
-Cloud Native PostgreSQL exposes ports at operator, instance manager and operand
+CloudNativePG exposes ports at operator, instance manager and operand
 levels, as listed in the table below:
 
 System           | Port number  | Exposing            |  Name               |  Certificates  |  Authentication
@@ -231,10 +206,10 @@ operand          | 5432         | PostgreSQL instance | `postgresql`        |  o
 
 ### PostgreSQL
 
-The current implementation of Cloud Native PostgreSQL automatically creates
+The current implementation of CloudNativePG automatically creates
 passwords and `.pgpass` files for the `postgres` superuser and the database owner.
 
-As far as encryption of password is concerned, Cloud Native PostgreSQL follows
+As far as encryption of password is concerned, CloudNativePG follows
 the default behavior of PostgreSQL: starting from PostgreSQL 14,
 `password_encryption` is by default set to `scram-sha-256`, while on earlier
 versions it is set to `md5`.

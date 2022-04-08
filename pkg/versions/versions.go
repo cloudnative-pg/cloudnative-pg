@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package versions contains the version of the Cloud Native PostgreSQL operator and the software
+// Package versions contains the version of the CloudNativePG operator and the software
 // that is used by it
 package versions
 
@@ -23,10 +23,10 @@ const (
 	Version = "1.14.0"
 
 	// DefaultImageName is the default image used by the operator to create pods
-	DefaultImageName = "quay.io/enterprisedb/postgresql:14.2"
+	DefaultImageName = "ghcr.io/cloudnative-pg/postgresql:14.2"
 
 	// DefaultOperatorImageName is the default operator image used by the controller in the pods running PostgreSQL
-	DefaultOperatorImageName = "quay.io/enterprisedb/cloud-native-postgresql:1.14.0"
+	DefaultOperatorImageName = "ghcr.io/cloudnative-pg/cloudnative-pg:1.14.0"
 )
 
 // BuildInfo is a struct containing all the info about the build

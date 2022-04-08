@@ -24,9 +24,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 )
 
 var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisruptive, tests.LabelNoOpenshift), func() {
@@ -149,7 +149,7 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 		})
 
 		By("verifying reconciliation", func() {
-			// Get current CNP cluster's Primary
+			// Get current CNPG cluster's Primary
 			currentPrimary, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			oldPrimary := currentPrimary.GetName()

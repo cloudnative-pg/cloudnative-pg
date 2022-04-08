@@ -25,9 +25,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/concurrency"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 // PostgresLifecycle implements the manager.Runnable interface for a postgres.Instance

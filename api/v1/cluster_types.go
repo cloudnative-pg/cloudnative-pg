@@ -22,9 +22,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -351,7 +351,7 @@ type ClusterStatus struct {
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
 	// The commit hash number of which this operator running
-	CommitHash string `json:"cloudNativePostgresqlCommitHash,omitempty"`
+	CommitHash string `json:"cloudNativePGCommitHash,omitempty"`
 
 	// The timestamp when the last actual promotion to primary has occurred
 	CurrentPrimaryTimestamp string `json:"currentPrimaryTimestamp,omitempty"`
@@ -363,7 +363,7 @@ type ClusterStatus struct {
 	PoolerIntegrations *PoolerIntegrations `json:"poolerIntegrations,omitempty"`
 
 	// The hash of the binary of the operator
-	OperatorHash string `json:"cloudNativePostgresqlOperatorHash,omitempty"`
+	OperatorHash string `json:"cloudNativePGOperatorHash,omitempty"`
 
 	// OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster
 	OnlineUpdateEnabled bool `json:"onlineUpdateEnabled,omitempty"`
@@ -1230,9 +1230,9 @@ func (cluster *Cluster) GetImageName() string {
 // image name.
 // Example:
 //
-// quay.io/enterprisedb/postgresql:14.0 corresponds to version 140000
-// quay.io/enterprisedb/postgresql:13.2 corresponds to version 130002
-// quay.io/enterprisedb/postgresql:9.6.3 corresponds to version 90603
+// ghcr.io/cloudnative-pg/postgresql:14.0 corresponds to version 140000
+// ghcr.io/cloudnative-pg/postgresql:13.2 corresponds to version 130002
+// ghcr.io/cloudnative-pg/postgresql:9.6.3 corresponds to version 90603
 func (cluster *Cluster) GetPostgresqlVersion() (int, error) {
 	image := cluster.GetImageName()
 	tag := utils.GetImageTag(image)

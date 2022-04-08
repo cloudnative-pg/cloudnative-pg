@@ -28,9 +28,9 @@ import (
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics/histogram"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics/histogram"
 )
 
 // QueriesCollector is the implementation of PgCollector for a certain
@@ -454,7 +454,7 @@ func createMonitoringTx(conn *sql.DB) (*sql.Tx, error) {
 		}
 	}()
 
-	_, err = tx.Exec("SET application_name TO cnp_metrics_exporter")
+	_, err = tx.Exec("SET application_name TO cnpg_metrics_exporter")
 	if err != nil {
 		return nil, err
 	}
