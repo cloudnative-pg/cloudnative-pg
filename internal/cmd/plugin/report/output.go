@@ -12,25 +12,34 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
 )
 
-// reportZipper is the common interface to print the results of the report commands
-type reportZipper interface {
-	writeToZip(zipper *zip.Writer, format plugin.OutputFormat) error
+// reportName produces a timestamped report string apt for file/folder naming
+func reportName(kind string, objName ...string) string {
+	now := time.Now().UTC()
+	if len(objName) != 0 {
+		return fmt.Sprintf("report_%s_%s_%s", kind, objName[0], now.Format("2006-01-02T15:04:05UTC"))
+	}
+	return fmt.Sprintf("report_%s_%s", kind, now.Format("2006-01-02T15:04:05UTC"))
 }
 
-// writerZippedReport writes a zip with the various report parts to file
-func writeZippedReport(rep reportZipper, format plugin.OutputFormat, file string) (err error) {
-	var outputFile *os.File
+// zipFileWriter abstracts any function that will write a new file into a ZIP
+// within the `dirname` folder in the ZIP
+type zipFileWriter func(zipper *zip.Writer, dirname string) error
 
+// writerZippedReport writes a zip with the various report parts to file s
+//  - file: the name of the zip file
+//  - folder: the top-level folder created in the zip to contain all sections
+func writeZippedReport(sections []zipFileWriter, file, folder string) (err error) {
 	if exists, _ := fileutils.FileExists(file); exists {
 		return fmt.Errorf("file already exist will not overwrite")
 	}
 
-	outputFile, err = os.Create(filepath.Clean(file))
+	outputFile, err := os.Create(filepath.Clean(file))
 	if err != nil {
 		return fmt.Errorf("could not create zip file: %w", err)
 	}
@@ -49,21 +58,24 @@ func writeZippedReport(rep reportZipper, format plugin.OutputFormat, file string
 
 	zipper := zip.NewWriter(outputFile)
 	defer func() {
-		var errZ error
-		if errZ = zipper.Flush(); errZ != nil {
-			if err == nil {
-				err = fmt.Errorf("could not flush the zip: %w", errZ)
-			}
-		}
-
-		if errZ = zipper.Close(); errZ != nil {
+		if errZ := zipper.Close(); errZ != nil {
 			if err == nil {
 				err = fmt.Errorf("could not close the zip: %w", errZ)
 			}
 		}
 	}()
 
-	err = rep.writeToZip(zipper, format)
+	_, err = zipper.Create(folder + "/")
+	if err != nil {
+		return err
+	}
+
+	for _, section := range sections {
+		err = section(zipper, folder)
+		if err != nil {
+			return
+		}
+	}
 
 	return err
 }
@@ -73,29 +85,31 @@ type namedObject struct {
 	Object interface{}
 }
 
-func addContentToZip(c interface{}, name string, zipper *zip.Writer, format plugin.OutputFormat) error {
+func addContentToZip(c interface{}, name, folder string, format plugin.OutputFormat, zipper *zip.Writer) error {
 	var writer io.Writer
-	writer, err := zipper.Create(name + "." + string(format))
+	fileName := filepath.Join(folder, name) + "." + string(format)
+	writer, err := zipper.Create(fileName)
 	if err != nil {
-		return fmt.Errorf("could not add '%s' to zip: %w", name, err)
+		return fmt.Errorf("could not add '%s' to zip: %w", fileName, err)
 	}
 
 	if err = plugin.Print(c, format, writer); err != nil {
-		return fmt.Errorf("could not print '%s': %w", name, err)
+		return fmt.Errorf("could not print '%s': %w", fileName, err)
 	}
 	return nil
 }
 
-func addObjectsToZip(objects []namedObject, zipper *zip.Writer, format plugin.OutputFormat) error {
+func addObjectsToZip(objects []namedObject, folder string, format plugin.OutputFormat, zipper *zip.Writer) error {
 	for _, obj := range objects {
 		var objF io.Writer
-		objF, err := zipper.Create(obj.Name + "." + string(format))
+		fileName := filepath.Join(folder, obj.Name) + "." + string(format)
+		objF, err := zipper.Create(fileName)
 		if err != nil {
 			return fmt.Errorf("could not add object '%s' to zip: %w", obj, err)
 		}
 
 		if err = plugin.Print(obj.Object, format, objF); err != nil {
-			return fmt.Errorf("could not print: %w", err)
+			return fmt.Errorf("could not print '%s': %w", fileName, err)
 		}
 	}
 	return nil

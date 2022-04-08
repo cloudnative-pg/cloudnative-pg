@@ -11,18 +11,18 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
+	"path/filepath"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
+	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/report/deployments"
 
 	v12 "k8s.io/api/admissionregistration/v1"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/report/deployments"
 )
 
 // operatorReport contains the data to be printed by the `report operator` plugin
@@ -37,29 +37,42 @@ type operatorReport struct {
 	validatingWebhookConfig *v12.ValidatingWebhookConfigurationList
 }
 
-func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputFormat) (err error) {
-	err = addContentToZip(or.deployment, "deployment", zipper, format)
-	if err != nil {
-		return
-	}
-	err = addContentToZip(or.operatorPod, "operator-pod", zipper, format)
-	if err != nil {
-		return
-	}
-	err = addObjectsToZip(or.configs, zipper, format)
-	if err != nil {
-		return
-	}
-	err = addObjectsToZip(or.secrets, zipper, format)
-	if err != nil {
-		return
-	}
-	err = addContentToZip(or.events, "events", zipper, format)
-	if err != nil {
-		return
+// writeToZip makes a new section in the ZIP file, and adds in it various
+// Kubernetes object manifests
+func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputFormat, folder string) error {
+	singleObjects := []struct {
+		content interface{}
+		name    string
+	}{
+		{content: or.deployment, name: "deployment"},
+		{content: or.operatorPod, name: "operator-pod"},
+		{content: or.events, name: "events"},
+		{content: or.validatingWebhookConfig, name: "validating-webhook-configuration"},
+		{content: or.mutatingWebhookConfig, name: "mutating-webhook-configuration"},
+		{content: or.webhookService, name: "webhook-service"},
 	}
 
-	return
+	newFolder := filepath.Join(folder, "manifests")
+	_, err := zipper.Create(newFolder + "/")
+	if err != nil {
+		return err
+	}
+
+	for _, object := range singleObjects {
+		err := addContentToZip(object.content, object.name, newFolder, format, zipper)
+		if err != nil {
+			return err
+		}
+	}
+
+	multiObjects := [][]namedObject{or.configs, or.secrets}
+	for _, obj := range multiObjects {
+		err := addObjectsToZip(obj, newFolder, format, zipper)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Operator implements the "report operator" subcommand
@@ -68,10 +81,10 @@ func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputForm
 //  - operator pod definition
 //  - operator configuration Configmap and Secret key (if any)
 //  - events in the operator namespace
-//  - kubernetes environment information (server part of `kubectl version`)
 //  - operator's Validating/MutatingWebhookConfiguration and their associated services
+//  - operator pod's logs (if `includeLogs` is true)
 func Operator(ctx context.Context, format plugin.OutputFormat,
-	file string, stopRedaction bool,
+	file string, stopRedaction, includeLogs bool,
 ) error {
 	secretRedactor := redactSecret
 	configMapRedactor := redactConfigMap
@@ -158,7 +171,20 @@ func Operator(ctx context.Context, format plugin.OutputFormat,
 		webhookService:          webhookService,
 	}
 
-	err = writeZippedReport(rep, format, file)
+	reportZipper := func(zipper *zip.Writer, dirname string) error {
+		return rep.writeToZip(zipper, format, dirname)
+	}
+
+	sections := []zipFileWriter{reportZipper}
+
+	if includeLogs {
+		logZipper := func(zipper *zip.Writer, dirname string) error {
+			return streamPodLogsToZip(ctx, operatorPod, dirname, "operator-logs", zipper)
+		}
+		sections = append(sections, logZipper)
+	}
+
+	err = writeZippedReport(sections, file, reportName("operator"))
 	if err != nil {
 		return fmt.Errorf("could not write report: %w", err)
 	}

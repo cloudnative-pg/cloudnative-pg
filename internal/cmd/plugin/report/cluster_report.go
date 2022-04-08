@@ -10,6 +10,7 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
+	"path/filepath"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -29,8 +30,9 @@ type clusterReport struct {
 	events      corev1.EventList
 }
 
-// writeToZip adds the elements of the report to a zip as inner files
-func (cr clusterReport) writeToZip(zipper *zip.Writer, format plugin.OutputFormat) error {
+// writeToZip makes a new section in the ZIP file, and adds in it various
+// Kubernetes object manifests
+func (cr clusterReport) writeToZip(zipper *zip.Writer, format plugin.OutputFormat, folder string) error {
 	objects := []struct {
 		content interface{}
 		name    string
@@ -41,8 +43,14 @@ func (cr clusterReport) writeToZip(zipper *zip.Writer, format plugin.OutputForma
 		{content: cr.events, name: "events"},
 	}
 
+	newFolder := filepath.Join(folder, "manifests")
+	_, err := zipper.Create(newFolder + "/")
+	if err != nil {
+		return err
+	}
+
 	for _, object := range objects {
-		err := addContentToZip(object.content, object.name, zipper, format)
+		err := addContentToZip(object.content, object.name, newFolder, format, zipper)
 		if err != nil {
 			return err
 		}
@@ -56,8 +64,10 @@ func (cr clusterReport) writeToZip(zipper *zip.Writer, format plugin.OutputForma
 //  - cluster pod and job definitions
 //  - cluster resource (same content as `kubectl get cluster -o yaml`)
 //  - events in the cluster namespace
+//  - logs from the cluster pods (optional - activated with `includeLogs`)
+//  - logs from the cluster jobs (optional - activated with `includeLogs`)
 func Cluster(ctx context.Context, clusterName, namespace string, format plugin.OutputFormat,
-	file string,
+	file string, includeLogs bool,
 ) error {
 	var events corev1.EventList
 	err := plugin.Client.List(ctx, &events, client.InNamespace(namespace))
@@ -96,7 +106,25 @@ func Cluster(ctx context.Context, clusterName, namespace string, format plugin.O
 		clusterJobs: jobs,
 	}
 
-	err = writeZippedReport(rep, format, file)
+	reportZipper := func(zipper *zip.Writer, dirname string) error {
+		return rep.writeToZip(zipper, format, dirname)
+	}
+
+	sections := []zipFileWriter{reportZipper}
+
+	if includeLogs {
+		logsZipper := func(zipper *zip.Writer, dirname string) error {
+			return streamClusterLogsToZip(ctx, clusterName, plugin.Namespace, dirname, zipper)
+		}
+
+		jobLogsZipper := func(zipper *zip.Writer, dirname string) error {
+			return streamClusterJobLogsToZip(ctx, clusterName, plugin.Namespace, dirname, zipper)
+		}
+
+		sections = append(sections, logsZipper, jobLogsZipper)
+	}
+
+	err = writeZippedReport(sections, file, reportName("cluster", clusterName))
 	if err != nil {
 		return fmt.Errorf("could not write report: %w", err)
 	}
