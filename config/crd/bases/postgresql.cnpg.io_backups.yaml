@@ -6,9 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.7.0
   creationTimestamp: null
-  name: backups.postgresql.k8s.enterprisedb.io
+  name: backups.postgresql.cnpg.io
 spec:
-  group: postgresql.k8s.enterprisedb.io
+  group: postgresql.cnpg.io
   names:
     kind: Backup
     listKind: BackupList

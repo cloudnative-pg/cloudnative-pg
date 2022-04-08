@@ -34,12 +34,12 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 )
 
 func AssertSwitchover(namespace string, clusterName string, env *testsUtils.TestingEnvironment) {

@@ -23,7 +23,7 @@ import (
 
 	"github.com/blang/semver"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // capabilities stores the current Barman capabilities

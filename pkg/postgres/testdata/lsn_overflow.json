@@ -19,17 +19,17 @@
           "resourceVersion": "3656838",
           "creationTimestamp": "2021-12-09T16:10:34Z",
           "labels": {
-            "k8s.enterprisedb.io/cluster": "sandbox",
+            "cnpg.io/cluster": "sandbox",
             "postgresql": "sandbox",
             "role": "replica"
           },
           "annotations": {
-            "k8s.enterprisedb.io/nodeSerial": "6",
-            "k8s.enterprisedb.io/operatorVersion": "1.10.0"
+            "cnpg.io/nodeSerial": "6",
+            "cnpg.io/operatorVersion": "1.10.0"
           },
           "ownerReferences": [
             {
-              "apiVersion": "postgresql.k8s.enterprisedb.io/v1",
+              "apiVersion": "postgresql.cnpg.io/v1",
               "kind": "Cluster",
               "name": "sandbox",
               "uid": "b1ec3b05-27e3-408b-b66d-43b2a3608fcf",
@@ -48,12 +48,12 @@
                 "f:metadata": {
                   "f:annotations": {
                     ".": {},
-                    "f:k8s.enterprisedb.io/nodeSerial": {},
-                    "f:k8s.enterprisedb.io/operatorVersion": {}
+                    "f:cnpg.io/nodeSerial": {},
+                    "f:cnpg.io/operatorVersion": {}
                   },
                   "f:labels": {
                     ".": {},
-                    "f:k8s.enterprisedb.io/cluster": {},
+                    "f:cnpg.io/cluster": {},
                     "f:postgresql": {},
                     "f:role": {}
                   },
@@ -453,7 +453,7 @@
           "initContainers": [
             {
               "name": "bootstrap-controller",
-              "image": "quay.io/enterprisedb/cloud-native-postgresql-testing:main@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
+              "image": "ghcr.io/cloudnative-pg/cloudnative-pg-testing:main@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
               "command": [
                 "/manager",
                 "bootstrap",
@@ -771,7 +771,7 @@
               "ready": true,
               "restartCount": 0,
               "image": "sha256:af7b34df0036a4b89f6c19b6c2fac884295cb05ebe80b0039f624733df2f54fe",
-              "imageID": "quay.io/enterprisedb/cloud-native-postgresql-testing@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
+              "imageID": "ghcr.io/cloudnative-pg/cloudnative-pg-testing@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
               "containerID": "containerd://427a187550b0cf110edb9ee4f32227d7ed819b127834b1917f2034ddb797a1df"
             }
           ],
@@ -829,17 +829,17 @@
           "resourceVersion": "3650327",
           "creationTimestamp": "2021-12-09T15:23:04Z",
           "labels": {
-            "k8s.enterprisedb.io/cluster": "sandbox",
+            "cnpg.io/cluster": "sandbox",
             "postgresql": "sandbox",
             "role": "replica"
           },
           "annotations": {
-            "k8s.enterprisedb.io/nodeSerial": "3",
-            "k8s.enterprisedb.io/operatorVersion": "1.10.0"
+            "cnpg.io/nodeSerial": "3",
+            "cnpg.io/operatorVersion": "1.10.0"
           },
           "ownerReferences": [
             {
-              "apiVersion": "postgresql.k8s.enterprisedb.io/v1",
+              "apiVersion": "postgresql.cnpg.io/v1",
               "kind": "Cluster",
               "name": "sandbox",
               "uid": "b1ec3b05-27e3-408b-b66d-43b2a3608fcf",
@@ -858,12 +858,12 @@
                 "f:metadata": {
                   "f:annotations": {
                     ".": {},
-                    "f:k8s.enterprisedb.io/nodeSerial": {},
-                    "f:k8s.enterprisedb.io/operatorVersion": {}
+                    "f:cnpg.io/nodeSerial": {},
+                    "f:cnpg.io/operatorVersion": {}
                   },
                   "f:labels": {
                     ".": {},
-                    "f:k8s.enterprisedb.io/cluster": {},
+                    "f:cnpg.io/cluster": {},
                     "f:postgresql": {},
                     "f:role": {}
                   },
@@ -1263,7 +1263,7 @@
           "initContainers": [
             {
               "name": "bootstrap-controller",
-              "image": "quay.io/enterprisedb/cloud-native-postgresql-testing:main@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
+              "image": "ghcr.io/cloudnative-pg/cloudnative-pg-testing:main@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
               "command": [
                 "/manager",
                 "bootstrap",
@@ -1581,7 +1581,7 @@
               "ready": true,
               "restartCount": 0,
               "image": "sha256:af7b34df0036a4b89f6c19b6c2fac884295cb05ebe80b0039f624733df2f54fe",
-              "imageID": "quay.io/enterprisedb/cloud-native-postgresql-testing@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
+              "imageID": "ghcr.io/cloudnative-pg/cloudnative-pg-testing@sha256:ef23605dfb2f2da3c9ee421aec0cc2ef4182a18d6d025604c717e6e60ac96750",
               "containerID": "containerd://150389f0f62f838673a28c58db5a1917e3ba132c666e7431aca347f3e7030c94"
             }
           ],

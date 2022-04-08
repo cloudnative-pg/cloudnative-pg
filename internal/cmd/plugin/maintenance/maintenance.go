@@ -27,9 +27,9 @@ import (
 	"github.com/cheynewallace/tabby"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // Maintenance command implementation

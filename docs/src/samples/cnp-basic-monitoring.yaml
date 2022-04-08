@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: cnp-basic-monitoring
   labels:
-    k8s.enterprisedb.io/reload: ""
+    cnpg.io/reload: ""
 data:
   custom-queries: |
     backends:

@@ -291,9 +291,9 @@ jobs:
         name: Build meta
         id: build-meta
         run: |
-          images='quay.io/enterprisedb/cloud-native-postgresql-testing'
+          images='ghcr.io/cloudnative-pg/cloudnative-pg-testing'
           tags=''
-          labels='quay.expires-after=7d'
+          labels=''
           commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
@@ -336,10 +336,9 @@ jobs:
         name: Detect platforms
         id: docker-platforms
         run: |
-          # Available architecture on UBI8 are: linux/amd64, linux/ppc64le, linux/s390x
           # Keep in mind that adding more platforms (architectures) will increase the building
           # time even if we use the ghcache for the building process.
-          platforms="linux/amd64,linux/ppc64le,linux/s390x"
+          platforms="linux/amd64"
           echo "::set-output name=platforms::${platforms}"
       -
         name: Set up QEMU
@@ -352,12 +351,12 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v1
       -
-        name: Login to quay.io
+        name: Login to ghcr.io
         uses: docker/login-action@v1
         with:
-          registry: quay.io/enterprisedb
-          username: ${{ secrets.QUAY_USERNAME }}
-          password: ${{ secrets.QUAY_TOKEN }}
+          registry: ghcr.io/cloudnative-pg
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
         uses: docker/build-push-action@v2.10.0
@@ -381,49 +380,6 @@ jobs:
           # TAGS could be separated by newlines or commas
           image=$(sed -n '1{s/,.*//; p}' <<< "$TAGS")
           echo "::set-output name=image::${image}"
-
-  trigger-ocp:
-    name: Trigger OCP bundle
-    needs:
-      - golangci
-      - shellcheck
-      - tests
-      - apidoc
-      - crd
-      - duplicate_runs
-      - change-triage
-    # Trigger OCP bundle if anything but docs have changed,
-    # or it is a scheduled execution
-    # See https://github.com/actions/runner/issues/491#issuecomment-850884422
-    if: |
-      (
-        github.event_name == 'schedule' ||
-        needs.duplicate_runs.outputs.should_skip != 'true' &&
-        github.event.sender.login != 'cnp-autobot' &&
-        (
-          needs.change-triage.outputs.operator-changed == 'true' ||
-          needs.change-triage.outputs.test-changed == 'true' ||
-          needs.change-triage.outputs.shell-script-changed == 'true' ||
-          needs.change-triage.outputs.go-code-changed == 'true'
-        )
-      ) &&
-      always() &&
-      (needs.golangci.result == 'success' || needs.golangci.result == 'skipped') &&
-      (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
-      (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
-      (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
-      (needs.crd.result == 'success' || needs.crd.result == 'skipped')
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Repository Dispatch
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.REPO_GHA_PAT }}
-          repository: enterprisedb/cloud-native-postgresql-ocp-certified
-          event-type: cnp-trigger
-          client-payload: '{"upstream_commit": "${{ github.event.pull_request.head.sha || github.sha }}",
-          "info": {"branch_name": "${{ github.ref_name }}", "run_number": "${{ github.run_number }}"}}'
-
 
   generate-jobs:
     name: Generate jobs for E2E tests
@@ -515,9 +471,9 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
 
-      DOCKER_SERVER: quay.io/enterprisedb
-      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
+      DOCKER_SERVER: ghcr.io/cloudnative-pg
+      DOCKER_USERNAME: ${{ github.actor }}
+      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -657,9 +613,9 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
 
-      DOCKER_SERVER: quay.io/enterprisedb
-      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
+      DOCKER_SERVER: ghcr.io/cloudnative-pg
+      DOCKER_USERNAME: ${{ github.actor }}
+      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -891,9 +847,9 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
 
-      DOCKER_SERVER: quay.io/enterprisedb
-      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
+      DOCKER_SERVER: ghcr.io/cloudnative-pg
+      DOCKER_USERNAME: ${{ github.actor }}
+      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -1123,9 +1079,9 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
 
-      DOCKER_SERVER: quay.io/enterprisedb
-      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
+      DOCKER_SERVER: ghcr.io/cloudnative-pg
+      DOCKER_USERNAME: ${{ github.actor }}
+      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -1309,9 +1265,9 @@ jobs:
         E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
         CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
 
-        DOCKER_SERVER: quay.io/enterprisedb
-        DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
-        DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
+        DOCKER_SERVER: ghcr.io/cloudnative-pg
+        DOCKER_USERNAME: ${{ github.actor }}
+        DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
         DEBUG: "true"
         BUILD_IMAGE: "false"

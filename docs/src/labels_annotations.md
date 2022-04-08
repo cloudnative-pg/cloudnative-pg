@@ -18,7 +18,7 @@ In short:
   selector capability
 
 You can select one or more labels and/or annotations you will use
-in your Cloud Native PostgreSQL deployments. Then you need to configure the operator
+in your CloudNativePG deployments. Then you need to configure the operator
 so that when you define these labels and/or annotations in a cluster's metadata,
 they are automatically inherited by all resources created by it (including pods).
 
@@ -50,7 +50,7 @@ When defining the cluster, **before** any resource is deployed, you can
 properly set the metadata as follows:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
@@ -73,7 +73,7 @@ kubectl get pods --show-labels
 
 ## Current limitations
 
-Currently, Cloud Native PostgreSQL does not automatically propagate labels or
+Currently, CloudNativePG does not automatically propagate labels or
 annotations deletions. Therefore, when an annotation or label is removed from
 a Cluster, which was previously propagated to the underlying pods, the operator
 will not automatically remove it on the associated resources.

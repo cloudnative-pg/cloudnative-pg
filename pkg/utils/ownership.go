@@ -87,7 +87,7 @@ func GetOperatorDeployment(
 	}
 
 	deploymentList, err = client.AppsV1().Deployments(namespace).List(
-		ctx, metav1.ListOptions{LabelSelector: "operators.coreos.com/cloud-native-postgresql.openshift-operators="})
+		ctx, metav1.ListOptions{LabelSelector: "operators.coreos.com/cloudnative-pg.openshift-operators="})
 	if err != nil {
 		return nil, err
 	}

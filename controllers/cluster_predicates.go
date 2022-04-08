@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 var (

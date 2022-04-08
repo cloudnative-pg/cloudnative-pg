@@ -38,7 +38,7 @@ following plugins/utilities to be available in your system:
 
 ### Logs
 
-Every resource created and controlled by Cloud Native PostgreSQL logs to
+Every resource created and controlled by CloudNativePG logs to
 standard output, as expected by Kubernetes, and directly in [JSON
 format](logging.md). As a result, you should rely on the `kubectl logs`
 command to retrieve logs from a given resource.
@@ -61,7 +61,7 @@ kubectl logs --help
 
 ## Operator information
 
-By default, the Cloud Native PostgreSQL operator is installed in the
+By default, the CloudNativePG operator is installed in the
 `postgresql-operator-system` namespace in Kubernetes as a `Deployment`
 (see the ["Details about the deployment" section](installation_upgrade.md#details-about-the-deployment)
 for details).
@@ -93,7 +93,7 @@ kubectl logs -n postgresql-operator-system <POD>
 
 ### Gather more information about the operator
 
-Get logs from all pods in Cloud Native PostgreSQL operator Deployment
+Get logs from all pods in CloudNativePG operator Deployment
 (in case you have a multi operator deployment) by running:
 
 ```shell
@@ -112,7 +112,7 @@ kubectl logs -n postgresql-operator-system \
   jq -r . > cnp_logs.json
 ```
 
-Get Cloud Native PostgreSQL operator version by using `kubectl-cnp` plugin:
+Get CloudNativePG operator version by using `kubectl-cnp` plugin:
 
 ```shell
 kubectl-cnp status <CLUSTER>
@@ -215,7 +215,7 @@ cluster with:
 
 ```shell
 # using labels available from CNP 1.12.0
-kubectl get pod -l k8s.enterprisedb.io/cluster=<CLUSTER> -L role -n <NAMESPACE>
+kubectl get pod -l cnpg.io/cluster=<CLUSTER> -L role -n <NAMESPACE>
 # using legacy labels
 kubectl get pod -l postgresql=<CLUSTER> -L role -n <NAMESPACE>
 ```
@@ -349,7 +349,7 @@ info | 1636383566.0664876 | postgres | record
 You can list the backups that have been created for a named cluster with:
 
 ```shell
-kubectl get backup -l k8s.enterprisedb.io/cluster=<CLUSTER>
+kubectl get backup -l cnpg.io/cluster=<CLUSTER>
 ```
 
 !!! Important
@@ -386,7 +386,7 @@ Additionally, you can gather the list of nodes where the pods of a given
 cluster are running with:
 
 ```shell
-kubectl get pod -l k8s.enterprisedb.io/clusterName=<CLUSTER> \
+kubectl get pod -l cnpg.io/clusterName=<CLUSTER> \
   -L role -n <NAMESPACE> -o wide
 ```
 

@@ -17,9 +17,9 @@ builds:
   ldflags:
   - -s
   - -w
-  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion={{.Env.VERSION}}
-  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit={{.Env.COMMIT}}
-  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate={{.Env.DATE}}
+  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion={{.Env.VERSION}}
+  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit={{.Env.COMMIT}}
+  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate={{.Env.DATE}}
   goos:
   - linux
   goarch:

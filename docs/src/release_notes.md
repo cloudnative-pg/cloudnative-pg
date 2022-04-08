@@ -1,6 +1,6 @@
 # Release notes
 
-History of user-visible changes for Cloud Native PostgreSQL.
+History of user-visible changes for CloudNativePG.
 
 ## Version 1.14.0
 
@@ -180,7 +180,7 @@ Features:
   shutdown for the remaining half, before the pod is killed by Kubernetes
 - Add the `switchoverDelay` option to control the time given to the former
   primary to shut down gracefully and archive all the WAL files before
-  promoting the new primary (by default, Cloud Native PostgreSQL waits
+  promoting the new primary (by default, CloudNativePG waits
   indefinitely to privilege data durability)
 - Handle changes to resource requests and limits for a PostgreSQL `Cluster` by
   issuing a rolling update
@@ -196,7 +196,7 @@ Features:
 - Manage automated resizing of persistent volumes in Azure through the
   `ENABLE_AZURE_PVC_UPDATES` operator configuration option, by issuing a
   rolling update of the cluster if needed (disabled by default)
-- Introduce the`k8s.enterprisedb.io/reconciliationLoop` annotation that, when
+- Introduce the`cnpg.io/reconciliationLoop` annotation that, when
   set to `disabled` on a given Postgres cluster, prevents the reconciliation
   loop from running
 - Introduce the `postInitApplicationSQL` option as part of the `initdb`
@@ -270,10 +270,10 @@ Features:
   about the backup
 - Introduce a new annotation that reports the status of a PVC (being
   initialized or ready)
-- Set the cluster name in the `k8s.enterprisedb.io/cluster` label for every
+- Set the cluster name in the `cnpg.io/cluster` label for every
   object generated in a `Cluster`, including `Backup` objects
 - Drop support for deprecated API version
-  `postgresql.k8s.enterprisedb.io/v1alpha1` on the `Cluster`, `Backup`, and
+  `postgresql.cnpg.io/v1alpha1` on the `Cluster`, `Backup`, and
   `ScheduledBackup` kinds
 - Set default operand image to PostgreSQL 14.2
 
@@ -451,7 +451,7 @@ Features:
       `pg_stat_statements`, ` pgaudit` or `auto_explain` options are added to
       the `postgresql` parameters section
 
-- Support the `k8s.enterprisedb.io/reload` label to finely control the
+- Support the `cnpg.io/reload` label to finely control the
   automated reload of config maps and secrets, including those used for custom
   monitoring/alerting metrics in the Prometheus exporter or to store certificates
 - Add the `reload` command to the `cnp` plugin for `kubectl` to trigger a
@@ -578,16 +578,16 @@ Security Enhancements:
 
 Changes:
 
-- **IMPORTANT:** If you have previously deployed the Cloud Native PostgreSQL
+- **IMPORTANT:** If you have previously deployed the CloudNativePG
   operator using the YAML manifest, you must delete the existing operator
   deployment before installing the new version. This is required to avoid
   conflicts with other Kubernetes API's due to a change in labels
   and label selectors being directly managed by the operator. Please refer to
-  the Cloud Native PostgreSQL documentation for additional detail on upgrading
+  the CloudNativePG documentation for additional detail on upgrading
   to 1.4.0
 - Fix the labels that are automatically defined by the operator, renaming them
   from `control-plane: controller-manager` to
-  `app.kubernetes.io/name: cloud-native-postgresql`
+  `app.kubernetes.io/name: cloudnative-pg`
 - Assign the `metrics` name to the TCP port for the Prometheus exporter
 - Set `cnp_metrics_exporter` as the `application_name` to the metrics exporter
   connection in PostgreSQL
@@ -667,8 +667,8 @@ Changes:
 
 **Release date:** 4 Feb 2021
 
-The first major stable release of Cloud Native PostgreSQL implements `Cluster`,
-`Backup` and `ScheduledBackup` in the API group `postgresql.k8s.enterprisedb.io/v1`.
+The first major stable release of CloudNativePG implements `Cluster`,
+`Backup` and `ScheduledBackup` in the API group `postgresql.cnpg.io/v1`.
 It uses these resources to create and manage PostgreSQL clusters inside
 Kubernetes with the following main capabilities:
 

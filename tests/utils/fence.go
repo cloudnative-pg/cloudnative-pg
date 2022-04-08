@@ -19,8 +19,8 @@ package utils
 import (
 	"fmt"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/fence"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // FencingMethod will be one of the supported ways to trigger an instance fencing

@@ -29,7 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	utils2 "github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PodCreateAndWaitForReady creates a given pod object and wait for it to be ready

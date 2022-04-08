@@ -20,7 +20,7 @@ specific to Kubernetes and PostgreSQL.
 | [Operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)                                       | An *operator* is a custom resource that automates those steps that are normally performed by a human operator when managing one or more applications or given services. An operator assists Kubernetes in making sure that the resource's defined state always matches the observed one.                                                                                                                                                                                                                                                                                                                       |
 | [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/)                                                 | `kubectl` is the command-line tool used to manage a Kubernetes cluster.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
-Cloud Native PostgreSQL requires Kubernetes 1.19 or higher.
+CloudNativePG requires Kubernetes 1.19 or higher.
 
 ## PostgreSQL terminology
 
@@ -31,9 +31,9 @@ Cloud Native PostgreSQL requires Kubernetes 1.19 or higher.
 | Replica | A PostgreSQL instance replicating from the only primary instance in a cluster and is kept updated by reading a stream of Write-Ahead Log (WAL) records. A replica is also known as *standby* or *secondary* server. PostgreSQL relies on physical streaming replication (async/sync) and file-based log shipping (async). |
 | Hot Standby | PostgreSQL feature that allows a *replica* to accept read-only workloads. |
 | Cluster | To be intended as High Availability (HA) Cluster: a set of PostgreSQL instances made up by a single primary and an optional arbitrary number of replicas. |
-| Replica Cluster | A Cloud Native PostgreSQL `Cluster` that is in continuous recovery mode from a selected PostgreSQL cluster, normally residing outside the Kubernetes cluster. It is a feature that enables multi-cluster deployments in private, public, hybrid, and multi-cloud contexts. |
+| Replica Cluster | A CloudNativePG `Cluster` that is in continuous recovery mode from a selected PostgreSQL cluster, normally residing outside the Kubernetes cluster. It is a feature that enables multi-cluster deployments in private, public, hybrid, and multi-cloud contexts. |
 | Designated Primary | A PostgreSQL standby instance in a replica cluster that is in continuous recovery from another PostgreSQL cluster and that is designated to become primary in case the replica cluster becomes primary. |
-| Superuser | In PostgreSQL a *superuser* is any role with both `LOGIN` and `SUPERUSER` privileges. For security reasons, Cloud Native PostgreSQL performs administrative tasks by connecting to the `postgres` database as the `postgres` user via `peer` authentication over the local Unix Domain Socket. |
+| Superuser | In PostgreSQL a *superuser* is any role with both `LOGIN` and `SUPERUSER` privileges. For security reasons, CloudNativePG performs administrative tasks by connecting to the `postgres` database as the `postgres` user via `peer` authentication over the local Unix Domain Socket. |
 
 ## Cloud terminology
 
@@ -45,4 +45,4 @@ Cloud Native PostgreSQL requires Kubernetes 1.19 or higher.
 ## What to do next
 
 Now that you have familiarized with the terminology, you can decide to
-[test Cloud Native PostgreSQL on your laptop using a local cluster](quickstart.md) before deploying the operator in your selected cloud environment.
+[test CloudNativePG on your laptop using a local cluster](quickstart.md) before deploying the operator in your selected cloud environment.

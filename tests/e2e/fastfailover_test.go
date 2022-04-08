@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
 )
 
 var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() {

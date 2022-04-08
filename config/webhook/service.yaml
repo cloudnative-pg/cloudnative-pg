@@ -9,4 +9,4 @@ spec:
     - port: 443
       targetPort: 9443
   selector:
-    app.kubernetes.io/name: cloud-native-postgresql
+    app.kubernetes.io/name: cloudnative-pg

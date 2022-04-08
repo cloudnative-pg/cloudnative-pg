@@ -30,12 +30,12 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/pgbouncer/management/controller"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/config"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/metricsserver"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/pgbouncer/management/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/metricsserver"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 // NewCmd creates the "instance run" subcommand
@@ -91,7 +91,7 @@ func NewCmd() *cobra.Command {
 func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedName) error {
 	var err error
 
-	log.Info("Starting Cloud Native PostgreSQL PgBouncer Instance Manager",
+	log.Info("Starting CloudNativePG PgBouncer Instance Manager",
 		"version", versions.Version,
 		"build", versions.Info)
 

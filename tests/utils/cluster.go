@@ -29,7 +29,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // AllClusterPodsHaveLabels verifies if the labels defined in a map are included

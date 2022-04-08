@@ -27,11 +27,11 @@ import (
 
 	"github.com/lib/pq"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/constants"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
@@ -125,7 +125,7 @@ func (info InitInfo) CreateDataDirectory() error {
 	}
 
 	// Always read the custom configuration file created by the operator
-	postgresConfTrailer := fmt.Sprintf("# load Cloud Native PostgreSQL custom configuration\n"+
+	postgresConfTrailer := fmt.Sprintf("# load CloudNativePG custom configuration\n"+
 		"include '%v'\n",
 		constants.PostgresqlCustomConfigurationFile)
 	err = fileutils.AppendStringToFile(

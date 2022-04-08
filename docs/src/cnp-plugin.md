@@ -1,7 +1,6 @@
-# Cloud Native PostgreSQL Plugin
+# CloudNativePG Plugin
 
-Cloud Native PostgreSQL provides a plugin for `kubectl` to manage a cluster in Kubernetes.
-The plugin also works with `oc` in an OpenShift environment.
+CloudNativePG provides a plugin for `kubectl` to manage a cluster in Kubernetes.
 
 ## Install
 
@@ -15,7 +14,7 @@ curl -sSfL \
 
 ### Supported Architectures
 
-Cloud Native PostgreSQL Plugin is currently build for the following
+CloudNativePG Plugin is currently build for the following
 operating system and architectures:
 
 * Linux
@@ -226,7 +225,7 @@ kubectl cnp promote cluster-example 2
 
 ### Certificates
 
-Clusters created using the Cloud Native PostgreSQL operator work with a CA to sign
+Clusters created using the CloudNativePG operator work with a CA to sign
 a TLS authentication certificate.
 
 To get a certificate, you need to provide a name for the secret to store
@@ -275,7 +274,7 @@ common case for this will be a minor upgrade of PostgreSQL image.
 
 !!! Note
     If you want ConfigMaps and Secrets to be **automatically** reloaded
-    by instances, you can add a label with key `k8s.enterprisedb.io/reload` to it.
+    by instances, you can add a label with key `cnpg.io/reload` to it.
 
 ### Reload
 

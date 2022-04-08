@@ -24,8 +24,8 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // ErrorNonExistentFile is returned when the spool tried to work

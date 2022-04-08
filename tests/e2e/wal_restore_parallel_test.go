@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walrestore"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	testUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

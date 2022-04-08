@@ -15,7 +15,7 @@ There are primarily two ways to bootstrap a new cluster:
     and that accepts read-only connections.
 
 !!! Warning
-    Cloud Native PostgreSQL requires both the `postgres` user and database to
+    CloudNativePG requires both the `postgres` user and database to
     always exists. Using the local Unix Domain Socket, it needs to connect
     as `postgres` user to the `postgres` database via `peer` authentication in
     order to perform administrative tasks on the cluster.  
@@ -25,7 +25,7 @@ There are primarily two ways to bootstrap a new cluster:
 
 The *bootstrap* method can be defined in the `bootstrap` section of the cluster
 specification.
-Cloud Native PostgreSQL currently supports the following bootstrap methods:
+CloudNativePG currently supports the following bootstrap methods:
 
 - `initdb`: initialize an empty PostgreSQL cluster (default)
 - `recovery`: create a PostgreSQL cluster by restoring from an existing cluster
@@ -33,7 +33,7 @@ Cloud Native PostgreSQL currently supports the following bootstrap methods:
   a given *point in time*
 - `pg_basebackup`: create a PostgreSQL cluster by cloning an existing one of
   the same major version using `pg_basebackup` via streaming replication protocol -
-  useful if you want to migrate databases to Cloud Native PostgreSQL, even
+  useful if you want to migrate databases to CloudNativePG, even
   from outside Kubernetes.
 
 Differently from the `initdb` method, both `recovery` and `pg_basebackup`
@@ -93,7 +93,7 @@ scratch. It is the default one unless specified differently.
 The following example contains the full structure of the `initdb` configuration:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example-initdb
@@ -204,7 +204,7 @@ walSegmentSize
     option in `initdb` (default: not set - defined by PostgreSQL as 16 megabytes).
 
 !!! Note
-    The only two locale options that Cloud Native PostgreSQL implements during
+    The only two locale options that CloudNativePG implements during
     the `initdb` bootstrap refer to the `LC_COLLATE` and `LC_TYPE` subcategories.
     The remaining locale subcategories can be configured directly in the PostgreSQL
     configuration, using the `lc_messages`, `lc_monetary`, `lc_numeric`, and
@@ -214,7 +214,7 @@ The following example enables data checksums and sets the default encoding to
 `LATIN1`:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example-initdb
@@ -231,7 +231,7 @@ spec:
     size: 1Gi
 ```
 
-Cloud Native PostgreSQL supports another way to customize the behaviour of the
+CloudNativePG supports another way to customize the behaviour of the
 `initdb` invocation, using the `options` subsection. However, given that there
 are options that can break the behaviour of the operator (such as `--auth` or
 `-d`), this technique is deprecated and will be removed from future versions of
@@ -243,7 +243,7 @@ be executed as the *superuser* (`postgres`), connected to the `postgres`
 database:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example-initdb
@@ -271,7 +271,7 @@ spec:
 
 ## Bootstrap from another cluster
 
-Cloud Native PostgreSQL enables the bootstrap of a cluster starting from
+CloudNativePG enables the bootstrap of a cluster starting from
 another one of the same major version.
 This operation can happen by connecting directly to the source cluster via
 streaming replication (`pg_basebackup`), or indirectly via a *recovery object
@@ -294,7 +294,7 @@ by `name` (our recommendation is to use the same `name` of the origin cluster).
 The `recovery` bootstrap mode lets you create a new cluster from
 an existing backup, namely a *recovery object store*.
 
-There are two ways to achieve this result in Cloud Native PostgreSQL:
+There are two ways to achieve this result in CloudNativePG:
 
 - using a recovery object store, that is a backup of another cluster
   created by Barman Cloud and defined via the `barmanObjectStore` option
@@ -320,7 +320,7 @@ reference it in the `.spec.recovery.source` option. The following example
 defines a recovery object store in a blob container in Azure:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-restore
@@ -372,7 +372,7 @@ cluster should be created, you can specify its name through
 `.spec.bootstrap.recovery.backup.name`, as in the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example-initdb
@@ -432,7 +432,7 @@ feature to work in case a recovery target is specified, like in the following
 example that uses a recovery object stored in Azure:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-restore-pitr
@@ -488,7 +488,7 @@ stopping right after the recovery target, setting the `exclusive` parameter to
 `false` like in the following example relying on a blob container in Azure:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-restore-pitr
@@ -527,7 +527,7 @@ an exact physical copy of an existing and **binary compatible** PostgreSQL
 instance (*source*), through a valid *streaming replication* connection.
 The source instance can be either a primary or a standby PostgreSQL server.
 
-The primary use case for this method is represented by **migrations** to Cloud Native PostgreSQL,
+The primary use case for this method is represented by **migrations** to CloudNativePG,
 either from outside Kubernetes or within Kubernetes (e.g., from another operator).
 
 !!! Warning
@@ -538,13 +538,13 @@ either from outside Kubernetes or within Kubernetes (e.g., from another operator
 Similar to the case of the `recovery` bootstrap method, once the clone operation
 completes, the operator will take ownership of the target cluster, starting from
 the first instance. This includes overriding some configuration parameters, as
-required by Cloud Native PostgreSQL, resetting the superuser password, creating
+required by CloudNativePG, resetting the superuser password, creating
 the `streaming_replica` user, managing the replicas, and so on. The resulting
 cluster will be completely independent of the source instance.
 
 !!! Important
     Configuring the network between the target instance and the source instance
-    goes beyond the scope of Cloud Native PostgreSQL documentation, as it depends
+    goes beyond the scope of CloudNativePG documentation, as it depends
     on the actual context and environment.
 
 The streaming replication client on the target instance, which will be
@@ -555,7 +555,7 @@ instance in any of the following ways:
 2. via [TLS client certificate](#tls-certificate-authentication)
 
 The latter is the recommended one if you connect to a source managed
-by Cloud Native PostgreSQL or configured for TLS authentication.
+by CloudNativePG or configured for TLS authentication.
 The first option is, however, the most common form of authentication to a
 PostgreSQL server in general, and might be the easiest way if the source
 instance is on a traditional environment outside Kubernetes.
@@ -594,7 +594,7 @@ As explained in the requirements section, you need to have a user
 with either the `SUPERUSER` or, preferably, just the `REPLICATION`
 privilege in the source instance.
 
-If the source database is created with Cloud Native PostgreSQL, you
+If the source database is created with CloudNativePG, you
 can reuse the `streaming_replica` user and take advantage of client
 TLS certificates authentication (which, by default, is the only allowed
 connection method for `streaming_replica`).
@@ -619,7 +619,7 @@ will need to add it to a secret in the target instance.
 
 #### Username/Password authentication
 
-The first authentication method supported by Cloud Native PostgreSQL
+The first authentication method supported by CloudNativePG
 with the `pg_basebackup` bootstrap is based on username and password matching.
 
 Make sure you have the following information before you start the procedure:
@@ -646,7 +646,7 @@ the `streaming_replica` user, whose password is stored in the
 `password` key of the `source-db-replica-user` secret.
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: target-db
@@ -676,7 +676,7 @@ the same PostgreSQL version (in our case 14.2).
 
 #### TLS certificate authentication
 
-The second authentication method supported by Cloud Native PostgreSQL
+The second authentication method supported by CloudNativePG
 with the `pg_basebackup` bootstrap is based on TLS client certificates.
 This is the recommended approach from a security standpoint.
 
@@ -696,7 +696,7 @@ information (respectively in the `cluster-example-replication` and
 `cluster-example-ca` secrets).
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-clone-tls
@@ -732,16 +732,16 @@ spec:
 
 ##### Missing tablespace support
 
-Cloud Native PostgreSQL does not currently include full declarative management
+CloudNativePG does not currently include full declarative management
 of PostgreSQL global objects, namely roles, databases, and tablespaces.
 While roles and databases are copied from the source instance to the target
 cluster, tablespaces require a capability that this version of
-Cloud Native PostgreSQL is missing: definition and management of additional
+CloudNativePG is missing: definition and management of additional
 persistent volumes. When dealing with base backup and tablespaces, PostgreSQL
 itself requires that the exact mount points in the source instance
 must also exist in the target instance, in our case, the pods in Kubernetes
-that Cloud Native PostgreSQL manages. For this reason, you cannot directly
-migrate in Cloud Native PostgreSQL a PostgreSQL instance that takes advantage
+that CloudNativePG manages. For this reason, you cannot directly
+migrate in CloudNativePG a PostgreSQL instance that takes advantage
 of tablespaces (you first need to remove them from the source or, if your
 organization requires this feature, contact EDB to prioritize it).
 
@@ -764,11 +764,11 @@ before migrating to the target database in Kubernetes.
     procedure as many times as needed to systematically measure the downtime of your
     applications in production. Feel free to contact EDB for assistance.
 
-Future versions of Cloud Native PostgreSQL will enable users to control
+Future versions of CloudNativePG will enable users to control
 PostgreSQL's continuous recovery mechanism via Write-Ahead Log (WAL) shipping
 by creating a new cluster that is a replica of another PostgreSQL instance.
 This will open up two main use cases:
 
-- replication over different Kubernetes clusters in Cloud Native PostgreSQL
-- *0 cutover time* migrations to Cloud Native PostgreSQL with the `pg_basebackup`
+- replication over different Kubernetes clusters in CloudNativePG
+- *0 cutover time* migrations to CloudNativePG with the `pg_basebackup`
   bootstrap method
