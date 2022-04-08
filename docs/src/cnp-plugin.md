@@ -346,19 +346,40 @@ regarding the operator deployment, configuration and events.
     The flag `-S` / `--stopRedaction` will defeat the redaction and show the
     values. Use only at your own risk, this will share private data.
 
+!!! Note
+    By default, operator logs are not collected, but you can enable operator
+    log collection with the `--logs` flag
+
 * **deployment information**: the operator Deployment and operator Pod
 * **configuration**: the Secrets and ConfigMaps in the operator namespace
 * **events**: the Events in the operator namespace
+* **webhook configuration**: the mutating and validating webhook configurations
+* **webhook service**: the webhook service
+* **logs**: logs for the operator Pod (optional, off by default) in JSON-lines format
 
 The command will generate a ZIP file containing various manifest in YAML format
-(by default, but settable to `json` with the `-o` flag).
-Use the `-f` flag to name a result file explicitly.
+(by default, but settable to JSON with the `-o` flag).
+Use the `-f` flag to name a result file explicitly. If the `-f` flag is not used, a
+default time-stamped filename is created for the zip file.
+
+``` shell
+kubectl cnp report operator
+```
+
+results in
+
+``` shell
+Successfully written report to "report_operator_<TIMESTAMP>.zip" (format: "yaml")
+```
+
+With the `-f` flag set:
 
 ```shell
 kubectl cnp report operator -f reportRedacted.zip
 ```
 
-Unzipping the file will produce the various manifests:
+Unzipping the file will produce a time-stamped top-level folder to keep the
+directory tidy:
 
 ```shell
 unzip reportRedacted.zip
@@ -366,18 +387,24 @@ unzip reportRedacted.zip
 
 will result in:
 
-```shell
+``` shell
 Archive:  reportRedacted.zip
-  inflating: deployment.yaml
-  inflating: operator-pod.yaml
-  inflating: postgresql-operator-ca-secret.yaml
-  inflating: postgresql-operator-webhook-cert.yaml
-  inflating: events.yaml
+   creating: report_operator_<TIMESTAMP>/
+   creating: report_operator_<TIMESTAMP>/manifests/
+  inflating: report_operator_<TIMESTAMP>/manifests/deployment.yaml  
+  inflating: report_operator_<TIMESTAMP>/manifests/operator-pod.yaml  
+  inflating: report_operator_<TIMESTAMP>/manifests/events.yaml  
+  inflating: report_operator_<TIMESTAMP>/manifests/validating-webhook-configuration.yaml  
+  inflating: report_operator_<TIMESTAMP>/manifests/mutating-webhook-configuration.yaml  
+  inflating: report_operator_<TIMESTAMP>/manifests/webhook-service.yaml  
+  inflating: report_operator_<TIMESTAMP>/manifests/postgresql-operator-ca-secret.yaml  
+  inflating: report_operator_<TIMESTAMP>/manifests/postgresql-operator-webhook-cert.yaml
 ```
 
 You can verify that the confidential information is REDACTED:
 
-```shell
+``` shell
+cd report_operator_<TIMESTAMP>/manifests/
 head postgresql-operator-ca-secret.yaml
 ```
 
@@ -402,7 +429,8 @@ kubectl cnp report operator -f reportNonRedacted.zip -S
 You'll get a reminder that you're about to view confidential information:
 
 ``` shell
-WARNING: secret Redaction is OFF. Use caution
+WARNING: secret Redaction is OFF. Use it with caution
+Successfully written report to "reportNonRedacted.zip" (format: "yaml")
 ```
 
 ``` shell
@@ -429,10 +457,17 @@ The `cluster` sub-command gathers the following:
 * **cluster pods**: pods in the cluster namespace matching the cluster name
 * **cluster jobs**: jobs, if any, in the cluster namespace matching the cluster name
 * **events**: events in the cluster namespace
+* **pod logs**: logs for the cluster Pods (optional, off by default) in JSON-lines format
+* **job logs**: logs for the Pods created by jobs (optional, off by default) in JSON-lines format
 
 The `cluster` sub-command accepts the `-f` and `-o` flags, as the `operator` does.
+If the `-f` flag is not used, a default timestamped report name will be used.
 Note that the cluster information does not contain configuration Secrets / ConfigMaps,
 so the `-S` is disabled.
+
+!!! Note
+    By default, cluster logs are not collected, but you can enable cluster
+    log collection with the `--logs` flag
 
 Usage:
 
@@ -456,8 +491,41 @@ unzip report.zip
 
 ``` shell
 Archive:  report.zip
-  inflating: cluster.yaml
-  inflating: cluster-pods.yaml
-  inflating: cluster-jobs.yaml
-  inflating: events.yaml
+   creating: report_cluster_<TIMESTAMP>/
+   creating: report_cluster_<TIMESTAMP>/manifests/
+  inflating: report_cluster_<TIMESTAMP>/manifests/cluster.yaml  
+  inflating: report_cluster_<TIMESTAMP>/manifests/cluster-pods.yaml  
+  inflating: report_cluster_<TIMESTAMP>/manifests/cluster-jobs.yaml  
+  inflating: report_cluster_<TIMESTAMP>/manifests/events.yaml
+```
+
+Remember that you can use the `--logs` flag to add the pod and job logs to the ZIP.
+
+``` shell
+kubectl cnp report cluster cluster-example-full -n example2 --logs
+```
+
+will result in:
+
+``` shell
+Successfully written report to "report_cluster_<TIMESTAMP>.zip" (format: "yaml")
+```
+
+``` shell
+unzip report_cluster_<TIMESTAMP>.zip
+```
+
+``` shell
+Archive:  report_cluster_<TIMESTAMP>.zip
+   creating: report_cluster_<TIMESTAMP>/
+   creating: report_cluster_<TIMESTAMP>/manifests/
+  inflating: report_cluster_<TIMESTAMP>/manifests/cluster.yaml  
+  inflating: report_cluster_<TIMESTAMP>/manifests/cluster-pods.yaml  
+  inflating: report_cluster_<TIMESTAMP>/manifests/cluster-jobs.yaml  
+  inflating: report_cluster_<TIMESTAMP>/manifests/events.yaml  
+   creating: report_cluster_<TIMESTAMP>/logs/
+  inflating: report_cluster_<TIMESTAMP>/logs/cluster-example-full-1.jsonl  
+   creating: report_cluster_<TIMESTAMP>/job-logs/
+  inflating: report_cluster_<TIMESTAMP>/job-logs/cluster-example-full-1-initdb-qnnvw.jsonl  
+  inflating: report_cluster_<TIMESTAMP>/job-logs/cluster-example-full-2-join-tvj8r.jsonl 
 ```
