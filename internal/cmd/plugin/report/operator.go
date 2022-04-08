@@ -16,25 +16,27 @@ func operatorCmd() *cobra.Command {
 	var (
 		file, output  string
 		stopRedaction bool
+		includeLogs   bool
 	)
 	cmd := &cobra.Command{
 		Use:   "operator -f <filename.zip>",
-		Short: "Report operator deployment, pod, events",
+		Short: "Report operator deployment, pod, events, logs (opt-in)",
 		Long:  "Collects combined information on the operator in a Zip file",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return Operator(cmd.Context(), plugin.OutputFormat(output),
-				file, stopRedaction)
+				file, stopRedaction, includeLogs)
 		},
 	}
 
 	cmd.AddCommand()
 
-	cmd.Flags().StringVarP(&file, "file", "f", "report.zip",
+	cmd.Flags().StringVarP(&file, "file", "f", reportName("operator")+".zip",
 		"Output file")
 	cmd.Flags().StringVarP(&output, "output", "o", "yaml",
 		"Output format. One of yaml|json")
 	cmd.Flags().BoolVarP(&stopRedaction, "stopRedaction", "S", false,
 		"Don't redact secrets")
+	cmd.Flags().BoolVarP(&includeLogs, "logs", "l", false, "include logs")
 
 	return cmd
 }

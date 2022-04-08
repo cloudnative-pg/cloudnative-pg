@@ -338,6 +338,7 @@ bs
 bzip
 cGFzc
 cb
+cd
 ce
 cheatsheet
 checksums
