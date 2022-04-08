@@ -20,7 +20,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -28,14 +28,15 @@ import (
 
 var _ = Describe("Release tag extraction", func() {
 	It("properly works with expected filename", func() {
-		tag := extractTag("postgresql-operator-0.5.0.yaml")
+		tag := extractTag("cnpg-0.5.0.yaml")
 		Expect(tag).To(Equal("0.5.0"))
 	})
 })
 
-var _ = Describe("Most recent tag", func() {
+// TODO: Remove Pending after first release (first-release)
+var _ = Describe("Most recent tag", Pending, func() {
 	It("properly works with release tag", func() {
-		err := os.Setenv("CNP_VERSION", "1.9.1")
+		err := os.Setenv("CNPG_VERSION", "1.9.1")
 		Expect(err).To(BeNil())
 		wd, err := os.Getwd()
 		Expect(err).To(BeNil())
@@ -47,7 +48,7 @@ var _ = Describe("Most recent tag", func() {
 	})
 
 	It("properly works with dev tag", func() {
-		err := os.Setenv("CNP_VERSION", "1.9.1-test")
+		err := os.Setenv("CNPG_VERSION", "1.9.1-test")
 		Expect(err).To(BeNil())
 		wd, err := os.Getwd()
 		Expect(err).To(BeNil())
@@ -60,13 +61,13 @@ var _ = Describe("Most recent tag", func() {
 })
 
 var _ = Describe("Dev tag version check", func() {
-	It("returns true when CNP_VERSION contains a dev tag", func() {
-		err := os.Setenv("CNP_VERSION", "100.9.1-test")
+	It("returns true when CNPG_VERSION contains a dev tag", func() {
+		err := os.Setenv("CNPG_VERSION", "100.9.1-test")
 		Expect(err).To(BeNil())
 		Expect(isDevTagVersion()).To(BeTrue())
 	})
-	It("returns false when CNP_VERSION contains a release tag", func() {
-		err := os.Setenv("CNP_VERSION", "100.9.1")
+	It("returns false when CNPG_VERSION contains a release tag", func() {
+		err := os.Setenv("CNPG_VERSION", "100.9.1")
 		Expect(err).To(BeNil())
 		Expect(isDevTagVersion()).To(BeFalse())
 	})

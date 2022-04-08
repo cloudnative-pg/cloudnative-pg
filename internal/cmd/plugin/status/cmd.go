@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // NewCmd create the new "status" subcommand

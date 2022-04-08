@@ -24,7 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 // PGLocalSocketDir is the directory containing the PostgreSQL local socket

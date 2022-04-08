@@ -22,8 +22,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,7 +38,7 @@ var _ = Describe("Metrics", func() {
 		clusterMetricsFile             = fixturesDir + "/metrics/cluster-metrics.yaml"
 		clusterMetricsDBFile           = fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml"
 		customQueriesSampleFile        = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
-		defaultMonitoringConfigMapName = "postgresql-operator-default-monitoring"
+		defaultMonitoringConfigMapName = "cnpg-default-monitoring"
 		level                          = tests.Low
 	)
 
@@ -55,15 +55,15 @@ var _ = Describe("Metrics", func() {
 	// there are no errors during the collection.
 	metricsRegexp := regexp.MustCompile(
 		`(?m:^(` +
-			`cnp_pg_postmaster_start_time_seconds \d+\.\d+|` + // wokeignore:rule=master
-			`cnp_pg_wal_files_total \d+|` +
-			`cnp_pg_database_size_bytes{datname="app"} [0-9e\+\.]+|` +
-			`cnp_pg_replication_slots_inactive 0|` +
-			`cnp_pg_stat_archiver_archived_count \d+|` +
-			`cnp_pg_stat_archiver_failed_count \d+|` +
-			`cnp_pg_locks_blocked_queries 0|` +
-			`cnp_runonserver_match 42|` +
-			`cnp_collector_last_collection_error 0)` +
+			`cnpg_pg_postmaster_start_time_seconds \d+\.\d+|` + // wokeignore:rule=master
+			`cnpg_pg_wal_files_total \d+|` +
+			`cnpg_pg_database_size_bytes{datname="app"} [0-9e\+\.]+|` +
+			`cnpg_pg_replication_slots_inactive 0|` +
+			`cnpg_pg_stat_archiver_archived_count \d+|` +
+			`cnpg_pg_stat_archiver_failed_count \d+|` +
+			`cnpg_pg_locks_blocked_queries 0|` +
+			`cnpg_runonserver_match 42|` +
+			`cnpg_collector_last_collection_error 0)` +
 			`$)`)
 
 	JustAfterEach(func() {

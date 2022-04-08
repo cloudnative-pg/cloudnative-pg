@@ -24,8 +24,8 @@ import (
 
 	"github.com/lib/pq"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/stringset"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 
 // UpdatePostgresConfigurationFile search and replace options in a Postgres configuration file.

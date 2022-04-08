@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 )
 
 var _ = Describe("cluster_status unit tests", func() {
@@ -38,7 +38,7 @@ var _ = Describe("cluster_status unit tests", func() {
 
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		secretName := rand.String(10)
 
 		By("creating the required secret", func() {
@@ -61,7 +61,7 @@ var _ = Describe("cluster_status unit tests", func() {
 	It("makes sure that getPgbouncerIntegrationStatus returns the correct secret name without duplicates", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler1 := *newFakePooler(cluster)
 		pooler2 := *newFakePooler(cluster)
 		Expect(pooler1.Name).ToNot(Equal(pooler2.Name))
@@ -75,7 +75,7 @@ var _ = Describe("cluster_status unit tests", func() {
 	It("makes sure getObjectResourceVersion returns the correct object version", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 
 		version, err := clusterReconciler.getObjectResourceVersion(ctx, cluster, pooler.Name, &v1.Pooler{})
@@ -87,7 +87,7 @@ var _ = Describe("cluster_status unit tests", func() {
 		const podName = "test-pod"
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		Expect(cluster.Status.TargetPrimaryTimestamp).To(BeEmpty())
 
 		By("setting the primaryInstance and making sure the passed object is updated", func() {
@@ -111,7 +111,7 @@ var _ = Describe("cluster_status unit tests", func() {
 		const phaseReason = "testing"
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 
 		By("registering the phase and making sure the passed object is updated", func() {
 			err := clusterReconciler.RegisterPhase(ctx, cluster, v1.PhaseSwitchover, phaseReason)
@@ -132,7 +132,7 @@ var _ = Describe("cluster_status unit tests", func() {
 	It("makes sure that getManagedResources works correctly", func() {
 		ctx, cancel := context.WithCancel(context.TODO())
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		var jobs []batchv1.Job
 		var pods []corev1.Pod
 		var pvcs []corev1.PersistentVolumeClaim

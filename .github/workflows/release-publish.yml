@@ -12,109 +12,12 @@ env:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
-  buildx:
-    name: Build containers
-    runs-on: ubuntu-20.04
-    outputs:
-      version: ${{ steps.build-meta.outputs.version }}
-      digest: ${{ steps.build.outputs.digest }}
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v3
-        with:
-          # To identify the commit we need the history and all the tags.
-          fetch-depth: 0
-      -
-        name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-      -
-        name: Build meta
-        id: build-meta
-        run: |
-          images="quay.io/enterprisedb/cloud-native-postgresql-testing"
-          images="${images},quay.io/enterprisedb/cloud-native-postgresql"
-          commit_sha=${{ github.sha }}
-          commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
-          # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
-          commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
-          commit_short=$(git rev-parse --short "${commit_sha}")
-          echo "::set-output name=images::${images}"
-          echo "::set-output name=date::${commit_date}"
-          echo "::set-output name=version::${commit_version}"
-          echo "::set-output name=commit::${commit_short}"
-      -
-        name: Set GoReleaser environment
-        run: |
-          echo GOPATH=$(go env GOPATH) >> $GITHUB_ENV
-          echo PWD=$(pwd) >> $GITHUB_ENV
-      -
-        name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
-        with:
-          distribution: goreleaser
-          version: latest
-          args: build -f .goreleaser-multiarch.yml --skip-validate --rm-dist
-        env:
-          DATE: ${{ steps.build-meta.outputs.date }}
-          COMMIT: ${{ steps.build-meta.outputs.commit }}
-          VERSION: ${{ steps.build-meta.outputs.version }}
-      -
-        name: Docker meta
-        id: docker-meta
-        uses: docker/metadata-action@v3.3.0
-        with:
-          images: ${{ steps.build-meta.outputs.images }}
-          tags: |
-            type=semver,pattern={{version}}
-      -
-        name: Detect platforms
-        id: docker-platforms
-        run: |
-          # Available architecture on UBI8 are: linux/amd64, linux/ppc64le, linux/s390x
-          # Keep in mind that adding more platforms (architectures) will increase the building
-          # time even if we use the ghcache for the building process.
-          platforms="linux/amd64,linux/ppc64le,linux/s390x"
-          echo "::set-output name=platforms::${platforms}"
-      -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v1.2.0
-        with:
-          image: tonistiigi/binfmt:qemu-v6.1.0
-          platforms: ${{ steps.docker-platforms.outputs.platforms }}
-      -
-        name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1.3.0
-      -
-        name: Login to quay.io
-        uses: docker/login-action@v1.9.0
-        with:
-          registry: quay.io/enterprisedb
-          username: ${{ secrets.QUAY_USERNAME }}
-          password: ${{ secrets.QUAY_TOKEN }}
-      -
-        name: Build and push
-        id: build
-        uses: docker/build-push-action@v2.10.0
-        with:
-          platforms: ${{ steps.docker-platforms.outputs.platforms }}
-          context: .
-          push: true
-          build-args: |
-            VERSION=${{ steps.build-meta.outputs.version }}
-          tags: ${{ steps.docker-meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   release:
     runs-on: ubuntu-20.04
-    needs:
-      - buildx
     steps:
       -
         name: Checkout
@@ -141,13 +44,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  release-plugin:
+  release-binaries:
+    name: Build containers
     runs-on: ubuntu-20.04
+    outputs:
+      version: ${{ steps.build-meta.outputs.version }}
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       -
         name: Checkout
         uses: actions/checkout@v3
         with:
+          # To identify the commit we need the history and all the tags.
           fetch-depth: 0
       -
         name: Install Go
@@ -155,18 +63,30 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
-        name: Get tag
-        run: |
-          tag="${GITHUB_REF#refs/tags/v}"
-          echo "TAG=${tag}" >> $GITHUB_ENV
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
-        name: Generate release notes
+        name: Build meta
+        id: build-meta
         run: |
-          docker run --rm -v $(pwd):/src \
-            -v /tmp:/tmp mist/submark \
-            submark -O --h2 "Version ${{ env.TAG }}" \
-            --out-file /tmp/release_notes.md \
-            /src/docs/src/release_notes.md
+          images='ghcr.io/cloudnative-pg/cloudnative-pg'
+          images="${images},ghcr.io/cloudnative-pg/cloudnative-pg-testing"
+          commit_sha=${{ github.sha }}
+          commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
+          # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
+          commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
+          commit_short=$(git rev-parse --short "${commit_sha}")
+          echo "::set-output name=images::${images}"
+          echo "::set-output name=date::${commit_date}"
+          echo "::set-output name=version::${commit_version}"
+          echo "::set-output name=commit::${commit_short}"
       -
         name: Import GPG key
         id: import_gpg
@@ -174,15 +94,6 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
-      -
-        name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          body_path: /tmp/release_notes.md
-          draft: false
-          name: Release ${{ env.TAG }}
-          repository: EnterpriseDB/kubectl-cnp
-          token: ${{ secrets.REPO_GHA_PAT }}
       -
         name: Set GoReleaser environment
         run: |
@@ -196,27 +107,52 @@ jobs:
           version: latest
           args: release --rm-dist
         env:
-          GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
+          DATE: ${{ steps.build-meta.outputs.date }}
+          COMMIT: ${{ steps.build-meta.outputs.commit }}
+          VERSION: ${{ steps.build-meta.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-
-  invoke-redhat-certification:
-    name: Trigger Red Hat Certification Workflow
-    runs-on: ubuntu-20.04
-    needs:
-      - buildx
-      - release
-    if: |
-      needs.buildx.result == 'success' &&
-      needs.release.result == 'success'
-    steps:
-      - name: Invoke workflow-dispatch
-        id: trigger-workflow
-        uses: aurelien-baudet/workflow-dispatch@v2.1.1
+      -
+        name: Docker meta
+        id: docker-meta
+        uses: docker/metadata-action@v3.3.0
         with:
-          workflow: redhat-certification
-          token: ${{ secrets.REPO_GHA_PAT }}
-          ref: ${{ steps.vars.outputs.ref }}
-          display-workflow-run-url: true
-          wait-for-completion: false
-          inputs: >
-            {"digest":"${{ needs.buildx.outputs.digest }}","version":"${{ needs.buildx.outputs.version }}"}
+          images: ${{ steps.build-meta.outputs.images }}
+          tags: |
+            type=semver,pattern={{version}}
+      -
+        name: Detect platforms
+        id: docker-platforms
+        run: |
+          # Keep in mind that adding more platforms (architectures) will increase the building
+          # time even if we use the ghcache for the building process.
+          platforms="linux/amd64"
+          echo "::set-output name=platforms::${platforms}"
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v1.2.0
+        with:
+          image: tonistiigi/binfmt:qemu-v6.1.0
+          platforms: ${{ steps.docker-platforms.outputs.platforms }}
+      -
+        name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1.3.0
+      -
+        name: Login to ghcr.io
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      -
+        name: Build and push
+        id: build
+        uses: docker/build-push-action@v2.10.0
+        with:
+          platforms: ${{ steps.docker-platforms.outputs.platforms }}
+          context: .
+          push: true
+          build-args: |
+            VERSION=${{ steps.build-meta.outputs.version }}
+          tags: ${{ steps.docker-meta.outputs.tags }}

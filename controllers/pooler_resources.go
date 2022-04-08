@@ -25,7 +25,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // poolerManagedResources contains all the resources that are going to be

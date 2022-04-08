@@ -20,13 +20,24 @@ import json
 
 min_supported_major = 10
 
-pg_repo_url = "https://quay.io/api/v1/repository/enterprisedb/postgresql"
+pg_repo_name = "cloudnative-pg/postgresql"
 pg_version_re = re.compile(r"^(\d+)(?:\.\d+)(-\d+)?$")
 pg_versions_file = ".github/pg_versions.json"
 
 
-def get_json(repo_url):
+def get_token(repo_name):
+    token_url = "https://ghcr.io/token?scope=repository:{}:pull".format(repo_name)
+    req = urllib.request.Request(token_url)
+    data = urllib.request.urlopen(req).read()
+    token_json = json.loads(data.decode("utf-8"))
+    return token_json["token"]
+
+
+def get_json(repo_name):
+    token = get_token(repo_name)
+    repo_url = "https://ghcr.io/v2/{}/tags/list".format(repo_name)
     req = urllib.request.Request(repo_url)
+    req.add_header("Authorization", "Bearer {}".format(token))
     data = urllib.request.urlopen(req).read()
     repo_json = json.loads(data.decode("utf-8"))
     return repo_json
@@ -46,7 +57,7 @@ def version_sort_key(version):
 def write_json(repo_url, version_re, output_file):
     repo_json = get_json(repo_url)
 
-    tags = list(repo_json["tags"].keys())
+    tags = repo_json["tags"]
     tags.sort(key=version_sort_key, reverse=True)
 
     results = {}
@@ -85,4 +96,4 @@ def write_json(repo_url, version_re, output_file):
 
 if __name__ == "__main__":
     # PostgreSQL JSON file generator with Versions like x.y
-    write_json(pg_repo_url, pg_version_re, pg_versions_file)
+    write_json(pg_repo_name, pg_version_re, pg_versions_file)

@@ -25,8 +25,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
 
 // NewCmd create the "instance status" subcommand

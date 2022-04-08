@@ -30,7 +30,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 
 	It("apply the default settings", func() {
 		info := ConfigurationInfo{
-			Settings:           CnpConfigurationSettings,
+			Settings:           CnpgConfigurationSettings,
 			MajorVersion:       100000,
 			UserSettings:       settings,
 			IncludingMandatory: true,
@@ -44,7 +44,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 
 	It("enforce the mandatory values", func() {
 		info := ConfigurationInfo{
-			Settings:     CnpConfigurationSettings,
+			Settings:     CnpgConfigurationSettings,
 			MajorVersion: 100000,
 			UserSettings: map[string]string{
 				"hot_standby": "off",
@@ -59,7 +59,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 
 	It("generate a config file", func() {
 		info := ConfigurationInfo{
-			Settings:           CnpConfigurationSettings,
+			Settings:           CnpgConfigurationSettings,
 			MajorVersion:       100000,
 			UserSettings:       settings,
 			IncludingMandatory: true,
@@ -86,7 +86,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	When("version is 10", func() {
 		It("will use appropriate settings", func() {
 			info := ConfigurationInfo{
-				Settings:           CnpConfigurationSettings,
+				Settings:           CnpgConfigurationSettings,
 				MajorVersion:       100000,
 				UserSettings:       settings,
 				IncludingMandatory: true,
@@ -101,7 +101,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	When("version is 13", func() {
 		It("will use appropriate settings", func() {
 			info := ConfigurationInfo{
-				Settings:           CnpConfigurationSettings,
+				Settings:           CnpgConfigurationSettings,
 				MajorVersion:       130000,
 				UserSettings:       settings,
 				IncludingMandatory: true,
@@ -116,7 +116,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	When("replica cluster is being configured", func() {
 		It("will set archive_mode to always", func() {
 			info := ConfigurationInfo{
-				Settings:           CnpConfigurationSettings,
+				Settings:           CnpgConfigurationSettings,
 				MajorVersion:       130000,
 				UserSettings:       settings,
 				IncludingMandatory: true,
@@ -132,7 +132,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	When("a primary cluster is configured", func() {
 		It("will set archive_mode to on", func() {
 			info := ConfigurationInfo{
-				Settings:           CnpConfigurationSettings,
+				Settings:           CnpgConfigurationSettings,
 				MajorVersion:       130000,
 				UserSettings:       settings,
 				IncludingMandatory: true,
@@ -147,7 +147,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 
 	It("adds shared_preload_library correctly", func() {
 		info := ConfigurationInfo{
-			Settings:                         CnpConfigurationSettings,
+			Settings:                         CnpgConfigurationSettings,
 			MajorVersion:                     130000,
 			IncludingMandatory:               true,
 			SyncReplicas:                     0,
@@ -164,7 +164,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	When("we are using synchronous replication", func() {
 		It("generate the correct value for the synchronous_standby_names parameter", func() {
 			info := ConfigurationInfo{
-				Settings:           CnpConfigurationSettings,
+				Settings:           CnpgConfigurationSettings,
 				MajorVersion:       130000,
 				UserSettings:       settings,
 				IncludingMandatory: true,
@@ -183,7 +183,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 
 	It("checks if PreserveFixedSettingsFromUser works properly", func() {
 		info := ConfigurationInfo{
-			Settings:     CnpConfigurationSettings,
+			Settings:     CnpgConfigurationSettings,
 			MajorVersion: 100000,
 			UserSettings: map[string]string{
 				"ssl":                  "off",
@@ -270,7 +270,7 @@ var _ = Describe("pgaudit", func() {
 	})
 	It("adds pgaudit to shared_preload_library", func() {
 		info := ConfigurationInfo{
-			Settings:                        CnpConfigurationSettings,
+			Settings:                        CnpgConfigurationSettings,
 			MajorVersion:                    130000,
 			UserSettings:                    map[string]string{"pgaudit.something": "something"},
 			IncludingSharedPreloadLibraries: true,
@@ -287,7 +287,7 @@ var _ = Describe("pgaudit", func() {
 	})
 	It("adds pg_stat_statements to shared_preload_library", func() {
 		info := ConfigurationInfo{
-			Settings:                        CnpConfigurationSettings,
+			Settings:                        CnpgConfigurationSettings,
 			MajorVersion:                    130000,
 			UserSettings:                    map[string]string{"pg_stat_statements.something": "something"},
 			IncludingMandatory:              true,
@@ -304,7 +304,7 @@ var _ = Describe("pgaudit", func() {
 	})
 	It("adds pg_stat_statements and pg_audit to shared_preload_library", func() {
 		info := ConfigurationInfo{
-			Settings:     CnpConfigurationSettings,
+			Settings:     CnpgConfigurationSettings,
 			MajorVersion: 130000,
 			UserSettings: map[string]string{
 				"pg_stat_statements.something": "something",

@@ -8,5 +8,5 @@ roleRef:
   name: manager
 subjects:
 - kind: ServiceAccount
-  name: postgresql-operator-manager
-  namespace: postgresql-operator-system
+  name: cnpg-manager
+  namespace: cnpg-system

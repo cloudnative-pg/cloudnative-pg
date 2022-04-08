@@ -3,7 +3,7 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: scheduledbackups.postgresql.k8s.enterprisedb.io
+  name: scheduledbackups.postgresql.cnpg.io
 spec:
   preserveUnknownFields: false
   conversion:

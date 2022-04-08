@@ -25,9 +25,9 @@ import (
 
 	"k8s.io/client-go/util/retry"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/url"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
 
 // GetCluster gets the required cluster from cache

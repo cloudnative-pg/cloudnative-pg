@@ -29,8 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 )
 
 var _ = Describe("unit test of pooler_update reconciliation logic", func() {
@@ -45,7 +45,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 	It("it should test the deployment update logic", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
 
@@ -102,7 +102,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 	It("should test the ServiceAccount and RBAC update logic", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		res := &poolerManagedResources{Cluster: cluster, ServiceAccount: nil}
 
@@ -216,7 +216,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 	It("should test the Service update logic", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		res := &poolerManagedResources{Cluster: cluster}
 

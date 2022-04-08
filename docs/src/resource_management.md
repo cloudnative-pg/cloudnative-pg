@@ -3,7 +3,7 @@
 In a typical Kubernetes cluster, pods run with unlimited resources. By default,
 they might be allowed to use as much CPU and RAM as needed.
 
-Cloud Native PostgreSQL allows administrators to control and manage resource usage by the pods of the cluster,
+CloudNativePG allows administrators to control and manage resource usage by the pods of the cluster,
 through the `resources` section of the manifest, with two knobs:
 
 - `requests`: initial requirement
@@ -56,7 +56,7 @@ while creating a cluster:
 You can refer to the following example manifest:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: postgresql-resources

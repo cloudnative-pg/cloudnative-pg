@@ -18,7 +18,7 @@ limitations under the License.
 package show
 
 import (
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/show/walarchivequeue"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/show/walarchivequeue"
 	"github.com/spf13/cobra"
 )
 

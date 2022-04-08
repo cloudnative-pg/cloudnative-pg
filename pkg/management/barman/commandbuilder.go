@@ -19,9 +19,9 @@ package barman
 import (
 	"fmt"
 
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // AppendCloudProviderOptionsFromConfiguration takes an options array and adds the cloud provider specified

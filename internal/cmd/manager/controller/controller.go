@@ -36,15 +36,15 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/controllers"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/multicache"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -65,26 +65,26 @@ var (
 const (
 	// WebhookSecretName is the name of the secret where the certificates
 	// for the webhook server are stored
-	WebhookSecretName = "postgresql-operator-webhook-cert" // #nosec
+	WebhookSecretName = "cnpg-webhook-cert" // #nosec
 
 	// WebhookServiceName is the name of the service where the webhook server
 	// is reachable
-	WebhookServiceName = "postgresql-operator-webhook-service" // #nosec
+	WebhookServiceName = "cnpg-webhook-service" // #nosec
 
 	// MutatingWebhookConfigurationName is the name of the mutating webhook configuration
-	MutatingWebhookConfigurationName = "postgresql-operator-mutating-webhook-configuration"
+	MutatingWebhookConfigurationName = "cnpg-mutating-webhook-configuration"
 
 	// ValidatingWebhookConfigurationName is the name of the validating webhook configuration
-	ValidatingWebhookConfigurationName = "postgresql-operator-validating-webhook-configuration"
+	ValidatingWebhookConfigurationName = "cnpg-validating-webhook-configuration"
 
 	// The name of the directory containing the TLS certificates
 	defaultWebhookCertDir = postgres.ScratchDataDirectory + "/certificates"
 
 	// LeaderElectionID The operator Leader Election ID
-	LeaderElectionID = "db9c8771.k8s.enterprisedb.io"
+	LeaderElectionID = "db9c8771.cnpg.io"
 
 	// CaSecretName is the name of the secret which is hosting the Operator CA
-	CaSecretName = "postgresql-operator-ca-secret" // #nosec
+	CaSecretName = "cnpg-ca-secret" // #nosec
 
 )
 
@@ -111,7 +111,7 @@ func RunController(
 ) error {
 	ctx := context.Background()
 
-	setupLog.Info("Starting Cloud Native PostgreSQL Operator",
+	setupLog.Info("Starting CloudNativePG Operator",
 		"version", versions.Version,
 		"build", versions.Info)
 
@@ -190,7 +190,7 @@ func RunController(
 
 	if configuration.Current.WebhookCertDir != "" {
 		// OLM is generating certificates for us, so we can avoid injecting/creating certificates.
-		// It also means that CNP may have CA secrets leftover from the previous deployment, deleting them.
+		// It also means that CNPG may have CA secrets leftover from the previous deployment, deleting them.
 		err = cleanupPKI(ctx)
 		if err != nil {
 			setupLog.Warning("unable to cleanup PKI infrastructure", "error", err)
@@ -213,7 +213,7 @@ func RunController(
 	if err = (&controllers.BackupReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloud-native-postgresql-backup"),
+		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-backup"),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
@@ -222,7 +222,7 @@ func RunController(
 	if err = (&controllers.ScheduledBackupReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloud-native-postgresql-scheduledbackup"),
+		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
 		return err
@@ -231,7 +231,7 @@ func RunController(
 	if err = (&controllers.PoolerReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("cloud-native-postgresql-pooler"),
+		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-pooler"),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err
@@ -355,11 +355,11 @@ func setupPKI(ctx context.Context, certDir string) error {
 		MutatingWebhookConfigurationName:   MutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: ValidatingWebhookConfigurationName,
 		CustomResourceDefinitionsName: []string{
-			"backups.postgresql.k8s.enterprisedb.io",
-			"clusters.postgresql.k8s.enterprisedb.io",
-			"scheduledbackups.postgresql.k8s.enterprisedb.io",
+			"backups.postgresql.cnpg.io",
+			"clusters.postgresql.cnpg.io",
+			"scheduledbackups.postgresql.cnpg.io",
 		},
-		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloud-native-postgresql",
+		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloudnative-pg",
 	}
 	err := retry.OnError(retry.DefaultRetry, apierrs.IsNotFound, func() error {
 		return pkiConfig.Setup(ctx, clientSet, apiClientSet)

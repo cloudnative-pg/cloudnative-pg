@@ -22,19 +22,19 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 const (
 	// ClusterLabelName is the name of cluster which the backup CR belongs to
-	ClusterLabelName = "k8s.enterprisedb.io/cluster"
+	ClusterLabelName = "cnpg.io/cluster"
 
 	// JobRoleLabelName is the name of the label containing the purpose of the executed job
-	JobRoleLabelName = "k8s.enterprisedb.io/jobRole"
+	JobRoleLabelName = "cnpg.io/jobRole"
 
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
-	OperatorVersionAnnotationName = "k8s.enterprisedb.io/operatorVersion"
+	OperatorVersionAnnotationName = "cnpg.io/operatorVersion"
 
 	// AppArmorAnnotationPrefix will be the name of the AppArmor profile to apply
 	// This is required for Azure but can be set in other environments
@@ -42,7 +42,7 @@ const (
 
 	// ReconciliationLoopAnnotationName is the name of the annotation controlling
 	// the status of the reconciliation loop for the cluster
-	ReconciliationLoopAnnotationName = "k8s.enterprisedb.io/reconciliationLoop"
+	ReconciliationLoopAnnotationName = "cnpg.io/reconciliationLoop"
 
 	// ReconciliationDisabledValue it the value that stops the reconciliation loop
 	ReconciliationDisabledValue = "disabled"

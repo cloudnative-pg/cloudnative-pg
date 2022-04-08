@@ -10,7 +10,7 @@ PostgreSQL can face on a Kubernetes cluster during its lifetime.
 !!! Seealso "Postgres instance manager"
     Please refer to the ["Postgres instance manager" section](instance_manager.md)
     for more information the liveness and readiness probes implemented by
-    Cloud Native PostgreSQL.
+    CloudNativePG.
 
 ## Storage space usage
 
@@ -139,19 +139,19 @@ to solve the problem manually.
     support and assistance of EDB engineering team.
 
 From version 1.11.0 of the operator, you can use the
-`k8s.enterprisedb.io/reconciliationLoop` annotation to temporarily disable the
+`cnpg.io/reconciliationLoop` annotation to temporarily disable the
 reconciliation loop on a selected PostgreSQL cluster, as follows:
 
 ``` yaml
 metadata:
   name: cluster-example-no-reconcile
   annotations:
-    k8s.enterprisedb.io/reconciliationLoop: "disabled"
+    cnpg.io/reconciliationLoop: "disabled"
 spec:
   # ...
 ```
 
-The `k8s.enterprisedb.io/reconciliationLoop` must be used with extreme care
+The `cnpg.io/reconciliationLoop` must be used with extreme care
 and for the sole duration of the extraordinary/emergency operation.
 
 !!! Warning

@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/pgbouncer/run"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/pgbouncer/run"
 )
 
 // NewCmd creates the "instance" command

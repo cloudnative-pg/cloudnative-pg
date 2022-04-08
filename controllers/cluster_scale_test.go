@@ -32,7 +32,7 @@ var _ = Describe("cluster_scale unit tests", func() {
 	It("should make sure that scale down works correctly", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 
 		resources := &managedResources{
 			pvcs: corev1.PersistentVolumeClaimList{Items: generateFakePVC(cluster)},

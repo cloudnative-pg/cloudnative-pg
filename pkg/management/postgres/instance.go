@@ -34,12 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/pool"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 const (
@@ -140,7 +140,7 @@ type Instance struct {
 	ClusterName string
 
 	// The sha256 of the config. It is computed on the config string, before
-	// adding the PostgreSQL CNPConfigSha256 parameter
+	// adding the PostgreSQL CNPGConfigSha256 parameter
 	ConfigSha256 string
 
 	// PgCtlTimeoutForPromotion specifies the maximum number of seconds to wait when waiting for promotion to complete
@@ -507,7 +507,7 @@ func (instance *Instance) parseVersion(version string) (semver.Version, error) {
 
 // ConnectionPool gets or initializes the connection pool for this instance
 func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
-	const applicationName = "cnp-instance-manager"
+	const applicationName = "cnpg-instance-manager"
 	if instance.pool == nil {
 		socketDir := GetSocketDir()
 		dsn := fmt.Sprintf(
@@ -629,7 +629,7 @@ func (instance *Instance) WaitForConfigReloaded() error {
 
 	return retry.OnError(retry.DefaultRetry, errorIsRetryable, func() error {
 		var sha string
-		row := db.QueryRow(fmt.Sprintf("SHOW %s", postgres.CNPConfigSha256))
+		row := db.QueryRow(fmt.Sprintf("SHOW %s", postgres.CNPGConfigSha256))
 		err = row.Scan(&sha)
 		if err != nil {
 			return err

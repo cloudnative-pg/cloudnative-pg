@@ -4,12 +4,12 @@ apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
   labels:
-    app.kubernetes.io/name: cloud-native-postgresql
+    app.kubernetes.io/name: cloudnative-pg
   name: controller-manager-metrics-monitor
   namespace: system
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: cloud-native-postgresql
+      app.kubernetes.io/name: cloudnative-pg
   podMetricsEndpoints:
     - port: metrics

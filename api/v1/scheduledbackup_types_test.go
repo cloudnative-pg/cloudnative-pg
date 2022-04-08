@@ -20,7 +20,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 var _ = Describe("Scheduled backup", func() {

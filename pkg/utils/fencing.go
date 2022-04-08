@@ -21,7 +21,7 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/stringset"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 
 var (
@@ -46,10 +46,10 @@ const (
 	// FencedInstanceAnnotation is the annotation to be used for fencing instances, the value should be a
 	// JSON list of all the instances we want to be fenced, e.g. `["cluster-example-1","cluster-example-2`"].
 	// If the list contain the "*" element, every node is fenced.
-	FencedInstanceAnnotation = "k8s.enterprisedb.io/fencedInstances"
+	FencedInstanceAnnotation = "cnpg.io/fencedInstances"
 
 	// FenceAllServers is the wildcard that, if put inside the fenced instances list, will fence every
-	// CNP instance
+	// CNPG instance
 	FenceAllServers = "*"
 )
 

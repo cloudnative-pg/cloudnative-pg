@@ -21,7 +21,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // ShowListsMetrics contains all the SHOW LISTS Metrics

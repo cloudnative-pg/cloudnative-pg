@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	. "github.com/onsi/ginkgo/v2" // nolint
 	. "github.com/onsi/gomega"    // nolint
@@ -60,9 +60,9 @@ func EnableOnlineUpgradeForInstanceManager(pgOperatorNamespace, configName strin
 	})
 }
 
-// InstallLatestCNPOperator installs an operator version with the most recent release tag
-func InstallLatestCNPOperator(releaseTag string, env *TestingEnvironment) {
-	mostRecentReleasePath := "../../releases/postgresql-operator-" + releaseTag + ".yaml"
+// InstallLatestCNPGOperator installs an operator version with the most recent release tag
+func InstallLatestCNPGOperator(releaseTag string, env *TestingEnvironment) {
+	mostRecentReleasePath := "../../releases/cnpg-" + releaseTag + ".yaml"
 
 	Eventually(func() error {
 		GinkgoWriter.Printf("installing: %s\n", mostRecentReleasePath)
@@ -78,7 +78,7 @@ func InstallLatestCNPOperator(releaseTag string, env *TestingEnvironment) {
 	Eventually(func() error {
 		_, _, err := RunUnchecked(
 			"kubectl wait --for condition=established --timeout=60s " +
-				"crd/clusters.postgresql.k8s.enterprisedb.io")
+				"crd/clusters.postgresql.cnpg.io")
 		return err
 	}, 150).ShouldNot(HaveOccurred())
 
@@ -97,8 +97,8 @@ func InstallLatestCNPOperator(releaseTag string, env *TestingEnvironment) {
 
 	Eventually(func() error {
 		_, _, err := RunUnchecked(
-			"kubectl wait --for=condition=Available --timeout=2m -n postgresql-operator-system " +
-				"deployments postgresql-operator-controller-manager")
+			"kubectl wait --for=condition=Available --timeout=2m -n cnpg-system " +
+				"deployments cnpg-controller-manager")
 		return err
 	}, 150).ShouldNot(HaveOccurred())
 }

@@ -10,7 +10,7 @@ used as a fallback option, for example, to store WAL files in an object store).
 Replicas are usually called *standby servers* and can also be used for
 read-only workloads, thanks to the *Hot Standby* feature.
 
-Cloud Native PostgreSQL supports clusters based on asynchronous and synchronous
+CloudNativePG supports clusters based on asynchronous and synchronous
 streaming replication to manage multiple hot standby replicas within the same
 Kubernetes cluster, with the following specifications:
 
@@ -28,12 +28,12 @@ Kubernetes cluster, with the following specifications:
 
 !!! Seealso "Replication"
     Please refer to the ["Replication" section](replication.md) for more
-    information about how Cloud Native PostgreSQL relies on PostgreSQL replication,
+    information about how CloudNativePG relies on PostgreSQL replication,
     including synchronous settings.
 
 !!! Seealso "Connecting from an application"
     Please refer to the ["Connecting from an application" section](applications.md) for
-    information about how to connect to Cloud Native PostgreSQL from a stateless
+    information about how to connect to CloudNativePG from a stateless
     application within the same Kubernetes cluster.
 
 !!! Seealso "Connection Pooling"
@@ -77,7 +77,7 @@ Applications can also access any PostgreSQL instance through the
 ## Multi-cluster deployments
 
 !!! Info
-    Cloud Native PostgreSQL supports deploying PostgreSQL across multiple
+    CloudNativePG supports deploying PostgreSQL across multiple
     Kubernetes clusters through a feature called **Replica Cluster**,
     which is described in this section.
 
@@ -98,9 +98,9 @@ However, for business continuity objectives it is fundamental to:
 - reduce global **recovery time objectives** (RTO) by taking advantage of PostgreSQL
   replication beyond the primary Kubernetes cluster (**High Availability**)
 
-In order to address the above concerns, Cloud Native PostgreSQL introduces the
-concept of a *PostgreSQL Replica Cluster*. Replica clusters are the Cloud
-Native PostgreSQL way to enable multi-cluster deployments in private, public,
+In order to address the above concerns, CloudNativePG introduces the
+concept of a *PostgreSQL Replica Cluster*. Replica clusters are the
+CloudNativePG way to enable multi-cluster deployments in private, public,
 hybrid, and multi-cloud contexts.
 
 A replica cluster is a separate `Cluster` resource:
@@ -139,7 +139,7 @@ The designated primary can be promoted at any time, making the replica cluster
 a primary cluster capable of accepting write connections.
 
 !!! Warning
-    Cloud Native PostgreSQL does not perform any cross-cluster switchover
+    CloudNativePG does not perform any cross-cluster switchover
     or failover at the moment. Such operation must be performed manually
     or delegated to a multi-cluster/federated cluster aware authority.
     Each PostgreSQL cluster is independent from any other.
@@ -148,7 +148,7 @@ The designated primary in the above example is fed via WAL streaming
 (`primary_conninfo`), with fallback option for file-based WAL shipping through
 the `restore_command` and `barman-cloud-wal-restore`.
 
-Cloud Native PostgreSQL allows you to define multiple replica clusters.
+CloudNativePG allows you to define multiple replica clusters.
 You can also define replica clusters with a lower number of replicas, and then
 increase this number when the cluster is promoted to primary.
 
