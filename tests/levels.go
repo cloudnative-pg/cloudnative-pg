@@ -20,7 +20,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 )
 
 // Level - Define test importance. Each test should define its own importance

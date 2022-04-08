@@ -1,6 +1,6 @@
 # End-to-End Tests
 
-Cloud Native PostgreSQL operator is automatically tested after each
+CloudNativePG operator is automatically tested after each
 commit via a suite of **End-to-end (E2E) tests**. It ensures that
 the operator correctly deploys and manages the PostgreSQL clusters.
 

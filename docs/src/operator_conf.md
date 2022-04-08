@@ -1,6 +1,6 @@
 # Operator configuration
 
-The operator for Cloud Native PostgreSQL is installed from a standard
+The operator for CloudNativePG is installed from a standard
 deployment manifest and follows the convention over configuration paradigm.
 While this is fine in most cases, there are some scenarios where you want
 to change the default behavior, such as:

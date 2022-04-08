@@ -1,6 +1,6 @@
-# Cloud Native PostgreSQL
+# CloudNativePG
 
-**Cloud Native PostgreSQL** is a stack designed by
+**CloudNativePG** is a stack designed by
 [EnterpriseDB](https://www.enterprisedb.com) to manage PostgreSQL
 workloads on Kubernetes, particularly optimized for private cloud environments
 with local Persistent Volumes (PV).
@@ -25,7 +25,7 @@ make licenses
 
 # Authors
 
-Cloud Native PostgreSQL (Operator for Kubernetes/OpenShift) has been designed,
+CloudNativePG (Operator for Kubernetes/OpenShift) has been designed,
 developed, and tested by the EnterpriseDB Cloud Native team:
 
 - Gabriele Bartolini

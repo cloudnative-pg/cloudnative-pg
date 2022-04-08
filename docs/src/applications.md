@@ -1,6 +1,6 @@
 # Connecting from an application
 
-Applications are supposed to work with the services created by Cloud Native PostgreSQL
+Applications are supposed to work with the services created by CloudNativePG
 in the same Kubernetes cluster:
 
 * `[cluster name]-rw`

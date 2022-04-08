@@ -3,8 +3,8 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal
 ARG VERSION="dev"
 ARG TARGETARCH
 
-ENV SUMMARY="Cloud Native PostgreSQL Operator Container Image." \
-    DESCRIPTION="This Docker image contains Cloud Native PostgreSQL Operator \
+ENV SUMMARY="CloudNativePG Operator Container Image." \
+    DESCRIPTION="This Docker image contains CloudNativePG Operator \
 based on RedHat Universal Base Images (UBI) 8."
 
 RUN microdnf update && microdnf clean all
@@ -16,7 +16,7 @@ LABEL summary="$SUMMARY" \
       description="$DESCRIPTION" \
       io.k8s.display-name="$SUMMARY" \
       io.k8s.description="$DESCRIPTION" \
-      name="Cloud Native PostgreSQL Operator" \
+      name="CloudNativePG Operator" \
       vendor="EnterpriseDB Corporation" \
       url="https://www.enterprisedb.com/" \
       version="$VERSION" \

@@ -24,7 +24,7 @@ jobs:
       maturity: ${{ steps.get-version.outputs.MATURITY }}
     env:
       PROJECT_NAME: "cloud-native-postgresql"
-      PDF_TITLE: "Cloud Native PostgreSQL"
+      PDF_TITLE: "CloudNativePG"
     steps:
       -
         name: Checkout code

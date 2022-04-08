@@ -36,15 +36,15 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/controllers"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/multicache"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -81,7 +81,7 @@ const (
 	defaultWebhookCertDir = postgres.ScratchDataDirectory + "/certificates"
 
 	// LeaderElectionID The operator Leader Election ID
-	LeaderElectionID = "db9c8771.k8s.enterprisedb.io"
+	LeaderElectionID = "db9c8771.cnpg.io"
 
 	// CaSecretName is the name of the secret which is hosting the Operator CA
 	CaSecretName = "postgresql-operator-ca-secret" // #nosec
@@ -111,7 +111,7 @@ func RunController(
 ) error {
 	ctx := context.Background()
 
-	setupLog.Info("Starting Cloud Native PostgreSQL Operator",
+	setupLog.Info("Starting CloudNativePG Operator",
 		"version", versions.Version,
 		"build", versions.Info)
 
@@ -355,9 +355,9 @@ func setupPKI(ctx context.Context, certDir string) error {
 		MutatingWebhookConfigurationName:   MutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: ValidatingWebhookConfigurationName,
 		CustomResourceDefinitionsName: []string{
-			"backups.postgresql.k8s.enterprisedb.io",
-			"clusters.postgresql.k8s.enterprisedb.io",
-			"scheduledbackups.postgresql.k8s.enterprisedb.io",
+			"backups.postgresql.cnpg.io",
+			"clusters.postgresql.cnpg.io",
+			"scheduledbackups.postgresql.cnpg.io",
 		},
 		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloud-native-postgresql",
 	}

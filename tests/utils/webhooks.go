@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
 )
 
 // GetCNPsMutatingWebhookByName get the MutatingWebhook filtered by the name of one
@@ -151,9 +151,9 @@ func CheckWebhookReady(env *TestingEnvironment, namespace string) error {
 	}
 
 	customResourceDefinitionsName := []string{
-		"backups.postgresql.k8s.enterprisedb.io",
-		"clusters.postgresql.k8s.enterprisedb.io",
-		"scheduledbackups.postgresql.k8s.enterprisedb.io",
+		"backups.postgresql.cnpg.io",
+		"clusters.postgresql.cnpg.io",
+		"scheduledbackups.postgresql.cnpg.io",
 	}
 
 	ctx := context.Background()

@@ -1,4 +1,4 @@
-# Cloud Native PostgreSQL release procedure
+# CloudNativePG release procedure
 
 ## Initial verification
 
@@ -20,7 +20,7 @@ instructions accordingly for your version.
 1. Run `hack/release.sh 1.7.0`.
 2. Approve the PR that is automatically generated.
 3. Merge the PR.
-4. Wait until all [Github Actions](https://github.com/EnterpriseDB/cloud-native-postgresql/actions) finish.
+4. Wait until all [Github Actions](https://github.com/cloudnative-pg/cloudnative-pg/actions) finish.
 
 ### What's missing
 
@@ -37,8 +37,8 @@ instructions accordingly for your version.
 - Copy the output of the following command to `charts/cloud-native-postgresql/templates/crds/crds.yaml` in the cloud-native-postgresql-helm chart: `kustomize build config/helm`
 - Diff the new release version with the previous one (e.g.: `vimdiff releases/postgresql-operator-1.9.1.yaml releases/postgresql-operator-1.9.2.yaml` using your IDE of choice)
 - Port any diff to the templates in the helm chart accordingly
-- Proceed with the release process described in the `RELEASE.md` file in the [cloud-native-postgresql-helm](https://github.com/EnterpriseDB/cloud-native-postgresql-helm) repository.
+- Proceed with the release process described in the `RELEASE.md` file in the [cloud-native-postgresql-helm](https://github.com/cloudnative-pg/cloudnative-pg-helm) repository.
 
 ## OpenShift
 
-For OpenShift release, please check the [OCP Certified](https://github.com/EnterpriseDB/cloud-native-postgresql-ocp-certified/blob/main/RELEASE.md#release) repository with the instructions.
+For OpenShift release, please check the [OCP Certified](https://github.com/cloudnative-pg/cloudnative-pg-ocp-certified/blob/main/RELEASE.md#release) repository with the instructions.

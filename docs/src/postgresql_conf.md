@@ -87,7 +87,7 @@ wal_receiver_timeout = '5s'
     It is your duty to plan for WAL segments retention in your PostgreSQL
     cluster and properly configure either `wal_keep_size` or `wal_keep_segments`,
     depending on the server version, based on the expected and observed workloads.
-    Until Cloud Native PostgreSQL supports replication slots, and if you don't have
+    Until CloudNativePG supports replication slots, and if you don't have
     continuous backup in place, this is the only way at the moment that protects
     from the case of a standby falling out of sync and returning error messages like:
     `"could not receive data from WAL stream: ERROR: requested WAL segment ************************ has already been removed"`.
@@ -146,18 +146,18 @@ comma-separated list. Typically, it is used in PostgreSQL to load those
 extensions that need to be available to most database sessions in the whole system
 (e.g. `pg_stat_statements`).
 
-In Cloud Native PostgreSQL the `shared_preload_libraries` option is empty by
+In CloudNativePG the `shared_preload_libraries` option is empty by
 default. Although you can override the content of `shared_preload_libraries`,
 we recommend that only expert Postgres users take advantage of this option.
 
 !!! Important
     In case a specified library is not found, the server fails to start,
-    preventing Cloud Native PostgreSQL from any self-healing attempt and requiring
+    preventing CloudNativePG from any self-healing attempt and requiring
     manual intervention. Please make sure you always test both the extensions and
     the settings of `shared_preload_libraries` if you plan to directly manage its
     content.
 
-Cloud Native PostgreSQL is able to automatically manage the content of the
+CloudNativePG is able to automatically manage the content of the
 `shared_preload_libraries` option for some of the most used PostgreSQL
 extensions (see the ["Managed extensions"](#managed-extensions) section below
 for details).
@@ -178,7 +178,7 @@ will merge them with the ones that it automatically manages.
 
 ### Managed extensions
 
-As anticipated in the previous section, Cloud Native PostgreSQL automatically
+As anticipated in the previous section, CloudNativePG automatically
 manages the content in `shared_preload_libraries` for some well-known and
 supported extensions. The current list includes:
 
@@ -191,7 +191,7 @@ using them, normally views and/or functions managed via the `CREATE EXTENSION`
 command to be run in a database (the `DROP EXTENSION` command typically removes
 those objects).
 
-For such libraries, Cloud Native PostgreSQL automatically handles the creation
+For such libraries, CloudNativePG automatically handles the creation
 and removal of the extension in all databases that accept a connection in the
 cluster, identified by the following query:
 
@@ -253,7 +253,7 @@ against the `pg_stat_statements` view.
 
 The `pgaudit` extension provides detailed session and/or object audit logging via the standard PostgreSQL logging facility.
 
-Cloud Native PostgreSQL has transparent and native support for
+CloudNativePG has transparent and native support for
 [PGAudit](https://www.pgaudit.org/) on PostgreSQL clusters. For further information, please refer to the ["PGAudit" logs section.](logging.md#pgaudit-logs)
 
 You can enable `pgaudit` by adding to the configuration a parameter
@@ -335,7 +335,7 @@ perform a rolling upgrade.
 PostgreSQL supports a few implementations for dynamic shared memory
 management through the
 [`dynamic_shared_memory_type`](https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-DYNAMIC-SHARED-MEMORY-TYPE)
-configuration option. In Cloud Native PostgreSQL we recommend to limit ourselves to
+configuration option. In CloudNativePG we recommend to limit ourselves to
 any of the following two values:
 
 - `posix`: which relies on POSIX shared memory allocated using `shm_open` (default setting)

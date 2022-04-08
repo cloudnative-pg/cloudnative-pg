@@ -1,4 +1,4 @@
-# This file is part of Cloud Native PostgreSQL.
+# This file is part of CloudNativePG.
 #
 # Copyright (C) 2019-2022 EnterpriseDB Corporation.
 
@@ -16,9 +16,9 @@ endif
 COMMIT := $(shell git rev-parse --short HEAD || echo unknown)
 DATE := $(shell git log -1 --pretty=format:'%ad' --date short)
 VERSION := $(shell git describe --tags --match 'v*' | sed -e 's/^v//; s/-g[0-9a-f]\+$$//; s/-\([0-9]\+\)$$/+dev\1/')
-LDFLAGS= "-X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion=${VERSION} $\
--X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit=${COMMIT} $\
--X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate=${DATE}"
+LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=${VERSION} $\
+-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit=${COMMIT} $\
+-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/enterprisedb/postgresql:13
@@ -159,7 +159,7 @@ checks: generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint 
 licenses: go-licenses ## Generate the licenses folder.
 	# The following statement is expected to fail because our license is unrecognised
 	GOPRIVATE="https://github.com/EnterpriseDB/*" $(GO_LICENSES) \
-		save github.com/EnterpriseDB/cloud-native-postgresql \
+		save github.com/cloudnative-pg/cloudnative-pg \
 		--save_path licenses/go-licenses --force || true
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete

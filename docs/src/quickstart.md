@@ -1,19 +1,19 @@
 # Quickstart
 
 This section describes how to test a PostgreSQL cluster on your laptop/computer
-using Cloud Native PostgreSQL on a local Kubernetes cluster in
+using CloudNativePG on a local Kubernetes cluster in
 [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/) or
 [Kind](https://kind.sigs.k8s.io/).
 
 Red Hat OpenShift Container Platform users can test the certified operator for
-Cloud Native PostgreSQL on the [Red Hat CodeReady Containers (CRC)](https://developers.redhat.com/products/codeready-containers/overview)
+CloudNativePG on the [Red Hat CodeReady Containers (CRC)](https://developers.redhat.com/products/codeready-containers/overview)
 for OpenShift.
 
 !!! Warning
     The instructions contained in this section are for demonstration,
     testing, and practice purposes only and must not be used in production.
 
-Like any other Kubernetes application, Cloud Native PostgreSQL is deployed using
+Like any other Kubernetes application, CloudNativePG is deployed using
 regular manifests written in YAML.
 
 By following the instructions on this page you should be able to start a PostgreSQL
@@ -93,10 +93,10 @@ CRC doesn't come with a StorageClass, so one has to be configured.
 You can follow the [Dynamic volume provisioning wiki page](https://github.com/code-ready/crc/wiki/Dynamic-volume-provisioning)
 and install `rancher/local-path-provisioner`.
 
-## Part 2 - Install Cloud Native PostgreSQL
+## Part 2 - Install CloudNativePG
 
 Now that you have a Kubernetes or OpenShift installation up and running
-on your laptop, you can proceed with Cloud Native PostgreSQL installation.
+on your laptop, you can proceed with CloudNativePG installation.
 
 Please refer to the ["Installation"](installation_upgrade.md) section and then proceed
 with the deployment of a PostgreSQL cluster.
@@ -112,7 +112,7 @@ disk space:
 
 ```yaml
 # Example of PostgreSQL cluster
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
@@ -153,7 +153,7 @@ You can override this by setting the `imageName` key in the `spec` section of
 the `Cluster` definition. For example, to install PostgreSQL 12.5:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
    # [...]

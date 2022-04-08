@@ -19,21 +19,21 @@ package main
 import (
 	"os"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/maintenance"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/certificate"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/fence"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/promote"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/reload"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/report"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/restart"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin/status"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/reload"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/report"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/restart"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/status"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
 )
 
 func main() {
@@ -41,7 +41,7 @@ func main() {
 
 	rootCmd := &cobra.Command{
 		Use:          "kubectl-cnp",
-		Short:        "A plugin to manage your Cloud Native PostgreSQL clusters",
+		Short:        "A plugin to manage your CloudNativePG clusters",
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return plugin.CreateKubernetesClient(configFlags)

@@ -1,20 +1,20 @@
 # Red Hat OpenShift
 
-Cloud Native PostgreSQL is certified to run on
+CloudNativePG is certified to run on
 [Red Hat OpenShift Container Platform (OCP) version 4.x](https://www.openshift.com/products/container-platform)
 and is available directly from the
 [Red Hat Catalog](https://catalog.redhat.com/software/operators/detail/5fb41c88abd2a6f7dbe1b37b).
 
 The goal of this section is to help you decide the best installation method for
-Cloud Native PostgreSQL based on your organizations' security and access
+CloudNativePG based on your organizations' security and access
 control policies.
 
-Cloud Native PostgreSQL can be installed and managed via:
+CloudNativePG can be installed and managed via:
 
 - [OpenShift web console](#installation-via-web-console)
 - [OpenShift command-line interface (CLI)](#installation-via-the-oc-cli) called `oc`, for full control
 
-Cloud Native PostgreSQL supports all available install modes defined by
+CloudNativePG supports all available install modes defined by
 OpenShift:
 
 - cluster-wide, in all namespaces
@@ -25,7 +25,7 @@ OpenShift:
     A project is a Kubernetes namespace with additional annotations, and is the
     central vehicle by which access to resources for regular users is managed.
 
-In most cases, the default cluster-wide installation of Cloud Native PostgreSQL
+In most cases, the default cluster-wide installation of CloudNativePG
 is the recommended one, with either central management of PostgreSQL clusters
 or delegated management (limited to specific users/projects according to RBAC
 definitions - see ["Important OpenShift concepts"](#important-openshift-concepts)
@@ -41,7 +41,7 @@ and ["Users and Permissions"](#users-and-permissions) below).
 
 ## Important OpenShift concepts
 
-To understand how the Cloud Native PostgreSQL operator fits in an OpenShift environment,
+To understand how the CloudNativePG operator fits in an OpenShift environment,
 you must familiarize yourself with the following Kubernetes-related topics:
 
 - Operators
@@ -60,7 +60,7 @@ cluster role bindings, local role bindings, users, groups and service accounts.
 
 ![OpenShift Cluster Roles](./images/openshift/openshift-rbac.png)
 The ["Predefined RBAC objects" section](#predefined-rbac-objects)
-below contains important information about how Cloud Native PostgreSQL adheres
+below contains important information about how CloudNativePG adheres
 to Kubernetes and OpenShift RBAC implementation, covering default installed
 cluster roles, roles, service accounts.
 
@@ -99,7 +99,7 @@ for the operator, namely: `AllNamespaces` (cluster-wide), `SingleNamespace`
 
 Red Hat OpenShift Container Platform provides limited support for
 simultaneously installing different variations of an operator on a single
-cluster. Like any other operator, Cloud Native PostgreSQL becomes an extension
+cluster. Like any other operator, CloudNativePG becomes an extension
 of the control plane. As the control plane is shared among all tenants
 (projects) of an OpenShift cluster, operators too become shared resources in a
 multi-tenant environment.
@@ -114,7 +114,7 @@ in OpenShift documentation.
 
 ## Installation via web console
 
-The Cloud Native PostgreSQL operator can be found in the Red Hat OperatorHub
+The CloudNativePG operator can be found in the Red Hat OperatorHub
 directly from your OpenShift dashboard.
 
 1. Navigate in the web console to the `Operators -> OperatorHub` page:
@@ -122,7 +122,7 @@ directly from your OpenShift dashboard.
     ![Menu OperatorHub](./images/openshift/operatorhub_1.png)
 
 2. Scroll in the `Database` section or type a keyword into the `Filter by keyword`
-   box (in this case, "PostgreSQL") to find the Cloud Native PostgreSQL
+   box (in this case, "PostgreSQL") to find the CloudNativePG
    Operator, then select it:
 
     ![Install OperatorHub](./images/openshift/operatorhub_2.png)
@@ -164,13 +164,13 @@ you need to remove every local installation of the operator first.
 With cluster-wide installation, you are asking OpenShift to install the
 Operator in the default `openshift-operators` namespace and to make it
 available to all the projects in the cluster. This is the default and normally
-recommended approach to install Cloud Native PostgreSQL.
+recommended approach to install CloudNativePG.
 
 !!! Warning
     This doesn't mean that every user in the OpenShift cluster can use the Cloud Native
     PostgreSQL Operator, deploy a `Cluster` object or even see the `Cluster` objects that
     are running in their own namespaces. There are some special roles that users must
-    have in the namespace in order to interact with Cloud Native PostgreSQL's managed
+    have in the namespace in order to interact with CloudNativePG's managed
     custom resources - primarily the `Cluster` one. Please refer to the
     ["Users and Permissions" section below](#users-and-permissions) for details.
 
@@ -197,7 +197,7 @@ Operator in a given namespace, and to make it available to that project only.
     PostgreSQL Operator, deploy a `Cluster` object or even see the `Cluster` objects that
     are running in the namespace. Similarly to the cluster-wide installation mode,
     There are some special roles that users must have in the namespace in order to
-    interact with Cloud Native PostgreSQL's managed custom resources - primarily the `Cluster`
+    interact with CloudNativePG's managed custom resources - primarily the `Cluster`
     one. Please refer to the ["Users and Permissions" section below](#users-and-permissions)
     for details.
 
@@ -232,7 +232,7 @@ different projects. In this case, make sure you read
     for information on how to install the `oc` command-line interface.
 
 Instead of using the OpenShift Container Platform web console, you can install
-the Cloud Native PostgreSQL Operator from the OperatorHub and create a
+the CloudNativePG Operator from the OperatorHub and create a
 subscription using the `oc` command-line interface. Through the `oc` CLI you
 can install the operator in all namespaces, a single namespace or multiple
 namespaces.
@@ -300,7 +300,7 @@ projects with a simple example, by creating an `OperatorGroup` and a
    `OperatorGroup` and `Subscription` objects.
 
 The method described in this section can be very powerful in conjunction with
-proper `RoleBinding` objects, as it enables mapping Cloud Native PostgreSQL's
+proper `RoleBinding` objects, as it enables mapping CloudNativePG's
 predefined `ClusterRole`s to specific users in selected namespaces.
 
 !!! Info
@@ -358,12 +358,12 @@ suits your needs in terms of operating system and architecture:
 
 ## Predefined RBAC objects
 
-Cloud Native PostgreSQL comes with a predefined set of resources that play an
+CloudNativePG comes with a predefined set of resources that play an
 important role when it comes to RBAC policy configuration.
 
 ### Custom Resource Definitions (CRD)
 
-The Cloud Native PostgreSQL operator owns the following custom resource
+The CloudNativePG operator owns the following custom resource
 definitions (CRD):
 
 * `Backup`
@@ -380,10 +380,10 @@ oc get customresourcedefinitions.apiextensions.k8s.io | grep postgresql
 which returns something similar to:
 
 ```console
-backups.postgresql.k8s.enterprisedb.io                            20YY-MM-DDTHH:MM:SSZ
-clusters.postgresql.k8s.enterprisedb.io                           20YY-MM-DDTHH:MM:SSZ
-poolers.postgresql.k8s.enterprisedb.io                            20YY-MM-DDTHH:MM:SSZ
-scheduledbackups.postgresql.k8s.enterprisedb.io                   20YY-MM-DDTHH:MM:SSZ
+backups.postgresql.cnpg.io                            20YY-MM-DDTHH:MM:SSZ
+clusters.postgresql.cnpg.io                           20YY-MM-DDTHH:MM:SSZ
+poolers.postgresql.cnpg.io                            20YY-MM-DDTHH:MM:SSZ
+scheduledbackups.postgresql.cnpg.io                   20YY-MM-DDTHH:MM:SSZ
 ```
 
 ### Service accounts
@@ -430,12 +430,12 @@ plane in managing PostgreSQL clusters.
 The Operator Licecycle Manager (OLM) automatically creates a set of cluster
 role objects to facilitate role binding definitions and granular implementation
 of RBAC policies. Some cluster roles have rules that apply to Custom Resource
-Definitions that are part of Cloud Native PostgreSQL, while others that are
+Definitions that are part of CloudNativePG, while others that are
 part of the broader Kubernetes/OpenShift realm.
 
-#### Cluster roles on Cloud Native PostgreSQL CRDs
+#### Cluster roles on CloudNativePG CRDs
 
-For [every CRD owned by Cloud Native PostgreSQL's CSV](#custom-resource-definitions-crd),
+For [every CRD owned by CloudNativePG's CSV](#custom-resource-definitions-crd),
 OLM deploys some predefined cluster roles that can be used by customer facing
 users and service accounts. In particular:
 
@@ -462,45 +462,45 @@ oc get clusterroles | grep postgresql
 which returns something similar to:
 
 ```console
-backups.postgresql.k8s.enterprisedb.io-v1-admin                  YYYY-MM-DDTHH:MM:SSZ
-backups.postgresql.k8s.enterprisedb.io-v1-crdview                YYYY-MM-DDTHH:MM:SSZ
-backups.postgresql.k8s.enterprisedb.io-v1-edit                   YYYY-MM-DDTHH:MM:SSZ
-backups.postgresql.k8s.enterprisedb.io-v1-view                   YYYY-MM-DDTHH:MM:SSZ
+backups.postgresql.cnpg.io-v1-admin                  YYYY-MM-DDTHH:MM:SSZ
+backups.postgresql.cnpg.io-v1-crdview                YYYY-MM-DDTHH:MM:SSZ
+backups.postgresql.cnpg.io-v1-edit                   YYYY-MM-DDTHH:MM:SSZ
+backups.postgresql.cnpg.io-v1-view                   YYYY-MM-DDTHH:MM:SSZ
 cloud-native-postgresql.VERSION-HASH                             YYYY-MM-DDTHH:MM:SSZ
-clusters.postgresql.k8s.enterprisedb.io-v1-admin                 YYYY-MM-DDTHH:MM:SSZ
-clusters.postgresql.k8s.enterprisedb.io-v1-crdview               YYYY-MM-DDTHH:MM:SSZ
-clusters.postgresql.k8s.enterprisedb.io-v1-edit                  YYYY-MM-DDTHH:MM:SSZ
-clusters.postgresql.k8s.enterprisedb.io-v1-view                  YYYY-MM-DDTHH:MM:SSZ
-poolers.postgresql.k8s.enterprisedb.io-v1-admin                  YYYY-MM-DDTHH:MM:SSZ
-poolers.postgresql.k8s.enterprisedb.io-v1-crdview                YYYY-MM-DDTHH:MM:SSZ
-poolers.postgresql.k8s.enterprisedb.io-v1-edit                   YYYY-MM-DDTHH:MM:SSZ
-poolers.postgresql.k8s.enterprisedb.io-v1-view                   YYYY-MM-DDTHH:MM:SSZ
-scheduledbackups.postgresql.k8s.enterprisedb.io-v1-admin         YYYY-MM-DDTHH:MM:SSZ
-scheduledbackups.postgresql.k8s.enterprisedb.io-v1-crdview       YYYY-MM-DDTHH:MM:SSZ
-scheduledbackups.postgresql.k8s.enterprisedb.io-v1-edit          YYYY-MM-DDTHH:MM:SSZ
-scheduledbackups.postgresql.k8s.enterprisedb.io-v1-view          YYYY-MM-DDTHH:MM:SSZ
+clusters.postgresql.cnpg.io-v1-admin                 YYYY-MM-DDTHH:MM:SSZ
+clusters.postgresql.cnpg.io-v1-crdview               YYYY-MM-DDTHH:MM:SSZ
+clusters.postgresql.cnpg.io-v1-edit                  YYYY-MM-DDTHH:MM:SSZ
+clusters.postgresql.cnpg.io-v1-view                  YYYY-MM-DDTHH:MM:SSZ
+poolers.postgresql.cnpg.io-v1-admin                  YYYY-MM-DDTHH:MM:SSZ
+poolers.postgresql.cnpg.io-v1-crdview                YYYY-MM-DDTHH:MM:SSZ
+poolers.postgresql.cnpg.io-v1-edit                   YYYY-MM-DDTHH:MM:SSZ
+poolers.postgresql.cnpg.io-v1-view                   YYYY-MM-DDTHH:MM:SSZ
+scheduledbackups.postgresql.cnpg.io-v1-admin         YYYY-MM-DDTHH:MM:SSZ
+scheduledbackups.postgresql.cnpg.io-v1-crdview       YYYY-MM-DDTHH:MM:SSZ
+scheduledbackups.postgresql.cnpg.io-v1-edit          YYYY-MM-DDTHH:MM:SSZ
+scheduledbackups.postgresql.cnpg.io-v1-view          YYYY-MM-DDTHH:MM:SSZ
 ```
 
 You can inspect an actual role as any other Kubernetes resource with the `get`
 command. For example:
 
 ```sh
-oc get -o yaml clusterrole clusters.postgresql.k8s.enterprisedb.io-v1-admin
+oc get -o yaml clusterrole clusters.postgresql.cnpg.io-v1-admin
 ```
 
 By looking at the relevant skimmed output below, you can notice that the
-`clusters.postgresql.k8s.enterprisedb.io-v1-admin` cluster role enables
+`clusters.postgresql.cnpg.io-v1-admin` cluster role enables
 everything on the `cluster` resource defined by the
-`postgresql.k8s.enterprisedb.io` API group:
+`postgresql.cnpg.io` API group:
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: clusters.postgresql.k8s.enterprisedb.io-v1-admin
+  name: clusters.postgresql.cnpg.io-v1-admin
 rules:
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - clusters
   verbs:
@@ -550,10 +550,10 @@ PolicyRule:
   services                                                      []                 []              [create delete get list patch update watch]
   deployments.apps                                              []                 []              [create delete get list patch update watch]
   poddisruptionbudgets.policy                                   []                 []              [create delete get list patch update watch]
-  backups.postgresql.k8s.enterprisedb.io                        []                 []              [create delete get list patch update watch]
-  clusters.postgresql.k8s.enterprisedb.io                       []                 []              [create delete get list patch update watch]
-  poolers.postgresql.k8s.enterprisedb.io                        []                 []              [create delete get list patch update watch]
-  scheduledbackups.postgresql.k8s.enterprisedb.io               []                 []              [create delete get list patch update watch]
+  backups.postgresql.cnpg.io                        []                 []              [create delete get list patch update watch]
+  clusters.postgresql.cnpg.io                       []                 []              [create delete get list patch update watch]
+  poolers.postgresql.cnpg.io                        []                 []              [create delete get list patch update watch]
+  scheduledbackups.postgresql.cnpg.io               []                 []              [create delete get list patch update watch]
   persistentvolumeclaims                                        []                 []              [create delete get list patch watch]
   pods/exec                                                     []                 []              [create delete get list patch watch]
   pods                                                          []                 []              [create delete get list patch watch]
@@ -569,15 +569,15 @@ PolicyRule:
   customresourcedefinitions.apiextensions.k8s.io                []                 []              [get list update]
   namespaces                                                    []                 []              [get list watch]
   nodes                                                         []                 []              [get list watch]
-  clusters.postgresql.k8s.enterprisedb.io/status                []                 []              [get patch update watch]
-  poolers.postgresql.k8s.enterprisedb.io/status                 []                 []              [get patch update watch]
+  clusters.postgresql.cnpg.io/status                []                 []              [get patch update watch]
+  poolers.postgresql.cnpg.io/status                 []                 []              [get patch update watch]
   configmaps/status                                             []                 []              [get patch update]
   secrets/status                                                []                 []              [get patch update]
-  backups.postgresql.k8s.enterprisedb.io/status                 []                 []              [get patch update]
-  scheduledbackups.postgresql.k8s.enterprisedb.io/status        []                 []              [get patch update]
+  backups.postgresql.cnpg.io/status                 []                 []              [get patch update]
+  scheduledbackups.postgresql.cnpg.io/status        []                 []              [get patch update]
   pods/status                                                   []                 []              [get]
-  clusters.postgresql.k8s.enterprisedb.io/finalizers            []                 []              [update]
-  poolers.postgresql.k8s.enterprisedb.io/finalizers             []                 []              [update]
+  clusters.postgresql.cnpg.io/finalizers            []                 []              [update]
+  poolers.postgresql.cnpg.io/finalizers             []                 []              [update]
 ```
 
 !!! Important
@@ -585,7 +585,7 @@ PolicyRule:
     account to interact with the Kubernetes API server.  They are not directly
     accessible by the users of the operator that interact only with `Cluster`,
     `Pooler`, `Backup`, and `ScheduledBackup` resources (see
-    ["Cluster roles on Cloud Native PostgreSQL CRDs"](#cluster-roles-on-cloud-native-postgresql-crds)).
+    ["Cluster roles on CloudNativePG CRDs"](#cluster-roles-on-cloud-native-postgresql-crds)).
 
 The operator automates in a declarative way a lot of operations related to
 PostgreSQL management that otherwise would require manual and imperative
@@ -599,14 +599,14 @@ permissions, please refer to the
 
 ## Users and Permissions
 
-A very common way to use the Cloud Native PostgreSQL operator is to rely on the
+A very common way to use the CloudNativePG operator is to rely on the
 `cluster-admin` role and manage resources centrally.
 
 Alternatively, you can use the RBAC framework made available by
 Kubernetes/OpenShift, as with any other operator or resources.
 
 For example, you might be interested in binding the
-`clusters.postgresql.k8s.enterprisedb.io-v1-admin` cluster role to specific
+`clusters.postgresql.cnpg.io-v1-admin` cluster role to specific
 groups or users in a specific namespace, as any other cloud native application.
 The following example binds that cluster role to a specific user in the
 `web-prod` project:
@@ -624,7 +624,7 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: clusters.postgresql.k8s.enterprisedb.io-v1-admin
+  name: clusters.postgresql.cnpg.io-v1-admin
 ```
 
 The same process can be repeated with any other predefined `ClusterRole`.
@@ -640,7 +640,7 @@ metadata:
   namespace: web-prod
 rules:
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - clusters
   verbs:
@@ -679,7 +679,7 @@ metadata:
   namespace: web-prod
 rules:
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - clusters
   - backups

@@ -1,10 +1,10 @@
-# Cloud Native PostgreSQL
+# CloudNativePG
 
-**Cloud Native PostgreSQL** is an [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
+**CloudNativePG** is an [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 designed by [EDB](https://www.enterprisedb.com)
 to manage [PostgreSQL](https://www.postgresql.org/) workloads on any supported [Kubernetes](https://kubernetes.io)
 cluster running in private, public, hybrid, or multi-cloud environments.
-Cloud Native PostgreSQL adheres to DevOps principles and concepts
+CloudNativePG adheres to DevOps principles and concepts
 such as declarative configuration and immutable infrastructure.
 
 It defines a new Kubernetes resource called "Cluster" representing a PostgreSQL
@@ -19,19 +19,19 @@ or a switchover. Applications that reside outside the Kubernetes cluster, need
 to configure a Service or Ingress object to expose the Postgres via TCP.
 Web applications can take advantage of the native connection pooler based on PgBouncer.
 
-Cloud Native PostgreSQL works with PostgreSQL and is available under the
+CloudNativePG works with PostgreSQL and is available under the
 [EDB Limited Use License](https://www.enterprisedb.com/limited-use-license).
 
 !!! Note
     Based on the [Operator Capability Levels model](operator_capability_levels.md),
     users can expect a **"Level V - Auto Pilot"** set of capabilities from the
-    Cloud Native PostgreSQL Operator.
+    CloudNativePG Operator.
 
 ## Supported Kubernetes distributions
 
-Cloud Native PostgreSQL requires Kubernetes 1.19 or higher.
+CloudNativePG requires Kubernetes 1.19 or higher.
 
-Cloud Native PostgreSQL has also been certified for
+CloudNativePG has also been certified for
 [Red Hat OpenShift Container Platform (OCP)](https://www.openshift.com/products/container-platform)
 4.6+ and is available directly from the [Red Hat Catalog](https://catalog.redhat.com/).
 OpenShift Container Platform is an open-source distribution of Kubernetes which is
@@ -49,11 +49,11 @@ page from the EDB website for a list of the currently supported Kubernetes distr
 
 ### Multiple architectures
 
-The Cloud Native PostgreSQL Operator container images support the multi-arch
+The CloudNativePG Operator container images support the multi-arch
 format for the following platforms: `linux/amd64`, `linux/ppc64le`, `linux/s390x`.
 
 !!! Warning
-    Cloud Native PostgreSQL requires that all nodes in a Kubernetes cluster have the
+    CloudNativePG requires that all nodes in a Kubernetes cluster have the
     same CPU architecture, thus a hybrid CPU architecture Kubernetes cluster is not
     supported. Additionally, EDB supports `linux/ppc64le` and `linux/s390x` architectures
     on OpenShift only.
@@ -105,7 +105,7 @@ architectures on OpenShift only.
 
 ## About this guide
 
-Follow the instructions in the ["Quickstart"](quickstart.md) to test Cloud Native PostgreSQL
+Follow the instructions in the ["Quickstart"](quickstart.md) to test CloudNativePG
 on a local Kubernetes cluster using Minikube or Kind.
 
 In case you are not familiar with some basic terminology on Kubernetes and PostgreSQL,

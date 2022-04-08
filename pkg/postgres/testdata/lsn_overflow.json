@@ -19,17 +19,17 @@
           "resourceVersion": "3656838",
           "creationTimestamp": "2021-12-09T16:10:34Z",
           "labels": {
-            "k8s.enterprisedb.io/cluster": "sandbox",
+            "cnpg.io/cluster": "sandbox",
             "postgresql": "sandbox",
             "role": "replica"
           },
           "annotations": {
-            "k8s.enterprisedb.io/nodeSerial": "6",
-            "k8s.enterprisedb.io/operatorVersion": "1.10.0"
+            "cnpg.io/nodeSerial": "6",
+            "cnpg.io/operatorVersion": "1.10.0"
           },
           "ownerReferences": [
             {
-              "apiVersion": "postgresql.k8s.enterprisedb.io/v1",
+              "apiVersion": "postgresql.cnpg.io/v1",
               "kind": "Cluster",
               "name": "sandbox",
               "uid": "b1ec3b05-27e3-408b-b66d-43b2a3608fcf",
@@ -48,12 +48,12 @@
                 "f:metadata": {
                   "f:annotations": {
                     ".": {},
-                    "f:k8s.enterprisedb.io/nodeSerial": {},
-                    "f:k8s.enterprisedb.io/operatorVersion": {}
+                    "f:cnpg.io/nodeSerial": {},
+                    "f:cnpg.io/operatorVersion": {}
                   },
                   "f:labels": {
                     ".": {},
-                    "f:k8s.enterprisedb.io/cluster": {},
+                    "f:cnpg.io/cluster": {},
                     "f:postgresql": {},
                     "f:role": {}
                   },
@@ -829,17 +829,17 @@
           "resourceVersion": "3650327",
           "creationTimestamp": "2021-12-09T15:23:04Z",
           "labels": {
-            "k8s.enterprisedb.io/cluster": "sandbox",
+            "cnpg.io/cluster": "sandbox",
             "postgresql": "sandbox",
             "role": "replica"
           },
           "annotations": {
-            "k8s.enterprisedb.io/nodeSerial": "3",
-            "k8s.enterprisedb.io/operatorVersion": "1.10.0"
+            "cnpg.io/nodeSerial": "3",
+            "cnpg.io/operatorVersion": "1.10.0"
           },
           "ownerReferences": [
             {
-              "apiVersion": "postgresql.k8s.enterprisedb.io/v1",
+              "apiVersion": "postgresql.cnpg.io/v1",
               "kind": "Cluster",
               "name": "sandbox",
               "uid": "b1ec3b05-27e3-408b-b66d-43b2a3608fcf",
@@ -858,12 +858,12 @@
                 "f:metadata": {
                   "f:annotations": {
                     ".": {},
-                    "f:k8s.enterprisedb.io/nodeSerial": {},
-                    "f:k8s.enterprisedb.io/operatorVersion": {}
+                    "f:cnpg.io/nodeSerial": {},
+                    "f:cnpg.io/operatorVersion": {}
                   },
                   "f:labels": {
                     ".": {},
-                    "f:k8s.enterprisedb.io/cluster": {},
+                    "f:cnpg.io/cluster": {},
                     "f:postgresql": {},
                     "f:role": {}
                   },

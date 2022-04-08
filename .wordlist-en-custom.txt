@@ -46,6 +46,8 @@ Certmanager
 ClientCASecret
 ClientCertsCASecret
 ClientReplicationSecret
+CloudNativePG
+CloudNativePG's
 ClusterCondition
 ClusterConditionType
 ClusterIP
@@ -357,6 +359,7 @@ clusterspec
 clusterstatus
 cmd
 cnp
+cnpg
 codeready
 columnValue
 commandError

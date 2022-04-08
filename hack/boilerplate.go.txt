@@ -1,5 +1,5 @@
 /*
-This file is part of Cloud Native PostgreSQL.
+This file is part of CloudNativePG.
 
 Copyright (C) 2019-2022 EnterpriseDB Corporation.
 */

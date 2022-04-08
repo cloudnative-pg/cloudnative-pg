@@ -1,6 +1,6 @@
 # Container Image Requirements
 
-The Cloud Native PostgreSQL operator for Kubernetes is designed to
+The CloudNativePG operator for Kubernetes is designed to
 work with any compatible container image of PostgreSQL that complies
 with the following requirements:
 
@@ -25,7 +25,7 @@ No entry point and/or command is required in the image definition, as Cloud
 Native PostgreSQL overrides it with its instance manager.
 
 !!! Warning
-    Application Container Images will be used by Cloud Native PostgreSQL
+    Application Container Images will be used by CloudNativePG
     in a **Primary with multiple/optional Hot Standby Servers Architecture**
     only.
 

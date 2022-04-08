@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -51,8 +51,8 @@ var (
 		MutatingWebhookConfigurationName:   "mutating-webhook",
 		ValidatingWebhookConfigurationName: "validating-webhook",
 		CustomResourceDefinitionsName: []string{
-			"clusters.postgresql.k8s.enterprisedb.io",
-			"backups.postgresql.k8s.enterprisedb.io",
+			"clusters.postgresql.cnpg.io",
+			"backups.postgresql.cnpg.io",
 		},
 	}
 
