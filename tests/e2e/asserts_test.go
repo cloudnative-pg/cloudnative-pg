@@ -32,12 +32,12 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -243,16 +243,16 @@ func AssertWebhookEnabled(env *testsUtils.TestingEnvironment, mutating, validati
 	By("re-setting namespace selector for all admission controllers", func() {
 		// Setting the namespace selector in MutatingWebhook and ValidatingWebhook
 		// to nil will go back to the default behaviour
-		mWhc, position, err := testsUtils.GetCNPsMutatingWebhookByName(env, mutating)
+		mWhc, position, err := testsUtils.GetCNPGsMutatingWebhookByName(env, mutating)
 		Expect(err).ToNot(HaveOccurred())
 		mWhc.Webhooks[position].NamespaceSelector = nil
-		err = testsUtils.UpdateCNPsMutatingWebhookConf(env, mWhc)
+		err = testsUtils.UpdateCNPGsMutatingWebhookConf(env, mWhc)
 		Expect(err).ToNot(HaveOccurred())
 
-		vWhc, position, err := testsUtils.GetCNPsValidatingWebhookByName(env, validating)
+		vWhc, position, err := testsUtils.GetCNPGsValidatingWebhookByName(env, validating)
 		Expect(err).ToNot(HaveOccurred())
 		vWhc.Webhooks[position].NamespaceSelector = nil
-		err = testsUtils.UpdateCNPsValidatingWebhookConf(env, vWhc)
+		err = testsUtils.UpdateCNPGsValidatingWebhookConf(env, vWhc)
 		Expect(err).ToNot(HaveOccurred())
 	})
 }
@@ -970,11 +970,11 @@ func AssertMetricsData(namespace, clusterName, curlPodName, targetOne, targetTwo
 			podIP := pod.Status.PodIP
 			out, err := testsUtils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(strings.Contains(out, fmt.Sprintf(`cnp_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
+			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
-			Expect(strings.Contains(out, fmt.Sprintf(`cnp_some_query_rows{datname="%v"} 0`, targetTwo))).Should(BeTrue(),
+			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetTwo))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
-			Expect(strings.Contains(out, fmt.Sprintf(`cnp_some_query_test_rows{datname="%v"} 1`,
+			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_test_rows{datname="%v"} 1`,
 				targetSecret))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
 		}
@@ -1985,13 +1985,13 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		expectedKeywordInMetricsOutput := [7]string{
-			"cnp_pg_settings_setting",
-			"cnp_backends_waiting_total",
-			"cnp_pg_postmaster_start_time",
-			"cnp_pg_replication",
-			"cnp_pg_stat_archiver",
-			"cnp_pg_stat_bgwriter",
-			"cnp_pg_stat_database",
+			"cnpg_pg_settings_setting",
+			"cnpg_backends_waiting_total",
+			"cnpg_pg_postmaster_start_time",
+			"cnpg_pg_replication",
+			"cnpg_pg_stat_archiver",
+			"cnpg_pg_stat_bgwriter",
+			"cnpg_pg_stat_database",
 		}
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
@@ -2000,7 +2000,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 			Expect(err).ToNot(HaveOccurred())
 
 			// error should be zero on each pod metrics
-			Expect(strings.Contains(out, "cnp_collector_last_collection_error 0")).Should(BeTrue(),
+			Expect(strings.Contains(out, "cnpg_collector_last_collection_error 0")).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
 			// verify that, default set of monitoring queries should not be existed on each pod
 			for _, data := range expectedKeywordInMetricsOutput {

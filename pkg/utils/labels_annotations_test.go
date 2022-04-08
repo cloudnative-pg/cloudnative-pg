@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 var _ = Describe("Operator version annotation management", func() {

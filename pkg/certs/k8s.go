@@ -30,9 +30,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var pkiLog = log.WithName("pki")
@@ -68,7 +68,7 @@ type PublicKeyInfrastructure struct {
 	CustomResourceDefinitionsName []string
 
 	// The labelSelector to be used to get the operators deployment,
-	// e.g. "app.kubernetes.io/name=cloud-native-postgresql"
+	// e.g. "app.kubernetes.io/name=cloudnative-pg"
 	OperatorDeploymentLabelSelector string
 }
 

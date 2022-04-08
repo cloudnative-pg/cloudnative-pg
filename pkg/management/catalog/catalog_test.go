@@ -19,7 +19,7 @@ package catalog
 import (
 	"time"
 
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

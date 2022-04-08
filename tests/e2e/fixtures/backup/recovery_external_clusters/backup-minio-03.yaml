@@ -1,4 +1,4 @@
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Backup
 metadata:
   name: cluster-backup-03

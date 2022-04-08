@@ -11,7 +11,7 @@ defaults:
 
 jobs:
   check-latest-postgres-version:
-    runs-on: self-hosted
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -28,10 +28,10 @@ jobs:
       - name: Get the latest version of PostgreSQL Docker image
         id: latest
         env:
-          QUAY_REPO: quay.io/enterprisedb/postgresql
+          IMAGE_REPO: ghcr.io/cloudnative-pg/postgresql
         run: |
           LATEST_POSTGRES_VERSION=$(jq -r '.[keys | max][0]' < .github/pg_versions.json)
-          LATEST_POSTGRES_VERSION_IMAGE="${QUAY_REPO}:${LATEST_POSTGRES_VERSION}"
+          LATEST_POSTGRES_VERSION_IMAGE="${IMAGE_REPO}:${LATEST_POSTGRES_VERSION}"
           echo "::set-output name=LATEST_POSTGRES_VERSION::$LATEST_POSTGRES_VERSION"
           echo "::set-output name=LATEST_POSTGRES_VERSION_IMAGE::$LATEST_POSTGRES_VERSION_IMAGE"
 

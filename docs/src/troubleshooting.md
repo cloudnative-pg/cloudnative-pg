@@ -1,7 +1,7 @@
 # Troubleshooting
 
-In this page, you can find some basic information on how to troubleshoot Cloud
-Native PostgreSQL in your Kubernetes cluster deployment.
+In this page, you can find some basic information on how to troubleshoot
+CloudNativePG in your Kubernetes cluster deployment.
 
 !!! Hint
     As a Kubernetes administrator, you should have the
@@ -29,7 +29,7 @@ Make sure you know:
 On top of the mandatory `kubectl` utility, for troubleshooting, we recommend the
 following plugins/utilities to be available in your system:
 
-- [`cnp` plugin](cnp-plugin.md) for `kubectl`
+- [`cnpg` plugin](cnpg-plugin.md) for `kubectl`
 - [`jq`](https://stedolan.github.io/jq/), a lightweight and flexible command-line JSON processor
 - [`grep`](https://www.gnu.org/software/grep/), searches one or more input files
   for lines containing a match to a specified pattern. It is already available in most \*nix distros.
@@ -38,7 +38,7 @@ following plugins/utilities to be available in your system:
 
 ### Logs
 
-Every resource created and controlled by Cloud Native PostgreSQL logs to
+Every resource created and controlled by CloudNativePG logs to
 standard output, as expected by Kubernetes, and directly in [JSON
 format](logging.md). As a result, you should rely on the `kubectl logs`
 command to retrieve logs from a given resource.
@@ -56,49 +56,48 @@ kubectl logs --help
 
 !!! Note
     In the sections below, we will show some examples on how to retrieve logs
-    about different resources when it comes to troubleshooting Cloud Native
-    PostgreSQL.
+    about different resources when it comes to troubleshooting CloudNativePG.
 
 ## Operator information
 
-By default, the Cloud Native PostgreSQL operator is installed in the
-`postgresql-operator-system` namespace in Kubernetes as a `Deployment`
+By default, the CloudNativePG operator is installed in the
+`cnpg-system` namespace in Kubernetes as a `Deployment`
 (see the ["Details about the deployment" section](installation_upgrade.md#details-about-the-deployment)
 for details).
 
 You can get a list of the operator pods by running:
 
 ```shell
-kubectl get pods -n postgresql-operator-system
+kubectl get pods -n cnpg-system
 ```
 
 !!! Note
     Under normal circumstances, you should have one pod where the operator is
-    running, identified by a name starting with `postgresql-operator-controller-manager-`.
+    running, identified by a name starting with `cnpg-controller-manager-`.
     In case you have set up your operator for high availability, you should have more entries.
-    Those pods are managed by a deployment named `postgresql-operator-controller-manager`.
+    Those pods are managed by a deployment named `cnpg-controller-manager`.
 
 Collect the relevant information about the operator that is running in pod
 `<POD>` with:
 
 ```shell
-kubectl describe pod -n postgresql-operator-system <POD>
+kubectl describe pod -n cnpg-system <POD>
 ```
 
 Then get the logs from the same pod by running:
 
 ```shell
-kubectl logs -n postgresql-operator-system <POD>
+kubectl logs -n cnpg-system <POD>
 ```
 
 ### Gather more information about the operator
 
-Get logs from all pods in Cloud Native PostgreSQL operator Deployment
+Get logs from all pods in CloudNativePG operator Deployment
 (in case you have a multi operator deployment) by running:
 
 ```shell
-kubectl logs -n postgresql-operator-system \
-  deployment/postgresql-operator-controller-manager --all-containers=true
+kubectl logs -n cnpg-system \
+  deployment/cnpg-controller-manager --all-containers=true
 ```
 
 !!! Tip
@@ -107,15 +106,15 @@ kubectl logs -n postgresql-operator-system \
 Save logs to a JSON file by running:
 
 ```shell
-kubectl logs -n postgresql-operator-system \
-  deployment/postgresql-operator-controller-manager --all-containers=true | \
-  jq -r . > cnp_logs.json
+kubectl logs -n cnpg-system \
+  deployment/cnpg-controller-manager --all-containers=true | \
+  jq -r . > cnpg_logs.json
 ```
 
-Get Cloud Native PostgreSQL operator version by using `kubectl-cnp` plugin:
+Get CloudNativePG operator version by using `kubectl-cnpg` plugin:
 
 ```shell
-kubectl-cnp status <CLUSTER>
+kubectl-cnpg status <CLUSTER>
 ```
 
 Output:
@@ -125,7 +124,7 @@ Cluster in healthy state
 Name:               cluster-example
 Namespace:          default
 System ID:          7044925089871458324
-PostgreSQL Image:   quay.io/enterprisedb/postgresql:14.2-3
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:14.2-3
 Primary instance:   cluster-example-1
 Instances:          3
 Ready instances:    3
@@ -175,22 +174,22 @@ kubectl get cluster -o yaml -n <NAMESPACE> <CLUSTER>
 ```
 
 Another important command to gather is the `status` one, as provided by the
-`cnp` plugin:
+`cnpg` plugin:
 
 ```shell
-kubectl cnp status -n <NAMESPACE> <CLUSTER>
+kubectl cnpg status -n <NAMESPACE> <CLUSTER>
 ```
 
 !!! Tip
     You can print more information by adding the `--verbose` option.
 
 !!! Note
-    Besides knowing cluster status, you can also do the following things with the cnp plugin:
+    Besides knowing cluster status, you can also do the following things with the cnpg plugin:
     Promote a replica.<br />
     Manage certificates.<br />
     Make a rollout restart cluster to apply configuration changes.<br />
     Make a reconciliation loop to reload and apply configuration changes.<br />
-    For more information, please see [`cnp` plugin](cnp-plugin.md) documentation.
+    For more information, please see [`cnpg` plugin](cnpg-plugin.md) documentation.
 
 Get PostgreSQL container image version:
 
@@ -201,11 +200,11 @@ kubectl describe cluster <CLUSTER_NAME> -n <NAMESPACE> | grep "Image Name"
 Output:
 
 ```shell
-  Image Name:    quay.io/enterprisedb/postgresql:14.2-3
+  Image Name:    ghcr.io/cloudnative-pg/postgresql:14.2-3
 ```
 
 !!! Note
-    Also you can use `kubectl-cnp status -n <NAMESPACE> <CLUSTER_NAME>`
+    Also you can use `kubectl-cnpg status -n <NAMESPACE> <CLUSTER_NAME>`
     to get the same information.
 
 ## Pod information
@@ -214,10 +213,7 @@ You can retrieve the list of instances that belong to a given PostgreSQL
 cluster with:
 
 ```shell
-# using labels available from CNP 1.12.0
-kubectl get pod -l k8s.enterprisedb.io/cluster=<CLUSTER> -L role -n <NAMESPACE>
-# using legacy labels
-kubectl get pod -l postgresql=<CLUSTER> -L role -n <NAMESPACE>
+kubectl get pod -l cnpg.io/cluster=<CLUSTER> -L role -n <NAMESPACE>
 ```
 
 Output:
@@ -349,12 +345,12 @@ info | 1636383566.0664876 | postgres | record
 You can list the backups that have been created for a named cluster with:
 
 ```shell
-kubectl get backup -l k8s.enterprisedb.io/cluster=<CLUSTER>
+kubectl get backup -l cnpg.io/cluster=<CLUSTER>
 ```
 
 !!! Important
-    Backup labelling has been introduced in version 1.10.0 of Cloud Native
-    PostgreSQL. So only those resources that have been created with that version or
+    Backup labelling has been introduced in version 1.10.0 of CloudNativePG.
+    So only those resources that have been created with that version or
     a higher one will contain such a label.
 
 ## Storage information
@@ -386,7 +382,7 @@ Additionally, you can gather the list of nodes where the pods of a given
 cluster are running with:
 
 ```shell
-kubectl get pod -l k8s.enterprisedb.io/clusterName=<CLUSTER> \
+kubectl get pod -l cnpg.io/clusterName=<CLUSTER> \
   -L role -n <NAMESPACE> -o wide
 ```
 

@@ -1,10 +1,10 @@
 # Connection Pooling
 
-Cloud Native PostgreSQL provides native support for connection pooling with
+CloudNativePG provides native support for connection pooling with
 [PgBouncer](https://www.pgbouncer.org/), one of the most popular open source
 connection poolers for PostgreSQL, through the `Pooler` CRD.
 
-In a nutshell, a `Pooler` in Cloud Native PostgreSQL is a deployment of
+In a nutshell, a `Pooler` in CloudNativePG is a deployment of
 PgBouncer pods that sits between your applications and a PostgreSQL service
 (for example the `rw` service), creating a separate, scalable, configurable,
 and highly available **database access layer**.
@@ -12,7 +12,7 @@ and highly available **database access layer**.
 ## Architecture
 
 The following diagram highlights how the introduction of a database access
-layer based on PgBouncer changes the architecture of Cloud Native PostgreSQL,
+layer based on PgBouncer changes the architecture of CloudNativePG,
 like an additional blade in a Swiss Army knife. Instead of directly connecting
 to the PostgreSQL primary service, applications can now connect to the
 equivalent service for PgBouncer, enabling reuse of existing connections for
@@ -22,11 +22,11 @@ faster performance and better resource management on the PostgreSQL side.
 
 ## Quickstart
 
-The easiest way to explain how Cloud Native PostgreSQL implements a PgBouncer
+The easiest way to explain how CloudNativePG implements a PgBouncer
 pooler is through an example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
   name: pooler-example-rw
@@ -53,7 +53,7 @@ service (`rw`, therefore `cluster-example-rw`).
 
 The `Pooler` must live in the same namespace of the Postgres cluster.
 It consists of a Kubernetes deployment of 3 pods running the
-[latest stable image of PgBouncer](https://quay.io/repository/enterprisedb/pgbouncer),
+[latest stable image of PgBouncer](https://ghcr.io/cloudnative-pg/pgbouncer),
 configured with the [`session` pooling mode](https://www.pgbouncer.org/config.html#pool-mode)
 and accepting up to 1000 connections each - with a default pool size of 10
 user/database pairs towards PostgreSQL.
@@ -64,7 +64,7 @@ user/database pairs towards PostgreSQL.
     relayed to the PostgreSQL server (please refer to ["Section [databases]"
     in PgBouncer's documentation](https://www.pgbouncer.org/config.html#section-databases)).
 
-Additionally, Cloud Native PostgreSQL automatically creates a secret with the
+Additionally, CloudNativePG automatically creates a secret with the
 same name of the pooler containing the configuration files used with PgBouncer.
 
 !!! Seealso "API reference"
@@ -89,7 +89,7 @@ doesn't imply the automatic deletion of the `Pooler`, and viceversa.
 
 ## Security
 
-Any PgBouncer pooler is transparently integrated with Cloud Native PostgreSQL
+Any PgBouncer pooler is transparently integrated with CloudNativePG
 support for in-transit encryption via **TLS connections**, both on the client
 (application) and server (PostgreSQL) side of the pool.
 
@@ -122,17 +122,17 @@ So we can treat this secret as a TLS secret, and start from there.
 ## Authentication
 
 **Password based authentication** is the only supported method for clients of
-PgBouncer in Cloud Native PostgreSQL.
+PgBouncer in CloudNativePG.
 
 Internally, our implementation relies on PgBouncer's `auth_user` and `auth_query` options. Specifically, the operator:
 
-- creates a standard user called `cnp_pooler_pgbouncer` in the PostgreSQL server
+- creates a standard user called `cnpg_pooler_pgbouncer` in the PostgreSQL server
 - creates the lookup function in the `postgres` database and grants execution
-  privileges to the `cnp_pooler_pgbouncer` user (PoLA)
+  privileges to the `cnpg_pooler_pgbouncer` user (PoLA)
 - issues a TLS certificate for this user
-- sets `cnp_pooler_pgbouncer` as the `auth_user`
+- sets `cnpg_pooler_pgbouncer` as the `auth_user`
 - configures PgBouncer to use the TLS certificate to authenticate
-  `cnp_pooler_pgbouncer` against the PostgreSQL server
+  `cnpg_pooler_pgbouncer` against the PostgreSQL server
 - removes all the above when it detects that a cluster does not have
   any pooler associated to it
 
@@ -145,13 +145,13 @@ To manually integrate the Pooler, in the case that you have specified your own s
 
 
    ```sql
-   CREATE ROLE cnp_pooler_pgbouncer WITH LOGIN;
+   CREATE ROLE cnpg_pooler_pgbouncer WITH LOGIN;
    ```
 
-2. For each application database, grant the permission for `cnp_pooler_pgbouncer` to connect to it:
+2. For each application database, grant the permission for `cnpg_pooler_pgbouncer` to connect to it:
 
    ```sql
-   GRANT CONNECT ON DATABASE { database name here } TO cnp_pooler_pgbouncer;
+   GRANT CONNECT ON DATABASE { database name here } TO cnpg_pooler_pgbouncer;
    ```
 
 3. Connect in each application database, then create the authentication function inside each of the application databases:
@@ -161,7 +161,7 @@ To manually integrate the Pooler, in the case that you have specified your own s
 
    REVOKE ALL ON FUNCTION user_search(text) FROM public;
 
-   GRANT EXECUTE ON FUNCTION user_search(text) TO cnp_pooler_pgbouncer;
+   GRANT EXECUTE ON FUNCTION user_search(text) TO cnpg_pooler_pgbouncer;
    ```
 
 
@@ -173,12 +173,12 @@ section](api_reference.md#PoolerSpec) in the API reference.
 
 Through templates you can configure pods as you like, including fine
 control over affinity and anti-affinity rules for pods and nodes.
-By default, containers use images from `quay.io/enterprisedb/pgbouncer`.
+By default, containers use images from `ghcr.io/cloudnative-pg/pgbouncer`.
 
 Here an example of Pooler specifying PodAntiAffinity:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
   name: pooler-example-rw
@@ -216,7 +216,7 @@ spec:
 Here an example setting resources and changing the used image:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
   name: pooler-example-rw
@@ -325,13 +325,13 @@ without disrupting the service.
 
 The PgBouncer implementation of the `Pooler` comes with a default
 Prometheus exporter that automatically makes available several
-metrics having the `cnp_pgbouncer_` prefix, by running:
+metrics having the `cnpg_pgbouncer_` prefix, by running:
 
-- `SHOW LISTS` (prefix: `cnp_pgbouncer_lists`)
-- `SHOW POOLS` (prefix: `cnp_pgbouncer_pools`)
-- `SHOW STATS` (prefix: `cnp_pgbouncer_stats`)
+- `SHOW LISTS` (prefix: `cnpg_pgbouncer_lists`)
+- `SHOW POOLS` (prefix: `cnpg_pgbouncer_pools`)
+- `SHOW STATS` (prefix: `cnpg_pgbouncer_stats`)
 
-Similarly to the Cloud Native PostgreSQL instance, the exporter runs on port
+Similarly to the CloudNativePG instance, the exporter runs on port
 `9127` of each pod running PgBouncer, and also provides metrics related to the
 Go runtime (with prefix `go_*`). You can debug the exporter on a pod running
 PgBouncer through the following command:
@@ -340,168 +340,168 @@ PgBouncer through the following command:
 kubectl exec -ti <PGBOUNCER_POD> -- curl 127.0.0.1:9127/metrics
 ```
 
-An example of the output for `cnp_pgbouncer` metrics:
+An example of the output for `cnpg_pgbouncer` metrics:
 
 ```text
-# HELP cnp_pgbouncer_collection_duration_seconds Collection time duration in seconds
-# TYPE cnp_pgbouncer_collection_duration_seconds gauge
-cnp_pgbouncer_collection_duration_seconds{collector="Collect.up"} 0.002443168
+# HELP cnpg_pgbouncer_collection_duration_seconds Collection time duration in seconds
+# TYPE cnpg_pgbouncer_collection_duration_seconds gauge
+cnpg_pgbouncer_collection_duration_seconds{collector="Collect.up"} 0.002443168
 
-# HELP cnp_pgbouncer_collections_total Total number of times PostgreSQL was accessed for metrics.
-# TYPE cnp_pgbouncer_collections_total counter
-cnp_pgbouncer_collections_total 1
+# HELP cnpg_pgbouncer_collections_total Total number of times PostgreSQL was accessed for metrics.
+# TYPE cnpg_pgbouncer_collections_total counter
+cnpg_pgbouncer_collections_total 1
 
-# HELP cnp_pgbouncer_last_collection_error 1 if the last collection ended with error, 0 otherwise.
-# TYPE cnp_pgbouncer_last_collection_error gauge
-cnp_pgbouncer_last_collection_error 0
+# HELP cnpg_pgbouncer_last_collection_error 1 if the last collection ended with error, 0 otherwise.
+# TYPE cnpg_pgbouncer_last_collection_error gauge
+cnpg_pgbouncer_last_collection_error 0
 
-# HELP cnp_pgbouncer_lists_databases Count of databases.
-# TYPE cnp_pgbouncer_lists_databases gauge
-cnp_pgbouncer_lists_databases 1
+# HELP cnpg_pgbouncer_lists_databases Count of databases.
+# TYPE cnpg_pgbouncer_lists_databases gauge
+cnpg_pgbouncer_lists_databases 1
 
-# HELP cnp_pgbouncer_lists_dns_names Count of DNS names in the cache.
-# TYPE cnp_pgbouncer_lists_dns_names gauge
-cnp_pgbouncer_lists_dns_names 0
+# HELP cnpg_pgbouncer_lists_dns_names Count of DNS names in the cache.
+# TYPE cnpg_pgbouncer_lists_dns_names gauge
+cnpg_pgbouncer_lists_dns_names 0
 
-# HELP cnp_pgbouncer_lists_dns_pending Not used.
-# TYPE cnp_pgbouncer_lists_dns_pending gauge
-cnp_pgbouncer_lists_dns_pending 0
+# HELP cnpg_pgbouncer_lists_dns_pending Not used.
+# TYPE cnpg_pgbouncer_lists_dns_pending gauge
+cnpg_pgbouncer_lists_dns_pending 0
 
-# HELP cnp_pgbouncer_lists_dns_queries Count of in-flight DNS queries.
-# TYPE cnp_pgbouncer_lists_dns_queries gauge
-cnp_pgbouncer_lists_dns_queries 0
+# HELP cnpg_pgbouncer_lists_dns_queries Count of in-flight DNS queries.
+# TYPE cnpg_pgbouncer_lists_dns_queries gauge
+cnpg_pgbouncer_lists_dns_queries 0
 
-# HELP cnp_pgbouncer_lists_dns_zones Count of DNS zones in the cache.
-# TYPE cnp_pgbouncer_lists_dns_zones gauge
-cnp_pgbouncer_lists_dns_zones 0
+# HELP cnpg_pgbouncer_lists_dns_zones Count of DNS zones in the cache.
+# TYPE cnpg_pgbouncer_lists_dns_zones gauge
+cnpg_pgbouncer_lists_dns_zones 0
 
-# HELP cnp_pgbouncer_lists_free_clients Count of free clients.
-# TYPE cnp_pgbouncer_lists_free_clients gauge
-cnp_pgbouncer_lists_free_clients 49
+# HELP cnpg_pgbouncer_lists_free_clients Count of free clients.
+# TYPE cnpg_pgbouncer_lists_free_clients gauge
+cnpg_pgbouncer_lists_free_clients 49
 
-# HELP cnp_pgbouncer_lists_free_servers Count of free servers.
-# TYPE cnp_pgbouncer_lists_free_servers gauge
-cnp_pgbouncer_lists_free_servers 0
+# HELP cnpg_pgbouncer_lists_free_servers Count of free servers.
+# TYPE cnpg_pgbouncer_lists_free_servers gauge
+cnpg_pgbouncer_lists_free_servers 0
 
-# HELP cnp_pgbouncer_lists_login_clients Count of clients in login state.
-# TYPE cnp_pgbouncer_lists_login_clients gauge
-cnp_pgbouncer_lists_login_clients 0
+# HELP cnpg_pgbouncer_lists_login_clients Count of clients in login state.
+# TYPE cnpg_pgbouncer_lists_login_clients gauge
+cnpg_pgbouncer_lists_login_clients 0
 
-# HELP cnp_pgbouncer_lists_pools Count of pools.
-# TYPE cnp_pgbouncer_lists_pools gauge
-cnp_pgbouncer_lists_pools 1
+# HELP cnpg_pgbouncer_lists_pools Count of pools.
+# TYPE cnpg_pgbouncer_lists_pools gauge
+cnpg_pgbouncer_lists_pools 1
 
-# HELP cnp_pgbouncer_lists_used_clients Count of used clients.
-# TYPE cnp_pgbouncer_lists_used_clients gauge
-cnp_pgbouncer_lists_used_clients 1
+# HELP cnpg_pgbouncer_lists_used_clients Count of used clients.
+# TYPE cnpg_pgbouncer_lists_used_clients gauge
+cnpg_pgbouncer_lists_used_clients 1
 
-# HELP cnp_pgbouncer_lists_used_servers Count of used servers.
-# TYPE cnp_pgbouncer_lists_used_servers gauge
-cnp_pgbouncer_lists_used_servers 0
+# HELP cnpg_pgbouncer_lists_used_servers Count of used servers.
+# TYPE cnpg_pgbouncer_lists_used_servers gauge
+cnpg_pgbouncer_lists_used_servers 0
 
-# HELP cnp_pgbouncer_lists_users Count of users.
-# TYPE cnp_pgbouncer_lists_users gauge
-cnp_pgbouncer_lists_users 2
+# HELP cnpg_pgbouncer_lists_users Count of users.
+# TYPE cnpg_pgbouncer_lists_users gauge
+cnpg_pgbouncer_lists_users 2
 
-# HELP cnp_pgbouncer_pools_cl_active Client connections that are linked to server connection and can process queries.
-# TYPE cnp_pgbouncer_pools_cl_active gauge
-cnp_pgbouncer_pools_cl_active{database="pgbouncer",user="pgbouncer"} 1
+# HELP cnpg_pgbouncer_pools_cl_active Client connections that are linked to server connection and can process queries.
+# TYPE cnpg_pgbouncer_pools_cl_active gauge
+cnpg_pgbouncer_pools_cl_active{database="pgbouncer",user="pgbouncer"} 1
 
-# HELP cnp_pgbouncer_pools_cl_cancel_req Client connections that have not forwarded query cancellations to the server yet.
-# TYPE cnp_pgbouncer_pools_cl_cancel_req gauge
-cnp_pgbouncer_pools_cl_cancel_req{database="pgbouncer",user="pgbouncer"} 0
+# HELP cnpg_pgbouncer_pools_cl_cancel_req Client connections that have not forwarded query cancellations to the server yet.
+# TYPE cnpg_pgbouncer_pools_cl_cancel_req gauge
+cnpg_pgbouncer_pools_cl_cancel_req{database="pgbouncer",user="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_pools_cl_waiting Client connections that have sent queries but have not yet got a server connection.
-# TYPE cnp_pgbouncer_pools_cl_waiting gauge
-cnp_pgbouncer_pools_cl_waiting{database="pgbouncer",user="pgbouncer"} 0
+# HELP cnpg_pgbouncer_pools_cl_waiting Client connections that have sent queries but have not yet got a server connection.
+# TYPE cnpg_pgbouncer_pools_cl_waiting gauge
+cnpg_pgbouncer_pools_cl_waiting{database="pgbouncer",user="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_pools_maxwait How long the first (oldest) client in the queue has waited, in seconds. If this starts increasing, then the current pool of servers does not handle requests quickly enough. The reason may be either an overloaded server or just too small of a pool_size setting.
-# TYPE cnp_pgbouncer_pools_maxwait gauge
-cnp_pgbouncer_pools_maxwait{database="pgbouncer",user="pgbouncer"} 0
+# HELP cnpg_pgbouncer_pools_maxwait How long the first (oldest) client in the queue has waited, in seconds. If this starts increasing, then the current pool of servers does not handle requests quickly enough. The reason may be either an overloaded server or just too small of a pool_size setting.
+# TYPE cnpg_pgbouncer_pools_maxwait gauge
+cnpg_pgbouncer_pools_maxwait{database="pgbouncer",user="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_pools_maxwait_us Microsecond part of the maximum waiting time.
-# TYPE cnp_pgbouncer_pools_maxwait_us gauge
-cnp_pgbouncer_pools_maxwait_us{database="pgbouncer",user="pgbouncer"} 0
+# HELP cnpg_pgbouncer_pools_maxwait_us Microsecond part of the maximum waiting time.
+# TYPE cnpg_pgbouncer_pools_maxwait_us gauge
+cnpg_pgbouncer_pools_maxwait_us{database="pgbouncer",user="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_pools_pool_mode The pooling mode in use. 1 for session, 2 for transaction, 3 for statement, -1 if unknown
-# TYPE cnp_pgbouncer_pools_pool_mode gauge
-cnp_pgbouncer_pools_pool_mode{database="pgbouncer",user="pgbouncer"} 3
+# HELP cnpg_pgbouncer_pools_pool_mode The pooling mode in use. 1 for session, 2 for transaction, 3 for statement, -1 if unknown
+# TYPE cnpg_pgbouncer_pools_pool_mode gauge
+cnpg_pgbouncer_pools_pool_mode{database="pgbouncer",user="pgbouncer"} 3
 
-# HELP cnp_pgbouncer_pools_sv_active Server connections that are linked to a client.
-# TYPE cnp_pgbouncer_pools_sv_active gauge
-cnp_pgbouncer_pools_sv_active{database="pgbouncer",user="pgbouncer"} 0
+# HELP cnpg_pgbouncer_pools_sv_active Server connections that are linked to a client.
+# TYPE cnpg_pgbouncer_pools_sv_active gauge
+cnpg_pgbouncer_pools_sv_active{database="pgbouncer",user="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_pools_sv_idle Server connections that are unused and immediately usable for client queries.
-# TYPE cnp_pgbouncer_pools_sv_idle gauge
-cnp_pgbouncer_pools_sv_idle{database="pgbouncer",user="pgbouncer"} 0
+# HELP cnpg_pgbouncer_pools_sv_idle Server connections that are unused and immediately usable for client queries.
+# TYPE cnpg_pgbouncer_pools_sv_idle gauge
+cnpg_pgbouncer_pools_sv_idle{database="pgbouncer",user="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_pools_sv_login Server connections currently in the process of logging in.
-# TYPE cnp_pgbouncer_pools_sv_login gauge
-cnp_pgbouncer_pools_sv_login{database="pgbouncer",user="pgbouncer"} 0
+# HELP cnpg_pgbouncer_pools_sv_login Server connections currently in the process of logging in.
+# TYPE cnpg_pgbouncer_pools_sv_login gauge
+cnpg_pgbouncer_pools_sv_login{database="pgbouncer",user="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_pools_sv_tested Server connections that are currently running either server_reset_query or server_check_query.
-# TYPE cnp_pgbouncer_pools_sv_tested gauge
-cnp_pgbouncer_pools_sv_tested{database="pgbouncer",user="pgbouncer"} 0
+# HELP cnpg_pgbouncer_pools_sv_tested Server connections that are currently running either server_reset_query or server_check_query.
+# TYPE cnpg_pgbouncer_pools_sv_tested gauge
+cnpg_pgbouncer_pools_sv_tested{database="pgbouncer",user="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_pools_sv_used Server connections that have been idle for more than server_check_delay, so they need server_check_query to run on them before they can be used again.
-# TYPE cnp_pgbouncer_pools_sv_used gauge
-cnp_pgbouncer_pools_sv_used{database="pgbouncer",user="pgbouncer"} 0
+# HELP cnpg_pgbouncer_pools_sv_used Server connections that have been idle for more than server_check_delay, so they need server_check_query to run on them before they can be used again.
+# TYPE cnpg_pgbouncer_pools_sv_used gauge
+cnpg_pgbouncer_pools_sv_used{database="pgbouncer",user="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_stats_avg_query_count Average queries per second in last stat period.
-# TYPE cnp_pgbouncer_stats_avg_query_count gauge
-cnp_pgbouncer_stats_avg_query_count{database="pgbouncer"} 1
+# HELP cnpg_pgbouncer_stats_avg_query_count Average queries per second in last stat period.
+# TYPE cnpg_pgbouncer_stats_avg_query_count gauge
+cnpg_pgbouncer_stats_avg_query_count{database="pgbouncer"} 1
 
-# HELP cnp_pgbouncer_stats_avg_query_time Average query duration, in microseconds.
-# TYPE cnp_pgbouncer_stats_avg_query_time gauge
-cnp_pgbouncer_stats_avg_query_time{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_avg_query_time Average query duration, in microseconds.
+# TYPE cnpg_pgbouncer_stats_avg_query_time gauge
+cnpg_pgbouncer_stats_avg_query_time{database="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_stats_avg_recv Average received (from clients) bytes per second.
-# TYPE cnp_pgbouncer_stats_avg_recv gauge
-cnp_pgbouncer_stats_avg_recv{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_avg_recv Average received (from clients) bytes per second.
+# TYPE cnpg_pgbouncer_stats_avg_recv gauge
+cnpg_pgbouncer_stats_avg_recv{database="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_stats_avg_sent Average sent (to clients) bytes per second.
-# TYPE cnp_pgbouncer_stats_avg_sent gauge
-cnp_pgbouncer_stats_avg_sent{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_avg_sent Average sent (to clients) bytes per second.
+# TYPE cnpg_pgbouncer_stats_avg_sent gauge
+cnpg_pgbouncer_stats_avg_sent{database="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_stats_avg_wait_time Time spent by clients waiting for a server, in microseconds (average per second).
-# TYPE cnp_pgbouncer_stats_avg_wait_time gauge
-cnp_pgbouncer_stats_avg_wait_time{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_avg_wait_time Time spent by clients waiting for a server, in microseconds (average per second).
+# TYPE cnpg_pgbouncer_stats_avg_wait_time gauge
+cnpg_pgbouncer_stats_avg_wait_time{database="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_stats_avg_xact_count Average transactions per second in last stat period.
-# TYPE cnp_pgbouncer_stats_avg_xact_count gauge
-cnp_pgbouncer_stats_avg_xact_count{database="pgbouncer"} 1
+# HELP cnpg_pgbouncer_stats_avg_xact_count Average transactions per second in last stat period.
+# TYPE cnpg_pgbouncer_stats_avg_xact_count gauge
+cnpg_pgbouncer_stats_avg_xact_count{database="pgbouncer"} 1
 
-# HELP cnp_pgbouncer_stats_avg_xact_time Average transaction duration, in microseconds.
-# TYPE cnp_pgbouncer_stats_avg_xact_time gauge
-cnp_pgbouncer_stats_avg_xact_time{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_avg_xact_time Average transaction duration, in microseconds.
+# TYPE cnpg_pgbouncer_stats_avg_xact_time gauge
+cnpg_pgbouncer_stats_avg_xact_time{database="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_stats_total_query_count Total number of SQL queries pooled by pgbouncer.
-# TYPE cnp_pgbouncer_stats_total_query_count gauge
-cnp_pgbouncer_stats_total_query_count{database="pgbouncer"} 3
+# HELP cnpg_pgbouncer_stats_total_query_count Total number of SQL queries pooled by pgbouncer.
+# TYPE cnpg_pgbouncer_stats_total_query_count gauge
+cnpg_pgbouncer_stats_total_query_count{database="pgbouncer"} 3
 
-# HELP cnp_pgbouncer_stats_total_query_time Total number of microseconds spent by pgbouncer when actively connected to PostgreSQL, executing queries.
-# TYPE cnp_pgbouncer_stats_total_query_time gauge
-cnp_pgbouncer_stats_total_query_time{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_total_query_time Total number of microseconds spent by pgbouncer when actively connected to PostgreSQL, executing queries.
+# TYPE cnpg_pgbouncer_stats_total_query_time gauge
+cnpg_pgbouncer_stats_total_query_time{database="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_stats_total_received Total volume in bytes of network traffic received by pgbouncer.
-# TYPE cnp_pgbouncer_stats_total_received gauge
-cnp_pgbouncer_stats_total_received{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_total_received Total volume in bytes of network traffic received by pgbouncer.
+# TYPE cnpg_pgbouncer_stats_total_received gauge
+cnpg_pgbouncer_stats_total_received{database="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_stats_total_sent Total volume in bytes of network traffic sent by pgbouncer.
-# TYPE cnp_pgbouncer_stats_total_sent gauge
-cnp_pgbouncer_stats_total_sent{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_total_sent Total volume in bytes of network traffic sent by pgbouncer.
+# TYPE cnpg_pgbouncer_stats_total_sent gauge
+cnpg_pgbouncer_stats_total_sent{database="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_stats_total_wait_time Time spent by clients waiting for a server, in microseconds.
-# TYPE cnp_pgbouncer_stats_total_wait_time gauge
-cnp_pgbouncer_stats_total_wait_time{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_total_wait_time Time spent by clients waiting for a server, in microseconds.
+# TYPE cnpg_pgbouncer_stats_total_wait_time gauge
+cnpg_pgbouncer_stats_total_wait_time{database="pgbouncer"} 0
 
-# HELP cnp_pgbouncer_stats_total_xact_count Total number of SQL transactions pooled by pgbouncer.
-# TYPE cnp_pgbouncer_stats_total_xact_count gauge
-cnp_pgbouncer_stats_total_xact_count{database="pgbouncer"} 3
+# HELP cnpg_pgbouncer_stats_total_xact_count Total number of SQL transactions pooled by pgbouncer.
+# TYPE cnpg_pgbouncer_stats_total_xact_count gauge
+cnpg_pgbouncer_stats_total_xact_count{database="pgbouncer"} 3
 
-# HELP cnp_pgbouncer_stats_total_xact_time Total number of microseconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries.
-# TYPE cnp_pgbouncer_stats_total_xact_time gauge
-cnp_pgbouncer_stats_total_xact_time{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_total_xact_time Total number of microseconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries.
+# TYPE cnpg_pgbouncer_stats_total_xact_time gauge
+cnpg_pgbouncer_stats_total_xact_time{database="pgbouncer"} 0
 ```
 
 Like for `Clusters`, if you are using the [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator)
@@ -515,7 +515,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      k8s.enterprisedb.io/poolerName: <POOLER_NAME>
+      cnpg.io/poolerName: <POOLER_NAME>
   podMetricsEndpoints:
   - port: metrics
 ```
@@ -564,7 +564,7 @@ service defined in the `Pooler`.
     features to reduce the perceived downtime by client applications.
     At the moment, you can achieve the same results by setting the `paused`
     attribute to `true`, then issuing the switchover command through the
-    [`cnp` plugin](cnp-plugin.md#promote), and finally restoring the `paused`
+    [`cnpg` plugin](cnpg-plugin.md#promote), and finally restoring the `paused`
     attribute to `false`.
 
 ## Limitations
@@ -572,12 +572,12 @@ service defined in the `Pooler`.
 ### Single PostgreSQL cluster
 
 The current implementation of the pooler is designed to work as part of a
-specific Cloud Native PostgreSQL cluster (a service, to be precise). It is not
+specific CloudNativePG cluster (a service, to be precise). It is not
 possible at the moment to create a pooler that spans over multiple clusters.
 
 ### Controlled configurability
 
-Cloud Native PostgreSQL transparently manages several configuration options
+CloudNativePG transparently manages several configuration options
 that are used for the PgBouncer layer to communicate with PostgreSQL. Such
 options are not configurable from outside and include TLS certificates,
 authentication settings, `databases` section, and `users` section. Also,

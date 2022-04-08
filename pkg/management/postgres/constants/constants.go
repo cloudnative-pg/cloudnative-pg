@@ -35,5 +35,5 @@ const (
 	InitdbName = "initdb"
 
 	// Startup is the name of a file that is created once during the first reconcile of an instance
-	Startup = "cnp_initialized"
+	Startup = "cnpg_initialized"
 )

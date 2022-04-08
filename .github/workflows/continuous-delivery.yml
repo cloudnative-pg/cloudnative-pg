@@ -11,9 +11,6 @@ on:
         description: 'Depth (push, pull_request, main, schedule)'
         required: true
         default: 'main'
-      limit:
-        description: 'Limit to the specified engines list (local, eks, aks, gke, rke)'
-        required: false
       test_level:
         description: 'Test level (0-4)'
         required: false
@@ -82,7 +79,7 @@ jobs:
             - 'licenses/**'
             - 'pkg/**'
             - '.github/workflows/continuous-delivery.yml'
-            - '.goreleaser-multiarch.yml'
+            - '.goreleaser.yml'
             - 'Dockerfile'
             - 'Makefile'
             - 'go.mod'
@@ -108,13 +105,23 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       -
+        name: Checkout code
+        uses: actions/checkout@v3
+      -
         name: Install Go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
-        name: Checkout code
-        uses: actions/checkout@v3
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
         name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -171,6 +178,16 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
         name: Run unit tests
         env:
@@ -272,9 +289,12 @@ jobs:
       (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
       (needs.crd.result == 'success' || needs.crd.result == 'skipped')
     runs-on: ubuntu-20.04
+    permissions:
+      contents: read
+      packages: write
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
-      cnp_version: ${{ steps.build-meta.outputs.cnp_version }}
+      cnpg_version: ${{ steps.build-meta.outputs.cnpg_version }}
     steps:
       -
         name: Checkout
@@ -288,12 +308,22 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      -
         name: Build meta
         id: build-meta
         run: |
-          images='quay.io/enterprisedb/cloud-native-postgresql-testing'
+          images='ghcr.io/cloudnative-pg/cloudnative-pg-testing'
           tags=''
-          labels='quay.expires-after=7d'
+          labels=''
           commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
@@ -306,7 +336,7 @@ jobs:
           echo "::set-output name=date::${commit_date}"
           echo "::set-output name=version::${commit_version}"
           echo "::set-output name=commit::${commit_short}"
-          echo "::set-output name=cnp_version::${git_version_tag}"
+          echo "::set-output name=cnpg_version::${git_version_tag}"
       -
         name: Set GoReleaser environment
         run: |
@@ -318,7 +348,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: build -f .goreleaser-multiarch.yml --skip-validate --rm-dist
+          args: build --skip-validate --rm-dist
         env:
           DATE: ${{ steps.build-meta.outputs.date }}
           COMMIT: ${{ steps.build-meta.outputs.commit }}
@@ -336,10 +366,9 @@ jobs:
         name: Detect platforms
         id: docker-platforms
         run: |
-          # Available architecture on UBI8 are: linux/amd64, linux/ppc64le, linux/s390x
           # Keep in mind that adding more platforms (architectures) will increase the building
           # time even if we use the ghcache for the building process.
-          platforms="linux/amd64,linux/ppc64le,linux/s390x"
+          platforms="linux/amd64"
           echo "::set-output name=platforms::${platforms}"
       -
         name: Set up QEMU
@@ -352,12 +381,12 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v1
       -
-        name: Login to quay.io
+        name: Login to ghcr.io
         uses: docker/login-action@v1
         with:
-          registry: quay.io/enterprisedb
-          username: ${{ secrets.QUAY_USERNAME }}
-          password: ${{ secrets.QUAY_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
         uses: docker/build-push-action@v2.10.0
@@ -382,49 +411,6 @@ jobs:
           image=$(sed -n '1{s/,.*//; p}' <<< "$TAGS")
           echo "::set-output name=image::${image}"
 
-  trigger-ocp:
-    name: Trigger OCP bundle
-    needs:
-      - golangci
-      - shellcheck
-      - tests
-      - apidoc
-      - crd
-      - duplicate_runs
-      - change-triage
-    # Trigger OCP bundle if anything but docs have changed,
-    # or it is a scheduled execution
-    # See https://github.com/actions/runner/issues/491#issuecomment-850884422
-    if: |
-      (
-        github.event_name == 'schedule' ||
-        needs.duplicate_runs.outputs.should_skip != 'true' &&
-        github.event.sender.login != 'cnp-autobot' &&
-        (
-          needs.change-triage.outputs.operator-changed == 'true' ||
-          needs.change-triage.outputs.test-changed == 'true' ||
-          needs.change-triage.outputs.shell-script-changed == 'true' ||
-          needs.change-triage.outputs.go-code-changed == 'true'
-        )
-      ) &&
-      always() &&
-      (needs.golangci.result == 'success' || needs.golangci.result == 'skipped') &&
-      (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
-      (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
-      (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
-      (needs.crd.result == 'success' || needs.crd.result == 'skipped')
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Repository Dispatch
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.REPO_GHA_PAT }}
-          repository: enterprisedb/cloud-native-postgresql-ocp-certified
-          event-type: cnp-trigger
-          client-payload: '{"upstream_commit": "${{ github.event.pull_request.head.sha || github.sha }}",
-          "info": {"branch_name": "${{ github.ref_name }}", "run_number": "${{ github.run_number }}"}}'
-
-
   generate-jobs:
     name: Generate jobs for E2E tests
     needs:
@@ -439,14 +425,6 @@ jobs:
       image: ${{ needs.buildx.outputs.image }}
       localMatrix: ${{ steps.generate-jobs.outputs.localMatrix }}
       localEnabled: ${{ steps.generate-jobs.outputs.localEnabled }}
-      eksMatrix: ${{ steps.generate-jobs.outputs.eksMatrix }}
-      eksEnabled: ${{ steps.generate-jobs.outputs.eksEnabled }}
-      aksMatrix: ${{ steps.generate-jobs.outputs.aksMatrix }}
-      aksEnabled: ${{ steps.generate-jobs.outputs.aksEnabled }}
-      gkeMatrix: ${{ steps.generate-jobs.outputs.gkeMatrix }}
-      gkeEnabled: ${{ steps.generate-jobs.outputs.gkeEnabled }}
-      rkeMatrix: ${{ steps.generate-jobs.outputs.rkeMatrix }}
-      rkeEnabled: ${{ steps.generate-jobs.outputs.rkeEnabled }}
     steps:
       -
         name: Checkout code
@@ -457,8 +435,7 @@ jobs:
         shell: bash
         run: |
           python .github/e2e-matrix-generator.py \
-            -m '${{ github.event.inputs.depth || github.event_name }}' \
-            -l '${{ github.event.inputs.limit }}'
+            -m '${{ github.event.inputs.depth || github.event_name }}'
 
   evaluate-test-level:
     name: Evaluate test level
@@ -513,11 +490,11 @@ jobs:
       MATRIX: ${{ matrix.id }}
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
-      CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
+      CNPG_VERSION: ${{ needs.buildx.outputs.cnpg_version }}
 
-      DOCKER_SERVER: quay.io/enterprisedb
-      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
+      DOCKER_SERVER: ghcr.io
+      DOCKER_USERNAME: ${{ github.actor }}
+      DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
@@ -547,6 +524,16 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
         name: Prepare the environment
         uses: nick-fields/retry@v2
@@ -629,892 +616,18 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  e2e-aks:
-    name: Run E2E on Microsoft AKS
-    if: |
-      needs.generate-jobs.outputs.aksEnabled == 'true' &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      always() &&
-      needs.generate-jobs.result == 'success' &&
-      needs.evaluate-test-level.result == 'success'
-    needs:
-      - buildx
-      - generate-jobs
-      - duplicate_runs
-      - evaluate-test-level
-    strategy:
-      fail-fast: false
-      max-parallel: 15
-      matrix:
-        ${{ fromJSON(needs.generate-jobs.outputs.aksMatrix) }}
-    runs-on: ubuntu-20.04
-    env:
-      TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
-      K8S_VERSION: "${{ matrix.k8s_version }}"
-      POSTGRES_VERSION: ${{ matrix.postgres_version }}
-      MATRIX: ${{ matrix.id }}
-      POSTGRES_IMG: "${{ matrix.postgres_img }}"
-      E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
-      CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
-
-      DOCKER_SERVER: quay.io/enterprisedb
-      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
-
-      DEBUG: "true"
-      BUILD_IMAGE: "false"
-      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
-      E2E_DEFAULT_STORAGE_CLASS: rook-ceph-block
-
-    steps:
-      -
-        name: Checkout code
-        uses: actions/checkout@v3
-      -
-        name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-      -
-        name: Prepare the environment
-        uses: nick-fields/retry@v2
-        with:
-          timeout_seconds: 30
-          max_attempts: 3
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y gettext-base
-      -
-        name:  Install ginkgo
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 1
-          max_attempts: 3
-          command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
-      -
-        name: Azure Login
-        uses: azure/login@v1.4.3
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-      -
-        name: Install kubectl
-        uses: azure/setup-kubectl@v2.1
-        with:
-          version: v${{ env.K8S_VERSION }}
-      -
-        name: Create AKS cluster
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          command: |
-            az extension add --name aks-preview
-            az account set --subscription "Cloud Native Development"
-
-            AZURE_AKS="${{ secrets.AZURE_RESOURCENAME }}-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )"
-            echo "AZURE_AKS=${AZURE_AKS}" >> $GITHUB_ENV
-            az aks create --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
-              --name ${AZURE_AKS} \
-              --node-count 3 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
-              --workspace-resource-id ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
-              --aks-custom-headers EnableAzureDiskFileCSIDriver=true
-            AZURE_STORAGE_ACCOUNT="${{ github.run_number }}$( echo ${{ matrix.id }} | cut -c4- | tr -d '_.-' | tr '[:upper:]' '[:lower:]' )"
-            az storage account create \
-              --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
-              --name ${AZURE_STORAGE_ACCOUNT} \
-              --sku Standard_LRS -o none
-            az aks get-credentials --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
-              --name ${AZURE_AKS}
-
-            # get Storage Account credentials
-            echo "AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT}" >> $GITHUB_ENV
-            AZURE_STORAGE_KEY=$(az storage account keys list -g "${{ secrets.AZURE_RESOURCEGROUP }}" -n "${AZURE_STORAGE_ACCOUNT}" --query "[0].value" -o tsv)
-            echo "AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}" >> $GITHUB_ENV
-
-            # create diagnostic settings for monitoring kube-apiserver logs
-            AKS_CLUSTER_RESOURCE_ID=$(az aks show --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${AZURE_AKS} --query id -o tsv --only-show-errors)
-            az monitor diagnostic-settings create --resource ${AKS_CLUSTER_RESOURCE_ID} \
-              --name diagnostic-kube-apiserver-logs \
-              --workspace ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
-              --logs '[ { "category": "kube-apiserver", "enabled": true, "retentionPolicy": { "enabled": true, "days": 30 } } ]'
-      -
-        # Azure is slow in provisioning disks, and we can't wait two minutes
-        # every time we create a pod, otherwise all the tests will time out.
-        # We set up a few large disks now, we run Rook on top of them and we
-        # use rook to get the small PV we use in the tests.
-        # It can still take a while to deploy rook.
-        name: Set up Rook
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 27
-          max_attempts: 1
-          command: |
-            STORAGECLASSNAME=default
-            GO111MODULE=on go get github.com/mikefarah/yq/v4
-            ROOK_BASE_URL=https://raw.githubusercontent.com/rook/rook/${{ env.ROOK_VERSION }}/cluster/examples/kubernetes/ceph
-            kubectl apply -f ${ROOK_BASE_URL}/crds.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/common.yaml
-            kubectl apply -f ${ROOK_BASE_URL}/operator.yaml
-            curl ${ROOK_BASE_URL}/cluster-on-pvc.yaml | \
-              sed '/^ *#/d;/^ *$/d' | \
-              yq e ".spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.resources.requests.storage = \"50Gi\" |
-                .spec.storage.storageClassDeviceSets[].volumeClaimTemplates[].spec.storageClassName = \"${STORAGECLASSNAME}\" |
-                .spec.mon.volumeClaimTemplate.spec.storageClassName = \"${STORAGECLASSNAME}\" " - | \
-              kubectl apply -f -
-            while true; do
-              output=$( kubectl get deploy -n rook-ceph -l app=rook-ceph-osd --no-headers -o name )
-              if [[ $(wc -w <<< $output)  == 3 ]]; then
-                break
-              fi
-            done
-            echo "Waiting for Rook OSDs to be available"
-            kubectl wait deploy -n rook-ceph --for condition=available --timeout 480s -l app=rook-ceph-osd
-            kubectl apply -f ${ROOK_BASE_URL}/csi/rbd/storageclass.yaml
-      -
-        name: Run E2E tests
-        run: hack/e2e/run-e2e.sh
-      -
-        name: Report failed E2E tests
-        if: failure()
-        run: |
-          set +x
-          chmod +x .github/report-failed-test.sh
-          ./.github/report-failed-test.sh
-      - name: Create individual artifact for each E2E test
-        if: always()
-        run: |
-          set +x
-          echo '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
-          python .github/generate-test-artifacts.py \
-            -o testartifacts-${{ env.MATRIX }} \
-            -f tests/e2e/out/report.json \
-            -m '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
-          if [ -f tests/e2e/out/upgrade_report.json ]; then
-            python .github/generate-test-artifacts.py \
-              -o testartifacts-${{ env.MATRIX }} \
-              -f tests/e2e/out/upgrade_report.json \
-              -m '{"runner": "aks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
-          fi
-      -
-        name: Archive test artifacts
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: testartifacts-aks
-          path: testartifacts-${{ env.MATRIX }}/
-          retention-days: 7
-      -
-        name: Cleanup test artifacts
-        if: always()
-        run:
-          rm -rf testartifacts-${{ env.MATRIX }}/
-      -
-        name: Cleanup ginkgo JSON report
-        # Delete report.json after the analysis. File should always exist.
-        # Delete upgrade_report.json. It may not exist depending on test level.
-        if: always()
-        run: |
-          if [ -f tests/e2e/out/upgrade_report.json ]; then
-            rm tests/e2e/out/upgrade_report.json
-          fi
-          rm tests/e2e/out/report.json
-      -
-        name: Archive e2e failure contexts
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-failure-contexts-${{ matrix.id }}
-          path: |
-            tests/*/out/
-          retention-days: 7
-          if-no-files-found: ignore
-      -
-        name: Clean up
-        if: always()
-        uses: azure/CLI@v1
-        with:
-          inlineScript: |
-            az account set --subscription "Cloud Native Development"
-            attempt=1
-            max_attempts=3
-            while [ "${attempt}" -le "${max_attempts}" ]; do
-               echo "Deleting cluster. Attempt ${attempt} of ${max_attempts}"
-               az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y  --name ${{env.AZURE_AKS}}
-               status=$?
-               if [[ $status == 0 ]]; then
-                  echo "AKS cluster deleted"
-                  break
-               fi
-               echo "Failed deleting cluster ${{env.AZURE_AKS}}, retrying"
-               sleep 5
-               attempt=$((attempt+1))
-            done
-            attempt=1
-            max_attempts=3
-            while [ "${attempt}" -le "${max_attempts}" ]; do
-               echo "Deleting storage account. Attempt ${attempt} of ${max_attempts}"
-               az storage account delete -y --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ env.AZURE_STORAGE_ACCOUNT }}
-               status=$?
-               if [[ $status == 0 ]]; then
-                  echo "Storage account deleted"
-                  break
-               fi
-               echo "Failed deleting storage account ${{ env.AZURE_STORAGE_ACCOUNT }}, retrying"
-               sleep 5
-               attempt=$((attempt+1))
-            done
-  e2e-eks:
-    name: Run E2E on Amazon EKS
-    if: |
-      needs.generate-jobs.outputs.eksEnabled == 'true' &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      always() &&
-      needs.generate-jobs.result == 'success' &&
-      needs.evaluate-test-level.result == 'success'
-    needs:
-      - buildx
-      - generate-jobs
-      - duplicate_runs
-      - evaluate-test-level
-    strategy:
-      fail-fast: false
-      matrix:
-         ${{ fromJSON(needs.generate-jobs.outputs.eksMatrix) }}
-    runs-on: ubuntu-20.04
-    env:
-      TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
-      K8S_VERSION: "${{ matrix.k8s_version }}"
-      POSTGRES_VERSION: ${{ matrix.postgres_version }}
-      MATRIX: ${{ matrix.id }}
-      POSTGRES_IMG: "${{ matrix.postgres_img }}"
-      E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
-      CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
-
-      DOCKER_SERVER: quay.io/enterprisedb
-      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
-
-      DEBUG: "true"
-      BUILD_IMAGE: "false"
-      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
-      E2E_DEFAULT_STORAGE_CLASS: gp2
-
-      AWS_REGION: eu-central-1
-      AWS_EKS_ADMIN_IAM_ROLES: ${{ secrets.AWS_EKS_ADMIN_IAM_ROLES}}
-    steps:
-      -
-        name: Set cluster name
-        run: |
-          echo "CLUSTER_NAME=cnp-test-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )" >> $GITHUB_ENV
-      -
-        name: Checkout code
-        uses: actions/checkout@v3
-      -
-        name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-      -
-        name: Prepare the environment
-        uses: nick-fields/retry@v2
-        with:
-          timeout_seconds: 30
-          max_attempts: 3
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y gettext-base
-      -
-        name:  Install ginkgo
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 1
-          max_attempts: 3
-          command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
-      -
-        name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-      -
-        name: Install eksctl
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 1
-          max_attempts: 3
-          command: |
-            mkdir -p "$HOME/.local/bin"
-            curl -sL "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" \
-              | tar xz -C $HOME/.local/bin
-            echo "$HOME/.local/bin" >> $GITHUB_PATH
-      -
-        name: Configure EKS setup
-        run: |
-          envsubst < hack/e2e/eks-cluster.yaml.template > hack/e2e/eks-cluster.yaml
-      -
-        name: Setup EKS
-        run: |
-          # Defining variables
-          AWS_ADMIN_ACCESS_ROLE=$(echo "$AWS_EKS_ADMIN_IAM_ROLES" | sed '1q;d')
-          AWS_EDB_POWER_ROLE=$(echo "$AWS_EKS_ADMIN_IAM_ROLES" | sed '2q;d')
-
-          # Masking variables to hide values
-          echo "::add-mask::$AWS_ADMIN_ACCESS_ROLE"
-          echo "::add-mask::$AWS_EDB_POWER_ROLE"
-
-          # Setting up EKS cluster
-          eksctl create cluster -f hack/e2e/eks-cluster.yaml
-          eksctl create iamidentitymapping --cluster "${CLUSTER_NAME}" --region="${AWS_REGION}" --arn "${AWS_ADMIN_ACCESS_ROLE}" --group system:masters --username admin
-          eksctl create iamidentitymapping --cluster "${CLUSTER_NAME}" --region="${AWS_REGION}" --arn "${AWS_EDB_POWER_ROLE}" --group system:masters --username admin
-      -
-        name: Setup log archiving via fluentd and insights
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 1
-          max_attempts: 3
-          command: |
-            curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml \
-              | sed "s/{{cluster_name}}/${{ env.CLUSTER_NAME }}/;s/{{region_name}}/${{ env.AWS_REGION }}/" \
-              | kubectl apply -f -
-      -
-        name: Run E2E tests
-        run: hack/e2e/run-e2e.sh
-      -
-        name: Report failed E2E tests
-        if: failure()
-        run: |
-          set +x
-          chmod +x .github/report-failed-test.sh
-          ./.github/report-failed-test.sh
-      - name: Create individual artifact for each E2E test
-        if: always()
-        run: |
-          set +x
-          echo '{"runner": "eks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
-          python .github/generate-test-artifacts.py \
-            -o testartifacts-${{ env.MATRIX }} \
-            -f tests/e2e/out/report.json \
-            -m '{"runner": "eks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
-          if [ -f tests/e2e/out/upgrade_report.json ]; then
-            python .github/generate-test-artifacts.py \
-              -o testartifacts-${{ env.MATRIX }} \
-              -f tests/e2e/out/upgrade_report.json \
-              -m '{"runner": "eks", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
-          fi
-      -
-        name: Archive test artifacts
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: testartifacts-eks
-          path: testartifacts-${{ env.MATRIX }}/
-          retention-days: 7
-      -
-        name: Cleanup test artifacts
-        if: always()
-        run:
-          rm -rf testartifacts-${{ env.MATRIX }}/
-      -
-        name: Cleanup ginkgo JSON report
-        # Delete report.json after the analysis. File should always exist.
-        # Delete upgrade_report.json. It may not exist depending on test level.
-        if: always()
-        run: |
-          if [ -f tests/e2e/out/upgrade_report.json ]; then
-            rm tests/e2e/out/upgrade_report.json
-          fi
-          rm tests/e2e/out/report.json
-      -
-        name: Archive e2e failure contexts
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-failure-contexts-${{ matrix.id }}
-          path: |
-            tests/*/out/
-          retention-days: 7
-          if-no-files-found: ignore
-      -
-        name: Clean up
-        if: always()
-        run: |
-          CLUSTER_NAME="${{ env.CLUSTER_NAME }}"
-          REGION_NAME="${{ env.AWS_REGION }}"
-          STACK_NAME="eksctl-${CLUSTER_NAME}-cluster"
-          CLOUDFORMATION_STATUS_CURRENT=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME}" | jq -r '.Stacks[].StackStatus' || true)
-          if [[ -z "${CLOUDFORMATION_STATUS_CURRENT}" ]]; then
-            echo "CloudFormation stack not found. Nothing to cleanup."
-            exit 0
-          fi
-
-          # Attempt to remove any leftover PDB (and Cluster that would recreate it)
-          # that could prevent the EKS cluster deletion
-          kubectl delete cluster --all --all-namespaces || true
-          kubectl delete pdb --all --all-namespaces || true
-
-          # Attempting three times to cleanly remove the cluster via eksctl
-          attempt=1
-          max_attempts=3
-          while [ "${attempt}" -le "${max_attempts}" ]; do
-              echo "Deleting cluster. Attempt ${attempt} of ${max_attempts}"
-              output=$( eksctl delete cluster -n "${CLUSTER_NAME}" -r "${REGION_NAME}" --wait 2>&1 )
-              status=$?
-              if [[ $status == 0 ]]; then
-                  echo "EKS cluster deleted"
-                  break
-              fi
-              if ( grep "ResourceNotFoundException: No cluster found for name: ${CLUSTER_NAME}" <<< "$output" ); then
-                  echo "EKS cluster doesn't exist, nothing to remove"
-                  break
-              fi
-              echo "Failed deleting cluster ${CLUSTER_NAME}, retrying"
-              sleep 5
-              attempt=$((attempt+1))
-          done
-
-          # Recheck if something got stuck, and use harder methods to clean up
-          CLOUDFORMATION_STATUS_CURRENT=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME}" | jq -r '.Stacks[].StackStatus' || true)
-          CLOUDFORMATION_STATUS_ARRAY=("DELETE_FAILED ROLLBACK_FAILED ROLLBACK_COMPLETE")
-
-          if [ -n "${CLOUDFORMATION_STATUS_CURRENT}" ] && [[ "${CLOUDFORMATION_STATUS_ARRAY[*]}" =~ "${CLOUDFORMATION_STATUS_CURRENT}" ]] ; then
-            echo "::warning file=continuous-delivery.yml::eksctl failed deleting a cluster cleanly"
-            # When the status of CloudFormation stack managed by eksctl reports an error, try to delete resources directly with AWS CLI
-            pip install boto3
-            for vpc_id in $(aws ec2 describe-vpcs | jq -r '.Vpcs[] | select(.Tags?[]? | .Key == "Name" and (.Value | contains("'"${STACK_NAME}"'"))).VpcId'); do
-              python .github/vpc_destroy.py --vpc_id "${vpc_id}" --region "${REGION_NAME}" --services ec2
-            done
-            # Then we try to delete the cluster cleanly and the cloudformation
-            if aws eks describe-cluster --name "${CLUSTER_NAME}" --region "${REGION_NAME}" ; then
-               eksctl delete cluster -n "${CLUSTER_NAME}" -r "${REGION_NAME}" --wait
-            fi
-            if aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --region "${REGION_NAME}" ; then
-               aws cloudformation delete-stack --stack-name "${STACK_NAME}" --region "${REGION_NAME}"
-            fi
-          fi
-
-  e2e-gke:
-    name: Run E2E on Google GKE
-    if: |
-      needs.generate-jobs.outputs.gkeEnabled == 'true' &&
-      needs.duplicate_runs.outputs.should_skip != 'true' &&
-      always() &&
-      needs.generate-jobs.result == 'success' &&
-      needs.evaluate-test-level.result == 'success'
-    needs:
-      - buildx
-      - generate-jobs
-      - duplicate_runs
-      - evaluate-test-level
-    strategy:
-      fail-fast: false
-      max-parallel: 15
-      matrix:
-        ${{ fromJSON(needs.generate-jobs.outputs.gkeMatrix) }}
-    runs-on: ubuntu-20.04
-    env:
-      TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
-      K8S_VERSION: "${{ matrix.k8s_version }}"
-      POSTGRES_VERSION: ${{ matrix.postgres_version }}
-      MATRIX: ${{ matrix.id }}
-      POSTGRES_IMG: "${{ matrix.postgres_img }}"
-      E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
-      CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
-
-      DOCKER_SERVER: quay.io/enterprisedb
-      DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
-
-      DEBUG: "true"
-      BUILD_IMAGE: "false"
-      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
-      E2E_DEFAULT_STORAGE_CLASS: standard
-
-      ZONE: europe-west3-a
-    steps:
-      -
-        name: Checkout code
-        uses: actions/checkout@v3
-      -
-        name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-      -
-        name: Prepare the environment
-        uses: nick-fields/retry@v2
-        with:
-          timeout_seconds: 30
-          max_attempts: 3
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y gettext-base
-      -
-        name: Install ginkgo
-        uses: nick-fields/retry@v2
-        with:
-          timeout_seconds: 30
-          max_attempts: 3
-          command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
-      -
-        name: Set cluster name
-        run: |
-          # GKE cluster names rules:
-          # only lowercase alphanumerics and '-' allowed, must start with a letter and end with an alphanumeric,
-          # and must be no longer than 40 characters
-          # We need to shorten the name and lower the case
-          SHORT_ID=$( echo ${{ matrix.id }} | tr -d '_.-' | tr '[:upper:]' '[:lower:]')
-          echo "CLUSTER_NAME=cnp-test-${{ github.run_number }}-${SHORT_ID}" >> $GITHUB_ENV
-      -
-        name: Authenticate to Google Cloud
-        id: 'auth'
-        uses: google-github-actions/auth@v0.7.0
-        with:
-          credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT }}'
-      -
-        name: Set up Cloud SDK and kubectl
-        uses: google-github-actions/setup-gcloud@v0.6.0
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          install_components: kubectl
-      -
-        name: Create GKE cluster
-        run: |
-          # We may go over the amount of API requests allowed
-          # by Google when creating all the clusters at the same time.
-          # We give a few attempts at creating the cluster before giving up
-          for i in `seq 1 5`; do
-            if gcloud container clusters create ${{ env.CLUSTER_NAME }} \
-              --num-nodes=3 \
-              --cluster-version=${{ env.K8S_VERSION }} \
-              --zone=${{ env.ZONE }} \
-              --disk-size=20 \
-              --machine-type=e2-standard-2
-            then
-              exit 0
-            fi
-            echo "Couldn't create the cluster. Retrying in 100s."
-            sleep 100
-          done
-          echo "Couldn't create the cluster. Failing."
-          exit 1
-      -
-        name: Get GKE kubeconfig credentials
-        uses: google-github-actions/get-gke-credentials@main
-        with:
-          cluster_name: ${{ env.CLUSTER_NAME }}
-          location: ${{ env.ZONE }}
-          credentials: ${{ secrets.gcp_credentials }}
-          use_auth_provider: true
-      -
-        name: Run E2E tests
-        run: hack/e2e/run-e2e.sh
-      -
-        name: Report failed E2E tests
-        if: failure()
-        run: |
-          set +x
-          chmod +x .github/report-failed-test.sh
-          ./.github/report-failed-test.sh
-      - name: Create individual artifact for each E2E test
-        if: always()
-        run: |
-          set +x
-          echo '{"runner": "gke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
-          python .github/generate-test-artifacts.py \
-            -o testartifacts-${{ env.MATRIX }} \
-            -f tests/e2e/out/report.json \
-            -m '{"runner": "gke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
-          if [ -f tests/e2e/out/upgrade_report.json ]; then
-            python .github/generate-test-artifacts.py \
-              -o testartifacts-${{ env.MATRIX }} \
-              -f tests/e2e/out/upgrade_report.json \
-              -m '{"runner": "gke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
-          fi
-      -
-        name: Archive test artifacts
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: testartifacts-gke
-          path: testartifacts-${{ env.MATRIX }}/
-          retention-days: 7
-      -
-        name: Cleanup test artifacts
-        if: always()
-        run:
-          rm -rf testartifacts-${{ env.MATRIX }}/
-      -
-        name: Cleanup ginkgo JSON report
-        # Delete report.json after the analysis. File should always exist.
-        # Delete upgrade_report.json. It may not exist depending on test level.
-        if: always()
-        run: |
-          if [ -f tests/e2e/out/upgrade_report.json ]; then
-            rm tests/e2e/out/upgrade_report.json
-          fi
-          rm tests/e2e/out/report.json
-      -
-        name: Archive e2e failure contexts
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-failure-contexts-${{ matrix.id }}
-          path: |
-            tests/*/out/
-          retention-days: 7
-          if-no-files-found: ignore
-      -
-        name: Clean up
-        if: always()
-        run: |
-          gcloud container clusters delete ${{ env.CLUSTER_NAME }} --zone=${{ env.ZONE }} --quiet
-          # Disks are not automatically deleted when the cluster is removed and
-          # their name only contains the run number, so we can't find the actual cluster from
-          # the matrix that created them. We delete all the disks of a run that are not
-          # owned by anyone, without worrying to much if some other job deleted them first.
-          IDS=$(gcloud compute disks list --filter="name~cnp-test-${{github.run_number}} AND zone:${{env.ZONE}} AND -users:*" --format="value(id)")
-          for ID in ${IDS}
-          do
-            gcloud compute disks delete --zone "${{env.ZONE}}" --quiet "${ID}" || true
-          done
-
-  e2e-rke:
-      name: Run E2E on Rancher RKE
-      if: |
-        needs.generate-jobs.outputs.rkeEnabled == 'true' &&
-        needs.duplicate_runs.outputs.should_skip != 'true' &&
-        always() &&
-        needs.generate-jobs.result == 'success' &&
-        needs.evaluate-test-level.result == 'success'
-      needs:
-        - buildx
-        - generate-jobs
-        - duplicate_runs
-        - evaluate-test-level
-      strategy:
-        fail-fast: false
-        matrix:
-          ${{ fromJSON(needs.generate-jobs.outputs.rkeMatrix) }}
-      runs-on: ubuntu-20.04
-      env:
-        TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
-        K8S_VERSION: "${{ matrix.k8s_version }}"
-        POSTGRES_VERSION: ${{ matrix.postgres_version }}
-        MATRIX: ${{ matrix.id }}
-        POSTGRES_IMG: "${{ matrix.postgres_img }}"
-        E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
-        CNP_VERSION: ${{ needs.buildx.outputs.cnp_version }}
-
-        DOCKER_SERVER: quay.io/enterprisedb
-        DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
-        DOCKER_PASSWORD: ${{ secrets.QUAY_TOKEN }}
-
-        DEBUG: "true"
-        BUILD_IMAGE: "false"
-        CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
-        E2E_DEFAULT_STORAGE_CLASS: gp2
-        LOG_DIR: ${{ github.workspace }}/rke-logs/
-
-        AWS_REGION: eu-central-1
-        TF_WORKDIR: ${{ github.workspace }}/hack/e2e/rke-ec2/
-        TF_LOG: TRACE
-        TF_LOG_PATH: terraform.log
-        TF_VAR_k8s_version: "${{ matrix.k8s_version }}"
-      steps:
-      -
-        name: Set cluster name
-        run: |
-          echo "TF_VAR_cluster_name=cnp-test-${{ github.run_number }}-$( echo ${{ matrix.id }} | tr -d '_.-' )" >> $GITHUB_ENV
-      -
-        name: Checkout code
-        uses: actions/checkout@v3
-      -
-        name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-      -
-        name:  Install ginkgo
-        uses: nick-fields/retry@v2
-        with:
-          timeout_seconds: 30
-          max_attempts: 3
-          command: |
-            go install github.com/onsi/ginkgo/v2/ginkgo
-      -
-        name:  Install Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 0.14.x
-      -
-        name: Set Docker version
-        run: |
-          echo "K8S_VERSION=$(echo ${{ env.TF_VAR_k8s_version }} | awk -F '[v -]' '{print $2}')" >> $GITHUB_ENV
-          if dpkg --compare-versions "${{ env.K8S_VERSION }}" "lt" "1.17" ]; then
-            echo "TF_VAR_docker_install_url=https://releases.rancher.com/install-docker/18.09.sh" >> $GITHUB_ENV
-          fi
-      -
-        name: Set Source Ip Address
-        run: |
-          # Restrict access to just the source address
-          echo "TF_VAR_source_ip_address=$(curl -s showip.net)" >> $GITHUB_ENV
-      -
-        name: Install kubectl
-        uses: azure/setup-kubectl@v2.1
-        with:
-          version: v${{ env.K8S_VERSION }}
-      -
-        name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-      -
-        name: Terraform RKE cluster
-        working-directory: ${{ env.TF_WORKDIR }}
-        run: |
-          terraform init && terraform apply -auto-approve
-          echo "KUBECONFIG=${PWD}/kube_config_cluster.yml" >> $GITHUB_ENV
-          # Retrieve the private_key and the list of hosts.
-          # They will be used to gather log files
-          jq -r '.outputs.id_rsa.value' terraform.tfstate > ${PWD}/id_rsa && chmod 600 ${PWD}/id_rsa
-          jq -r '.outputs.public_dns.value[]' terraform.tfstate > ${PWD}/host.list
-      -
-        name: Run E2E tests
-        run: hack/e2e/run-e2e.sh
-      -
-        name: Report failed E2E tests
-        if: failure()
-        run: |
-          set +x
-          chmod +x .github/report-failed-test.sh
-          ./.github/report-failed-test.sh
-      - name: Create individual artifact for each E2E test
-        if: always()
-        run: |
-          set +x
-          echo '{"runner": "rke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}" }'
-          python .github/generate-test-artifacts.py \
-            -o testartifacts-${{ env.MATRIX }} \
-            -f tests/e2e/out/report.json \
-            -m '{"runner": "rke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
-          if [ -f tests/e2e/out/upgrade_report.json ]; then
-            python .github/generate-test-artifacts.py \
-              -o testartifacts-${{ env.MATRIX }} \
-              -f tests/e2e/out/upgrade_report.json \
-              -m '{"runner": "rke", "postgres": "${{env.POSTGRES_VERSION}}", "kubernetes": "${{env.K8S_VERSION}}", "runid": ${{ github.run_id }}, "id": "${{ env.MATRIX }}", "repo": "${{github.repository}}", "branch": "${{github.head_ref}}", "refname": "${{github.ref_name}}"  }'
-          fi
-      -
-        name: Archive test artifacts
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: testartifacts-rke
-          # we need a separate folder per matrix branch so we can cleanup with `rm -rf`
-          path: testartifacts-${{ env.MATRIX }}/
-          retention-days: 7
-      -
-        name: Cleanup test artifacts
-        if: always()
-        run:
-          rm -rf testartifacts-${{ env.MATRIX }}/
-      -
-        name: Cleanup ginkgo JSON report
-        # Delete report.json after the analysis. File should always exist.
-        # Delete upgrade_report.json. It may not exist depending on test level.
-        if: always()
-        run: |
-          if [ -f tests/e2e/out/upgrade_report.json ]; then
-            rm tests/e2e/out/upgrade_report.json
-          fi
-          rm tests/e2e/out/report.json
-      -
-        name: Wait for PVs to be released
-        if: always()
-        run: |
-          ITER=0
-          MAX_ITER=12
-          while true; do
-            output=$( kubectl get pv -o json | jq '.items | length' 2>&1 )
-            if [[ $output == "0" ]]; then
-                echo "PVs have been released"
-                break
-            fi
-            (( ++ITER ))
-            if [[ ${ITER} -ge ${MAX_ITER} ]]; then
-                echo "Time out waiting for Pvs to be terminating"
-                exit 1
-            fi
-            sleep 10;
-          done
-      -
-        name: Gather RKE logs
-        if: failure()
-        working-directory: ${{ env.TF_WORKDIR }}
-        run: |
-          # To avoid rsync warnings with vanished files, in case of error we wait and retry
-          # after 20 seconds for 3 times. This could happen because some pods created during the E2E
-          # tests are still being terminated, and their logs may be removed during the copy.
-          for i in $(cat ${PWD}/host.list); do \
-            mkdir -p "${LOG_DIR}/${i}"; \
-            for x in `seq 1 3`; do
-              if rsync -avPL --rsync-path="sudo rsync" -e "ssh -i ${PWD}/id_rsa -l ubuntu -o StrictHostKeyChecking=no" \
-                ${i}:/var/log/containers/* "${LOG_DIR}/${i}/"; then
-                break
-              fi
-              echo "Couldn't transfer logs. Trying again in 20s."
-              sleep 20
-            done
-          done
-      -
-        name: Archive RKE logs
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: rke-logs-${{ matrix.id }}
-          path: |
-           rke-logs/
-           ${{ env.TF_WORKDIR }}/terraform.log
-           ${{ env.TF_WORKDIR }}/rke_debug.log
-          retention-days: 7
-      -
-        name: Archive e2e failure contexts
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-failure-contexts-${{ matrix.id }}
-          path: |
-            tests/*/out/
-          retention-days: 7
-          if-no-files-found: ignore
-      -
-        name: Clean up
-        if: always()
-        working-directory: ${{ env.TF_WORKDIR }}
-        run: |
-          terraform destroy -auto-approve
-          rm -fr .terraform* terraform* id_rsa host.list
-
   ok-to-merge:
     name: Label PR ok-to-merge
     needs:
       - duplicate_runs
       - evaluate-test-level
       - e2e-local
-      - e2e-eks
-      - e2e-aks
     if: |
       !failure() && !cancelled() &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       github.ref != 'refs/heads/main' &&
       github.event_name == 'workflow_dispatch' &&
       ( github.event.inputs.depth == 'main' || github.event.inputs.depth == 'schedule' ) &&
-      github.event.inputs.limit == '' &&
       needs.evaluate-test-level.outputs.testLevel >= 4
     runs-on: ubuntu-20.04
     steps:
@@ -1525,7 +638,7 @@ jobs:
         name: Get PR number
         id: get_pr_number
         env:
-          GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pr_number=$(gh pr view --json number -q .number || : )
           echo "::set-output name=pr_number::${pr_number}"
@@ -1544,8 +657,6 @@ jobs:
       - duplicate_runs
       - evaluate-test-level
       - e2e-local
-      - e2e-eks
-      - e2e-aks
     if: |
       failure() &&
       needs.duplicate_runs.outputs.should_skip != 'true' &&
@@ -1557,7 +668,7 @@ jobs:
       - name: Get PR number
         id: get_pr_number
         env:
-          GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pr_number=$(gh pr view --json number -q .number || : )
           echo "::set-output name=pr_number::${pr_number}"

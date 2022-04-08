@@ -46,9 +46,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package plugin contains the common behaviors of the kubectl-cnp subcommand
+// Package plugin contains the common behaviors of the kubectl-cnpg subcommand
 package plugin
 
 import (
@@ -24,7 +24,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 	Client client.Client
 )
 
-// CreateKubernetesClient creates a k8s client to be used inside the kubectl-cnp
+// CreateKubernetesClient creates a k8s client to be used inside the kubectl-cnpg
 // utility
 func CreateKubernetesClient(configFlags *genericclioptions.ConfigFlags) error {
 	var err error

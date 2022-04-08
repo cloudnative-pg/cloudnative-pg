@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walrestore"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	testUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,7 +32,6 @@ import (
 // This e2e test is to test the wal-restore handling when maxParallel (specified as "3" in this testing) is specified in
 // wal section under backup for wal archive storing/recovering. To facilitate controlling the testing, we directly forge
 // wals on the object storage ("minio" in this testing) by copying and renaming an existing wal file.
-// All the testing follows the "Testing Proposals" in https://enterprisedb.atlassian.net/browse/CNP-1868
 
 var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), func() {
 	const (

@@ -11,7 +11,7 @@ more `ConfigMap` or `Secret` resources (see the
 ["User defined metrics" section](#user-defined-metrics) below for details).
 
 !!! Important
-    Starting from version 1.11, Cloud Native PostgreSQL already installs
+    Starting from version 1.11, CloudNativePG already installs
     [by default a set of predefined metrics](#default-set-of-metrics) in
     a `ConfigMap` called `default-monitoring`.
 
@@ -25,7 +25,7 @@ All monitoring queries that are performed on PostgreSQL are:
 
 - transactionally atomic (one transaction per query)
 - executed with the `pg_monitor` role
-- executed with `application_name` set to `cnp_metrics_exporter`
+- executed with `application_name` set to `cnpg_metrics_exporter`
 - executed as user `postgres`
 
 Please refer to the "Default roles" section in PostgreSQL
@@ -44,7 +44,7 @@ The default database can always be overridden for a given user-defined metric,
 by specifying a list of one or more databases in the `target_databases` option.
 
 !!! Seealso "Prometheus/Grafana"
-    If you are interested in evaluating the integration of Cloud Native PostgreSQL
+    If you are interested in evaluating the integration of CloudNativePG
     with Prometheus and Grafana, please look at [cnp-sandbox](https://github.com/EnterpriseDB/cnp-sandbox).
 
 ### Prometheus Operator example
@@ -82,7 +82,7 @@ spec:
 Every PostgreSQL instance exporter automatically exposes a set of predefined
 metrics, which can be classified in two major categories:
 
-- PostgreSQL related metrics, starting with `cnp_collector_*`, including:
+- PostgreSQL related metrics, starting with `cnpg_collector_*`, including:
 
     - number of WAL files and total size on disk
     - number of `.ready` and `.done` files in the archive status folder
@@ -98,59 +98,59 @@ endpoint of an instance. As you can see, the Prometheus format is
 self-documenting:
 
 ```text
-# HELP cnp_collector_collection_duration_seconds Collection time duration in seconds
-# TYPE cnp_collector_collection_duration_seconds gauge
-cnp_collector_collection_duration_seconds{collector="Collect.up"} 0.0031393
+# HELP cnpg_collector_collection_duration_seconds Collection time duration in seconds
+# TYPE cnpg_collector_collection_duration_seconds gauge
+cnpg_collector_collection_duration_seconds{collector="Collect.up"} 0.0031393
 
-# HELP cnp_collector_collections_total Total number of times PostgreSQL was accessed for metrics.
-# TYPE cnp_collector_collections_total counter
-cnp_collector_collections_total 2
+# HELP cnpg_collector_collections_total Total number of times PostgreSQL was accessed for metrics.
+# TYPE cnpg_collector_collections_total counter
+cnpg_collector_collections_total 2
 
-# HELP cnp_collector_last_collection_error 1 if the last collection ended with error, 0 otherwise.
-# TYPE cnp_collector_last_collection_error gauge
-cnp_collector_last_collection_error 0
+# HELP cnpg_collector_last_collection_error 1 if the last collection ended with error, 0 otherwise.
+# TYPE cnpg_collector_last_collection_error gauge
+cnpg_collector_last_collection_error 0
 
-# HELP cnp_collector_manual_switchover_required 1 if a manual switchover is required, 0 otherwise
-# TYPE cnp_collector_manual_switchover_required gauge
-cnp_collector_manual_switchover_required 0
+# HELP cnpg_collector_manual_switchover_required 1 if a manual switchover is required, 0 otherwise
+# TYPE cnpg_collector_manual_switchover_required gauge
+cnpg_collector_manual_switchover_required 0
 
-# HELP cnp_collector_pg_wal Total size in bytes of WAL segments in the '/var/lib/postgresql/data/pgdata/pg_wal' directory  computed as (wal_segment_size * count)
-# TYPE cnp_collector_pg_wal gauge
-cnp_collector_pg_wal{value="count"} 7
-cnp_collector_pg_wal{value="size"} 1.17440512e+08
+# HELP cnpg_collector_pg_wal Total size in bytes of WAL segments in the '/var/lib/postgresql/data/pgdata/pg_wal' directory  computed as (wal_segment_size * count)
+# TYPE cnpg_collector_pg_wal gauge
+cnpg_collector_pg_wal{value="count"} 7
+cnpg_collector_pg_wal{value="size"} 1.17440512e+08
 
-# HELP cnp_collector_pg_wal_archive_status Number of WAL segments in the '/var/lib/postgresql/data/pgdata/pg_wal/archive_status' directory (ready, done)
-# TYPE cnp_collector_pg_wal_archive_status gauge
-cnp_collector_pg_wal_archive_status{value="done"} 6
-cnp_collector_pg_wal_archive_status{value="ready"} 0
+# HELP cnpg_collector_pg_wal_archive_status Number of WAL segments in the '/var/lib/postgresql/data/pgdata/pg_wal/archive_status' directory (ready, done)
+# TYPE cnpg_collector_pg_wal_archive_status gauge
+cnpg_collector_pg_wal_archive_status{value="done"} 6
+cnpg_collector_pg_wal_archive_status{value="ready"} 0
 
-# HELP cnp_collector_replica_mode 1 if the cluster is in replica mode, 0 otherwise
-# TYPE cnp_collector_replica_mode gauge
-cnp_collector_replica_mode 0
+# HELP cnpg_collector_replica_mode 1 if the cluster is in replica mode, 0 otherwise
+# TYPE cnpg_collector_replica_mode gauge
+cnpg_collector_replica_mode 0
 
-# HELP cnp_collector_sync_replicas Number of requested synchronous replicas (synchronous_standby_names)
-# TYPE cnp_collector_sync_replicas gauge
-cnp_collector_sync_replicas{value="expected"} 0
-cnp_collector_sync_replicas{value="max"} 0
-cnp_collector_sync_replicas{value="min"} 0
-cnp_collector_sync_replicas{value="observed"} 0
+# HELP cnpg_collector_sync_replicas Number of requested synchronous replicas (synchronous_standby_names)
+# TYPE cnpg_collector_sync_replicas gauge
+cnpg_collector_sync_replicas{value="expected"} 0
+cnpg_collector_sync_replicas{value="max"} 0
+cnpg_collector_sync_replicas{value="min"} 0
+cnpg_collector_sync_replicas{value="observed"} 0
 
-# HELP cnp_collector_up 1 if PostgreSQL is up, 0 otherwise.
-# TYPE cnp_collector_up gauge
-cnp_collector_up{cluster="cluster-example"} 1
+# HELP cnpg_collector_up 1 if PostgreSQL is up, 0 otherwise.
+# TYPE cnpg_collector_up gauge
+cnpg_collector_up{cluster="cluster-example"} 1
 
-# HELP cnp_collector_postgres_version Postgres version
-# TYPE cnp_collector_postgres_version gauge
-cnp_collector_postgres_version{cluster="cluster-example",full="13.4.0"} 13.4
+# HELP cnpg_collector_postgres_version Postgres version
+# TYPE cnpg_collector_postgres_version gauge
+cnpg_collector_postgres_version{cluster="cluster-example",full="13.4.0"} 13.4
 
-# HELP cnp_collector_first_recoverability_point The first point of recoverability for the cluster as a unix timestamp
-# TYPE cnp_collector_first_recoverability_point gauge
-cnp_collector_first_recoverability_point 1.63238406e+09
+# HELP cnpg_collector_first_recoverability_point The first point of recoverability for the cluster as a unix timestamp
+# TYPE cnpg_collector_first_recoverability_point gauge
+cnpg_collector_first_recoverability_point 1.63238406e+09
 
-# HELP cnp_collector_lo_pages Estimated number of pages in the pg_largeobject table
-# TYPE cnp_collector_lo_pages gauge
-cnp_collector_lo_pages{datname="app"} 0
-cnp_collector_lo_pages{datname="postgres"} 78
+# HELP cnpg_collector_lo_pages Estimated number of pages in the pg_largeobject table
+# TYPE cnpg_collector_lo_pages gauge
+cnpg_collector_lo_pages{datname="app"} 0
+cnpg_collector_lo_pages{datname="postgres"} 78
 
 # HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.
 # TYPE go_gc_duration_seconds summary
@@ -272,7 +272,7 @@ go_threads 18
 ```
 
 !!! Note
-    `cnp_collector_postgres_version` is a GaugeVec metric containing
+    `cnpg_collector_postgres_version` is a GaugeVec metric containing
     the `Major.Minor` version of PostgreSQL. The full semantic version
     `Major.Minor.Patch` can be found inside one of its label field
     named `full`.
@@ -287,7 +287,7 @@ Custom metrics can be defined by users by referring to the created `Configmap`/`
 under the `.spec.monitoring.customQueriesConfigMap` or `customQueriesSecret` section as in the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
@@ -310,8 +310,8 @@ Take care that the referred resources have to be created **in the same namespace
 
 !!! Note
     If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
-    add a label with key `k8s.enterprisedb.io/reload` to it, otherwise you will have to reload
-    the instances using the `kubectl cnp reload` subcommand.
+    add a label with key `cnpg.io/reload` to it, otherwise you will have to reload
+    the instances using the `kubectl cnpg reload` subcommand.
 
 !!! Important
     When a user defined metric overwrites an already existing metric the instance manager prints a json warning log,
@@ -330,7 +330,7 @@ metadata:
   name: example-monitoring
   namespace: test
   labels:
-    k8s.enterprisedb.io/reload: ""
+    cnpg.io/reload: ""
 data:
   custom-queries: |
     pg_replication:
@@ -358,8 +358,8 @@ data:
             description: "Number of streaming replicas connected to the instance"
 ```
 
-A list of basic monitoring queries can be found in the [`cnp-basic-monitoring.yaml` file](
-./samples/cnp-basic-monitoring.yaml).
+A list of basic monitoring queries can be found in the [`cnpg-basic-monitoring.yaml` file](
+./samples/cnpg-basic-monitoring.yaml).
 
 #### Example of a user defined metric running on multiple databases
 
@@ -404,9 +404,9 @@ some_query:
 This will produce in the following metric being exposed:
 
 ```text
-cnp_some_query_rows{datname="albert"} 2
-cnp_some_query_rows{datname="bb"} 5
-cnp_some_query_rows{datname="freddie"} 10
+cnpg_some_query_rows{datname="albert"} 2
+cnpg_some_query_rows{datname="bb"} 5
+cnpg_some_query_rows{datname="freddie"} 10
 ```
 
 Here is an example of a query with auto-discovery enabled which also
@@ -435,11 +435,11 @@ some_query:
 The above example will produce the following metrics (provided the databases exist):
 
 ```text
-cnp_some_query_rows{datname="albert"} 2
-cnp_some_query_rows{datname="bb"} 5
-cnp_some_query_rows{datname="freddie"} 10
-cnp_some_query_rows{datname="template1"} 7
-cnp_some_query_rows{datname="postgres"} 42
+cnpg_some_query_rows{datname="albert"} 2
+cnpg_some_query_rows{datname="bb"} 5
+cnpg_some_query_rows{datname="freddie"} 10
+cnpg_some_query_rows{datname="template1"} 7
+cnpg_some_query_rows{datname="postgres"} 42
 ```
 
 ### Structure of a user defined metric
@@ -494,7 +494,7 @@ Custom defined metrics are returned by the Prometheus exporter endpoint (`:9187/
 with the following format:
 
 ```text
-cnp_<MetricName>_<ColumnName>{<LabelColumnName>=<LabelColumnValue> ... } <ColumnValue>
+cnpg_<MetricName>_<ColumnName>{<LabelColumnName>=<LabelColumnValue> ... } <ColumnValue>
 ```
 
 !!! Note
@@ -505,18 +505,18 @@ Considering the `pg_replication` example above, the exporter's endpoint would
 return the following output when invoked:
 
 ```text
-# HELP cnp_pg_replication_in_recovery Whether the instance is in recovery
-# TYPE cnp_pg_replication_in_recovery gauge
-cnp_pg_replication_in_recovery 0
-# HELP cnp_pg_replication_lag Replication lag behind primary in seconds
-# TYPE cnp_pg_replication_lag gauge
-cnp_pg_replication_lag 0
-# HELP cnp_pg_replication_streaming_replicas Number of streaming replicas connected to the instance
-# TYPE cnp_pg_replication_streaming_replicas gauge
-cnp_pg_replication_streaming_replicas 2
-# HELP cnp_pg_replication_is_wal_receiver_up Whether the instance wal_receiver is up
-# TYPE cnp_pg_replication_is_wal_receiver_up gauge
-cnp_pg_replication_is_wal_receiver_up 0
+# HELP cnpg_pg_replication_in_recovery Whether the instance is in recovery
+# TYPE cnpg_pg_replication_in_recovery gauge
+cnpg_pg_replication_in_recovery 0
+# HELP cnpg_pg_replication_lag Replication lag behind primary in seconds
+# TYPE cnpg_pg_replication_lag gauge
+cnpg_pg_replication_lag 0
+# HELP cnpg_pg_replication_streaming_replicas Number of streaming replicas connected to the instance
+# TYPE cnpg_pg_replication_streaming_replicas gauge
+cnpg_pg_replication_streaming_replicas 2
+# HELP cnpg_pg_replication_is_wal_receiver_up Whether the instance wal_receiver is up
+# TYPE cnpg_pg_replication_is_wal_receiver_up gauge
+cnpg_pg_replication_is_wal_receiver_up 0
 ```
 
 ### Default set of metrics
@@ -532,8 +532,8 @@ Any change to the `queries` content will be immediately reflected on all the
 deployed Clusters using it.
 
 The operator installation manifests come with a predefined ConfigMap, 
-called `postgresql-operator-default-monitoring`, to be used by all Clusters.
-`MONITORING_QUERIES_CONFIGMAP` is by default set to `postgresql-operator-default-monitoring` in the operator configuration.
+called `cnpg-default-monitoring`, to be used by all Clusters.
+`MONITORING_QUERIES_CONFIGMAP` is by default set to `cnpg-default-monitoring` in the operator configuration.
 
 If you want to disable the default set of metrics, you can:
 - disable it at operator level: set the `MONITORING_QUERIES_CONFIGMAP`/`MONITORING_QUERIES_SECRET` key to `""`
@@ -542,14 +542,14 @@ If you want to disable the default set of metrics, you can:
 
 !!! Important
     The ConfigMap or Secret specified via `MONITORING_QUERIES_CONFIGMAP`/`MONITORING_QUERIES_SECRET`
-    will always be copied to the Cluster's namespace with a fixed name: `postgresql-operator-default-monitoring`.
+    will always be copied to the Cluster's namespace with a fixed name: `cnpg-default-monitoring`.
     So that, if you intend to have default metrics, you should not create a ConfigMap with this name in the cluster's namespace.
 
 ### Differences with the Prometheus Postgres exporter
 
-Cloud Native PostgreSQL is inspired by the PostgreSQL Prometheus Exporter, but
+CloudNativePG is inspired by the PostgreSQL Prometheus Exporter, but
 presents some differences. In particular, the `cache_seconds` field is not implemented
-in Cloud Native PostgreSQL's exporter.
+in CloudNativePG's exporter.
 
 ## Monitoring the operator
 
@@ -576,62 +576,11 @@ resource:
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: postgresql-operator-controller-manager
+  name: cnpg-controller-manager
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: cloud-native-postgresql
+      app.kubernetes.io/name: cloudnative-pg
   podMetricsEndpoints:
     - port: metrics
 ```
-
-## Monitoring on OpenShift
-
-Starting on Openshift 4.6 there is a complete monitoring stack called
-["Monitoring for user-defined projects"](https://docs.openshift.com/container-platform/4.6/monitoring/enabling-monitoring-for-user-defined-projects.html)
-which can be enabled by cluster administrators. Cloud Native PostgreSQL will
-automatically create a `PodMonitor` object if the option
-`spec.monitoring.enablePodMonitor` of the `Cluster` definition is set to
-`true`.
-
-To enable cluster wide `user-defined` monitoring you must first create a
-`ConfigMap` with the name `cluster-monitoring-config` in the
-`openshift-monitoring` namespace/project with the following content:
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cluster-monitoring-config
-  namespace: openshift-monitoring
-data:
-  config.yaml: |
-    enableUserWorkload: true
-```
-If the `ConfigMap` already exists, just add the variable `enableUserWorkload: true`.
-
-!!! Important
-    This will enable the monitoring for the whole cluster, if it is needed only
-    for one namespace/project please refer to the official Red Hat documentation or
-    talk with your cluster administrator.
-
-After that, just create the proper PodMonitor in the namespace/project with
-something similar to this:
-
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: cluster-sample
-spec:
-  selector:
-    matchLabels:
-      postgresql: cluster-sample
-  podMetricsEndpoints:
-  - port: metrics
-```
-
-!!! Note
-    We currently don’t use `ServiceMonitor` because our service doesn’t define
-    a port pointing to the metrics. If we added a metric port this could expose
-    sensitive data.

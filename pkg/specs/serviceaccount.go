@@ -26,7 +26,7 @@ import (
 const (
 	// OperatorManagedSecretsName is the name of the annotation containing the secrets
 	// managed by the operator inside the generated service account
-	OperatorManagedSecretsName = "k8s.enterprisedb.io/managedSecrets" // #nosec
+	OperatorManagedSecretsName = "cnpg.io/managedSecrets" // #nosec
 )
 
 // UpdateServiceAccount sets the needed values in the ServiceAccount that will be used in every Pod

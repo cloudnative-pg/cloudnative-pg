@@ -1,6 +1,6 @@
 # Use cases
 
-Cloud Native PostgreSQL has been designed to work with applications
+CloudNativePG has been designed to work with applications
 that reside in the same Kubernetes cluster, for a full cloud native
 experience.
 
@@ -25,7 +25,7 @@ provider's load balancer facility, via HTTPS.
 
 The application uses the backend PostgreSQL database to keep track of the state
 in a reliable and persistent way. The application refers to the read-write
-service exposed by the `Cluster` resource defined by Cloud Native PostgreSQL,
+service exposed by the `Cluster` resource defined by CloudNativePG,
 which points to the current primary instance, through a TLS connection.  The
 `Cluster` resource embeds the logic of single primary and multiple standby
 architecture, hiding the complexity of managing a high availability cluster in

@@ -81,7 +81,7 @@ func NewReference(name string) *Reference {
 // Example:
 //
 //     GetImageTag("postgres") == "latest"
-//     GetImageTag("quay.io/test/postgres:12.3") == "12.3"
+//     GetImageTag("ghcr.io/cloudnative-pg/postgresql:12.3") == "12.3"
 //
 func GetImageTag(imageName string) string {
 	ref := NewReference(imageName)

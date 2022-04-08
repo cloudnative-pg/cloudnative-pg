@@ -23,11 +23,11 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/controllers"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	pkgUtils "github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // refreshServerCertificateFiles gets the latest server certificates files from the

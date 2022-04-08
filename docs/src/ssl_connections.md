@@ -2,11 +2,11 @@
 
 !!! Seealso "Certificates"
     Please refer to the ["Certificates"](certificates.md)
-    page for more details on how Cloud Native PostgreSQL supports TLS certificates.
+    page for more details on how CloudNativePG supports TLS certificates.
 
-The Cloud Native PostgreSQL operator has been designed to work with TLS/SSL for both encryption in transit and
-authentication, on server and client sides. Clusters created using the CNP operator comes with a Certification
-Authority (CA) to create and sign TLS client certificates. Through the `cnp` plugin for `kubectl` you can
+The CloudNativePG operator has been designed to work with TLS/SSL for both encryption in transit and
+authentication, on server and client sides. Clusters created using the CNPG operator comes with a Certification
+Authority (CA) to create and sign TLS client certificates. Through the `cnpg` plugin for `kubectl` you can
 issue a new TLS client certificate which can be used to authenticate a user instead of using passwords.
 
 Please refer to the following steps to authenticate via TLS/SSL certificates, which assume you have
@@ -17,16 +17,16 @@ in the `bootstrap` section).
 
 ## Issuing a new certificate
 
-!!! Seealso "About CNP plugin for kubectl"
-    Please refer to the ["Certificates" section in the "Cloud Native PostgreSQL Plugin"](cnp-plugin.md#certificates)
+!!! Seealso "About CNPG plugin for kubectl"
+    Please refer to the ["Certificates" section in the "CloudNativePG Plugin"](cnpg-plugin.md#certificates)
     page for details on how to use the plugin for `kubectl`.
 
 You can create a certificate for the `app` user in the `cluster-example` PostgreSQL cluster as follows:
 
 ```shell
-kubectl cnp certificate cluster-app \
-  --cnp-cluster cluster-example \
-  --cnp-user app
+kubectl cnpg certificate cluster-app \
+  --cnpg-cluster cluster-example \
+  --cnpg-user app
 ```
 
 You can now verify the certificate with:
@@ -61,8 +61,8 @@ entries in `pg_hba.conf`.
 
 ## Testing the connection via a TLS certificate
 
-Now we will test this client certificate by configuring a demo client application that connects to our Cloud Native
-PostgreSQL cluster.
+Now we will test this client certificate by configuring a demo client application that connects to our CloudNativePG
+cluster.
 
 The following manifest called `cert-test.yaml` creates a demo Pod with a test application
 in the same namespace where your database cluster is running:
@@ -119,7 +119,7 @@ spec:
             defaultMode: 0600
 ```
 
-This Pod will mount secrets managed by the Cloud Native PostgreSQL operator, including:
+This Pod will mount secrets managed by the CloudNativePG operator, including:
 
 * `sslcert`: the TLS client public certificate
 * `sslkey`: the TLS client certificate private key
@@ -131,7 +131,7 @@ requires to establish a TLS encrypted connection to the Postgres database.
 
 By default `psql` searches for certificates inside the `~/.postgresql` directory of the current user, but we can use
 the sslkey, sslcert, sslrootcert options to point libpq to the actual location of the cryptographic material.
-The content of the above files is gathered from the secrets that were previously created by using the `cnp` plugin for
+The content of the above files is gathered from the secrets that were previously created by using the `cnpg` plugin for
 kubectl.
 
 Now deploy the application:

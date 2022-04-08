@@ -24,9 +24,9 @@ import (
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
 	// +kubebuilder:scaffold:imports
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -88,7 +88,7 @@ var _ = BeforeEach(func() {
 func TestE2ESuite(t *testing.T) {
 	RegisterFailHandler(Fail)
 	SetDefaultEventuallyPollingInterval(1 * time.Second)
-	RunSpecs(t, "Cloud Native PostgreSQL Operator E2E")
+	RunSpecs(t, "CloudNativePG Operator E2E")
 }
 
 // Before the end of the tests we should verify that the operator never restarted

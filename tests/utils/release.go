@@ -63,7 +63,7 @@ func GetMostRecentReleaseTag(releasesPath string) (string, error) {
 }
 
 func isDevTagVersion() bool {
-	currentTagVersion := os.Getenv("CNP_VERSION")
+	currentTagVersion := os.Getenv("CNPG_VERSION")
 	if currentTagVersion == "" {
 		currentTagVersionBytes, err := exec.Command("git", "describe", "--tags", "--match", "v*").Output()
 		if err != nil {
@@ -77,7 +77,7 @@ func isDevTagVersion() bool {
 }
 
 func extractTag(releaseFile string) string {
-	releaseFile = strings.TrimPrefix(releaseFile, "postgresql-operator-")
+	releaseFile = strings.TrimPrefix(releaseFile, "cnpg-")
 	tag := strings.TrimSuffix(releaseFile, ".yaml")
 
 	return tag

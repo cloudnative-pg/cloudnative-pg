@@ -1,6 +1,6 @@
 # Container Image Requirements
 
-The Cloud Native PostgreSQL operator for Kubernetes is designed to
+The CloudNativePG operator for Kubernetes is designed to
 work with any compatible container image of PostgreSQL that complies
 with the following requirements:
 
@@ -21,22 +21,22 @@ with the following requirements:
   in the deployed clusters)
 - Sensible locale settings
 
-No entry point and/or command is required in the image definition, as Cloud
-Native PostgreSQL overrides it with its instance manager.
+No entry point and/or command is required in the image definition, as
+CloudNativePG overrides it with its instance manager.
 
 !!! Warning
-    Application Container Images will be used by Cloud Native PostgreSQL
+    Application Container Images will be used by CloudNativePG
     in a **Primary with multiple/optional Hot Standby Servers Architecture**
     only.
 
-EDB provides and supports public container images for Cloud Native
-PostgreSQL and publishes them on
-[Quay.io](https://quay.io/repository/enterprisedb/postgresql).
+EDB provides and supports public container images for CloudNativePG
+and publishes them on
+[ghcr.io](https://ghcr.io/cloudnative-pg/postgresql).
 
 ## Image tag requirements
 
-While the image name can be anything valid for Docker, the Cloud Native
-PostgreSQL operator relies on the *image tag* to detect the Postgres major
+While the image name can be anything valid for Docker, the CloudNativePG
+operator relies on the *image tag* to detect the Postgres major
 version carried out by the image.
 
 The image tag must start with a valid PostgreSQL major version number (e.g. 9.6

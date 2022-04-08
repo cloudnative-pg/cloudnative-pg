@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 var _ = Describe("bootstrap methods validation", func() {
