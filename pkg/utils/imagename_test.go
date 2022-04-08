@@ -25,14 +25,14 @@ var _ = Describe("image name management", func() {
 	It("should normalize image names", func() {
 		Expect(NewReference("postgres").GetNormalizedName()).To(
 			Equal("docker.io/library/postgres:latest"))
-		Expect(NewReference("enterprisedb/postgres").GetNormalizedName()).To(
-			Equal("docker.io/enterprisedb/postgres:latest"))
+		Expect(NewReference("myimage/postgres").GetNormalizedName()).To(
+			Equal("docker.io/myimage/postgres:latest"))
 		Expect(NewReference("localhost:5000/postgres").GetNormalizedName()).To(
 			Equal("localhost:5000/postgres:latest"))
 		Expect(NewReference("registry.localhost:5000/postgres:14.4").GetNormalizedName()).To(
 			Equal("registry.localhost:5000/postgres:14.4"))
-		Expect(NewReference("quay.io/test/postgres:34").GetNormalizedName()).To(
-			Equal("quay.io/test/postgres:34"))
+		Expect(NewReference("ghcr.io/cloudnative-pg/postgresql:34").GetNormalizedName()).To(
+			Equal("ghcr.io/cloudnative-pg/postgresql:34"))
 	})
 
 	It("should extract tag names", func() {

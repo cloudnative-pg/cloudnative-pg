@@ -25,7 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // scheduledBackupLog is for logging in this package.
@@ -38,7 +38,7 @@ func (r *ScheduledBackup) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-// +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},path=/mutate-postgresql-k8s-enterprisedb-io-v1-scheduledbackup,mutating=true,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=scheduledbackups,verbs=create;update,versions=v1,name=mscheduledbackup.kb.io,sideEffects=None
+// +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},path=/mutate-postgresql-cnpg-io-v1-scheduledbackup,mutating=true,failurePolicy=fail,groups=postgresql.cnpg.io,resources=scheduledbackups,verbs=create;update,versions=v1,name=mscheduledbackup.kb.io,sideEffects=None
 
 var _ webhook.Defaulter = &ScheduledBackup{}
 
@@ -48,7 +48,7 @@ func (r *ScheduledBackup) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-// +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},verbs=create;update,path=/validate-postgresql-k8s-enterprisedb-io-v1-scheduledbackup,mutating=false,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=scheduledbackups,versions=v1,name=vscheduledbackup.kb.io,sideEffects=None
+// +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},verbs=create;update,path=/validate-postgresql-cnpg-io-v1-scheduledbackup,mutating=false,failurePolicy=fail,groups=postgresql.cnpg.io,resources=scheduledbackups,versions=v1,name=vscheduledbackup.kb.io,sideEffects=None
 
 var _ webhook.Validator = &ScheduledBackup{}
 
@@ -64,7 +64,7 @@ func (r *ScheduledBackup) ValidateCreate() error {
 	}
 
 	return apierrors.NewInvalid(
-		schema.GroupKind{Group: "scheduledbackup.k8s.enterprisedb.io", Kind: "Backup"},
+		schema.GroupKind{Group: "scheduledbackup.cnpg.io", Kind: "Backup"},
 		r.Name, allErrs)
 }
 

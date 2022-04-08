@@ -21,11 +21,7 @@ import sys
 from operator import itemgetter
 from typing import Dict, List
 
-POSTGRES_REPO = "quay.io/enterprisedb/postgresql"
-AKS_VERSIONS_FILE = ".github/aks_versions.json"
-EKS_VERSIONS_FILE = ".github/eks_versions.json"
-GKE_VERSIONS_FILE = ".github/gke_versions.json"
-RKE_VERSIONS_FILE = ".github/rke_versions.json"
+POSTGRES_REPO = "ghcr.io/cloudnative-pg/postgresql"
 PG_VERSIONS_FILE = ".github/pg_versions.json"
 
 
@@ -73,26 +69,6 @@ K8S = VersionList(
         "v1.19.11",
     ]
 )
-
-# Kubernetes versions on EKS to use during the tests
-with open(EKS_VERSIONS_FILE) as json_file:
-    eks_versions = json.load(json_file)
-EKS_K8S = VersionList(eks_versions)
-
-# Kubernetes versions on AKS to use during the tests
-with open(AKS_VERSIONS_FILE) as json_file:
-    aks_versions = json.load(json_file)
-AKS_K8S = VersionList(aks_versions)
-
-# Kubernetes versions on GKE to use during the tests
-with open(GKE_VERSIONS_FILE) as json_file:
-    gke_versions = json.load(json_file)
-GKE_K8S = VersionList(gke_versions)
-
-# Kubernetes versions on RKE to use during the tests
-with open(RKE_VERSIONS_FILE) as json_file:
-    rke_versions = json.load(json_file)
-RKE_K8S = VersionList(rke_versions)
 
 # PostgreSQL versions to use during the tests
 # Entries are expected to be ordered from newest to oldest
@@ -214,30 +190,6 @@ ENGINE_MODES = {
         "main": build_main_include_local,
         "schedule": build_schedule_include_local,
     },
-    "eks": {
-        "push": lambda: build_push_include_cloud(EKS_K8S),
-        "pull_request": lambda: build_pull_request_include_cloud(EKS_K8S),
-        "main": lambda: build_main_include_cloud(EKS_K8S),
-        "schedule": lambda: build_schedule_include_cloud(EKS_K8S),
-    },
-    "aks": {
-        "push": lambda: build_push_include_cloud(AKS_K8S),
-        "pull_request": lambda: build_pull_request_include_cloud(AKS_K8S),
-        "main": lambda: build_main_include_cloud(AKS_K8S),
-        "schedule": lambda: build_schedule_include_cloud(AKS_K8S),
-    },
-    "gke": {
-        "push": lambda: build_push_include_cloud(GKE_K8S),
-        "pull_request": lambda: build_pull_request_include_cloud(GKE_K8S),
-        "main": lambda: build_main_include_cloud(GKE_K8S),
-        "schedule": lambda: build_schedule_include_cloud(GKE_K8S),
-    },
-    "rke": {
-        "push": lambda: build_push_include_cloud(RKE_K8S),
-        "pull_request": lambda: build_pull_request_include_cloud(RKE_K8S),
-        "main": lambda: build_main_include_cloud(RKE_K8S),
-        "schedule": lambda: build_schedule_include_cloud(RKE_K8S),
-    },
 }
 
 
@@ -270,9 +222,6 @@ if __name__ == "__main__":
                 f"Limit contains unknown engines {wrong_engines}. Available engines: {engines}"
             )
         engines = required_engines
-    else:
-        # Do not run `gke` and `rke` by default
-        engines = engines - {"rke"}
 
     matrix = {}
     for engine in ENGINE_MODES:

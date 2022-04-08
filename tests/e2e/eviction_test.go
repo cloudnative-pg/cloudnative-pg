@@ -25,16 +25,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-// This test evicts a CNP cluster's pod to simulate out of memory issues.
+// This test evicts a CNPG cluster's pod to simulate out of memory issues.
 // Under this condition, the operator will immediately delete that evicted pod
 // and a new pod will be created after that. We are using the status API to patch the pod
 // status to phase=Failed, reason=Evict to simulate the eviction.
@@ -50,7 +50,7 @@ import (
 // #pod-selection-for-kubelet-eviction
 // we can not guarantee how much memory is left in node and when it will get OOM and start eviction,
 // so we choose to use patch and drain to simulate the eviction. The patch status issued one problem,
-// when evicting the primary pod of multiple clusters (see CNP-1851).
+// when evicting the primary pod of multiple clusters.
 
 var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 	const (

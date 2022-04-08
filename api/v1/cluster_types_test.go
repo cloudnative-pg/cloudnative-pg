@@ -19,7 +19,7 @@ package v1
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -493,15 +493,15 @@ var _ = Describe("PostgreSQL version detection", func() {
 		postgresVersion int
 	}{
 		{
-			"quay.io/enterprisedb/postgresql:14.0",
+			"ghcr.io/cloudnative-pg/postgresql:14.0",
 			140000,
 		},
 		{
-			"quay.io/enterprisedb/postgresql:13.2",
+			"ghcr.io/cloudnative-pg/postgresql:13.2",
 			130002,
 		},
 		{
-			"quay.io/enterprisedb/postgresql:9.6.3",
+			"ghcr.io/cloudnative-pg/postgresql:9.6.3",
 			90603,
 		},
 	}

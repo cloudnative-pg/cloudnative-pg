@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,16 +35,16 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
-	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
-	barmanCredentials "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/credentials"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/catalog"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
+	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
+	barmanCredentials "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/credentials"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // We wait up to 10 minutes to have a WAL archived correctly

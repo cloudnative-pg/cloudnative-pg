@@ -30,16 +30,16 @@ for high transactional and Very Large DataBase (VLDB) workloads, as it
 guarantees higher and more predictable performance.
 
 !!! Warning
-    Before you deploy a PostgreSQL cluster with Cloud Native PostgreSQL,
+    Before you deploy a PostgreSQL cluster with CloudNativePG,
     ensure that the storage you are using is recommended for database
     workloads. Our advice is to clearly set performance expectations by
     first benchmarking the storage using tools such as [fio](https://fio.readthedocs.io/en/latest/fio_doc.html),
     and then the database using [pgbench](https://www.postgresql.org/docs/current/pgbench.html).
 
-## Benchmarking Cloud Native PostgreSQL
+## Benchmarking CloudNativePG
 
 EDB maintains [cnp-bench](https://github.com/EnterpriseDB/cnp-bench),
-an open source set of guidelines and Helm charts for benchmarking Cloud Native PostgreSQL
+an open source set of guidelines and Helm charts for benchmarking CloudNativePG
 in a controlled Kubernetes environment, before deploying the database in production.
 
 Briefly, `cnp-bench` is designed to operate at two levels:
@@ -73,7 +73,7 @@ The easier way to configure the storage for a PostgreSQL class is to just
 request storage of a certain size, like in the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: postgresql-storage-class
@@ -88,7 +88,7 @@ class. If the target Kubernetes cluster has no default storage class, or even if
 to be satisfied by a known storage class, you can set it into the custom resource:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: postgresql-storage-class
@@ -100,7 +100,7 @@ spec:
 ```
 
 !!! Important
-    Cloud Native PostgreSQL has been designed to be storage class agnostic.
+    CloudNativePG has been designed to be storage class agnostic.
     As usual, our recommendation is to properly benchmark the storage class
     in a controlled environment, before hitting production.
 
@@ -110,7 +110,7 @@ To further customize the generated PVCs, you can provide a PVC template inside t
 like in the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: postgresql-pvc-template
@@ -156,10 +156,10 @@ for each Pod to be back up.
 ### Expanding PVC volumes on AKS
 
 At the moment, [Azure is not able to resize the PVC's volume without restarting the pod](https://github.com/Azure/AKS/issues/1477).
-Cloud Native PostgreSQL has overcome this limitation through the
+CloudNativePG has overcome this limitation through the
 `ENABLE_AZURE_PVC_UPDATES` environment variable in the
 [operator configuration](operator_conf.md#available-options).
-When set to `'true'`, Cloud Native PostgreSQL triggers a rolling update of the
+When set to `'true'`, CloudNativePG triggers a rolling update of the
 Postgres cluster.
 
 Alternatively, you can follow the workaround below to manually resize the
@@ -187,7 +187,7 @@ to recreate the Pod and immediately reattach it to its PVC before the background
 First step is to edit the cluster definition applying the new size, let's say "2Gi", as follows:
 
 ```
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
@@ -248,8 +248,8 @@ So, you can repeat these steps for the remaining Pods.
 
 !!! Important
     Please leave the resizing of the disk associated with the primary instance as last disk,
-    after promoting through a switchover a new resized Pod, using `kubectl cnp promote`
-    (e.g. `kubectl cnp promote cluster-example 3` to promote `cluster-example-3` to primary).
+    after promoting through a switchover a new resized Pod, using `kubectl cnpg promote`
+    (e.g. `kubectl cnpg promote cluster-example 3` to promote `cluster-example-3` to primary).
 
 ### Recreating storage
 
@@ -261,7 +261,7 @@ While you do that, you need to prevent the operator from changing the existing P
 by disabling the `resizeInUseVolumes` flag, like in the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: postgresql-pvc-template

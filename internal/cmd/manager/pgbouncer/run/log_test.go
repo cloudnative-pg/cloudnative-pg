@@ -20,7 +20,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/logtest"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/logtest"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

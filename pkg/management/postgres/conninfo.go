@@ -19,8 +19,8 @@ package postgres
 import (
 	"fmt"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // buildPrimaryConnInfo builds the connection string to connect to primaryHostname

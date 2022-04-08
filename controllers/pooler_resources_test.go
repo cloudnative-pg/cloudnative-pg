@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 )
 
 var _ = Describe("pooler_resources unit tests", func() {
@@ -40,7 +40,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 	It("should correctly fetch the deployment when it exists", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		objectKey := client.ObjectKey{Namespace: pooler.Namespace, Name: pooler.Name}
 
@@ -67,7 +67,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 	It("should correctly fetch the cluster when it exists", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		objectKey := client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Name}
 
 		By("making sure it returns the cluster object", func() {
@@ -79,7 +79,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 	It("should correctly fetch the secret when it exists", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		objectKey := client.ObjectKey{Name: pooler.GetAuthQuerySecretName(), Namespace: pooler.Namespace}
 
@@ -109,7 +109,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 	It("should correctly fetch the service when it exists", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		objectKey := client.ObjectKey{Namespace: pooler.Namespace, Name: pooler.Name}
 
@@ -134,7 +134,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 	It("should correctly fetch the role when it exists", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		objectKey := client.ObjectKey{Namespace: pooler.Namespace, Name: pooler.Name}
 
@@ -159,7 +159,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 	It("should correctly fetch the roleBinding when it exists", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		objectKey := client.ObjectKey{Namespace: pooler.Namespace, Name: pooler.Name}
 
@@ -184,7 +184,7 @@ var _ = Describe("pooler_resources unit tests", func() {
 	It("should correctly fetch the SA when it exists", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		objectKey := client.ObjectKey{Namespace: pooler.Namespace, Name: pooler.Name}
 

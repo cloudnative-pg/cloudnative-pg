@@ -48,11 +48,11 @@ while read -r f; do
 done
 
 # Getting the operator images need a pull secret
-kubectl create namespace postgresql-operator-system
+kubectl create namespace cnpg-system
 if [ -n "${DOCKER_SERVER-}" ] && [ -n "${DOCKER_USERNAME-}" ] && [ -n "${DOCKER_PASSWORD-}" ]; then
   kubectl create secret docker-registry \
-    -n postgresql-operator-system \
-    postgresql-operator-pull-secret \
+    -n cnpg-system \
+    cnpg-pull-secret \
     --docker-server="${DOCKER_SERVER}" \
     --docker-username="${DOCKER_USERNAME}" \
     --docker-password="${DOCKER_PASSWORD}"
@@ -66,6 +66,9 @@ fi
 if ! which ginkgo &>/dev/null; then
   go install github.com/onsi/ginkgo/v2/ginkgo
 fi
+
+# TODO: Remove next line after first release (first-release)
+TEST_UPGRADE_TO_V1=false
 
 # The RC return code will be non-zero iff either the two `jq` calls has a non-zero exit
 # NOTE: the ginkgo calls may have non-zero exits, with E2E tests that fail but could be 'ignore-fail'
@@ -102,13 +105,13 @@ CONTROLLER_IMG="${CONTROLLER_IMG}" \
   POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
   make -C "${ROOT_DIR}" deploy
 kubectl wait --for=condition=Available --timeout=2m \
-  -n postgresql-operator-system deployments \
-  postgresql-operator-controller-manager
+  -n cnpg-system deployments \
+  cnpg-controller-manager
 
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
 
-# Build kubectl-cnp and export its path
+# Build kubectl-cnpg and export its path
 make build
 export PATH=${ROOT_DIR}/bin/:${PATH}
 

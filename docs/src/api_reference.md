@@ -1,6 +1,6 @@
 # API Reference
 
-Cloud Native PostgreSQL extends the Kubernetes API defining the following
+CloudNativePG extends the Kubernetes API defining the following
 custom resources:
 
 -   [Backup](#backup)
@@ -8,7 +8,7 @@ custom resources:
 -   [Pooler](#pooler)
 -   [ScheduledBackup](#scheduledbackup)
 
-All the resources are defined in the `postgresql.k8s.enterprisedb.io/v1`
+All the resources are defined in the `postgresql.cnpg.io/v1`
 API.
 
 Please refer to the ["Configuration Samples" page](samples.md)" of the
@@ -590,9 +590,9 @@ PgBouncerSpec defines how to configure PgBouncer
 Name            | Description                                                                                                                                                                                                                                                                       | Type                                          
 --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------
 `poolMode       ` | The pool mode                                                                                                                                                                                                                                                                     - *mandatory*  | PgBouncerPoolMode                             
-`authQuerySecret` | The credentials of the user that need to be used for the authentication query. In case it is specified, also an AuthQuery (e.g. "SELECT usename, passwd FROM pg_shadow WHERE usename=$1") has to be specified and no automatic CNP Cluster integration will be triggered.         | [*LocalObjectReference](#LocalObjectReference)
-`authQuery      ` | The query that will be used to download the hash of the password of a certain user. Default: "SELECT usename, passwd FROM user_search($1)". In case it is specified, also an AuthQuerySecret has to be specified and no automatic CNP Cluster integration will be triggered.      | string                                        
-`parameters     ` | Additional parameters to be passed to PgBouncer - please check the CNP documentation for a list of options you can configure                                                                                                                                                      | map[string]string                             
+`authQuerySecret` | The credentials of the user that need to be used for the authentication query. In case it is specified, also an AuthQuery (e.g. "SELECT usename, passwd FROM pg_shadow WHERE usename=$1") has to be specified and no automatic CNPG Cluster integration will be triggered.        | [*LocalObjectReference](#LocalObjectReference)
+`authQuery      ` | The query that will be used to download the hash of the password of a certain user. Default: "SELECT usename, passwd FROM user_search($1)". In case it is specified, also an AuthQuerySecret has to be specified and no automatic CNPG Cluster integration will be triggered.     | string                                        
+`parameters     ` | Additional parameters to be passed to PgBouncer - please check the CNPG documentation for a list of options you can configure                                                                                                                                                     | map[string]string                             
 `paused         ` | When set to `true`, PgBouncer will disconnect from the PostgreSQL server, first waiting for all queries to complete, and pause all new client connections until this value is set to `false` (default). Internally, the operator calls PgBouncer's `PAUSE` and `RESUME` commands. | *bool                                         
 
 <a id='PodMeta'></a>

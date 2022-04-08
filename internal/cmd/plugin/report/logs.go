@@ -23,8 +23,8 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"

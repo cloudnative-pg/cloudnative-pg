@@ -1,6 +1,6 @@
 # Postgres instance manager
 
-Cloud Native PostgreSQL does not rely on an external tool for failover management.
+CloudNativePG does not rely on an external tool for failover management.
 It simply relies on the Kubernetes API server and a native key component called:
 the **Postgres instance manager**.
 

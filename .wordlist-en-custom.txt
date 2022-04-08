@@ -30,6 +30,7 @@ BootstrapPgBaseBackup
 BootstrapRecovery
 CIS
 CN
+CNCF
 CONFIG
 CONTAINERNAME
 CR's
@@ -46,6 +47,8 @@ Certmanager
 ClientCASecret
 ClientCertsCASecret
 ClientReplicationSecret
+CloudNativePG
+CloudNativePG's
 ClusterCondition
 ClusterConditionType
 ClusterIP
@@ -157,7 +160,6 @@ Niccolò
 NodeMaintenanceWindow
 NodeSelector
 Noland
-OCP
 OU
 ObjectMeta
 OnlineUpdateEnabled
@@ -167,6 +169,7 @@ OperatorGroup
 OperatorHub
 PGAudit
 PGDATA
+PGDG
 PGSQL
 PKI
 PODNAME
@@ -263,6 +266,7 @@ Synopsys
 TCP
 TLS
 TOC
+TODO
 TopologyKey
 UID
 Uncomment
@@ -360,6 +364,8 @@ clair
 classid
 cli
 clientCASecret
+cloudnative
+cloudnativepg
 clusterBackup
 clusterName
 clusterlist
@@ -369,6 +375,7 @@ clusterstatus
 cmd
 cn
 cnp
+cnpg
 codeready
 columnValue
 commandError
@@ -431,6 +438,7 @@ dev
 devel
 devsecops
 distro
+distroless
 distros
 dl
 dn
@@ -465,6 +473,7 @@ gc
 gcc
 gce
 gcsCredentials
+ghcr
 github
 gkeEnvironment
 gmail
@@ -598,7 +607,6 @@ objid
 objsubid
 observability
 oc
-ocp
 ol
 olm
 openldap

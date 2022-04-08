@@ -17,7 +17,7 @@ limitations under the License.
 package utils
 
 import (
-	config "github.com/EnterpriseDB/cloud-native-postgresql/internal/configuration"
+	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

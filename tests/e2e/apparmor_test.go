@@ -19,9 +19,9 @@ package e2e
 import (
 	"fmt"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
-	pkgutils "github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

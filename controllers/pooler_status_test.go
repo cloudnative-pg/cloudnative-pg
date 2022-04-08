@@ -26,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 )
 
 var _ = Describe("pooler_status unit tests", func() {
@@ -44,7 +44,7 @@ var _ = Describe("pooler_status unit tests", func() {
 	It("should correctly deduce the status inherited from the cluster resource", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
 
@@ -56,7 +56,7 @@ var _ = Describe("pooler_status unit tests", func() {
 	It("should correctly set the status for authUserSecret", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		authUserSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -75,7 +75,7 @@ var _ = Describe("pooler_status unit tests", func() {
 	It("should correctly set the deployment status", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		dep, err := pgbouncer.Deployment(pooler, cluster)
 		dep.Status.Replicas = *dep.Spec.Replicas
@@ -90,7 +90,7 @@ var _ = Describe("pooler_status unit tests", func() {
 	It("should correctly interact with the api server", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
-		cluster := newFakeCNPCluster(namespace)
+		cluster := newFakeCNPGCluster(namespace)
 		pooler := newFakePooler(cluster)
 		poolerQuery := types.NamespacedName{Name: pooler.Name, Namespace: pooler.Namespace}
 		authUserSecret := &corev1.Secret{
