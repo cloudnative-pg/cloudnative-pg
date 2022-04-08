@@ -27,13 +27,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
-	cacheClient "github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache/client"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/restorer"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
+	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/restorer"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 var (

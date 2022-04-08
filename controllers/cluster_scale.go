@@ -26,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // scaleDownCluster handles the scaling down operations of a PostgreSQL cluster.

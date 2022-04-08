@@ -23,8 +23,8 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

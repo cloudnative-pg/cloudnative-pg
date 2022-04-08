@@ -1,10 +1,10 @@
 # Connection Pooling
 
-Cloud Native PostgreSQL provides native support for connection pooling with
+CloudNativePG provides native support for connection pooling with
 [PgBouncer](https://www.pgbouncer.org/), one of the most popular open source
 connection poolers for PostgreSQL, through the `Pooler` CRD.
 
-In a nutshell, a `Pooler` in Cloud Native PostgreSQL is a deployment of
+In a nutshell, a `Pooler` in CloudNativePG is a deployment of
 PgBouncer pods that sits between your applications and a PostgreSQL service
 (for example the `rw` service), creating a separate, scalable, configurable,
 and highly available **database access layer**.
@@ -12,7 +12,7 @@ and highly available **database access layer**.
 ## Architecture
 
 The following diagram highlights how the introduction of a database access
-layer based on PgBouncer changes the architecture of Cloud Native PostgreSQL,
+layer based on PgBouncer changes the architecture of CloudNativePG,
 like an additional blade in a Swiss Army knife. Instead of directly connecting
 to the PostgreSQL primary service, applications can now connect to the
 equivalent service for PgBouncer, enabling reuse of existing connections for
@@ -22,11 +22,11 @@ faster performance and better resource management on the PostgreSQL side.
 
 ## Quickstart
 
-The easiest way to explain how Cloud Native PostgreSQL implements a PgBouncer
+The easiest way to explain how CloudNativePG implements a PgBouncer
 pooler is through an example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
   name: pooler-example-rw
@@ -64,7 +64,7 @@ user/database pairs towards PostgreSQL.
     relayed to the PostgreSQL server (please refer to ["Section [databases]"
     in PgBouncer's documentation](https://www.pgbouncer.org/config.html#section-databases)).
 
-Additionally, Cloud Native PostgreSQL automatically creates a secret with the
+Additionally, CloudNativePG automatically creates a secret with the
 same name of the pooler containing the configuration files used with PgBouncer.
 
 !!! Seealso "API reference"
@@ -89,7 +89,7 @@ doesn't imply the automatic deletion of the `Pooler`, and viceversa.
 
 ## Security
 
-Any PgBouncer pooler is transparently integrated with Cloud Native PostgreSQL
+Any PgBouncer pooler is transparently integrated with CloudNativePG
 support for in-transit encryption via **TLS connections**, both on the client
 (application) and server (PostgreSQL) side of the pool.
 
@@ -122,7 +122,7 @@ So we can treat this secret as a TLS secret, and start from there.
 ## Authentication
 
 **Password based authentication** is the only supported method for clients of
-PgBouncer in Cloud Native PostgreSQL.
+PgBouncer in CloudNativePG.
 
 Internally, our implementation relies on PgBouncer's `auth_user` and `auth_query` options. Specifically, the operator:
 
@@ -178,7 +178,7 @@ By default, containers use images from `quay.io/enterprisedb/pgbouncer`.
 Here an example of Pooler specifying PodAntiAffinity:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
   name: pooler-example-rw
@@ -216,7 +216,7 @@ spec:
 Here an example setting resources and changing the used image:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
   name: pooler-example-rw
@@ -331,7 +331,7 @@ metrics having the `cnp_pgbouncer_` prefix, by running:
 - `SHOW POOLS` (prefix: `cnp_pgbouncer_pools`)
 - `SHOW STATS` (prefix: `cnp_pgbouncer_stats`)
 
-Similarly to the Cloud Native PostgreSQL instance, the exporter runs on port
+Similarly to the CloudNativePG instance, the exporter runs on port
 `9127` of each pod running PgBouncer, and also provides metrics related to the
 Go runtime (with prefix `go_*`). You can debug the exporter on a pod running
 PgBouncer through the following command:
@@ -515,7 +515,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      k8s.enterprisedb.io/poolerName: <POOLER_NAME>
+      cnpg.io/poolerName: <POOLER_NAME>
   podMetricsEndpoints:
   - port: metrics
 ```
@@ -572,12 +572,12 @@ service defined in the `Pooler`.
 ### Single PostgreSQL cluster
 
 The current implementation of the pooler is designed to work as part of a
-specific Cloud Native PostgreSQL cluster (a service, to be precise). It is not
+specific CloudNativePG cluster (a service, to be precise). It is not
 possible at the moment to create a pooler that spans over multiple clusters.
 
 ### Controlled configurability
 
-Cloud Native PostgreSQL transparently manages several configuration options
+CloudNativePG transparently manages several configuration options
 that are used for the PgBouncer layer to communicate with PostgreSQL. Such
 options are not configurable from outside and include TLS certificates,
 authentication settings, `databases` section, and `users` section. Also,

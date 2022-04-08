@@ -1,4 +1,4 @@
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
@@ -21,7 +21,7 @@ kind: ConfigMap
 metadata:
   name: example-monitoring
   labels:
-    k8s.enterprisedb.io/reload: ""
+    cnpg.io/reload: ""
 data:
   custom-queries: |
     pg_replication:
@@ -239,7 +239,7 @@ kind: Secret
 metadata:
   name: example-monitoring-secret
   labels:
-    k8s.enterprisedb.io/reload: ""
+    cnpg.io/reload: ""
 stringData:
   pg-database: |
     pg_database:

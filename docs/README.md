@@ -1,4 +1,4 @@
-# Cloud Native PostgreSQL documentation
+# CloudNativePG documentation
 
 The documentation is compiled using [MkDocs](https://www.mkdocs.org/)
 

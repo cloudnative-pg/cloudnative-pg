@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package tests contains the test infrastructure of the Cloud Native PostgreSQL operator
+// Package tests contains the test infrastructure of the CloudNativePG operator
 package tests
 
 // List of the labels we use for labeling test specs

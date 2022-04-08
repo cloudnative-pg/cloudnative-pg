@@ -1,4 +1,4 @@
-# Contributing to Cloud Native PostgreSQL
+# Contributing to CloudNativePG
 
 Please read the [code of conduct](CODE-OF-CONDUCT.md) first.
 
@@ -11,7 +11,7 @@ Before reporting a new issue, please make sure you have:
 
 ## How to contribute
 
-You can contribute to Cloud Native PostgreSQL by submitting a new pull request.
+You can contribute to CloudNativePG by submitting a new pull request.
 
 Please:
 

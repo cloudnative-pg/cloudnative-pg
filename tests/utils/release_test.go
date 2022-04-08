@@ -20,7 +20,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,7 +33,8 @@ var _ = Describe("Release tag extraction", func() {
 	})
 })
 
-var _ = Describe("Most recent tag", func() {
+// TODO: Remove Pending after first release (first-release)
+var _ = Describe("Most recent tag", Pending, func() {
 	It("properly works with release tag", func() {
 		err := os.Setenv("CNP_VERSION", "1.9.1")
 		Expect(err).To(BeNil())

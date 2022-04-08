@@ -24,8 +24,8 @@ import (
 
 	"github.com/mitchellh/go-ps"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // PostgresqlPidFile is the name of the file which contains

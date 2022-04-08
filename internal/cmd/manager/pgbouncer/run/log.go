@@ -22,7 +22,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 var pgBouncerLogRegex = regexp.

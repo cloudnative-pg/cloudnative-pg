@@ -69,7 +69,7 @@ Given that secret, you can configure your cluster like in
 the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 [...]
 spec:
@@ -99,7 +99,7 @@ In this example, it will use the `bucket` bucket of Linode in the region
 `us-east1`.
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 [...]
 spec:
@@ -112,13 +112,13 @@ spec:
 ```
 
 !!! Important
-    Suppose you configure an Object Storage provider which uses a certificated signed with a private CA,
-    like when using OpenShift or MinIO via HTTPS. In that case, you need to set the option `endpointCA`
+    Suppose you configure an Object Storage provider which uses a certificate signed with a private CA,
+    like when using MinIO via HTTPS. In that case, you need to set the option `endpointCA`
     referring to a secret containing the CA bundle so that Barman can verify the certificate correctly.
 
 !!! Note
     If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
-    add a label with key `k8s.enterprisedb.io/reload` to it, otherwise you will have to reload
+    add a label with key `cnpg.io/reload` to it, otherwise you will have to reload
     the instances using the `kubectl cnp reload` subcommand.
 
 ### MinIO Gateway
@@ -127,7 +127,7 @@ Optionally, you can use MinIO Gateway as a common interface which
 relays backup objects to other cloud storage solutions, like S3 or GCS.
 For more information, please refer to [MinIO official documentation](https://docs.min.io/).
 
-Specifically, the Cloud Native PostgreSQL cluster can directly point to a local
+Specifically, the CloudNativePG cluster can directly point to a local
 MinIO Gateway as an endpoint, using previously created credentials and service.
 
 MinIO secrets will be used by both the PostgreSQL cluster and the MinIO instance.
@@ -221,7 +221,7 @@ Proceed by configuring MinIO Gateway service as the `endpointURL` in the `Cluste
 definition, then choose a bucket name to replace `BUCKET_NAME`:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 [...]
 spec:
@@ -269,7 +269,7 @@ Given the previous secret, the provided credentials can be injected inside the c
 configuration:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 [...]
 spec:
@@ -327,7 +327,7 @@ This could be one of the easiest way to create a backup, and only requires
 the following configuration:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 [...]
 spec:
@@ -360,7 +360,7 @@ kubectl create secret generic backup-creds --from-file=gcsCredentials=gcs_creden
 This will create the `Secret` with the name `backup-creds` to be used in the yaml file like this:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 [...]
 spec:
@@ -386,7 +386,7 @@ To request a new backup, you need to create a new Backup resource
 like the following one:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Backup
 metadata:
   name: backup-example
@@ -404,11 +404,11 @@ command:
 Name:         backup-example
 Namespace:    default
 Labels:       <none>
-Annotations:  API Version:  postgresql.k8s.enterprisedb.io/v1
+Annotations:  API Version:  postgresql.cnpg.io/v1
 Kind:         Backup
 Metadata:
   Creation Timestamp:  2020-10-26T13:57:40Z
-  Self Link:         /apis/postgresql.k8s.enterprisedb.io/v1/namespaces/default/backups/backup-example
+  Self Link:         /apis/postgresql.cnpg.io/v1/namespaces/default/backups/backup-example
   UID:               ad5f855c-2ffd-454a-a157-900d5f1f6584
 Spec:
   Cluster:
@@ -426,11 +426,11 @@ like in the following example:
 Name:         backup-example
 Namespace:    default
 Labels:       <none>
-Annotations:  API Version:  postgresql.k8s.enterprisedb.io/v1
+Annotations:  API Version:  postgresql.cnpg.io/v1
 Kind:         Backup
 Metadata:
   Creation Timestamp:  2020-10-26T13:57:40Z
-  Self Link:         /apis/postgresql.k8s.enterprisedb.io/v1/namespaces/default/backups/backup-example
+  Self Link:         /apis/postgresql.cnpg.io/v1/namespaces/default/backups/backup-example
   UID:               ad5f855c-2ffd-454a-a157-900d5f1f6584
 Spec:
   Cluster:
@@ -470,7 +470,7 @@ This field is a *cron schedule* specification, which follows the same
 This is an example of a scheduled backup:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
   name: backup-example
@@ -510,7 +510,7 @@ If required, you can choose to compress WAL files as soon as they
 are uploaded and/or encrypt them:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 [...]
 spec:
@@ -535,7 +535,7 @@ can use the parallel WAL archiving feature of the instance manager
 like in the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 [...]
 spec:
@@ -601,7 +601,7 @@ manager running in the Pods.
 
 ## Retention policies
 
-Cloud Native PostgreSQL can manage the automated deletion of backup files from
+CloudNativePG can manage the automated deletion of backup files from
 the backup object store, using **retention policies** based on recovery window.
 
 Internally, the retention policy feature uses `barman-cloud-backup-delete`
@@ -611,7 +611,7 @@ For example, you can define your backups with a retention policy of 30 days as
 follows:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 [...]
 spec:
@@ -633,7 +633,7 @@ spec:
     *Point of Recoverability* (`PoR`), a moving point in time determined by
     `current time - recovery window`. The *first valid backup* is the first
     available backup before `PoR` (in reverse chronological order).
-    Cloud Native PostgreSQL must ensure that we can recover the cluster at
+    CloudNativePG must ensure that we can recover the cluster at
     any point in time between `PoR` and the latest successfully archived WAL
     file, starting from the first valid backup. Base backups that are older
     than the first valid backup will be marked as *obsolete* and permanently
@@ -641,7 +641,7 @@ spec:
 
 ## Compression algorithms
 
-Cloud Native PostgreSQL by default archives backups and WAL files in an
+CloudNativePG by default archives backups and WAL files in an
 uncompressed fashion. However, it also supports the following compression
 algorithms via `barman-cloud-backup` (for backups) and
 `barman-cloud-wal-archive` (for WAL files):
@@ -676,7 +676,7 @@ a [deeper analysis](https://github.com/EnterpriseDB/barman/issues/344#issuecomme
 Barman 2.18 introduces support for tagging backup resources when saving them in
 object stores via `barman-cloud-backup` and `barman-cloud-wal-archive`. As a
 result, if your PostgreSQL container image includes Barman with version 2.18 or
-higher, Cloud Native PostgreSQL enables you to specify tags as key-value pairs
+higher, CloudNativePG enables you to specify tags as key-value pairs
 for backup objects, namely base backups, WAL files and history files.
 
 You can use two properties in the `.spec.backup.barmanObjectStore` definition:
@@ -690,7 +690,7 @@ The excerpt of a YAML manifest below provides an example of usage of this
 feature:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 [...]
 spec:

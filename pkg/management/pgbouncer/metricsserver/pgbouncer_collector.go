@@ -24,9 +24,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/config"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/pool"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
 
 // PrometheusNamespace is the namespace to be used for all custom metrics exposed by instances

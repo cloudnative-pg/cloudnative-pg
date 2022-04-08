@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	cnpv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	cnpv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // clusterReport contains the data to be printed by the `report cluster` plugin

@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // EnableOnlineUpgradeForInstanceManager creates the operator namespace and enables tho online upgrade for
@@ -77,7 +77,7 @@ func InstallLatestCNPOperator(releaseTag string, env *TestingEnvironment) {
 	Eventually(func() error {
 		_, _, err := RunUnchecked(
 			"kubectl wait --for condition=established --timeout=60s " +
-				"crd/clusters.postgresql.k8s.enterprisedb.io")
+				"crd/clusters.postgresql.cnpg.io")
 		return err
 	}, 150).ShouldNot(HaveOccurred())
 

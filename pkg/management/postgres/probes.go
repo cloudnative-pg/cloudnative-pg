@@ -27,12 +27,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/executablehash"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 // IsServerHealthy check if the instance is healthy

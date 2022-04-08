@@ -69,7 +69,7 @@ format](https://www.postgresql.org/docs/current/runtime-config-logging.html).
 
 ## PGAudit logs
 
-Cloud Native PostgreSQL has transparent and native support for
+CloudNativePG has transparent and native support for
 [PGAudit](https://www.pgaudit.org/) on PostgreSQL clusters.
 
 All you need to do is add the required `pgaudit` parameters to the `postgresql`
@@ -77,7 +77,7 @@ section in the configuration of the cluster.
 
 !!! Important
     It is unnecessary to add the PGAudit library to `shared_preload_libraries`.
-    The library will be added automatically by Cloud Native PostgreSQL based on the
+    The library will be added automatically by CloudNativePG based on the
     presence of `pgaudit.*` parameters in the postgresql configuration.
     The operator will detect and manage the addition and removal of the
     library from `shared_preload_libraries`.
@@ -86,7 +86,7 @@ The operator also takes care of creating and removing the extension from all
 the available databases in the cluster.
 
 !!! Important
-    Cloud Native PostgreSQL runs the `CREATE EXTENSION` and
+    CloudNativePG runs the `CREATE EXTENSION` and
     `DROP EXTENSION` command in all databases in the cluster that accept
     connections.
 
@@ -94,7 +94,7 @@ Here is an example of a PostgreSQL 13 `Cluster` deployment which will result in
 `pgaudit` being enabled with the requested configuration:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example

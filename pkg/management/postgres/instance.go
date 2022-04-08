@@ -34,12 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/execlog"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/pool"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 const (

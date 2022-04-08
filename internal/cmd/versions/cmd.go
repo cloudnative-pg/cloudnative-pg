@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 // NewCmd is a cobra command printing build information

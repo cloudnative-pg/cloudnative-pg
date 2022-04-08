@@ -29,7 +29,7 @@ data:
   ACCESS_KEY_ID: a2V5X2lk
   ACCESS_SECRET_KEY: c2VjcmV0X2tleQ==
 ---
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example-full

@@ -1,6 +1,6 @@
 # Operator configuration
 
-The operator for Cloud Native PostgreSQL is installed from a standard
+The operator for CloudNativePG is installed from a standard
 deployment manifest and follows the convention over configuration paradigm.
 While this is fine in most cases, there are some scenarios where you want
 to change the default behavior, such as:
@@ -113,13 +113,12 @@ kubectl rollout restart deployment \
     postgresql-operator-controller-manager
 ```
 
-Otherwise, If you have installed the operator using OLM, or you are running on
-Openshift, run the following command specifying the namespace the operator is
-installed in:
+In general, given a specific namespace, you can delete the operator pods with
+the following command:
 
 ```shell
 kubectl delete pods -n [NAMESPACE_NAME_HERE] \
-  -l app.kubernetes.io/name=cloud-native-postgresql
+  -l app.kubernetes.io/name=cloudnative-pg
 ```
 
 !!! Warning

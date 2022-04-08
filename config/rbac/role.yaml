@@ -210,7 +210,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - backups
   verbs:
@@ -222,7 +222,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - backups/status
   verbs:
@@ -230,7 +230,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - clusters
   verbs:
@@ -242,13 +242,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - clusters/finalizers
   verbs:
   - update
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - clusters/status
   verbs:
@@ -257,7 +257,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - poolers
   verbs:
@@ -269,13 +269,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - poolers/finalizers
   verbs:
   - update
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - poolers/status
   verbs:
@@ -284,7 +284,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - scheduledbackups
   verbs:
@@ -296,7 +296,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - scheduledbackups/status
   verbs:

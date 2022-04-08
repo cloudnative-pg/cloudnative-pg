@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
@@ -34,7 +34,7 @@ func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
 	deploymentList := &appsv1.DeploymentList{}
 
 	if err := plugin.Client.List(
-		ctx, deploymentList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloud-native-postgresql"},
+		ctx, deploymentList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloudnative-pg"},
 	); err != nil {
 		return appsv1.Deployment{}, err
 	}
@@ -50,7 +50,7 @@ func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
 	if err := plugin.Client.List(
 		ctx,
 		deploymentList,
-		ctrlclient.HasLabels{"operators.coreos.com/cloud-native-postgresql.openshift-operators"},
+		ctrlclient.HasLabels{"operators.coreos.com/cloudnative-pg.openshift-operators"},
 	); err != nil {
 		return appsv1.Deployment{}, err
 	}
@@ -85,7 +85,7 @@ func GetOperatorPod(ctx context.Context) (corev1.Pod, error) {
 	// This will work for newer version of the operator, which are using
 	// our custom label
 	if err := plugin.Client.List(
-		ctx, podList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloud-native-postgresql"}); err != nil {
+		ctx, podList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloudnative-pg"}); err != nil {
 		return corev1.Pod{}, err
 	}
 	switch {

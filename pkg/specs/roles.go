@@ -20,7 +20,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
@@ -82,7 +82,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.k8s.enterprisedb.io",
+				"postgresql.cnpg.io",
 			},
 			Resources: []string{
 				"clusters",
@@ -98,7 +98,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.k8s.enterprisedb.io",
+				"postgresql.cnpg.io",
 			},
 			Resources: []string{
 				"clusters/status",
@@ -115,7 +115,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.k8s.enterprisedb.io",
+				"postgresql.cnpg.io",
 			},
 			Resources: []string{
 				"backups",
@@ -126,7 +126,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		},
 		{
 			APIGroups: []string{
-				"postgresql.k8s.enterprisedb.io",
+				"postgresql.cnpg.io",
 			},
 			Resources: []string{
 				"backups/status",

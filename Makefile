@@ -1,6 +1,18 @@
-# This file is part of Cloud Native PostgreSQL.
 #
-# Copyright (C) 2019-2022 EnterpriseDB Corporation.
+# Copyright 2019-2022 The CloudNativePG Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 
 # Image URL to use all building/pushing image targets
 
@@ -9,16 +21,16 @@
 ifeq (,$(CONTROLLER_IMG))
 IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
 ifneq (,${IMAGE_TAG})
-CONTROLLER_IMG = quay.io/enterprisedb/cloud-native-postgresql-testing:${IMAGE_TAG}
+CONTROLLER_IMG = ghcr.io/cloudnative-pg/cloudnative-pg-testing:${IMAGE_TAG}
 endif
 endif
 
 COMMIT := $(shell git rev-parse --short HEAD || echo unknown)
 DATE := $(shell git log -1 --pretty=format:'%ad' --date short)
 VERSION := $(shell git describe --tags --match 'v*' | sed -e 's/^v//; s/-g[0-9a-f]\+$$//; s/-\([0-9]\+\)$$/+dev\1/')
-LDFLAGS= "-X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion=${VERSION} $\
--X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit=${COMMIT} $\
--X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate=${DATE}"
+LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=${VERSION} $\
+-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit=${COMMIT} $\
+-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= quay.io/enterprisedb/postgresql:13
@@ -159,7 +171,7 @@ checks: generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint 
 licenses: go-licenses ## Generate the licenses folder.
 	# The following statement is expected to fail because our license is unrecognised
 	GOPRIVATE="https://github.com/EnterpriseDB/*" $(GO_LICENSES) \
-		save github.com/EnterpriseDB/cloud-native-postgresql \
+		save github.com/cloudnative-pg/cloudnative-pg \
 		--save_path licenses/go-licenses --force || true
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete

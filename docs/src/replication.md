@@ -9,7 +9,7 @@ scale-out of read-only workloads and offloading some work from the primary.
 ## Application-level replication
 
 Having contributed throughout the years to the replication feature in PostgreSQL,
-we have decided to build high availability in Cloud Native PostgreSQL on top of
+we have decided to build high availability in CloudNativePG on top of
 the native physical replication technology and integrate it
 directly in the Kubernetes API.
 
@@ -38,7 +38,7 @@ publisher/subscriber pattern to replicate data from an origin to a destination.
 
 ### Streaming replication support
 
-At the moment, Cloud Native PostgreSQL natively and transparently manages
+At the moment, CloudNativePG natively and transparently manages
 physical streaming replicas within a cluster in a declarative way, based on
 the number of provided `instances` in the `spec`:
 
@@ -70,21 +70,21 @@ hostssl replication streaming_replica all cert
 ```
 
 !!! Seealso "Certificates"
-    For details on how Cloud Native PostgreSQL manages certificates, please refer
+    For details on how CloudNativePG manages certificates, please refer
     to the ["Certificates" section](certificates.md#client-streaming_replica-certificate)
     in the documentation.
 
 
 ### Continuous backup integration
 
-In case continuous backup is configured in the cluster, Cloud Native PostgreSQL
+In case continuous backup is configured in the cluster, CloudNativePG
 transparently configures replicas to take advantage of `restore_command` when
 in continuous recovery. As a result, PostgreSQL is able to use the WAL archive
 as a fallback option everytime pulling WALs via streaming replication fails.
 
 ### Synchronous replication
 
-Cloud Native PostgreSQL supports configuration of **quorum-based synchronous
+CloudNativePG supports configuration of **quorum-based synchronous
 streaming replication** via two configuration options called `minSyncReplicas`
 and `maxSyncReplicas` which are the minimum and maximum number of expected
 synchronous standby replicas available at any time.
@@ -127,7 +127,7 @@ requested number of synchronous standbys in the list*.
 
 ## Replication from an external PostgreSQL cluster
 
-Cloud Native PostgreSQL relies on the foundations of the PostgreSQL replication
+CloudNativePG relies on the foundations of the PostgreSQL replication
 framework even when a PostgreSQL cluster is created from an existing one (source)
 and kept synchronized through the
 [replica cluster](architecture.md#multi-cluster-deployments) feature. The source
@@ -154,14 +154,14 @@ If the external cluster contains a `barmanObjectStore` section:
 
 - you'll be able to boostrap the replica cluster from an object store
   using the `recovery` section
-- Cloud Native PostgreSQL will automatically set the `restore_command`
+- CloudNativePG will automatically set the `restore_command`
   in the designated primary instance
 
 If the external cluster contains a `connectionParameters` section:
 
 - you'll be able to boostrap the replica cluster via streaming replication
   using the `pg_basebackup` section
-- Cloud Native PostgreSQL will automatically set the `primary_conninfo`
+- CloudNativePG will automatically set the `primary_conninfo`
   option in the designated primary instance, so that a WAL receiver
   process is started to connect to the source cluster and receive data
 

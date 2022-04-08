@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // MinioSetup contains the resources needed for a working minio server deployment:
