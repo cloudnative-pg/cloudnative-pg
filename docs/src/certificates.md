@@ -1,6 +1,6 @@
 # Certificates
 
-Cloud Native PostgreSQL has been designed to natively support TLS certificates.
+CloudNativePG has been designed to natively support TLS certificates.
 In order to set up a `Cluster`, the operator requires:
 
 - a server Certification Authority (CA) certificate
@@ -12,15 +12,15 @@ In order to set up a `Cluster`, the operator requires:
     You can find all the secrets used by the cluster and their expiration dates
     in the cluster's status.
 
-Cloud Native PostgreSQL is very flexible when it comes to TLS certificates, and
+CloudNativePG is very flexible when it comes to TLS certificates, and
 primarily operates in two modes:
 
 1. [**operator managed**](#operator-managed-mode): certificates are internally
    managed by the operator in a fully automated way, and signed using a CA created
-   by Cloud Native PostgreSQL
+   by CloudNativePG
 2. [**user provided**](#user-provided-certificates-mode): certificates are
    generated outside the operator and imported in the cluster definition as
-   secrets - Cloud Native PostgreSQL integrates itself with cert-manager (see
+   secrets - CloudNativePG integrates itself with cert-manager (see
    examples below)
 
 You can also choose a hybrid approach, where only part of the certificates is
@@ -90,7 +90,7 @@ the following parameters:
 
 !!! Note
     If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
-    add a label with key `k8s.enterprisedb.io/reload` to it, otherwise you will have to reload
+    add a label with key `cnpg.io/reload` to it, otherwise you will have to reload
     the instances using the `kubectl cnp reload` subcommand.
 
 See below for a complete example.
@@ -121,7 +121,7 @@ Create a `Cluster` referencing those secrets:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
@@ -157,7 +157,7 @@ kind: Secret
 metadata:
   name: my-postgres-server-cert
   labels:
-    k8s.enterprisedb.io/reload: ""
+    cnpg.io/reload: ""
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -188,7 +188,7 @@ A Secret named `my-postgres-server-cert` is created by cert-manager, containing 
 from a Cluster as follows:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
@@ -228,7 +228,7 @@ the following parameters:
 
 !!! Note
     If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
-    add a label with key `k8s.enterprisedb.io/reload` to it, otherwise you will have to reload
+    add a label with key `cnpg.io/reload` to it, otherwise you will have to reload
     the instances using the `kubectl cnp reload` subcommand.
 
 #### Cert-manager Example
@@ -250,7 +250,7 @@ kind: Secret
 metadata:
   name: my-postgres-client-cert
   labels:
-    k8s.enterprisedb.io/reload: ""
+    cnpg.io/reload: ""
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -271,7 +271,7 @@ A Secret named `my-postgres-client-cert` is created by cert-manager, containing 
 from a Cluster as follows:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example

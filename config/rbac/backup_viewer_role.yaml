@@ -5,7 +5,7 @@ metadata:
   name: backup-viewer-role
 rules:
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - backups
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - backups/status
   verbs:

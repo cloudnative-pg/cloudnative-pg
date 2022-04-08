@@ -24,8 +24,8 @@ import (
 
 	"k8s.io/client-go/util/retry"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/pgbouncer/config"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/pool"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
 
 // PgBouncerInstanceInterface the public interface for a PgBouncer instance,

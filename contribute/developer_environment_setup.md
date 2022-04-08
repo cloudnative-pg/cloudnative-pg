@@ -75,7 +75,7 @@ Please allow a reasonable amount of memory for Docker.
 For instance, this is the configuration on the machine of a CNP developer
 ("Preferences->Resources of your Docker desktop app"):
 
-![](docs/images/docker_resources.png)
+![](./images/docker_resources.png)
 
 In order to execute the `setup-cluster.sh`, you also need to add this in "Preferences->Docker Engine":
 
@@ -87,4 +87,4 @@ In order to execute the `setup-cluster.sh`, you also need to add this in "Prefer
 }
 ```
 
-![](docs/images/docker_settings.png)
+![](./images/docker_settings.png)

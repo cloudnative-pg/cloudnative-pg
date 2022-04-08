@@ -1,6 +1,6 @@
 # API Reference
 
-Cloud Native PostgreSQL extends the Kubernetes API defining the following
+CloudNativePG extends the Kubernetes API defining the following
 custom resources:
 
 -   [Backup](#backup)
@@ -8,7 +8,7 @@ custom resources:
 -   [Pooler](#pooler)
 -   [ScheduledBackup](#scheduledbackup)
 
-All the resources are defined in the `postgresql.k8s.enterprisedb.io/v1`
+All the resources are defined in the `postgresql.cnpg.io/v1`
 API.
 
 Please refer to the ["Configuration Samples" page](samples.md)" of the

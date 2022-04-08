@@ -11,7 +11,7 @@ more `ConfigMap` or `Secret` resources (see the
 ["User defined metrics" section](#user-defined-metrics) below for details).
 
 !!! Important
-    Starting from version 1.11, Cloud Native PostgreSQL already installs
+    Starting from version 1.11, CloudNativePG already installs
     [by default a set of predefined metrics](#default-set-of-metrics) in
     a `ConfigMap` called `default-monitoring`.
 
@@ -44,7 +44,7 @@ The default database can always be overridden for a given user-defined metric,
 by specifying a list of one or more databases in the `target_databases` option.
 
 !!! Seealso "Prometheus/Grafana"
-    If you are interested in evaluating the integration of Cloud Native PostgreSQL
+    If you are interested in evaluating the integration of CloudNativePG
     with Prometheus and Grafana, please look at [cnp-sandbox](https://github.com/EnterpriseDB/cnp-sandbox).
 
 ### Prometheus Operator example
@@ -287,7 +287,7 @@ Custom metrics can be defined by users by referring to the created `Configmap`/`
 under the `.spec.monitoring.customQueriesConfigMap` or `customQueriesSecret` section as in the following example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-example
@@ -310,7 +310,7 @@ Take care that the referred resources have to be created **in the same namespace
 
 !!! Note
     If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
-    add a label with key `k8s.enterprisedb.io/reload` to it, otherwise you will have to reload
+    add a label with key `cnpg.io/reload` to it, otherwise you will have to reload
     the instances using the `kubectl cnp reload` subcommand.
 
 !!! Important
@@ -330,7 +330,7 @@ metadata:
   name: example-monitoring
   namespace: test
   labels:
-    k8s.enterprisedb.io/reload: ""
+    cnpg.io/reload: ""
 data:
   custom-queries: |
     pg_replication:
@@ -547,9 +547,9 @@ If you want to disable the default set of metrics, you can:
 
 ### Differences with the Prometheus Postgres exporter
 
-Cloud Native PostgreSQL is inspired by the PostgreSQL Prometheus Exporter, but
+CloudNativePG is inspired by the PostgreSQL Prometheus Exporter, but
 presents some differences. In particular, the `cache_seconds` field is not implemented
-in Cloud Native PostgreSQL's exporter.
+in CloudNativePG's exporter.
 
 ## Monitoring the operator
 
@@ -580,58 +580,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: cloud-native-postgresql
+      app.kubernetes.io/name: cloudnative-pg
   podMetricsEndpoints:
     - port: metrics
 ```
-
-## Monitoring on OpenShift
-
-Starting on Openshift 4.6 there is a complete monitoring stack called
-["Monitoring for user-defined projects"](https://docs.openshift.com/container-platform/4.6/monitoring/enabling-monitoring-for-user-defined-projects.html)
-which can be enabled by cluster administrators. Cloud Native PostgreSQL will
-automatically create a `PodMonitor` object if the option
-`spec.monitoring.enablePodMonitor` of the `Cluster` definition is set to
-`true`.
-
-To enable cluster wide `user-defined` monitoring you must first create a
-`ConfigMap` with the name `cluster-monitoring-config` in the
-`openshift-monitoring` namespace/project with the following content:
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cluster-monitoring-config
-  namespace: openshift-monitoring
-data:
-  config.yaml: |
-    enableUserWorkload: true
-```
-If the `ConfigMap` already exists, just add the variable `enableUserWorkload: true`.
-
-!!! Important
-    This will enable the monitoring for the whole cluster, if it is needed only
-    for one namespace/project please refer to the official Red Hat documentation or
-    talk with your cluster administrator.
-
-After that, just create the proper PodMonitor in the namespace/project with
-something similar to this:
-
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: cluster-sample
-spec:
-  selector:
-    matchLabels:
-      postgresql: cluster-sample
-  podMetricsEndpoints:
-  - port: metrics
-```
-
-!!! Note
-    We currently don’t use `ServiceMonitor` because our service doesn’t define
-    a port pointing to the metrics. If we added a metric port this could expose
-    sensitive data.

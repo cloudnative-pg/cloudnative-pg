@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package v1 contains API Schema definitions for the postgresql v1 API group
 // +kubebuilder:object:generate=true
-// +groupName=postgresql.k8s.enterprisedb.io
+// +groupName=postgresql.cnpg.io
 package v1
 
 import (
@@ -26,7 +26,7 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "postgresql.k8s.enterprisedb.io", Version: "v1"}
+	GroupVersion = schema.GroupVersion{Group: "postgresql.cnpg.io", Version: "v1"}
 
 	// ClusterGVK is the triple to reach Cluster resources in k8s
 	ClusterGVK = schema.GroupVersionResource{

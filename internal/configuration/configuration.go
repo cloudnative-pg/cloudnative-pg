@@ -22,9 +22,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configparser"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configparser"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 var configurationLog = log.WithName("configuration")

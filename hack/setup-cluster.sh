@@ -325,7 +325,7 @@ pyroscopeConfigs:
     - job-name: cnp
       enabled-profiles: [cpu, mem]
       static-configs:
-        - application: cloud-native-postgresql
+        - application: cloudnative-pg
           targets:
             - cnp-pprof:6060
           labels:
@@ -348,7 +348,7 @@ spec:
     app: cnp-pprof
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: cloud-native-postgresql
+    app.kubernetes.io/name: cloudnative-pg
 EOF
   kubectl -n postgresql-operator-system apply -f "${service_file}"
 }
@@ -481,7 +481,7 @@ print_image() {
   if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_${ENGINE}"; then
     tag=latest
   fi
-  echo "${registry_name}:5000/cloud-native-postgresql:${tag}"
+  echo "${registry_name}:5000/cloudnative-pg:${tag}"
 }
 
 export_logs() {

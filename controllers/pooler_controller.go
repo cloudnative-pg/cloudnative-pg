@@ -36,8 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // PoolerReconciler reconciles a Pooler object
@@ -47,9 +47,9 @@ type PoolerReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=poolers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=poolers/status,verbs=get;update;patch;watch
-// +kubebuilder:rbac:groups=postgresql.k8s.enterprisedb.io,resources=poolers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=poolers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=poolers/status,verbs=get;update;patch;watch
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=poolers/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=secrets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;create;delete;update;patch;list;watch

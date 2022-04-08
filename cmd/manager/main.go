@@ -21,16 +21,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/backup"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/bootstrap"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/controller"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/pgbouncer"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/show"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walarchive"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walrestore"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/backup"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/bootstrap"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/pgbouncer"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/show"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walarchive"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )

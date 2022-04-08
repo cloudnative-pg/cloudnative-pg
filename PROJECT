@@ -1,5 +1,5 @@
-domain: k8s.enterprisedb.io
-repo: github.com/EnterpriseDB/cloud-native-postgresql
+domain: cnpg.io
+repo: github.com/cloudnative-pg/cloudnative-pg
 resources:
 - group: postgresql
   kind: Cluster

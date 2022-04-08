@@ -27,12 +27,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
-	m "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
-	postgresconf "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	m "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
+	postgresconf "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 // PrometheusNamespace is the namespace to be used for all custom metrics exposed by instances

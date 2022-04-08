@@ -17,7 +17,7 @@ limitations under the License.
 package logpipe
 
 import (
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 const (

@@ -20,8 +20,8 @@ import (
 	"errors"
 	"os/exec"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 // tryShuttingDownFastImmediate first tries to shut down the instance with mode fast,

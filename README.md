@@ -1,56 +1,58 @@
-# Cloud Native PostgreSQL
+# Welcome to the CloudNativePG project!
 
-**Cloud Native PostgreSQL** is a stack designed by
-[EnterpriseDB](https://www.enterprisedb.com) to manage PostgreSQL
-workloads on Kubernetes, particularly optimized for private cloud environments
-with local Persistent Volumes (PV).
+**CloudNativePG** is an open source operator designed to manage
+[PostgreSQL](https://www.postgresql.org/) workloads on any supported Kubernetes
+cluster running in private, public, hybrid, or multi-cloud environments.
+
+CloudNativePG was originally built and sponsored by [EDB](https://www.enterprisedb.com).
 
 ## Table of content
 
-- [Code of conduct](CODE-OF-CONDUCT.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Governance policies](GOVERNANCE.md)
 - [Contributing](CONTRIBUTING.md)
 - [License](LICENSE)
-- [Setting up your dev workstation](DEVELOPERS.md)
-- [Setting up a local k8s cluster to test your code](hack/e2e/README.md#setting-up-a-local-k8s-cluster)
-- [E2E tests (how-to)](hack/e2e/README.md#e2e-testing)
-- [Release process (how-to)](RELEASE.md)
 
-## How to upgrade the list of licenses
+## Getting Started
 
-To generate or update the `licenses` folder run the following command:
+The best way to get started is with the ["Quickstart"](docs/src/quickstart.md)
+section in the documentation.
 
-```bash
-make licenses
-```
+## Scope
 
-# Authors
+The goal of CloudNativePG is to increase the adoption of PostgreSQL, one of the
+most loved DBMS in traditional VM and bare metal environments, inside
+Kubernetes, thus making the database an integral part of the development
+process and CI/CD automated pipelines.
 
-Cloud Native PostgreSQL (Operator for Kubernetes/OpenShift) has been designed,
-developed, and tested by the EnterpriseDB Cloud Native team:
+### Out of scope
 
-- Gabriele Bartolini
-- Jonathan Battiato
-- Jihyuk Bok
-- Francesco Canovai
-- Leonardo Cecchi
-- Valerio Del Sarto
-- Niccolò Fei
-- Jonathan Gonzalez
-- Hai He
-- Federico Innocenti
-- Danish Khan
-- Dhilip Kumar
-- Tao Li
-- John Long
-- Marco Nenciarini
-- Adrian Noland
-- Gabriele Quaresima
-- Armando Ruocco
-- Philippe Scorsolini
-- Marcos Silva
-- Jaime Silvela
-- Jitendra Wadle
-- Adam Wright
+PostgreSQL is our focus. Developing a cross database operator is beyond the
+scope of this project.
+
+## Communications
+
+- [Slack Channel](https://cloudnativepg.slack.com)
+- [Github Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions)
+- [Twitter](https://twitter.com/CloudNativePg)
+
+## Resources
+
+- [Roadmap](https://github.com/orgs/cloudnative-pg/projects/1)
+- [Website](https://cloudnative-pg.io)
+
+## Maintainers
+
+The current maintainers of the CloudNativePG project are:
+
+- Gabriele Bartolini (EDB)
+- Francesco Canovai (EDB)
+- Leonardo Cecchi (EDB)
+- Jonathan Gonzalez (EDB)
+- Marco Nenciarini (EDB)
+- Philippe Scorsolini (EDB)
+
+They are listed in the [CODEOWNERS](CODEOWNERS) file.
 
 # Trademarks
 

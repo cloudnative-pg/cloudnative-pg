@@ -28,7 +28,7 @@ The primary is the last node to be upgraded.
 Rolling updates are configurable and can be either entirely automated
 (`unsupervised`) or requiring human intervention (`supervised`).
 
-The upgrade keeps the Cloud Native PostgreSQL identity, without re-cloning the
+The upgrade keeps the CloudNativePG identity, without re-cloning the
 data. Pods will be deleted and created again with the same PVCs and a new
 image, if required.
 

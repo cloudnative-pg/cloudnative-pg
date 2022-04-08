@@ -24,10 +24,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	testsUtils "github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils/nodes"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
 )
 
 // Set of tests in which we check that operator is able to fail over a new

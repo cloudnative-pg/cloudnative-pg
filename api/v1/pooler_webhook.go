@@ -24,8 +24,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/stringset"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 
 var (
@@ -77,7 +77,7 @@ func (r *Pooler) SetupWebhookWithManager(mgr ctrl.Manager) error {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-// +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},verbs=create;update,path=/validate-postgresql-k8s-enterprisedb-io-v1-pooler,mutating=false,failurePolicy=fail,groups=postgresql.k8s.enterprisedb.io,resources=poolers,versions=v1,name=vpooler.kb.io,sideEffects=None
+// +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},verbs=create;update,path=/validate-postgresql-cnpg-io-v1-pooler,mutating=false,failurePolicy=fail,groups=postgresql.cnpg.io,resources=poolers,versions=v1,name=vpooler.kb.io,sideEffects=None
 
 var _ webhook.Validator = &Pooler{}
 
@@ -92,7 +92,7 @@ func (r *Pooler) ValidateCreate() error {
 	}
 
 	return apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.k8s.enterprisedb.io", Kind: "Pooler"},
+		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
 		r.Name, allErrs)
 }
 
@@ -107,7 +107,7 @@ func (r *Pooler) ValidateUpdate(old runtime.Object) error {
 	}
 
 	return apierrors.NewInvalid(
-		schema.GroupKind{Group: "postgresql.k8s.enterprisedb.io", Kind: "Pooler"},
+		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Pooler"},
 		r.Name, allErrs)
 }
 

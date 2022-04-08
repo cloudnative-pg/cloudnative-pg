@@ -36,8 +36,8 @@ jobs:
         name: Build meta
         id: build-meta
         run: |
-          images="quay.io/enterprisedb/cloud-native-postgresql-testing"
-          images="${images},quay.io/enterprisedb/cloud-native-postgresql"
+          images='ghcr.io/cloudnative-pg/cloudnative-pg-testing'
+          images="${images},ghcr.io/cloudnative-pg/cloudnative-pg"
           commit_sha=${{ github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
@@ -75,10 +75,9 @@ jobs:
         name: Detect platforms
         id: docker-platforms
         run: |
-          # Available architecture on UBI8 are: linux/amd64, linux/ppc64le, linux/s390x
           # Keep in mind that adding more platforms (architectures) will increase the building
           # time even if we use the ghcache for the building process.
-          platforms="linux/amd64,linux/ppc64le,linux/s390x"
+          platforms="linux/amd64"
           echo "::set-output name=platforms::${platforms}"
       -
         name: Set up QEMU
@@ -91,12 +90,12 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v1.3.0
       -
-        name: Login to quay.io
+        name: Login to ghcr.io
         uses: docker/login-action@v1.9.0
         with:
-          registry: quay.io/enterprisedb
-          username: ${{ secrets.QUAY_USERNAME }}
-          password: ${{ secrets.QUAY_TOKEN }}
+          registry: ghcr.io/cloudnative-pg
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
         id: build
@@ -198,25 +197,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-
-  invoke-redhat-certification:
-    name: Trigger Red Hat Certification Workflow
-    runs-on: ubuntu-20.04
-    needs:
-      - buildx
-      - release
-    if: |
-      needs.buildx.result == 'success' &&
-      needs.release.result == 'success'
-    steps:
-      - name: Invoke workflow-dispatch
-        id: trigger-workflow
-        uses: aurelien-baudet/workflow-dispatch@v2.1.1
-        with:
-          workflow: redhat-certification
-          token: ${{ secrets.REPO_GHA_PAT }}
-          ref: ${{ steps.vars.outputs.ref }}
-          display-workflow-run-url: true
-          wait-for-completion: false
-          inputs: >
-            {"digest":"${{ needs.buildx.outputs.digest }}","version":"${{ needs.buildx.outputs.version }}"}
