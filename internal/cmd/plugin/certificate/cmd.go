@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // NewCmd creates the new "certificate" subcommand
@@ -37,8 +37,8 @@ connect to the PostgreSQL cluster.`,
 			ctx := context.Background()
 			secretName := args[0]
 
-			user, _ := cmd.Flags().GetString("cnp-user")
-			cluster, _ := cmd.Flags().GetString("cnp-cluster")
+			user, _ := cmd.Flags().GetString("cnpg-user")
+			cluster, _ := cmd.Flags().GetString("cnpg-cluster")
 			dryRun, _ := cmd.Flags().GetBool("dry-run")
 			output, _ := cmd.Flags().GetString("output")
 
@@ -54,11 +54,11 @@ connect to the PostgreSQL cluster.`,
 	}
 
 	certificateCmd.Flags().String(
-		"cnp-user", "", "The name of the PostgreSQL user")
-	_ = certificateCmd.MarkFlagRequired("cnp-user")
+		"cnpg-user", "", "The name of the PostgreSQL user")
+	_ = certificateCmd.MarkFlagRequired("cnpg-user")
 	certificateCmd.Flags().String(
-		"cnp-cluster", "", "The name of the PostgreSQL cluster")
-	_ = certificateCmd.MarkFlagRequired("cnp-cluster")
+		"cnpg-cluster", "", "The name of the PostgreSQL cluster")
+	_ = certificateCmd.MarkFlagRequired("cnpg-cluster")
 	certificateCmd.Flags().StringP(
 		"output", "o", "", "Output format. One of json|yaml")
 	certificateCmd.Flags().Bool(

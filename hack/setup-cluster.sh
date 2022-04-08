@@ -322,16 +322,16 @@ deploy_pyroscope() {
 pyroscopeConfigs:
   log-level: "debug"
   scrape-configs:
-    - job-name: cnp
+    - job-name: cnpg
       enabled-profiles: [cpu, mem]
       static-configs:
-        - application: cloud-native-postgresql
+        - application: cloudnative-pg
           targets:
-            - cnp-pprof:6060
+            - cnpg-pprof:6060
           labels:
-            cnp: cnp
+            cnpg: cnpg
 EOF
-  helm -n postgresql-operator-system install pyroscope pyroscope-io/pyroscope -f "${values_file}"
+  helm -n cnpg-system install pyroscope pyroscope-io/pyroscope -f "${values_file}"
 
   service_file="${TEMP_DIR}/pyroscope_service.yaml"
 
@@ -339,18 +339,18 @@ EOF
 apiVersion: v1
 kind: Service
 metadata:
-  name: cnp-pprof
+  name: cnpg-pprof
 spec:
   ports:
   - targetPort: 6060
     port: 6060
   selector:
-    app: cnp-pprof
+    app: cnpg-pprof
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: cloud-native-postgresql
+    app.kubernetes.io/name: cloudnative-pg
 EOF
-  kubectl -n postgresql-operator-system apply -f "${service_file}"
+  kubectl -n cnpg-system apply -f "${service_file}"
 }
 
 load_image_registry() {
@@ -372,7 +372,7 @@ load_image() {
 }
 
 deploy_operator() {
-  kubectl delete ns postgresql-operator-system 2> /dev/null || :
+  kubectl delete ns cnpg-system 2> /dev/null || :
 
   make -C "${ROOT_DIR}" deploy "CONTROLLER_IMG=${CONTROLLER_IMG}"
 }
@@ -481,7 +481,7 @@ print_image() {
   if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_${ENGINE}"; then
     tag=latest
   fi
-  echo "${registry_name}:5000/cloud-native-postgresql:${tag}"
+  echo "${registry_name}:5000/cloudnative-pg:${tag}"
 }
 
 export_logs() {

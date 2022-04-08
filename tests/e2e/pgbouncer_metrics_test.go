@@ -24,14 +24,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/specs/pgbouncer"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 )
 
 var _ = Describe("PGBouncer Metrics", func() {
 	const (
-		cnpCluster                  = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml"
+		cnpgCluster                 = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml"
 		poolerBasicAuthRWSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-rw.yaml"
 		namespace                   = "pgbouncer-metrics-e2e"
 		level                       = tests.Low
@@ -67,9 +67,9 @@ var _ = Describe("PGBouncer Metrics", func() {
 				curlPodName = curlClient.GetName()
 			})
 
-			clusterName, err = env.GetResourceNameFromYAML(cnpCluster)
+			clusterName, err = env.GetResourceNameFromYAML(cnpgCluster)
 			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, cnpCluster, env)
+			AssertCreateCluster(namespace, clusterName, cnpgCluster, env)
 
 			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthRWSampleFile, 1)
 
@@ -82,20 +82,20 @@ var _ = Describe("PGBouncer Metrics", func() {
 
 			metricsRegexp := regexp.MustCompile(
 				`(?m:^(` +
-					`cnp_pgbouncer_collection_duration_seconds{collector="Collect.up"} [0-9e\+\.]+|` +
-					`cnp_pgbouncer_collections_total 1|` +
-					`cnp_pgbouncer_last_collection_error 0|` +
-					`cnp_pgbouncer_lists_dns_pending 0|` +
-					`cnp_pgbouncer_lists_dns_queries 0|` +
-					`cnp_pgbouncer_lists_free_clients 49|` +
-					`cnp_pgbouncer_lists_pools 1|` +
-					`cnp_pgbouncer_lists_used_servers 0|` +
-					`cnp_pgbouncer_lists_users 2|` +
-					`cnp_pgbouncer_pools_cl_cancel_req{database="pgbouncer",user="pgbouncer"} 0|` +
-					`cnp_pgbouncer_pools_pool_mode{database="pgbouncer",user="pgbouncer"} 3|` +
-					`cnp_pgbouncer_stats_avg_query_time{database="pgbouncer"} [0-9e\+\.]+|` +
-					`cnp_pgbouncer_stats_avg_recv{database="pgbouncer"} [0-9e\+\.]+|` +
-					`cnp_pgbouncer_stats_total_query_count{database="pgbouncer"} \d+` +
+					`cnpg_pgbouncer_collection_duration_seconds{collector="Collect.up"} [0-9e\+\.]+|` +
+					`cnpg_pgbouncer_collections_total 1|` +
+					`cnpg_pgbouncer_last_collection_error 0|` +
+					`cnpg_pgbouncer_lists_dns_pending 0|` +
+					`cnpg_pgbouncer_lists_dns_queries 0|` +
+					`cnpg_pgbouncer_lists_free_clients 49|` +
+					`cnpg_pgbouncer_lists_pools 1|` +
+					`cnpg_pgbouncer_lists_used_servers 0|` +
+					`cnpg_pgbouncer_lists_users 2|` +
+					`cnpg_pgbouncer_pools_cl_cancel_req{database="pgbouncer",user="pgbouncer"} 0|` +
+					`cnpg_pgbouncer_pools_pool_mode{database="pgbouncer",user="pgbouncer"} 3|` +
+					`cnpg_pgbouncer_stats_avg_query_time{database="pgbouncer"} [0-9e\+\.]+|` +
+					`cnpg_pgbouncer_stats_avg_recv{database="pgbouncer"} [0-9e\+\.]+|` +
+					`cnpg_pgbouncer_stats_total_query_count{database="pgbouncer"} \d+` +
 					`)$)`)
 
 			for _, pod := range podList.Items {

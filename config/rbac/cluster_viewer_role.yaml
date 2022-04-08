@@ -5,7 +5,7 @@ metadata:
   name: cluster-viewer-role
 rules:
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - clusters
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - postgresql.k8s.enterprisedb.io
+  - postgresql.cnpg.io
   resources:
   - clusters/status
   verbs:

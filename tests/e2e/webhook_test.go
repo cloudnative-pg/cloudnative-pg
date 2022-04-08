@@ -24,8 +24,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests"
-	"github.com/EnterpriseDB/cloud-native-postgresql/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 )
 
 /*
@@ -40,7 +40,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 	// Define some constants to be used in the test
 	const (
 		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml"
-		operatorNamespace = "postgresql-operator-system"
+		operatorNamespace = "cnpg-system"
 		level             = tests.Highest
 		mutatingWebhook   = "mcluster.kb.io"
 		validatingWebhook = "vcluster.kb.io"
@@ -93,7 +93,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 		webhookNamespace = "no-webhook-test"
 		clusterIsDefaulted = true
 
-		mWebhook, admissionNumber, err := utils.GetCNPsMutatingWebhookByName(env, mutatingWebhook)
+		mWebhook, admissionNumber, err := utils.GetCNPGsMutatingWebhookByName(env, mutatingWebhook)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Add a namespace selector to MutatingWebhooks and ValidatingWebhook, this will assign the webhooks
@@ -103,11 +103,11 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &v13.LabelSelector{
 				MatchLabels: map[string]string{"test": "value"},
 			}
-			err := utils.UpdateCNPsMutatingWebhookConf(env, newWebhook)
+			err := utils.UpdateCNPGsMutatingWebhookConf(env, newWebhook)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		vWebhook, admissionNumber, err := utils.GetCNPsValidatingWebhookByName(env, validatingWebhook)
+		vWebhook, admissionNumber, err := utils.GetCNPGsValidatingWebhookByName(env, validatingWebhook)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("Disabling the validating webhook %v namespace", operatorNamespace), func() {
@@ -115,7 +115,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &v13.LabelSelector{
 				MatchLabels: map[string]string{"test": "value"},
 			}
-			err := utils.UpdateCNPsValidatingWebhookConf(env, newWebhook)
+			err := utils.UpdateCNPGsValidatingWebhookConf(env, newWebhook)
 			Expect(err).ToNot(HaveOccurred())
 		})
 

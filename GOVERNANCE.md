@@ -108,13 +108,8 @@ and invited to the private maintainer mailing list.
 ## Meetings
 
 Time zones permitting, Maintainers are expected to participate in the public
-developer meeting, which occurs bi-weekly on the first and third Tuesday of
-each month, via Zoom:
-
-- Meeting ID: [973 0110 7092](https://enterprisedb.zoom.us/j/97301107092?pwd=ckJtV2ZoSDdKZW9EWlR4ckpOWlNWQT09)
-- Passcode: 504519
-
-[Agenda and minutes are publicly available](https://docs.google.com/document/d/1Bmf2AZG5WLKAyESJbYk7MbsfiuD3jgdIDQrDkNuKT9w/edit?usp=sharing).
+developers meeting (see ["Meetings" in the contributing guidelines](CONTRIBUTING.md#meetings)
+page for details).
 
 Maintainers will also have closed meetings to discuss security reports
 or Code of Conduct violations. Such meetings should be scheduled by any

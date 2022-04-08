@@ -22,12 +22,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/initdb"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/join"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/pgbasebackup"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/restore"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/run"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/instance/status"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/initdb"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/join"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/pgbasebackup"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/restore"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/status"
 )
 
 // NewCmd creates the "instance" command

@@ -1,5 +1,5 @@
 # Example of PostgreSQL cluster using a node selector
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: postgresql-nodeselector

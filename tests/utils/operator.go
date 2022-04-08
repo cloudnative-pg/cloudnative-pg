@@ -24,12 +24,13 @@ import (
 	"path/filepath"
 	"time"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	"github.com/avast/retry-go/v4"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -98,10 +99,10 @@ func (env TestingEnvironment) DumpOperator(namespace string, filename string) {
 
 // GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
 func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error) {
-	const operatorDeploymentName = "postgresql-operator-controller-manager"
+	const operatorDeploymentName = "cnpg-controller-manager"
 	deploymentList := &appsv1.DeploymentList{}
 	if err := GetObjectList(&env, deploymentList,
-		ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloud-native-postgresql"},
+		ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloudnative-pg"},
 	); err != nil {
 		return appsv1.Deployment{}, err
 	}
@@ -117,7 +118,7 @@ func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error)
 	if err := GetObjectList(
 		&env,
 		deploymentList,
-		ctrlclient.HasLabels{"operators.coreos.com/cloud-native-postgresql.openshift-operators"},
+		ctrlclient.HasLabels{"operators.coreos.com/cloudnative-pg.openshift-operators"},
 	); err != nil {
 		return appsv1.Deployment{}, err
 	}
@@ -153,7 +154,7 @@ func (env TestingEnvironment) GetOperatorPod() (corev1.Pod, error) {
 	// This will work for newer version of the operator, which are using
 	// our custom label
 	if err := GetObjectList(
-		&env, podList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloud-native-postgresql"}); err != nil {
+		&env, podList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloudnative-pg"}); err != nil {
 		return corev1.Pod{}, err
 	}
 	switch {

@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	mlog "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	mlog "github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // Flags contains the set of values necessary

@@ -27,14 +27,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	cnpv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/plugin"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	cnpgv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // clusterReport contains the data to be printed by the `report cluster` plugin
 type clusterReport struct {
-	cluster     cnpv1.Cluster
+	cluster     cnpgv1.Cluster
 	clusterPods corev1.PodList
 	clusterJobs batchv1.JobList
 	events      corev1.EventList
@@ -85,7 +85,7 @@ func Cluster(ctx context.Context, clusterName, namespace string, format plugin.O
 		return fmt.Errorf("could not get events: %w", err)
 	}
 
-	var cluster cnpv1.Cluster
+	var cluster cnpgv1.Cluster
 	err = plugin.Client.Get(ctx,
 		types.NamespacedName{Namespace: namespace, Name: clusterName},
 		&cluster)

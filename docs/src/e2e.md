@@ -1,6 +1,6 @@
 # End-to-End Tests
 
-Cloud Native PostgreSQL operator is automatically tested after each
+CloudNativePG operator is automatically tested after each
 commit via a suite of **End-to-end (E2E) tests**. It ensures that
 the operator correctly deploys and manages the PostgreSQL clusters.
 
@@ -56,5 +56,3 @@ and the following suite of E2E tests are performed on that cluster:
 * Physical replica clusters;
 * Storage expansion;
 * Data corruption;
-
-The E2E tests suite is also run for OpenShift versions 4.6, 4.7, 4.8 and 4.9.

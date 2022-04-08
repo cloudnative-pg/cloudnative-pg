@@ -29,10 +29,10 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/concurrency"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils/compatibility"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils/compatibility"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 type lineHandler func(line []byte)

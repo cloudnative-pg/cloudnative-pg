@@ -1,9 +1,9 @@
-project_name: kubectl-cnp
+project_name: cnpg
 
 release:
   github:
-    owner: EnterpriseDB
-    name: kubectl-cnp
+    owner: cloudnative-pg
+    name: cloudnative-pg
 
 env:
   - GO111MODULE=on
@@ -14,17 +14,33 @@ before:
     - go mod download
 
 builds:
-- id: kubectl-cnp
-  binary: kubectl-cnp
-  main: cmd/kubectl-cnp/main.go
+- id: manager
+  binary: manager
+  main: cmd/manager/main.go
+  gcflags:
+    - all=-trimpath={{.Env.GOPATH}};{{.Env.PWD}}
+  ldflags:
+    - -s
+    - -w
+    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion={{.Env.VERSION}}
+    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit={{.Env.COMMIT}}
+    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate={{.Env.DATE}}
+  goos:
+    - linux
+  goarch:
+    - amd64
+
+- id: kubectl-cnpg
+  binary: kubectl-cnpg
+  main: cmd/kubectl-cnpg/main.go
   gcflags:
   - all=-trimpath={{.Env.GOPATH}};{{.Env.PWD}}
   ldflags:
   - -s
   - -w
-  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildVersion={{.Version}}
-  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildCommit={{.ShortCommit}}
-  - -X github.com/EnterpriseDB/cloud-native-postgresql/pkg/versions.buildDate={{.CommitDate}}
+  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion={{.Env.VERSION}}
+  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit={{.Env.COMMIT}}
+  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate={{.Env.DATE}}
   goos:
   - darwin
   - linux
@@ -49,7 +65,10 @@ builds:
     goarch: s390x
 
 archives:
-- replacements:
+- name_template: kubectl-cnpg_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}
+  builds:
+  - kubectl-cnpg
+  replacements:
     386: i386
     amd64: x86_64
 

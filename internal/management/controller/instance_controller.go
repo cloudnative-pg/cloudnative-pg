@@ -27,8 +27,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configfile"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/constants"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
@@ -39,20 +39,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	apiv1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	"github.com/EnterpriseDB/cloud-native-postgresql/controllers"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/cmd/manager/walrestore"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/cache"
-	"github.com/EnterpriseDB/cloud-native-postgresql/internal/management/utils"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/certs"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/fileutils"
-	barmanCredentials "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/credentials"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	postgresManagement "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/metrics"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/webserver/metricserver"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	pkgUtils "github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	barmanCredentials "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/credentials"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	postgresManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -706,7 +706,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		dbname = cluster.Spec.Bootstrap.InitDB.Database
 	}
 
-	queriesCollector := metrics.NewQueriesCollector("cnp", r.instance, dbname)
+	queriesCollector := metrics.NewQueriesCollector("cnpg", r.instance, dbname)
 	queriesCollector.InjectUserQueries(metricserver.DefaultQueries)
 
 	if cluster.Spec.Monitoring == nil {
@@ -791,7 +791,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 //
 // 2. when invoked inside the reconciliation loop, if the operation
 //    raise an error, it's pointless to retry. The only way to recover
-//    from such an error is wait for the CNP operator to refresh the
+//    from such an error is wait for the CNPG operator to refresh the
 //    resource version of the secrets to be used, and in that case a
 //    reconciliation loop will be started again.
 func (r *InstanceReconciler) RefreshSecrets(

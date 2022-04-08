@@ -4,8 +4,8 @@
 2021-10-04 09:21:48.256 UTC [1] LOG listening on unix:/tmp/.s.PGSQL.5432
 2021-10-04 09:21:48.256 UTC [1] LOG process up: PgBouncer 1.16.0, libevent 2.1.8-stable (epoll), adns: udns 0.4, tls: OpenSSL 1.1.1g FIPS  21 Apr 2020
 2021-10-04 09:21:59.888 UTC [1] LOG C-0x22824f0: (nodb)/(nouser)@10.244.0.251:41996 registered new auto-database: db=app
-2021-10-04 09:21:59.888 UTC [1] LOG S-0x2292cb0: app/cnp_pooler_pgbouncer@10.96.16.93:5432 new connection to server (from 10.244.0.12:38130)
-2021-10-04 09:21:59.892 UTC [1] LOG S-0x2292cb0: app/cnp_pooler_pgbouncer@10.96.16.93:5432 SSL established: TLSv1.3/TLS_AES_256_GCM_SHA384/ECDH=prime256v1
+2021-10-04 09:21:59.888 UTC [1] LOG S-0x2292cb0: app/cnpg_pooler_pgbouncer@10.96.16.93:5432 new connection to server (from 10.244.0.12:38130)
+2021-10-04 09:21:59.892 UTC [1] LOG S-0x2292cb0: app/cnpg_pooler_pgbouncer@10.96.16.93:5432 SSL established: TLSv1.3/TLS_AES_256_GCM_SHA384/ECDH=prime256v1
 2021-10-04 09:21:59.897 UTC [1] LOG C-0x22824f0: app/app@10.244.0.251:41996 login attempt: db=app user=app tls=TLSv1.3/TLS_AES_256_GCM_SHA384
 2021-10-04 09:22:04.083 UTC [1] LOG C-0x22824f0: app/app@10.244.0.251:42048 login attempt: db=app user=app tls=TLSv1.3/TLS_AES_256_GCM_SHA384
 2021-10-04 09:22:04.083 UTC [1] LOG S-0x2292ee0: app/app@10.96.16.93:5432 new connection to server (from 10.244.0.12:38182)
@@ -22,6 +22,6 @@
 2021-10-04 09:30:47.689 UTC [1] LOG stats: 0 xacts/s, 0 queries/s, in 0 B/s, out 0 B/s, xact 0 us, query 0 us, wait 0 us
 2021-10-04 09:31:47.620 UTC [1] LOG stats: 0 xacts/s, 0 queries/s, in 0 B/s, out 0 B/s, xact 0 us, query 0 us, wait 0 us
 2021-10-04 09:32:04.286 UTC [1] LOG S-0x2292ee0: app/app@10.96.16.93:5432 closing because: server idle timeout (age=600s)
-2021-10-04 09:32:04.286 UTC [1] LOG S-0x2292cb0: app/cnp_pooler_pgbouncer@10.96.16.93:5432 closing because: server idle timeout (age=604s)
+2021-10-04 09:32:04.286 UTC [1] LOG S-0x2292cb0: app/cnpg_pooler_pgbouncer@10.96.16.93:5432 closing because: server idle timeout (age=604s)
 2021-10-04 09:32:47.551 UTC [1] LOG stats: 0 xacts/s, 0 queries/s, in 0 B/s, out 0 B/s, xact 0 us, query 0 us, wait 0 us
 2021-10-04 09:33:47.485 UTC [1] LOG stats: 0 xacts/s, 0 queries/s, in 0 B/s, out 0 B/s, xact 0 us, query 0 us, wait 0 us

@@ -4,7 +4,6 @@ on:
   repository_dispatch:
     types:
       - test-command
-      - test-cnp-command
 
 jobs:
   chatops-receiver:
@@ -42,4 +41,4 @@ jobs:
           repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
           issue-number: ${{ github.event.client_payload.github.payload.issue.number }}
           body: |
-            @${{ github.event.client_payload.github.actor }}, here's the link to the E2E on CNP workflow run: ${{ steps.trigger-workflow.outputs.workflow-url }}
+            @${{ github.event.client_payload.github.actor }}, here's the link to the E2E on CNPG workflow run: ${{ steps.trigger-workflow.outputs.workflow-url }}

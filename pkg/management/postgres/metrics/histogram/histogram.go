@@ -24,7 +24,7 @@ import (
 
 	"github.com/lib/pq"
 
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 const (

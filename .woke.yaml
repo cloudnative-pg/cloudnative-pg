@@ -1,5 +1,5 @@
 ignore_files:
-  - config/crd/bases/postgresql.k8s.enterprisedb.io_poolers.yaml
+  - config/crd/bases/postgresql.cnpg.io_poolers.yaml
   - tests/e2e/fixtures/upgrade/current-manifest.yaml
 
 # Default internal rules refer https://github.com/get-woke/woke/blob/main/internal/rule/default.yaml

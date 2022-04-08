@@ -71,20 +71,20 @@ make kustomize
 KUSTOMIZE="${REPO_ROOT}/bin/kustomize"
 
 mkdir -p releases/
-release_manifest="releases/postgresql-operator-${release_version}.yaml"
+release_manifest="releases/cnpg-${release_version}.yaml"
 
 sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
     -e "/DefaultOperatorImageName *= *.*/Is/\"\(.*\):.*\"/\"\1:${release_version}\"/" \
     pkg/versions/versions.go
 
-sed -i "s/postgresql-operator-[0-9.]*.yaml/postgresql-operator-${release_version}.yaml/g" \
+sed -i "s/cnpg-[0-9.]*.yaml/cnpg-${release_version}.yaml/g" \
     docs/src/installation_upgrade.md
 
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
 (
     cd "${CONFIG_TMP_DIR}/manager"
-    "${KUSTOMIZE}" edit set image controller="quay.io/enterprisedb/cloud-native-postgresql:${release_version}"
+    "${KUSTOMIZE}" edit set image controller="ghcr.io/cloudnative-pg/cloudnative-pg:${release_version}"
 )
 
 "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${release_manifest}"

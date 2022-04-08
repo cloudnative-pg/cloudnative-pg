@@ -47,10 +47,10 @@ import (
 	"sort"
 	"time"
 
-	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
-	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/catalog"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // barmanLog is the log that will be used for interactions with Barman
