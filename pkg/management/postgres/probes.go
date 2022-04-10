@@ -152,7 +152,7 @@ func updateResultForDecrease(
 	if !result.IsPrimary {
 		// in case of hot standby parameters being decreased,
 		// followers need to wait for the new value to be present in the PGDATA before being restarted.
-		pgControldataParams, err := getEnforcedParametersThroughPgControldata(instance.PgData)
+		pgControldataParams, err := GetEnforcedParametersThroughPgControldata(instance.PgData)
 		if err != nil {
 			return err
 		}

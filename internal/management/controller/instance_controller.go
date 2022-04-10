@@ -13,7 +13,12 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
+	"strconv"
 	"time"
+
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/configfile"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/constants"
 
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
@@ -116,10 +121,9 @@ func (r *InstanceReconciler) Reconcile(
 
 	// here we execute initialization tasks that need to be executed only on the first reconciliation loop
 	if !r.firstReconcileDone.Load() {
-		if err = r.verifyPgDataCoherenceForPrimary(ctx, cluster); err != nil {
+		if err = r.initialize(ctx, cluster); err != nil {
 			return handleErrNextLoop(err)
 		}
-		r.instance.SetFencing(cluster.IsInstanceFenced(r.instance.PodName))
 		r.firstReconcileDone.Store(true)
 	}
 
@@ -229,6 +233,86 @@ func handleErrNextLoop(err error) (reconcile.Result, error) {
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 	return reconcile.Result{}, err
+}
+
+// initialize will handle initialization tasks
+func (r *InstanceReconciler) initialize(ctx context.Context, cluster *apiv1.Cluster) error {
+	// we check there are no parameters that would prevent a follower to start
+	if err := r.verifyParametersForFollower(cluster); err != nil {
+		return err
+	}
+
+	if err := r.verifyPgDataCoherenceForPrimary(ctx, cluster); err != nil {
+		return err
+	}
+
+	r.instance.SetFencing(cluster.IsInstanceFenced(r.instance.PodName))
+
+	return nil
+}
+
+// verifyParametersForFollower enforces that the follower's settings for the enforced
+// parameters are higher than those of the primary.
+// This could not be the case if the cluster spec value for one of those parameters
+// is decreased shortly after having been increased. The follower would be restarting
+// towards a high level, then write the lower value to the local config
+func (r *InstanceReconciler) verifyParametersForFollower(cluster *apiv1.Cluster) error {
+	if isPrimary, _ := r.instance.IsPrimary(); isPrimary {
+		return nil
+	}
+
+	// we use a file as a flag to ensure the pod has been restarted already. I.e. on
+	// newly created pod we don't need to check the enforced parameters
+	filename := path.Join(r.instance.PgData, fmt.Sprintf("%s-%s", constants.Startup, r.instance.PodName))
+	exists, err := fileutils.FileExists(filename)
+	if err != nil {
+		return err
+	}
+	// if the file did not exist, the pod was newly created and we can skip out
+	if !exists {
+		_, err := fileutils.WriteFileAtomic(filename, []byte(nil), 0o600)
+		return err
+	}
+	log.Info("Found previous run flag", "filename", filename)
+	enforcedParams, err := postgresManagement.GetEnforcedParametersThroughPgControldata(r.instance.PgData)
+	if err != nil {
+		return err
+	}
+
+	clusterParams := cluster.Spec.PostgresConfiguration.Parameters
+	options := make(map[string]string)
+	for key, enforcedparam := range enforcedParams {
+		clusterparam, found := clusterParams[key]
+		if !found {
+			continue
+		}
+		enforcedparamInt, err := strconv.Atoi(enforcedparam)
+		if err != nil {
+			return err
+		}
+		clusterparamInt, err := strconv.Atoi(clusterparam)
+		if err != nil {
+			return err
+		}
+		// if the values from `pg_controldata` are higher than the cluster spec,
+		// they are the safer choice, so set them in config
+		if enforcedparamInt > clusterparamInt {
+			options[key] = enforcedparam
+		}
+	}
+	if len(options) == 0 {
+		return nil
+	}
+	log.Info("Updating some enforced parameters that would prevent the instance to start",
+		"parameters", options, "clusterParams", clusterParams)
+	// we write the safer enforced parameter values to pod config as safety
+	// in the face of cluster specs going up and down from nervous users
+	if _, err := configfile.UpdatePostgresConfigurationFile(
+		path.Join(r.instance.PgData, constants.PostgresqlCustomConfigurationFile),
+		options); err != nil {
+		return err
+	}
+	return nil
 }
 
 // reconcileOldPrimary shuts down the instance in case it is an old primary

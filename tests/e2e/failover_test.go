@@ -178,7 +178,7 @@ var _ = Describe("Failover", func() {
 				query := fmt.Sprintf("SELECT true FROM pg_stat_replication "+
 					"WHERE application_name = '%v' AND replay_lsn > '%v'",
 					targetPrimary, strings.Trim(initialLSN, "\n"))
-				out, _, err := env.ExecCommand(
+				out, _, err := env.EventuallyExecCommand(
 					env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
 					"psql", "-U", "postgres", "-tAc", query)
 				return strings.TrimSpace(out), err

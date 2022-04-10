@@ -338,7 +338,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
 
-	enforcedParams, err := getEnforcedParametersThroughPgControldata(info.PgData)
+	enforcedParams, err := GetEnforcedParametersThroughPgControldata(info.PgData)
 	if err != nil {
 		return err
 	}
@@ -387,7 +387,9 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 		0o600)
 }
 
-func getEnforcedParametersThroughPgControldata(pgData string) (map[string]string, error) {
+// GetEnforcedParametersThroughPgControldata will parse the output of pg_controldata in order to get
+// the values of all the hot standby sensible parameters
+func GetEnforcedParametersThroughPgControldata(pgData string) (map[string]string, error) {
 	var stdoutBuffer bytes.Buffer
 	var stderrBuffer bytes.Buffer
 	pgControlDataCmd := exec.Command(pgControlDataName,
