@@ -75,7 +75,7 @@ var _ = Describe("Synchronous Replicas", func() {
 				err := env.Client.Get(env.Ctx, namespacedName, &primaryPod)
 				Expect(err).ToNot(HaveOccurred())
 				query := "SELECT count(*) from pg_stat_replication WHERE sync_state = 'quorum'"
-				out, _, err := env.ExecCommand(
+				out, _, err := env.EventuallyExecCommand(
 					env.Ctx, primaryPod, specs.PostgresContainerName, &timeout,
 					"psql", "-U", "postgres", "-tAc", query)
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))

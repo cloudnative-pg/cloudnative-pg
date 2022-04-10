@@ -213,7 +213,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// keep in mind that the logic handled by the instance manager
 	// is still working in the Pods which are not fenced.
 	if instancesStatus.ShouldSkipReconcile() {
-		log.Info("An instance asked to skip reconciliation, will retry")
+		contextLogger.Info("An instance asked to skip reconciliation, will retry")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 

@@ -388,7 +388,7 @@ func assertClusterStandbysAreStreaming(namespace string, clusterName string) {
 			}
 
 			timeout := time.Second
-			out, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &timeout,
+			out, _, err := env.EventuallyExecCommand(env.Ctx, pod, specs.PostgresContainerName, &timeout,
 				"psql", "-U", "postgres", "-tAc", "SELECT count(*) FROM pg_stat_wal_receiver")
 			if err != nil {
 				return err

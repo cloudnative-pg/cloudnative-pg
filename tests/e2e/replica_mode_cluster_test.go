@@ -106,7 +106,7 @@ var _ = Describe("Replica Mode", func() {
 					if err != nil {
 						return err
 					}
-					_, _, err = env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
+					_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
 						&replicaCommandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 					return err
 				}, 300, 15).ShouldNot(HaveOccurred())
