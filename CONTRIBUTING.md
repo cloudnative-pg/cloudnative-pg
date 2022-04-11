@@ -2,13 +2,13 @@
 
 Welcome! We are glad that you want to contribute to our CloudNativePG project! 💖
 
-As you get started, you are in the best position to give us feedback on areas of
-our project that we need help with including:
+As you get started, you are in the best position to give us feedbacks on areas of
+our project that we need help with, including:
 
-* Problems found during setting up a new developer environment
+* Problems found while setting up the development environment
 * Gaps in our documentation
 * Bugs in our Github actions
-* Promotion of PostgreSQL in Kubernetes with out operator
+* Promotion of PostgreSQL on Kubernetes with out operator
 
 First, though, it is important that you read the [code of
 conduct](CODE-OF-CONDUCT.md).
@@ -47,11 +47,10 @@ start a new Github discussion.
 
 When raising issues, please specify the following:
 
-- Setup details need to be filled as specified in the issue template clearly
-  for the reviewer to check
+- Setup details as specified in the issue template
 - A scenario where the issue occurred (with details on how to reproduce it)
 - Errors and log messages that are displayed by the involved software
-- Any other details that might be useful
+- Any other detail that might be useful
 
 ## Meetings
 
