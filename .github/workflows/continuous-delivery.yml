@@ -109,7 +109,7 @@ jobs:
     steps:
       -
         name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
@@ -168,7 +168,7 @@ jobs:
         uses: actions/checkout@v3
       -
         name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
@@ -196,7 +196,7 @@ jobs:
       uses: actions/checkout@v3
 
     - name: Install Go
-      uses: actions/setup-go@v2.1.3
+      uses: actions/setup-go@v3
       with:
         go-version: ${{ env.GOLANG_VERSION }}
 
@@ -225,7 +225,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Go
-        uses: actions/setup-go@v2.1.3
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
 
@@ -284,7 +284,7 @@ jobs:
           fetch-depth: 0
       -
         name: Install Go
-        uses: actions/setup-go@v2.1.3
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
@@ -544,7 +544,7 @@ jobs:
         uses: actions/checkout@v3
       -
         name: Install Go
-        uses: actions/setup-go@v2.1.3
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
@@ -672,7 +672,7 @@ jobs:
         uses: actions/checkout@v3
       -
         name: Install Go
-        uses: actions/setup-go@v2.1.3
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
@@ -912,7 +912,7 @@ jobs:
         uses: actions/checkout@v3
       -
         name: Install Go
-        uses: actions/setup-go@v2.1.3
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
@@ -1139,7 +1139,7 @@ jobs:
         uses: actions/checkout@v3
       -
         name: Install Go
-        uses: actions/setup-go@v2.1.3
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
@@ -1334,7 +1334,7 @@ jobs:
         uses: actions/checkout@v3
       -
         name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
