@@ -589,7 +589,7 @@ jobs:
       -
         name: Archive test artifacts
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: testartifacts-local
           path: testartifacts-${{ env.MATRIX }}/
@@ -613,7 +613,7 @@ jobs:
       -
         name: Archive Kind logs
         if: failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: kind-logs-${{ matrix.id }}
           path: kind-logs/
@@ -621,7 +621,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
@@ -799,7 +799,7 @@ jobs:
       -
         name: Archive test artifacts
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: testartifacts-aks
           path: testartifacts-${{ env.MATRIX }}/
@@ -822,7 +822,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
@@ -1007,7 +1007,7 @@ jobs:
       -
         name: Archive test artifacts
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: testartifacts-eks
           path: testartifacts-${{ env.MATRIX }}/
@@ -1030,7 +1030,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
@@ -1237,7 +1237,7 @@ jobs:
       -
         name: Archive test artifacts
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: testartifacts-gke
           path: testartifacts-${{ env.MATRIX }}/
@@ -1260,7 +1260,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
@@ -1412,7 +1412,7 @@ jobs:
       -
         name: Archive test artifacts
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: testartifacts-rke
           # we need a separate folder per matrix branch so we can cleanup with `rm -rf`
@@ -1474,7 +1474,7 @@ jobs:
       -
         name: Archive RKE logs
         if: failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: rke-logs-${{ matrix.id }}
           path: |
@@ -1485,7 +1485,7 @@ jobs:
       -
         name: Archive e2e failure contexts
         if: failure()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
