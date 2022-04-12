@@ -8,8 +8,14 @@ Copyright (C) 2019-2022 EnterpriseDB Corporation.
 package catalog
 
 import (
+	"fmt"
 	"sort"
+	"strconv"
 	"time"
+
+	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 // Catalog is a list of backup infos belonging to the same server
@@ -37,6 +43,8 @@ func (catalog *Catalog) LatestBackupInfo() *BarmanBackup {
 // FirstRecoverabilityPoint gets the start time of the first backup in
 // the catalog
 func (catalog *Catalog) FirstRecoverabilityPoint() *time.Time {
+	// the code below assumes the catalog to be sorted, therefore we enforce it first
+	sort.Sort(catalog)
 	if catalog.Len() == 0 {
 		return nil
 	}
@@ -54,15 +62,71 @@ func (catalog *Catalog) FirstRecoverabilityPoint() *time.Time {
 }
 
 // FindClosestBackupInfo finds the backup info that should
-// use to file a PITR request for a certain time
-func (catalog *Catalog) FindClosestBackupInfo(pit time.Time) *BarmanBackup {
-	for i := len(catalog.List) - 1; i >= 0; i-- {
-		if !catalog.List[i].BeginTime.IsZero() && catalog.List[i].BeginTime.Before(pit) {
-			return &catalog.List[i]
+// use to file a PITR request via target parameters specified within `RecoveryTarget`
+func (catalog *Catalog) FindClosestBackupInfo(recoveryTarget *v1.RecoveryTarget) (*BarmanBackup, error) {
+	// the code below assumes the catalog to be sorted, therefore we enforce it first
+	sort.Sort(catalog)
+	targetTLI := recoveryTarget.TargetTLI
+
+	if t := recoveryTarget.TargetTime; t != "" {
+		backup, err := catalog.findClosestBackupFromTargetTime(t, targetTLI)
+		if err != nil || backup != nil {
+			return backup, err
 		}
 	}
 
-	return nil
+	if t := recoveryTarget.TargetLSN; t != "" {
+		backup, err := catalog.findClosestBackupFromTargetLSN(t, targetTLI)
+		if err != nil || backup != nil {
+			return backup, err
+		}
+	}
+
+	if recoveryTarget.TargetName != "" || recoveryTarget.TargetXID != "" {
+		return catalog.LatestBackupInfo(), nil
+	}
+
+	return nil, nil
+}
+
+func (catalog *Catalog) findClosestBackupFromTargetLSN(
+	targetLSNString string,
+	targetTLI string,
+) (*BarmanBackup, error) {
+	targetLSN := postgres.LSN(targetLSNString)
+	if _, err := targetLSN.Parse(); err != nil {
+		return nil, fmt.Errorf("while parsing recovery target targetLSN: " + err.Error())
+	}
+	for i := len(catalog.List) - 1; i >= 0; i-- {
+		barmanBackup := catalog.List[i]
+		if (strconv.Itoa(barmanBackup.TimeLine) == targetTLI ||
+			// if targetTLI is not an integer, it will be ignored actually
+			targetTLI == "" || targetTLI == "latest" || targetTLI == "current") &&
+			postgres.LSN(barmanBackup.BeginLSN).Less(targetLSN) {
+			return &catalog.List[i], nil
+		}
+	}
+	return nil, nil
+}
+
+func (catalog *Catalog) findClosestBackupFromTargetTime(
+	targetTimeString string,
+	targetTLI string,
+) (*BarmanBackup, error) {
+	targetTime, err := utils.ParseTargetTime(nil, targetTimeString)
+	if err != nil {
+		return nil, fmt.Errorf("while parsing recovery target targetTime: " + err.Error())
+	}
+	for i := len(catalog.List) - 1; i >= 0; i-- {
+		barmanBackup := catalog.List[i]
+		if (strconv.Itoa(barmanBackup.TimeLine) == targetTLI ||
+			// if targetTLI is not an integer, it will be ignored actually
+			targetTLI == "" || targetTLI == "latest" || targetTLI == "current") &&
+			!barmanBackup.BeginTime.IsZero() && barmanBackup.BeginTime.Before(targetTime) {
+			return &catalog.List[i], nil
+		}
+	}
+	return nil, nil
 }
 
 // BarmanBackup represent a backup as created
@@ -103,6 +167,9 @@ type BarmanBackup struct {
 
 	// The error output if present
 	Error string `json:"error"`
+
+	// The TimeLine
+	TimeLine int `json:"timeline"`
 }
 
 // NewCatalog creates a new sorted backup catalog, given a list of backup infos

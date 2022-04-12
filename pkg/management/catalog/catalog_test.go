@@ -9,6 +9,8 @@ package catalog
 import (
 	"time"
 
+	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -19,16 +21,19 @@ var _ = Describe("Backup catalog", func() {
 			ID:        "202101021200",
 			BeginTime: time.Date(2021, 1, 2, 12, 0, 0, 0, time.UTC),
 			EndTime:   time.Date(2021, 1, 2, 12, 30, 0, 0, time.UTC),
+			TimeLine:  1,
 		},
 		{
 			ID:        "202101011200",
 			BeginTime: time.Date(2021, 1, 1, 12, 0, 0, 0, time.UTC),
 			EndTime:   time.Date(2021, 1, 1, 12, 30, 0, 0, time.UTC),
+			TimeLine:  1,
 		},
 		{
 			ID:        "202101031200",
 			BeginTime: time.Date(2021, 1, 3, 12, 0, 0, 0, time.UTC),
 			EndTime:   time.Date(2021, 1, 3, 12, 30, 0, 0, time.UTC),
+			TimeLine:  1,
 		},
 	})
 
@@ -49,15 +54,23 @@ var _ = Describe("Backup catalog", func() {
 	})
 
 	It("can find the closest backup info when there is one", func() {
-		Expect(catalog.FindClosestBackupInfo(time.Now()).ID).To(Equal("202101031200"))
-		Expect(catalog.FindClosestBackupInfo(
-			time.Date(2021, 1, 2, 12, 30, 0, 0, time.UTC)).ID).To(
-			Equal("202101021200"))
+		recoveryTarget := &v1.RecoveryTarget{TargetTime: time.Now().Format("2006-01-02 15:04:04")}
+		closestBackupInfo, err := catalog.FindClosestBackupInfo(recoveryTarget)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(closestBackupInfo.ID).To(Equal("202101031200"))
+
+		recoveryTarget = &v1.RecoveryTarget{TargetTime: time.Date(2021, 1, 2, 12, 30, 0,
+			0, time.UTC).Format("2006-01-02 15:04:04")}
+		closestBackupInfo, err = catalog.FindClosestBackupInfo(recoveryTarget)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(closestBackupInfo.ID).To(Equal("202101021200"))
 	})
 
 	It("will return an empty result when the closest backup cannot be found", func() {
-		Expect(catalog.FindClosestBackupInfo(
-			time.Date(2019, 1, 2, 12, 30, 0, 0, time.UTC))).To(
-			BeNil())
+		recoveryTarget := &v1.RecoveryTarget{TargetTime: time.Date(2019, 1, 2, 12, 30,
+			0, 0, time.UTC).Format("2006-01-02 15:04:04")}
+		closestBackupInfo, err := catalog.FindClosestBackupInfo(recoveryTarget)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(closestBackupInfo).To(BeNil())
 	})
 })

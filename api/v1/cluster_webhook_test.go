@@ -671,6 +671,50 @@ var _ = Describe("recovery target", func() {
 		Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
 	})
 
+	It("raises errors for invalid LSN", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						RecoveryTarget: &RecoveryTarget{
+							TargetTLI:       "",
+							TargetXID:       "",
+							TargetName:      "",
+							TargetLSN:       "28734982739847293874823974928738423/987429837498273498723984723",
+							TargetTime:      "",
+							TargetImmediate: nil,
+							Exclusive:       nil,
+						},
+					},
+				},
+			},
+		}
+
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
+	})
+
+	It("valid LSN", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						RecoveryTarget: &RecoveryTarget{
+							TargetTLI:       "",
+							TargetXID:       "",
+							TargetName:      "",
+							TargetLSN:       "1/1",
+							TargetTime:      "",
+							TargetImmediate: nil,
+							Exclusive:       nil,
+						},
+					},
+				},
+			},
+		}
+
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
+	})
+
 	It("can be specified", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{

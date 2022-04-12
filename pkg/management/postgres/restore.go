@@ -38,7 +38,6 @@ import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/postgres/constants"
 	postgresSpec "github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
 var (
@@ -211,14 +210,11 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	// We are now choosing the right backup to restore
 	var targetBackup *catalog.BarmanBackup
 	if cluster.Spec.Bootstrap.Recovery != nil &&
-		cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil &&
-		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTime != "" {
-		targetTime, err := utils.ParseTargetTime(nil, cluster.Spec.Bootstrap.Recovery.RecoveryTarget.TargetTime)
+		cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
+		targetBackup, err = backupCatalog.FindClosestBackupInfo(cluster.Spec.Bootstrap.Recovery.RecoveryTarget)
 		if err != nil {
-			log.Error(err, "while parsing recovery target targetTime")
-			return nil, nil, err
+			log.Error(err, "while finding the closest BackupInfo")
 		}
-		targetBackup = backupCatalog.FindClosestBackupInfo(targetTime)
 	} else {
 		targetBackup = backupCatalog.LatestBackupInfo()
 	}
