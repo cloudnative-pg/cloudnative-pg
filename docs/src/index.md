@@ -82,6 +82,9 @@ architectures on OpenShift only.
 * Definition of an arbitrary number of instances (minimum 1 - one primary server)
 * Definition of the *read-write* service, to connect your applications to the only primary server of the cluster
 * Definition of the *read-only* service, to connect your applications to any of the instances for reading workloads
+* Declarative management of PostgreSQL configuration, including certain popular
+  Postgres extensions through the cluster `spec`: `pg_audit`, `auto_explain`,
+  and `pg_stat_statements`
 * Support for Local Persistent Volumes with PVC templates
 * Reuse of Persistent Volumes storage in Pods
 * Rolling updates for PostgreSQL minor versions
@@ -91,7 +94,11 @@ architectures on OpenShift only.
 * Continuous backup to an object store  (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
 * Backup retention policies (based on recovery window)
 * Full recovery and Point-In-Time recovery from an existing backup in an object store
-* Replica clusters for PostgreSQL deployments across multiple Kubernetes
+* Parallel WAL archiving and restore to allow the database to keep up with WAL
+  generation on high write systems
+* Support tagging backup files uploaded to an object store to enable optional
+  retention management at the object store layer Replica clusters for
+* PostgreSQL deployments across multiple Kubernetes
   clusters, enabling private, public, hybrid, and multi-cloud architectures
 * Support for Synchronous Replicas
 * Connection pooling with PgBouncer
@@ -99,6 +106,7 @@ architectures on OpenShift only.
 * Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)
 * Standard output logging of PostgreSQL error messages in JSON format
 * Support for the `restricted` security context constraint (SCC) in Red Hat OpenShift
+* Automatically set `readOnlyRootFilesystem` security context for pods
 * `cnp` plugin for `kubectl`
 * Fencing of an entire PostgreSQL cluster, or a subset of the instances
 * Multi-arch format container images
