@@ -1,7 +1,7 @@
 # Replication
 
 Physical replication is one of the strengths of PostgreSQL and one of the
-reasons why some of the world's largest organizations in the world have chosen
+reasons why some of the largest organizations in the world have chosen
 it for the management of their data in business continuity contexts.
 Primarily used to achieve high availability, physical replication also allows
 scale-out of read-only workloads and offloading some work from the primary.
@@ -10,7 +10,7 @@ scale-out of read-only workloads and offloading some work from the primary.
 
 Having contributed throughout the years to the replication feature in PostgreSQL,
 we have decided to build high availability in Cloud Native PostgreSQL on top of
-the native physical replication technology and integrate it
+the native physical replication technology, and integrate it
 directly in the Kubernetes API.
 
 In Kubernetes terms, this is referred to as **application-level replication**, in
@@ -80,7 +80,7 @@ hostssl replication streaming_replica all cert
 In case continuous backup is configured in the cluster, Cloud Native PostgreSQL
 transparently configures replicas to take advantage of `restore_command` when
 in continuous recovery. As a result, PostgreSQL is able to use the WAL archive
-as a fallback option everytime pulling WALs via streaming replication fails.
+as a fallback option whenever pulling WALs via streaming replication fails.
 
 ### Synchronous replication
 
@@ -88,8 +88,8 @@ Cloud Native PostgreSQL supports configuration of **quorum-based synchronous
 streaming replication** via two configuration options called `minSyncReplicas`
 and `maxSyncReplicas` which are the minimum and maximum number of expected
 synchronous standby replicas available at any time.
-For self-healing purposes, the operator always weights these two values with
-the available number of replicas in order to determine the quorum.
+For self-healing purposes, the operator always compares these two values with
+the number of available replicas in order to determine the quorum.
 
 Synchronous replication is disabled by default (`minSyncReplicas` and
 `maxSyncReplicas` are not defined).
@@ -120,7 +120,7 @@ transaction commits wait until their WAL records are replicated to at least the
 requested number of synchronous standbys in the list*.
 
 !!! Important
-    Even though the operator privileges self-healing over enforcement of
+    Even though the operator chooses self-healing over enforcement of
     synchronous replication settings, our recommendation is to plan for
     synchronous replication only in clusters with 3+ instances or,
     more generally, when `maxSyncReplicas < (instances - 1)`.
@@ -152,14 +152,14 @@ for information on how to clone a PostgreSQL server using either
 
 If the external cluster contains a `barmanObjectStore` section:
 
-- you'll be able to boostrap the replica cluster from an object store
+- you'll be able to bootstrap the replica cluster from an object store
   using the `recovery` section
 - Cloud Native PostgreSQL will automatically set the `restore_command`
   in the designated primary instance
 
 If the external cluster contains a `connectionParameters` section:
 
-- you'll be able to boostrap the replica cluster via streaming replication
+- you'll be able to bootstrap the replica cluster via streaming replication
   using the `pg_basebackup` section
 - Cloud Native PostgreSQL will automatically set the `primary_conninfo`
   option in the designated primary instance, so that a WAL receiver
@@ -180,3 +180,134 @@ distributed architecture for a PostgreSQL database, by choosing:
 - a public cloud spanning over multiple Kubernetes clusters in different
   regions and on different Cloud Service Providers
 
+### Setting up a replica cluster
+
+To setup a replica cluster from a source cluster, we need to create a cluster yaml
+file and define the following parts accordingly:
+
+- define the `externalClusters` section in the replica cluster
+- define the bootstrap part for the replica cluster. We can either bootstrap via
+  streaming using the `pg_basebackup` section, or bootstrap from an object store
+  using the `recovery` section
+- define the continuous recovery part (`spec.replica`) in the replica cluster. All
+  we need to do is to enable the replica mode through option `spec.replica.enabled`
+  and set the `externalClusters` name in option `spec.replica.source`
+
+This **first example** defines a replica cluster using streaming replication in
+both bootstrap and continuous recovery. The replica cluster connects to the
+source cluster using TLS authentication.
+
+You can check the [sample YAML](samples/cluster-example-replica-streaming.yaml)
+in the `samples/` subdirectory.
+
+Note the `bootstrap` and `replica` sections pointing to the source cluster.
+
+```yaml
+  bootstrap:
+    pg_basebackup:
+      source: cluster-example
+
+  replica:
+    enabled: true
+    source: cluster-example
+```
+
+In the `externalClusters` section, remember to use the right namespace for the
+host in the `connectionParameters` sub-section.
+The `-replication` and `-ca` secrets should have been copied over if necessary,
+in case the replica cluster is in a separate namespace.
+
+```yaml
+  externalClusters:
+  - name: <MAIN-CLUSTER>
+    connectionParameters:
+      host: <MAIN-CLUSTER>-rw.<NAMESPACE>.svc
+      user: streaming_replica
+      sslmode: verify-full
+      dbname: postgres
+    sslKey:
+      name: <MAIN-CLUSTER>-replication
+      key: tls.key
+    sslCert:
+      name: <MAIN-CLUSTER>-replication
+      key: tls.crt
+    sslRootCert:
+      name: <MAIN-CLUSTER>-ca
+      key: ca.crt
+```
+
+The **second example** defines a replica cluster which bootstraps from an object
+store using the `recovery` section, and continuous recovery using both streaming
+replication and the given object store. For streaming replication, the replica
+cluster connects to the source cluster using basic authentication.
+
+You can check the [sample YAML](samples/cluster-example-replica-from-backup.yaml)
+for it in the `samples/` subdirectory.
+
+Note the `bootstrap` and `replica` sections pointing to the source cluster.
+
+```yaml
+  bootstrap:
+    recovery:
+      source: cluster-example
+
+  replica:
+    enabled: true
+    source: cluster-example
+```
+
+In the `externalClusters` section, take care to use the right namespace in the
+`endpointURL` and the `connectionParameters.host`.
+And do ensure that the necessary secrets have been copied if necessary, and that
+a backup of the source cluster has been created already.
+
+```yaml
+  externalClusters:
+  - name: <MAIN-CLUSTER>
+    barmanObjectStore:
+      destinationPath: s3://backups/
+      endpointURL: http://minio:9000
+      s3Credentials:
+        …
+    connectionParameters:
+      host: <MAIN-CLUSTER>-rw.default.svc
+      user: postgres
+      dbname: postgres
+    password:
+      name: <MAIN-CLUSTER>-superuser
+      key: password
+```
+
+!!! Note
+    To use streaming replication between the source cluster and the replica
+    cluster, we need to make sure there is network connectivity between the two
+    clusters, and that all the necessary secrets which hold passwords or
+    certificates are properly created in advance.
+
+### Promoting the designated primary in the replica cluster
+
+To promote the **designated primary** to **primary**, all we need to do is to
+disable the replica mode in the replica cluster through the option
+`spec.replica.enabled`
+
+```yaml
+ replica:
+   enabled: false
+   source: cluster-example
+```
+
+Once the replica mode is disabled, the replica cluster and the source cluster
+will become two separate clusters, and the **designated primary** in the replica
+cluster will be promoted to be that cluster's **primary**. We can verify the role
+change using the cnp plugin, checking the status of the cluster which was
+previously the replica:
+
+```shell
+kubectl cnp -n <cluster-name-space> status cluster-replica-example
+```
+
+!!! Note
+    Disabling replication is an **irreversible** operation: once replication is
+    disabled and the **designated primary** is promoted to **primary**, the
+    replica cluster and the source cluster will become two independent clusters
+    definitively.

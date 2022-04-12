@@ -14,5 +14,10 @@ In this section, you can find some examples of configuration files to set up you
    a basic example of `Cluster` that uses a persistent volume claim template.
 * [`cluster-example-full.yaml`](samples/cluster-example-full.yaml):
    an example of `Cluster` that sets most of the available options.
+* [`cluster-example-replica-streaming.yaml`](samples/cluster-example-replica-streaming.yaml):
+   a replica cluster following `cluster-example`, usable in a different namespace.
+* [`cluster-example-replica-from-backup.yaml`](samples/cluster-example-replica-from-backup.yaml):
+   a replica cluster following a cluster with backup configured. Usable in
+   a different namespace.
 
 For a list of available options, please refer to the ["API Reference" page](api_reference.md).
