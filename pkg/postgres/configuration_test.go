@@ -223,13 +223,18 @@ var _ = Describe("pg_hba.conf generation", func() {
 	}
 
 	It("insert the spec configuration between an header and a footer when the version can not be parsed", func() {
-		Expect(CreateHBARules(specRules, "md5")).To(
+		Expect(CreateHBARules(specRules, "md5", "")).To(
 			ContainSubstring("\ntwo\n"))
 	})
 
 	It("really use the passed default authentication method", func() {
-		Expect(CreateHBARules(specRules, "this-one")).To(
+		Expect(CreateHBARules(specRules, "this-one", "")).To(
 			ContainSubstring("\nhost all all all this-one\n"))
+	})
+
+	It("really uses the ldapConfigString", func() {
+		Expect(CreateHBARules(specRules, "defaultAuthenticationMethod", "ldapConfigString")).To(
+			ContainSubstring("\nldapConfigString\n"))
 	})
 })
 

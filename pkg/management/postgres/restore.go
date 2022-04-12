@@ -450,6 +450,10 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	temporaryInstance.Namespace = info.Namespace
 	temporaryInstance.ClusterName = info.ClusterName
 
+	_, err = temporaryInstance.RefreshPGHBA(cluster, "")
+	if err != nil {
+		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
+	}
 	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(cluster)
 	if err != nil {
 		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)

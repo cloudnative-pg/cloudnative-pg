@@ -8,7 +8,6 @@ package v1
 
 import (
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/log"
-	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/postgres"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
@@ -40,28 +39,4 @@ func (cluster *Cluster) GetSyncReplicasNumber() (syncReplicas int) {
 	}
 
 	return syncReplicas
-}
-
-// CreatePostgresqlHBA creates the HBA rules for this cluster
-func (cluster *Cluster) CreatePostgresqlHBA() (string, error) {
-	version, err := cluster.GetPostgresqlVersion()
-	if err != nil {
-		return "", err
-	}
-
-	// From PostgreSQL 14 we default to SCRAM-SHA-256
-	// authentication as the default `password_encryption`
-	// is set to `scram-sha-256` and this is the most
-	// secure authentication method available.
-	//
-	// See:
-	// https://www.postgresql.org/docs/14/release-14.html
-	defaultAuthenticationMethod := "scram-sha-256"
-	if version < 140000 {
-		defaultAuthenticationMethod = "md5"
-	}
-
-	return postgres.CreateHBARules(
-		cluster.Spec.PostgresConfiguration.PgHBA,
-		defaultAuthenticationMethod)
 }

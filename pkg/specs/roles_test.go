@@ -69,7 +69,18 @@ var _ = Describe("Roles", func() {
 					},
 				},
 			},
-
+			PostgresConfiguration: apiv1.PostgresConfiguration{
+				LDAP: &apiv1.LDAPConfig{
+					BindSearchAuth: &apiv1.LDAPBindSearchAuth{
+						BindPassword: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "testLDAPBindPasswordSecret",
+							},
+							Key: "key",
+						},
+					},
+				},
+			},
 			Monitoring: &apiv1.MonitoringConfiguration{
 				CustomQueriesConfigMap: []apiv1.ConfigMapKeySelector{
 					{
@@ -148,6 +159,7 @@ var _ = Describe("Roles", func() {
 			"testServerTLSSecret",
 			"testSecretBootstrapInitDB",
 			"testSuperUserSecretName",
+			"testLDAPBindPasswordSecret",
 			"testSecretKeySelector",
 			"testS3Secret",
 			"testS3Access",

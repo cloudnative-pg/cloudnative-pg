@@ -10,6 +10,9 @@ package controller
 
 import (
 	"context"
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
 
 	"go.uber.org/atomic"
 	"k8s.io/apimachinery/pkg/types"
@@ -82,4 +85,18 @@ func (r *InstanceReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, er
 	}
 
 	return &cluster, nil
+}
+
+// GetSecret will get a named secret in the instance namespace
+func (r *InstanceReconciler) GetSecret(ctx context.Context, name string) (*corev1.Secret, error) {
+	var secret corev1.Secret
+	err := r.GetClient().Get(ctx,
+		types.NamespacedName{
+			Name:      name,
+			Namespace: r.instance.Namespace,
+		}, &secret)
+	if err != nil {
+		return nil, fmt.Errorf("while getting secret: %w", err)
+	}
+	return &secret, nil
 }

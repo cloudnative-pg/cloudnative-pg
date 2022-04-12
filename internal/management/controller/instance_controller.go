@@ -23,6 +23,7 @@ import (
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -105,19 +106,11 @@ func (r *InstanceReconciler) Reconcile(
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
 	reloadNeeded := r.RefreshSecrets(ctx, cluster)
 
-	// Reconcile PostgreSQL configuration
-	// This doesn't need the PG connection, but it needs to reload it in case of changes
-	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(cluster)
+	reloadConfigNeeded, err := r.refreshConfigurationFiles(ctx, cluster)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	reloadNeeded = reloadNeeded || reloadConfig
-
-	reloadReplicaConfig, err := r.refreshReplicaConfiguration(ctx, cluster)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-	reloadNeeded = reloadNeeded || reloadReplicaConfig
+	reloadNeeded = reloadNeeded || reloadConfigNeeded
 
 	// here we execute initialization tasks that need to be executed only on the first reconciliation loop
 	if !r.firstReconcileDone.Load() {
@@ -207,6 +200,31 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 		return true, r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 	}
 	return false, nil
+}
+
+func (r *InstanceReconciler) refreshConfigurationFiles(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (reloadNeeded bool, err error) {
+	reloadNeeded, err = r.refreshPGHBA(ctx, cluster)
+	if err != nil {
+		return false, err
+	}
+
+	// Reconcile PostgreSQL configuration
+	// This doesn't need the PG connection, but it needs to reload it in case of changes
+	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(cluster)
+	if err != nil {
+		return false, err
+	}
+	reloadNeeded = reloadNeeded || reloadConfig
+
+	reloadReplicaConfig, err := r.refreshReplicaConfiguration(ctx, cluster)
+	if err != nil {
+		return false, err
+	}
+	reloadNeeded = reloadNeeded || reloadReplicaConfig
+	return reloadNeeded, nil
 }
 
 func (r *InstanceReconciler) reconcileFencing(cluster *apiv1.Cluster) *reconcile.Result {
@@ -1185,4 +1203,30 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string,
 func (r *InstanceReconciler) disableSuperuserPassword(tx *sql.Tx) error {
 	_, err := tx.Exec("ALTER ROLE postgres WITH PASSWORD NULL")
 	return err
+}
+
+func (r *InstanceReconciler) refreshPGHBA(ctx context.Context, cluster *apiv1.Cluster) (
+	postgresHBAChanged bool,
+	err error,
+) {
+	var ldapBindPassword string
+	if ldapSecretName := cluster.GetLDAPSecretName(); ldapSecretName != "" {
+		ldapBindPasswordSecret := corev1.Secret{}
+		err := r.GetClient().Get(ctx,
+			types.NamespacedName{
+				Name:      ldapSecretName,
+				Namespace: r.instance.Namespace,
+			}, &ldapBindPasswordSecret)
+		if err != nil {
+			return false, err
+		}
+		secretKey := cluster.Spec.PostgresConfiguration.LDAP.BindSearchAuth.BindPassword.Key
+		ldapBindPasswordByte, ok := ldapBindPasswordSecret.Data[secretKey]
+		if !ok {
+			return false, fmt.Errorf("missing key inside bind+search secret: %s", secretKey)
+		}
+		ldapBindPassword = string(ldapBindPasswordByte)
+	}
+	// Generate pg_hba.conf file
+	return r.instance.RefreshPGHBA(cluster, ldapBindPassword)
 }
