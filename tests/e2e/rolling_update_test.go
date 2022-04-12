@@ -332,4 +332,31 @@ var _ = Describe("Rolling updates", func() {
 			AssertRollingUpdate(namespace, clusterName, sampleFile, 1)
 		})
 	})
+
+	Context("primaryUpdateMethod set to restart", func() {
+		const sampleFile = fixturesDir + "/rolling_updates/cluster-using-primary-update-method.yaml"
+		var namespace, clusterName string
+
+		JustAfterEach(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpClusterEnv(namespace, clusterName,
+					"out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+		})
+
+		AfterEach(func() {
+			err := env.DeleteNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("can do rolling update", func() {
+			namespace = "cluster-rolling-with-primary-update-method"
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			AssertRollingUpdate(namespace, clusterName, sampleFile, 2)
+		})
+	})
 })
