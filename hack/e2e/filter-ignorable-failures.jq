@@ -2,7 +2,7 @@
 # uses the JSON output format from ginkgo, outputs flattened JSON
 #
 .[].SpecReports[]
-| select(.State == "failed")
+| select(.State != "passed" and .State != "skipped")
 # skip failed tests with an IgnoreFails label
 | select(.ContainerHierarchyLabels
         | flatten
