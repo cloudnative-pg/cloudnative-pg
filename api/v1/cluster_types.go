@@ -524,6 +524,10 @@ type PostgresConfiguration struct {
 	// Lists of shared preload libraries to add to the default ones
 	// +optional
 	AdditionalLibraries []string `json:"shared_preload_libraries,omitempty"`
+
+	// Options to specify LDAP configuration
+	// +optional
+	LDAP *LDAPConfig `json:"ldap,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL
@@ -541,6 +545,62 @@ type BootstrapConfiguration struct {
 	// Bootstrap the cluster taking a physical backup of another compatible
 	// PostgreSQL instance
 	PgBaseBackup *BootstrapPgBaseBackup `json:"pg_basebackup,omitempty"`
+}
+
+// LDAPScheme defines the possible schemes for LDAP
+type LDAPScheme string
+
+// These are the valid LDAP schemes
+const (
+	LDAPSchemeLDAP  LDAPScheme = "ldap"
+	LDAPSchemeLDAPS LDAPScheme = "ldaps"
+)
+
+// LDAPConfig contains the parameters needed for LDAP authentication
+type LDAPConfig struct {
+	// LDAP hostname or IP address
+	Server string `json:"server,omitempty"`
+	// LDAP server port
+	Port int `json:"port,omitempty"`
+
+	// LDAP schema to be used, possible options are `ldap` and `ldaps`
+	// +kubebuilder:validation:Enum=ldap;ldaps
+	Scheme LDAPScheme `json:"scheme,omitempty"`
+
+	// Set to 1 to enable LDAP over TLS
+	// +kubebuilder:default:=false
+	TLS bool `json:"tls,omitempty"`
+
+	// Bind as authentication configuration
+	BindAsAuth *LDAPBindAsAuth `json:"bindAsAuth,omitempty"`
+
+	// Bind+Search authentication configuration
+	BindSearchAuth *LDAPBindSearchAuth `json:"bindSearchAuth,omitempty"`
+}
+
+// LDAPBindAsAuth provides the required fields to use the
+// bind authentication for LDAP
+type LDAPBindAsAuth struct {
+	// Prefix for the bind authentication option
+	Prefix string `json:"prefix,omitempty"`
+	// Suffix for the bind authentication option
+	Suffix string `json:"suffix,omitempty"`
+}
+
+// LDAPBindSearchAuth provides the required fields to use
+// the bind+search LDAP authentication process
+type LDAPBindSearchAuth struct {
+	// Root DN to begin the user search
+	BaseDN string `json:"baseDN,omitempty"`
+	// DN of the user to bind to the directory
+	BindDN string `json:"bindDN,omitempty"`
+	// Secret with the password for the user to bind to the directory
+	BindPassword *corev1.SecretKeySelector `json:"bindPassword,omitempty"`
+
+	// Attribute to match against the username
+	SearchAttribute string `json:"searchAttribute,omitempty"`
+	// Search filter to use when doing the search+bind authentication
+	SearchFilter string `json:"searchFilter,omitempty"`
 }
 
 // CertificatesConfiguration contains the needed configurations to handle server certificates.
@@ -1182,6 +1242,27 @@ func (cluster *Cluster) GetSuperuserSecretName() string {
 	}
 
 	return fmt.Sprintf("%v%v", cluster.Name, SuperUserSecretSuffix)
+}
+
+// GetEnableLDAPAuth return true if bind or bind+search method are
+// configured in the cluster configuration
+func (cluster *Cluster) GetEnableLDAPAuth() bool {
+	if cluster.Spec.PostgresConfiguration.LDAP != nil &&
+		(cluster.Spec.PostgresConfiguration.LDAP.BindAsAuth != nil ||
+			cluster.Spec.PostgresConfiguration.LDAP.BindSearchAuth != nil) {
+		return true
+	}
+	return false
+}
+
+// GetLDAPSecretName gets the secret name containing the LDAP password
+func (cluster *Cluster) GetLDAPSecretName() string {
+	if cluster.Spec.PostgresConfiguration.LDAP != nil &&
+		cluster.Spec.PostgresConfiguration.LDAP.BindSearchAuth != nil &&
+		cluster.Spec.PostgresConfiguration.LDAP.BindSearchAuth.BindPassword != nil {
+		return cluster.Spec.PostgresConfiguration.LDAP.BindSearchAuth.BindPassword.Name
+	}
+	return ""
 }
 
 // GetEnableSuperuserAccess returns if the superuser access is enabled or not

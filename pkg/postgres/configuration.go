@@ -26,9 +26,12 @@ local all all peer map=local
 hostssl postgres streaming_replica all cert
 hostssl replication streaming_replica all cert
 hostssl all cnp_pooler_pgbouncer all cert
-
 {{ range $rule := .UserRules }}
 {{ $rule -}}
+{{ end }}
+{{ if .LDAPConfiguration }}
+# LDAP Configuration
+{{.LDAPConfiguration}}
 {{ end }}
 
 # Otherwise use the default authentication method
@@ -395,16 +398,21 @@ var (
 
 // CreateHBARules will create the content of pg_hba.conf file given
 // the rules set by the cluster spec
-func CreateHBARules(hba []string, defaultAuthenticationMethod string) (string, error) {
+func CreateHBARules(hba []string,
+	defaultAuthenticationMethod, ldapConfigString string,
+) (string, error) {
 	var hbaContent bytes.Buffer
 
 	templateData := struct {
 		UserRules                   []string
+		LDAPConfiguration           string
 		DefaultAuthenticationMethod string
 	}{
 		UserRules:                   hba,
+		LDAPConfiguration:           ldapConfigString,
 		DefaultAuthenticationMethod: defaultAuthenticationMethod,
 	}
+
 	if err := hbaTemplate.Execute(&hbaContent, templateData); err != nil {
 		return "", err
 	}

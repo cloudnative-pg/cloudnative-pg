@@ -22,6 +22,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 		cluster.GetServerTLSSecretName(),
 		cluster.GetApplicationSecretName(),
 		cluster.GetSuperuserSecretName(),
+		cluster.GetLDAPSecretName(),
 	}
 
 	involvedConfigMapNames := []string{

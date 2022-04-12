@@ -233,6 +233,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 	allErrs = append(allErrs, r.validateReplicaMode()...)
 	allErrs = append(allErrs, r.validateBackupConfiguration()...)
 	allErrs = append(allErrs, r.validateConfiguration()...)
+	allErrs = append(allErrs, r.validateLDAP()...)
 
 	return allErrs
 }
@@ -281,6 +282,33 @@ func (r *Cluster) ValidateDelete() error {
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil
+}
+
+// validateLDAP validates the ldap postgres configuration
+func (r *Cluster) validateLDAP() field.ErrorList {
+	// No validating if not specified
+	if r.Spec.PostgresConfiguration.LDAP == nil {
+		return nil
+	}
+	var result field.ErrorList
+
+	ldapConfig := r.Spec.PostgresConfiguration.LDAP
+	if ldapConfig.Server == "" {
+		result = append(result,
+			field.Invalid(field.NewPath("spec", "postgresql", "ldap"),
+				ldapConfig.Server,
+				"ldap server cannot be empty if any other ldap parameters are specified"))
+	}
+
+	if ldapConfig.BindSearchAuth != nil && ldapConfig.BindAsAuth != nil {
+		result = append(
+			result,
+			field.Invalid(field.NewPath("spec", "postgresql", "ldap"),
+				"bindAsAuth or bindSearchAuth",
+				"only bind+search or bind method can be specified"))
+	}
+
+	return result
 }
 
 // validateInitDB validate the bootstrapping options when initdb

@@ -43,14 +43,10 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 // RefreshConfigurationFilesFromCluster receives a cluster object, then generates the
 // PostgreSQL configuration and rewrites the file in the PGDATA if needed. This
 // function will return "true" if the configuration has been really changed.
-// Important: this will not send a SIGHUP to the server
-func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cluster) (bool, error) {
+func (instance *Instance) RefreshConfigurationFilesFromCluster(
+	cluster *apiv1.Cluster,
+) (bool, error) {
 	postgresConfiguration, sha256, err := createPostgresqlConfiguration(cluster)
-	if err != nil {
-		return false, err
-	}
-
-	postgresHBA, err := cluster.CreatePostgresqlHBA()
 	if err != nil {
 		return false, err
 	}
@@ -65,21 +61,112 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(cluster *apiv1.Cl
 			err)
 	}
 
-	postgresHBAChanged, err := InstallPgDataFileContent(
-		instance.PgData,
-		postgresHBA,
-		constants.PostgresqlHBARulesFile)
-	if err != nil {
-		return postgresConfigurationChanged || postgresHBAChanged, fmt.Errorf(
-			"installing postgresql HBA rules: %w",
-			err)
-	}
-
 	if sha256 != "" && postgresConfigurationChanged {
 		instance.ConfigSha256 = sha256
 	}
 
-	return postgresConfigurationChanged || postgresHBAChanged, nil
+	return postgresConfigurationChanged, nil
+}
+
+// GeneratePostgresqlHBA generates the pg_hba.conf content with the LDAP configuration if configured.
+func (instance *Instance) GeneratePostgresqlHBA(cluster *apiv1.Cluster, ldapBindPassword string) (string, error) {
+	version, err := cluster.GetPostgresqlVersion()
+	if err != nil {
+		return "", err
+	}
+
+	// From PostgreSQL 14 we default to SCRAM-SHA-256
+	// authentication as the default `password_encryption`
+	// is set to `scram-sha-256` and this is the most
+	// secure authentication method available.
+	//
+	// See:
+	// https://www.postgresql.org/docs/14/release-14.html
+	defaultAuthenticationMethod := "scram-sha-256"
+	if version < 140000 {
+		defaultAuthenticationMethod = "md5"
+	}
+
+	return postgres.CreateHBARules(
+		cluster.Spec.PostgresConfiguration.PgHBA,
+		defaultAuthenticationMethod,
+		buildLDAPConfigString(cluster, ldapBindPassword))
+}
+
+// RefreshPGHBA generates and writes down the pg_hba.conf file
+func (instance *Instance) RefreshPGHBA(cluster *apiv1.Cluster, ldapBindPassword string) (
+	postgresHBAChanged bool,
+	err error,
+) {
+	// Generate pg_hba.conf file
+	pgHBAContent, err := instance.GeneratePostgresqlHBA(cluster, ldapBindPassword)
+	if err != nil {
+		return false, nil
+	}
+	postgresHBAChanged, err = InstallPgDataFileContent(
+		instance.PgData,
+		pgHBAContent,
+		constants.PostgresqlHBARulesFile)
+	if err != nil {
+		return postgresHBAChanged, fmt.Errorf(
+			"installing postgresql HBA rules: %w",
+			err)
+	}
+
+	return postgresHBAChanged, err
+}
+
+// buildLDAPConfigString will create the string needed for ldap in pg_hba
+func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) string {
+	var ldapConfigString string
+	if !cluster.GetEnableLDAPAuth() {
+		return ldapConfigString
+	}
+	ldapConfig := cluster.Spec.PostgresConfiguration.LDAP
+
+	ldapConfigString += fmt.Sprintf("host all all 0.0.0.0/0 ldap ldapserver=%s", ldapConfig.Server)
+
+	if ldapConfig.Port != 0 {
+		ldapConfigString += fmt.Sprintf(" ldapport=%d", ldapConfig.Port)
+	}
+
+	if ldapConfig.Scheme != "" {
+		ldapConfigString += fmt.Sprintf(" ldapscheme=%s", ldapConfig.Scheme)
+	}
+
+	if ldapConfig.TLS {
+		ldapConfigString += " ldaptls=1"
+	}
+
+	if ldapConfig.BindAsAuth != nil {
+		log.Debug("Setting pg_hba to use ldap authentication in simple bind mode",
+			"server", ldapConfig.Server,
+			"prefix", ldapConfig.BindAsAuth.Prefix,
+			"suffix", ldapConfig.BindAsAuth.Suffix)
+		ldapConfigString += fmt.Sprintf(" ldapprefix=\"%s\" ldapsuffix=\"%s\"", ldapConfig.BindAsAuth.Prefix,
+			ldapConfig.BindAsAuth.Suffix)
+	}
+
+	if ldapConfig.BindSearchAuth != nil {
+		log.Debug("setting pg_hba to use ldap authentication in search+bind mode",
+			"server", ldapConfig.Server,
+			"BaseDN", ldapConfig.BindSearchAuth.BaseDN,
+			"binDN", ldapConfig.BindSearchAuth.BindDN,
+			"secret name", ldapConfig.BindSearchAuth.BindPassword.Name,
+			"search attribute", ldapConfig.BindSearchAuth.SearchAttribute,
+			"search filter", ldapConfig.BindSearchAuth.SearchFilter)
+
+		ldapConfigString += fmt.Sprintf(" ldapbasedn=\"%s\" ldapbinddn=\"%s\" "+
+			"ldapbindpasswd=%s", ldapConfig.BindSearchAuth.BaseDN, ldapConfig.BindSearchAuth.BindDN, ldapBindPassword)
+		if ldapConfig.BindSearchAuth.SearchFilter != "" {
+			ldapConfigString += fmt.Sprintf(" ldapsearchfilter=%s", ldapConfig.BindSearchAuth.SearchFilter)
+		}
+		if ldapConfig.BindSearchAuth.SearchAttribute != "" {
+			ldapConfigString += fmt.Sprintf(" ldapsearchattribute=%s", ldapConfig.BindSearchAuth.SearchAttribute)
+		}
+	}
+
+	return ldapConfigString
 }
 
 // UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version

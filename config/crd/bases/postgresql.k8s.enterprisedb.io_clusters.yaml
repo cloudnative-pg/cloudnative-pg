@@ -1723,6 +1723,74 @@ spec:
               postgresql:
                 description: Configuration of the PostgreSQL server
                 properties:
+                  ldap:
+                    description: Options to specify LDAP configuration
+                    properties:
+                      bindAsAuth:
+                        description: Bind as authentication configuration
+                        properties:
+                          prefix:
+                            description: Prefix for the bind authentication option
+                            type: string
+                          suffix:
+                            description: Suffix for the bind authentication option
+                            type: string
+                        type: object
+                      bindSearchAuth:
+                        description: Bind+Search authentication configuration
+                        properties:
+                          baseDN:
+                            description: Root DN to begin the user search
+                            type: string
+                          bindDN:
+                            description: DN of the user to bind to the directory
+                            type: string
+                          bindPassword:
+                            description: Secret with the password for the user to
+                              bind to the directory
+                            properties:
+                              key:
+                                description: The key of the secret to select from.  Must
+                                  be a valid secret key.
+                                type: string
+                              name:
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  TODO: Add other useful fields. apiVersion, kind,
+                                  uid?'
+                                type: string
+                              optional:
+                                description: Specify whether the Secret or its key
+                                  must be defined
+                                type: boolean
+                            required:
+                            - key
+                            type: object
+                          searchAttribute:
+                            description: Attribute to match against the username
+                            type: string
+                          searchFilter:
+                            description: Search filter to use when doing the search+bind
+                              authentication
+                            type: string
+                        type: object
+                      port:
+                        description: LDAP server port
+                        type: integer
+                      scheme:
+                        description: LDAP schema to be used, possible options are
+                          `ldap` and `ldaps`
+                        enum:
+                        - ldap
+                        - ldaps
+                        type: string
+                      server:
+                        description: LDAP hostname or IP address
+                        type: string
+                      tls:
+                        default: false
+                        description: Set to 1 to enable LDAP over TLS
+                        type: boolean
+                    type: object
                   parameters:
                     additionalProperties:
                       type: string
