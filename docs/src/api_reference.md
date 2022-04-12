@@ -45,6 +45,9 @@ Below you will find a description of the defined resources:
 - [ExternalCluster](#ExternalCluster)
 - [GoogleCredentials](#GoogleCredentials)
 - [InstanceID](#InstanceID)
+- [LDAPBindAsAuth](#LDAPBindAsAuth)
+- [LDAPBindSearchAuth](#LDAPBindSearchAuth)
+- [LDAPConfig](#LDAPConfig)
 - [LocalObjectReference](#LocalObjectReference)
 - [MonitoringConfiguration](#MonitoringConfiguration)
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
@@ -482,6 +485,46 @@ Name        | Description      | Type
 `podName    ` | The pod name     | string
 `ContainerID` | The container ID | string
 
+<a id='LDAPBindAsAuth'></a>
+
+## LDAPBindAsAuth
+
+LDAPBindAsAuth provides the required fields to use the bind authentication for LDAP
+
+Name   | Description                               | Type  
+------ | ----------------------------------------- | ------
+`prefix` | Prefix for the bind authentication option | string
+`suffix` | Suffix for the bind authentication option | string
+
+<a id='LDAPBindSearchAuth'></a>
+
+## LDAPBindSearchAuth
+
+LDAPBindSearchAuth provides the required fields to use the bind+search LDAP authentication process
+
+Name            | Description                                                    | Type                                                                                                                       
+--------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------
+`baseDN         ` | Root DN to begin the user search                               | string                                                                                                                     
+`bindDN         ` | DN of the user to bind to the directory                        | string                                                                                                                     
+`bindPassword   ` | Secret with the password for the user to bind to the directory | [*corev1.SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#secretkeyselector-v1-core)
+`searchAttribute` | Attribute to match against the username                        | string                                                                                                                     
+`searchFilter   ` | Search filter to use when doing the search+bind authentication | string                                                                                                                     
+
+<a id='LDAPConfig'></a>
+
+## LDAPConfig
+
+LDAPConfig contains the parameters needed for LDAP authentication
+
+Name           | Description                                                     | Type                                      
+-------------- | --------------------------------------------------------------- | ------------------------------------------
+`server        ` | LDAP hostname or IP address                                     | string                                    
+`port          ` | LDAP server port                                                | int                                       
+`scheme        ` | LDAP schema to be used, possible options are `ldap` and `ldaps` | LDAPScheme                                
+`tls           ` | Set to 1 to enable LDAP over TLS                                | bool                                      
+`bindAsAuth    ` | Bind as authentication configuration                            | [*LDAPBindAsAuth](#LDAPBindAsAuth)        
+`bindSearchAuth` | Bind+Search authentication configuration                        | [*LDAPBindSearchAuth](#LDAPBindSearchAuth)
+
 <a id='LocalObjectReference'></a>
 
 ## LocalObjectReference
@@ -655,12 +698,13 @@ Name      | Description                               | Type
 
 PostgresConfiguration defines the PostgreSQL configuration
 
-Name                     | Description                                                                                                                                                                                    | Type             
------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------
-`parameters              ` | PostgreSQL configuration options (postgresql.conf)                                                                                                                                             | map[string]string
-`pg_hba                  ` | PostgreSQL Host Based Authentication rules (lines to be appended to the pg_hba.conf file)                                                                                                      | []string         
-`promotionTimeout        ` | Specifies the maximum number of seconds to wait when promoting an instance to primary. Default value is 40000000, greater than one year in seconds, big enough to simulate an infinite timeout | int32            
-`shared_preload_libraries` | Lists of shared preload libraries to add to the default ones                                                                                                                                   | []string         
+Name                     | Description                                                                                                                                                                                    | Type                      
+------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------
+`parameters              ` | PostgreSQL configuration options (postgresql.conf)                                                                                                                                             | map[string]string         
+`pg_hba                  ` | PostgreSQL Host Based Authentication rules (lines to be appended to the pg_hba.conf file)                                                                                                      | []string                  
+`promotionTimeout        ` | Specifies the maximum number of seconds to wait when promoting an instance to primary. Default value is 40000000, greater than one year in seconds, big enough to simulate an infinite timeout | int32                     
+`shared_preload_libraries` | Lists of shared preload libraries to add to the default ones                                                                                                                                   | []string                  
+`ldap                    ` | Options to specify LDAP configuration                                                                                                                                                          | [*LDAPConfig](#LDAPConfig)
 
 <a id='RecoveryTarget'></a>
 
