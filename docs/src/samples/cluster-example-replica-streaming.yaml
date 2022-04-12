@@ -1,0 +1,38 @@
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-replica-example
+spec:
+  instances: 1
+
+  bootstrap:
+    pg_basebackup:
+      source: cluster-example
+
+  replica:
+    enabled: false
+    source: cluster-example
+
+  storage:
+    size: 1Gi
+  # note the namespace 'default' in the host name `cluster-example-rw.default.svc`
+  # remember to change accordingly with the namespace of the main cluster
+  externalClusters:
+  - name: cluster-example
+    connectionParameters:
+      host: cluster-example-rw.default.svc
+      user: streaming_replica
+      sslmode: verify-full
+      dbname: postgres
+    # NOTE: if this cluster is created in a different namespace than the main cluster
+    # remember to create the `-replication` and `-ca` secrets in the follower namespace
+    # before creating the follower cluster
+    sslKey:
+      name: cluster-example-replication
+      key: tls.key
+    sslCert:
+      name: cluster-example-replication
+      key: tls.crt
+    sslRootCert:
+      name: cluster-example-ca
+      key: ca.crt
