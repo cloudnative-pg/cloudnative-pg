@@ -694,6 +694,16 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 		}
 	}
 
+	// validate TargetLSN
+	if recoveryTarget.TargetLSN != "" {
+		if _, err := postgres.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
+				recoveryTarget.TargetLSN,
+				"Invalid TargetLSN"))
+		}
+	}
+
 	switch recoveryTarget.TargetTLI {
 	case "", "latest", "current":
 		// Allowed non numeric values
