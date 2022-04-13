@@ -9,22 +9,13 @@ package utils
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"os/exec"
 	"time"
 
 	"github.com/avast/retry-go/v4"
-
 	"github.com/google/shlex"
 	"github.com/onsi/ginkgo/v2"
-	corev1 "k8s.io/api/core/v1"
 )
-
-// PodCommandResult contains the pod a command has been run and the output of the command
-type PodCommandResult struct {
-	Pod    corev1.Pod
-	Output string
-}
 
 // RunUnchecked executes a command and process the information
 func RunUnchecked(command string) (stdout string, stderr string, err error) {
@@ -53,10 +44,10 @@ func RunUncheckedRetry(command string) (stdout string, stderr string, err error)
 	}
 
 	var outBuffer, errBuffer bytes.Buffer
-	cmd := exec.Command(tokens[0], tokens[1:]...) // #nosec G204
-	cmd.Stdout, cmd.Stderr = &outBuffer, &errBuffer
 	err = retry.Do(
 		func() error {
+			cmd := exec.Command(tokens[0], tokens[1:]...) // #nosec G204
+			cmd.Stdout, cmd.Stderr = &outBuffer, &errBuffer
 			err = cmd.Run()
 			if err != nil {
 				return err
@@ -84,26 +75,14 @@ func Run(command string) (stdout string, stderr string, err error) {
 	return
 }
 
-// RunOnPodList executes a command on a list of pod and returns the outputs
-func RunOnPodList(namespace, command string, podList *corev1.PodList) ([]PodCommandResult, error) {
-	podCommandResults := make([]PodCommandResult, 0, len(podList.Items))
-	for _, pod := range podList.Items {
-		podName := pod.GetName()
+// RunRetry executes a command with retry and prints the output when terminates with an error
+func RunRetry(command string) (stdout string, stderr string, err error) {
+	stdout, stderr, err = RunUncheckedRetry(command)
 
-		out, _, err := Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			namespace,
-			podName,
-			command))
-		if err != nil {
-			return nil, err
-		}
-
-		podCommandResults = append(podCommandResults, PodCommandResult{
-			Pod:    pod,
-			Output: out,
-		})
+	var exerr *exec.ExitError
+	if errors.As(err, &exerr) {
+		ginkgo.GinkgoWriter.Printf("RunCheck: %v\nExitCode: %v\n Out:\n%v\nErr:\n%v\n",
+			command, exerr.ExitCode(), stdout, stderr)
 	}
-
-	return podCommandResults, nil
+	return
 }

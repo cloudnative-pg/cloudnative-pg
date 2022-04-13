@@ -951,17 +951,14 @@ func AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBName, t
 	})
 }
 
-func AssertMetricsData(namespace, clusterName, targetOne, targetTwo, targetSecret string) {
+func AssertMetricsData(namespace, clusterName, curlPodName, targetOne, targetTwo, targetSecret string) {
 	By("collect and verify metric being exposed with target databases", func() {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			out, _, err := testsUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				podName,
-				"sh -c 'curl -s 127.0.0.1:9187/metrics'"))
+			podIP := pod.Status.PodIP
+			out, err := testsUtils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(strings.Contains(out, fmt.Sprintf(`cnp_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
@@ -1973,7 +1970,7 @@ func DeleteTableUsingPgBouncerService(
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName string, expectPresent bool) {
+func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curlPodName string, expectPresent bool) {
 	By("collecting and verify default set of metrics on each pod", func() {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -1988,9 +1985,11 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName strin
 		}
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			out, _, _ := testsUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v", namespace, podName, "sh -c 'curl -s 127.0.0.1:9187/metrics'"))
-			// errors should not be existed in metrics on each pod
+			podIP := pod.Status.PodIP
+			out, err := testsUtils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
+			Expect(err).ToNot(HaveOccurred())
+
+			// error should be zero on each pod metrics
 			Expect(strings.Contains(out, "cnp_collector_last_collection_error 0")).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
 			// verify that, default set of monitoring queries should not be existed on each pod

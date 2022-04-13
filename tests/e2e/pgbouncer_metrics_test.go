@@ -28,7 +28,7 @@ var _ = Describe("PGBouncer Metrics", func() {
 		level                       = tests.Low
 	)
 
-	var clusterName string
+	var clusterName, curlPodName string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -49,6 +49,14 @@ var _ = Describe("PGBouncer Metrics", func() {
 		func() {
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
+
+			// Create the curl client pod and wait for it to be ready.
+			By("setting up curl client pod", func() {
+				curlClient := utils.CurlClient(namespace)
+				err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
+				Expect(err).ToNot(HaveOccurred())
+				curlPodName = curlClient.GetName()
+			})
 
 			clusterName, err = env.GetResourceNameFromYAML(cnpCluster)
 			Expect(err).ToNot(HaveOccurred())
@@ -81,16 +89,17 @@ var _ = Describe("PGBouncer Metrics", func() {
 					`cnp_pgbouncer_stats_total_query_count{database="pgbouncer"} \d+` +
 					`)$)`)
 
-			podCommandResults, err := utils.RunOnPodList(namespace, "sh -c 'curl -s 127.0.0.1:9127/metrics'", podList)
-			Expect(err).ToNot(HaveOccurred())
-
-			for _, podCommandResult := range podCommandResults {
-				matches := metricsRegexp.FindAllString(podCommandResult.Output, -1)
+			for _, pod := range podList.Items {
+				podName := pod.GetName()
+				podIP := pod.Status.PodIP
+				out, err := utils.CurlGetMetrics(namespace, curlPodName, podIP, 9127)
+				Expect(err).ToNot(HaveOccurred())
+				matches := metricsRegexp.FindAllString(out, -1)
 				Expect(matches).To(
 					HaveLen(14),
 					"Metric collection issues on %v.\nCollected metrics:\n%v",
-					podCommandResult.Pod.GetName(),
-					podCommandResult.Output,
+					podName,
+					out,
 				)
 			}
 		})
