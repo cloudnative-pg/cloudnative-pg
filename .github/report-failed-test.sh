@@ -73,7 +73,7 @@ function failure_summary {
       echo "::group::Stack Trace:"
       echo "${indented_stack}"
       echo "::endgroup::"
-      cnt+=1
+      (( cnt+=1 ))
       echo
       echo "-----"
     done < <(jq -c -f "${filter_file}" $ff)
