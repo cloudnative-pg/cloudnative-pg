@@ -30,7 +30,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		tableName = "to_restore"
 	)
 
-	var namespace, clusterName, azStorageAccount, azStorageKey string
+	var namespace, clusterName, curlPodName, azStorageAccount, azStorageKey string
 	currentTimestamp := new(string)
 
 	BeforeEach(func() {
@@ -107,6 +107,14 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 
+			// Create the curl client pod and wait for it to be ready.
+			By("setting up curl client pod", func() {
+				curlClient := testUtils.CurlClient(namespace)
+				err := testUtils.PodCreateAndWaitForReady(env, &curlClient, 240)
+				Expect(err).ToNot(HaveOccurred())
+				curlPodName = curlClient.GetName()
+			})
+
 			// Create ConfigMap and secrets to verify metrics for target database after backup restore
 			AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
 
@@ -174,7 +182,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			// Restore backup in a new cluster
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
 
-			AssertMetricsData(namespace, restoredClusterName, targetDBOne, targetDBTwo, targetDBSecret)
+			AssertMetricsData(namespace, restoredClusterName, curlPodName, targetDBOne, targetDBTwo, targetDBSecret)
 
 			previous := 0
 
