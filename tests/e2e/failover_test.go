@@ -112,7 +112,7 @@ var _ = Describe("Failover", func() {
 
 			// Send the SIGSTOP
 			_, _, err = env.EventuallyExecCommand(env.Ctx, pausedPod, specs.PostgresContainerName, &timeout,
-				"kill", "-STOP", pid)
+				"sh", "-c", fmt.Sprintf("kill -STOP %v", pid))
 			Expect(err).ToNot(HaveOccurred())
 
 			// Terminate the pausedReplica walsender on the primary.
@@ -218,7 +218,7 @@ var _ = Describe("Failover", func() {
 			Expect(err).ToNot(HaveOccurred())
 			commandTimeout := time.Second * 2
 			_, _, err = env.EventuallyExecCommand(env.Ctx, pausedPod, specs.PostgresContainerName,
-				&commandTimeout, "kill", "-CONT", pid)
+				&commandTimeout, "sh", "-c", fmt.Sprintf("kill -CONT %v", pid))
 			Expect(err).ToNot(HaveOccurred())
 
 			// The operator should eventually set the cluster target primary to
