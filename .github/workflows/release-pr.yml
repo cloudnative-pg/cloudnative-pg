@@ -21,7 +21,7 @@ jobs:
       -
         name: Pull Request
         id: open-pr
-        uses: repo-sync/pull-request@v2.6
+        uses: repo-sync/pull-request@v2.6.2
         with:
           destination_branch: "main"
           github_token: ${{ secrets.GITHUB_TOKEN }}
