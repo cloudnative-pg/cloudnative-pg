@@ -7,7 +7,6 @@ Copyright (C) 2019-2022 EnterpriseDB Corporation.
 package e2e
 
 import (
-	"fmt"
 	"regexp"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -40,7 +39,7 @@ var _ = Describe("Metrics", func() {
 	})
 
 	// Cluster identifiers
-	var namespace, metricsClusterName string
+	var namespace, metricsClusterName, curlPodName string
 	var err error
 	// We define a few metrics in the tests. We check that all of them exist and
 	// there are no errors during the collection.
@@ -78,6 +77,14 @@ var _ = Describe("Metrics", func() {
 
 		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries.yaml", 2, 1)
 
+		// Create the curl client pod and wait for it to be ready.
+		By("setting up curl client pod", func() {
+			curlClient := utils.CurlClient(namespace)
+			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
+			Expect(err).ToNot(HaveOccurred())
+			curlPodName = curlClient.GetName()
+		})
+
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsFile, env)
 
@@ -86,11 +93,8 @@ var _ = Describe("Metrics", func() {
 			Expect(err).ToNot(HaveOccurred())
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
-				out, _, err := utils.Run(fmt.Sprintf(
-					"kubectl exec -n %v %v -- %v",
-					namespace,
-					pod.GetName(),
-					"sh -c 'curl -s 127.0.0.1:9187/metrics'"))
+				podIP := pod.Status.PodIP
+				out, err := utils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
 				matches := metricsRegexp.FindAllString(out, -1)
 				Expect(matches, err).To(HaveLen(8), "Metric collection issues on %v.\nCollected metrics:\n%v", pod.GetName(), out)
 			}
@@ -105,12 +109,21 @@ var _ = Describe("Metrics", func() {
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
+
+		// Create the curl client pod and wait for it to be ready.
+		By("setting up curl client pod", func() {
+			curlClient := utils.CurlClient(namespace)
+			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
+			Expect(err).ToNot(HaveOccurred())
+			curlPodName = curlClient.GetName()
+		})
+
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsDBFile, env)
 		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBOne, testTableName)
 		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBTwo, testTableName)
 		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBSecret, testTableName)
-		AssertMetricsData(namespace, metricsClusterName, targetDBOne, targetDBTwo, targetDBSecret)
+		AssertMetricsData(namespace, metricsClusterName, curlPodName, targetDBOne, targetDBTwo, targetDBSecret)
 	})
 
 	It("can gather default metrics details", func() {
@@ -120,6 +133,15 @@ var _ = Describe("Metrics", func() {
 		Expect(err).ToNot(HaveOccurred())
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+
+		// Create the curl client pod and wait for it to be ready.
+		By("setting up curl client pod", func() {
+			curlClient := utils.CurlClient(namespace)
+			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
+			Expect(err).ToNot(HaveOccurred())
+			curlPodName = curlClient.GetName()
+		})
+
 		AssertCreateCluster(namespace, metricsClusterName, clusterWithDefaultMetricsFile, env)
 
 		By("verify default monitoring configMap in cluster namespace", func() {
@@ -134,7 +156,7 @@ var _ = Describe("Metrics", func() {
 			}, 10).ShouldNot(HaveOccurred())
 		})
 
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, true)
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, curlPodName, true)
 	})
 
 	It("default set of metrics queries should not be injected into the cluster "+
@@ -145,9 +167,18 @@ var _ = Describe("Metrics", func() {
 		Expect(err).ToNot(HaveOccurred())
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
+
+		// Create the curl client pod and wait for it to be ready.
+		By("setting up curl client pod", func() {
+			curlClient := utils.CurlClient(namespace)
+			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
+			Expect(err).ToNot(HaveOccurred())
+			curlPodName = curlClient.GetName()
+		})
+
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, defaultMonitoringQueriesDisableSampleFile, env)
 
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, false)
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, curlPodName, false)
 	})
 })
