@@ -105,13 +105,23 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       -
+        name: Checkout code
+        uses: actions/checkout@v3
+      -
         name: Install Go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
-        name: Checkout code
-        uses: actions/checkout@v3
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
         name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -168,6 +178,16 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
         name: Run unit tests
         env:
@@ -284,6 +304,16 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
         name: Build meta
         id: build-meta
@@ -491,6 +521,16 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
         name: Prepare the environment
         uses: nick-fields/retry@v2

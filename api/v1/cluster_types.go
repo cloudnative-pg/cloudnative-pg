@@ -351,7 +351,7 @@ type ClusterStatus struct {
 	FirstRecoverabilityPoint string `json:"firstRecoverabilityPoint,omitempty"`
 
 	// The commit hash number of which this operator running
-	CommitHash string `json:"cloudNativePostgresqlCommitHash,omitempty"`
+	CommitHash string `json:"cloudNativePGCommitHash,omitempty"`
 
 	// The timestamp when the last actual promotion to primary has occurred
 	CurrentPrimaryTimestamp string `json:"currentPrimaryTimestamp,omitempty"`
@@ -363,7 +363,7 @@ type ClusterStatus struct {
 	PoolerIntegrations *PoolerIntegrations `json:"poolerIntegrations,omitempty"`
 
 	// The hash of the binary of the operator
-	OperatorHash string `json:"cloudNativePostgresqlOperatorHash,omitempty"`
+	OperatorHash string `json:"cloudNativePGOperatorHash,omitempty"`
 
 	// OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster
 	OnlineUpdateEnabled bool `json:"onlineUpdateEnabled,omitempty"`
