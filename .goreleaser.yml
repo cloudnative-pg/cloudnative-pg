@@ -38,9 +38,9 @@ builds:
   ldflags:
   - -s
   - -w
-  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion={{.Version}}
-  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit={{.ShortCommit}}
-  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate={{.CommitDate}}
+  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion={{.Env.VERSION}}
+  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit={{.Env.COMMIT}}
+  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate={{.Env.DATE}}
   goos:
   - darwin
   - linux
