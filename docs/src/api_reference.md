@@ -728,10 +728,10 @@ Name            | Description                                                   
 
 ReplicaClusterConfiguration encapsulates the configuration of a replica cluster
 
-Name    | Description                                                                                                                                                     | Type  
-------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------
-`enabled` | If replica mode is enabled, this cluster will be a replica of an existing cluster. A cluster of such type can be created only using bootstrap via pg_basebackup - *mandatory*  | bool  
-`source ` | The name of the external cluster which is the replication origin                                                                                                - *mandatory*  | string
+Name    | Description                                                                                                                                                                                                                                                     | Type  
+------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------
+`enabled` | If replica mode is enabled, this cluster will be a replica of an existing cluster. Replica cluster can be created from a recovery object store or via streaming through pg_basebackup. Refer to the Replication page of the documentation for more information. - *mandatory*  | bool  
+`source ` | The name of the external cluster which is the replication origin                                                                                                                                                                                                - *mandatory*  | string
 
 <a id='RollingUpdateStatus'></a>
 
