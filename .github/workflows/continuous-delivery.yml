@@ -105,13 +105,23 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       -
+        name: Checkout code
+        uses: actions/checkout@v3
+      -
         name: Install Go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
-        name: Checkout code
-        uses: actions/checkout@v3
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
         name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -168,6 +178,16 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
         name: Run unit tests
         env:
@@ -269,6 +289,9 @@ jobs:
       (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
       (needs.crd.result == 'success' || needs.crd.result == 'skipped')
     runs-on: ubuntu-20.04
+    permissions:
+      contents: read
+      packages: write
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
       cnpg_version: ${{ steps.build-meta.outputs.cnpg_version }}
@@ -284,6 +307,16 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
         name: Build meta
         id: build-meta
@@ -351,7 +384,7 @@ jobs:
         name: Login to ghcr.io
         uses: docker/login-action@v1
         with:
-          registry: ghcr.io/cloudnative-pg
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
@@ -459,7 +492,7 @@ jobs:
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       CNPG_VERSION: ${{ needs.buildx.outputs.cnpg_version }}
 
-      DOCKER_SERVER: ghcr.io/cloudnative-pg
+      DOCKER_SERVER: ghcr.io
       DOCKER_USERNAME: ${{ github.actor }}
       DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
@@ -491,6 +524,16 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GOLANG_VERSION }}
+      -
+        name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       -
         name: Prepare the environment
         uses: nick-fields/retry@v2
