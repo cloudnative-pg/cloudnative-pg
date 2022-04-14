@@ -424,9 +424,10 @@ type PgBouncerIntegrationStatus struct {
 // cluster
 type ReplicaClusterConfiguration struct {
 	// If replica mode is enabled, this cluster will be a replica of an
-	// existing cluster. A cluster of such type can be created only
-	// using bootstrap via pg_basebackup
-	//+optional
+	// existing cluster. Replica cluster can be created from a recovery
+	// object store or via streaming through pg_basebackup.
+	// Refer to the Replication page of the documentation for more information.
+	// +optional
 	Enabled bool `json:"enabled"`
 
 	// The name of the external cluster which is the replication origin
