@@ -2157,10 +2157,10 @@ spec:
                       a new secret will be created using the provided CA.
                     type: string
                 type: object
-              cloudNativePostgresqlCommitHash:
+              cloudNativePGCommitHash:
                 description: The commit hash number of which this operator running
                 type: string
-              cloudNativePostgresqlOperatorHash:
+              cloudNativePGOperatorHash:
                 description: The hash of the binary of the operator
                 type: string
               conditions:
