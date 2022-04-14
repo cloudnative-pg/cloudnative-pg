@@ -2,6 +2,12 @@
 
 History of user-visible changes for CloudNativePG.
 
+## Version 1.14.1
+
+**Release date:** 14 April 2022
+
+MOCKED RELEASE TO TEST RELEASE PROCEDURE
+
 ## Version 1.14.0
 
 **Release date:** 25 March 2022
