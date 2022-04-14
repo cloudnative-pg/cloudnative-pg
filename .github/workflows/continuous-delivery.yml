@@ -1110,7 +1110,7 @@ jobs:
       - evaluate-test-level
     strategy:
       fail-fast: false
-      max-parallel: 10
+      max-parallel: 15
       matrix:
         ${{ fromJSON(needs.generate-jobs.outputs.gkeMatrix) }}
     runs-on: ubuntu-20.04
