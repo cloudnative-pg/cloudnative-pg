@@ -156,5 +156,5 @@ jobs:
           build-args: |
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+#          cache-from: type=gha
+#          cache-to: type=gha,mode=max
