@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,7 +61,9 @@ func NewCmd() *cobra.Command {
 			instance.PodName = podName
 			instance.ClusterName = clusterName
 
-			return runSubCommand(ctx, instance)
+			return retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
+				return runSubCommand(ctx, instance)
+			})
 		},
 	}
 
@@ -189,7 +192,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	setupLog.Info("starting controller-runtime manager")
 	if err := mgr.Start(onlineUpgradeCtx); err != nil {
 		setupLog.Error(err, "unable to run controller-runtime manager")
-		return err
+		return makeUnretryableError(err)
 	}
 
 	return nil
