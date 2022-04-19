@@ -9,6 +9,7 @@ package catalog
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"time"
@@ -24,6 +25,8 @@ type Catalog struct {
 	List []BarmanBackup `json:"backups_list"`
 }
 
+var currentTLIRegex = regexp.MustCompile("^(|latest)$")
+
 // LatestBackupInfo gets the information about the latest successful backup
 func (catalog *Catalog) LatestBackupInfo() *BarmanBackup {
 	if catalog.Len() == 0 {
@@ -32,7 +35,7 @@ func (catalog *Catalog) LatestBackupInfo() *BarmanBackup {
 
 	// Skip errored backups and return the latest valid one
 	for i := len(catalog.List) - 1; i >= 0; i-- {
-		if !catalog.List[i].BeginTime.IsZero() && !catalog.List[i].EndTime.IsZero() {
+		if catalog.List[i].isBackupDone() {
 			return &catalog.List[i]
 		}
 	}
@@ -43,15 +46,16 @@ func (catalog *Catalog) LatestBackupInfo() *BarmanBackup {
 // FirstRecoverabilityPoint gets the start time of the first backup in
 // the catalog
 func (catalog *Catalog) FirstRecoverabilityPoint() *time.Time {
-	// the code below assumes the catalog to be sorted, therefore we enforce it first
-	sort.Sort(catalog)
 	if catalog.Len() == 0 {
 		return nil
 	}
 
+	// the code below assumes the catalog to be sorted, therefore we enforce it first
+	sort.Sort(catalog)
+
 	// Skip errored backups and return the first valid one
 	for i := 0; i < len(catalog.List); i++ {
-		if catalog.List[i].BeginTime.IsZero() || catalog.List[i].EndTime.IsZero() {
+		if !catalog.List[i].isBackupDone() {
 			continue
 		}
 
@@ -69,24 +73,15 @@ func (catalog *Catalog) FindClosestBackupInfo(recoveryTarget *v1.RecoveryTarget)
 	targetTLI := recoveryTarget.TargetTLI
 
 	if t := recoveryTarget.TargetTime; t != "" {
-		backup, err := catalog.findClosestBackupFromTargetTime(t, targetTLI)
-		if err != nil || backup != nil {
-			return backup, err
-		}
+		return catalog.findClosestBackupFromTargetTime(t, targetTLI)
 	}
 
 	if t := recoveryTarget.TargetLSN; t != "" {
-		backup, err := catalog.findClosestBackupFromTargetLSN(t, targetTLI)
-		if err != nil || backup != nil {
-			return backup, err
-		}
+		return catalog.findClosestBackupFromTargetLSN(t, targetTLI)
 	}
 
-	if recoveryTarget.TargetName != "" || recoveryTarget.TargetXID != "" {
-		return catalog.LatestBackupInfo(), nil
-	}
-
-	return nil, nil
+	// targetXID, targetName will be ignored in choosing the proper backup
+	return catalog.findlatestBackupFromTimeline(targetTLI), nil
 }
 
 func (catalog *Catalog) findClosestBackupFromTargetLSN(
@@ -99,9 +94,12 @@ func (catalog *Catalog) findClosestBackupFromTargetLSN(
 	}
 	for i := len(catalog.List) - 1; i >= 0; i-- {
 		barmanBackup := catalog.List[i]
+		if !barmanBackup.isBackupDone() {
+			continue
+		}
 		if (strconv.Itoa(barmanBackup.TimeLine) == targetTLI ||
 			// if targetTLI is not an integer, it will be ignored actually
-			targetTLI == "" || targetTLI == "latest" || targetTLI == "current") &&
+			currentTLIRegex.MatchString(targetTLI)) &&
 			postgres.LSN(barmanBackup.BeginLSN).Less(targetLSN) {
 			return &catalog.List[i], nil
 		}
@@ -119,14 +117,33 @@ func (catalog *Catalog) findClosestBackupFromTargetTime(
 	}
 	for i := len(catalog.List) - 1; i >= 0; i-- {
 		barmanBackup := catalog.List[i]
+		if !barmanBackup.isBackupDone() {
+			continue
+		}
 		if (strconv.Itoa(barmanBackup.TimeLine) == targetTLI ||
 			// if targetTLI is not an integer, it will be ignored actually
-			targetTLI == "" || targetTLI == "latest" || targetTLI == "current") &&
-			!barmanBackup.BeginTime.IsZero() && barmanBackup.BeginTime.Before(targetTime) {
+			currentTLIRegex.MatchString(targetTLI)) &&
+			barmanBackup.BeginTime.Before(targetTime) {
 			return &catalog.List[i], nil
 		}
 	}
 	return nil, nil
+}
+
+func (catalog *Catalog) findlatestBackupFromTimeline(targetTLI string) *BarmanBackup {
+	for i := len(catalog.List) - 1; i >= 0; i-- {
+		barmanBackup := catalog.List[i]
+		if !barmanBackup.isBackupDone() {
+			continue
+		}
+		if strconv.Itoa(barmanBackup.TimeLine) == targetTLI ||
+			// if targetTLI is not an integer, it will be ignored actually
+			currentTLIRegex.MatchString(targetTLI) {
+			return &catalog.List[i]
+		}
+	}
+
+	return nil
 }
 
 // BarmanBackup represent a backup as created
@@ -170,6 +187,10 @@ type BarmanBackup struct {
 
 	// The TimeLine
 	TimeLine int `json:"timeline"`
+}
+
+func (b *BarmanBackup) isBackupDone() bool {
+	return !b.BeginTime.IsZero() && !b.EndTime.IsZero()
 }
 
 // NewCatalog creates a new sorted backup catalog, given a list of backup infos

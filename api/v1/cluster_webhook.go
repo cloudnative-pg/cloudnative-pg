@@ -733,7 +733,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 	}
 
 	switch recoveryTarget.TargetTLI {
-	case "", "latest", "current":
+	case "", "latest":
 		// Allowed non numeric values
 	default:
 		// Everything else must be a valid positive integer
@@ -741,7 +741,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetTLI"),
 				recoveryTarget,
-				"recovery target timeline can be set to 'latest', 'current' or a positive integer"))
+				"recovery target timeline can be set to 'latest' or a positive integer"))
 		}
 	}
 
