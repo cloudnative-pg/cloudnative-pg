@@ -356,7 +356,7 @@ var _ = Describe("Rolling updates", func() {
 
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
-			AssertRollingUpdate(namespace, clusterName, sampleFile, 2)
+			AssertRollingUpdate(namespace, clusterName, sampleFile, 1)
 		})
 	})
 })

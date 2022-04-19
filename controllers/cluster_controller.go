@@ -242,6 +242,38 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
 	}
+	result, err := r.handleSwitchover(ctx, cluster, resources, instancesStatus)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if result != nil {
+		return *result, nil
+	}
+
+	// Updates all the objects managed by the controller
+	return r.reconcileResources(ctx, cluster, resources, instancesStatus)
+}
+
+func (r *ClusterReconciler) handleSwitchover(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+	instancesStatus postgres.PostgresqlStatusList,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+	if cluster.Status.Phase == apiv1.PhaseInplaceDeletePrimaryRestart {
+		if cluster.Status.ReadyInstances != cluster.Spec.Instances {
+			contextLogger.Info("Waiting for the primary to be restarted without triggering a switchover")
+			return nil, nil
+		}
+		contextLogger.Info("All instances ready, will proceed",
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary)
+		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
 
 	// Update the target primary name from the Pods status.
 	// This means issuing a failover or switchover when needed.
@@ -249,22 +281,20 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	if err != nil {
 		if err == ErrWalReceiversRunning {
 			contextLogger.Info("Waiting for all WAL receivers to be down to elect a new primary")
-			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+			return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 		}
 		contextLogger.Info("Cannot update target primary: operation cannot be fulfilled. "+
 			"An immediate retry will be scheduled",
 			"cluster", cluster.Name)
-		return ctrl.Result{Requeue: true}, nil
+		return &ctrl.Result{Requeue: true}, nil
 	}
 	if selectedPrimary != "" {
 		// If we selected a new primary, stop the reconciliation loop here
 		contextLogger.Info("Waiting for the new primary to notice the promotion request",
 			"newPrimary", selectedPrimary)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
-
-	// Updates all the objects managed by the controller
-	return r.reconcileResources(ctx, cluster, resources, instancesStatus)
+	return nil, nil
 }
 
 func (r *ClusterReconciler) getCluster(

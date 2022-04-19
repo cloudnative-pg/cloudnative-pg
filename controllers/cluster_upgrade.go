@@ -78,9 +78,10 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 
 	// we need to check whether a manual switchover is required
 	primaryPod := primaryPostgresqlStatus.Pod
+	contextLogger = contextLogger.WithValues("primaryPod", primaryPod.Name)
 	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
 		contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
-			"reason", reason, "primaryPod", primaryPod.Name)
+			"reason", reason)
 		err := r.RegisterPhase(ctx, cluster, apiv1.PhaseWaitingForUser, "User must issue a supervised switchover")
 		if err != nil {
 			return false, err
@@ -89,14 +90,25 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		return true, nil
 	}
 
-	// if restart has been selected as primary update method we will trigger an in-place update
-	if inPlacePossible && cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart {
-		if err := r.updateRestartAnnotation(ctx, cluster, primaryPod); err != nil {
+	if cluster.GetPrimaryUpdateMethod() == apiv1.PrimaryUpdateMethodRestart {
+		if inPlacePossible {
+			// In-place restart is possible
+			if err := r.updateRestartAnnotation(ctx, cluster, primaryPod); err != nil {
+				return false, err
+			}
+			contextLogger.Info("Restarting primary instance in-place",
+				"reason", reason)
+			err := r.RegisterPhase(ctx, cluster, apiv1.PhaseInplacePrimaryRestart, reason)
+			return err == nil, err
+		}
+		// The pod needs to be deleted and recreated for the change to be applied
+		contextLogger.Info("Restarting primary instance without a switchover first",
+			"reason", reason)
+		err := r.RegisterPhase(ctx, cluster, apiv1.PhaseInplaceDeletePrimaryRestart, reason)
+		if err != nil {
 			return false, err
 		}
-		contextLogger.Info("Restarting primary instance in-place",
-			"reason", reason, "primaryPod", primaryPod.Name)
-		err := r.RegisterPhase(ctx, cluster, apiv1.PhaseInplacePrimaryRestart, reason)
+		err = r.upgradePod(ctx, cluster, &primaryPod)
 		return err == nil, err
 	}
 
