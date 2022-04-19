@@ -1347,7 +1347,7 @@ jobs:
             go install github.com/onsi/ginkgo/v2/ginkgo
       -
         name:  Install Terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 0.14.x
       -
