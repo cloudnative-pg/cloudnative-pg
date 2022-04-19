@@ -256,6 +256,9 @@ const (
 	// PhaseInplacePrimaryRestart for a cluster restarting the primary instance in-place
 	PhaseInplacePrimaryRestart = "Primary instance is being restarted in-place"
 
+	// PhaseInplaceDeletePrimaryRestart for a cluster restarting the primary instance without a switchover
+	PhaseInplaceDeletePrimaryRestart = "Primary instance is being restarted without a switchover"
+
 	// PhaseHealthy for a cluster doing nothing
 	PhaseHealthy = "Cluster in healthy state"
 

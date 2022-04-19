@@ -53,9 +53,21 @@ The `primaryUpdateMethod` option accepts one of the following values:
   primary instance is running. Otherwise, the restart request is ignored and a
   switchover issued.
 
-!!! IMPORTANT
-    A current limitation is that `restart` is only possible with rolling
-    updates that involve configuration changes.
+There's no one-size-fits-all configuration for the update method, as that
+depends on several factors like the actual workload of your database, the
+requirements in terms of RPO and RTO, whether your PostgreSQL architecture is
+shared or shared nothing, and so on.
+
+Indeed, being PostgreSQL a primary/standby architecture database management
+system, the update process inevitably generates a downtime for your
+applications. One important aspect to consider for your context is the time it
+takes for your pod to download the new PostgreSQL container image, as that
+depends on your Kubernetes cluster settings and specifications. The
+`switchover` method makes sure that the promoted instance already runs the
+target image version of the container. The `restart` method instead might require
+to download the image from the origin registry after the primary pod has been
+shut down. It is up to you to determine whether, for your database, it is best
+to use `restart` or `switchover` as part of the rolling update procedure.
 
 ## Manual updates (`supervised`)
 
