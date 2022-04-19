@@ -26,7 +26,7 @@ COPY licenses /licenses
 COPY LICENSE /licenses
 
 WORKDIR /
-COPY dist/manager_linux_${TARGETARCH}/manager .
+COPY dist/manager_linux_${TARGETARCH}*/manager .
 USER 1001
 
 ENTRYPOINT ["/manager"]
