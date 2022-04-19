@@ -747,21 +747,6 @@ var _ = Describe("recovery target", func() {
 			Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
 		})
 
-		It("allows 'current'", func() {
-			cluster := Cluster{
-				Spec: ClusterSpec{
-					Bootstrap: &BootstrapConfiguration{
-						Recovery: &BootstrapRecovery{
-							RecoveryTarget: &RecoveryTarget{
-								TargetTLI: "current",
-							},
-						},
-					},
-				},
-			}
-			Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
-		})
-
 		It("allows a positive integer", func() {
 			cluster := Cluster{
 				Spec: ClusterSpec{

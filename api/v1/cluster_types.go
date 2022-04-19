@@ -757,7 +757,7 @@ type BootstrapPgBaseBackup struct {
 // RecoveryTarget allows to configure the moment where the recovery process
 // will stop. All the target options except TargetTLI are mutually exclusive.
 type RecoveryTarget struct {
-	// The target timeline ("latest", "current" or a positive integer)
+	// The target timeline ("latest" or a positive integer)
 	TargetTLI string `json:"targetTLI,omitempty"`
 
 	// The target transaction ID

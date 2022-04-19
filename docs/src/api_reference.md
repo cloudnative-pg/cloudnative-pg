@@ -714,7 +714,7 @@ RecoveryTarget allows to configure the moment where the recovery process will st
 
 Name            | Description                                                               | Type  
 --------------- | ------------------------------------------------------------------------- | ------
-`targetTLI      ` | The target timeline ("latest", "current" or a positive integer)           | string
+`targetTLI      ` | The target timeline ("latest" or a positive integer)                      | string
 `targetXID      ` | The target transaction ID                                                 | string
 `targetName     ` | The target name (to be previously created with `pg_create_restore_point`) | string
 `targetLSN      ` | The target LSN (Log Sequence Number)                                      | string
