@@ -637,6 +637,7 @@ podAntiAffinityType
 podMetricsEndpoints
 podName
 podmonitor
+podtemplates
 poolMode
 pooler
 poolers
