@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -72,6 +73,7 @@ func CreateObject(env *TestingEnvironment, object client.Object, opts ...client.
 		retry.Delay(PollingTime*time.Second),
 		retry.Attempts(RetryTimeout),
 		retry.DelayType(retry.FixedDelay),
+		retry.RetryIf(func(err error) bool { return !apierrs.IsAlreadyExists(err) }),
 	)
 	return err
 }
@@ -85,6 +87,7 @@ func DeleteObject(env *TestingEnvironment, object client.Object, opts ...client.
 		retry.Delay(PollingTime*time.Second),
 		retry.Attempts(RetryTimeout),
 		retry.DelayType(retry.FixedDelay),
+		retry.RetryIf(func(err error) bool { return !apierrs.IsNotFound(err) }),
 	)
 	return err
 }

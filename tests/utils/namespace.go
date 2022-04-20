@@ -7,6 +7,7 @@ Copyright (C) 2019-2022 EnterpriseDB Corporation.
 package utils
 
 import (
+	"errors"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -16,6 +17,11 @@ import (
 
 // CreateNamespace creates a namespace
 func (env TestingEnvironment) CreateNamespace(name string, opts ...client.CreateOption) error {
+	// Exit immediately if the name is empty
+	if name == "" {
+		return errors.New("cannot create namespace with empty name")
+	}
+
 	u := &unstructured.Unstructured{}
 	u.SetName(name)
 	u.SetGroupVersionKind(schema.GroupVersionKind{
@@ -28,7 +34,12 @@ func (env TestingEnvironment) CreateNamespace(name string, opts ...client.Create
 
 // DeleteNamespace deletes a namespace if existent
 func (env TestingEnvironment) DeleteNamespace(name string, opts ...client.DeleteOption) error {
-	// Exit immediately if if the namespace is listed in PreserveNamespaces
+	// Exit immediately if the name is empty
+	if name == "" {
+		return errors.New("cannot delete namespace with empty name")
+	}
+
+	// Exit immediately if the namespace is listed in PreserveNamespaces
 	for _, v := range env.PreserveNamespaces {
 		if v == name {
 			return nil
