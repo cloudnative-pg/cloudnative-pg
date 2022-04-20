@@ -1787,7 +1787,6 @@ spec:
                         description: LDAP hostname or IP address
                         type: string
                       tls:
-                        default: false
                         description: Set to 1 to enable LDAP over TLS
                         type: boolean
                     type: object
