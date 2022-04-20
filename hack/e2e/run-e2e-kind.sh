@@ -43,7 +43,7 @@ cleanup() {
 
 main() {
   # Call to setup-cluster.sh script
-  "${HACK_DIR}/setup-cluster.sh" create
+  "${HACK_DIR}/setup-cluster.sh" create -r
 
   trap cleanup EXIT
 
