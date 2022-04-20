@@ -133,12 +133,10 @@ var _ = Describe("cluster_status unit tests", func() {
 		By("starting the manager", func() {
 			wg.Add(1)
 			go func() {
-				defer func() {
-					GinkgoRecover()
-					wg.Done()
-				}()
+				defer wg.Done()
+				defer GinkgoRecover()
 				err := mgr.Start(ctx)
-				Expect(err).To(BeNil())
+				Expect(err).ShouldNot(HaveOccurred())
 			}()
 		})
 

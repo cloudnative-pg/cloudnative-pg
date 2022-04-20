@@ -26,8 +26,8 @@ var _ = Describe("Executed", func() {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
-			defer GinkgoRecover()
 			defer wg.Done()
+			defer GinkgoRecover()
 			i.Wait()
 			Expect(i.done).To(BeTrue())
 		}()
