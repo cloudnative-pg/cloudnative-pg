@@ -688,3 +688,26 @@ rules:
   verbs:
   - '*'
 ```
+
+## Customization of the Pooler image
+
+By default, the `Pooler` resource creates pods having the `pgbouncer` container
+that runs with the `quay.io/enterprisedb/pgbouncer` image.
+
+!!! Note "There's more"
+    For more details about pod customization for the pooler, please refer to
+    the ["Pod templates"](connection_pooling.md#podtemplates) section in the
+    connection pooling documentation.
+
+You can change the image name from the advanced interface, specifically by
+opening the *"Template"* section, then selecting *"Add container"*
+under *"Spec > Containers"*:
+
+![Pooler template](./images/pgbouncer-pooler-template.png)
+
+Then:
+
+- set `pgbouncer` as the name of the container (required field in the pod template)
+- set the *"Image"* field as desired (see the image below)
+
+![Pooler image](./images/pgbouncer-pooler-image.png)
