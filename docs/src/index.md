@@ -109,6 +109,7 @@ architectures on OpenShift only.
 * Automatically set `readOnlyRootFilesystem` security context for pods
 * `cnp` plugin for `kubectl`
 * Fencing of an entire PostgreSQL cluster, or a subset of the instances
+* Simple bind and search+bind LDAP client authentication
 * Multi-arch format container images
 
 ## About this guide

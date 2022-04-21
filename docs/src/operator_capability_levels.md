@@ -198,6 +198,12 @@ are properly reloaded or restarted, depending on the configuration option.
 *Current limitation:* changes with `ALTER SYSTEM` are not detected, meaning
 that the cluster state is not enforced.
 
+### Basic LDAP authentication for PostgreSQL
+
+The operator allows you to configure LDAP authentication for your PostgreSQL
+clients, using either the *simple bind* or *search+bind* mode, as described in
+the ["PostgreSQL documentation: LDAP authentication" section](https://www.postgresql.org/docs/current/auth-ldap.html).
+
 ### Multiple installation methods
 
 The operator can be installed through a Kubernetes manifest via `kubectl
