@@ -1093,8 +1093,8 @@ k8s.io/apimachinery v0.23.6/go.mod h1:BEuFMMBaIbcOqVIJqNZJXGFTP4W6AycEpb5+m/97hr
 k8s.io/apiserver v0.23.0/go.mod h1:Cec35u/9zAepDPPFyT+UMrgqOCjgJ5qtfVJDxjZYmt4=
 k8s.io/apiserver v0.23.5/go.mod h1:7wvMtGJ42VRxzgVI7jkbKvMbuCbVbgsWFT7RyXiRNTw=
 k8s.io/apiserver v0.23.6/go.mod h1:5PU32F82tfErXPmf7FXhd/UcuLfh97tGepjKUgJ2atg=
-k8s.io/cli-runtime v0.23.5 h1:Z7XUpGoJZYZB2uNjQfJjMbyDKyVkoBGye62Ap0sWQHY=
-k8s.io/cli-runtime v0.23.5/go.mod h1:oY6QDF2qo9xndSq32tqcmRp2UyXssdGrLfjAVymgbx4=
+k8s.io/cli-runtime v0.23.6 h1:zvsGa4An+udUnznKSfD1Q17sETWHNOaMqYKHwHCvg+4=
+k8s.io/cli-runtime v0.23.6/go.mod h1:0Z3VR/HRIFKiLzKIAkm1mPtcH98GT/fXu2IU0E4vFmw=
 k8s.io/client-go v0.23.0/go.mod h1:hrDnpnK1mSr65lHHcUuIZIXDgEbzc7/683c6hyG4jTA=
 k8s.io/client-go v0.23.5/go.mod h1:flkeinTO1CirYgzMPRWxUCnV0G4Fbu2vLhYCObnt/r4=
 k8s.io/client-go v0.23.6 h1:7h4SctDVQAQbkHQnR4Kzi7EyUyvla5G1pFWf4+Od7hQ=
