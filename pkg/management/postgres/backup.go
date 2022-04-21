@@ -323,6 +323,11 @@ func (b *BackupCommand) run(ctx context.Context) {
 		return
 	}
 
+	err = barman.DeleteBackupsNotInCatalog(ctx, b.Client, b.Cluster, backupList)
+	if err != nil {
+		b.Log.Error(err, "while deleting Backups not present in the catalog")
+	}
+
 	// We have just made a new backup, if the backup list is empty
 	// something is going wrong in the cloud storage
 	if backupList.Len() == 0 {

@@ -8,11 +8,16 @@ package barman
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
+	"reflect"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/EnterpriseDB/cloud-native-postgresql/api/v1"
 	barmanCapabilities "github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/barman/capabilities"
+	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/management/catalog"
 	"github.com/EnterpriseDB/cloud-native-postgresql/pkg/utils"
 )
 
@@ -76,4 +81,90 @@ func DeleteBackupsByPolicy(backupConfig *v1.BackupConfiguration, serverName stri
 	}
 
 	return nil
+}
+
+// DeleteBackupsNotInCatalog deletes all Backup objects pointing to the given cluster that are not
+// present in the backup anymore
+func DeleteBackupsNotInCatalog(
+	ctx context.Context,
+	cli client.Client,
+	cluster *v1.Cluster,
+	catalog *catalog.Catalog,
+) error {
+	// We had two options:
+	//
+	// A. quicker
+	// get policy checker function
+	// get all backups in the namespace for this cluster
+	// check with policy checker function if backup should be deleted, then delete it if true
+	//
+	// B. more precise
+	// get the catalog (GetBackupList)
+	// get all backups in the namespace for this cluster
+	// go through all backups and delete them if not in the catalog
+	//
+	// 1: all backups in the bucket should be also in the cluster
+	// 2: all backups in the cluster should be in the bucket
+	//
+	// A can violate 1 and 2
+	// A + B can still violate 2
+	// B satisfies 1 and 2
+
+	// We chose to go with B
+
+	backups := v1.BackupList{}
+	err := cli.List(ctx, &backups, client.InNamespace(cluster.GetNamespace()))
+	if err != nil {
+		return fmt.Errorf("while getting backups: %w", err)
+	}
+
+	var errors []error
+	for id, backup := range backups.Items {
+		if backup.Spec.Cluster.Name != cluster.GetName() ||
+			backup.Status.Phase != v1.BackupPhaseCompleted ||
+			!useSameBackupLocation(&backup.Status, cluster) {
+			continue
+		}
+		var found bool
+		for _, barmanBackup := range catalog.List {
+			if backup.Status.BackupID == barmanBackup.ID {
+				found = true
+				break
+			}
+		}
+		// here we could add further checks, e.g. if the backup is not found but would still
+		// be in the retention policy we could either not delete it or update it is status
+		if !found {
+			err := cli.Delete(ctx, &backups.Items[id])
+			if err != nil {
+				errors = append(errors, fmt.Errorf(
+					"while deleting backup %s/%s: %w",
+					backup.Namespace,
+					backup.Name,
+					err,
+				))
+			}
+		}
+	}
+
+	if errors != nil {
+		return fmt.Errorf("got errors while deleting Backups not in the cluster: %v", errors)
+	}
+	return nil
+}
+
+// useSameBackupLocation checks whether the given backup was taken using the same configuration as provided
+func useSameBackupLocation(backup *v1.BackupStatus, cluster *v1.Cluster) bool {
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+		return false
+	}
+	configuration := cluster.Spec.Backup.BarmanObjectStore
+	return backup.EndpointURL == configuration.EndpointURL &&
+		backup.DestinationPath == configuration.DestinationPath &&
+		(backup.ServerName == configuration.ServerName ||
+			// if not specified we use the cluster name as server name
+			(configuration.ServerName == "" && backup.ServerName == cluster.Name)) &&
+		reflect.DeepEqual(backup.S3Credentials, configuration.S3Credentials) &&
+		reflect.DeepEqual(backup.AzureCredentials, configuration.AzureCredentials) &&
+		reflect.DeepEqual(backup.GoogleCredentials, configuration.GoogleCredentials)
 }

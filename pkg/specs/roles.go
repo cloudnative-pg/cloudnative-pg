@@ -112,7 +112,9 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"backups",
 			},
 			Verbs: []string{
+				"list",
 				"get",
+				"delete",
 			},
 		},
 		{
