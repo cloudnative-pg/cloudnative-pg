@@ -2,6 +2,51 @@
 
 History of user-visible changes for Cloud Native PostgreSQL.
 
+## Version 1.15.0
+
+**Release date:** 21 April 2022
+
+Features:
+
+- **Fencing:** Introduction of the fencing capability for a cluster or a given
+  set of PostgreSQL instances through the `k8s.enterprisedb.io/fencedInstances`
+  annotation, which, if not empty, disables switchover/failovers in the cluster;
+  fenced instances are shut down and the pod is kept running (while considered
+  not ready) for inspection and emergencies
+- **LDAP authentication:** Allow LDAP Simple Bind and Search+Bind configuration
+  options in the `pg_hba.conf` to be defined in the Postgres cluster spec
+  declaratively, enabling the optional use of Kubernetes secrets for sensitive
+  options such as `ldapbindpasswd`
+- Introduction of the `primaryUpdateMethod` option, accepting the values of
+  `switchover` (default) and `restart`, to be used in case of unsupervised
+  `primaryUpdateStrategy`; this method controls what happens to the primary
+  instance during the rolling update procedure
+- New `report` command in the `kubectl cnp` plugin for better diagnosis and
+  more effective troubleshooting of both the operator and a specific Postgres
+  cluster
+- Prune those `Backup` objects that are no longer in the backup object store
+- Specification of target timeline and `LSN` in Point-In-Time Recovery
+  bootstrap method
+- Support for the `AWS_SESSION_TOKEN` authentication token in AWS S3 through
+  the `sessionToken` option
+- Default image name for PgBouncer in `Pooler` pods set to
+  `quay.io/enterprisedb/pgbouncer:1.17.0`
+
+Fixes:
+
+- Base backup detection for Point-In-Time Recovery via `targetTime` correctly
+  works now, as previously a target prior to the latest available backup was
+  not possible (the detection algorithm was always wrong by selecting the last
+  backup as a starting point)
+- Improved resilience of hot standby sensitive parameters by relying on the
+  values the operator collects from `pg_controldata`
+- Intermediate certificates handling has been improved by properly discarding invalid entries,
+  instead of throwing an invalid certificate error
+- Prometheus exporter metric collection queries in the databases are now
+  committed instead of rolled back (this might result in a change in the number
+  of rolled back transactions that are visible from downstream dashboards,
+  where applicable)
+
 ## Version 1.14.0
 
 **Release date:** 25 March 2022
