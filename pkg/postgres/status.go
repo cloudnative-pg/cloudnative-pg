@@ -219,13 +219,25 @@ func (list PostgresqlStatusList) ArePodsWaitingForDecreasedSettings() bool {
 	return false
 }
 
-// ShouldSkipReconcile checks whether at least an instance is asking for the reconciliation loop to be skipped
-func (list PostgresqlStatusList) ShouldSkipReconcile() bool {
+// ReportingMightBeUnavailable checks whether the given instance might be unavailable
+func (list PostgresqlStatusList) ReportingMightBeUnavailable(instance string) bool {
 	for _, item := range list.Items {
-		if item.MightBeUnavailable {
+		if item.Pod.Name == instance && item.MightBeUnavailable {
 			return true
 		}
 	}
 
 	return false
+}
+
+// InstancesReportingMightBeUnavailable returns the number of instances that might be unavailable
+func (list PostgresqlStatusList) InstancesReportingMightBeUnavailable() int32 {
+	var n int32
+	for _, item := range list.Items {
+		if item.MightBeUnavailable {
+			n++
+		}
+	}
+
+	return n
 }

@@ -94,21 +94,12 @@ required. Then:
   set to 1
 
 !!! Warning
-    When at least one instance in a `Cluster` is fenced, failovers/switchovers for that
-    `Cluster` will be blocked until the fence is lifted, as the status of the `Cluster`
-    cannot be considered stable.
-
-    In particular, if a **primary instance** will be fenced, the postmaster process
-    will be shut down but no failover will happen, interrupting the operativity of
+    If a **primary instance** is fenced, its postmaster process
+    is shut down but no failover is performed, interrupting the operativity of
     the applications. When the fence will be lifted, the primary instance will be
-    started up again without any failover happening.
+    started up again without performing a failover.
 
-    Given that, we advise the user to fence only replica instances when possible.
-
-!!! Warning
-    If the primary is the only fenced instance in a `Cluster` and the pod is deleted, a
-    failover will be performed. When the fence on the old primary is lifted, that instance
-    is restarted as a standby (follower of the new primary).
+    Given that, we advise users to fence primary instances only if strictly required
 
 If a fenced instance is deleted, the pod will be recreated normally, but the
 postmaster won't be started. This can be extremely helpful when instances

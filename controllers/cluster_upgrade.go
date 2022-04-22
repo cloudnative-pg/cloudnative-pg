@@ -61,6 +61,10 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 			continue
 		}
 
+		if cluster.IsInstanceFenced(postgresqlStatus.Pod.Name) {
+			continue
+		}
+
 		shouldRestart, _, reason := conditionFunc(postgresqlStatus, cluster)
 		if !shouldRestart {
 			continue
@@ -82,6 +86,10 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 	}
 
 	// from now on we know we have a primary instance
+
+	if cluster.IsInstanceFenced(primaryPostgresqlStatus.Pod.Name) {
+		return false, nil
+	}
 
 	// we first check whether a restart is needed given the provided condition
 	shouldRestart, inPlacePossible, reason := conditionFunc(*primaryPostgresqlStatus, cluster)
@@ -209,7 +217,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	inPlacePossible bool,
 	reason string,
 ) {
-	if !status.IsReady {
+	if !status.IsReady || cluster.IsInstanceFenced(status.Pod.Name) || status.MightBeUnavailable {
 		return false, false, ""
 	}
 
