@@ -85,8 +85,6 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		if err != nil {
 			return
 		}
-		// force the instance to be reported as ready
-		result.IsReady = true
 	}()
 
 	if instance.PgRewindIsRunning {
