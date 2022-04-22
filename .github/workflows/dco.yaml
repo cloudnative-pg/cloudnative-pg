@@ -1,0 +1,8 @@
+name: DCO Check
+
+on:
+  pull_request:
+
+jobs:
+  dco:
+    runs-on: ubuntu-20.04
