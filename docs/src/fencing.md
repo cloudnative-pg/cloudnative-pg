@@ -99,7 +99,7 @@ required. Then:
     the applications. When the fence will be lifted, the primary instance will be
     started up again without performing a failover.
 
-    Given that, we advise users to fence primary instances only if strictly required
+    Given that, we advise users to fence primary instances only if strictly required.
 
 If a fenced instance is deleted, the pod will be recreated normally, but the
 postmaster won't be started. This can be extremely helpful when instances
