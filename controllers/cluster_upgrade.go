@@ -437,10 +437,10 @@ func upgradeInstanceManagerOnPod(ctx context.Context, pod v1.Pod) error {
 
 	updateURL := url.Build(pod.Status.PodIP, url.PathUpdate, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, updateURL, nil)
-	req.Body = binaryFileStream
 	if err != nil {
 		return err
 	}
+	req.Body = binaryFileStream
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

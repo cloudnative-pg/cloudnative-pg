@@ -20,6 +20,7 @@ package configfile
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/lib/pq"
@@ -44,9 +45,12 @@ func UpdatePostgresConfigurationFile(fileName string, options map[string]string)
 // content is passed
 func UpdateConfigurationContents(content string, options map[string]string) string {
 	lines := splitLines(content)
-
+	resultLength := len(lines) + len(options)
+	if resultLength >= math.MaxInt {
+		return ""
+	}
 	// Change matching existing lines
-	resultContent := make([]string, 0, len(lines)+len(options))
+	resultContent := make([]string, 0, resultLength)
 	foundKeys := stringset.New()
 	for _, line := range lines {
 		// Keep empty lines and comments

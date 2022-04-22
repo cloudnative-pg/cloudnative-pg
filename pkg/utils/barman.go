@@ -42,11 +42,12 @@ func ParsePolicy(policy string) (string, error) {
 // MapToBarmanTagsFormat will transform a map[string]string into the
 // Barman tags format needed
 func MapToBarmanTagsFormat(option string, mapTags map[string]string) []string {
-	if len(mapTags) == 0 {
+	tagsLength := len(mapTags)
+	if tagsLength == 0 {
 		return []string{}
 	}
 
-	tags := make([]string, 0, len(mapTags)+1)
+	tags := make([]string, 0, tagsLength)
 	tags = append(tags, option)
 	for k, v := range mapTags {
 		tags = append(tags, fmt.Sprintf("%v,%v", k, v))

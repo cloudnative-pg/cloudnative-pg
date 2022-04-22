@@ -1155,7 +1155,7 @@ func (r *ClusterReconciler) reconcilePVCs(
 		return ctrl.Result{}, fmt.Errorf("cannot detect serial from PVC %v: %v", pvc.Name, err)
 	}
 
-	pod := specs.PodWithExistingStorage(*cluster, int32(nodeSerial))
+	pod := specs.PodWithExistingStorage(*cluster, nodeSerial)
 
 	if configuration.Current.EnableAzurePVCUpdates {
 		for _, resizingPVC := range cluster.Status.ResizingPVC {

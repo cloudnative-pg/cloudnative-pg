@@ -148,7 +148,12 @@ func (archiver *WALArchiver) ArchiveList(
 // Archive archives a certain WAL file using barman-cloud-wal-archive.
 // See archiveWALFileList for the meaning of the parameters
 func (archiver *WALArchiver) Archive(walName string, baseOptions []string) error {
-	options := make([]string, len(baseOptions), len(baseOptions)+1)
+	optionsLength := len(baseOptions)
+	optionsLengthMax := optionsLength + 1
+	if optionsLength >= math.MaxInt || optionsLengthMax >= math.MaxInt {
+		return fmt.Errorf("can't archive wal file %v, options too long", walName)
+	}
+	options := make([]string, optionsLength, optionsLengthMax)
 	copy(options, baseOptions)
 	options = append(options, walName)
 
