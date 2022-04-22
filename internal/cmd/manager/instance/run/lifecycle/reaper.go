@@ -30,7 +30,35 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// PostgresOrphansReaper implements the Runnable interface and handles orphaned process
+// PostgresOrphansReaper implements the Runnable interface and handles orphaned
+// postmaster child processes.
+//
+// We are running as PID 1 in our container and we may receive SIGCHLD for
+// the following reasons:
+//
+// 1 - a child process we manually executed via `exec.Cmd` (i.e. the postmaster)
+//     exited
+// 2 - an postmaster worker process terminated after the postmaster itself
+//
+// The second condition may seem unlikely but it unfortunately happens everytime
+// the postmaster ends, even if just for the logging collector subprocess.
+//
+// As we can see in the postgres codebase (see [1]) the logging collector process
+// will ignore any termination signal sent by the postmaster and just wait for
+// every upstream process to be gone. This is why it will terminate after the
+// postmaster and we'll receive a SIGCHLD.
+//
+// If we don't collect the logging collector exit code we would get a
+// zombie process everytime we restart the postmaster.
+//
+// Anyway, if we just accept any SIGCHLD signal, we would break the internals
+// of `os.exec.Command` preventing the detection of the exit code of the child
+// process.
+//
+// This is why our zombie reaper works only for processes whose
+// executable is `postgres`.
+//
+// [1]: https://github.com/postgres/postgres/blob/REL_14_STABLE/src/backend/postmaster/syslogger.c#L237
 type PostgresOrphansReaper struct {
 	instance *postgres.Instance
 }
