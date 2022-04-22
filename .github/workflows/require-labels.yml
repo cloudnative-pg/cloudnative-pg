@@ -18,6 +18,6 @@ jobs:
       - name: Require labels
         uses: docker://agilepathway/pull-request-label-checker:v1.0.104
         with:
-          any_of: ok-to-merge
+          any_of: ok to merge
           none_of: do not merge
           repo_token: ${{ secrets.GITHUB_TOKEN }}
