@@ -860,7 +860,7 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv
 }
 
 // generateNodeSerial extracts the first free node serial in this pods
-func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *apiv1.Cluster) (int32, error) {
+func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *apiv1.Cluster) (int, error) {
 	cluster.Status.LatestGeneratedNode++
 	if err := r.Status().Update(ctx, cluster); err != nil {
 		return 0, err
@@ -1027,7 +1027,7 @@ func (r *ClusterReconciler) getOriginBackup(ctx context.Context, cluster *apiv1.
 
 func (r *ClusterReconciler) joinReplicaInstance(
 	ctx context.Context,
-	nodeSerial int32,
+	nodeSerial int,
 	cluster *apiv1.Cluster,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)

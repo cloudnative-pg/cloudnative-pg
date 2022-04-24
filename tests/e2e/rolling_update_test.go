@@ -251,7 +251,7 @@ var _ = Describe("Rolling updates", func() {
 		}
 		err := env.Client.Get(env.Ctx, namespacedName, cluster)
 		Expect(err).ToNot(HaveOccurred())
-		clusterInstances := int(cluster.Spec.Instances)
+		clusterInstances := cluster.Spec.Instances
 
 		By("Gathering info on the current state", func() {
 			originalPodNames, originalPodUID, originalPVCUID, err = gatherClusterInfo(namespace, clusterName)

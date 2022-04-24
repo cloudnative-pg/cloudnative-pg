@@ -32,7 +32,7 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1beta1.Pod
 	if cluster == nil || cluster.Spec.Instances < 3 {
 		return nil
 	}
-	minAvailableReplicas := int(cluster.Spec.Instances) - 2
+	minAvailableReplicas := cluster.Spec.Instances - 2
 	allReplicasButOne := intstr.FromInt(minAvailableReplicas)
 
 	return &policyv1beta1.PodDisruptionBudget{

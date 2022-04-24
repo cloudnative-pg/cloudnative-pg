@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -160,7 +161,9 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 
 	// Step 3: gather the WAL files names to archive
 	walFilesList := gatherWALFilesToArchive(ctx, walName, maxParallel)
-
+	if len(walFilesList) == 0 {
+		return fmt.Errorf("can't gather wal file list")
+	}
 	checkWalOptions, err := barmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
@@ -231,7 +234,11 @@ func gatherWALFilesToArchive(ctx context.Context, requestedWALFile string, paral
 
 	// slightly more optimized, but equivalent to:
 	// walList = []string{requestedWALFile}
-	walList = make([]string, 1, 1+parallel)
+	walListLength := parallel + 1
+	if walListLength >= math.MaxInt {
+		return []string{}
+	}
+	walList = make([]string, 1, walListLength)
 	walList[0] = requestedWALFile
 
 	err := filepath.WalkDir(archiveStatusPath, func(path string, d os.DirEntry, err error) error {

@@ -213,7 +213,7 @@ var _ = Describe("Failover", func() {
 			// At this point the promotion is waiting for all the walreceivers
 			// to be disconnected. We can send the SIGCONT now.
 			timeout := 60
-			Eventually(func() (int32, error) {
+			Eventually(func() (int, error) {
 				cluster := &apiv1.Cluster{}
 				err := env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.ReadyInstances, err

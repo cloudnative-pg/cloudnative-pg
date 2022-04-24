@@ -132,21 +132,21 @@ type ClusterSpec struct {
 	// Number of instances required in the cluster
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=1
-	Instances int32 `json:"instances"`
+	Instances int `json:"instances"`
 
 	// Minimum number of instances required in synchronous replication with the
 	// primary. Undefined or 0 allow writes to complete when no standby is
 	// available.
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
-	MinSyncReplicas int32 `json:"minSyncReplicas,omitempty"`
+	MinSyncReplicas int `json:"minSyncReplicas,omitempty"`
 
 	// The target value for the synchronous replication quorum, that can be
 	// decreased if the number of ready standbys is lower than this.
 	// Undefined or 0 disable synchronous replication.
 	// +kubebuilder:default:=0
 	// +kubebuilder:validation:Minimum=0
-	MaxSyncReplicas int32 `json:"maxSyncReplicas,omitempty"`
+	MaxSyncReplicas int `json:"maxSyncReplicas,omitempty"`
 
 	// Configuration of the PostgreSQL server
 	// +optional
@@ -286,16 +286,16 @@ const (
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// Total number of instances in the cluster
-	Instances int32 `json:"instances,omitempty"`
+	Instances int `json:"instances,omitempty"`
 
 	// Total number of ready instances in the cluster
-	ReadyInstances int32 `json:"readyInstances,omitempty"`
+	ReadyInstances int `json:"readyInstances,omitempty"`
 
 	// Instances status
 	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
 
 	// ID of the latest generated node (used to avoid node name clashing)
-	LatestGeneratedNode int32 `json:"latestGeneratedNode,omitempty"`
+	LatestGeneratedNode int `json:"latestGeneratedNode,omitempty"`
 
 	// Current primary instance
 	CurrentPrimary string `json:"currentPrimary,omitempty"`

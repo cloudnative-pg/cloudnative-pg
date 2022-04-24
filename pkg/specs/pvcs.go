@@ -67,7 +67,7 @@ func CreatePVC(
 	storageConfiguration apiv1.StorageConfiguration,
 	name string,
 	namespace string,
-	nodeSerial int32,
+	nodeSerial int,
 ) (*corev1.PersistentVolumeClaim, error) {
 	pvcName := fmt.Sprintf("%s-%v", name, nodeSerial)
 
@@ -76,7 +76,7 @@ func CreatePVC(
 			Name:      pvcName,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				ClusterSerialAnnotationName: strconv.Itoa(int(nodeSerial)),
+				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
 				PVCStatusAnnotationName:     PVCStatusInitializing,
 			},
 		},

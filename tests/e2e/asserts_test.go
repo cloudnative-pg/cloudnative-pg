@@ -207,7 +207,7 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			if err != nil {
 				return "", err
 			}
-			if cluster.Spec.Instances == int32(utils.CountReadyPods(podList.Items)) {
+			if cluster.Spec.Instances == utils.CountReadyPods(podList.Items) {
 				err = env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.Phase, err
 			}
