@@ -25,6 +25,7 @@ import (
 
 	"github.com/lib/pq"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/cnpgerrors"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
@@ -37,16 +38,20 @@ func UpdatePostgresConfigurationFile(fileName string, options map[string]string)
 		return false, fmt.Errorf("error while reading content of %v: %w", fileName, err)
 	}
 
-	updatedContent := UpdateConfigurationContents(string(rawCurrentContent), options)
+	updatedContent, err := UpdateConfigurationContents(string(rawCurrentContent), options)
+	if err != nil {
+		return false, fmt.Errorf("error while updating configuration from %v: %w", fileName, err)
+	}
 	return fileutils.WriteStringToFile(fileName, updatedContent)
 }
 
 // UpdateConfigurationContents search and replace options in a configuration file whose
 // content is passed
-func UpdateConfigurationContents(content string, options map[string]string) string {
+func UpdateConfigurationContents(content string, options map[string]string) (string, error) {
 	lines := splitLines(content)
 	if len(lines) >= math.MaxInt-len(options) {
-		return ""
+		return "", fmt.Errorf("could not updateConfigurationContents: %w",
+			cnpgerrors.ErrMemoryAllocation)
 	}
 	resultLength := len(lines) + len(options)
 	// Change matching existing lines
@@ -85,7 +90,7 @@ func UpdateConfigurationContents(content string, options map[string]string) stri
 		}
 	}
 
-	return strings.Join(resultContent, "\n") + "\n"
+	return strings.Join(resultContent, "\n") + "\n", nil
 }
 
 // RemoveOptionFromConfigurationContents deletes the lines containing the given option a configuration file whose

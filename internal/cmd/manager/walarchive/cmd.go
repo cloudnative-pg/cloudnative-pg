@@ -161,9 +161,7 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 
 	// Step 3: gather the WAL files names to archive
 	walFilesList := gatherWALFilesToArchive(ctx, walName, maxParallel)
-	if len(walFilesList) == 0 {
-		return fmt.Errorf("can't gather wal file list")
-	}
+
 	checkWalOptions, err := barmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
@@ -232,12 +230,15 @@ func gatherWALFilesToArchive(ctx context.Context, requestedWALFile string, paral
 	archiveStatusPath := path.Join(pgWalDirectory, "archive_status")
 	noMoreWALFilesNeeded := errors.New("no more files needed")
 
+	// allocate parallel + 1 only if it does not overflow. Cap otherwise
+	var walListLength int
+	if parallel < math.MaxInt-1 {
+		walListLength = parallel + 1
+	} else {
+		walListLength = math.MaxInt - 1
+	}
 	// slightly more optimized, but equivalent to:
 	// walList = []string{requestedWALFile}
-	if parallel >= math.MaxInt-1 {
-		return []string{}
-	}
-	walListLength := parallel + 1
 	walList = make([]string, 1, walListLength)
 	walList[0] = requestedWALFile
 
@@ -326,13 +327,19 @@ func barmanCloudWalArchiveOptions(
 	}
 
 	if len(configuration.Tags) > 0 {
-		options = append(options,
-			utils.MapToBarmanTagsFormat("--tags", configuration.Tags)...)
+		tags, err := utils.MapToBarmanTagsFormat("--tags", configuration.Tags)
+		if err != nil {
+			return nil, err
+		}
+		options = append(options, tags...)
 	}
 
 	if len(configuration.HistoryTags) > 0 {
-		options = append(options,
-			utils.MapToBarmanTagsFormat("--history-tags", configuration.HistoryTags)...)
+		historyTags, err := utils.MapToBarmanTagsFormat("--history-tags", configuration.HistoryTags)
+		if err != nil {
+			return nil, err
+		}
+		options = append(options, historyTags...)
 	}
 
 	options, err = barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
