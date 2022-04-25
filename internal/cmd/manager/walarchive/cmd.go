@@ -234,10 +234,10 @@ func gatherWALFilesToArchive(ctx context.Context, requestedWALFile string, paral
 
 	// slightly more optimized, but equivalent to:
 	// walList = []string{requestedWALFile}
-	walListLength := parallel + 1
-	if walListLength >= math.MaxInt {
+	if parallel >= math.MaxInt-1 {
 		return []string{}
 	}
+	walListLength := parallel + 1
 	walList = make([]string, 1, walListLength)
 	walList[0] = requestedWALFile
 

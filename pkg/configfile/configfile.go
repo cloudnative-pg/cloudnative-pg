@@ -45,10 +45,10 @@ func UpdatePostgresConfigurationFile(fileName string, options map[string]string)
 // content is passed
 func UpdateConfigurationContents(content string, options map[string]string) string {
 	lines := splitLines(content)
-	resultLength := len(lines) + len(options)
-	if resultLength >= math.MaxInt {
+	if len(lines) >= math.MaxInt-len(options) {
 		return ""
 	}
+	resultLength := len(lines) + len(options)
 	// Change matching existing lines
 	resultContent := make([]string, 0, resultLength)
 	foundKeys := stringset.New()

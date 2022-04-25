@@ -150,11 +150,10 @@ func (archiver *WALArchiver) ArchiveList(
 // See archiveWALFileList for the meaning of the parameters
 func (archiver *WALArchiver) Archive(walName string, baseOptions []string) error {
 	optionsLength := len(baseOptions)
-	optionsLengthMax := optionsLength + 1
-	if optionsLength >= math.MaxInt || optionsLengthMax >= math.MaxInt {
+	if optionsLength >= math.MaxInt-1 {
 		return fmt.Errorf("can't archive wal file %v, options too long", walName)
 	}
-	options := make([]string, optionsLength, optionsLengthMax)
+	options := make([]string, optionsLength, optionsLength+1)
 	copy(options, baseOptions)
 	options = append(options, walName)
 

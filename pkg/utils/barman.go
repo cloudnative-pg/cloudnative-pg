@@ -18,6 +18,7 @@ package utils
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 )
 
@@ -43,11 +44,11 @@ func ParsePolicy(policy string) (string, error) {
 // Barman tags format needed
 func MapToBarmanTagsFormat(option string, mapTags map[string]string) []string {
 	tagsLength := len(mapTags)
-	if tagsLength == 0 {
+	if tagsLength == 0 || tagsLength >= math.MaxInt-1 {
 		return []string{}
 	}
 
-	tags := make([]string, 0, tagsLength)
+	tags := make([]string, 0, tagsLength+1)
 	tags = append(tags, option)
 	for k, v := range mapTags {
 		tags = append(tags, fmt.Sprintf("%v,%v", k, v))
