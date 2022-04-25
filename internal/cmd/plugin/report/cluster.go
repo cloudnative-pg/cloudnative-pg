@@ -17,6 +17,8 @@ limitations under the License.
 package report
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -28,20 +30,26 @@ func clusterCmd() *cobra.Command {
 		includeLogs  bool
 	)
 
+	const filePlaceholder = "report_cluster_<name>_<timestamp>.zip"
+
 	cmd := &cobra.Command{
-		Use:   "cluster [clusterName]",
+		Use:   "cluster <clusterName>",
 		Short: "Report cluster resources, pods, events, logs (opt-in)",
 		Long:  "Collects combined information on the cluster in a Zip file",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
-			return Cluster(cmd.Context(), clusterName, plugin.Namespace,
-				plugin.OutputFormat(output), file, includeLogs)
+			now := time.Now().UTC()
+			if file == filePlaceholder {
+				file = reportName("cluster", now, clusterName) + ".zip"
+			}
+			return cluster(cmd.Context(), clusterName, plugin.Namespace,
+				plugin.OutputFormat(output), file, includeLogs, now)
 		},
 	}
 
-	cmd.Flags().StringVarP(&file, "file", "f", reportName("cluster")+".zip",
-		"Output file (timestamp computed at each run)")
+	cmd.Flags().StringVarP(&file, "file", "f", filePlaceholder,
+		"Output file")
 	cmd.Flags().StringVarP(&output, "output", "o", "yaml",
 		"Output format (yaml or json)")
 	cmd.Flags().BoolVarP(&includeLogs, "logs", "l", false, "include logs")

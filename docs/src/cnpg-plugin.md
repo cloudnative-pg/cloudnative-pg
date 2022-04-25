@@ -471,7 +471,7 @@ so the `-S` is disabled.
 Usage:
 
 ``` shell
-kubectl-cnpg report cluster [clusterName] -f <filename.zip> [flags]
+kubectl cnpg report cluster <clusterName> [flags]
 ```
 
 Note that, unlike the `operator` sub-command, for the `cluster` sub-command you
@@ -479,7 +479,7 @@ need to provide the cluster name, and very likely the namespace, unless the clus
 is in the default one.
 
 ``` shell
-kubectl cnpg report cluster cluster-example-full -f report.zip -n example2
+kubectl cnpg report cluster example -f report.zip -n example_namespace
 ```
 
 and then:
@@ -490,24 +490,24 @@ unzip report.zip
 
 ``` shell
 Archive:  report.zip
-   creating: report_cluster_<TIMESTAMP>/
-   creating: report_cluster_<TIMESTAMP>/manifests/
-  inflating: report_cluster_<TIMESTAMP>/manifests/cluster.yaml  
-  inflating: report_cluster_<TIMESTAMP>/manifests/cluster-pods.yaml  
-  inflating: report_cluster_<TIMESTAMP>/manifests/cluster-jobs.yaml  
-  inflating: report_cluster_<TIMESTAMP>/manifests/events.yaml
+   creating: report_cluster_example_<TIMESTAMP>/
+   creating: report_cluster_example_<TIMESTAMP>/manifests/
+  inflating: report_cluster_example_<TIMESTAMP>/manifests/cluster.yaml
+  inflating: report_cluster_example_<TIMESTAMP>/manifests/cluster-pods.yaml
+  inflating: report_cluster_example_<TIMESTAMP>/manifests/cluster-jobs.yaml
+  inflating: report_cluster_example_<TIMESTAMP>/manifests/events.yaml
 ```
 
 Remember that you can use the `--logs` flag to add the pod and job logs to the ZIP.
 
 ``` shell
-kubectl cnpg report cluster cluster-example-full -n example2 --logs
+kubectl cnpg report cluster example -n example_namespace --logs
 ```
 
 will result in:
 
 ``` shell
-Successfully written report to "report_cluster_<TIMESTAMP>.zip" (format: "yaml")
+Successfully written report to "report_cluster_example_<TIMESTAMP>.zip" (format: "yaml")
 ```
 
 ``` shell
@@ -515,16 +515,16 @@ unzip report_cluster_<TIMESTAMP>.zip
 ```
 
 ``` shell
-Archive:  report_cluster_<TIMESTAMP>.zip
-   creating: report_cluster_<TIMESTAMP>/
-   creating: report_cluster_<TIMESTAMP>/manifests/
-  inflating: report_cluster_<TIMESTAMP>/manifests/cluster.yaml  
-  inflating: report_cluster_<TIMESTAMP>/manifests/cluster-pods.yaml  
-  inflating: report_cluster_<TIMESTAMP>/manifests/cluster-jobs.yaml  
-  inflating: report_cluster_<TIMESTAMP>/manifests/events.yaml  
-   creating: report_cluster_<TIMESTAMP>/logs/
-  inflating: report_cluster_<TIMESTAMP>/logs/cluster-example-full-1.jsonl  
-   creating: report_cluster_<TIMESTAMP>/job-logs/
-  inflating: report_cluster_<TIMESTAMP>/job-logs/cluster-example-full-1-initdb-qnnvw.jsonl  
-  inflating: report_cluster_<TIMESTAMP>/job-logs/cluster-example-full-2-join-tvj8r.jsonl 
+Archive:  report_cluster_example_<TIMESTAMP>.zip
+   creating: report_cluster_example_<TIMESTAMP>/
+   creating: report_cluster_example_<TIMESTAMP>/manifests/
+  inflating: report_cluster_example_<TIMESTAMP>/manifests/cluster.yaml
+  inflating: report_cluster_example_<TIMESTAMP>/manifests/cluster-pods.yaml
+  inflating: report_cluster_example_<TIMESTAMP>/manifests/cluster-jobs.yaml
+  inflating: report_cluster_example_<TIMESTAMP>/manifests/events.yaml
+   creating: report_cluster_example_<TIMESTAMP>/logs/
+  inflating: report_cluster_example_<TIMESTAMP>/logs/cluster-example-full-1.jsonl
+   creating: report_cluster_example_<TIMESTAMP>/job-logs/
+  inflating: report_cluster_example_<TIMESTAMP>/job-logs/cluster-example-full-1-initdb-qnnvw.jsonl
+  inflating: report_cluster_example_<TIMESTAMP>/job-logs/cluster-example-full-2-join-tvj8r.jsonl
 ```
