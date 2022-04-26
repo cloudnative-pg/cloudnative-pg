@@ -118,7 +118,7 @@ The current maintainers of the CloudNativePG project are:
 - Leonardo Cecchi (EDB)
 - Jonathan Gonzalez (EDB)
 - Marco Nenciarini (EDB)
-- Philippe Scorsolini (EDB)
+- Philippe Scorsolini (controlplane.io)
 
 They are listed in the [CODEOWNERS](CODEOWNERS) file.
 
