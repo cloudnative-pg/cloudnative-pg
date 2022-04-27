@@ -338,7 +338,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: build --skip-validate --rm-dist
+          args: build --skip-validate --rm-dist --id manager
         env:
           DATE: ${{ steps.build-meta.outputs.date }}
           COMMIT: ${{ steps.build-meta.outputs.commit }}
