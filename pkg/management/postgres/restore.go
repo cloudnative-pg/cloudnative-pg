@@ -30,6 +30,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walarchive"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -85,6 +88,13 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
+	// Before starting the restore we check if the archive destination it's safe to use
+	// otherwise, we stop creating the cluster
+	err = info.checkBackupDestination(ctx, typedClient, cluster)
+	if err != nil {
+		return err
+	}
+
 	backup, env, err := info.loadBackup(ctx, typedClient, cluster)
 	if err != nil {
 		return err
@@ -118,7 +128,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.writeRestoreWalConfig(backup); err != nil {
+	if err := info.writeRestoreWalConfig(backup, cluster); err != nil {
 		return err
 	}
 
@@ -301,7 +311,7 @@ func (info InitInfo) loadBackupFromReference(
 // writeRestoreWalConfig writes a `custom.conf` allowing PostgreSQL
 // to complete the WAL recovery from the object storage and then start
 // as a new primary
-func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
+func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.Cluster) error {
 	// Ensure restore_command is used to correctly recover WALs
 	// from the object storage
 	major, err := postgresSpec.GetMajorVersion(info.PgData)
@@ -333,7 +343,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup) error {
 			"restore_command = '%s'\n"+
 			"%s",
 		strings.Join(cmd, " "),
-		info.RecoveryTarget)
+		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
 
 	log.Info("Generated recovery configuration", "configuration", recoveryFileContents)
 	// Disable archiving
@@ -555,6 +565,49 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 		if err != nil {
 			return fmt.Errorf("while configuring replica: %w", err)
 		}
+	}
+
+	return nil
+}
+
+func (info *InitInfo) checkBackupDestination(
+	ctx context.Context,
+	client client.Client,
+	cluster *apiv1.Cluster,
+) error {
+	if !cluster.Spec.Backup.IsBarmanBackupConfigured() {
+		return nil
+	}
+	// Get environment from cache
+	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(ctx,
+		client,
+		cluster.Namespace,
+		cluster.Spec.Backup.BarmanObjectStore,
+		os.Environ())
+	if err != nil {
+		return fmt.Errorf("can't get credentials for cluster %v: %w", cluster.Name, err)
+	}
+	if len(env) == 0 {
+		return nil
+	}
+
+	// Instance the WALArchiver to get the proper configuration
+	var walArchiver *archiver.WALArchiver
+	walArchiver, err = archiver.New(ctx, cluster, env, walarchive.SpoolDirectory)
+	if err != nil {
+		return fmt.Errorf("while creating the archiver: %w", err)
+	}
+
+	// Get WAL archive options
+	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
+	if err != nil {
+		log.Error(err, "while getting barman-cloud-wal-archive options")
+		return err
+	}
+
+	// Check if we're ok to archive in the desired destination
+	if err := walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions); err != nil {
+		return err
 	}
 
 	return nil

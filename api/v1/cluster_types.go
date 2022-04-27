@@ -1608,6 +1608,15 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	return false
 }
 
+// IsBarmanBackupConfigured returns true if one of the possible backup destination
+// is configured, false otherwise
+func (backupConfiguration *BackupConfiguration) IsBarmanBackupConfigured() bool {
+	return backupConfiguration != nil && backupConfiguration.BarmanObjectStore != nil &&
+		(backupConfiguration.BarmanObjectStore.AzureCredentials != nil ||
+			backupConfiguration.BarmanObjectStore.S3Credentials != nil ||
+			backupConfiguration.BarmanObjectStore.GoogleCredentials != nil)
+}
+
 // IsBarmanEndpointCASet returns true if we have a CA bundle for the endpoint
 // false otherwise
 func (backupConfiguration *BackupConfiguration) IsBarmanEndpointCASet() bool {
@@ -1621,8 +1630,13 @@ func (backupConfiguration *BackupConfiguration) IsBarmanEndpointCASet() bool {
 // BuildPostgresOptions create the list of options that
 // should be added to the PostgreSQL configuration to
 // recover given a certain target
-func (target RecoveryTarget) BuildPostgresOptions() string {
+func (target *RecoveryTarget) BuildPostgresOptions() string {
 	result := ""
+
+	if target == nil {
+		return result
+	}
+
 	if target.TargetTLI != "" {
 		result += fmt.Sprintf(
 			"recovery_target_timeline = '%v'\n",

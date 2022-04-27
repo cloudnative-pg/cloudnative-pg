@@ -26,6 +26,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/spool"
@@ -182,28 +184,31 @@ func (archiver *WALArchiver) Archive(walName string, baseOptions []string) error
 	return nil
 }
 
-// CheckWalArchive checks if the destinationObjectStore is ready perform archiving.
-// Based on this ticket in Barman https://github.com/EnterpriseDB/barman/issues/432
-// and its implementation https://github.com/EnterpriseDB/barman/pull/443
-// The idea here is to check ONLY if we're archiving the wal files for the first time in the bucket
-// since in this case the command barman-cloud-check-wal-archive will fail if the bucket exist and
-// contain wal files inside
-func (archiver *WALArchiver) CheckWalArchive(ctx context.Context, walFilesList, options []string) error {
+// CheckWalFiles check a list of WAL files looking for the first WAL file of the first Timeline
+// return true if the first file in the list it's the fir WAL file
+func (archiver *WALArchiver) CheckWalFiles(ctx context.Context, walFilesList []string) bool {
 	contextLogger := log.FromContext(ctx)
-
 	// If walFileList is empty then, this is a no-op just like the method ArchiveList
 	if len(walFilesList) == 0 {
-		return nil
+		contextLogger.Debug("WAL file list is empty, skipping check")
+		return false
 	}
 
 	// Get the first wal file from the list
 	walName := path.Base(walFilesList[0])
 	// We check that we have the first wal file of the first timeline, otherwise, there's nothing to do here
-	if walName != "000000010000000000000001" {
-		return nil
-	}
+	return walName == "000000010000000000000001"
+}
 
-	contextLogger.Info("barman-cloud-check-wal-archive checking the first wal", "walName", walName)
+// CheckWalArchiveDestination checks if the destinationObjectStore is ready perform archiving.
+// Based on this ticket in Barman https://github.com/EnterpriseDB/barman/issues/432
+// and its implementation https://github.com/EnterpriseDB/barman/pull/443
+// The idea here is to check ONLY if we're archiving the wal files for the first time in the bucket
+// since in this case the command barman-cloud-check-wal-archive will fail if the bucket exist and
+// contain wal files inside
+func (archiver *WALArchiver) CheckWalArchiveDestination(ctx context.Context, options []string) error {
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Info("barman-cloud-check-wal-archive checking the first wal")
 
 	// Check barman compatibility
 	capabilities, err := barmanCapabilities.CurrentCapabilities()
@@ -218,7 +223,6 @@ func (archiver *WALArchiver) CheckWalArchive(ctx context.Context, walFilesList, 
 	}
 
 	contextLogger.Trace("Executing "+barmanCapabilities.BarmanCloudCheckWalArchive,
-		"walName", walName,
 		"currentPrimary", archiver.cluster.Status.CurrentPrimary,
 		"targetPrimary", archiver.cluster.Status.TargetPrimary,
 		"options", options,
@@ -230,7 +234,6 @@ func (archiver *WALArchiver) CheckWalArchive(ctx context.Context, walFilesList, 
 	err = execlog.RunStreaming(barmanCloudWalArchiveCmd, barmanCapabilities.BarmanCloudCheckWalArchive)
 	if err != nil {
 		contextLogger.Error(err, "Error invoking "+barmanCapabilities.BarmanCloudCheckWalArchive,
-			"walName", walName,
 			"currentPrimary", archiver.cluster.Status.CurrentPrimary,
 			"targetPrimary", archiver.cluster.Status.TargetPrimary,
 			"options", options,
@@ -242,4 +245,36 @@ func (archiver *WALArchiver) CheckWalArchive(ctx context.Context, walFilesList, 
 	contextLogger.Trace("barman-cloud-check-wal-archive command execution completed")
 
 	return nil
+}
+
+// BarmanCloudCheckWalArchiveOptions create the options needed for the `barman-cloud-check-wal-archive`
+// command.
+func (archiver *WALArchiver) BarmanCloudCheckWalArchiveOptions(
+	cluster *apiv1.Cluster,
+	clusterName string,
+) ([]string, error) {
+	configuration := cluster.Spec.Backup.BarmanObjectStore
+
+	var options []string
+	if len(configuration.EndpointURL) > 0 {
+		options = append(
+			options,
+			"--endpoint-url",
+			configuration.EndpointURL)
+	}
+
+	options, err := barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
+	if err != nil {
+		return nil, err
+	}
+
+	serverName := clusterName
+	if len(configuration.ServerName) != 0 {
+		serverName = configuration.ServerName
+	}
+	options = append(
+		options,
+		configuration.DestinationPath,
+		serverName)
+	return options, nil
 }
