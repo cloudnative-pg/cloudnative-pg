@@ -28,13 +28,15 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
+const labelOperatorName = "cloudnative-pg"
+
 // GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
 func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
 	const operatorDeploymentName = "cnpg-controller-manager"
 	deploymentList := &appsv1.DeploymentList{}
 
 	if err := plugin.Client.List(
-		ctx, deploymentList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloudnative-pg"},
+		ctx, deploymentList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": labelOperatorName},
 	); err != nil {
 		return appsv1.Deployment{}, err
 	}
@@ -78,28 +80,24 @@ func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
 	return deploymentList.Items[0], nil
 }
 
-// GetOperatorPod returns the operator pod if there is a single one running, error otherwise
-func GetOperatorPod(ctx context.Context) (corev1.Pod, error) {
+// GetOperatorPods returns the operator pods if found, error otherwise
+func GetOperatorPods(ctx context.Context) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 
 	// This will work for newer version of the operator, which are using
 	// our custom label
 	if err := plugin.Client.List(
-		ctx, podList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloudnative-pg"}); err != nil {
-		return corev1.Pod{}, err
+		ctx, podList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": labelOperatorName}); err != nil {
+		return nil, err
 	}
-	switch {
-	case len(podList.Items) > 1:
-		err := fmt.Errorf("number of running operator pods greater than 1: %v pods running", len(podList.Items))
-		return corev1.Pod{}, err
 
-	case len(podList.Items) == 1:
-		return podList.Items[0], nil
+	if len(podList.Items) > 0 {
+		return podList.Items, nil
 	}
 
 	operatorNamespace, err := GetOperatorNamespaceName(ctx)
 	if err != nil {
-		return corev1.Pod{}, err
+		return nil, err
 	}
 
 	// This will work for older version of the operator, which are using
@@ -108,14 +106,14 @@ func GetOperatorPod(ctx context.Context) (corev1.Pod, error) {
 		ctx, podList,
 		ctrlclient.MatchingLabels{"control-plane": "controller-manager"},
 		ctrlclient.InNamespace(operatorNamespace)); err != nil {
-		return corev1.Pod{}, err
+		return nil, err
 	}
-	if len(podList.Items) != 1 {
-		err = fmt.Errorf("number of running operator different than 1: %v pods running", len(podList.Items))
-		return corev1.Pod{}, err
+	if len(podList.Items) == 0 {
+		err = fmt.Errorf("operator pods not found")
+		return nil, err
 	}
 
-	return podList.Items[0], nil
+	return podList.Items, nil
 }
 
 // GetOperatorNamespaceName returns the namespace the operator Deployment is running in

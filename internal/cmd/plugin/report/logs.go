@@ -61,22 +61,27 @@ func streamPodLogs(ctx context.Context, pod corev1.Pod, writer io.Writer) (err e
 }
 
 // streamPodLogsToZip streams the pod logs to a new section in the ZIP
-func streamPodLogsToZip(ctx context.Context, pod corev1.Pod,
+func streamPodLogsToZip(ctx context.Context, pods []corev1.Pod,
 	dirname, name string, zipper *zip.Writer,
 ) error {
 	logsdir := filepath.Join(dirname, name)
-	_, err := zipper.Create(logsdir + "/")
-	if err != nil {
+	if _, err := zipper.Create(logsdir + "/"); err != nil {
 		return fmt.Errorf("could not add '%s' to zip: %w", logsdir, err)
 	}
 
-	path := filepath.Join(logsdir, "logs.jsonl")
-	writer, err := zipper.Create(path)
-	if err != nil {
-		return fmt.Errorf("could not add '%s' to zip: %w", path, err)
+	for i := range pods {
+		pod := pods[i]
+		path := filepath.Join(logsdir, fmt.Sprintf("%s-logs.jsonl", pod.Name))
+		writer, zipperErr := zipper.Create(path)
+		if zipperErr != nil {
+			return fmt.Errorf("could not add '%s' to zip: %w", path, zipperErr)
+		}
+		if err := streamPodLogs(ctx, pod, writer); err != nil {
+			return err
+		}
 	}
 
-	return streamPodLogs(ctx, pod, writer)
+	return nil
 }
 
 // streamClusterLogsToZip streams the logs from the pods in the cluster, one by
