@@ -31,9 +31,7 @@ jobs:
                   || github.event.client_payload.slash_command.args.named.depth }}",
             "test_level":"${{ github.event.client_payload.slash_command.args.named.tl
                   || github.event.client_payload.slash_command.args.named.level
-                  || github.event.client_payload.slash_command.args.named.test_level }}",
-            "limit":"${{ github.event.client_payload.slash_command.args.named.l
-                  || github.event.client_payload.slash_command.args.named.limit }}"}
+                  || github.event.client_payload.slash_command.args.named.test_level }}"
       - name: Create comment
         uses: peter-evans/create-or-update-comment@v2
         with:
