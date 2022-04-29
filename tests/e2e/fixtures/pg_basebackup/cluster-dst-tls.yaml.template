@@ -21,6 +21,10 @@ spec:
 
   bootstrap:
     pg_basebackup:
+      database: app
+      owner: appuser
+      secret:
+        name: postgresql-user-supplied-app
       source: pg-basebackup-src
 
   externalClusters:
@@ -40,3 +44,14 @@ spec:
       sslRootCert:
         name: pg-basebackup-src-ca
         key: ca.crt
+---
+apiVersion: v1
+data:
+  username: YXBwdXNlcg==
+  password: NGxzMDU0ZjM=
+kind: Secret
+metadata:
+  name: postgresql-user-supplied-app
+  labels:
+    cnpg.io/reload: ""
+type: kubernetes.io/basic-auth

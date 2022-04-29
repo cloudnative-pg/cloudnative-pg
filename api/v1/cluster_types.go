@@ -746,6 +746,21 @@ type BootstrapRecovery struct {
 	// as expected by PostgreSQL (i.e., timestamp, transaction Id, LSN, ...).
 	// More info: https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET
 	RecoveryTarget *RecoveryTarget `json:"recoveryTarget,omitempty"`
+
+	// Name of the database used by the application. Default: `app`.
+	// +optional
+	Database string `json:"database"`
+
+	// Name of the owner of the database in the instance to be used
+	// by applications. Defaults to the value of the `database` key.
+	// +optional
+	Owner string `json:"owner"`
+
+	// Name of the secret containing the initial credentials for the
+	// owner of the user database. If empty a new secret will be
+	// created from scratch
+	// +optional
+	Secret *LocalObjectReference `json:"secret,omitempty"`
 }
 
 // BackupSource contains the backup we need to restore from, plus some
@@ -764,6 +779,21 @@ type BootstrapPgBaseBackup struct {
 	// The name of the server of which we need to take a physical backup
 	// +kubebuilder:validation:MinLength=1
 	Source string `json:"source"`
+
+	// Name of the database used by the application. Default: `app`.
+	// +optional
+	Database string `json:"database"`
+
+	// Name of the owner of the database in the instance to be used
+	// by applications. Defaults to the value of the `database` key.
+	// +optional
+	Owner string `json:"owner"`
+
+	// Name of the secret containing the initial credentials for the
+	// owner of the user database. If empty a new secret will be
+	// created from scratch
+	// +optional
+	Secret *LocalObjectReference `json:"secret,omitempty"`
 }
 
 // RecoveryTarget allows to configure the moment where the recovery process
@@ -1296,15 +1326,78 @@ func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 	return true
 }
 
-// GetApplicationSecretName get the name of the secret of the application
+// GetApplicationSecretName get the name of the application secret for any bootstrap type
 func (cluster *Cluster) GetApplicationSecretName() string {
+	switch {
+	case cluster.Spec.Bootstrap == nil:
+		return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
+	case cluster.Spec.Bootstrap.Recovery != nil:
+		return cluster.GetRecoveryApplicationSecretName()
+	case cluster.Spec.Bootstrap.PgBaseBackup != nil:
+		return cluster.GetPgBaseBackupApplicationSecretName()
+	default:
+		return cluster.GetInitDBApplicationSecretName()
+	}
+}
+
+// GetApplicationDatabaseName get the name of the application database for a specific bootstrap
+func (cluster *Cluster) GetApplicationDatabaseName() string {
+	switch {
+	case cluster.ShouldRecoveryCreateApplicationDatabase():
+		return cluster.Spec.Bootstrap.Recovery.Database
+	case cluster.ShouldPgBaseBackupCreateApplicationDatabase():
+		return cluster.Spec.Bootstrap.PgBaseBackup.Database
+	case cluster.ShouldInitDBCreateApplicationDatabase():
+		return cluster.Spec.Bootstrap.InitDB.Database
+	default:
+		return ""
+	}
+}
+
+// GetApplicationDatabaseOwner get the owner user of the application database for a specific bootstrap
+func (cluster *Cluster) GetApplicationDatabaseOwner() string {
+	switch {
+	case cluster.ShouldRecoveryCreateApplicationDatabase():
+		return cluster.Spec.Bootstrap.Recovery.Owner
+	case cluster.ShouldPgBaseBackupCreateApplicationDatabase():
+		return cluster.Spec.Bootstrap.PgBaseBackup.Owner
+	case cluster.ShouldInitDBCreateApplicationDatabase():
+		return cluster.Spec.Bootstrap.InitDB.Owner
+	default:
+		return ""
+	}
+}
+
+// GetInitDBApplicationSecretName get the name of the secret of the application for initdb
+func (cluster *Cluster) GetInitDBApplicationSecretName() string {
 	if cluster.Spec.Bootstrap != nil &&
 		cluster.Spec.Bootstrap.InitDB != nil &&
 		cluster.Spec.Bootstrap.InitDB.Secret != nil &&
 		cluster.Spec.Bootstrap.InitDB.Secret.Name != "" {
 		return cluster.Spec.Bootstrap.InitDB.Secret.Name
 	}
+	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
+}
 
+// GetRecoveryApplicationSecretName get the name of the secret of the application for recovery
+func (cluster *Cluster) GetRecoveryApplicationSecretName() string {
+	if cluster.Spec.Bootstrap != nil &&
+		cluster.Spec.Bootstrap.Recovery != nil &&
+		cluster.Spec.Bootstrap.Recovery.Secret != nil &&
+		cluster.Spec.Bootstrap.Recovery.Secret.Name != "" {
+		return cluster.Spec.Bootstrap.Recovery.Secret.Name
+	}
+	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
+}
+
+// GetPgBaseBackupApplicationSecretName get the name of the secret of the application for pg_basebackup
+func (cluster *Cluster) GetPgBaseBackupApplicationSecretName() string {
+	if cluster.Spec.Bootstrap != nil &&
+		cluster.Spec.Bootstrap.PgBaseBackup != nil &&
+		cluster.Spec.Bootstrap.PgBaseBackup.Secret != nil &&
+		cluster.Spec.Bootstrap.PgBaseBackup.Secret.Name != "" {
+		return cluster.Spec.Bootstrap.PgBaseBackup.Secret.Name
+	}
 	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
 }
 
@@ -1478,9 +1571,49 @@ func (cluster *Cluster) ShouldResizeInUseVolumes() bool {
 	return *cluster.Spec.StorageConfiguration.ResizeInUseVolumes
 }
 
+// ShouldCreateApplicationSecret returns true if for this cluster,
+// during the bootstrap phase, we need to create a secret to store application credentials
+func (cluster *Cluster) ShouldCreateApplicationSecret() bool {
+	return cluster.ShouldInitDBCreateApplicationSecret() ||
+		cluster.ShouldPgBaseBackupCreateApplicationSecret() ||
+		cluster.ShouldRecoveryCreateApplicationSecret()
+}
+
+// ShouldInitDBCreateApplicationSecret returns true if for this cluster,
+// during the bootstrap phase using initDB, we need to create an new application secret
+func (cluster *Cluster) ShouldInitDBCreateApplicationSecret() bool {
+	return cluster.ShouldInitDBCreateApplicationDatabase() &&
+		(cluster.Spec.Bootstrap.InitDB.Secret == nil ||
+			cluster.Spec.Bootstrap.InitDB.Secret.Name == "")
+}
+
+// ShouldPgBaseBackupCreateApplicationSecret returns true if for this cluster,
+// during the bootstrap phase using pg_basebackup, we need to create an application secret
+func (cluster *Cluster) ShouldPgBaseBackupCreateApplicationSecret() bool {
+	return cluster.ShouldPgBaseBackupCreateApplicationDatabase() &&
+		(cluster.Spec.Bootstrap.PgBaseBackup.Secret == nil ||
+			cluster.Spec.Bootstrap.PgBaseBackup.Secret.Name == "")
+}
+
+// ShouldRecoveryCreateApplicationSecret returns true if for this cluster,
+// during the bootstrap phase using recovery, we need to create an application secret
+func (cluster *Cluster) ShouldRecoveryCreateApplicationSecret() bool {
+	return cluster.ShouldRecoveryCreateApplicationDatabase() &&
+		(cluster.Spec.Bootstrap.Recovery.Secret == nil ||
+			cluster.Spec.Bootstrap.Recovery.Secret.Name == "")
+}
+
 // ShouldCreateApplicationDatabase returns true if for this cluster,
 // during the bootstrap phase, we need to create an application database
-func (cluster Cluster) ShouldCreateApplicationDatabase() bool {
+func (cluster *Cluster) ShouldCreateApplicationDatabase() bool {
+	return cluster.ShouldInitDBCreateApplicationDatabase() ||
+		cluster.ShouldRecoveryCreateApplicationDatabase() ||
+		cluster.ShouldPgBaseBackupCreateApplicationDatabase()
+}
+
+// ShouldInitDBCreateApplicationDatabase returns true if for this cluster,
+// during the bootstrap phase using initDB, we need to create an application database
+func (cluster *Cluster) ShouldInitDBCreateApplicationDatabase() bool {
 	if cluster.Spec.Bootstrap == nil {
 		return false
 	}
@@ -1490,6 +1623,36 @@ func (cluster Cluster) ShouldCreateApplicationDatabase() bool {
 	}
 
 	initDBParameters := cluster.Spec.Bootstrap.InitDB
+	return initDBParameters.Owner != "" && initDBParameters.Database != ""
+}
+
+// ShouldPgBaseBackupCreateApplicationDatabase returns true if for this cluster,
+// during the bootstrap phase using pg_basebackup, we need to create an application database
+func (cluster *Cluster) ShouldPgBaseBackupCreateApplicationDatabase() bool {
+	if cluster.Spec.Bootstrap == nil {
+		return false
+	}
+
+	if cluster.Spec.Bootstrap.PgBaseBackup == nil {
+		return false
+	}
+
+	initDBParameters := cluster.Spec.Bootstrap.PgBaseBackup
+	return initDBParameters.Owner != "" && initDBParameters.Database != ""
+}
+
+// ShouldRecoveryCreateApplicationDatabase returns true if for this cluster,
+// during the bootstrap phase using recovery, we need to create an application database
+func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
+	if cluster.Spec.Bootstrap == nil {
+		return false
+	}
+
+	if cluster.Spec.Bootstrap.Recovery == nil {
+		return false
+	}
+
+	initDBParameters := cluster.Spec.Bootstrap.Recovery
 	return initDBParameters.Owner != "" && initDBParameters.Database != ""
 }
 

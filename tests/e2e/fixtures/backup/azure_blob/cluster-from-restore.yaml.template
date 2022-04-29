@@ -21,6 +21,10 @@ spec:
 
   bootstrap:
     recovery:
+      database: appdb
+      owner: appuser
+      secret:
+        name: postgresql-user-supplied-app
       backup:
         name: cluster-backup
 
@@ -31,3 +35,14 @@ spec:
     customQueriesSecret:
       - name: monitoring-01
         key: additional-queries
+---
+apiVersion: v1
+data:
+  username: YXBwdXNlcg==
+  password: NGxzMDU0ZjM=
+kind: Secret
+metadata:
+  name: postgresql-user-supplied-app
+  labels:
+    cnpg.io/reload: ""
+type: kubernetes.io/basic-auth

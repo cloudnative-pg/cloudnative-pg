@@ -1102,6 +1102,26 @@ spec:
                     description: Bootstrap the cluster taking a physical backup of
                       another compatible PostgreSQL instance
                     properties:
+                      database:
+                        description: 'Name of the database used by the application.
+                          Default: `app`.'
+                        type: string
+                      owner:
+                        description: Name of the owner of the database in the instance
+                          to be used by applications. Defaults to the value of the
+                          `database` key.
+                        type: string
+                      secret:
+                        description: Name of the secret containing the initial credentials
+                          for the owner of the user database. If empty a new secret
+                          will be created from scratch
+                        properties:
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - name
+                        type: object
                       source:
                         description: The name of the server of which we need to take
                           a physical backup
@@ -1137,6 +1157,15 @@ spec:
                         required:
                         - name
                         type: object
+                      database:
+                        description: 'Name of the database used by the application.
+                          Default: `app`.'
+                        type: string
+                      owner:
+                        description: Name of the owner of the database in the instance
+                          to be used by applications. Defaults to the value of the
+                          `database` key.
+                        type: string
                       recoveryTarget:
                         description: 'By default, the recovery process applies all
                           the available WAL files in the archive (full recovery).
@@ -1172,6 +1201,17 @@ spec:
                           targetXID:
                             description: The target transaction ID
                             type: string
+                        type: object
+                      secret:
+                        description: Name of the secret containing the initial credentials
+                          for the owner of the user database. If empty a new secret
+                          will be created from scratch
+                        properties:
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - name
                         type: object
                       source:
                         description: The external cluster whose backup we will restore.

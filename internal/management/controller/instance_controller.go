@@ -675,7 +675,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 
 	dbname := "postgres"
 	if cluster.ShouldCreateApplicationDatabase() {
-		dbname = cluster.Spec.Bootstrap.InitDB.Database
+		dbname = cluster.GetApplicationDatabaseName()
 	}
 
 	queriesCollector := metrics.NewQueriesCollector("cnpg", r.instance, dbname)
@@ -1132,12 +1132,11 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 	}
 
 	if cluster.ShouldCreateApplicationDatabase() {
-		err = r.reconcileUser(ctx, cluster.Spec.Bootstrap.InitDB.Owner, cluster.GetApplicationSecretName(), tx)
+		err = r.reconcileUser(ctx, cluster.GetApplicationDatabaseOwner(), cluster.GetApplicationSecretName(), tx)
 		if err != nil {
 			return err
 		}
 	}
-
 	return tx.Commit()
 }
 

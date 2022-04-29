@@ -64,7 +64,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 			shellquote.Join(cluster.Spec.Bootstrap.InitDB.PostInitTemplateSQL...))
 	}
 
-	if cluster.ShouldCreateApplicationDatabase() {
+	if cluster.ShouldInitDBCreateApplicationDatabase() {
 		initCommand = append(initCommand,
 			"--app-db-name", cluster.Spec.Bootstrap.InitDB.Database,
 			"--app-user", cluster.Spec.Bootstrap.InitDB.Owner)
@@ -121,6 +121,12 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 		"/controller/manager",
 		"instance",
 		"restore",
+	}
+
+	if cluster.ShouldRecoveryCreateApplicationDatabase() {
+		initCommand = append(initCommand,
+			"--app-db-name", cluster.Spec.Bootstrap.Recovery.Database,
+			"--app-user", cluster.Spec.Bootstrap.Recovery.Owner)
 	}
 
 	job := createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
@@ -198,7 +204,11 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *bat
 		"instance",
 		"pgbasebackup",
 	}
-
+	if cluster.ShouldPgBaseBackupCreateApplicationDatabase() {
+		initCommand = append(initCommand,
+			"--app-db-name", cluster.Spec.Bootstrap.PgBaseBackup.Database,
+			"--app-user", cluster.Spec.Bootstrap.PgBaseBackup.Owner)
+	}
 	return createPrimaryJob(cluster, nodeSerial, "pgbasebackup", initCommand)
 }
 

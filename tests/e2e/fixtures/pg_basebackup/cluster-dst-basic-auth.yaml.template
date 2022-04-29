@@ -21,6 +21,8 @@ spec:
 
   bootstrap:
     pg_basebackup:
+      database: app
+      owner: appuser
       source: pg-basebackup-src
 
   externalClusters:

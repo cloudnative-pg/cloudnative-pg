@@ -49,6 +49,10 @@ const (
 	// DefaultMonitoringSecretName is the name of the target secret with the default monitoring queries,
 	// if configured
 	DefaultMonitoringSecretName = DefaultMonitoringConfigMapName
+	// DefaultApplicationDatabaseName is the name of application database if not specific
+	DefaultApplicationDatabaseName = "app"
+	// DefaultApplicationUserName is the name of application database owner if not specific
+	DefaultApplicationUserName = DefaultApplicationDatabaseName
 )
 
 // clusterLog is for logging in this package.
@@ -89,7 +93,12 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	}
 
 	// Defaulting initDB if no other boostrap method was passed
-	if r.Spec.Bootstrap.Recovery == nil && r.Spec.Bootstrap.PgBaseBackup == nil {
+	switch {
+	case r.Spec.Bootstrap.Recovery != nil:
+		r.defaultRecovery()
+	case r.Spec.Bootstrap.PgBaseBackup != nil:
+		r.defaultPgBaseBackup()
+	default:
 		r.defaultInitDB()
 	}
 
@@ -180,13 +189,13 @@ func (r *Cluster) defaultMonitoringQueries(config *configuration.Data) {
 func (r *Cluster) defaultInitDB() {
 	if r.Spec.Bootstrap.InitDB == nil {
 		r.Spec.Bootstrap.InitDB = &BootstrapInitDB{
-			Database: "app",
-			Owner:    "app",
+			Database: DefaultApplicationDatabaseName,
+			Owner:    DefaultApplicationUserName,
 		}
 	}
 
 	if r.Spec.Bootstrap.InitDB.Database == "" {
-		r.Spec.Bootstrap.InitDB.Database = "app"
+		r.Spec.Bootstrap.InitDB.Database = DefaultApplicationDatabaseName
 	}
 	if r.Spec.Bootstrap.InitDB.Owner == "" {
 		r.Spec.Bootstrap.InitDB.Owner = r.Spec.Bootstrap.InitDB.Database
@@ -199,6 +208,38 @@ func (r *Cluster) defaultInitDB() {
 	}
 	if r.Spec.Bootstrap.InitDB.LocaleCType == "" {
 		r.Spec.Bootstrap.InitDB.LocaleCType = "C"
+	}
+}
+
+// defaultRecovery enriches the recovery with defaults if not all the required arguments were passed
+func (r *Cluster) defaultRecovery() {
+	// if none area is provided, will ignore the application database configuration
+	if r.Spec.Bootstrap.Recovery.Database == "" &&
+		r.Spec.Bootstrap.Recovery.Owner == "" &&
+		r.Spec.Bootstrap.Recovery.Secret == nil {
+		return
+	}
+	if r.Spec.Bootstrap.Recovery.Database == "" {
+		r.Spec.Bootstrap.Recovery.Database = DefaultApplicationDatabaseName
+	}
+	if r.Spec.Bootstrap.Recovery.Owner == "" {
+		r.Spec.Bootstrap.Recovery.Owner = r.Spec.Bootstrap.Recovery.Database
+	}
+}
+
+// defaultPgBaseBackup enriches the pg_basebackup with defaults if not all the required arguments were passed
+func (r *Cluster) defaultPgBaseBackup() {
+	// if none area is provided, will ignore the application database configuration
+	if r.Spec.Bootstrap.PgBaseBackup.Database == "" &&
+		r.Spec.Bootstrap.PgBaseBackup.Owner == "" &&
+		r.Spec.Bootstrap.PgBaseBackup.Secret == nil {
+		return
+	}
+	if r.Spec.Bootstrap.PgBaseBackup.Database == "" {
+		r.Spec.Bootstrap.PgBaseBackup.Database = DefaultApplicationDatabaseName
+	}
+	if r.Spec.Bootstrap.PgBaseBackup.Owner == "" {
+		r.Spec.Bootstrap.PgBaseBackup.Owner = r.Spec.Bootstrap.PgBaseBackup.Database
 	}
 }
 
@@ -371,6 +412,82 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 				field.NewPath("spec", "bootstrap", "initdb", "walSegmentSize"),
 				initDBOptions.WalSegmentSize,
 				"WAL segment size must be a power of 2"))
+	}
+
+	return result
+}
+
+// validateRecovery validate the bootstrapping options when Recovery
+// method is used
+func (r *Cluster) validateRecovery() field.ErrorList {
+	var result field.ErrorList
+
+	// If it's not configured, everything is ok
+	if r.Spec.Bootstrap == nil {
+		return result
+	}
+
+	if r.Spec.Bootstrap.Recovery == nil {
+		return result
+	}
+
+	// If you specify the database name, then you need also to specify the
+	// owner user and vice-versa
+	recoveryOptions := r.Spec.Bootstrap.Recovery
+
+	if recoveryOptions.Database != "" && recoveryOptions.Owner == "" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "owner"),
+				"",
+				"You need to specify the database owner user"))
+	}
+	if recoveryOptions.Database == "" && recoveryOptions.Owner != "" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "database"),
+				"",
+				"You need to specify the database name"))
+	}
+
+	return result
+}
+
+// validatePgBaseBackup validate the bootstrapping options when pg_basebackup
+// method is used
+func (r *Cluster) validatePgBaseBackup() field.ErrorList {
+	var result field.ErrorList
+
+	// If it's not configured, everything is ok
+	if r.Spec.Bootstrap == nil {
+		return result
+	}
+
+	if r.Spec.Bootstrap.PgBaseBackup == nil {
+		return result
+	}
+
+	// If you specify the database name, then you need also to specify the
+	// owner user and vice-versa
+	pgBaseBackupOptions := r.Spec.Bootstrap.PgBaseBackup
+
+	if pgBaseBackupOptions.Database != "" && pgBaseBackupOptions.Owner == "" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "pg_basebackup", "owner"),
+				"",
+				"You need to specify the database owner user"))
+	}
+	if pgBaseBackupOptions.Database == "" && pgBaseBackupOptions.Owner != "" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "pg_basebackup", "database"),
+				"",
+				"You need to specify the database name"))
 	}
 
 	return result

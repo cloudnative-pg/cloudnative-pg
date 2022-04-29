@@ -325,6 +325,66 @@ var _ = Describe("cluster configuration", func() {
 		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("appdb"))
 	})
 
+	It("defaults to creating an application database if recovery is used", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{},
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.ShouldRecoveryCreateApplicationDatabase()).Should(BeFalse())
+		Expect(cluster.Spec.Bootstrap.Recovery.Database).Should(BeEmpty())
+		Expect(cluster.Spec.Bootstrap.Recovery.Owner).Should(BeEmpty())
+		Expect(cluster.Spec.Bootstrap.Recovery.Secret).Should(BeNil())
+	})
+
+	It("defaults the owner user with the database name for recovery", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Database: "appdb",
+					},
+				},
+			},
+		}
+
+		cluster.Default()
+		Expect(cluster.Spec.Bootstrap.Recovery.Owner).To(Equal("appdb"))
+	})
+
+	It("defaults not to create an application database if pg_basebackup is used", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+			},
+		}
+		cluster.Default()
+		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).Should(BeFalse())
+		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Database).Should(BeEmpty())
+		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Owner).Should(BeEmpty())
+		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Secret).Should(BeNil())
+	})
+
+	It("defaults the owner user with the database name for pg_basebackup", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Database: "appdb",
+					},
+				},
+			},
+		}
+
+		cluster.Default()
+		Expect(cluster.Spec.Bootstrap.PgBaseBackup.Owner).To(Equal("appdb"))
+	})
+
 	It("defaults the PostgreSQL configuration with parameters from the operator", func() {
 		cluster := Cluster{}
 		cluster.Default()
@@ -1145,6 +1205,52 @@ var _ = Describe("validation of an external cluster", func() {
 })
 
 var _ = Describe("bootstrap base backup validation", func() {
+	It("complains if you specify the database name but not the owner for pg_basebackup", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Database: "app",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePgBaseBackup()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("complains if you specify the owner but not the database name for pg_basebackup", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Owner: "app",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePgBaseBackup()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("doesn't complain if you specify both database name and owner user for pg_basebackup", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Database: "app",
+						Owner:    "app",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePgBaseBackup()
+		Expect(result).To(BeEmpty())
+	})
+
 	It("doesn't complain if we are not bootstrapping using pg_basebackup", func() {
 		recoveryCluster := &Cluster{
 			Spec: ClusterSpec{
@@ -1171,6 +1277,52 @@ var _ = Describe("bootstrap base backup validation", func() {
 })
 
 var _ = Describe("bootstrap recovery validation", func() {
+	It("complains if you specify the database name but not the owner for recovery", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Database: "app",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateRecovery()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("complains if you specify the owner but not the database name for recovery", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Owner: "app",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateRecovery()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("doesn't complain if you specify both database name and owner user for recovery", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Database: "app",
+						Owner:    "app",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateRecovery()
+		Expect(result).To(BeEmpty())
+	})
+
 	It("does not complain when bootstrap recovery source matches one of the names of external clusters", func() {
 		recoveryCluster := &Cluster{
 			Spec: ClusterSpec{
@@ -1378,35 +1530,6 @@ var _ = Describe("validation of the list of external clusters", func() {
 			},
 		}
 		Expect(cluster.validateExternalClusters()).To(BeEmpty())
-	})
-})
-
-var _ = Describe("bootstrap base backup validation", func() {
-	It("doesn't complain if we are not bootstrapping using pg_basebackup", func() {
-		recoveryCluster := &Cluster{
-			Spec: ClusterSpec{
-				Bootstrap: &BootstrapConfiguration{},
-			},
-		}
-		result := recoveryCluster.validateBootstrapPgBaseBackupSource()
-		Expect(result).To(BeEmpty())
-	})
-
-	It("complain when the source cluster doesn't exist", func() {
-		bootstrap := BootstrapConfiguration{}
-		bpb := BootstrapPgBaseBackup{"test"}
-		bootstrap.PgBaseBackup = &bpb
-		recoveryCluster := &Cluster{
-			Spec: ClusterSpec{
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{
-						Source: "test",
-					},
-				},
-			},
-		}
-		result := recoveryCluster.validateBootstrapPgBaseBackupSource()
-		Expect(result).ToNot(BeEmpty())
 	})
 })
 

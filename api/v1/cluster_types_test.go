@@ -137,21 +137,105 @@ var _ = Describe("Node maintenance window", func() {
 var _ = Describe("Bootstrap via initdb", func() {
 	It("will create an application database if specified", func() {
 		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
 					InitDB: &BootstrapInitDB{
-						Database: "app",
-						Owner:    "app",
+						Database: "appDB",
+						Owner:    "appOwner",
+						Secret: &LocalObjectReference{
+							Name: "appSecret",
+						},
 					},
 				},
 			},
 		}
 
 		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeTrue())
+		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
+		Expect(cluster.GetInitDBApplicationSecretName()).To(Equal("appSecret"))
 	})
 
 	It("will not create an application database if not requested", func() {
-		Expect(Cluster{}.ShouldCreateApplicationDatabase()).To(BeFalse())
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+		}
+		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeFalse())
+		Expect(cluster.GetInitDBApplicationSecretName()).To(Equal("clusterName-app"))
+	})
+})
+
+var _ = Describe("Bootstrap via recovery", func() {
+	It("will create an application database if specified", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Database: "appDB",
+						Owner:    "appOwner",
+						Secret: &LocalObjectReference{
+							Name: "appSecret",
+						},
+					},
+				},
+			},
+		}
+
+		Expect(cluster.ShouldRecoveryCreateApplicationDatabase()).To(BeTrue())
+		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
+		Expect(cluster.GetRecoveryApplicationSecretName()).To(Equal("appSecret"))
+	})
+
+	It("will not create an application database if not requested", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+		}
+		Expect(cluster.ShouldRecoveryCreateApplicationDatabase()).To(BeFalse())
+		Expect(cluster.GetRecoveryApplicationSecretName()).To(Equal("clusterName-app"))
+	})
+})
+
+var _ = Describe("Bootstrap via pg_basebackup", func() {
+	It("will create an application database if specified", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Database: "appDB",
+						Owner:    "appOwner",
+						Secret: &LocalObjectReference{
+							Name: "appSecret",
+						},
+					},
+				},
+			},
+		}
+
+		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).To(BeTrue())
+		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
+		Expect(cluster.GetPgBaseBackupApplicationSecretName()).To(Equal("appSecret"))
+	})
+
+	It("will get default application secrets name if not specific", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+		}
+		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).To(BeFalse())
+		Expect(cluster.GetPgBaseBackupApplicationSecretName()).To(Equal("clusterName-app"))
 	})
 })
 

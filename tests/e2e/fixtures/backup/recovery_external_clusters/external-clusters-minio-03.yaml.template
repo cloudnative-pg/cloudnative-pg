@@ -28,6 +28,10 @@ spec:
 
   bootstrap:
     recovery:
+      database: appdb
+      owner: appuser
+      secret:
+        name: postgresql-user-supplied-app
       # cluster name in source cluster
       source: source-cluster-minio
 
@@ -47,3 +51,14 @@ spec:
           secretAccessKey:
             name: backup-storage-creds
             key: KEY
+---
+apiVersion: v1
+data:
+  username: YXBwdXNlcg==
+  password: NGxzMDU0ZjM=
+kind: Secret
+metadata:
+  name: postgresql-user-supplied-app
+  labels:
+    cnpg.io/reload: ""
+type: kubernetes.io/basic-auth

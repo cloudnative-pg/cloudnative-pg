@@ -10,6 +10,10 @@ spec:
 
   bootstrap:
     recovery:
+      database: appdb
+      owner: appuser
+      secret:
+        name: postgresql-user-supplied-app
       source: clusterBackupSas
 
   externalClusters:
@@ -24,3 +28,14 @@ spec:
           storageSasToken:
             name: restore-storage-creds-sas
             key: KEY
+---
+apiVersion: v1
+data:
+  username: YXBwdXNlcg==
+  password: NGxzMDU0ZjM=
+kind: Secret
+metadata:
+  name: postgresql-user-supplied-app
+  labels:
+    cnpg.io/reload: ""
+type: kubernetes.io/basic-auth

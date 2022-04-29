@@ -30,6 +30,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -566,7 +568,15 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 		}
 	}
 
-	return nil
+	// Configure the application database information for restored instance
+	return instance.WithActiveInstance(func() error {
+		err = info.ConfigureApplicationForRestoredInstance(instance)
+		if err != nil {
+			return fmt.Errorf("while configuring restored instance: %w", err)
+		}
+
+		return nil
+	})
 }
 
 func (info *InitInfo) checkBackupDestination(
@@ -637,4 +647,71 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 
 		return nil
 	})
+}
+
+// ConfigureApplicationForRestoredInstance  configure the application database for the restored instance
+func (info InitInfo) ConfigureApplicationForRestoredInstance(instance *Instance) error {
+	// if the application database or user are not specific
+	// we ignore the application database configuration
+	if info.ApplicationDatabase == "" || info.ApplicationUser == "" {
+		return nil
+	}
+
+	db, err := instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("while getting superuser database: %w", err)
+	}
+
+	var existsRole bool
+	row := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = '%s'",
+		info.ApplicationUser))
+	err = row.Scan(&existsRole)
+	if err != nil {
+		return err
+	}
+	if !existsRole {
+		// create the user if it does not exist
+		_, err := db.Exec(fmt.Sprintf("CREATE USER %v",
+			pq.QuoteIdentifier(info.ApplicationUser)))
+		if err != nil {
+			log.Error(
+				err,
+				"create role error")
+			return err
+		}
+	}
+
+	var dbName, roleName string
+	row = db.QueryRow(fmt.Sprintf("SELECT datname, rolname FROM pg_database AS db, "+
+		"pg_roles AS roles WHERE db.datname = '%s' AND db.datdba = roles.oid",
+		info.ApplicationDatabase))
+
+	err = row.Scan(&dbName, &roleName)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// create the application database and set owner to the user
+			_, err := db.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
+				pq.QuoteIdentifier(info.ApplicationDatabase),
+				pq.QuoteIdentifier(info.ApplicationUser)))
+			if err != nil {
+				log.Error(err, "create database error")
+				return err
+			}
+		} else {
+			log.Error(err, "scan rows error")
+			return err
+		}
+	}
+	// if existed application database owner is different from the one defined in --app-user
+	// change the database owner to value of --app-user
+	if roleName != info.ApplicationUser {
+		_, err := db.Exec(fmt.Sprintf("ALTER DATABASE %v OWNER TO %v",
+			pq.QuoteIdentifier(info.ApplicationDatabase),
+			pq.QuoteIdentifier(info.ApplicationUser)))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
