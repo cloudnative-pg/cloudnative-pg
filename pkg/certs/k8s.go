@@ -83,7 +83,7 @@ func EnsureRootCACertificate(
 	secret, err := client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err == nil {
 		// Verify the temporal validity of this CA and renew the secret if needed
-		_, err := renewCACertificate(ctx, client, secret)
+		secret, err = renewCACertificate(ctx, client, secret)
 		if err != nil {
 			return nil, err
 		}
