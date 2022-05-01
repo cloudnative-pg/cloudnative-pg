@@ -29,6 +29,7 @@ BootstrapInitDB
 BootstrapPgBaseBackup
 BootstrapRecovery
 CIS
+CKA
 CN
 CNCF
 CONFIG
@@ -115,8 +116,10 @@ Grafana
 HH
 Hai
 HistoryTags
+Huß
 IAM
 INPLACE
+Ibryam
 IfNotPresent
 InfoSec
 Innocenti
@@ -160,6 +163,7 @@ Niccolò
 NodeMaintenanceWindow
 NodeSelector
 Noland
+O'Reilly
 OU
 ObjectMeta
 OnlineUpdateEnabled
@@ -174,7 +178,6 @@ PGSQL
 PKI
 PODNAME
 PPROF
-PV
 PV
 PVCs
 Patroni
@@ -205,6 +208,7 @@ PoolerSecretsVersions
 PoolerSpec
 PoolerStatus
 PoolerType
+PostGIS
 Postgres
 PostgresConfiguration
 PrimaryUpdateMethod
@@ -237,6 +241,7 @@ SCCs
 SDK
 SELinux
 SHA
+SLA
 SQLQuery
 SSL
 SSZ
@@ -433,6 +438,7 @@ declaratively
 defaultMode
 defaultPoolSize
 deployer
+desidered
 destinationPath
 dev
 devel
@@ -458,6 +464,7 @@ endpointURL
 enterprisedb
 env
 executables
+extensibility
 externalClusters
 facto
 failover
@@ -575,6 +582,8 @@ memstats
 metav
 metric's
 metricNameKS
+microservice
+microservices
 microsoft
 minSyncReplicas
 minikube
@@ -591,6 +600,7 @@ namespace
 namespaced
 namespaces
 natively
+ndQuadrant
 newers
 nextScheduleTime
 nginx
@@ -647,6 +657,7 @@ podMetricsEndpoints
 podName
 podmonitor
 podtemplates
+pood
 poolMode
 pooler
 poolers
@@ -691,12 +702,14 @@ recv
 redhat
 relatime
 replicationTLSSecret
+repmgr
 reportNonRedacted
 reportRedacted
 req
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resourcerequirements
+resync
 retentionPolicy
 reusePVC
 robfig
@@ -754,6 +767,7 @@ sslrootcert
 sso
 startDelay
 startedAt
+stateful
 stderr
 stdout
 stedolan
@@ -777,6 +791,8 @@ sv
 svc
 switchovers
 sys
+syslog
+systemd
 sysv
 tAc
 tablespace
