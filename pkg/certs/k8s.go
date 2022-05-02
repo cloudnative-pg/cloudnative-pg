@@ -18,10 +18,10 @@ package certs
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"path"
-	"path/filepath"
+	"time"
 
 	"github.com/robfig/cron"
 
@@ -29,6 +29,7 @@ import (
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 
@@ -37,7 +38,18 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-var pkiLog = log.WithName("pki")
+var (
+	pkiLog = log.WithName("pki")
+	// errSecretsMountNotRefreshed is the error returned when the kubelet has not yet updated the mounted secret files
+	// to the latest version
+	errSecretsMountNotRefreshed = errors.New("secrets mount still not refreshed")
+	mountedSecretCheckBackoff   = wait.Backoff{
+		Duration: 10 * time.Millisecond,
+		Jitter:   0.1,
+		Factor:   2,
+		Steps:    10,
+	}
+)
 
 // PublicKeyInfrastructure represent the PKI under which the operator and the WebHook server
 // will work
@@ -125,7 +137,7 @@ func (pki *PublicKeyInfrastructure) Setup(
 	apiClientSet *apiextensionsclientset.Clientset,
 ) error {
 	err := retry.OnError(retry.DefaultRetry, func(err error) bool {
-		return apierrors.IsNotFound(err) || apierrors.IsAlreadyExists(err)
+		return apierrors.IsNotFound(err) || apierrors.IsAlreadyExists(err) || isSecretsMountNotRefreshedError(err)
 	}, func() error {
 		return pki.ensureCertificatesAreUpToDate(ctx, clientSet, apiClientSet)
 	})
@@ -157,12 +169,12 @@ func (pki PublicKeyInfrastructure) Cleanup(ctx context.Context, client *kubernet
 }
 
 // ensureRootCACertificate ensure that in the cluster there is a root CA Certificate
-func ensureRootCACertificate(
-	ctx context.Context, client kubernetes.Interface, namespace, name,
-	operatorLabelSelector string,
+func (pki *PublicKeyInfrastructure) ensureRootCACertificate(
+	ctx context.Context,
+	client kubernetes.Interface,
 ) (*v1.Secret, error) {
 	// Checking if the root CA already exist
-	secret, err := client.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	secret, err := client.CoreV1().Secrets(pki.OperatorNamespace).Get(ctx, pki.CaSecretName, metav1.GetOptions{})
 	if err == nil {
 		// Verify the temporal validity of this CA and renew the secret if needed
 		secret, err = renewCACertificate(ctx, client, secret)
@@ -176,18 +188,18 @@ func ensureRootCACertificate(
 	}
 
 	// Let's create the CA
-	pair, err := CreateRootCA(name, namespace)
+	pair, err := CreateRootCA(pki.CaSecretName, pki.OperatorNamespace)
 	if err != nil {
 		return nil, err
 	}
 
-	secret = pair.GenerateCASecret(namespace, name)
-	err = utils.SetAsOwnedByOperatorDeployment(ctx, client, &secret.ObjectMeta, operatorLabelSelector)
+	secret = pair.GenerateCASecret(pki.OperatorNamespace, pki.CaSecretName)
+	err = utils.SetAsOwnedByOperatorDeployment(ctx, client, &secret.ObjectMeta, pki.OperatorDeploymentLabelSelector)
 	if err != nil {
 		return nil, err
 	}
 
-	createdSecret, err := client.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{})
+	createdSecret, err := client.CoreV1().Secrets(pki.OperatorNamespace).Create(ctx, secret, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -231,23 +243,33 @@ func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret
 }
 
 // ensureCertificatesAreUpToDate will setup the PKI infrastructure that is needed for the operator
-// to correctly work, and copy the certificates which are required for the webhook
-// server to run in the right folder
+// to correctly work and makes sure that the mounted certificates are the latest.
 func (pki PublicKeyInfrastructure) ensureCertificatesAreUpToDate(
 	ctx context.Context,
 	client kubernetes.Interface,
 	apiClient apiextensionsclientset.Interface,
 ) error {
-	caSecret, err := ensureRootCACertificate(
+	caSecret, err := pki.ensureRootCACertificate(
 		ctx,
 		client,
-		pki.OperatorNamespace,
-		pki.CaSecretName, pki.OperatorDeploymentLabelSelector)
+	)
 	if err != nil {
 		return err
 	}
 
-	return pki.setupWebhooksCertificate(ctx, client, apiClient, caSecret)
+	webhookSecret, err := pki.setupWebhooksCertificate(ctx, client, apiClient, caSecret)
+	if err != nil {
+		return err
+	}
+
+	// When we create/update the secret it will take some seconds for the kubelet to create/update the mounted files.
+	// This retry logic ensures that:
+	// - on secret creation we wait for the certificates to be created inside the pod.
+	//   This avoids pods restart caused by the missing certificate error
+	// - on secret update we wait for the files to be updated to the latest version.
+	return retry.OnError(mountedSecretCheckBackoff, isSecretsMountNotRefreshedError, func() error {
+		return ensureMountedSecretsAreInSync(webhookSecret, pki.CertDir)
+	})
 }
 
 func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
@@ -255,41 +277,37 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 	client kubernetes.Interface,
 	apiClient apiextensionsclientset.Interface,
 	caSecret *v1.Secret,
-) error {
+) (*v1.Secret, error) {
 	if err := fileutils.EnsureDirectoryExist(pki.CertDir); err != nil {
-		return err
+		return nil, err
 	}
 
 	webhookSecret, err := pki.ensureCertificate(ctx, client, caSecret)
 	if err != nil {
-		return err
-	}
-
-	if err := dumpSecretToDir(webhookSecret, pki.CertDir, "apiserver"); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := pki.injectPublicKeyIntoMutatingWebhook(
 		ctx,
 		client,
 		webhookSecret); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := pki.injectPublicKeyIntoValidatingWebhook(
 		ctx,
 		client,
 		webhookSecret); err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, name := range pki.CustomResourceDefinitionsName {
 		if err := pki.injectPublicKeyIntoCRD(ctx, apiClient, name, webhookSecret); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return webhookSecret, nil
 }
 
 // schedulePeriodicMaintenance schedule a background periodic certificate maintenance,
@@ -383,53 +401,19 @@ func renewServerCertificate(
 	return secret, nil
 }
 
-// dumpSecretToDir dumps the contents of a secret inside a directory creating
-// a file to every key/value couple in the required Secret.
-//
-// The actual files written in the directory will be named accordingly to the
-// basename, i.e., given a secret with the following data:
-//
-//     data:
-//       test.crt: <test.crt.contents>
-//       test.key: <test.key.contents>
-//
-// The following files will be written:
-//
-//     <certdir>/<basename>.crt
-//     <certdir>/<basename>.key
-func dumpSecretToDir(secret *v1.Secret, certDir string, basename string) error {
-	resourceFileName := path.Join(certDir, "resource")
-
-	oldVersionExist, err := fileutils.FileExists(resourceFileName)
-	if err != nil {
-		return err
-	}
-	if oldVersionExist {
-		rawOldVersion, err := fileutils.ReadFile(resourceFileName)
+// ensureMountedSecretsAreInSync returns errSecretsMountNotRefreshed if secrets are not yet refreshed by the kubelet
+// or any other error encountered while reading the file
+func ensureMountedSecretsAreInSync(secret *v1.Secret, certDir string) error {
+	for name, content := range secret.Data {
+		fileName := path.Join(certDir, name)
+		mountedVersion, err := fileutils.ReadFile(fileName)
 		if err != nil {
 			return err
 		}
-
-		if string(rawOldVersion) == secret.ResourceVersion {
-			// No need to rewrite certificates, the content
-			// is just the same
-			return nil
+		if string(mountedVersion) != string(content) {
+			return errSecretsMountNotRefreshed
 		}
 	}
-
-	for name, content := range secret.Data {
-		extension := filepath.Ext(name)
-		fileName := path.Join(certDir, basename+extension)
-		if _, err = fileutils.WriteFileAtomic(fileName, content, 0o600); err != nil {
-			return err
-		}
-	}
-
-	err = ioutil.WriteFile(resourceFileName, []byte(secret.ResourceVersion), 0o600)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -497,4 +481,8 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoCRD(
 	}
 	_, err = apiClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
 	return err
+}
+
+func isSecretsMountNotRefreshedError(err error) bool {
+	return err == errSecretsMountNotRefreshed
 }

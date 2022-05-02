@@ -41,7 +41,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	// +kubebuilder:scaffold:imports
@@ -77,7 +76,7 @@ const (
 	ValidatingWebhookConfigurationName = "cnpg-validating-webhook-configuration"
 
 	// The name of the directory containing the TLS certificates
-	defaultWebhookCertDir = postgres.ScratchDataDirectory + "/certificates"
+	defaultWebhookCertDir = "/certificates/webhook"
 
 	// LeaderElectionID The operator Leader Election ID
 	LeaderElectionID = "db9c8771.cnpg.io"
@@ -149,9 +148,14 @@ func RunController(
 		return err
 	}
 
-	// Use certificate names compatible with OLM
-	mgr.GetWebhookServer().CertName = "apiserver.crt"
-	mgr.GetWebhookServer().KeyName = "apiserver.key"
+	if configuration.Current.WebhookCertDir != "" {
+		// Use certificate names compatible with OLM
+		mgr.GetWebhookServer().CertName = "apiserver.crt"
+		mgr.GetWebhookServer().KeyName = "apiserver.key"
+	} else {
+		mgr.GetWebhookServer().CertName = "tls.crt"
+		mgr.GetWebhookServer().KeyName = "tls.key"
+	}
 
 	err = createKubernetesClient(mgr.GetConfig())
 	if err != nil {
