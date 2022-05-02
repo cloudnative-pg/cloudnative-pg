@@ -364,7 +364,7 @@ func ensurePKI(ctx context.Context, mgrCertDir string) error {
 	}
 	// We need to self-manage required PKI infrastructure and install the certificates into
 	// the webhooks configuration
-	err := pkiConfig.SetupPki(ctx, clientSet, apiClientSet)
+	err := pkiConfig.Setup(ctx, clientSet, apiClientSet)
 	if err != nil {
 		setupLog.Error(err, "unable to setup PKI infrastructure")
 	}

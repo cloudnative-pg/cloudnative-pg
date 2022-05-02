@@ -74,8 +74,8 @@ type PublicKeyInfrastructure struct {
 	OperatorDeploymentLabelSelector string
 }
 
-// EnsureRootCACertificate ensure that in the cluster there is a root CA Certificate
-func EnsureRootCACertificate(
+// ensureRootCACertificate ensure that in the cluster there is a root CA Certificate
+func ensureRootCACertificate(
 	ctx context.Context, client kubernetes.Interface, namespace, name,
 	operatorLabelSelector string,
 ) (*v1.Secret, error) {
@@ -163,15 +163,15 @@ func (pki PublicKeyInfrastructure) Cleanup(ctx context.Context, client *kubernet
 	return nil
 }
 
-// Setup will setup the PKI infrastructure that is needed for the operator
+// synchronizeSecrets will setup the PKI infrastructure that is needed for the operator
 // to correctly work, and copy the certificates which are required for the webhook
 // server to run in the right folder
-func (pki PublicKeyInfrastructure) Setup(
+func (pki PublicKeyInfrastructure) synchronizeSecrets(
 	ctx context.Context,
 	client kubernetes.Interface,
 	apiClient apiextensionsclientset.Interface,
 ) error {
-	caSecret, err := EnsureRootCACertificate(
+	caSecret, err := ensureRootCACertificate(
 		ctx,
 		client,
 		pki.OperatorNamespace,
@@ -193,23 +193,23 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 		return err
 	}
 
-	webhookSecret, err := pki.EnsureCertificate(ctx, client, caSecret)
+	webhookSecret, err := pki.ensureCertificate(ctx, client, caSecret)
 	if err != nil {
 		return err
 	}
 
-	if err := DumpSecretToDir(webhookSecret, pki.CertDir, "apiserver"); err != nil {
+	if err := dumpSecretToDir(webhookSecret, pki.CertDir, "apiserver"); err != nil {
 		return err
 	}
 
-	if err := pki.InjectPublicKeyIntoMutatingWebhook(
+	if err := pki.injectPublicKeyIntoMutatingWebhook(
 		ctx,
 		client,
 		webhookSecret); err != nil {
 		return err
 	}
 
-	if err := pki.InjectPublicKeyIntoValidatingWebhook(
+	if err := pki.injectPublicKeyIntoValidatingWebhook(
 		ctx,
 		client,
 		webhookSecret); err != nil {
@@ -217,7 +217,7 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 	}
 
 	for _, name := range pki.CustomResourceDefinitionsName {
-		if err := pki.InjectPublicKeyIntoCRD(ctx, apiClient, name, webhookSecret); err != nil {
+		if err := pki.injectPublicKeyIntoCRD(ctx, apiClient, name, webhookSecret); err != nil {
 			return err
 		}
 	}
@@ -225,16 +225,16 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 	return nil
 }
 
-// SchedulePeriodicMaintenance schedule a background periodic certificate maintenance,
+// schedulePeriodicMaintenance schedule a background periodic certificate maintenance,
 // to automatically renew TLS certificates
-func (pki PublicKeyInfrastructure) SchedulePeriodicMaintenance(
+func (pki PublicKeyInfrastructure) schedulePeriodicMaintenance(
 	ctx context.Context,
 	client kubernetes.Interface,
 	apiClient apiextensionsclientset.Interface,
 ) error {
 	maintenance := func() {
 		pkiLog.Info("Periodic TLS certificates maintenance")
-		err := pki.Setup(ctx, client, apiClient)
+		err := pki.synchronizeSecrets(ctx, client, apiClient)
 		if err != nil {
 			pkiLog.Error(err, "TLS maintenance failed")
 		}
@@ -251,8 +251,8 @@ func (pki PublicKeyInfrastructure) SchedulePeriodicMaintenance(
 	return nil
 }
 
-// EnsureCertificate will ensure that a webhook certificate exists and is usable
-func (pki PublicKeyInfrastructure) EnsureCertificate(
+// ensureCertificate will ensure that a webhook certificate exists and is usable
+func (pki PublicKeyInfrastructure) ensureCertificate(
 	ctx context.Context, client kubernetes.Interface, caSecret *v1.Secret,
 ) (*v1.Secret, error) {
 	// Checking if the secret already exist
@@ -360,7 +360,7 @@ func renewServerCertificate(
 	return secret, nil
 }
 
-// DumpSecretToDir dumps the contents of a secret inside a directory creating
+// dumpSecretToDir dumps the contents of a secret inside a directory creating
 // a file to every key/value couple in the required Secret.
 //
 // The actual files written in the directory will be named accordingly to the
@@ -374,7 +374,7 @@ func renewServerCertificate(
 //
 //     <certdir>/<basename>.crt
 //     <certdir>/<basename>.key
-func DumpSecretToDir(secret *v1.Secret, certDir string, basename string) error {
+func dumpSecretToDir(secret *v1.Secret, certDir string, basename string) error {
 	resourceFileName := path.Join(certDir, "resource")
 
 	oldVersionExist, err := fileutils.FileExists(resourceFileName)
@@ -410,9 +410,9 @@ func DumpSecretToDir(secret *v1.Secret, certDir string, basename string) error {
 	return nil
 }
 
-// InjectPublicKeyIntoMutatingWebhook inject the TLS public key into the admitted
+// injectPublicKeyIntoMutatingWebhook inject the TLS public key into the admitted
 // ones for a certain mutating webhook configuration
-func (pki PublicKeyInfrastructure) InjectPublicKeyIntoMutatingWebhook(
+func (pki PublicKeyInfrastructure) injectPublicKeyIntoMutatingWebhook(
 	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret,
 ) error {
 	config, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
@@ -431,9 +431,9 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoMutatingWebhook(
 	return err
 }
 
-// InjectPublicKeyIntoValidatingWebhook inject the TLS public key into the admitted
+// injectPublicKeyIntoValidatingWebhook inject the TLS public key into the admitted
 // ones for a certain validating webhook configuration
-func (pki PublicKeyInfrastructure) InjectPublicKeyIntoValidatingWebhook(
+func (pki PublicKeyInfrastructure) injectPublicKeyIntoValidatingWebhook(
 	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret,
 ) error {
 	config, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
@@ -452,9 +452,9 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoValidatingWebhook(
 	return err
 }
 
-// InjectPublicKeyIntoCRD inject the TLS public key into the admitted
+// injectPublicKeyIntoCRD inject the TLS public key into the admitted
 // ones from a certain conversion webhook inside a CRD
-func (pki PublicKeyInfrastructure) InjectPublicKeyIntoCRD(
+func (pki PublicKeyInfrastructure) injectPublicKeyIntoCRD(
 	ctx context.Context,
 	apiClient apiextensionsclientset.Interface,
 	name string,
@@ -476,9 +476,8 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoCRD(
 	return err
 }
 
-// SetupPki ensures that we have the required PKI infrastructure to make
-// the operator and the clusters working
-func (pki *PublicKeyInfrastructure) SetupPki(
+// Setup ensures that we have the required PKI infrastructure to make the operator and the clusters working
+func (pki *PublicKeyInfrastructure) Setup(
 	ctx context.Context,
 	clientSet *kubernetes.Clientset,
 	apiClientSet *apiextensionsclientset.Clientset,
@@ -486,13 +485,13 @@ func (pki *PublicKeyInfrastructure) SetupPki(
 	err := retry.OnError(retry.DefaultRetry, func(err error) bool {
 		return apierrors.IsNotFound(err) || apierrors.IsAlreadyExists(err)
 	}, func() error {
-		return pki.Setup(ctx, clientSet, apiClientSet)
+		return pki.synchronizeSecrets(ctx, clientSet, apiClientSet)
 	})
 	if err != nil {
 		return err
 	}
 
-	err = pki.SchedulePeriodicMaintenance(ctx, clientSet, apiClientSet)
+	err = pki.schedulePeriodicMaintenance(ctx, clientSet, apiClientSet)
 	if err != nil {
 		return err
 	}
