@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -69,15 +70,15 @@ func (cr clusterReport) writeToZip(zipper *zip.Writer, format plugin.OutputForma
 	return nil
 }
 
-// Cluster implements the "report cluster" subcommand
+// cluster implements the "report cluster" subcommand
 // Produces a zip file containing
 //  - cluster pod and job definitions
 //  - cluster resource (same content as `kubectl get cluster -o yaml`)
 //  - events in the cluster namespace
 //  - logs from the cluster pods (optional - activated with `includeLogs`)
 //  - logs from the cluster jobs (optional - activated with `includeLogs`)
-func Cluster(ctx context.Context, clusterName, namespace string, format plugin.OutputFormat,
-	file string, includeLogs bool,
+func cluster(ctx context.Context, clusterName, namespace string, format plugin.OutputFormat,
+	file string, includeLogs bool, timestamp time.Time,
 ) error {
 	var events corev1.EventList
 	err := plugin.Client.List(ctx, &events, client.InNamespace(namespace))
@@ -134,7 +135,7 @@ func Cluster(ctx context.Context, clusterName, namespace string, format plugin.O
 		sections = append(sections, logsZipper, jobLogsZipper)
 	}
 
-	err = writeZippedReport(sections, file, reportName("cluster", clusterName))
+	err = writeZippedReport(sections, file, reportName("cluster", timestamp, clusterName))
 	if err != nil {
 		return fmt.Errorf("could not write report: %w", err)
 	}

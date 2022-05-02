@@ -17,6 +17,8 @@ limitations under the License.
 package report
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -28,22 +30,27 @@ func operatorCmd() *cobra.Command {
 		stopRedaction bool
 		includeLogs   bool
 	)
+
+	const filePlaceholder = "report_operator_<timestamp>.zip"
+
 	cmd := &cobra.Command{
-		Use:   "operator -f <filename.zip>",
+		Use:   "operator",
 		Short: "Report operator deployment, pod, events, logs (opt-in)",
 		Long:  "Collects combined information on the operator in a Zip file",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return Operator(cmd.Context(), plugin.OutputFormat(output),
-				file, stopRedaction, includeLogs)
+			now := time.Now().UTC()
+			if file == filePlaceholder {
+				file = reportName("operator", now) + ".zip"
+			}
+			return operator(cmd.Context(), plugin.OutputFormat(output),
+				file, stopRedaction, includeLogs, now)
 		},
 	}
 
-	cmd.AddCommand()
-
-	cmd.Flags().StringVarP(&file, "file", "f", reportName("operator")+".zip",
+	cmd.Flags().StringVarP(&file, "file", "f", filePlaceholder,
 		"Output file")
 	cmd.Flags().StringVarP(&output, "output", "o", "yaml",
-		"Output format. One of yaml|json")
+		"Output format (yaml or json)")
 	cmd.Flags().BoolVarP(&stopRedaction, "stopRedaction", "S", false,
 		"Don't redact secrets")
 	cmd.Flags().BoolVarP(&includeLogs, "logs", "l", false, "include logs")

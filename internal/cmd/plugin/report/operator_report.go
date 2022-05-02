@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	v12 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -85,7 +86,7 @@ func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputForm
 	return nil
 }
 
-// Operator implements the "report operator" subcommand
+// operator implements the "report operator" subcommand
 // Produces a zip file containing
 //  - operator deployment
 //  - operator pod definition
@@ -93,8 +94,8 @@ func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputForm
 //  - events in the operator namespace
 //  - operator's Validating/MutatingWebhookConfiguration and their associated services
 //  - operator pod's logs (if `includeLogs` is true)
-func Operator(ctx context.Context, format plugin.OutputFormat,
-	file string, stopRedaction, includeLogs bool,
+func operator(ctx context.Context, format plugin.OutputFormat,
+	file string, stopRedaction, includeLogs bool, now time.Time,
 ) error {
 	secretRedactor := redactSecret
 	configMapRedactor := redactConfigMap
@@ -194,7 +195,7 @@ func Operator(ctx context.Context, format plugin.OutputFormat,
 		sections = append(sections, logZipper)
 	}
 
-	err = writeZippedReport(sections, file, reportName("operator"))
+	err = writeZippedReport(sections, file, reportName("operator", now))
 	if err != nil {
 		return fmt.Errorf("could not write report: %w", err)
 	}

@@ -29,12 +29,11 @@ import (
 )
 
 // reportName produces a timestamped report string apt for file/folder naming
-func reportName(kind string, objName ...string) string {
-	now := time.Now().UTC()
+func reportName(kind string, timestamp time.Time, objName ...string) string {
 	if len(objName) != 0 {
-		return fmt.Sprintf("report_%s_%s_%s", kind, objName[0], now.Format("2006-01-02T15:04:05UTC"))
+		return fmt.Sprintf("report_%s_%s_%s", kind, objName[0], timestamp.Format(time.RFC3339))
 	}
-	return fmt.Sprintf("report_%s_%s", kind, now.Format("2006-01-02T15:04:05UTC"))
+	return fmt.Sprintf("report_%s_%s", kind, timestamp.Format(time.RFC3339))
 }
 
 // zipFileWriter abstracts any function that will write a new file into a ZIP
