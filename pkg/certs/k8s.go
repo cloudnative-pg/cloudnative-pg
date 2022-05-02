@@ -74,6 +74,88 @@ type PublicKeyInfrastructure struct {
 	OperatorDeploymentLabelSelector string
 }
 
+// RenewLeafCertificate renew a secret containing a server
+// certificate given the secret containing the CA that will sign it.
+// Returns true if the certificate has been renewed
+func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) {
+	// Verify the temporal validity of this CA
+	pair, err := ParseServerSecret(secret)
+	if err != nil {
+		return false, err
+	}
+
+	expiring, _, err := pair.IsExpiring()
+	if err != nil {
+		return false, err
+	}
+	if !expiring {
+		return false, nil
+	}
+
+	// Parse the CA secret to get the private key
+	caPair, err := ParseCASecret(caSecret)
+	if err != nil {
+		return false, err
+	}
+
+	caPrivateKey, err := caPair.ParseECPrivateKey()
+	if err != nil {
+		return false, err
+	}
+
+	caCertificate, err := caPair.ParseCertificate()
+	if err != nil {
+		return false, err
+	}
+
+	err = pair.RenewCertificate(caPrivateKey, caCertificate)
+	if err != nil {
+		return false, err
+	}
+
+	secret.Data["tls.crt"] = pair.Certificate
+
+	return true, nil
+}
+
+// Setup ensures that we have the required PKI infrastructure to make the operator and the clusters working
+func (pki *PublicKeyInfrastructure) Setup(
+	ctx context.Context,
+	clientSet *kubernetes.Clientset,
+	apiClientSet *apiextensionsclientset.Clientset,
+) error {
+	err := retry.OnError(retry.DefaultRetry, func(err error) bool {
+		return apierrors.IsNotFound(err) || apierrors.IsAlreadyExists(err)
+	}, func() error {
+		return pki.synchronizeSecrets(ctx, clientSet, apiClientSet)
+	})
+	if err != nil {
+		return err
+	}
+
+	err = pki.schedulePeriodicMaintenance(ctx, clientSet, apiClientSet)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Cleanup will remove the PKI infrastructure from the operator namespace
+func (pki PublicKeyInfrastructure) Cleanup(ctx context.Context, client *kubernetes.Clientset) error {
+	err := client.CoreV1().Secrets(pki.OperatorNamespace).Delete(ctx, pki.CaSecretName, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	err = client.CoreV1().Secrets(pki.OperatorNamespace).Delete(ctx, pki.SecretName, metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	return nil
+}
+
 // ensureRootCACertificate ensure that in the cluster there is a root CA Certificate
 func ensureRootCACertificate(
 	ctx context.Context, client kubernetes.Interface, namespace, name,
@@ -146,21 +228,6 @@ func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret
 	}
 
 	return updatedSecret, nil
-}
-
-// Cleanup will remove the PKI infrastructure from the operator namespace
-func (pki PublicKeyInfrastructure) Cleanup(ctx context.Context, client *kubernetes.Clientset) error {
-	err := client.CoreV1().Secrets(pki.OperatorNamespace).Delete(ctx, pki.CaSecretName, metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-
-	err = client.CoreV1().Secrets(pki.OperatorNamespace).Delete(ctx, pki.SecretName, metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-
-	return nil
 }
 
 // synchronizeSecrets will setup the PKI infrastructure that is needed for the operator
@@ -293,50 +360,6 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 	}
 
 	return createdSecret, nil
-}
-
-// RenewLeafCertificate renew a secret containing a server
-// certificate given the secret containing the CA that will sign it.
-// Returns true if the certificate has been renewed
-func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) {
-	// Verify the temporal validity of this CA
-	pair, err := ParseServerSecret(secret)
-	if err != nil {
-		return false, err
-	}
-
-	expiring, _, err := pair.IsExpiring()
-	if err != nil {
-		return false, err
-	}
-	if !expiring {
-		return false, nil
-	}
-
-	// Parse the CA secret to get the private key
-	caPair, err := ParseCASecret(caSecret)
-	if err != nil {
-		return false, err
-	}
-
-	caPrivateKey, err := caPair.ParseECPrivateKey()
-	if err != nil {
-		return false, err
-	}
-
-	caCertificate, err := caPair.ParseCertificate()
-	if err != nil {
-		return false, err
-	}
-
-	err = pair.RenewCertificate(caPrivateKey, caCertificate)
-	if err != nil {
-		return false, err
-	}
-
-	secret.Data["tls.crt"] = pair.Certificate
-
-	return true, nil
 }
 
 // renewServerCertificate renews a server certificate if needed
@@ -474,27 +497,4 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoCRD(
 	}
 	_, err = apiClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
 	return err
-}
-
-// Setup ensures that we have the required PKI infrastructure to make the operator and the clusters working
-func (pki *PublicKeyInfrastructure) Setup(
-	ctx context.Context,
-	clientSet *kubernetes.Clientset,
-	apiClientSet *apiextensionsclientset.Clientset,
-) error {
-	err := retry.OnError(retry.DefaultRetry, func(err error) bool {
-		return apierrors.IsNotFound(err) || apierrors.IsAlreadyExists(err)
-	}, func() error {
-		return pki.synchronizeSecrets(ctx, clientSet, apiClientSet)
-	})
-	if err != nil {
-		return err
-	}
-
-	err = pki.schedulePeriodicMaintenance(ctx, clientSet, apiClientSet)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
