@@ -127,7 +127,7 @@ func (pki *PublicKeyInfrastructure) Setup(
 	err := retry.OnError(retry.DefaultRetry, func(err error) bool {
 		return apierrors.IsNotFound(err) || apierrors.IsAlreadyExists(err)
 	}, func() error {
-		return pki.synchronizeSecrets(ctx, clientSet, apiClientSet)
+		return pki.ensureCertificatesAreUpToDate(ctx, clientSet, apiClientSet)
 	})
 	if err != nil {
 		return err
@@ -230,10 +230,10 @@ func renewCACertificate(ctx context.Context, client kubernetes.Interface, secret
 	return updatedSecret, nil
 }
 
-// synchronizeSecrets will setup the PKI infrastructure that is needed for the operator
+// ensureCertificatesAreUpToDate will setup the PKI infrastructure that is needed for the operator
 // to correctly work, and copy the certificates which are required for the webhook
 // server to run in the right folder
-func (pki PublicKeyInfrastructure) synchronizeSecrets(
+func (pki PublicKeyInfrastructure) ensureCertificatesAreUpToDate(
 	ctx context.Context,
 	client kubernetes.Interface,
 	apiClient apiextensionsclientset.Interface,
@@ -301,7 +301,7 @@ func (pki PublicKeyInfrastructure) schedulePeriodicMaintenance(
 ) error {
 	maintenance := func() {
 		pkiLog.Info("Periodic TLS certificates maintenance")
-		err := pki.synchronizeSecrets(ctx, client, apiClient)
+		err := pki.ensureCertificatesAreUpToDate(ctx, client, apiClient)
 		if err != nil {
 			pkiLog.Error(err, "TLS maintenance failed")
 		}

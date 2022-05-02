@@ -355,7 +355,7 @@ var _ = Describe("Webhook environment creation", func() {
 
 		apiClientSet := fakeApiExtension.NewSimpleClientset(&firstCrd, &secondCrd)
 
-		err = pki.synchronizeSecrets(ctx, clientSet, apiClientSet)
+		err = pki.ensureCertificatesAreUpToDate(ctx, clientSet, apiClientSet)
 		Expect(err).To(BeNil())
 
 		webhookSecret, err := clientSet.CoreV1().Secrets(
