@@ -24,11 +24,13 @@ import (
 	"path/filepath"
 
 	"github.com/robfig/cron"
+
 	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -472,4 +474,28 @@ func (pki PublicKeyInfrastructure) InjectPublicKeyIntoCRD(
 	}
 	_, err = apiClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
 	return err
+}
+
+// SetupPki ensures that we have the required PKI infrastructure to make
+// the operator and the clusters working
+func (pki *PublicKeyInfrastructure) SetupPki(
+	ctx context.Context,
+	clientSet *kubernetes.Clientset,
+	apiClientSet *apiextensionsclientset.Clientset,
+) error {
+	err := retry.OnError(retry.DefaultRetry, func(err error) bool {
+		return apierrors.IsNotFound(err) || apierrors.IsAlreadyExists(err)
+	}, func() error {
+		return pki.Setup(ctx, clientSet, apiClientSet)
+	})
+	if err != nil {
+		return err
+	}
+
+	err = pki.SchedulePeriodicMaintenance(ctx, clientSet, apiClientSet)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

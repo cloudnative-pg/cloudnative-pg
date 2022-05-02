@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -188,21 +187,8 @@ func RunController(
 		"systemUID", utils.GetKubeSystemUID(),
 		"haveSCC", utils.HaveSecurityContextConstraints())
 
-	if configuration.Current.WebhookCertDir != "" {
-		// OLM is generating certificates for us, so we can avoid injecting/creating certificates.
-		// It also means that CNPG may have CA secrets leftover from the previous deployment, deleting them.
-		err = cleanupPKI(ctx)
-		if err != nil {
-			setupLog.Warning("unable to cleanup PKI infrastructure", "error", err)
-		}
-	} else {
-		// We need to self-manage required PKI infrastructure and install the certificates into
-		// the webhooks configuration
-		err = setupPKI(ctx, mgr.GetWebhookServer().CertDir)
-		if err != nil {
-			setupLog.Error(err, "unable to setup PKI infrastructure")
-			return err
-		}
+	if err := ensurePKI(ctx, mgr.GetWebhookServer().CertDir); err != nil {
+		return err
 	}
 
 	if err = controllers.NewClusterReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
@@ -343,12 +329,27 @@ func createKubernetesClient(config *rest.Config) error {
 	return nil
 }
 
-// setupPKI ensures that we have the required PKI infrastructure to make
-// the operator and the clusters working
-func setupPKI(ctx context.Context, certDir string) error {
+func ensurePKI(ctx context.Context, mgrCertDir string) error {
+	if configuration.Current.WebhookCertDir != "" {
+		// trie to clean PKI infrastructure from the kubernetes cluster
+
+		// OLM is generating certificates for us, so we can avoid injecting/creating certificates.
+		// It also means that CNPG may have CA secrets leftover from the previous deployment, deleting them.
+		pkiConfig := certs.PublicKeyInfrastructure{
+			CaSecretName:      CaSecretName,
+			SecretName:        WebhookSecretName,
+			OperatorNamespace: configuration.Current.OperatorNamespace,
+		}
+		if err := pkiConfig.Cleanup(ctx, clientSet); err != nil {
+			setupLog.Warning("unable to cleanup PKI infrastructure", "error", err)
+		}
+		return nil
+	}
+
+	// ensures that we have the required PKI infrastructure to make the operator and the clusters working
 	pkiConfig := certs.PublicKeyInfrastructure{
 		CaSecretName:                       CaSecretName,
-		CertDir:                            certDir,
+		CertDir:                            mgrCertDir,
 		SecretName:                         WebhookSecretName,
 		ServiceName:                        WebhookServiceName,
 		OperatorNamespace:                  configuration.Current.OperatorNamespace,
@@ -361,29 +362,13 @@ func setupPKI(ctx context.Context, certDir string) error {
 		},
 		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloudnative-pg",
 	}
-	err := retry.OnError(retry.DefaultRetry, apierrs.IsNotFound, func() error {
-		return pkiConfig.Setup(ctx, clientSet, apiClientSet)
-	})
+	// We need to self-manage required PKI infrastructure and install the certificates into
+	// the webhooks configuration
+	err := pkiConfig.SetupPki(ctx, clientSet, apiClientSet)
 	if err != nil {
-		return err
+		setupLog.Error(err, "unable to setup PKI infrastructure")
 	}
-
-	err = pkiConfig.SchedulePeriodicMaintenance(ctx, clientSet, apiClientSet)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// cleanupPKI ensures that the PKI infrastructure is removed from the kubernetes cluster
-func cleanupPKI(ctx context.Context) error {
-	pkiConfig := certs.PublicKeyInfrastructure{
-		CaSecretName:      CaSecretName,
-		SecretName:        WebhookSecretName,
-		OperatorNamespace: configuration.Current.OperatorNamespace,
-	}
-	return pkiConfig.Cleanup(ctx, clientSet)
+	return err
 }
 
 // readConfigMap reads the configMap and returns its content as map
