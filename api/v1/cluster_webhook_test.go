@@ -1797,12 +1797,12 @@ var _ = Describe("Recovery and Backup Target", func() {
 		},
 	}
 
-	It("complain if external cluster and target backup are equal", func() {
+	It("complains if external cluster and target backup are equal", func() {
 		result := cluster.validateRecoveryAndBackupTarget()
 		Expect(result).NotTo(BeEmpty())
 	})
 
-	It("don't complain if target backup is different ot external backup in path", func() {
+	It("does not complain if target backup is different from external backup in path", func() {
 		cluster.Spec.Backup.BarmanObjectStore.DestinationPath = "/destination/new/path"
 		result := cluster.validateRecoveryAndBackupTarget()
 		Expect(result).To(BeEmpty())
