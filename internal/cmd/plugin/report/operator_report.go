@@ -39,7 +39,7 @@ import (
 // operatorReport contains the data to be printed by the `report operator` plugin
 type operatorReport struct {
 	deployment              appsv1.Deployment
-	operatorPod             corev1.Pod
+	operatorPods            []corev1.Pod
 	secrets                 []namedObject
 	configs                 []namedObject
 	events                  corev1.EventList
@@ -56,7 +56,7 @@ func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputForm
 		name    string
 	}{
 		{content: or.deployment, name: "deployment"},
-		{content: or.operatorPod, name: "operator-pod"},
+		{content: or.operatorPods, name: "operator-pods"},
 		{content: or.events, name: "events"},
 		{content: or.validatingWebhookConfig, name: "validating-webhook-configuration"},
 		{content: or.mutatingWebhookConfig, name: "mutating-webhook-configuration"},
@@ -110,7 +110,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 		return fmt.Errorf("could not get operator deployment: %w", err)
 	}
 
-	operatorPod, err := deployments.GetOperatorPod(ctx)
+	operatorPods, err := deployments.GetOperatorPods(ctx)
 	if err != nil {
 		return fmt.Errorf("could not get operator pod: %w", err)
 	}
@@ -127,7 +127,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 	for _, ss := range defaultSecrets {
 		var secret corev1.Secret
 
-		err := plugin.Client.Get(ctx, types.NamespacedName{Name: ss, Namespace: operatorPod.Namespace}, &secret)
+		err := plugin.Client.Get(ctx, types.NamespacedName{Name: ss, Namespace: operatorPods[0].Namespace}, &secret)
 		if err != nil {
 			e1, ok := err.(*errors.StatusError)
 			if ok && metav1.StatusReasonNotFound == e1.ErrStatus.Reason {
@@ -143,7 +143,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 	for _, cm := range configMaps {
 		var config corev1.ConfigMap
 
-		err := plugin.Client.Get(ctx, types.NamespacedName{Name: cm, Namespace: operatorPod.Namespace}, &config)
+		err := plugin.Client.Get(ctx, types.NamespacedName{Name: cm, Namespace: operatorPods[0].Namespace}, &config)
 		if err != nil {
 			e1, ok := err.(*errors.StatusError)
 			if ok && metav1.StatusReasonNotFound == e1.ErrStatus.Reason {
@@ -156,7 +156,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 	}
 
 	var events corev1.EventList
-	err = plugin.Client.List(ctx, &events, client.InNamespace(operatorPod.Namespace))
+	err = plugin.Client.List(ctx, &events, client.InNamespace(operatorPods[0].Namespace))
 	if err != nil {
 		return fmt.Errorf("could not get events: %w", err)
 	}
@@ -173,7 +173,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 
 	rep := operatorReport{
 		deployment:              operatorDeployment,
-		operatorPod:             operatorPod,
+		operatorPods:            operatorPods,
 		secrets:                 secrets,
 		configs:                 configs,
 		events:                  events,
@@ -190,7 +190,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 
 	if includeLogs {
 		logZipper := func(zipper *zip.Writer, dirname string) error {
-			return streamPodLogsToZip(ctx, operatorPod, dirname, "operator-logs", zipper)
+			return streamPodLogsToZip(ctx, operatorPods, dirname, "operator-logs", zipper)
 		}
 		sections = append(sections, logZipper)
 	}
