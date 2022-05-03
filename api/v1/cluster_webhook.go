@@ -19,7 +19,6 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -1188,7 +1187,12 @@ func (r *Cluster) validateRecoveryAndBackupTarget() field.ErrorList {
 		return allErrors
 	}
 
-	if reflect.DeepEqual(r.Spec.Backup.BarmanObjectStore, sourceCluster.BarmanObjectStore) {
+	barmanObjectStore := r.Spec.Backup.BarmanObjectStore
+	sourceBarmanObjectStore := sourceCluster.BarmanObjectStore
+
+	if barmanObjectStore.ServerName == sourceBarmanObjectStore.ServerName &&
+		barmanObjectStore.EndpointURL == sourceBarmanObjectStore.EndpointURL &&
+		barmanObjectStore.DestinationPath == sourceBarmanObjectStore.DestinationPath {
 		allErrors = append(
 			allErrors,
 			field.Invalid(
