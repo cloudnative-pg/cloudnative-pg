@@ -32,7 +32,6 @@ const labelOperatorName = "cloudnative-pg"
 
 // GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
 func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
-	const operatorDeploymentName = "cnpg-controller-manager"
 	deploymentList := &appsv1.DeploymentList{}
 
 	if err := plugin.Client.List(
@@ -41,11 +40,12 @@ func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
 		return appsv1.Deployment{}, err
 	}
 	// We check if we have one or more deployments
-	switch {
-	case len(deploymentList.Items) > 1:
-		err := fmt.Errorf("number of operator deployments != 1")
+	if len(deploymentList.Items) > 1 || len(deploymentList.Items) < 1 {
+		err := fmt.Errorf("number of operator deployments not equal to 1")
 		return appsv1.Deployment{}, err
-	case len(deploymentList.Items) == 1:
+	}
+
+	if len(deploymentList.Items) == 1 {
 		return deploymentList.Items[0], nil
 	}
 
@@ -58,25 +58,11 @@ func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
 	}
 
 	// We check if we have one or more deployments
-	switch {
-	case len(deploymentList.Items) > 1:
-		err := fmt.Errorf("number of operator deployments != 1")
-		return appsv1.Deployment{}, err
-	case len(deploymentList.Items) == 1:
-		return deploymentList.Items[0], nil
-	}
-
-	// This is for deployments created before 1.4.0
-	if err := plugin.Client.List(
-		ctx, deploymentList, ctrlclient.MatchingFields{"metadata.name": operatorDeploymentName},
-	); err != nil {
+	if len(deploymentList.Items) > 1 || len(deploymentList.Items) < 1 {
+		err := fmt.Errorf("number of operator deployments not equal to 1")
 		return appsv1.Deployment{}, err
 	}
 
-	if len(deploymentList.Items) != 1 {
-		err := fmt.Errorf("number of %v deployments != 1", operatorDeploymentName)
-		return appsv1.Deployment{}, err
-	}
 	return deploymentList.Items[0], nil
 }
 
@@ -95,25 +81,7 @@ func GetOperatorPods(ctx context.Context) ([]corev1.Pod, error) {
 		return podList.Items, nil
 	}
 
-	operatorNamespace, err := GetOperatorNamespaceName(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// This will work for older version of the operator, which are using
-	// the default label from kube-builder
-	if err = plugin.Client.List(
-		ctx, podList,
-		ctrlclient.MatchingLabels{"control-plane": "controller-manager"},
-		ctrlclient.InNamespace(operatorNamespace)); err != nil {
-		return nil, err
-	}
-	if len(podList.Items) == 0 {
-		err = fmt.Errorf("operator pods not found")
-		return nil, err
-	}
-
-	return podList.Items, nil
+	return nil, fmt.Errorf("operator pods not found")
 }
 
 // GetOperatorNamespaceName returns the namespace the operator Deployment is running in
