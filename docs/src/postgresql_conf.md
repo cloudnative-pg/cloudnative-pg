@@ -95,7 +95,6 @@ The following parameters are **fixed** and exclusively controlled by the operato
 ```text
 archive_command = '/controller/manager wal-archive %p'
 archive_mode = 'on'
-archive_timeout = '5min'
 full_page_writes = 'on'
 hot_standby = 'true'
 listen_addresses = '*'
@@ -436,7 +435,6 @@ Users are not allowed to set the following configuration parameters in the
 - `archive_cleanup_command`
 - `archive_command`
 - `archive_mode`
-- `archive_timeout`
 - `bonjour`
 - `bonjour_name`
 - `cluster_name`

@@ -529,6 +529,15 @@ PostgreSQL implements a sequential archiving scheme, where the
 `archive_command` will be executed sequentially for every WAL
 segment to be archived.
 
+!!! Important
+    By default, CloudNativePG sets `archive_timeout` to `5min`, ensuring
+    that WAL files, even in case of low workloads, are closed and archived
+    at least every 5 minutes, providing a deterministic time-based value for
+    your Recovery Point Objective (RPO). Even though you change the value
+    of the [`archive_timeout` setting in the PostgreSQL configuration](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-TIMEOUT),
+    our experience suggests that the default value set by the operator is
+    suitable for most use cases.
+
 When the bandwidth between the PostgreSQL instance and the object
 store allows archiving more than one WAL file in parallel, you
 can use the parallel WAL archiving feature of the instance manager
