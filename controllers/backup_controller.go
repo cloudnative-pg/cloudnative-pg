@@ -273,7 +273,7 @@ func (r *BackupReconciler) mapClustersToBackup(ctx context.Context) handler.MapF
 		}
 		var requests []reconcile.Request
 		for _, backup := range backups.Items {
-			if backup.Spec.Cluster.Name == cluster.ClusterName {
+			if backup.Spec.Cluster.Name == cluster.Name {
 				continue
 			}
 			requests = append(requests,
