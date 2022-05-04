@@ -318,7 +318,6 @@ var (
 		// The following parameters need a reload to be applied
 		"archive_cleanup_command":                blockedConfigurationParameter,
 		"archive_command":                        fixedConfigurationParameter,
-		"archive_timeout":                        fixedConfigurationParameter,
 		"full_page_writes":                       fixedConfigurationParameter,
 		"log_destination":                        blockedConfigurationParameter,
 		"log_directory":                          blockedConfigurationParameter,
@@ -356,6 +355,7 @@ var (
 	// default and the mandatory behavior of CNP
 	CnpgConfigurationSettings = ConfigurationSettings{
 		GlobalDefaultSettings: SettingsCollection{
+			"archive_timeout":            "5min",
 			"max_parallel_workers":       "32",
 			"max_worker_processes":       "32",
 			"max_replication_slots":      "32",
@@ -397,7 +397,6 @@ var (
 			"port":                fmt.Sprint(ServerPort),
 			"wal_level":           "logical",
 			"wal_log_hints":       "on",
-			"archive_timeout":     "5min", // TODO support configurable archive timeout
 			"full_page_writes":    "on",
 			"ssl":                 "on",
 			"ssl_cert_file":       ServerCertificateLocation,
