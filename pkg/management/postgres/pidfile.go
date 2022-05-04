@@ -41,28 +41,8 @@ const PostgresqlPidFile = "postmaster.pid" //wokeignore:rule=master
 // If it doesn't exist then the PID file is stale and is removed.
 func (instance *Instance) CheckForExistingPostmaster(postgresExecutable string) (*os.Process, error) {
 	pidFile := path.Join(instance.PgData, PostgresqlPidFile)
-	pidFileExists, err := fileutils.FileExists(pidFile)
-	if err != nil {
-		return nil, err
-	}
-
-	if !pidFileExists {
-		return nil, nil
-	}
-
-	// The PID file is existing. We need to check if it is stale
-	// or not
-	pidFileContents, err := fileutils.ReadFile(pidFile)
-	if err != nil {
-		return nil, err
-	}
-
 	contextLog := log.WithValues("file", pidFile)
-
-	// Inside the PID file, the first line contain the actual postmaster
-	// PID working on the data directory
-	pidLine := strings.Split(string(pidFileContents), "\n")[0]
-	pid, err := strconv.Atoi(strings.TrimSpace(pidLine))
+	pidFileContents, pid, err := instance.GetPostmasterPidFromFile(pidFile)
 	if err != nil {
 		// The content of the PID file is wrong.
 		// In this case we just remove the PID file, which is assumed
@@ -112,4 +92,29 @@ func (instance *Instance) CleanUpStalePid() error {
 	}
 
 	return nil
+}
+
+// GetPostmasterPidFromFile reads the given postmaster pid file, parse it and return its content and the actual pid
+func (instance *Instance) GetPostmasterPidFromFile(pidFile string) ([]byte, int, error) {
+	pidFileExists, err := fileutils.FileExists(pidFile)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	if !pidFileExists {
+		return nil, -1, os.ErrNotExist
+	}
+
+	// The PID file is existing. We need to check if it is stale
+	// or not
+	pidFileContents, err := fileutils.ReadFile(pidFile)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	// Inside the PID file, the first line contain the actual postmaster
+	// PID working on the data directory
+	pidLine := strings.Split(string(pidFileContents), "\n")[0]
+	pid, err := strconv.Atoi(strings.TrimSpace(pidLine))
+	return pidFileContents, pid, err
 }
