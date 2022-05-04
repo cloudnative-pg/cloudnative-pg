@@ -30,19 +30,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walarchive"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walarchive"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	barmanCredentials "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/credentials"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
@@ -88,7 +87,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	// Before starting the restore we check if the archive destination it's safe to use
+	// Before starting the restore we check if the archive destination is safe to use
 	// otherwise, we stop creating the cluster
 	err = info.checkBackupDestination(ctx, typedClient, cluster)
 	if err != nil {
@@ -591,7 +590,7 @@ func (info *InitInfo) checkBackupDestination(
 		return nil
 	}
 
-	// Instance the WALArchiver to get the proper configuration
+	// Instantiate the WALArchiver to get the proper configuration
 	var walArchiver *archiver.WALArchiver
 	walArchiver, err = archiver.New(ctx, cluster, env, walarchive.SpoolDirectory)
 	if err != nil {

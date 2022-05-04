@@ -26,9 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/spool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
@@ -184,9 +183,9 @@ func (archiver *WALArchiver) Archive(walName string, baseOptions []string) error
 	return nil
 }
 
-// CheckWalFiles check a list of WAL files looking for the first WAL file of the first Timeline
-// return true if the first file in the list it's the fir WAL file
-func (archiver *WALArchiver) CheckWalFiles(ctx context.Context, walFilesList []string) bool {
+// FileListStartsAtFirstWAL returns true if the first file in the list is the
+// first WAL file of the first timeline
+func (archiver *WALArchiver) FileListStartsAtFirstWAL(ctx context.Context, walFilesList []string) bool {
 	contextLogger := log.FromContext(ctx)
 	// If walFileList is empty then, this is a no-op just like the method ArchiveList
 	if len(walFilesList) == 0 {
@@ -194,10 +193,9 @@ func (archiver *WALArchiver) CheckWalFiles(ctx context.Context, walFilesList []s
 		return false
 	}
 
-	// Get the first wal file from the list
+	firstWalFirstTimeline := "000000010000000000000001"
 	walName := path.Base(walFilesList[0])
-	// We check that we have the first wal file of the first timeline, otherwise, there's nothing to do here
-	return walName == "000000010000000000000001"
+	return walName == firstWalFirstTimeline
 }
 
 // CheckWalArchiveDestination checks if the destinationObjectStore is ready perform archiving.

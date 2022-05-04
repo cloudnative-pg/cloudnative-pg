@@ -374,8 +374,7 @@ func checkWalArchive(ctx context.Context,
 		return err
 	}
 
-	firstWalFile := walArchiver.CheckWalFiles(ctx, walFilesList)
-	if !firstWalFile {
+	if !walArchiver.FileListStartsAtFirstWAL(ctx, walFilesList) {
 		return nil
 	}
 
