@@ -222,28 +222,36 @@ func (r *Cluster) ValidateCreate() error {
 
 // Validate groups the validation logic for clusters returning a list of all encountered errors
 func (r *Cluster) Validate() (allErrs field.ErrorList) {
-	allErrs = append(allErrs, r.validateInitDB()...)
-	allErrs = append(allErrs, r.validateSuperuserSecret()...)
-	allErrs = append(allErrs, r.validateCerts()...)
-	allErrs = append(allErrs, r.validateBootstrapMethod()...)
-	allErrs = append(allErrs, r.validateStorageConfiguration()...)
-	allErrs = append(allErrs, r.validateImageName()...)
-	allErrs = append(allErrs, r.validateImagePullPolicy()...)
-	allErrs = append(allErrs, r.validateRecoveryTarget()...)
-	allErrs = append(allErrs, r.validatePrimaryUpdateStrategy()...)
-	allErrs = append(allErrs, r.validateMinSyncReplicas()...)
-	allErrs = append(allErrs, r.validateMaxSyncReplicas()...)
-	allErrs = append(allErrs, r.validateStorageSize()...)
-	allErrs = append(allErrs, r.validateName()...)
-	allErrs = append(allErrs, r.validateBootstrapPgBaseBackupSource()...)
-	allErrs = append(allErrs, r.validateBootstrapRecoverySource()...)
-	allErrs = append(allErrs, r.validateExternalClusters()...)
-	allErrs = append(allErrs, r.validateTolerations()...)
-	allErrs = append(allErrs, r.validateAntiAffinity()...)
-	allErrs = append(allErrs, r.validateReplicaMode()...)
-	allErrs = append(allErrs, r.validateBackupConfiguration()...)
-	allErrs = append(allErrs, r.validateConfiguration()...)
-	allErrs = append(allErrs, r.validateLDAP()...)
+	type validation func() field.ErrorList
+	validations := []validation{
+		r.validateInitDB,
+		r.validateSuperuserSecret,
+		r.validateCerts,
+		r.validateBootstrapMethod,
+		r.validateStorageConfiguration,
+		r.validateImageName,
+		r.validateImagePullPolicy,
+		r.validateRecoveryTarget,
+		r.validatePrimaryUpdateStrategy,
+		r.validateMinSyncReplicas,
+		r.validateMaxSyncReplicas,
+		r.validateStorageSize,
+		r.validateName,
+		r.validateBootstrapPgBaseBackupSource,
+		r.validateBootstrapRecoverySource,
+		r.validateRecoveryAndBackupTarget,
+		r.validateExternalClusters,
+		r.validateTolerations,
+		r.validateAntiAffinity,
+		r.validateReplicaMode,
+		r.validateBackupConfiguration,
+		r.validateConfiguration,
+		r.validateLDAP,
+	}
+
+	for _, validate := range validations {
+		allErrs = append(allErrs, validate()...)
+	}
 
 	return allErrs
 }
@@ -1153,6 +1161,44 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 				"not a valid retention policy",
 			))
 		}
+	}
+
+	return allErrors
+}
+
+// validateRecoveryAndBackupTarget validates that the recovery point and
+// the backup point are not the same
+func (r *Cluster) validateRecoveryAndBackupTarget() field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.Source == "" ||
+		r.Spec.Backup == nil || r.Spec.Backup.BarmanObjectStore == nil {
+		return allErrors
+	}
+
+	var sourceCluster *ExternalCluster
+	for i, cluster := range r.Spec.ExternalClusters {
+		if cluster.Name == r.Spec.Bootstrap.Recovery.Source {
+			sourceCluster = &r.Spec.ExternalClusters[i]
+		}
+	}
+
+	if sourceCluster == nil || sourceCluster.BarmanObjectStore == nil {
+		return allErrors
+	}
+
+	barmanObjectStore := r.Spec.Backup.BarmanObjectStore
+	sourceBarmanObjectStore := sourceCluster.BarmanObjectStore
+
+	if barmanObjectStore.ServerName == sourceBarmanObjectStore.ServerName &&
+		barmanObjectStore.EndpointURL == sourceBarmanObjectStore.EndpointURL &&
+		barmanObjectStore.DestinationPath == sourceBarmanObjectStore.DestinationPath {
+		allErrors = append(
+			allErrors,
+			field.Invalid(
+				field.NewPath("spec", "backup", "barmanObjectStore"),
+				"",
+				"Cannot be equal to the ExternalCluster used to recover from"))
 	}
 
 	return allErrors

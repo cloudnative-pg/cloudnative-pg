@@ -1744,3 +1744,67 @@ var _ = Describe("Default monitoring queries", func() {
 			To(ContainElements(testCluster.Spec.Monitoring.CustomQueriesSecret))
 	})
 })
+
+var _ = Describe("Recovery and Backup Target", func() {
+	cluster := &Cluster{
+		Spec: ClusterSpec{
+			Bootstrap: &BootstrapConfiguration{
+				Recovery: &BootstrapRecovery{
+					Source: "one",
+				},
+			},
+			Backup: &BackupConfiguration{
+				BarmanObjectStore: &BarmanObjectStoreConfiguration{
+					S3Credentials: &S3Credentials{
+						AccessKeyIDReference: &SecretKeySelector{
+							LocalObjectReference: LocalObjectReference{
+								Name: "s3-creds",
+							},
+							Key: "access_key",
+						},
+						SecretAccessKeyReference: &SecretKeySelector{
+							LocalObjectReference: LocalObjectReference{
+								Name: "s3-creds",
+							},
+							Key: "secret_key",
+						},
+					},
+					DestinationPath: "/destination/path",
+				},
+			},
+			ExternalClusters: []ExternalCluster{
+				{
+					Name: "one",
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						S3Credentials: &S3Credentials{
+							AccessKeyIDReference: &SecretKeySelector{
+								LocalObjectReference: LocalObjectReference{
+									Name: "s3-creds",
+								},
+								Key: "access_key",
+							},
+							SecretAccessKeyReference: &SecretKeySelector{
+								LocalObjectReference: LocalObjectReference{
+									Name: "s3-creds",
+								},
+								Key: "secret_key",
+							},
+						},
+						DestinationPath: "/destination/path",
+					},
+				},
+			},
+		},
+	}
+
+	It("complains if external cluster and target backup are equal", func() {
+		result := cluster.validateRecoveryAndBackupTarget()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("does not complain if target backup is different from external backup in path", func() {
+		cluster.Spec.Backup.BarmanObjectStore.DestinationPath = "/destination/new/path"
+		result := cluster.validateRecoveryAndBackupTarget()
+		Expect(result).To(BeEmpty())
+	})
+})
