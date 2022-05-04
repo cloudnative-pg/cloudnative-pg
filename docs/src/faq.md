@@ -30,7 +30,7 @@ container images are built to run the main application as the
 single entry point (the so-called PID 1 process).
 
 In Kubernetes terms, the application is referred to as workload.
-Workloads can be stateless like a web application or stateful like a
+Workloads can be stateless like a web application server or stateful like a
 database. Mapping this concept to PostgreSQL, an immutable application
 container is a single "postgres" process that is running and
 tied to a single and specific version - the one in the immutable
