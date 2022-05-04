@@ -18,6 +18,25 @@ CloudNativePG was originally built and sponsored by [EDB](https://www.enterprise
 The best way to get started is with the ["Quickstart"](docs/src/quickstart.md)
 section in the documentation.
 
+### From source code
+
+The `Makefile` provides a way to test the development version of the operator
+in the `main` branch, just running the following command:
+
+```shell
+make deploy-locally
+```
+
+This will create a [KinD](https://kind.sigs.k8s.io/) cluster in your laptop.
+It requires to have [KinD](https://kind.sigs.k8s.io/) and all the dependencies
+installed and also the Go installed to compile the code.
+
+The created cluster can be destroyed like ts:
+
+```shell
+make kind-cluster-destroy
+```
+
 ## Scope
 
 The goal of CloudNativePG is to increase the adoption of PostgreSQL, one of the
