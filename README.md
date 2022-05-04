@@ -108,6 +108,7 @@ MariaDB cluster).
 
 - [Roadmap](https://github.com/orgs/cloudnative-pg/projects/1)
 - [Website](https://cloudnative-pg.io)
+- [FAQ](docs/src/faq.md)
 
 ## Maintainers
 

@@ -1,0 +1,349 @@
+# Frequently Asked Questions (FAQ)
+
+## Running PostgreSQL in Kubernetes
+
+**Everyone knows that stateful workloads like PostgreSQL cannot run in
+Kubernetes. Why do you say the contrary?**
+
+An [*independent research survey commissioned by the Data on Kubernetes
+Community*](https://dok.community/dokc-2021-report/) in September 2021
+revealed that half of the respondents run most of their production
+workloads on Kubernetes. 90% of them believe that Kubernetes is ready
+for stateful workloads, and 70% of them run databases in production.
+Databases like Postgres. However, according to them, significant
+challenges remain, such as the knowledge gap (Kubernetes and Cloud
+Native, in general, have a steep learning curve) and the quality of
+Kubernetes operators. The latter is the reason why we believe that an
+operator like CloudNativePG highly contributes to the success
+of your project.
+
+For database fanatics like us, a real game-changer has been the
+introduction of the support for local persistent volumes in
+[*Kubernetes 1.14 in April 2019*](https://kubernetes.io/blog/2019/04/04/kubernetes-1.14-local-persistent-volumes-ga/).
+
+**CloudNativePG is built on immutable application containers.
+What does it mean?**
+
+According to the microservice architectural pattern, a container is
+designed to run a single application or process. As a result, such
+container images are built to run the main application as the
+single entry point (the so-called PID 1 process).
+
+In Kubernetes terms, the application is referred to as workload.
+Workloads can be stateless like a web application server or stateful like a
+database. Mapping this concept to PostgreSQL, an immutable application
+container is a single "postgres" process that is running and
+tied to a single and specific version - the one in the immutable
+container image.
+
+No other processes such as SSH or systemd, or syslog are allowed.
+
+Immutable Application Containers are in contrast with Mutable System
+Containers, which are still a very common way to interpret and use
+containers.
+
+Immutable means that a container won't be modified during its life: no
+updates, no patches, no configuration changes. If you must update the
+application code or apply a patch, you build a new image and redeploy
+it. Immutability makes deployments safer and more repeatable.
+
+For more information, please refer to
+[*"Why EDB chose immutable application containers"*](https://www.enterprisedb.com/blog/why-edb-chose-immutable-application-containers).
+
+**What does Cloud Native mean?**
+
+The Cloud Native Computing Foundation defines the term
+"[*Cloud Native*](https://github.com/cncf/toc/blob/main/DEFINITION.md)".
+However, since the start of the Cloud Native PostgreSQL/CloudNativePG operator
+at 2ndQuadrant, the development team has been interpreting Cloud Native
+as three main concepts:
+
+1.  An existing, healthy, genuine, and prosperous DevOps culture, founded
+    on people, as well as principles and processes, which enables teams
+    and organizations (as teams of teams) to continuously change so to
+    innovate and accelerate the delivery of outcomes and produce value
+    for the business in safer, more efficient, and more engaging ways
+2.  A microservice architecture that is based on Immutable Application
+    Containers
+3.  A way to manage and orchestrate these containers, such as Kubernetes
+
+Currently, the standard de facto for container orchestration is
+Kubernetes, which automates the deployment, administration and
+scalability of Cloud Native Applications.
+
+Another definition of Cloud Native that resonates with us is the one
+defined by Ibryam and Huß in
+[*"Kubernetes Patterns", published by O'Reilly*](https://www.oreilly.com/library/view/kubernetes-patterns/9781492050278/):
+
+> Principles, Patterns, Tools to automate containerized microservices at scale
+
+
+<!--
+**Can I run CloudNativePG on bare metal Kubernetes?**
+
+TODO
+
+**Why should I use PostgreSQL replication instead of file system
+replication?**
+
+TODO
+-->
+
+**Why should I use an operator instead of running PostgreSQL as a
+container?**
+
+The most basic approach to running PostgreSQL in Kubernetes is to have a
+pod, which is the smallest unit of deployment in Kubernetes, running a
+Postgres container with no replica. The volume hosting the Postgres data
+directory is mounted on the pod, and it usually resides on network
+storage. In this case, Kubernetes restarts the pod in case of a
+problem or moves it to another Kubernetes node.
+
+The most sophisticated approach is to run PostgreSQL using an operator.
+An operator is an extension of the Kubernetes controller and defines how
+a complex application works in business continuity contexts. The
+operator pattern is currently state of the art in Kubernetes for
+this purpose. An operator simulates the work of a human operator in an
+automated and programmatic way.
+
+Postgres is a complex application, and an operator not only needs to
+deploy a cluster (the first step), but also properly react after
+unexpected events. The typical example is that of a failover.
+
+An operator relies on Kubernetes for capabilities like self-healing,
+scalability, replication, high availability, backup, recovery, updates,
+access, resource control, storage management, and so on. It also
+facilitates the integration of a PostgreSQL cluster in the log
+management and monitoring infrastructure.
+
+CloudNativePG enables the definition of the desired state of a
+PostgreSQL cluster via declarative configuration. Kubernetes
+continuously makes sure that the current state of the infrastructure
+matches the desired one through reconciliation loops initiated by the
+Kubernetes controller. If the desired state and the actual state don't
+match, reconciliation loops trigger self-healing procedures. That's
+where an operator like CloudNativePG comes into play.
+
+**You say that CloudNativePG is a fully declarative operator.
+What do you mean by that?**
+
+The easiest way is to explain declarative configuration through an
+example that highlights the differences with imperative configuration.
+In an imperative context, the state is defined as a series of tasks to
+be executed in sequence. So, we can get a three-node PostgreSQL cluster
+by creating the first instance, configuring the replication, cloning a
+second instance, and the third one.
+
+In a declarative approach, the state of a system is defined using
+configuration, namely: there's a PostgreSQL 13 cluster with two replicas.
+This approach highly simplifies change management operations, and when
+these are stored in source control systems like Git, it enables the
+Infrastructure as Code capability. And Kubernetes takes it farther than
+deployment, as it makes sure that our request is fulfilled at any time.
+
+**What are the required skills to run PostgreSQL on Kubernetes?**
+
+Running PostgreSQL on Kubernetes requires both PostgreSQL and Kubernetes
+skills in your DevOps team. The best experience is when database
+administrators familiarize themselves with Kubernetes core concepts
+and are able to interact with Kubernetes administrators.
+
+Our advice is for everyone that wants to fully exploit Cloud Native
+PostgreSQL to acquire the "Certified Kubernetes Administrator (CKA)"
+status from the CNCF certification program.
+
+<!--
+
+## High availability
+
+What are the reasons behind CloudNativePG not relying on a failover
+management tool like Patroni, repmgr, or Stolon?
+
+TODO
+
+How can I ensure that failover (unplanned) and switchover (planned)
+times are within our SLA of 99.995% per year?
+
+TODO
+
+Should I manually resync a former primary with the new one following a
+failover?
+
+TODO
+
+What happens if all nodes of PostgreSQL have a failure?
+
+TODO
+
+## Backup and restore
+
+Does CloudNativePG support logical backups with pg_dump?
+
+TODO
+
+What is the recommended setup for the best outcomes in terms of disaster
+recovery?
+
+TODO
+
+What happens if the Kubernetes cluster where I was running PostgreSQL is
+permanently gone?
+
+TODO
+
+
+## Miscellaneous
+
+**What are the Kubernetes distributions that CloudNativePG
+supports? What's the rationale behind this decision?**
+
+TODO
+
+**Are there performance tests or values for large environments (e.g. \>
+4 TB/256 GB/64 cores) ?**
+
+TODO
+
+**Question about LDAP/Active Directory support**
+
+TODO
+
+How can the provisioning of CloudNativePG databases be
+automated?
+
+TODO
+
+How can the de-provisioning of CloudNativePG be automated?
+
+TODO
+
+Does CloudNativePG wipe the data directory of PostgreSQL when
+a cluster is deleted?
+
+TODO
+
+How are changes of resources (storage/CPU/memory) made to a database
+instance during runtime?
+
+TODO
+
+How can I get notified via email after a PostgreSQL cluster has been
+successfully created, with details about connection?
+
+TODO
+
+## Updates
+
+How can I perform updates on the underlying Kubernetes nodes?
+
+TODO
+
+Can minor version updates of PostgreSQL be carried out without downtime?
+
+TODO
+
+Can major version upgrades of PostgreSQL be carried out without
+downtime?
+
+TODO
+
+-->
+
+## Database management
+
+**Why should I use PostgreSQL?**
+
+We believe that PostgreSQL is the equivalent in the database area of
+what Linux represents in the operating system space. The current latest
+major version of Postgres is version 14, which ships out of the box:
+
+-   native streaming replication, both physical and logical
+-   continuous hot backup and point in time recovery
+-   declarative partitioning for horizontal table partitioning, which is
+    a very well-known technique in the database area to improve vertical
+    scalability on a single instance
+-   extensibility, with extensions like PostGIS for geographical
+    databases
+-   parallel queries for vertical scalability
+-   JSON support, unleashing the multi-model hybrid database for both
+    structured and unstructured data queried via standard SQL
+
+And so on ...
+
+**How many databases should be hosted in a single PostgreSQL instance?**
+
+Our recommendation is to dedicate a single PostgreSQL cluster
+(intended as primary and multiple standby servers) to a single database,
+entirely managed by a single microservice application. However, by
+leveraging the "postgres" superuser, it is possible to create as many
+users and databases as desired (subject to the available resources).
+
+The reason for this recommendation lies in the Cloud Native concept,
+based on microservices. In a pure microservice architecture, the
+microservice itself should own the data it manages exclusively.
+These could be flat files, queues, key-value stores, or, in our case, a
+PostgreSQL relational database containing both structured and
+unstructured data. The general idea is that only the microservice can
+access the database, including schema management and migrations.
+
+CloudNativePG has been designed to work this way out of the
+box, by default creating an application user and an application database
+owned by the aforementioned application user.
+
+Reserving a PostgreSQL instance to a single microservice owned database,
+enhances:
+
+-   resource management: in PostgreSQL, CPU, and memory constrained
+    resources are generally handled at the instance level, not the
+    database level, making it easier to integrate it with Kubernetes
+    resource management policies at the pood level
+-   physical continuous backup and Point-In-Time-Recovery (PITR): given
+    that PostgreSQL handles continuous backup and recovery at the
+    instance level, having one database per instance simplifies PITR
+    operations, differentiates retention policy management, and
+    increases data protection of backups
+-   application updates: enable each application to decide their update
+    policies without impacting other databases owned by different
+    applications
+-   database updates: each application can decide which PostgreSQL
+    version to use, and independently, when to upgrade to a different
+    major version of PostgreSQL and at what conditions (e.g., cutover
+    time)
+
+
+<!--
+**What is the recommended architecture for best business continuity
+outcomes?**
+
+TODO
+
+**What are the global objects such as roles and databases that are
+automatically created by CloudNativePG?**
+
+TODO
+
+Q: Support for management of Postgres roles via declarative
+configuration
+
+TODO
+
+Q: Support for tablespaces
+
+TODO
+
+Q: GUI
+
+TODO
+
+Q: Monitoring
+
+TODO
+
+Q: Logging
+
+TODO
+
+How can instances be stopped or started?
+
+TODO
+-->
