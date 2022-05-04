@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os/exec"
 	"sync"
 	"time"
@@ -219,7 +220,11 @@ func (restorer *WALRestorer) RestoreList(
 
 // Restore restores a WAL file from the object store
 func (restorer *WALRestorer) Restore(walName, destinationPath string, baseOptions []string) error {
-	options := make([]string, len(baseOptions), len(baseOptions)+2)
+	optionsLength := len(baseOptions)
+	if optionsLength >= math.MaxInt-2 {
+		return fmt.Errorf("can't restore wal file %v, options too long", walName)
+	}
+	options := make([]string, optionsLength, optionsLength+2)
 	copy(options, baseOptions)
 	options = append(options, walName, destinationPath)
 

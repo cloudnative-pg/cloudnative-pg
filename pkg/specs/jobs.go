@@ -31,7 +31,7 @@ import (
 )
 
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
-func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
+func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -116,7 +116,7 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 }
 
 // CreatePrimaryJobViaRecovery creates a new primary instance in a Pod
-func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int32, backup *apiv1.Backup) *batchv1.Job {
+func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *apiv1.Backup) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -198,7 +198,7 @@ func addBarmanEndpointCAToJob(cluster apiv1.Cluster, backup *apiv1.Backup, job *
 }
 
 // CreatePrimaryJobViaPgBaseBackup creates a new primary instance in a Pod
-func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
+func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -209,7 +209,7 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int32) *b
 }
 
 // JoinReplicaInstance create a new PostgreSQL node, copying the contents from another Pod
-func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
+func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -222,7 +222,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int32) *batchv1.Job {
 
 // createPrimaryJob create a job that executes the provided command.
 // The role should describe the purpose of the executed job
-func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int32, role string, initCommand []string) *batchv1.Job {
+func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCommand []string) *batchv1.Job {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 	jobName := fmt.Sprintf("%s-%v-%s", cluster.Name, nodeSerial, role)
 

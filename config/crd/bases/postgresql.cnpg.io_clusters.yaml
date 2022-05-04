@@ -1614,7 +1614,6 @@ spec:
               instances:
                 default: 1
                 description: Number of instances required in the cluster
-                format: int32
                 minimum: 1
                 type: integer
               logLevel:
@@ -1633,7 +1632,6 @@ spec:
                 description: The target value for the synchronous replication quorum,
                   that can be decreased if the number of ready standbys is lower than
                   this. Undefined or 0 disable synchronous replication.
-                format: int32
                 minimum: 0
                 type: integer
               minSyncReplicas:
@@ -1641,7 +1639,6 @@ spec:
                 description: Minimum number of instances required in synchronous replication
                   with the primary. Undefined or 0 allow writes to complete when no
                   standby is available.
-                format: int32
                 minimum: 0
                 type: integer
               monitoring:
@@ -2233,7 +2230,6 @@ spec:
                 type: array
               instances:
                 description: Total number of instances in the cluster
-                format: int32
                 type: integer
               instancesStatus:
                 additionalProperties:
@@ -2249,7 +2245,6 @@ spec:
               latestGeneratedNode:
                 description: ID of the latest generated node (used to avoid node name
                   clashing)
-                format: int32
                 type: integer
               onlineUpdateEnabled:
                 description: OnlineUpdateEnabled shows if the online upgrade is enabled
@@ -2283,7 +2278,6 @@ spec:
                 type: string
               readyInstances:
                 description: Total number of ready instances in the cluster
-                format: int32
                 type: integer
               resizingPVC:
                 description: List of all the PVCs that have ResizingPVC condition.

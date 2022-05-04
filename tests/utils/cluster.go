@@ -47,7 +47,7 @@ func AllClusterPodsHaveLabels(
 	if err != nil {
 		return false, err
 	}
-	if len(podList.Items) != int(cluster.Spec.Instances) {
+	if len(podList.Items) != cluster.Spec.Instances {
 		return false, fmt.Errorf("%v found instances, %v expected", len(podList.Items), cluster.Spec.Instances)
 	}
 	for _, pod := range podList.Items {
@@ -73,7 +73,7 @@ func AllClusterPodsHaveAnnotations(
 	if err != nil {
 		return false, err
 	}
-	if len(podList.Items) != int(cluster.Spec.Instances) {
+	if len(podList.Items) != cluster.Spec.Instances {
 		return false, fmt.Errorf("%v found instances, %v expected", len(podList.Items), cluster.Spec.Instances)
 	}
 	for _, pod := range podList.Items {

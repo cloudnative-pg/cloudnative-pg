@@ -18,7 +18,10 @@ package utils
 
 import (
 	"fmt"
+	"math"
 	"regexp"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/cnpgerrors"
 )
 
 var regexPolicy = regexp.MustCompile(`([1-9][0-9]*)([dwm])$`)
@@ -41,16 +44,20 @@ func ParsePolicy(policy string) (string, error) {
 
 // MapToBarmanTagsFormat will transform a map[string]string into the
 // Barman tags format needed
-func MapToBarmanTagsFormat(option string, mapTags map[string]string) []string {
-	if len(mapTags) == 0 {
-		return []string{}
+func MapToBarmanTagsFormat(option string, mapTags map[string]string) ([]string, error) {
+	tagsLength := len(mapTags)
+	if tagsLength == 0 {
+		return []string{}, nil
+	}
+	if tagsLength >= math.MaxInt-1 {
+		return []string{}, fmt.Errorf("could not list barman tags: %w", cnpgerrors.ErrMemoryAllocation)
 	}
 
-	tags := make([]string, 0, len(mapTags)+1)
+	tags := make([]string, 0, tagsLength+1)
 	tags = append(tags, option)
 	for k, v := range mapTags {
 		tags = append(tags, fmt.Sprintf("%v,%v", k, v))
 	}
 
-	return tags
+	return tags, nil
 }

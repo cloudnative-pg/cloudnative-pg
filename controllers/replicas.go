@@ -190,7 +190,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 		// e.g an instance is being joined
 		(cluster.Spec.Instances != cluster.Status.ReadyInstances ||
 			// e.g. we want all instances to be moved to a schedulable node before triggering the switchover
-			len(podsOnOtherNodes.Items) < int(cluster.Spec.Instances)-1) {
+			len(podsOnOtherNodes.Items) < cluster.Spec.Instances-1) {
 		contextLogger.Info("Current primary is running on unschedulable node and something is already in progress",
 			"currentPrimary", primaryPod,
 			"podsOnOtherNodes", len(podsOnOtherNodes.Items),

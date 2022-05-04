@@ -145,8 +145,11 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 	}
 
 	if len(configuration.Tags) > 0 {
-		options = append(options,
-			utils.MapToBarmanTagsFormat("--tags", configuration.Tags)...)
+		tags, err := utils.MapToBarmanTagsFormat("--tags", configuration.Tags)
+		if err != nil {
+			return nil, err
+		}
+		options = append(options, tags...)
 	}
 
 	if len(configuration.EndpointURL) > 0 {

@@ -88,7 +88,7 @@ var _ = Describe("Update configuration files", func() {
 			"primary_conninfo = 'host=someHost user=someUser application_name=nodeName'\n" +
 			"recovery_target_timeline = 'latest'\n"
 
-		updatedContent := UpdateConfigurationContents(initialContent, map[string]string{
+		updatedContent, _ := UpdateConfigurationContents(initialContent, map[string]string{
 			"test.key": "test.value",
 		})
 
@@ -108,7 +108,7 @@ var _ = Describe("Update configuration files", func() {
 			"recovery_target_timeline = 'latest'\n" +
 			"primary_conninfo = 'host=someHost2 user=someUser2 application_name=nodeName2'\n"
 
-		updatedContent := UpdateConfigurationContents(initialContent, map[string]string{
+		updatedContent, _ := UpdateConfigurationContents(initialContent, map[string]string{
 			"primary_conninfo": "host=someHost user=someUser application_name=nodeName",
 		})
 

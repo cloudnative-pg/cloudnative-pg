@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -229,9 +230,16 @@ func gatherWALFilesToArchive(ctx context.Context, requestedWALFile string, paral
 	archiveStatusPath := path.Join(pgWalDirectory, "archive_status")
 	noMoreWALFilesNeeded := errors.New("no more files needed")
 
+	// allocate parallel + 1 only if it does not overflow. Cap otherwise
+	var walListLength int
+	if parallel < math.MaxInt-1 {
+		walListLength = parallel + 1
+	} else {
+		walListLength = math.MaxInt - 1
+	}
 	// slightly more optimized, but equivalent to:
 	// walList = []string{requestedWALFile}
-	walList = make([]string, 1, 1+parallel)
+	walList = make([]string, 1, walListLength)
 	walList[0] = requestedWALFile
 
 	err := filepath.WalkDir(archiveStatusPath, func(path string, d os.DirEntry, err error) error {
@@ -319,13 +327,19 @@ func barmanCloudWalArchiveOptions(
 	}
 
 	if len(configuration.Tags) > 0 {
-		options = append(options,
-			utils.MapToBarmanTagsFormat("--tags", configuration.Tags)...)
+		tags, err := utils.MapToBarmanTagsFormat("--tags", configuration.Tags)
+		if err != nil {
+			return nil, err
+		}
+		options = append(options, tags...)
 	}
 
 	if len(configuration.HistoryTags) > 0 {
-		options = append(options,
-			utils.MapToBarmanTagsFormat("--history-tags", configuration.HistoryTags)...)
+		historyTags, err := utils.MapToBarmanTagsFormat("--history-tags", configuration.HistoryTags)
+		if err != nil {
+			return nil, err
+		}
+		options = append(options, historyTags...)
 	}
 
 	options, err = barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)

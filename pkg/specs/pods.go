@@ -291,7 +291,7 @@ func CreatePostgresSecurityContext(postgresUser, postgresGroup int64) *corev1.Po
 }
 
 // PodWithExistingStorage create a new instance with an existing storage
-func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod {
+func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
 
@@ -302,7 +302,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int32) *corev1.Pod
 				utils.ClusterLabelName: cluster.Name,
 			},
 			Annotations: map[string]string{
-				ClusterSerialAnnotationName: strconv.Itoa(int(nodeSerial)),
+				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
 			},
 			Name:      podName,
 			Namespace: cluster.Namespace,

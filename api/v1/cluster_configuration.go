@@ -30,17 +30,17 @@ func (cluster *Cluster) GetSyncReplicasNumber() (syncReplicas int) {
 	readyReplicas := len(cluster.Status.InstancesStatus[utils.PodHealthy]) - 1
 
 	// Initially set it to the max sync replicas requested by user
-	syncReplicas = int(cluster.Spec.MaxSyncReplicas)
+	syncReplicas = cluster.Spec.MaxSyncReplicas
 
 	// Lower to min sync replicas if not enough ready replicas
 	if readyReplicas < syncReplicas {
-		syncReplicas = int(cluster.Spec.MinSyncReplicas)
+		syncReplicas = cluster.Spec.MinSyncReplicas
 	}
 
 	// Lower to ready replicas if min sync replicas is too high
 	// (this is a self-healing procedure that prevents from a
 	// temporarily unresponsive system)
-	if readyReplicas < int(cluster.Spec.MinSyncReplicas) {
+	if readyReplicas < cluster.Spec.MinSyncReplicas {
 		syncReplicas = readyReplicas
 		log.Info("Ignore minSyncReplicas to enforce self-healing",
 			"syncReplicas", readyReplicas,

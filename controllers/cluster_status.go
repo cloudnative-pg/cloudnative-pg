@@ -248,9 +248,9 @@ func (r *ClusterReconciler) updateResourceStatus(
 	filteredPods := utils.FilterActivePods(resources.pods.Items)
 
 	// Count pods
-	newInstances := int32(len(filteredPods))
+	newInstances := len(filteredPods)
 	cluster.Status.Instances = newInstances
-	cluster.Status.ReadyInstances = int32(utils.CountReadyPods(filteredPods))
+	cluster.Status.ReadyInstances = utils.CountReadyPods(filteredPods)
 
 	// Count jobs
 	newJobs := int32(len(resources.jobs.Items))

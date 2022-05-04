@@ -860,7 +860,7 @@ func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv
 }
 
 // generateNodeSerial extracts the first free node serial in this pods
-func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *apiv1.Cluster) (int32, error) {
+func (r *ClusterReconciler) generateNodeSerial(ctx context.Context, cluster *apiv1.Cluster) (int, error) {
 	cluster.Status.LatestGeneratedNode++
 	if err := r.Status().Update(ctx, cluster); err != nil {
 		return 0, err
@@ -1027,7 +1027,7 @@ func (r *ClusterReconciler) getOriginBackup(ctx context.Context, cluster *apiv1.
 
 func (r *ClusterReconciler) joinReplicaInstance(
 	ctx context.Context,
-	nodeSerial int32,
+	nodeSerial int,
 	cluster *apiv1.Cluster,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
@@ -1155,7 +1155,7 @@ func (r *ClusterReconciler) reconcilePVCs(
 		return ctrl.Result{}, fmt.Errorf("cannot detect serial from PVC %v: %v", pvc.Name, err)
 	}
 
-	pod := specs.PodWithExistingStorage(*cluster, int32(nodeSerial))
+	pod := specs.PodWithExistingStorage(*cluster, nodeSerial)
 
 	if configuration.Current.EnableAzurePVCUpdates {
 		for _, resizingPVC := range cluster.Status.ResizingPVC {

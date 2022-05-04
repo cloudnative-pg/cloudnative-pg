@@ -151,7 +151,7 @@ func newFakePooler(cluster *apiv1.Cluster) *apiv1.Pooler {
 }
 
 func newFakeCNPGCluster(namespace string) *apiv1.Cluster {
-	const instances int32 = 3
+	const instances int = 3
 	name := "cluster-" + rand.String(10)
 	caServer := fmt.Sprintf("%s-ca-server", name)
 	caClient := fmt.Sprintf("%s-ca-client", name)
@@ -227,7 +227,7 @@ func getPoolerDeployment(ctx context.Context, pooler *apiv1.Pooler) *appsv1.Depl
 }
 
 func generateFakeClusterPods(cluster *apiv1.Cluster, markAsReady bool) []corev1.Pod {
-	var idx int32
+	var idx int
 	var pods []corev1.Pod
 	for idx < cluster.Spec.Instances {
 		idx++
@@ -255,7 +255,7 @@ func generateFakeClusterPods(cluster *apiv1.Cluster, markAsReady bool) []corev1.
 }
 
 func generateFakeInitDBJobs(cluster *apiv1.Cluster) []batchv1.Job {
-	var idx int32
+	var idx int
 	var jobs []batchv1.Job
 	for idx < cluster.Spec.Instances {
 		idx++
@@ -270,7 +270,7 @@ func generateFakeInitDBJobs(cluster *apiv1.Cluster) []batchv1.Job {
 }
 
 func generateFakePVC(cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
-	var idx int32
+	var idx int
 	var pvcs []corev1.PersistentVolumeClaim
 	for idx < cluster.Spec.Instances {
 		idx++

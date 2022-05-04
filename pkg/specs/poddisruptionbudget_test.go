@@ -26,8 +26,8 @@ import (
 )
 
 var _ = Describe("POD Disruption Budget specifications", func() {
-	instancesNum := int32(3)
-	minAvailablePrimary := int32(1)
+	instancesNum := 3
+	minAvailablePrimary := 1
 	replicas := instancesNum - minAvailablePrimary
 	minAvailableReplicas := replicas - 1
 	cluster := &apiv1.Cluster{
@@ -46,11 +46,11 @@ var _ = Describe("POD Disruption Budget specifications", func() {
 
 	It("require not more than one unavailable replicas", func() {
 		result := BuildReplicasPodDisruptionBudget(cluster)
-		Expect(result.Spec.MinAvailable.IntVal).To(Equal(minAvailableReplicas))
+		Expect(result.Spec.MinAvailable.IntVal).To(Equal(int32(minAvailableReplicas)))
 	})
 
 	It("require at least one primary instance to be available at all times", func() {
 		result := BuildPrimaryPodDisruptionBudget(cluster)
-		Expect(result.Spec.MinAvailable.IntVal).To(Equal(minAvailablePrimary))
+		Expect(result.Spec.MinAvailable.IntVal).To(Equal(int32(minAvailablePrimary)))
 	})
 })
