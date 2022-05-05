@@ -31,7 +31,7 @@ This will create a [KinD](https://kind.sigs.k8s.io/) cluster in your laptop.
 It requires to have [KinD](https://kind.sigs.k8s.io/) and all the dependencies
 installed and also the Go installed to compile the code.
 
-The created cluster can be destroyed like ts:
+The created cluster can be destroyed as follows:
 
 ```shell
 make kind-cluster-destroy
