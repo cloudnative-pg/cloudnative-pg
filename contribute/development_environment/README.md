@@ -47,19 +47,30 @@ environment variable:
 - [golangci-lint](https://github.com/golangci/golangci-lint)
 - [goreleaser](https://goreleaser.com/)
 
-In addition, check that the following tools are installed in your system:
+In addition, check that the following packages are installed in your system:
 
 - `coreutils`,
 - `findutils`,
 - `git`,
-- `gnu-getopt`,
-- `gnu-sed`,
-- `gnu-tar`,
+- `util-linux`,
+- `sed`,
+- `tar`,
 - `gpg`,
 - `jq`,
 - `make`,
 - `pandoc`,
-- `zlib`
+- `zlib1g`.
+
+The previous list assumes that you are using a Debian-based distribution. For
+other distributions the name of the packages may vary.
+
+## Microsoft WSL2
+
+To setup a development environment you can use the same instructions discussed
+for GNU/Linux.
+
+Please ensure that the requirements for [Kind using
+WSL2](https://kind.sigs.k8s.io/docs/user/using-wsl2/) are met too.
 
 ### Mac OS X
 
