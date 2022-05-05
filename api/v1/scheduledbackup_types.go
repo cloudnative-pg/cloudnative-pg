@@ -38,6 +38,18 @@ type ScheduledBackupSpec struct {
 
 	// The cluster to backup
 	Cluster LocalObjectReference `json:"cluster,omitempty"`
+
+	// Indicates which ownerReference should be put inside the created backup resources.
+	//
+	// - none: no owner reference for created backup objects (same behavior as before the field was introduced)
+	//
+	// - self: sets the Scheduled backup object as owner of the backup
+	//
+	// - cluster: set the cluster as owner of the backup
+	//
+	// +kubebuilder:validation:Enum=none;self;cluster
+	// +kubebuilder:default:=none
+	BackupOwnerReference string `json:"backupOwnerReference,omitempty"`
 }
 
 // ScheduledBackupStatus defines the observed state of ScheduledBackup

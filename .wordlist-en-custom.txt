@@ -628,6 +628,7 @@ operatorgroups
 operatorhub
 osdk
 ou
+ownerReference
 packagemanifests
 parseable
 passwd

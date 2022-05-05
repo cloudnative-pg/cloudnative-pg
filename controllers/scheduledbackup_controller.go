@@ -23,9 +23,11 @@ import (
 	"time"
 
 	"github.com/robfig/cron"
+
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -197,10 +199,27 @@ func createBackup(
 	metadata.Labels[ImmediateBackupLabelName] = strconv.FormatBool(immediate)
 	metadata.Labels[ParentScheduledBackupLabelName] = scheduledBackup.GetName()
 
-	backupObject := backup.GetKubernetesObject()
+	switch scheduledBackup.Spec.BackupOwnerReference {
+	case "cluster":
+		var cluster apiv1.Cluster
+		if err := client.Get(
+			ctx,
+			types.NamespacedName{Name: scheduledBackup.Spec.Cluster.Name, Namespace: scheduledBackup.Namespace},
+			&cluster,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+		SetClusterOwnerAnnotationsAndLabels(&backup.ObjectMeta, &cluster)
+	case "self":
+		utils.SetAsOwnedBy(&backup.ObjectMeta, scheduledBackup.ObjectMeta, scheduledBackup.TypeMeta)
+	case "none":
+		break
+	default:
+		break
+	}
 
-	contextLogger.Info("Creating backup", "backupName", backup.GetName())
-	if err := client.Create(ctx, backupObject); err != nil {
+	contextLogger.Info("Creating backup", "backupName", backup.Name)
+	if err := client.Create(ctx, backup); err != nil {
 		if apierrs.IsConflict(err) {
 			// Retry later, the cache is stale
 			return ctrl.Result{}, nil
