@@ -159,10 +159,10 @@ shellcheck: ## Shellcheck for the hack directory.
 	}
 
 spellcheck: ## Runs the spellcheck on the project.
-	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:0.14.0
+	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:0.23.0
 
 woke: ## Runs the woke checks on project.
-	docker run --rm -v $(PWD):/src -w /src getwoke/woke:0.9 woke -c .woke.yaml
+	docker run --rm -v $(PWD):/src -w /src getwoke/woke:0.18.1 woke -c .woke.yaml
 
 wordlist-ordered: ## Order the wordlist using sort
 	LANG=C sort .wordlist-en-custom.txt > .wordlist-en-custom.txt.new && \
@@ -211,7 +211,7 @@ go-licenses: ## Download go-licenses locally if necessary.
 
 GO_RELEASER = $(shell pwd)/bin/goreleaser
 go-releaser: ## Download go-releaser locally if necessary.
-	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser@v1.6.3)
+	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser@v1.8.3)
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 # go-install-tool will 'go install' any package $2 and install it to $1.
