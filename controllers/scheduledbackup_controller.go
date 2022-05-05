@@ -212,9 +212,8 @@ func createBackup(
 		SetClusterOwnerAnnotationsAndLabels(&backup.ObjectMeta, &cluster)
 	case "self":
 		utils.SetAsOwnedBy(&backup.ObjectMeta, scheduledBackup.ObjectMeta, scheduledBackup.TypeMeta)
-	case "none":
-		break
 	default:
+		// the default behaviour is `none`, means no owner
 		break
 	}
 
