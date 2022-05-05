@@ -444,17 +444,18 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 	}
 
 	var pgWalStat PgStatWal
-	row := superUserDB.QueryRow(`SELECT 
-       wal_records,
-       wal_fpi,
-       wal_bytes,
-       wal_buffers_full,
-       wal_write,
-       wal_sync,
-       wal_write_time,
-       wal_sync_time,
-       stats_reset
-FROM pg_stat_wal`)
+	row := superUserDB.QueryRow(
+		`SELECT
+        wal_records,
+		wal_fpi,
+		wal_bytes,
+		wal_buffers_full,
+		wal_write,
+		wal_sync,
+		wal_write_time,
+		wal_sync_time,
+		stats_reset
+	    FROM pg_stat_wal`)
 	if err := row.Scan(
 		&pgWalStat.WalRecords,
 		&pgWalStat.WalFpi,
