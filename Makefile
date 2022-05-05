@@ -137,6 +137,10 @@ manifests: controller-gen ## Generate manifests e.g. CRD, RBAC etc.
 generate: controller-gen ## Generate code.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+deploy-locally: kind-cluster ## Build and deploy operator in local cluster
+	set -e ;\
+	hack/setup-cluster.sh -n1 -r load deploy
+
 ##@ Formatters and Linters
 
 fmt: ## Run go fmt against code.
@@ -218,3 +222,11 @@ echo "Downloading $(2)" ;\
 GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
 }
 endef
+
+kind-cluster: ## Create KinD cluster to run operator locally
+	set -e ;\
+	hack/setup-cluster.sh -n1 -r create
+
+kind-cluster-destroy: ## Destroy KinD cluster created using kind-cluster command
+	set -e ;\
+	hack/setup-cluster.sh -n1 -r destroy

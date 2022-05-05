@@ -220,7 +220,7 @@ kubectl cnpg promote cluster-example cluster-example-2
 Or you can use the instance node number to promote
 
 ```shell
-kubectl cnpgg promote cluster-example 2
+kubectl cnpg promote cluster-example 2
 ```
 
 ### Certificates
