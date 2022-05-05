@@ -67,9 +67,6 @@ if ! which ginkgo &>/dev/null; then
   go install github.com/onsi/ginkgo/v2/ginkgo
 fi
 
-# TODO: Remove next line after first release (first-release)
-TEST_UPGRADE_TO_V1=false
-
 # The RC return code will be non-zero iff either the two `jq` calls has a non-zero exit
 # NOTE: the ginkgo calls may have non-zero exits, with E2E tests that fail but could be 'ignore-fail'
 RC=0

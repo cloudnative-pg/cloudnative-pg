@@ -33,9 +33,30 @@ import (
 // Used for testing upgrades, so: if we're in a release branch, the MostRecent
 // should be the next-to-last release
 func GetMostRecentReleaseTag(releasesPath string) (string, error) {
-	fileInfo, err := ioutil.ReadDir(releasesPath)
+	versions, err := GetAvailableReleases(releasesPath)
 	if err != nil {
 		return "", err
+	}
+
+	if len(versions) == 0 {
+		return "", errors.New("could not find releases")
+	}
+
+	if len(versions) == 1 || isDevTagVersion() {
+		return versions[0].String(), nil
+	}
+
+	// if we're running on a release branch, we should get the previous version
+	// to test upgrades from it
+	return versions[1].String(), nil
+}
+
+// GetAvailableReleases retrieves all the available releases from
+// the list of YAML files in the top-level `releases/` directory.
+func GetAvailableReleases(releasesPath string) ([]*semver.Version, error) {
+	fileInfo, err := ioutil.ReadDir(releasesPath)
+	if err != nil {
+		return nil, err
 	}
 
 	versions := make([]*semver.Version, len(fileInfo))
@@ -49,17 +70,8 @@ func GetMostRecentReleaseTag(releasesPath string) (string, error) {
 
 	// Sorting version as descending order ([v1.10.0, v1.9.0...])
 	sort.Sort(sort.Reverse(semver.Collection(versions)))
-	if len(versions) == 0 {
-		return "", errors.New("could not find releases")
-	}
 
-	if isDevTagVersion() {
-		return versions[0].String(), nil
-	}
-
-	// if we're running on a release branch, we should get the previous version
-	// to test upgrades from it
-	return versions[1].String(), nil
+	return versions, nil
 }
 
 func isDevTagVersion() bool {
