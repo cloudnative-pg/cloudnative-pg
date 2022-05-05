@@ -41,7 +41,6 @@ we use to organize the flow of items.
 <!--
 TODO:
 
-- Merge "hack/e2e/README.md" here
 - Add architecture diagrams in the "contribute" folder
 - Add https://github.com/istio/istio/wiki/Writing-Good-Pull-Requests
 - Ideas from https://github.com/istio/istio/wiki/Reviewing-Pull-Requests
@@ -56,6 +55,17 @@ your workstation to build and locally test the version of the operator you are
 developing.  All you have to do is follow the instructions you find in
 ["Setting up your development environment for CloudNativePG"](development_environment/README.md).
 
+---
+
+## Your testing environment for CloudNativePG
+
+Can you manually test your patch for all the supported PostgreSQL versions on
+all the supported Kubernetes versions? You probably agree this is not feasible
+(have you ever heard of the inverted pyramid of testing?).
+
+This is the reason why we have invested since day 1 of CloudNativePG in
+automated testing. Please refer to ["Running E2E tests on your environment"](./e2e_testing_environment/README.md)
+for detailed information.
 
 ---
 
@@ -83,41 +93,3 @@ like `git config --global alias.ci 'commit -s'`. Now you can commit with `git ci
 commit will be signed.
 
 ---
-
----
-
-## To be classified (yet)
-
-### How to upgrade the list of licenses
-
-To generate or update the `licenses` folder run the following command:
-
-```bash
-make licenses
-```
-
----
-
-### Release procedure
-
-#### Initial verification
-
-- Make sure release notes for the release have been updated
-  in `docs/src/release_notes.md` and have been approved by
-  the maintainers
-- Make sure that the operator capability levels page has been
-  updated in `docs/src/operator_capability_levels.md` and approved
-  by the maintainers
-
-#### Release steps
-
-The following steps assume version 1.15.0 as the one to be released. Alter the
-instructions accordingly for your version.
-
-1. Run `hack/release.sh 1.15.0`.
-2. Approve the PR that is automatically generated.
-3. Merge the PR.
-4. Wait until all [Github Actions](https://github.com/cloudnative-pg/cloudnative-pg/actions) finish.
-
----
-
