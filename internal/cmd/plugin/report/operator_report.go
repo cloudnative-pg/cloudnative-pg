@@ -27,9 +27,6 @@ import (
 	v12 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -115,44 +112,22 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 		return fmt.Errorf("could not get operator pod: %w", err)
 	}
 
-	// TODO: parse configmap and secrets names from the deployment, as the client
-	// may have overridden the defaults.
-	// Currently we're getting the defaults only
-	defaultSecrets := []string{
-		"cnpg-ca-secret",
-		"cnpg-webhook-cert",
-		"cnpg-controller-manager-config",
+	operatorSecrets, err := deployments.GetOperatorSecrets(ctx)
+	if err != nil {
+		return fmt.Errorf("could not get operator secrets: %w", err)
 	}
-	secrets := make([]namedObject, 0, len(defaultSecrets))
-	for _, ss := range defaultSecrets {
-		var secret corev1.Secret
-
-		err := plugin.Client.Get(ctx, types.NamespacedName{Name: ss, Namespace: operatorPods[0].Namespace}, &secret)
-		if err != nil {
-			e1, ok := err.(*errors.StatusError)
-			if ok && metav1.StatusReasonNotFound == e1.ErrStatus.Reason {
-				continue
-			}
-			return fmt.Errorf("could not get secret '%s': %v", ss, err)
-		}
-		secrets = append(secrets, namedObject{Name: ss, Object: secretRedactor(secret)})
+	secrets := make([]namedObject, 0, len(operatorSecrets))
+	for _, ss := range operatorSecrets {
+		secrets = append(secrets, namedObject{Name: ss.Name + "(secret)", Object: secretRedactor(ss)})
 	}
 
-	configMaps := []string{"cnpg-controller-manager-config"}
-	configs := make([]namedObject, 0, len(configMaps))
-	for _, cm := range configMaps {
-		var config corev1.ConfigMap
-
-		err := plugin.Client.Get(ctx, types.NamespacedName{Name: cm, Namespace: operatorPods[0].Namespace}, &config)
-		if err != nil {
-			e1, ok := err.(*errors.StatusError)
-			if ok && metav1.StatusReasonNotFound == e1.ErrStatus.Reason {
-				continue
-			}
-			return fmt.Errorf("could not get config '%s': %v", cm, err)
-		}
-
-		configs = append(configs, namedObject{Name: cm, Object: configMapRedactor(config)})
+	opeartorConfigMaps, err := deployments.GetOperatorConfigMaps(ctx)
+	if err != nil {
+		return fmt.Errorf("could not get operator configmap: %w", err)
+	}
+	configs := make([]namedObject, 0, len(opeartorConfigMaps))
+	for _, cm := range opeartorConfigMaps {
+		configs = append(configs, namedObject{Name: cm.Name, Object: configMapRedactor(cm)})
 	}
 
 	var events corev1.EventList
