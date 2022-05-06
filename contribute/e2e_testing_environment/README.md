@@ -144,7 +144,7 @@ The script will take care of creating a K3d cluster and then run the tests on it
 In addition to the environment variables for the script,
 the following ones can be defined:
 
-* `PRESERVE_CLUSTER`: true to prevent the script from destroying the kind cluster.
+* `PRESERVE_CLUSTER`: true to prevent the script from destroying the Kubernetes cluster.
   Default: `false`
 * `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
   the tests. Only useful if specified with `PRESERVE_CLUSTER=true`

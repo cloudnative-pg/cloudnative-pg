@@ -79,7 +79,7 @@ continuity PostgreSQL cluster, without requiring any assistance from an
 intermediate management tool responsible for high availability and failover
 management like similar open source operators.
 
-CloudNativePG also manages additional resources the help the `Cluster` resource
+CloudNativePG also manages additional resources to help the `Cluster` resource
 manage PostgreSQL - currently `ScheduledBackup`, `Pooler`, and `Backup`.
 
 Fully embracing Kubernetes also means that, in case of failure of the whole

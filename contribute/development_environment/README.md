@@ -31,7 +31,7 @@ and view the available tasks you can run:
 make help
 ```
 
-Normally, the next step after this is to [clone the CloudNativePG repository](./fork.md)
+Normally, the next step after this is to [clone the CloudNativePG repository](#forking-the-repository)
 on your local workstation.
 
 <!-- TODO: We should add an easier way to check that requirements are met -->
