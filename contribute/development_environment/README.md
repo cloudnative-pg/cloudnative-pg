@@ -19,9 +19,9 @@ following the next three steps:
 
 ## Installation
 
-Currently, we provide installation instructions for [GNU/Linux](#gnulinux-systems)
-and [MacOS X](#mac-os-x) systems (feel free to submit a PR for any improvement you
-might think of).
+Currently, we provide installation instructions for [GNU/Linux](#gnulinux-systems),
+[MacOS X](#mac-os-x), and [Windows Subsystem for Linux](microsoft-wsl2)
+(feel free to submit a PR for any improvement you might think of).
 
 Once you have followed the instructions for your system, run the following
 command from the main directory to verify that GNU/Make is properly installed
@@ -69,8 +69,8 @@ other distributions the name of the packages may vary.
 To setup a development environment you can use the same instructions discussed
 for GNU/Linux.
 
-Please ensure that the requirements for [Kind using
-WSL2](https://kind.sigs.k8s.io/docs/user/using-wsl2/) are met too.
+Please ensure that the requirements for [kind using
+WSL2](https://kind.sigs.k8s.io/docs/user/using-wsl2/) are also met.
 
 ### Mac OS X
 
@@ -137,26 +137,8 @@ export GPG_AGENT_INFO=~/.gnupg/S.gpg-agent::1
 export GPG_TTY=$(tty)
 ```
 
-#### Notes about the Docker engine
-
-Please allow a reasonable amount of memory for Docker.
-For instance, this is the configuration on the machine of a CNPG developer
-("Preferences->Resources of your Docker desktop app"):
-
-![](./images/docker_resources.png)
-
-In order to setup the test environment, you also need to add this in
-"Preferences->Docker Engine":
-
-```
-{
-  "registry-mirrors": [
-    "https://mirror.gcr.io"
-  ]
-}
-```
-
-![](./images/docker_settings.png)
+If you are using Docker Desktop, please make sure you follow the instructions in the
+["Settings for Docker Desktop" section of the `kind` documentation](https://kind.sigs.k8s.io/docs/user/quick-start/#settings-for-docker-desktop).
 
 ## Forking the repository
 
