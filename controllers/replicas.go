@@ -410,6 +410,83 @@ func (r *ClusterReconciler) updateClusterLabelsOnPods(
 	return nil
 }
 
+// updateClusterAnnotationsOnPVCs we check if we need to add or modify existing annotations specified in the cluster but
+// not existing in the PVCs. We do not support the case of removed annotations from the cluster resource.
+func (r *ClusterReconciler) updateClusterAnnotationsOnPVCs(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pvcs corev1.PersistentVolumeClaimList,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	for i := range pvcs.Items {
+		pvc := &pvcs.Items[i]
+
+		// if all the required annotations are already set and with the correct value,
+		// we proceed to the next item
+		if utils.IsAnnotationSubset(pvc.Annotations, cluster.Annotations, configuration.Current) &&
+			utils.IsAnnotationAppArmorPresentInObject(&pvc.ObjectMeta, cluster.Annotations) {
+			contextLogger.Debug(
+				"Skipping cluster annotations reconciliation, because they are already present on pvc",
+				"pvc", pvc.Name,
+				"pvcAnnotations", pvc.Annotations,
+				"clusterAnnotations", cluster.Annotations,
+			)
+			continue
+		}
+
+		// otherwise, we add the modified/new annotations to the pvc
+		patch := client.MergeFrom(pvc.DeepCopy())
+		utils.InheritAnnotations(&pvc.ObjectMeta, cluster.Annotations,
+			cluster.GetFixedInheritedAnnotations(), configuration.Current)
+
+		contextLogger.Info("Updating cluster annotations on pvc", "pvc", pvc.Name)
+		if err := r.Patch(ctx, pvc, patch); err != nil {
+			return err
+		}
+		continue
+	}
+
+	return nil
+}
+
+// updateClusterAnnotationsOnPVCs we check if we need to add or modify existing labels specified in the cluster but
+// not existing in the PVCs. We do not support the case of removed labels from the cluster resource.
+func (r *ClusterReconciler) updateClusterLabelsOnPVCs(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pvcs corev1.PersistentVolumeClaimList,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	for i := range pvcs.Items {
+		pvc := &pvcs.Items[i]
+
+		// if all the required labels are already set and with the correct value,
+		// we proceed to the next item
+		if utils.IsLabelSubset(pvc.Labels, cluster.Labels, configuration.Current) {
+			contextLogger.Debug(
+				"Skipping cluster label reconciliation, because they are already present on pvc",
+				"pvc", pvc.Name,
+				"pvcLabels", pvc.Labels,
+				"clusterLabels", cluster.Labels,
+			)
+			continue
+		}
+
+		// otherwise, we add the modified/new labels to the pvc
+		patch := client.MergeFrom(pvc.DeepCopy())
+		utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
+
+		contextLogger.Info("Updating cluster labels on pvc", "pvc", pvc.Name)
+		if err := r.Patch(ctx, pvc, patch); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Make sure that only the currentPrimary has the label forward write traffic to him
 func (r *ClusterReconciler) updateRoleLabelsOnPods(
 	ctx context.Context,
