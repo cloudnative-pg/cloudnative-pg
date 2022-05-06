@@ -18,8 +18,15 @@ on:
     # The branches below must be a subset of the branches above
     branches: [ main ]
     paths-ignore:
+      - 'docs/**'
       - '**/*.md'
       - '**/*.txt'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.yaml.template'
+      - '**/*.py'
+      - '**/*.sh'
+      - 'hack/**'
   schedule:
     - cron: '24 0 * * 5'
 
