@@ -116,11 +116,17 @@ cluster and then run E2E tests on it.
 
 You can test the operator locally on `kind` with:
 
-``` bash
+```shell
 run-e2e-kind.sh
 ```
 
 It will take care of creating a `kind` cluster and run the tests on it.
+
+We have also provided a shortcut to this script in the main `Makefile`:
+
+```shell
+make e2e-test-kind
+```
 
 #### On k3d
 
@@ -138,6 +144,12 @@ Error response from daemon: manifest for rancher/k3s:v1.20.0-k3s5 not found: man
 ```
 
 The script will take care of creating a K3d cluster and then run the tests on it.
+
+We have also provided a shortcut to this script in the main `Makefile`:
+
+```shell
+make e2e-test-k3d
+```
 
 #### Environment variables
 
