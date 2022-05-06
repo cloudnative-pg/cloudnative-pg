@@ -8,10 +8,10 @@ our project that we need help with, including:
 * Problems found while setting up the development environment
 * Gaps in our documentation
 * Bugs in our Github actions
-* Promotion of PostgreSQL on Kubernetes with out operator
+* Promotion of PostgreSQL on Kubernetes with our operator
 
 First, though, it is important that you read the [code of
-conduct](CODE-OF-CONDUCT.md).
+conduct](CODE_OF_CONDUCT.md).
 
 The guidelines below are a starting point. We don't want to limit your
 creativity, passion, and initiative. If you think there's a better way, please
@@ -21,7 +21,7 @@ constructive dialogue!
 
 ## Ways to contribute
 
-We welcome many different types of contributions including:
+We welcome many types of contributions including:
 
 * New features
 * Builds, CI/CD
@@ -55,7 +55,7 @@ When raising issues, please specify the following:
 ## Meetings
 
 Absolutely everyone is welcome to come to any of our meetings. You never need an
-invite to join us. In fact, we want you to join us, even if you don’t have
+invitation to join us. In fact, we want you to join us, even if you don’t have
 anything you feel like you want to contribute. Just being there is enough!
 
 You don’t have to turn on your video. The first time you come, introducing
