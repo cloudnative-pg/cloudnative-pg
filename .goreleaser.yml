@@ -84,10 +84,10 @@ changelog:
 signs:
   - artifacts: checksum
     args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
+
 krews:
   - name: cnpg
     homepage: https://github.com/cloudnative-pg/cloudnative-pg
-    short_description: Manage your CNPG clusters
+    short_description: 'Manage your CloudNativePG clusters'
     skip_upload: true
-    description: 'This plugin provides multiple beneficial commands to help you manage your CNPG clusters from a high level.'
-
+    description: 'This plugin provides multiple commands to help you manage your CloudNativePG clusters.'
