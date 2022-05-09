@@ -65,6 +65,9 @@ var RetryUntilWalReceiverDown = wait.Backoff{
 	Steps: math.MaxInt32,
 }
 
+// shouldRequeue specifies whether a new reconciliation loop should be triggered
+type shoudRequeue bool
+
 // Reconcile is the main reconciliation loop for the instance
 // TODO this function needs to be refactor
 //nolint:gocognit
@@ -102,7 +105,7 @@ func (r *InstanceReconciler) Reconcile(
 	r.reconcileInstance(cluster)
 
 	// Refresh the cache
-	shouldRequeue := r.shouldUpdateCacheFromCluster(ctx, cluster)
+	requeue := r.updateCacheFromCluster(ctx, cluster)
 
 	// Reconcile monitoring section
 	r.reconcileMetrics(cluster)
@@ -185,7 +188,7 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
 
-	if shouldRequeue {
+	if requeue {
 		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 

@@ -30,22 +30,24 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-// shouldUpdateCacheFromCluster will update the internal cache with the cluster
+// updateCacheFromCluster will update the internal cache with the cluster
 //
 // returns true if the update was not total, and should be retried
-func (r *InstanceReconciler) shouldUpdateCacheFromCluster(
+func (r *InstanceReconciler) updateCacheFromCluster(
 	ctx context.Context, cluster *apiv1.Cluster,
-) (shouldRequeue bool) {
+) shoudRequeue {
 	cache.Store(cache.ClusterKey, cluster)
+
+	var requeue shoudRequeue
 
 	// Populate the cache with the backup configuration
 	if r.shouldUpdateWALArchiveSettingsCache(ctx, cluster) {
-		shouldRequeue = true
+		requeue = true
 	}
 
 	// Populate the cache with the recover configuration
 	r.updateWALRestoreSettingsCache(ctx, cluster)
-	return
+	return requeue
 }
 
 func (r *InstanceReconciler) updateWALRestoreSettingsCache(
