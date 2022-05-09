@@ -183,12 +183,12 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 // of PostgreSQL
 func UpdateReplicaConfiguration(pgData string, clusterName string, podName string) (changed bool, err error) {
 	primaryConnInfo := buildPrimaryConnInfo(clusterName+"-rw", podName)
-	return UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo)
+	return UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, podName)
 }
 
 // UpdateReplicaConfigurationForPrimary updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
-func UpdateReplicaConfigurationForPrimary(pgData string, primaryConnInfo string) (changed bool, err error) {
+func UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, podName string) (changed bool, err error) {
 	major, err := postgresutils.GetMajorVersion(pgData)
 	if err != nil {
 		return false, err
@@ -202,7 +202,7 @@ func UpdateReplicaConfigurationForPrimary(pgData string, primaryConnInfo string)
 		return false, err
 	}
 
-	return configurePostgresAutoConfFile(pgData, primaryConnInfo)
+	return configurePostgresAutoConfFile(pgData, primaryConnInfo, podName)
 }
 
 // configureRecoveryConfFile configures replication in the recovery.conf file
@@ -233,16 +233,21 @@ func configureRecoveryConfFile(pgData string, primaryConnInfo string) (changed b
 	return changed, nil
 }
 
-// configurePostgresAutoConfFile configures replication a in the postgresql.auto.conf file
+// configurePostgresAutoConfFile configures replication in the postgresql.auto.conf file
 // for PostgreSQL 12 and newer
-func configurePostgresAutoConfFile(pgData string, primaryConnInfo string) (changed bool, err error) {
+func configurePostgresAutoConfFile(pgData, primaryConnInfo, podName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, "postgresql.auto.conf")
+	slotName, err := GetSlotName(podName)
+	if err != nil {
+		return false, err
+	}
 
 	options := map[string]string{
 		"restore_command": fmt.Sprintf(
 			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
 			postgres.LogPath, postgres.LogFileName),
 		"recovery_target_timeline": "latest",
+		"primary_slot_name":        slotName,
 	}
 
 	if primaryConnInfo != "" {

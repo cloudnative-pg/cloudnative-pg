@@ -160,6 +160,10 @@ type Instance struct {
 	// MaxStopDelay is the current MaxStopDelay of the cluster
 	MaxStopDelay int32
 
+	// ReplicationSlots contains the current list of active replication slots
+	// living in the current primary instance
+	ReplicationSlots *ReplicationSlotList
+
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
 	// it's used by the readiness probe to know whether it should be short-circuited
@@ -545,6 +549,10 @@ func (instance *Instance) IsPrimary() (bool, error) {
 func (instance *Instance) Demote() error {
 	log.Info("Demoting instance",
 		"pgpdata", instance.PgData)
+
+	if err := instance.DeleteReplicationSlot(instance.PodName); err != nil {
+		return err
+	}
 
 	_, err := UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName)
 	return err
