@@ -33,7 +33,9 @@ import (
 // shouldUpdateCacheFromCluster will update the internal cache with the cluster
 //
 // returns true if the update was not total, and should be retried
-func (r *InstanceReconciler) shouldUpdateCacheFromCluster(ctx context.Context, cluster *apiv1.Cluster) (shouldRequeue bool) {
+func (r *InstanceReconciler) shouldUpdateCacheFromCluster(
+	ctx context.Context, cluster *apiv1.Cluster,
+) (shouldRequeue bool) {
 	cache.Store(cache.ClusterKey, cluster)
 
 	// Populate the cache with the backup configuration
