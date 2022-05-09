@@ -140,6 +140,8 @@ export GPG_TTY=$(tty)
 If you are using Docker Desktop, please make sure you follow the instructions in the
 ["Settings for Docker Desktop" section of the `kind` documentation](https://kind.sigs.k8s.io/docs/user/quick-start/#settings-for-docker-desktop).
 
+MacOS Airplay uses port 5000 and can interfere with docker repository port. Make sure Airplay is off (System Preferences -> Share -> uncheck the Airplay checkbox).
+
 ## Forking the repository
 
 Unless you are a developer with write permissions on the main repository of
