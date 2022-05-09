@@ -19,6 +19,8 @@ package v1
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -158,7 +160,7 @@ type ClusterSpec struct {
 	PostgresConfiguration PostgresConfiguration `json:"postgresql,omitempty"`
 
 	// Replication slots management configuration
-	ReplicationSlotsConfiguration *ReplicationSlotsConfiguration `json:"replicationSlots,omitempty"`
+	ReplicationSlots *ReplicationSlotsConfiguration `json:"replicationSlots,omitempty"`
 
 	// Instructions to bootstrap this cluster
 	// +optional
@@ -426,6 +428,9 @@ type ClusterStatus struct {
 
 	// Conditions for cluster object
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// List of instance names in the cluster
+	InstanceNames []string `json:"instanceNames,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -564,8 +569,10 @@ type ReplicationSlotsHAConfiguration struct {
 	Enabled bool `json:"enabled"`
 
 	// Prefix for replication slots managed by the operator for HA.
+	// It may only contain lower case letters, numbers, and the underscore character.
 	// This can only be set at creation time.
 	//+kubebuilder:default:=_cnpg_
+	//+kubebuilder:validation:Pattern=^[0-9a-z_]*$
 	SlotPrefix string `json:"slotPrefix,omitempty"`
 }
 
@@ -1946,6 +1953,54 @@ func (cluster Cluster) ExternalCluster(name string) (ExternalCluster, bool) {
 // IsReplica checks if this is a replica cluster or not
 func (cluster Cluster) IsReplica() bool {
 	return cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.Enabled
+}
+
+var slotNameNegativeRegex = regexp.MustCompile("[^a-z0-9_]+")
+
+// GetSlotNameFromInstanceName return the slot name starting from the instance name
+// This function returns an empty string if High Availability Replication Slots are disabled
+func (cluster Cluster) GetSlotNameFromInstanceName(instanceName string) string {
+	if cluster.Spec.ReplicationSlots == nil ||
+		cluster.Spec.ReplicationSlots.HighAvailability == nil ||
+		!cluster.Spec.ReplicationSlots.HighAvailability.Enabled {
+		return ""
+	}
+
+	sanitizedName := slotNameNegativeRegex.ReplaceAllString(strings.ToLower(instanceName), "_")
+
+	slotName := fmt.Sprintf(
+		"%s%s",
+		cluster.Spec.ReplicationSlots.HighAvailability.GetSlotPrefix(),
+		sanitizedName,
+	)
+
+	return slotName
+}
+
+// GetInstanceNameFromSlotName return the instance name starting from the slot name
+// This function return an empty string if is not able to match the given name to any instance
+func (cluster Cluster) GetInstanceNameFromSlotName(slotName string) string {
+	if cluster.Spec.ReplicationSlots == nil ||
+		cluster.Spec.ReplicationSlots.HighAvailability == nil {
+		return ""
+	}
+
+	slotPrefix := cluster.Spec.ReplicationSlots.HighAvailability.GetSlotPrefix()
+
+	if !strings.HasPrefix(slotName, slotPrefix) {
+		return ""
+	}
+
+	targetName := strings.TrimPrefix(slotName, slotPrefix)
+
+	for _, instanceName := range cluster.Status.InstanceNames {
+		sanitizedName := slotNameNegativeRegex.ReplaceAllString(strings.ToLower(instanceName), "_")
+		if targetName == sanitizedName {
+			return instanceName
+		}
+	}
+
+	return ""
 }
 
 // GetBarmanEndpointCAForReplicaCluster checks if this is a replica cluster which needs barman endpoint CA
