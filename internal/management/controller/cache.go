@@ -20,10 +20,8 @@ import (
 	"context"
 	"errors"
 	"os"
-	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
@@ -32,31 +30,34 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-// reconcileCacheFromCluster refreshes the reconciler internal cache using the provided cluster
-func (r *InstanceReconciler) reconcileCacheFromCluster(ctx context.Context, cluster *apiv1.Cluster) *ctrl.Result {
+// shouldUpdateCacheFromCluster will update the internal cache with the cluster
+//
+// returns true if the update was not total, and should be retried
+func (r *InstanceReconciler) shouldUpdateCacheFromCluster(ctx context.Context, cluster *apiv1.Cluster) (shouldRequeue bool) {
 	cache.Store(cache.ClusterKey, cluster)
 
 	// Populate the cache with the backup configuration
-	if result := r.reconcileWALArchiveSettingsCache(ctx, cluster); result != nil {
-		return result
+	if r.shouldUpdateWALArchiveSettingsCache(ctx, cluster) {
+		shouldRequeue = true
 	}
 
 	// Populate the cache with the recover configuration
-	return r.reconcileWALRestoreSettingsCache(ctx, cluster)
+	r.updateWALRestoreSettingsCache(ctx, cluster)
+	return
 }
 
-func (r *InstanceReconciler) reconcileWALRestoreSettingsCache(
+func (r *InstanceReconciler) updateWALRestoreSettingsCache(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-) *ctrl.Result {
+) {
 	_, env, barmanConfiguration, err := walrestore.GetRecoverConfiguration(cluster, r.instance.PodName)
 	if errors.Is(err, walrestore.ErrNoBackupConfigured) {
 		cache.Delete(cache.WALRestoreKey)
-		return nil
+		return
 	}
 	if err != nil {
 		log.Error(err, "while getting recover configuration")
-		return nil
+		return
 	}
 	env = append(env, os.Environ()...)
 
@@ -71,17 +72,19 @@ func (r *InstanceReconciler) reconcileWALRestoreSettingsCache(
 		log.Error(err, "while getting recover credentials")
 	}
 	cache.Store(cache.WALRestoreKey, envRestore)
-
-	return nil
 }
 
-func (r *InstanceReconciler) reconcileWALArchiveSettingsCache(
+// shouldUpdateWALArchiveSettingsCache updates the cache with the backup credentials
+//
+// returns true if and only if the update should run again, because:
+// the backup credentials exist but don't have permission,
+func (r *InstanceReconciler) shouldUpdateWALArchiveSettingsCache(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-) *ctrl.Result {
+) (shouldRetry bool) {
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		cache.Delete(cache.WALArchiveKey)
-		return nil
+		return false
 	}
 
 	// Populate the cache with the backup configuration
@@ -92,15 +95,15 @@ func (r *InstanceReconciler) reconcileWALArchiveSettingsCache(
 		cluster.Spec.Backup.BarmanObjectStore,
 		os.Environ())
 	if apierrors.IsForbidden(err) {
-		log.Info("backup secret not yet ready, running another reconciliation loop")
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}
+		log.Info("backup credentials don't yet have access permissions. Will retry reconciliation loop")
+		return true
 	}
 
 	if err != nil {
 		log.Error(err, "while getting backup credentials")
-		return nil
+		return false
 	}
 
 	cache.Store(cache.WALArchiveKey, envArchive)
-	return nil
+	return false
 }
