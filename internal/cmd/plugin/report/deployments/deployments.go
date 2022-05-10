@@ -25,11 +25,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 const (
@@ -103,8 +103,10 @@ func GetOperatorNamespaceName(ctx context.Context) (string, error) {
 	return deployment.GetNamespace(), err
 }
 
-// GetOperatorSecrets returns the secrets used by the operator if have
+// GetOperatorSecrets returns the secrets used by the operator
 func GetOperatorSecrets(ctx context.Context) ([]corev1.Secret, error) {
+	contextLogger := log.FromContext(ctx)
+
 	operatorNamespace, err := GetOperatorNamespaceName(ctx)
 	if err != nil {
 		return nil, err
@@ -129,21 +131,23 @@ func GetOperatorSecrets(ctx context.Context) ([]corev1.Secret, error) {
 		var secret corev1.Secret
 
 		err := plugin.Client.Get(ctx, types.NamespacedName{Name: ss, Namespace: operatorNamespace}, &secret)
+		if errors.IsNotFound(err) {
+			continue
+		}
 		if err != nil {
-			e1, ok := err.(*errors.StatusError)
-			if ok && metav1.StatusReasonNotFound == e1.ErrStatus.Reason {
-				continue
-			}
-			err = fmt.Errorf("could not get secret '%s': %v", ss, err)
+			contextLogger.Warning("could not get secret")
 			return nil, err
 		}
+
 		secrets = append(secrets, secret)
 	}
 	return secrets, nil
 }
 
-// GetOperatorConfigMaps returns the configmap referenced by the operator if have
+// GetOperatorConfigMaps returns the configmap referenced by the operator
 func GetOperatorConfigMaps(ctx context.Context) ([]corev1.ConfigMap, error) {
+	contextLogger := log.FromContext(ctx)
+
 	var configMaps []string
 	operatorNamespace, err := GetOperatorNamespaceName(ctx)
 	if err != nil {
@@ -163,12 +167,11 @@ func GetOperatorConfigMaps(ctx context.Context) ([]corev1.ConfigMap, error) {
 	for _, cm := range configMaps {
 		var config corev1.ConfigMap
 		err := plugin.Client.Get(ctx, types.NamespacedName{Name: cm, Namespace: operatorNamespace}, &config)
+		if errors.IsNotFound(err) {
+			continue
+		}
 		if err != nil {
-			e1, ok := err.(*errors.StatusError)
-			if ok && metav1.StatusReasonNotFound == e1.ErrStatus.Reason {
-				continue
-			}
-			err = fmt.Errorf("could not get config '%s': %v", cm, err)
+			contextLogger.Warning("could not get secret")
 			return nil, err
 		}
 		configs = append(configs, config)
