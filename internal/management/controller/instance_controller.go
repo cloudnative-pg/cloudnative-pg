@@ -22,15 +22,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"path"
 	"strconv"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
-
 	"github.com/lib/pq"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,14 +38,13 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	barmanCredentials "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/credentials"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	postgresManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -68,6 +64,9 @@ var RetryUntilWalReceiverDown = wait.Backoff{
 	// to int32 to support ARM-based 32 bit architectures
 	Steps: math.MaxInt32,
 }
+
+// shouldRequeue specifies whether a new reconciliation loop should be triggered
+type shoudRequeue bool
 
 // Reconcile is the main reconciliation loop for the instance
 // TODO this function needs to be refactor
@@ -106,7 +105,7 @@ func (r *InstanceReconciler) Reconcile(
 	r.reconcileInstance(cluster)
 
 	// Refresh the cache
-	r.updateCacheFromCluster(ctx, cluster)
+	requeue := r.updateCacheFromCluster(ctx, cluster)
 
 	// Reconcile monitoring section
 	r.reconcileMetrics(cluster)
@@ -187,6 +186,10 @@ func (r *InstanceReconciler) Reconcile(
 
 	if err := r.reconcileDatabases(ctx, cluster); err != nil {
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
+	}
+
+	if requeue {
+		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	return reconcile.Result{}, nil
@@ -403,52 +406,6 @@ func (r *InstanceReconciler) IsDBUp(ctx context.Context) error {
 		return err
 	}
 	return nil
-}
-
-// updateCacheFromCluster refreshes the reconciler internal cache using the provided cluster
-func (r *InstanceReconciler) updateCacheFromCluster(ctx context.Context, cluster *apiv1.Cluster) {
-	cache.Store(cache.ClusterKey, cluster)
-
-	// Populate the cache with the backup configuration
-	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
-		envArchive, err := barmanCredentials.EnvSetBackupCloudCredentials(
-			ctx,
-			r.GetClient(),
-			cluster.Namespace,
-			cluster.Spec.Backup.BarmanObjectStore,
-			os.Environ())
-		if err != nil {
-			log.Error(err, "while getting backup credentials")
-		} else {
-			cache.Store(cache.WALArchiveKey, envArchive)
-		}
-	} else {
-		cache.Delete(cache.WALArchiveKey)
-	}
-
-	// Populate the cache with the recover configuration
-	_, env, barmanConfiguration, err := walrestore.GetRecoverConfiguration(cluster, r.instance.PodName)
-	if errors.Is(err, walrestore.ErrNoBackupConfigured) {
-		cache.Delete(cache.WALRestoreKey)
-		return
-	}
-	if err != nil {
-		log.Error(err, "while getting recover configuration")
-		return
-	}
-	env = append(env, os.Environ()...)
-
-	envRestore, err := barmanCredentials.EnvSetBackupCloudCredentials(
-		ctx,
-		r.GetClient(),
-		cluster.Namespace,
-		barmanConfiguration,
-		env,
-	)
-	if err != nil {
-		log.Error(err, "while getting recover credentials")
-	}
-	cache.Store(cache.WALRestoreKey, envRestore)
 }
 
 // reconcileDatabases reconciles all the existing databases
