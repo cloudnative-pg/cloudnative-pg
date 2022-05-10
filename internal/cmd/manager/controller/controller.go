@@ -341,7 +341,8 @@ func ensurePKI(ctx context.Context, mgrCertDir string) error {
 		return nil
 	}
 
-	// Ensures that we have the required PKI infrastructure to make the operator and the clusters working
+	// We need to self-manage required PKI infrastructure and install the certificates into
+	// the webhooks configuration
 	pkiConfig := certs.PublicKeyInfrastructure{
 		CaSecretName:                       CaSecretName,
 		CertDir:                            mgrCertDir,
@@ -357,8 +358,6 @@ func ensurePKI(ctx context.Context, mgrCertDir string) error {
 		},
 		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloudnative-pg",
 	}
-	// We need to self-manage required PKI infrastructure and install the certificates into
-	// the webhooks configuration
 	err := pkiConfig.Setup(ctx, clientSet, apiClientSet)
 	if err != nil {
 		setupLog.Error(err, "unable to setup PKI infrastructure")
