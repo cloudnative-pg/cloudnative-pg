@@ -71,7 +71,7 @@ func (p *LogPipe) GetInitializedCondition() *concurrency.Executed {
 }
 
 // GetExitedCondition returns the condition that can be checked in order to
-// be sure initialization has been done
+// be sure the process has been executed
 func (p *LogPipe) GetExitedCondition() *concurrency.Executed {
 	return p.exited
 }
