@@ -102,12 +102,15 @@ AzureCredentials is the type for the credentials to be used to upload files to A
 
 - storageKey - storageSasToken
 
-Name             | Description                                                                       | Type                                    
----------------- | --------------------------------------------------------------------------------- | ----------------------------------------
-`connectionString` | The connection string to be used                                                  | [*SecretKeySelector](#SecretKeySelector)
-`storageAccount  ` | The storage account where to upload data                                          | [*SecretKeySelector](#SecretKeySelector)
-`storageKey      ` | The storage account key to be used in conjunction with the storage account name   | [*SecretKeySelector](#SecretKeySelector)
-`storageSasToken ` | A shared-access-signature to be used in conjunction with the storage account name | [*SecretKeySelector](#SecretKeySelector)
+- inheriting the credentials from the pod environment by setting inheritFromAzureAD to true
+
+Name               | Description                                                                       | Type                                    
+------------------ | --------------------------------------------------------------------------------- | ----------------------------------------
+`connectionString  ` | The connection string to be used                                                  | [*SecretKeySelector](#SecretKeySelector)
+`storageAccount    ` | The storage account where to upload data                                          | [*SecretKeySelector](#SecretKeySelector)
+`storageKey        ` | The storage account key to be used in conjunction with the storage account name   | [*SecretKeySelector](#SecretKeySelector)
+`storageSasToken   ` | A shared-access-signature to be used in conjunction with the storage account name | [*SecretKeySelector](#SecretKeySelector)
+`inheritFromAzureAD` | Use the Azure AD based authentication without providing explicitly the keys.      - *mandatory*  | bool                                    
 
 <a id='Backup'></a>
 
