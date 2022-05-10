@@ -877,11 +877,11 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	if cluster.Status.LatestGeneratedNode != 0 {
 		// We are we creating a new blank primary when we had previously generated
-		// other nodes and we don't have any PVC to reuse?
+		// other nodes, and we don't have any PVC to reuse?
 		// This can happen when:
 		//
 		// 1 - the user deletes all the PVCs and all the Pods in a cluster
-		//    (and why would an user do that?)
+		//    (and why would a user do that?)
 		// 2 - the cache isn't ready for Pods and ready for the Cluster,
 		//     so we actually haven't the first pod in our managed list
 		//     but it's still in the API Server
@@ -906,7 +906,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		if err == specs.ErrorInvalidSize {
 			// This error should have been caught by the validating
 			// webhook, but since we are here the user must have disabled server-side
-			// validation and we must react.
+			// validation, and we must react.
 			contextLogger.Info("The size specified for the cluster is not valid",
 				"size",
 				cluster.Spec.StorageConfiguration.Size)

@@ -162,25 +162,8 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 	// Step 3: gather the WAL files names to archive
 	walFilesList := gatherWALFilesToArchive(ctx, walName, maxParallel)
 
-	checkWalOptions, err := barmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
-	if err != nil {
-		log.Error(err, "while getting barman-cloud-wal-archive options")
-		if errCond := manager.UpdateCondition(ctx, client,
-			cluster, buildArchiveCondition(err)); errCond != nil {
-			log.Error(errCond, "Error status.UpdateCondition()")
-		}
-		return err
-	}
-
 	// Step 4: Check if the archive location is safe to perform archiving
-	// This will output no error if we're not in the timeline 1 and archiving the wal file 1
-	if err := walArchiver.CheckWalArchive(ctx, walFilesList, checkWalOptions); err != nil {
-		log.Error(err, "while barman-cloud-check-wal-archive")
-		// Update the condition if needed.
-		if errCond := manager.UpdateCondition(ctx, client,
-			cluster, buildArchiveCondition(err)); errCond != nil {
-			log.Error(errCond, "Error status.UpdateCondition()")
-		}
+	if err := checkWalArchive(ctx, cluster, walArchiver, client, walFilesList); err != nil {
 		return err
 	}
 
@@ -358,36 +341,6 @@ func barmanCloudWalArchiveOptions(
 	return options, nil
 }
 
-func barmanCloudCheckWalArchiveOptions(
-	cluster *apiv1.Cluster,
-	clusterName string,
-) ([]string, error) {
-	configuration := cluster.Spec.Backup.BarmanObjectStore
-
-	var options []string
-	if len(configuration.EndpointURL) > 0 {
-		options = append(
-			options,
-			"--endpoint-url",
-			configuration.EndpointURL)
-	}
-
-	options, err := barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
-	if err != nil {
-		return nil, err
-	}
-
-	serverName := clusterName
-	if len(configuration.ServerName) != 0 {
-		serverName = configuration.ServerName
-	}
-	options = append(
-		options,
-		configuration.DestinationPath,
-		serverName)
-	return options, nil
-}
-
 func buildArchiveCondition(err error) *apiv1.ClusterCondition {
 	if err != nil {
 		return &apiv1.ClusterCondition{
@@ -403,4 +356,37 @@ func buildArchiveCondition(err error) *apiv1.ClusterCondition {
 		Reason:  "Continuous Archiving is Working",
 		Message: "",
 	}
+}
+
+func checkWalArchive(ctx context.Context,
+	cluster *apiv1.Cluster,
+	walArchiver *archiver.WALArchiver,
+	client client.WithWatch,
+	walFilesList []string,
+) error {
+	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
+	if err != nil {
+		log.Error(err, "while getting barman-cloud-wal-archive options")
+		if errCond := manager.UpdateCondition(ctx, client,
+			cluster, buildArchiveCondition(err)); errCond != nil {
+			log.Error(errCond, "Error status.UpdateCondition()")
+		}
+		return err
+	}
+
+	if !walArchiver.FileListStartsAtFirstWAL(ctx, walFilesList) {
+		return nil
+	}
+
+	if err := walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions); err != nil {
+		log.Error(err, "while barman-cloud-check-wal-archive")
+		// Update the condition if needed.
+		if errCond := manager.UpdateCondition(ctx, client,
+			cluster, buildArchiveCondition(err)); errCond != nil {
+			log.Error(errCond, "Error status.UpdateCondition()")
+		}
+		return err
+	}
+
+	return nil
 }

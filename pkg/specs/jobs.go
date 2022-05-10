@@ -123,12 +123,6 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 		"restore",
 	}
 
-	if cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
-		initCommand = append(initCommand,
-			"--target",
-			cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
-	}
-
 	job := createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
 
 	addBarmanEndpointCAToJob(cluster, backup, job)

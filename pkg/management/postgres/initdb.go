@@ -73,10 +73,6 @@ type InitInfo struct {
 	// database just after having configured a new instance
 	PostInitTemplateSQL []string
 
-	// The recovery target options, only applicable for the
-	// recovery bootstrap type
-	RecoveryTarget string
-
 	// Whether it is a temporary instance that will never contain real data.
 	Temporary bool
 }
