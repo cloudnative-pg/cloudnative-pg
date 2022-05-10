@@ -234,6 +234,7 @@ ReplicaClusterConfiguration
 ReplicaSet
 ReplicationTLSSecret
 ResizingPVC
+ResizingPVCInformation
 ResourceRequirements
 ResourceVersion
 RetentionPolicy

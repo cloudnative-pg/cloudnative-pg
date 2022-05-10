@@ -66,6 +66,7 @@ Below you will find a description of the defined resources:
 - [PostgresConfiguration](#PostgresConfiguration)
 - [RecoveryTarget](#RecoveryTarget)
 - [ReplicaClusterConfiguration](#ReplicaClusterConfiguration)
+- [ResizingPVCInformation](#ResizingPVCInformation)
 - [RollingUpdateStatus](#RollingUpdateStatus)
 - [S3Credentials](#S3Credentials)
 - [ScheduledBackup](#ScheduledBackup)
@@ -383,7 +384,7 @@ Name                      | Description                                         
 `pvcCount                 ` | How many PVCs have been created by this cluster                                                                                                                                    | int32                                                
 `jobCount                 ` | How many Jobs have been created by this cluster                                                                                                                                    | int32                                                
 `danglingPVC              ` | List of all the PVCs created by this cluster and still available which are not attached to a Pod                                                                                   | []string                                             
-`resizingPVC              ` | List of all the PVCs that have ResizingPVC condition.                                                                                                                              | []string                                             
+`resizingPVC              ` | List of all the PVCs that have ResizingPVC condition.                                                                                                                              | [[]ResizingPVCInformation](#ResizingPVCInformation)  
 `initializingPVC          ` | List of all the PVCs that are being initialized by this cluster                                                                                                                    | []string                                             
 `healthyPVC               ` | List of all the PVCs not dangling nor initializing                                                                                                                                 | []string                                             
 `writeService             ` | Current write pod                                                                                                                                                                  | string                                               
@@ -758,6 +759,18 @@ Name    | Description                                                           
 ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------
 `enabled` | If replica mode is enabled, this cluster will be a replica of an existing cluster. Replica cluster can be created from a recovery object store or via streaming through pg_basebackup. Refer to the Replication page of the documentation for more information. - *mandatory*  | bool  
 `source ` | The name of the external cluster which is the replication origin                                                                                                                                                                                                - *mandatory*  | string
+
+<a id='ResizingPVCInformation'></a>
+
+## ResizingPVCInformation
+
+ResizingPVCInformation contains information about a PVC as it is resizing
+
+Name    | Description                                                  | Type  
+------- | ------------------------------------------------------------ | ------
+`name   ` | Name is the name of the resizing PVC                         | string
+`current` | Current is the actual current size of the PVC                | string
+`desired` | Desired is the desired size, the one that we are resizing to | string
 
 <a id='RollingUpdateStatus'></a>
 

@@ -2464,7 +2464,20 @@ spec:
               resizingPVC:
                 description: List of all the PVCs that have ResizingPVC condition.
                 items:
-                  type: string
+                  description: ResizingPVCInformation contains information about a
+                    PVC as it is resizing
+                  properties:
+                    current:
+                      description: Current is the actual current size of the PVC
+                      type: string
+                    desired:
+                      description: Desired is the desired size, the one that we are
+                        resizing to
+                      type: string
+                    name:
+                      description: Name is the name of the resizing PVC
+                      type: string
+                  type: object
                 type: array
               secretsResourceVersion:
                 description: The list of resource versions of the secrets managed

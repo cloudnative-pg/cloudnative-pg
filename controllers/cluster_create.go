@@ -1158,7 +1158,7 @@ func (r *ClusterReconciler) reconcilePVCs(
 	if configuration.Current.EnableAzurePVCUpdates {
 		for _, resizingPVC := range cluster.Status.ResizingPVC {
 			// This code works on the assumption that the PVC have the same name as the pod using it.
-			if resizingPVC == pvc.Name {
+			if resizingPVC.Name == pvc.Name {
 				contextLogger.Info("PVC is in resizing status, retrying in 5 seconds", "pod", pod.Name)
 				return ctrl.Result{RequeueAfter: 5 * time.Second}, ErrNextLoop
 			}
