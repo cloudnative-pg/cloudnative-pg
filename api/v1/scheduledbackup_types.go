@@ -44,7 +44,7 @@ type ScheduledBackupSpec struct {
 	// - self: sets the Scheduled backup object as owner of the backup<br />
 	// - cluster: set the cluster as owner of the backup<br />
 	// +kubebuilder:validation:Enum=none;self;cluster
-	// +kubebuilder:default:=self
+	// +kubebuilder:default:=none
 	BackupOwnerReference string `json:"backupOwnerReference,omitempty"`
 }
 
