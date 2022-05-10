@@ -76,7 +76,7 @@ const (
 	ValidatingWebhookConfigurationName = "cnpg-validating-webhook-configuration"
 
 	// The name of the directory containing the TLS certificates
-	defaultWebhookCertDir = "/certificates/webhook"
+	defaultWebhookCertDir = "/run/secrets/cnpg.io/webhook"
 
 	// LeaderElectionID The operator Leader Election ID
 	LeaderElectionID = "db9c8771.cnpg.io"
@@ -333,24 +333,15 @@ func createKubernetesClient(config *rest.Config) error {
 	return nil
 }
 
+// ensurePKI ensures that we have the required PKI infrastructure to make
+// the operator and the clusters working
 func ensurePKI(ctx context.Context, mgrCertDir string) error {
 	if configuration.Current.WebhookCertDir != "" {
-		// trie to clean PKI infrastructure from the kubernetes cluster
-
 		// OLM is generating certificates for us, so we can avoid injecting/creating certificates.
-		// It also means that CNPG may have CA secrets leftover from the previous deployment, deleting them.
-		pkiConfig := certs.PublicKeyInfrastructure{
-			CaSecretName:      CaSecretName,
-			SecretName:        WebhookSecretName,
-			OperatorNamespace: configuration.Current.OperatorNamespace,
-		}
-		if err := pkiConfig.Cleanup(ctx, clientSet); err != nil {
-			setupLog.Warning("unable to cleanup PKI infrastructure", "error", err)
-		}
 		return nil
 	}
 
-	// ensures that we have the required PKI infrastructure to make the operator and the clusters working
+	// Ensures that we have the required PKI infrastructure to make the operator and the clusters working
 	pkiConfig := certs.PublicKeyInfrastructure{
 		CaSecretName:                       CaSecretName,
 		CertDir:                            mgrCertDir,

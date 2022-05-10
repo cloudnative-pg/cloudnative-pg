@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/robfig/cron"
-
 	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,10 +39,12 @@ import (
 
 var (
 	pkiLog = log.WithName("pki")
+
 	// errSecretsMountNotRefreshed is the error returned when the kubelet has not yet updated the mounted secret files
 	// to the latest version
 	errSecretsMountNotRefreshed = errors.New("secrets mount still not refreshed")
-	mountedSecretCheckBackoff   = wait.Backoff{
+
+	mountedSecretCheckBackoff = wait.Backoff{
 		Duration: 10 * time.Millisecond,
 		Jitter:   0.1,
 		Factor:   2,
@@ -147,21 +148,6 @@ func (pki *PublicKeyInfrastructure) Setup(
 
 	err = pki.schedulePeriodicMaintenance(ctx, clientSet, apiClientSet)
 	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Cleanup will remove the PKI infrastructure from the operator namespace
-func (pki PublicKeyInfrastructure) Cleanup(ctx context.Context, client *kubernetes.Clientset) error {
-	err := client.CoreV1().Secrets(pki.OperatorNamespace).Delete(ctx, pki.CaSecretName, metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-
-	err = client.CoreV1().Secrets(pki.OperatorNamespace).Delete(ctx, pki.SecretName, metav1.DeleteOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 

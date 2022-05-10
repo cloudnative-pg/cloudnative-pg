@@ -262,29 +262,6 @@ var _ = Describe("Webhook certificate validation", func() {
 			Expect(cert.NotAfter).To(BeTemporally(">", time.Now()))
 		})
 	})
-
-	It("can dump the secrets to a directory", func() {
-		clientSet := fake.NewSimpleClientset()
-		generateFakeOperatorDeployment(clientSet)
-
-		ca, err := CreateRootCA("ca-secret-name", operatorNamespaceName)
-		Expect(err).To(BeNil())
-
-		caSecret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
-		err = clientSet.Tracker().Add(caSecret)
-		Expect(err).To(BeNil())
-
-		pki := pkiEnvironmentTemplate
-		_, err = pki.ensureCertificate(context.TODO(), clientSet, caSecret)
-		Expect(err).To(BeNil())
-
-		tempDirName, err := ioutil.TempDir("/tmp", "cert_*")
-		Expect(err).To(BeNil())
-		defer func() {
-			err = os.RemoveAll(tempDirName)
-			Expect(err).To(BeNil())
-		}()
-	})
 })
 
 var _ = Describe("TLS certificates injection", func() {
