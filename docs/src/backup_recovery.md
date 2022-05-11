@@ -476,6 +476,7 @@ metadata:
   name: backup-example
 spec:
   schedule: "0 0 0 * * *"
+  backupOwnerReference: self
   cluster:
     name: pg-backup
 ```
@@ -500,6 +501,14 @@ this will stop any new backup to be scheduled as long as the option is set to fa
 
 In case you want to issue a backup as soon as the ScheduledBackup resource is created
 you can set `.spec.immediate: true`.
+
+!!! Note
+    `.spec.backupOwnerReference` indicates which ownerReference should be put inside
+    the created backup resources.
+
+    - *none:* no owner reference for created backup objects (same behavior as before the field was introduced)
+    - *self:* sets the Scheduled backup object as owner of the backup
+    - *cluster:* set the cluster as owner of the backup
 
 ## WAL archiving
 
