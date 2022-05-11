@@ -450,6 +450,7 @@ func (instance Instance) WithActiveInstance(inner func() error) error {
 		return fmt.Errorf("while activating instance: %w", err)
 	}
 
+	// Start the CSV logpipe to redirect log to stdout
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	csvPipe := logpipe.NewLogPipe()
 
