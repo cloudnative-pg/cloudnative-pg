@@ -94,9 +94,7 @@ func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputForm
 //  - events in the operator namespace
 //  - operator's Validating/MutatingWebhookConfiguration and their associated services
 //  - operator pod's logs (if `includeLogs` is true)
-func operator(ctx context.Context, format plugin.OutputFormat,
-	file string, stopRedaction, includeLogs bool, now time.Time,
-) error {
+func operator(ctx context.Context, format plugin.OutputFormat, file string, stopRedaction, includeLogs bool, now time.Time, namespace string) error {
 	secretRedactor := redactSecret
 	configMapRedactor := redactConfigMap
 	if stopRedaction {
@@ -105,12 +103,12 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 		fmt.Println("WARNING: secret Redaction is OFF. Use it with caution")
 	}
 
-	operatorDeployment, err := deployments.GetOperatorDeployment(ctx)
+	operatorDeployment, err := deployments.GetOperatorDeployment(ctx, namespace)
 	if err != nil {
 		return fmt.Errorf("could not get operator deployment: %w", err)
 	}
 
-	operatorPods, err := deployments.GetOperatorPods(ctx)
+	operatorPods, err := deployments.GetOperatorPods(ctx, namespace)
 	if err != nil {
 		return fmt.Errorf("could not get operator pod: %w", err)
 	}

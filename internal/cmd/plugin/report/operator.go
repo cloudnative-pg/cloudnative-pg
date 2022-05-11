@@ -43,7 +43,7 @@ func operatorCmd() *cobra.Command {
 				file = reportName("operator", now) + ".zip"
 			}
 			return operator(cmd.Context(), plugin.OutputFormat(output),
-				file, stopRedaction, includeLogs, now)
+				file, stopRedaction, includeLogs, now, plugin.Namespace)
 		},
 	}
 

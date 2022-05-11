@@ -31,21 +31,27 @@ import (
 const labelOperatorName = "cloudnative-pg"
 
 // GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
-func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
+func GetOperatorDeployment(ctx context.Context, namespace string) (appsv1.Deployment, error) {
 	deploymentList := &appsv1.DeploymentList{}
 
 	if err := plugin.Client.List(
 		ctx, deploymentList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": labelOperatorName},
+		ctrlclient.InNamespace(namespace),
 	); err != nil {
 		return appsv1.Deployment{}, err
 	}
+
+	fmt.Printf("\n%v\n%v\n", deploymentList.Items, namespace)
+
 	// We check if we have one or more deployments
-	if len(deploymentList.Items) > 1 || len(deploymentList.Items) < 1 {
+	if len(deploymentList.Items) != 1 {
 		err := fmt.Errorf("number of operator deployments not equal to 1")
 		return appsv1.Deployment{}, err
+	} else {
+		return deploymentList.Items[0], nil
 	}
 
-	if len(deploymentList.Items) == 1 {
+	/*if len(deploymentList.Items) == 1 {
 		return deploymentList.Items[0], nil
 	}
 
@@ -63,11 +69,11 @@ func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
 		return appsv1.Deployment{}, err
 	}
 
-	return deploymentList.Items[0], nil
+	return deploymentList.Items[0], nil*/
 }
 
 // GetOperatorPods returns the operator pods if found, error otherwise
-func GetOperatorPods(ctx context.Context) ([]corev1.Pod, error) {
+func GetOperatorPods(ctx context.Context, namespace string) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 
 	// This will work for newer version of the operator, which are using
@@ -82,13 +88,4 @@ func GetOperatorPods(ctx context.Context) ([]corev1.Pod, error) {
 	}
 
 	return nil, fmt.Errorf("operator pods not found")
-}
-
-// GetOperatorNamespaceName returns the namespace the operator Deployment is running in
-func GetOperatorNamespaceName(ctx context.Context) (string, error) {
-	deployment, err := GetOperatorDeployment(ctx)
-	if err != nil {
-		return "", err
-	}
-	return deployment.GetNamespace(), err
 }
