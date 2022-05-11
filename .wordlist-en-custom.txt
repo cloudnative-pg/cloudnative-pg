@@ -332,6 +332,7 @@ ba
 backend
 backends
 backupId
+backupOwnerReference
 backupRetentionPolicy
 backupconfiguration
 backuplist
@@ -628,6 +629,7 @@ operatorgroups
 operatorhub
 osdk
 ou
+ownerReference
 packagemanifests
 parseable
 passwd

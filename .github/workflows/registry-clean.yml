@@ -1,0 +1,34 @@
+name: clean-testing-package
+
+on:
+  push:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+
+jobs:
+  clean-ghcr:
+    name: delete old testing container images
+    runs-on: ubuntu-latest
+    steps:
+    # once issue https://github.com/snok/container-retention-policy/issues/33 is fixed
+    # we can merge the two steps into one
+      - name: Delete '-testing' images for cloudnative-pg
+        uses: snok/container-retention-policy@v1
+        with:
+          image-names: cloudnative-pg-testing
+          cut-off: 5 days ago UTC
+          keep-at-least: 1
+          account-type: org
+          org-name: cloudnative-pg
+          token: ${{ secrets.REPO_GHA_PAT }}
+      - name: Delete '-testing' images for containers
+        uses: snok/container-retention-policy@v1
+        with:
+          image-names: pgbouncer-testing, postgresql-testing
+          cut-off: A week ago UTC
+          keep-at-least: 1
+          account-type: org
+          org-name: cloudnative-pg
+          token: ${{ secrets.REPO_GHA_PAT }}
