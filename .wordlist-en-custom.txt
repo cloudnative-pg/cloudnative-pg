@@ -481,6 +481,7 @@ freddie
 gc
 gcc
 gce
+gcs
 gcsCredentials
 ghcr
 github
