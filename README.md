@@ -109,6 +109,10 @@ MariaDB cluster).
 - [Roadmap](https://github.com/orgs/cloudnative-pg/projects/1)
 - [Website](https://cloudnative-pg.io)
 - [FAQ](docs/src/faq.md)
+- [Blog](https://cloudnative-pg.io/blog/)
+- ["Why Run Postgres in Kubernetes?"](https://containerjournal.com/kubecon-cnc-eu-2022/why-run-postgres-in-kubernetes/) (May 2022)
+- ["Shift-Left Security: The Path To PostgreSQL On Kubernetes"](https://www.tfir.io/shift-left-security-the-path-to-postgresql-on-kubernetes/) (April 2021)
+- ["Local Persistent Volumes and PostgreSQL usage in Kubernetes"](https://www.2ndquadrant.com/en/blog/local-persistent-volumes-and-postgresql-usage-in-kubernetes/) (June 2020)
 
 ## Maintainers
 
