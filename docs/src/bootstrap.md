@@ -360,7 +360,7 @@ spec:
 !!! Note
     In the above example we are taking advantage of the parallel WAL restore
     feature, dedicating up to 8 jobs to concurrently fetch the required WAL
-    files from the archive. This feature can sensibly reduce the recovery time.
+    files from the archive. This feature can appreciably reduce the recovery time.
     Make sure that you plan ahead for this scenario and correctly tune the
     value of this parameter for your environment. It will certainly make a
     difference **when** (not if) you'll need it.
@@ -414,7 +414,7 @@ recovery (see the ["Point in time recovery" section](#point-in-time-recovery)).
 
 !!! Important
     Consider using the `barmanObjectStore.wal.maxParallel` option to speed
-    up WAL fetching from the archive by concurrently download the transaction
+    up WAL fetching from the archive by concurrently downloading the transaction
     logs from the recovery object store.
 
 #### Point in time recovery (PITR)
