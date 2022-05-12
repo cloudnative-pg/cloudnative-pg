@@ -60,7 +60,7 @@ jobs:
 
       - name: Create PR to update PostgreSQL version
         if: steps.latest.outputs.LATEST_POSTGRES_VERSION_IMAGE != steps.current.outputs.CURRENT_POSTGRES_VERSION_IMAGE
-        uses: gr2m/create-or-update-pull-request-action@v1
+        uses: peter-evans/create-pull-request@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -69,10 +69,11 @@ jobs:
           branch: "postgres-versions-update"
           author: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
           commit-message: "feat: update default PostgreSQL version to ${{ steps.latest.outputs.LATEST_POSTGRES_VERSION }}"
+          signoff: true
 
       - name: Create Pull Request if postgresql versions have been updated
         if: steps.latest.outputs.LATEST_POSTGRES_VERSION_IMAGE == steps.current.outputs.CURRENT_POSTGRES_VERSION_IMAGE
-        uses: gr2m/create-or-update-pull-request-action@v1
+        uses: peter-evans/create-pull-request@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -80,5 +81,6 @@ jobs:
           body: "Update the Postgres versions used in E2E tests"
           branch: "postgres-versions-update"
           author: "postgres-versions-updater <postgres-versions-updater@users.noreply.github.com>"
-          path: ".github/"
+          add-paths: ".github/"
           commit-message: "test: Updated Postgres versions used in E2E tests"
+          signoff: true
