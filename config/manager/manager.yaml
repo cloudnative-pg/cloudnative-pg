@@ -74,10 +74,17 @@ spec:
         volumeMounts:
           - mountPath: /controller
             name: scratch-data
+          - mountPath: /run/secrets/cnpg.io/webhook
+            name: webhook-certificates
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
       volumes:
         - name: scratch-data
           emptyDir: {}
+        - name: webhook-certificates
+          secret:
+            optional: true
+            secretName: cnpg-webhook-cert
+            defaultMode: 420
       terminationGracePeriodSeconds: 10

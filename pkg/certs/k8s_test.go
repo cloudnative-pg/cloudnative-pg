@@ -20,7 +20,6 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
-	"path"
 	"time"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -29,8 +28,6 @@ import (
 	fakeApiExtension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -125,10 +122,15 @@ func generateFakeOperatorDeployment(clientSet *fake.Clientset) {
 }
 
 var _ = Describe("Root CA secret generation", func() {
+	pki := PublicKeyInfrastructure{
+		OperatorNamespace: operatorNamespaceName,
+		CaSecretName:      "ca-secret-name",
+	}
+
 	It("must generate a new CA secret when it doesn't already exist", func() {
 		clientSet := fake.NewSimpleClientset()
 		generateFakeOperatorDeployment(clientSet)
-		secret, err := EnsureRootCACertificate(context.TODO(), clientSet, operatorNamespaceName, "ca-secret-name", "")
+		secret, err := pki.ensureRootCACertificate(context.TODO(), clientSet)
 		Expect(err).To(BeNil())
 
 		Expect(secret.Namespace).To(Equal(operatorNamespaceName))
@@ -146,8 +148,7 @@ var _ = Describe("Root CA secret generation", func() {
 		secret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
 		clientSet := fake.NewSimpleClientset(secret)
 
-		resultingSecret, err := EnsureRootCACertificate(context.TODO(),
-			clientSet, operatorNamespaceName, "ca-secret-name", "")
+		resultingSecret, err := pki.ensureRootCACertificate(context.TODO(), clientSet)
 		Expect(err).To(BeNil())
 		Expect(resultingSecret.Namespace).To(Equal(operatorNamespaceName))
 		Expect(resultingSecret.Name).To(Equal("ca-secret-name"))
@@ -164,8 +165,7 @@ var _ = Describe("Root CA secret generation", func() {
 		clientSet := fake.NewSimpleClientset(secret)
 
 		// The secret should have been renewed now
-		resultingSecret, err := EnsureRootCACertificate(context.TODO(),
-			clientSet, operatorNamespaceName, "ca-secret-name", "")
+		resultingSecret, err := pki.ensureRootCACertificate(context.TODO(), clientSet)
 		Expect(err).To(BeNil())
 		Expect(resultingSecret.Namespace).To(Equal(operatorNamespaceName))
 		Expect(resultingSecret.Name).To(Equal("ca-secret-name"))
@@ -193,7 +193,7 @@ var _ = Describe("Webhook certificate validation", func() {
 		pki := pkiEnvironmentTemplate
 
 		It("should correctly generate a pki certificate", func() {
-			webhookSecret, err := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
+			webhookSecret, err := pki.ensureCertificate(context.TODO(), clientSet, caSecret)
 			Expect(err).To(BeNil())
 			Expect(webhookSecret.Name).To(Equal(pki.SecretName))
 			Expect(webhookSecret.Namespace).To(Equal(pki.OperatorNamespace))
@@ -218,10 +218,10 @@ var _ = Describe("Webhook certificate validation", func() {
 		err := clientSet.Tracker().Add(caSecret)
 		Expect(err).To(BeNil())
 		pki := pkiEnvironmentTemplate
-		webhookSecret, _ := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
+		webhookSecret, _ := pki.ensureCertificate(context.TODO(), clientSet, caSecret)
 
 		It("must reuse them", func() {
-			currentWebhookSecret, err := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
+			currentWebhookSecret, err := pki.ensureCertificate(context.TODO(), clientSet, caSecret)
 			Expect(err).To(BeNil())
 			Expect(webhookSecret.Data).To(BeEquivalentTo(currentWebhookSecret.Data))
 		})
@@ -248,7 +248,7 @@ var _ = Describe("Webhook certificate validation", func() {
 		pki := pkiEnvironmentTemplate
 
 		It("must renew the secret", func() {
-			currentServerSecret, err := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
+			currentServerSecret, err := pki.ensureCertificate(context.TODO(), clientSet, caSecret)
 			Expect(err).To(BeNil())
 			Expect(serverSecret.Data).To(Not(BeEquivalentTo(currentServerSecret.Data)))
 
@@ -261,35 +261,6 @@ var _ = Describe("Webhook certificate validation", func() {
 			Expect(cert.NotBefore).To(BeTemporally("<", time.Now()))
 			Expect(cert.NotAfter).To(BeTemporally(">", time.Now()))
 		})
-	})
-
-	It("can dump the secrets to a directory", func() {
-		clientSet := fake.NewSimpleClientset()
-		generateFakeOperatorDeployment(clientSet)
-
-		ca, err := CreateRootCA("ca-secret-name", operatorNamespaceName)
-		Expect(err).To(BeNil())
-
-		caSecret := ca.GenerateCASecret(operatorNamespaceName, "ca-secret-name")
-		err = clientSet.Tracker().Add(caSecret)
-		Expect(err).To(BeNil())
-
-		pki := pkiEnvironmentTemplate
-		webhookSecret, err := pki.EnsureCertificate(context.TODO(), clientSet, caSecret)
-		Expect(err).To(BeNil())
-
-		tempDirName, err := ioutil.TempDir("/tmp", "cert_*")
-		Expect(err).To(BeNil())
-		defer func() {
-			err = os.RemoveAll(tempDirName)
-			Expect(err).To(BeNil())
-		}()
-
-		err = DumpSecretToDir(webhookSecret, tempDirName, "apiserver")
-		Expect(err).To(BeNil())
-
-		Expect(fileutils.FileExists(path.Join(tempDirName, "apiserver.key"))).To(BeTrue())
-		Expect(fileutils.FileExists(path.Join(tempDirName, "apiserver.crt"))).To(BeTrue())
 	})
 })
 
@@ -307,7 +278,7 @@ var _ = Describe("TLS certificates injection", func() {
 		mutatingWebhook := mutatingWebhookTemplate
 		clientSet := fake.NewSimpleClientset(caSecret, webhookSecret, &mutatingWebhook)
 
-		err := pki.InjectPublicKeyIntoMutatingWebhook(context.TODO(), clientSet, webhookSecret)
+		err := pki.injectPublicKeyIntoMutatingWebhook(context.TODO(), clientSet, webhookSecret)
 		Expect(err).To(BeNil())
 
 		updatedWebhook, err := clientSet.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
@@ -322,7 +293,7 @@ var _ = Describe("TLS certificates injection", func() {
 		validatingWebhook := validatingWebhookTemplate
 		clientSet := fake.NewSimpleClientset(caSecret, webhookSecret, &validatingWebhook)
 
-		err := pki.InjectPublicKeyIntoValidatingWebhook(context.TODO(), clientSet, webhookSecret)
+		err := pki.injectPublicKeyIntoValidatingWebhook(context.TODO(), clientSet, webhookSecret)
 		Expect(err).To(BeNil())
 
 		updatedWebhook, err := clientSet.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
@@ -355,7 +326,10 @@ var _ = Describe("Webhook environment creation", func() {
 
 		apiClientSet := fakeApiExtension.NewSimpleClientset(&firstCrd, &secondCrd)
 
-		err = pki.Setup(ctx, clientSet, apiClientSet)
+		ca, err := pki.ensureRootCACertificate(ctx, clientSet)
+		Expect(err).To(BeNil())
+
+		_, err = pki.setupWebhooksCertificate(ctx, clientSet, apiClientSet, ca)
 		Expect(err).To(BeNil())
 
 		webhookSecret, err := clientSet.CoreV1().Secrets(
