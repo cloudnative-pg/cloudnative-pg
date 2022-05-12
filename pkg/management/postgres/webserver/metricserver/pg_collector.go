@@ -67,6 +67,19 @@ type metrics struct {
 	PgVersion                *prometheus.GaugeVec
 	FirstRecoverabilityPoint prometheus.Gauge
 	FencingOn                prometheus.Gauge
+	PgStatWalMetrics         PgStatWalMetrics
+}
+
+// PgStatWalMetrics is available from PG14+
+type PgStatWalMetrics struct {
+	WalRecords     *prometheus.GaugeVec
+	WalFpi         *prometheus.GaugeVec
+	WalBytes       *prometheus.GaugeVec
+	WALBuffersFull *prometheus.GaugeVec
+	WalWrite       *prometheus.GaugeVec
+	WalSync        *prometheus.GaugeVec
+	WalWriteTime   *prometheus.GaugeVec
+	WalSyncTime    *prometheus.GaugeVec
 }
 
 // NewExporter creates an exporter
@@ -162,6 +175,63 @@ func newMetrics() *metrics {
 			Name:      "fencing_on",
 			Help:      "1 if the instance is fenced, 0 otherwise",
 		}),
+		PgStatWalMetrics: PgStatWalMetrics{
+			WalRecords: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Namespace: PrometheusNamespace,
+				Subsystem: subsystem,
+				Name:      "wal_records",
+				Help:      "Total number of WAL records generated. Only available on PG 14+",
+			}, []string{"stats_reset"}),
+			WalFpi: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Namespace: PrometheusNamespace,
+				Subsystem: subsystem,
+				Name:      "wal_fpi",
+				Help:      "Total number of WAL full page images generated. Only available on PG 14+",
+			}, []string{"stats_reset"}),
+			WalBytes: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Namespace: PrometheusNamespace,
+				Subsystem: subsystem,
+				Name:      "wal_bytes",
+				Help:      "Total amount of WAL generated in bytes. Only available on PG 14+",
+			}, []string{"stats_reset"}),
+			WALBuffersFull: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Namespace: PrometheusNamespace,
+				Subsystem: subsystem,
+				Name:      "wal_buffers_full",
+				Help:      "Number of times WAL data was written to disk because WAL buffers became full. Only available on PG 14+",
+			}, []string{"stats_reset"}),
+			WalWrite: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Namespace: PrometheusNamespace,
+				Subsystem: subsystem,
+				Name:      "wal_write",
+				Help:      "Number of times WAL buffers were written out to disk via XLogWrite request. Only available on PG 14+",
+			}, []string{"stats_reset"}),
+			WalSync: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Namespace: PrometheusNamespace,
+				Subsystem: subsystem,
+				Name:      "wal_sync",
+				Help: "Number of times WAL files were synced to disk via issue_xlog_fsync request " +
+					"(if fsync is on and wal_sync_method is either fdatasync, fsync or fsync_writethrough, otherwise zero)." +
+					" Only available on PG 14+",
+			}, []string{"stats_reset"}),
+			WalWriteTime: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Namespace: PrometheusNamespace,
+				Subsystem: subsystem,
+				Name:      "wal_write_time",
+				Help: "Total amount of time spent writing WAL buffers to disk via XLogWrite request, in milliseconds " +
+					"(if track_wal_io_timing is enabled, otherwise zero). This includes the sync time when wal_sync_method " +
+					"is either open_datasync or open_sync." +
+					" Only available on PG 14+",
+			}, []string{"stats_reset"}),
+			WalSyncTime: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+				Namespace: PrometheusNamespace,
+				Subsystem: subsystem,
+				Name:      "wal_sync_time",
+				Help: "Total amount of time spent syncing WAL files to disk via issue_xlog_fsync request, in milliseconds " +
+					"(if track_wal_io_timing is enabled, fsync is on, and wal_sync_method is either fdatasync, fsync or " +
+					"fsync_writethrough, otherwise zero). Only available on PG 14+",
+			}, []string{"stats_reset"}),
+		},
 	}
 }
 
@@ -184,6 +254,17 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	if e.queries != nil {
 		e.queries.Describe(ch)
 	}
+
+	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
+		e.Metrics.PgStatWalMetrics.WalSync.Describe(ch)
+		e.Metrics.PgStatWalMetrics.WalWriteTime.Describe(ch)
+		e.Metrics.PgStatWalMetrics.WalFpi.Describe(ch)
+		e.Metrics.PgStatWalMetrics.WalWrite.Describe(ch)
+		e.Metrics.PgStatWalMetrics.WalSyncTime.Describe(ch)
+		e.Metrics.PgStatWalMetrics.WalRecords.Describe(ch)
+		e.Metrics.PgStatWalMetrics.WALBuffersFull.Describe(ch)
+		e.Metrics.PgStatWalMetrics.WalBytes.Describe(ch)
+	}
 }
 
 // Collect implements prometheus.Collector, collecting the Metrics values to
@@ -203,6 +284,17 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.Metrics.PgWALDirectory.Collect(ch)
 	e.Metrics.PgVersion.Collect(ch)
 	e.Metrics.FirstRecoverabilityPoint.Collect(ch)
+
+	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
+		e.Metrics.PgStatWalMetrics.WalSync.Collect(ch)
+		e.Metrics.PgStatWalMetrics.WalWriteTime.Collect(ch)
+		e.Metrics.PgStatWalMetrics.WalFpi.Collect(ch)
+		e.Metrics.PgStatWalMetrics.WalWrite.Collect(ch)
+		e.Metrics.PgStatWalMetrics.WalSyncTime.Collect(ch)
+		e.Metrics.PgStatWalMetrics.WalRecords.Collect(ch)
+		e.Metrics.PgStatWalMetrics.WALBuffersFull.Collect(ch)
+		e.Metrics.PgStatWalMetrics.WalBytes.Collect(ch)
+	}
 }
 
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
@@ -286,6 +378,14 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 		e.Metrics.Error.Set(1)
 		e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PGVersion").Inc()
 		e.Metrics.PgVersion.Reset()
+	}
+
+	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
+		if err := collectPGWALStat(e); err != nil {
+			log.Error(err, "while collecting pg_wal_stat")
+			e.Metrics.Error.Set(1)
+			e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PGWALStat").Inc()
+		}
 	}
 }
 
@@ -371,6 +471,24 @@ func collectPGWalArchiveMetric(exporter *Exporter) error {
 
 	exporter.Metrics.PgWALArchiveStatus.WithLabelValues("ready").Set(float64(ready))
 	exporter.Metrics.PgWALArchiveStatus.WithLabelValues("done").Set(float64(done))
+	return nil
+}
+
+func collectPGWALStat(e *Exporter) error {
+	walStat, err := e.instance.TryGetPgStatWAL()
+	if walStat == nil || err != nil {
+		return err
+	}
+	walMetrics := e.Metrics.PgStatWalMetrics
+	walMetrics.WalSync.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSync))
+	walMetrics.WalSyncTime.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSyncTime))
+	walMetrics.WALBuffersFull.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WALBuffersFull))
+	walMetrics.WalFpi.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalFpi))
+	walMetrics.WalWrite.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWrite))
+	walMetrics.WalBytes.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalBytes))
+	walMetrics.WalWriteTime.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWriteTime))
+	walMetrics.WalRecords.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalRecords))
+
 	return nil
 }
 

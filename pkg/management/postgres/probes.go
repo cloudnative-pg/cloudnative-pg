@@ -418,6 +418,61 @@ func (instance *Instance) IsWALReceiverActive() (bool, error) {
 	return result, nil
 }
 
+// PgStatWal is a representation of the pg_stat_wal table
+type PgStatWal struct {
+	WalRecords     int64
+	WalFpi         int64
+	WalBytes       int64
+	WALBuffersFull int64
+	WalWrite       int64
+	WalSync        int64
+	WalWriteTime   int64
+	WalSyncTime    int64
+	StatsReset     string
+}
+
+// TryGetPgStatWAL retrieves pg_wal_stat on pg version 14 and further
+func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
+	version, err := instance.GetPgVersion()
+	if err != nil || version.Major < 14 {
+		return nil, err
+	}
+
+	superUserDB, err := instance.GetSuperUserDB()
+	if err != nil {
+		return nil, err
+	}
+
+	var pgWalStat PgStatWal
+	row := superUserDB.QueryRow(
+		`SELECT
+        wal_records,
+		wal_fpi,
+		wal_bytes,
+		wal_buffers_full,
+		wal_write,
+		wal_sync,
+		wal_write_time,
+		wal_sync_time,
+		stats_reset
+	    FROM pg_stat_wal`)
+	if err := row.Scan(
+		&pgWalStat.WalRecords,
+		&pgWalStat.WalFpi,
+		&pgWalStat.WalBytes,
+		&pgWalStat.WALBuffersFull,
+		&pgWalStat.WalWrite,
+		&pgWalStat.WalSync,
+		&pgWalStat.WalWriteTime,
+		&pgWalStat.WalSyncTime,
+		&pgWalStat.StatsReset,
+	); err != nil {
+		return nil, err
+	}
+
+	return &pgWalStat, nil
+}
+
 // GetWALArchiveCounters returns the number of WAL files with status ready,
 // and the number of those in status done.
 func GetWALArchiveCounters() (ready, done int, err error) {
