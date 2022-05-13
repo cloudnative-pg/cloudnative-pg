@@ -254,8 +254,8 @@ of credentials:
 - **Storage account name** and [**Azure AD Workload Identity**](https://azure.github.io/azure-workload-identity/docs/introduction.html)
 properly configured.
 
-While using **Azure AD Workload Identity**, you can avoid saving the credentials into
-a Kubernetes Secret, and have a cluster configuration like this:
+Using **Azure AD Workload Identity**, you can avoid saving the credentials into a Kubernetes Secret,
+and have a Cluster configuration adding the `inheritFromAzureAD` as follows:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
