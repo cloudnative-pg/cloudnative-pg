@@ -10,7 +10,7 @@ backs up many PostgreSQL instances, the operator relies on the
 be *tarballs*. Both base backups and WAL files can be compressed 
 and encrypted.
 
-For this, it is required an image with `barman-cli-cloud` installed.
+For this, it is required to use an image with `barman-cli-cloud` included.
 You can use the image `ghcr.io/cloudnative-pg/postgresql` for this scope,
 as it is composed of a community PostgreSQL image and the latest
 `barman-cli-cloud` package.
@@ -45,14 +45,14 @@ discussed in the following sections.
 You will need the following information about your environment:
 
 - `ACCESS_KEY_ID`: the ID of the access key that will be used
-  to upload files in S3
+  to upload files into S3
 
-- `ACCESS_SECRET_KEY`: the secret part of the previous access key
+- `ACCESS_SECRET_KEY`: the secret part of the access key mentioned above
 
-- `ACCESS_SESSION_TOKEN`: the optional session token in case it is required
+- `ACCESS_SESSION_TOKEN`: the optional session token, in case it is required
 
-The access key used must have permission to upload files in
-the bucket. Given that, you must create a k8s secret with the
+The access key used must have permission to upload files into
+the bucket. Given that, you must create a Kubernetes secret with the
 credentials, and you can do that with the following command:
 
 ```sh
@@ -65,7 +65,7 @@ kubectl create secret generic aws-creds \
 The credentials will be stored inside Kubernetes and will be encrypted
 if encryption at rest is configured in your installation.
 
-Given that secret, you can configure your cluster like in
+Once that secret has been created, you can configure your cluster like in
 the following example:
 
 ```yaml
@@ -85,7 +85,7 @@ spec:
           key: ACCESS_SECRET_KEY
 ```
 
-The destination path can be every URL pointing to a folder where
+The destination path can be any URL pointing to a folder where
 the instance can upload the WAL files, e.g.
 `s3://BUCKET_NAME/path/to/folder`.
 
@@ -118,7 +118,7 @@ spec:
 
 !!! Note
     If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
-    add a label with key `cnpg.io/reload` to it, otherwise you will have to reload
+    add a label with key `cnpg.io/reload` to the Secrets/ConfigMaps. Otherwise, you will have to reload
     the instances using the `kubectl cnpg reload` subcommand.
 
 ### MinIO Gateway
@@ -164,7 +164,8 @@ spec:
 ```
 
 !!! Warning
-    At the time of writing this documentation, the official [MinIO Operator](https://github.com/minio/minio-operator/issues/71)
+    At the time of writing this documentation, the official
+    [MinIO Operator](https://github.com/minio/minio-operator/issues/71)
     for Kubernetes does not support the gateway feature. As such, we will use a
     `deployment` instead.
 
@@ -489,7 +490,7 @@ The above example will schedule a backup every day at midnight.
     advice is that you regularly test your backups by recovering them, and then
     measuring the time it takes to recover from scratch so that you can refine
     your RTO predictability. Recovery time is influenced by the size of the
-    base backup and the amount of WAL files that need to fetched from the archive
+    base backup and the amount of WAL files that need to be fetched from the archive
     and replayed during recovery (remember that WAL archiving is what enables
     continuous backup in PostgreSQL!).
     Based on our experience, a weekly base backup is more than enough for most
@@ -598,7 +599,7 @@ backup from the object storage.
 
 When the base backup recovery process is completed, the operator starts the
 Postgres instance in recovery mode: in this phase, PostgreSQL is up, albeit not
-being able to accept connections, and the pod is healthy, according to the
+able to accept connections, and the pod is healthy according to the
 liveness probe. Through the `restore_command`, PostgreSQL starts fetching WAL
 files from the archive (you can speed up this phase by setting the
 `maxParallel` option and enable the parallel WAL restore capability).
@@ -617,10 +618,66 @@ as usual, and the remaining instances will join the cluster as replicas.
 The process is transparent for the user and it is managed by the instance
 manager running in the Pods.
 
+### Restoring into a cluster with a backup section
+
+A manifest for a cluster restore may include a `backup` section.
+This means that the new cluster, after recovery, will start archiving WAL's and
+taking backups if configured to do so.
+
+!!! Warning
+    It is not allowed to use the same `barmanObjectStore` object in the `backup`
+    section as in the `externalClusters` section, for the recovery. While in some
+    cases this *could* work, the operator will prevent recovery into a new
+    cluster if using the same backup object as the source cluster. This is to
+    guard against edge cases where the source WAL's could be overwritten.
+    A cluster with the same `barmanObjectStore` reused for recovery and backup
+    will generate a validation error: `spec.backup.barmanObjectStore: Invalid value: …`
+
+For example, the section below could be part of a manifest for a Cluster
+bootstrapping from Cluster `cluster-example-backup`, and would create a
+new folder in the storage bucket named `recoveredCluster` where the base backups
+and WAL's of the recovered cluster would be stored.
+
+``` yaml
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://backups/
+      endpointURL: http://minio:9000
+      serverName: "recoveredCluster"
+      s3Credentials:
+        accessKeyId:
+          name: minio
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: minio
+          key: ACCESS_SECRET_KEY
+    retentionPolicy: "30d"
+
+  externalClusters:
+  - name: cluster-example-backup
+    barmanObjectStore:
+      destinationPath: s3://backups/
+      endpointURL: http://minio:9000
+      s3Credentials:
+```
+
+You should not re-use the exact same `barmanObjectStore` configuration
+for different clusters. There could be cases where the existing information
+in the storage buckets could be overwritten by the new cluster.
+
+!!! Warning
+    The operator now includes a safety check to ensure a cluster will not
+    overwrite a storage bucket that contained information. A cluster that would
+    overwrite existing storage will remain in state `Setting up primary` with
+    Pods in an Error state.
+    The pod logs will show:
+    `ERROR: WAL archive check failed for server recoveredCluster: Expected empty archive"`
+
 ## Retention policies
 
 CloudNativePG can manage the automated deletion of backup files from
-the backup object store, using **retention policies** based on recovery window.
+the backup object store, using **retention policies** based on the recovery
+window.
 
 Internally, the retention policy feature uses `barman-cloud-backup-delete`
 with `--retention-policy “RECOVERY WINDOW OF {{ retention policy value }} {{ retention policy unit }}”`.
