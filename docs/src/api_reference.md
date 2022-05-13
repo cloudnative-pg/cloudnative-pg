@@ -34,7 +34,6 @@ Below you will find a description of the defined resources:
 - [CertificatesConfiguration](#CertificatesConfiguration)
 - [CertificatesStatus](#CertificatesStatus)
 - [Cluster](#Cluster)
-- [ClusterCondition](#ClusterCondition)
 - [ClusterList](#ClusterList)
 - [ClusterSpec](#ClusterSpec)
 - [ClusterStatus](#ClusterStatus)
@@ -303,20 +302,6 @@ Name     | Description                                                          
 `spec    ` | Specification of the desired behavior of the cluster. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status                                                              | [ClusterSpec](#ClusterSpec)                                                                                 
 `status  ` | Most recently observed status of the cluster. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status | [ClusterStatus](#ClusterStatus)                                                                             
 
-<a id='ClusterCondition'></a>
-
-## ClusterCondition
-
-ClusterCondition describes the state of a cluster object at a certain point
-
-Name               | Description                                                       | Type                                                                                             
------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------
-`type              ` | Type of the condition.                                            | ClusterConditionType                                                                             
-`status            ` | Status of the condition, one of True, False, Unknown.             | ConditionStatus                                                                                  
-`lastTransitionTime` | Last time the condition transitioned from one status to another.  | [*metav1.Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#time-v1-meta)
-`reason            ` | The reason for the condition's last transition.                   | string                                                                                           
-`message           ` | A human readable message indicating details about the transition. | string                                                                                           
-
 <a id='ClusterList'></a>
 
 ## ClusterList
@@ -401,7 +386,7 @@ Name                      | Description                                         
 `cloudNativePGOperatorHash` | The hash of the binary of the operator                                                                                                                                             | string                                               
 `onlineUpdateEnabled      ` | OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster                                                                                                      | bool                                                 
 `azurePVCUpdateEnabled    ` | AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster                                                                                                  | bool                                                 
-`conditions               ` | Conditions for cluster object                                                                                                                                                      | [[]ClusterCondition](#ClusterCondition)              
+`conditions               ` | Conditions for cluster object                                                                                                                                                      | []metav1.Condition                                   
 
 <a id='ConfigMapKeySelector'></a>
 

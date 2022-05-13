@@ -26,8 +26,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -45,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // We wait up to 10 minutes to have a WAL archived correctly
@@ -279,6 +278,17 @@ func (b *BackupCommand) run(ctx context.Context) {
 
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
+	// Update backup status in cluster conditions on startup
+	condition := metav1.Condition{
+		Type:    string(apiv1.ConditionBackup),
+		Status:  metav1.ConditionFalse,
+		Reason:  "BackupStarted",
+		Message: "New Backup starting up",
+	}
+	if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, condition); condErr != nil {
+		b.Log.Error(condErr, "Error status.UpdateCondition()")
+	}
+
 	if err := fileutils.EnsureDirectoryExist(postgres.BackupTemporaryDirectory); err != nil {
 		b.Log.Error(err, "Cannot create backup temporary directory", "err", err)
 		return
@@ -294,12 +304,16 @@ func (b *BackupCommand) run(ctx context.Context) {
 		backupStatus.SetAsFailed(err)
 		b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
 
-		// Update backup status in cluster conditions
-		if errCond := manager.UpdateCondition(ctx, b.Client,
-			b.Cluster, BuildBackupCondition(err)); errCond != nil {
-			b.Log.Error(errCond, "Error status.UpdateCondition()")
+		// Update backup status in cluster conditions on failure
+		condition = metav1.Condition{
+			Type:    string(apiv1.ConditionBackup),
+			Status:  metav1.ConditionFalse,
+			Reason:  "LastBackupFailed",
+			Message: err.Error(),
 		}
-
+		if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, condition); condErr != nil {
+			b.Log.Error(condErr, "Error status.UpdateConditionInClusterStatus()")
+		}
 		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 			b.Log.Error(err, "Can't mark backup as failed")
 		}
@@ -311,10 +325,15 @@ func (b *BackupCommand) run(ctx context.Context) {
 	backupStatus.SetAsCompleted()
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
 
-	// Update backup status in cluster conditions
-	if errCond := manager.UpdateCondition(ctx, b.Client,
-		b.Cluster, BuildBackupCondition(nil)); errCond != nil {
-		b.Log.Error(errCond, "Error status.UpdateCondition()")
+	// Update backup status in cluster conditions on backup completion
+	condition = metav1.Condition{
+		Type:    string(apiv1.ConditionBackup),
+		Status:  metav1.ConditionTrue,
+		Reason:  "LastBackupSucceeded",
+		Message: "Backup has successful",
+	}
+	if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, condition); condErr != nil {
+		b.Log.Error(condErr, "Error status.UpdateCondition()")
 	}
 
 	// Delete backups per policy
@@ -445,22 +464,4 @@ func (b *BackupCommand) updateCompletedBackupStatus(backupList *catalog.Catalog)
 	backupStatus.EndWal = latestBackup.EndWal
 	backupStatus.BeginLSN = latestBackup.BeginLSN
 	backupStatus.EndLSN = latestBackup.EndLSN
-}
-
-// BuildBackupCondition build a backup conditions
-func BuildBackupCondition(err error) *apiv1.ClusterCondition {
-	if err != nil {
-		return &apiv1.ClusterCondition{
-			Type:    apiv1.ConditionBackup,
-			Status:  apiv1.ConditionFalse,
-			Reason:  "Last backup failed",
-			Message: err.Error(),
-		}
-	}
-	return &apiv1.ClusterCondition{
-		Type:    apiv1.ConditionBackup,
-		Status:  apiv1.ConditionTrue,
-		Reason:  "Last backup succeeded",
-		Message: "",
-	}
 }
