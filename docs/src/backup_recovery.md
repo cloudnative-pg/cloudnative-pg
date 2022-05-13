@@ -118,7 +118,7 @@ spec:
 
 !!! Note
     If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
-    add a label with key `cnpg.io/reload` to the secrets/configMaps. Otherwise you will have to reload
+    add a label with key `cnpg.io/reload` to the Secrets/ConfigMaps. Otherwise, you will have to reload
     the instances using the `kubectl cnpg reload` subcommand.
 
 ### MinIO Gateway
@@ -633,10 +633,10 @@ taking backups if configured to do so.
     A cluster with the same `barmanObjectStore` reused for recovery and backup
     will generate a validation error: `spec.backup.barmanObjectStore: Invalid value: …`
 
-For example, the section below could be part of a manifest for a cluster
-bootstrapping from cluster `cluster-example-backup`, and would create a
+For example, the section below could be part of a manifest for a Cluster
+bootstrapping from Cluster `cluster-example-backup`, and would create a
 new folder in the storage bucket named `recoveredCluster` where the base backups
-and WALs of the recovered cluster would be stored.
+and WAL's of the recovered cluster would be stored.
 
 ``` yaml
   backup:
