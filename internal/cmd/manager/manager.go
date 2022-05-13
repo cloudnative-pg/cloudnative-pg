@@ -28,6 +28,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -134,36 +136,20 @@ func customDestination(in *zap.Options) {
 	in.DestWriter = logStream
 }
 
-// UpdateCondition will allow instance manager to update a particular condition
-// if the condition was already updated in the correct state then this is a no-op
-func UpdateCondition(ctx context.Context, c client.Client,
-	cluster *apiv1.Cluster, condition *apiv1.ClusterCondition,
+// UpdateCondition will allow update a particular condition in cluster status.
+func UpdateCondition(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	condition metav1.Condition,
 ) error {
-	if cluster == nil && condition == nil {
-		// if cluster or condition is nil nothing to do here.
-		return nil
-	}
-
-	oriCluster := cluster.DeepCopy()
-	var exCondition *apiv1.ClusterCondition
-	for i, c := range cluster.Status.Conditions {
-		if c.Type == condition.Type {
-			exCondition = &cluster.Status.Conditions[i]
-			cluster.Status.Conditions[i] = *condition
-			break
-		}
-	}
-	// If existing condition is not found add
-	if exCondition == nil {
-		cluster.Status.Conditions = append(cluster.Status.Conditions, *condition)
-	}
-
-	if !reflect.DeepEqual(oriCluster.Status, cluster.Status) {
+	existingCluster := cluster.DeepCopy()
+	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
+	if !reflect.DeepEqual(existingCluster.Status, cluster.Status) {
 		// To avoid conflict using patch instead of update
-		if err := c.Status().Patch(ctx, cluster, client.MergeFrom(oriCluster)); err != nil {
+		if err := c.Status().Patch(ctx, cluster, client.MergeFrom(existingCluster)); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
