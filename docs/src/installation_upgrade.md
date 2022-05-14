@@ -25,7 +25,7 @@ kubectl get deploy -n cnpg-system cnpg-controller-manager
 
 ### Using the Helm Chart
 
-The operator can be installed using the provided [Helm chart](https://github.com/cloudnative-pg/cloudnative-pg-helm).
+The operator can be installed using the provided [Helm chart](https://github.com/cloudnative-pg/charts).
 
 
 ## Details about the deployment
