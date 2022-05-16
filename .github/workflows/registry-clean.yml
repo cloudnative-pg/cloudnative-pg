@@ -1,7 +1,6 @@
 name: clean-testing-package
 
 on:
-  push:
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * *'
@@ -22,6 +21,7 @@ jobs:
           keep-at-least: 1
           account-type: org
           org-name: cloudnative-pg
+          # use the GITHUB_TOKEN when issue https://github.com/snok/container-retention-policy/issues/27 is fixed
           token: ${{ secrets.REPO_GHA_PAT }}
       - name: Delete '-testing' images for containers
         uses: snok/container-retention-policy@v1
@@ -31,4 +31,5 @@ jobs:
           keep-at-least: 1
           account-type: org
           org-name: cloudnative-pg
+          # use the GITHUB_TOKEN when issue https://github.com/snok/container-retention-policy/issues/27 is fixed
           token: ${{ secrets.REPO_GHA_PAT }}
