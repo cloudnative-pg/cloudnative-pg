@@ -87,7 +87,7 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 
 		By("verifying current leader", func() {
 			// Check for the current Operator Pod leader from ConfigMap
-			Expect(testsUtils.GetLeaderInfoFromConfigMap(operatorNamespace, env)).To(HavePrefix(operatorPodName.GetName()))
+			Expect(testsUtils.GetLeaderInfoFromLease(operatorNamespace, env)).To(HavePrefix(operatorPodName.GetName()))
 		})
 
 		By("scale up operator replicas to 3", func() {
@@ -117,7 +117,7 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 		By("verifying leader information after scale up", func() {
 			// Check for Operator Pod leader from ConfigMap to be the former one
 			Eventually(func() (string, error) {
-				return testsUtils.GetLeaderInfoFromConfigMap(operatorNamespace, env)
+				return testsUtils.GetLeaderInfoFromLease(operatorNamespace, env)
 			}, 60).Should(HavePrefix(oldLeaderPodName))
 		})
 
@@ -145,7 +145,7 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 		By("new leader should be configured", func() {
 			// Verify that the leader name is different from the previous one
 			Eventually(func() (string, error) {
-				return testsUtils.GetLeaderInfoFromConfigMap(operatorNamespace, env)
+				return testsUtils.GetLeaderInfoFromLease(operatorNamespace, env)
 			}, 120).ShouldNot(HavePrefix(oldLeaderPodName))
 		})
 
@@ -200,7 +200,7 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 
 			// Verify the Operator Pod is the leader
 			Eventually(func() (string, error) {
-				return testsUtils.GetLeaderInfoFromConfigMap(operatorNamespace, env)
+				return testsUtils.GetLeaderInfoFromLease(operatorNamespace, env)
 			}, 120).Should(HavePrefix(operatorPodName.GetName()))
 		})
 	})
