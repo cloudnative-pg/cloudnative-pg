@@ -113,6 +113,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
       -
+        name: Publish Krew
+        uses: rajatjindal/krew-release-bot@v0.0.43
+        with:
+          krew_template_file: dist/cnpg.yaml
+      -
         name: Docker meta
         id: docker-meta
         uses: docker/metadata-action@v4
