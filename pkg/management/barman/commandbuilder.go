@@ -84,16 +84,25 @@ func appendCloudProviderOptions(
 				"aws-s3")
 		}
 	case azureCredentials:
+		//nolint: nestif
 		if capabilities.HasAzure {
 			options = append(
 				options,
 				"--cloud-provider",
 				"azure-blob-storage")
 			if azureInheritFromAzureAD {
-				options = append(
-					options,
-					"--credential",
-					"managed-identity")
+				if capabilities.HasAzureManagedIdentity {
+					options = append(
+						options,
+						"--credential",
+						"managed-identity")
+				} else {
+					err := fmt.Errorf(
+						"barman >= 2.18 is required to use azureInheritFromAzureAD, current: %v",
+						capabilities.Version)
+					log.Error(err, "Barman version not supported")
+					return nil, err
+				}
 			}
 		} else {
 			err := fmt.Errorf(

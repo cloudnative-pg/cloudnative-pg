@@ -31,5 +31,6 @@ type Capabilities struct {
 	HasCheckWalArchive         bool
 	HasSnappy                  bool
 	HasErrorCodesForWALRestore bool
+	HasAzureManagedIdentity    bool
 	Version                    *semver.Version
 }
