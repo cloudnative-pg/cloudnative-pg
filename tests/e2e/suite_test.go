@@ -27,6 +27,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/onsi/ginkgo/v2/types"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -96,6 +97,9 @@ func TestE2ESuite(t *testing.T) {
 // If either of those things happened, the test will fail, and all subsequent
 // tests will be SKIPPED, as they would always fail in this node.
 var _ = AfterEach(func() {
+	if CurrentSpecReport().State.Is(types.SpecStateSkipped) {
+		return
+	}
 	labelsForTestsBreakingTheOperator := []string{"upgrade", "disruptive"}
 	breakingLabelsInCurrentTest := funk.Join(CurrentSpecReport().Labels(),
 		labelsForTestsBreakingTheOperator, funk.InnerJoin)
