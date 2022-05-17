@@ -29,6 +29,8 @@ builds:
     - linux
   goarch:
     - amd64
+    - arm64
+    - arm
 
 - id: kubectl-cnpg
   binary: kubectl-cnpg
