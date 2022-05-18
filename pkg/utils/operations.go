@@ -91,8 +91,13 @@ func isResourceListSubset(resourceList, subResourceList corev1.ResourceList) boo
 }
 
 // IsLabelSubset checks if a label map is a subset of another
-func IsLabelSubset(mapSet map[string]string, mapSubset map[string]string, configuration *config.Data) bool {
+func IsLabelSubset(mapSet map[string]string, mapSubset map[string]string, configuration *config.Data,
+	fixedLabels map[string]string,
+) bool {
 	mapToEvaluate := map[string]string{}
+	for key, value := range fixedLabels {
+		mapToEvaluate[key] = value
+	}
 	for key, value := range mapSubset {
 		if configuration.IsLabelInherited(key) {
 			mapToEvaluate[key] = value
@@ -103,8 +108,13 @@ func IsLabelSubset(mapSet map[string]string, mapSubset map[string]string, config
 }
 
 // IsAnnotationSubset checks if an annotation map is a subset of another
-func IsAnnotationSubset(mapSet map[string]string, mapSubset map[string]string, configuration *config.Data) bool {
+func IsAnnotationSubset(mapSet map[string]string, mapSubset map[string]string, configuration *config.Data,
+	fixedAnnotations map[string]string,
+) bool {
 	mapToEvaluate := map[string]string{}
+	for key, value := range fixedAnnotations {
+		mapToEvaluate[key] = value
+	}
 	for key, value := range mapSubset {
 		if configuration.IsAnnotationInherited(key) {
 			mapToEvaluate[key] = value
