@@ -65,7 +65,7 @@ Features:
 - Ability to inherit an AWS IAM Role as an alternative way to provide
   credentials for the S3 object storage
 - Support for Opaque secrets for Pooler’s authQuerySecret and certificates
-- Updated default PostgreSQL version to 14.2
+- Updated default PostgreSQL version to 14.3
 - Add a new command to `kubectl cnp` plugin named `maintenance` to set
   maintenance window to cluster(s) in one or all namespaces across the Kubernetes
   cluster
@@ -320,7 +320,7 @@ Features:
 - Drop support for deprecated API version
   `postgresql.cnpg.io/v1alpha1` on the `Cluster`, `Backup`, and
   `ScheduledBackup` kinds
-- Set default operand image to PostgreSQL 14.2
+- Set default operand image to PostgreSQL 14.3
 
 Security:
 
