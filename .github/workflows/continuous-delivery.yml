@@ -358,7 +358,7 @@ jobs:
         run: |
           # Keep in mind that adding more platforms (architectures) will increase the building
           # time even if we use the ghcache for the building process.
-          platforms="linux/amd64"
+          platforms="linux/amd64,linux/arm64,linux/arm/v7"
           echo "::set-output name=platforms::${platforms}"
       -
         name: Set up QEMU
