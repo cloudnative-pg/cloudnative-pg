@@ -55,8 +55,13 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 			Name:      clusterName,
 		}
 		cluster := &apiv1.Cluster{}
-		err := env.Client.Get(env.Ctx, namespacedName, cluster)
-		Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
+
+		Eventually(func(g Gomega) bool {
+			err := env.Client.Get(env.Ctx, namespacedName, cluster)
+			g.Expect(err).To(BeNil())
+			return cluster.Status.CurrentPrimary == cluster.Status.TargetPrimary
+		}).Should(BeTrue())
+
 		oldPrimary = cluster.Status.CurrentPrimary
 
 		// Gather pod names
@@ -199,8 +204,9 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 		// the cluster status should be in healthy state
 		cluster := &apiv1.Cluster{}
 
-		err := env.Client.Get(env.Ctx, namespacedName, cluster)
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			return env.Client.Get(env.Ctx, namespacedName, cluster)
+		}).Should(BeNil())
 
 		Eventually(func() (string, error) {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -228,8 +234,10 @@ func AssertClusterDefault(namespace string, clusterName string,
 		// amount of instances defined in the cluster and
 		// the cluster status should be in healthy state
 		cluster := &apiv1.Cluster{}
-		err := env.Client.Get(env.Ctx, namespacedName, cluster)
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			return env.Client.Get(env.Ctx, namespacedName, cluster)
+		}).Should(BeNil())
+
 		validationErr := cluster.Validate()
 		if isExpectedToDefault {
 			Expect(len(validationErr)).Should(BeZero())
@@ -262,13 +270,14 @@ func AssertUpdateSecret(field string, value string, secretName string, namespace
 	clusterName string, timeout int, env *testsUtils.TestingEnvironment,
 ) {
 	var secret corev1.Secret
-	err := env.Client.Get(env.Ctx,
-		ctrlclient.ObjectKey{Namespace: namespace, Name: secretName},
-		&secret)
-	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() error {
+		return env.Client.Get(env.Ctx,
+			ctrlclient.ObjectKey{Namespace: namespace, Name: secretName},
+			&secret)
+	}).Should(BeNil())
 
 	secret.Data[field] = []byte(value)
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return env.Client.Update(env.Ctx, &secret)
 	})
 	Expect(err).ToNot(HaveOccurred())
@@ -847,13 +856,14 @@ func AssertFastFailOver(
 		commandTimeout := time.Second * 5
 		primaryPodName := clusterName + "-1"
 		primaryPod := &corev1.Pod{}
-		primaryPodNamespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      primaryPodName,
-		}
 
-		err = env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func(g Gomega) error {
+			return env.Client.Get(env.Ctx, types.NamespacedName{
+				Namespace: namespace,
+				Name:      primaryPodName,
+			}, primaryPod)
+		}).Should(BeNil())
+
 		_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		Expect(err).ToNot(HaveOccurred())
@@ -1650,8 +1660,9 @@ func assertReadWriteConnectionUsingPgBouncerService(
 		Namespace: namespace,
 		Name:      podName,
 	}
-	err = env.Client.Get(env.Ctx, namespacedName, pod)
-	Expect(err).ToNot(HaveOccurred())
+	Eventually(func(g Gomega) error {
+		return env.Client.Get(env.Ctx, namespacedName, pod)
+	}).Should(BeNil())
 
 	// Get the app user password from the -app secret
 	appSecretName := clusterName + "-app"
@@ -1660,8 +1671,11 @@ func assertReadWriteConnectionUsingPgBouncerService(
 		Namespace: namespace,
 		Name:      appSecretName,
 	}
-	err = env.Client.Get(env.Ctx, appSecretNamespacedName, appSecret)
-	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func(g Gomega) error {
+		return env.Client.Get(env.Ctx, appSecretNamespacedName, appSecret)
+	}).Should(BeNil())
+
 	generatedAppUserPassword := string(appSecret.Data["password"])
 	AssertConnection(poolerServiceName, "app", "app", generatedAppUserPassword, *pod, 180, env)
 
@@ -1727,8 +1741,9 @@ func assertDeploymentIsRecreated(namespace, poolerSampleFile string) {
 		Name:      poolerName,
 	}
 	deployment := &appsv1.Deployment{}
-	err = env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
-	Expect(err).ToNot(HaveOccurred())
+	Eventually(func(g Gomega) error {
+		return env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
+	}).Should(BeNil())
 	err = testsUtils.DeploymentWaitForReady(env, deployment, 60)
 	Expect(err).ToNot(HaveOccurred())
 	deploymentName := deployment.GetName()
@@ -1787,8 +1802,10 @@ func assertPGBouncerEndpointsContainsPodsIP(
 	endpoint := &corev1.Endpoints{}
 	endpointName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
-	err = env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: endpointName}, endpoint)
-	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func(g Gomega) error {
+		return env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: endpointName}, endpoint)
+	}).Should(BeNil())
 
 	poolerName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
@@ -1958,8 +1975,9 @@ func DeleteTableUsingPgBouncerService(
 		Namespace: namespace,
 		Name:      podName,
 	}
-	err = env.Client.Get(env.Ctx, namespacedName, pod)
-	Expect(err).ToNot(HaveOccurred())
+	Eventually(func(g Gomega) error {
+		return env.Client.Get(env.Ctx, namespacedName, pod)
+	}).Should(BeNil())
 
 	// Get the app user password from the -app secret
 	appSecretName := clusterName + "-app"
@@ -1968,8 +1986,10 @@ func DeleteTableUsingPgBouncerService(
 		Namespace: namespace,
 		Name:      appSecretName,
 	}
-	err = env.Client.Get(env.Ctx, appSecretNamespacedName, appSecret)
-	Expect(err).ToNot(HaveOccurred())
+	Eventually(func(g Gomega) error {
+		return env.Client.Get(env.Ctx, appSecretNamespacedName, appSecret)
+	}).Should(BeNil())
+
 	generatedAppUserPassword := string(appSecret.Data["password"])
 	AssertConnection(poolerServiceName, "app", "app", generatedAppUserPassword, *pod, 180, env)
 
