@@ -285,7 +285,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 		Reason:  "BackupStarted",
 		Message: "New Backup starting up",
 	}
-	if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, condition); condErr != nil {
+	if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, &condition); condErr != nil {
 		b.Log.Error(condErr, "Error status.UpdateCondition()")
 	}
 
@@ -311,7 +311,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 			Reason:  "LastBackupFailed",
 			Message: err.Error(),
 		}
-		if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, condition); condErr != nil {
+		if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, &condition); condErr != nil {
 			b.Log.Error(condErr, "Error status.UpdateConditionInClusterStatus()")
 		}
 		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
@@ -332,7 +332,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 		Reason:  "LastBackupSucceeded",
 		Message: "Backup has successful",
 	}
-	if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, condition); condErr != nil {
+	if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, &condition); condErr != nil {
 		b.Log.Error(condErr, "Error status.UpdateCondition()")
 	}
 

@@ -177,7 +177,7 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 			Reason:  "ContinuousArchivingFailing",
 			Message: err.Error(),
 		}
-		if errCond := manager.UpdateCondition(ctx, client, cluster, condition); errCond != nil {
+		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
 			log.Error(errCond, "Error status.UpdateCondition()")
 		}
 		return err
@@ -202,7 +202,7 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 		Reason:  "ContinuousArchivingSuccess",
 		Message: "Continuous archiving is working",
 	}
-	if errCond := manager.UpdateCondition(ctx, client, cluster, condition); errCond != nil {
+	if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
 		log.Error(errCond, "Error status.UpdateCondition()")
 	}
 	// We return only the first error to PostgreSQL, because the first error
@@ -367,7 +367,7 @@ func checkWalArchive(ctx context.Context,
 			Reason:  "ContinuousArchivingIsFailing",
 			Message: err.Error(),
 		}
-		if errCond := manager.UpdateCondition(ctx, client, cluster, condition); errCond != nil {
+		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
 			log.Error(errCond, "Error status.UpdateCondition()")
 		}
 		return err
@@ -386,7 +386,7 @@ func checkWalArchive(ctx context.Context,
 			Reason:  "ContinuousArchivingIsFailing",
 			Message: err.Error(),
 		}
-		if errCond := manager.UpdateCondition(ctx, client, cluster, condition); errCond != nil {
+		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
 			log.Error(errCond, "Error status.UpdateCondition()")
 		}
 		return err
