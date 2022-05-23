@@ -141,15 +141,20 @@ func UpdateCondition(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	condition metav1.Condition,
+	condition *metav1.Condition,
 ) error {
+	if cluster == nil || condition == nil {
+		return nil
+	}
 	existingCluster := cluster.DeepCopy()
-	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
-	if !reflect.DeepEqual(existingCluster.Status, cluster.Status) {
+	meta.SetStatusCondition(&cluster.Status.Conditions, *condition)
+
+	if !reflect.DeepEqual(existingCluster.Status.Conditions, cluster.Status.Conditions) {
 		// To avoid conflict using patch instead of update
 		if err := c.Status().Patch(ctx, cluster, client.MergeFrom(existingCluster)); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }

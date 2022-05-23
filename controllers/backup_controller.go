@@ -235,7 +235,7 @@ func StartBackup(
 			Reason:  "LastBackupFailed",
 			Message: err.Error(),
 		}
-		if errCond := manager.UpdateCondition(ctx, client, cluster, condition); errCond != nil {
+		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
 			log.FromContext(ctx).Error(errCond, "Error while updating conditions")
 		}
 		return postgres.UpdateBackupStatusAndRetry(ctx, client, backup)
