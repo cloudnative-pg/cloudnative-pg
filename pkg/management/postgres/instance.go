@@ -17,6 +17,7 @@ limitations under the License.
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -37,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -447,10 +449,23 @@ func (instance Instance) WithActiveInstance(inner func() error) error {
 	if err != nil {
 		return fmt.Errorf("while activating instance: %w", err)
 	}
+
+	// Start the CSV logpipe to redirect log to stdout
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	csvPipe := logpipe.NewLogPipe()
+
+	go func() {
+		if err := csvPipe.Start(ctx); err != nil {
+			log.Info("csv pipeline encountered an error", "err", err)
+		}
+	}()
+
 	defer func() {
 		if err := instance.Shutdown(DefaultShutdownOptions); err != nil {
 			log.Info("Error while deactivating instance", "err", err)
 		}
+		ctxCancel()
+		csvPipe.GetExitedCondition().Wait()
 	}()
 
 	return inner()
