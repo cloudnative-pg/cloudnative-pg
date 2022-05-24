@@ -313,8 +313,8 @@ enhances:
 
 **Is there an upper limit in database size for not considering Kubernetes?**
 
-Theoretically? No. Kubernetes is no different from virtual machines and
-bare metal as far as this is regarded.
+No, as Kubernetes is no different from virtual machines and bare metal as far
+as this is regarded.
 Practically, however, it depends on the available resources of your Kubernetes
 cluster. Our advice with very large databases (VLDB) is to consider a shared
 nothing architecture, where a Kubernetes worker node is dedicated to a single
