@@ -239,7 +239,7 @@ func AssertClusterDefault(namespace string, clusterName string,
 		cluster := &apiv1.Cluster{}
 		Eventually(func(g Gomega) {
 			err := env.Client.Get(env.Ctx, namespacedName, cluster)
-			Expect(err).ToNot(HaveOccurred())
+			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
 
 		validationErr := cluster.Validate()
@@ -278,7 +278,7 @@ func AssertUpdateSecret(field string, value string, secretName string, namespace
 		err := env.Client.Get(env.Ctx,
 			ctrlclient.ObjectKey{Namespace: namespace, Name: secretName},
 			&secret)
-		Expect(err).ToNot(HaveOccurred())
+		g.Expect(err).ToNot(HaveOccurred())
 	}).Should(Succeed())
 
 	secret.Data[field] = []byte(value)
@@ -867,7 +867,7 @@ func AssertFastFailOver(
 				Namespace: namespace,
 				Name:      primaryPodName,
 			}, primaryPod)
-			Expect(err).ToNot(HaveOccurred())
+			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
 
 		_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
@@ -1668,7 +1668,7 @@ func assertReadWriteConnectionUsingPgBouncerService(
 	}
 	Eventually(func(g Gomega) {
 		err := env.Client.Get(env.Ctx, namespacedName, pod)
-		Expect(err).ToNot(HaveOccurred())
+		g.Expect(err).ToNot(HaveOccurred())
 	}).Should(Succeed())
 
 	// Get the app user password from the -app secret
@@ -1681,7 +1681,7 @@ func assertReadWriteConnectionUsingPgBouncerService(
 
 	Eventually(func(g Gomega) {
 		err := env.Client.Get(env.Ctx, appSecretNamespacedName, appSecret)
-		Expect(err).ToNot(HaveOccurred())
+		g.Expect(err).ToNot(HaveOccurred())
 	}).Should(Succeed())
 
 	generatedAppUserPassword := string(appSecret.Data["password"])
@@ -1751,7 +1751,7 @@ func assertDeploymentIsRecreated(namespace, poolerSampleFile string) {
 	deployment := &appsv1.Deployment{}
 	Eventually(func(g Gomega) {
 		err := env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
-		Expect(err).ToNot(HaveOccurred())
+		g.Expect(err).ToNot(HaveOccurred())
 	}).Should(Succeed())
 	err = testsUtils.DeploymentWaitForReady(env, deployment, 60)
 	Expect(err).ToNot(HaveOccurred())
@@ -1814,7 +1814,7 @@ func assertPGBouncerEndpointsContainsPodsIP(
 
 	Eventually(func(g Gomega) {
 		err := env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: endpointName}, endpoint)
-		Expect(err).ToNot(HaveOccurred())
+		g.Expect(err).ToNot(HaveOccurred())
 	}).Should(Succeed())
 
 	poolerName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
@@ -1987,7 +1987,7 @@ func DeleteTableUsingPgBouncerService(
 	}
 	Eventually(func(g Gomega) {
 		err := env.Client.Get(env.Ctx, namespacedName, pod)
-		Expect(err).ToNot(HaveOccurred())
+		g.Expect(err).ToNot(HaveOccurred())
 	}).Should(Succeed())
 
 	// Get the app user password from the -app secret
@@ -1999,7 +1999,7 @@ func DeleteTableUsingPgBouncerService(
 	}
 	Eventually(func(g Gomega) {
 		err := env.Client.Get(env.Ctx, appSecretNamespacedName, appSecret)
-		Expect(err).ToNot(HaveOccurred())
+		g.Expect(err).ToNot(HaveOccurred())
 	}).Should(Succeed())
 
 	generatedAppUserPassword := string(appSecret.Data["password"])
