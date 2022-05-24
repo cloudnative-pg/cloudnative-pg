@@ -85,7 +85,13 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 	if !shouldRestart {
 		return false, nil
 	}
-
+	// usually PendingRestartForDecrease status changed in instance reconcile and primary
+	// pod reach to this location has no pending restart for decrease.
+	// but sometime, the instance reconcile to handle the pending restart for decrease is slower
+	// than cluster reconcile, which will leads to switchover first.
+	if primaryPostgresqlStatus.IsPrimary && primaryPostgresqlStatus.PendingRestartForDecrease {
+		return false, nil
+	}
 	// we need to check whether a manual switchover is required
 	primaryPod := primaryPostgresqlStatus.Pod
 	contextLogger = contextLogger.WithValues("primaryPod", primaryPod.Name)
