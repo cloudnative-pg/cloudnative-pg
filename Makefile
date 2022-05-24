@@ -174,7 +174,7 @@ checks: generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint 
 
 licenses: go-licenses ## Generate the licenses folder.
 	# The following statement is expected to fail because our license is unrecognised
-	GOPRIVATE="https://github.com/EnterpriseDB/*" $(GO_LICENSES) \
+	$(GO_LICENSES) \
 		save github.com/cloudnative-pg/cloudnative-pg \
 		--save_path licenses/go-licenses --force || true
 	chmod a+rw -R licenses/go-licenses
