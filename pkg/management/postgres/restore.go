@@ -663,8 +663,9 @@ func (info InitInfo) configureApplicationForRestoredInstance(instance *Instance)
 	}
 
 	var existsRole bool
-	row := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = '%s'",
-		info.ApplicationUser))
+	row := db.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
+		info.ApplicationUser)
+
 	err = row.Scan(&existsRole)
 	if err != nil {
 		return err
@@ -682,9 +683,9 @@ func (info InitInfo) configureApplicationForRestoredInstance(instance *Instance)
 	}
 
 	var dbName, roleName string
-	row = db.QueryRow(fmt.Sprintf("SELECT datname, rolname FROM pg_database AS db, "+
-		"pg_roles AS roles WHERE db.datname = '%s' AND db.datdba = roles.oid",
-		info.ApplicationDatabase))
+	row = db.QueryRow("SELECT datname, rolname FROM pg_database AS db, "+
+		"pg_roles AS roles WHERE db.datname = $1 AND db.datdba = roles.oid",
+		info.ApplicationDatabase)
 
 	err = row.Scan(&dbName, &roleName)
 	if err != nil {
@@ -702,15 +703,9 @@ func (info InitInfo) configureApplicationForRestoredInstance(instance *Instance)
 			return err
 		}
 	}
-	// if existed application database owner is different from the one defined in --app-user
-	// change the database owner to value of --app-user
+
 	if roleName != info.ApplicationUser {
-		_, err := db.Exec(fmt.Sprintf("ALTER DATABASE %v OWNER TO %v",
-			pq.QuoteIdentifier(info.ApplicationDatabase),
-			pq.QuoteIdentifier(info.ApplicationUser)))
-		if err != nil {
-			return err
-		}
+		return fmt.Errorf("the specified database restored isn't owned by the provided user")
 	}
 
 	return nil
