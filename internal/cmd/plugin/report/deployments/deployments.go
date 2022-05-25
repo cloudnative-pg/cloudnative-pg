@@ -20,15 +20,25 @@ package deployments
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-const labelOperatorName = "cloudnative-pg"
+const (
+	webhookSecretName       = "cnpg-webhook-cert"              // #nosec
+	caSecretName            = "cnpg-ca-secret"                 // #nosec
+	defaultConfigSecretName = "cnpg-controller-manager-config" // #nosec
+	defaultConfigmapName    = "cnpg-controller-manager-config"
+	labelOperatorName       = "cloudnative-pg"
+)
 
 // GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
 func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
@@ -91,4 +101,135 @@ func GetOperatorNamespaceName(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return deployment.GetNamespace(), err
+}
+
+// GetOperatorSecrets returns the secrets used by the operator
+func GetOperatorSecrets(ctx context.Context) ([]corev1.Secret, error) {
+	contextLogger := log.FromContext(ctx)
+
+	operatorNamespace, err := GetOperatorNamespaceName(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// default secrets name
+	secretNames := []string{
+		webhookSecretName,
+		caSecretName,
+	}
+	// get the operator config secrets name from deployment
+	configSecretName, err := getOperatorConfigSecretName(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if configSecretName != "" {
+		secretNames = append(secretNames, configSecretName)
+	} else {
+		secretNames = append(secretNames, defaultConfigSecretName)
+	}
+	secrets := make([]corev1.Secret, 0, len(secretNames))
+	for _, ss := range secretNames {
+		var secret corev1.Secret
+
+		err := plugin.Client.Get(ctx, types.NamespacedName{Name: ss, Namespace: operatorNamespace}, &secret)
+		if errors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			contextLogger.Warning("could not get secret")
+			return nil, err
+		}
+
+		secrets = append(secrets, secret)
+	}
+	return secrets, nil
+}
+
+// GetOperatorConfigMaps returns the configmap referenced by the operator
+func GetOperatorConfigMaps(ctx context.Context) ([]corev1.ConfigMap, error) {
+	contextLogger := log.FromContext(ctx)
+
+	var configMaps []string
+	operatorNamespace, err := GetOperatorNamespaceName(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// get the operator configmap name from deployment
+	configMapName, err := getOperatorConfigMapName(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if configMapName != "" {
+		configMaps = append(configMaps, configMapName)
+	} else {
+		configMaps = append(configMaps, defaultConfigmapName)
+	}
+	configs := make([]corev1.ConfigMap, 0, len(configMaps))
+	for _, cm := range configMaps {
+		var config corev1.ConfigMap
+		err := plugin.Client.Get(ctx, types.NamespacedName{Name: cm, Namespace: operatorNamespace}, &config)
+		if errors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			contextLogger.Warning("could not get secret")
+			return nil, err
+		}
+		configs = append(configs, config)
+	}
+	return configs, nil
+}
+
+// getOperatorConfigMapName return the name of configmap for operator configuration
+func getOperatorConfigMapName(ctx context.Context) (string, error) {
+	const configMapArgPrefix = "--config-map-name="
+	deployment, err := GetOperatorDeployment(ctx)
+	if err != nil {
+		return "", err
+	}
+	container := getManagerContainer(deployment)
+	if container == nil {
+		err = fmt.Errorf("can not find manager container from deployment")
+		return "", err
+	}
+	var configMapName string
+	for _, arg := range container.Args {
+		if strings.HasPrefix(arg, configMapArgPrefix) {
+			configMapName = strings.Split(arg, "=")[1]
+			break
+		}
+	}
+	return configMapName, nil
+}
+
+// getOperatorConfigSecretName return the name of secret for operator configuration
+func getOperatorConfigSecretName(ctx context.Context) (string, error) {
+	const secretArgPrefix = "--secret-name="
+	deployment, err := GetOperatorDeployment(ctx)
+	if err != nil {
+		return "", err
+	}
+	container := getManagerContainer(deployment)
+	if container == nil {
+		err = fmt.Errorf("can not find manager container from deployment")
+		return "", err
+	}
+	var secretName string
+	for _, arg := range container.Args {
+		if strings.HasPrefix(arg, secretArgPrefix) {
+			secretName = strings.Split(arg, "=")[1]
+			break
+		}
+	}
+	return secretName, nil
+}
+
+// getManagerContainer get the running container from the deployment spec
+func getManagerContainer(deployment appsv1.Deployment) *corev1.Container {
+	const managerContainerName = "manager"
+	for _, c := range deployment.Spec.Template.Spec.Containers {
+		if c.Name == managerContainerName {
+			return &c
+		}
+	}
+	return nil
 }
