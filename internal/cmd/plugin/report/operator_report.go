@@ -121,12 +121,12 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 		secrets = append(secrets, namedObject{Name: ss.Name + "(secret)", Object: secretRedactor(ss)})
 	}
 
-	opeartorConfigMaps, err := deployments.GetOperatorConfigMaps(ctx)
+	operatorConfigMaps, err := deployments.GetOperatorConfigMaps(ctx)
 	if err != nil {
 		return fmt.Errorf("could not get operator configmap: %w", err)
 	}
-	configs := make([]namedObject, 0, len(opeartorConfigMaps))
-	for _, cm := range opeartorConfigMaps {
+	configs := make([]namedObject, 0, len(operatorConfigMaps))
+	for _, cm := range operatorConfigMaps {
 		configs = append(configs, namedObject{Name: cm.Name, Object: configMapRedactor(cm)})
 	}
 
