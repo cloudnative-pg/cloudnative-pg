@@ -30,8 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lib/pq"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -576,7 +574,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 
 	// Configure the application database information for restored instance
 	return instance.WithActiveInstance(func() error {
-		err = info.configureApplicationForRestoredInstance(instance)
+		err = info.ConfigureNewInstance(instance)
 		if err != nil {
 			return fmt.Errorf("while configuring restored instance: %w", err)
 		}
@@ -653,60 +651,4 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 
 		return nil
 	})
-}
-
-// configureApplicationForRestoredInstance configure the application database for the restored instance
-func (info InitInfo) configureApplicationForRestoredInstance(instance *Instance) error {
-	db, err := instance.GetSuperUserDB()
-	if err != nil {
-		return fmt.Errorf("while getting superuser database: %w", err)
-	}
-
-	var existsRole bool
-	row := db.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
-		info.ApplicationUser)
-
-	err = row.Scan(&existsRole)
-	if err != nil {
-		return err
-	}
-	if !existsRole {
-		// create the user if it does not exist
-		_, err := db.Exec(fmt.Sprintf("CREATE USER %v",
-			pq.QuoteIdentifier(info.ApplicationUser)))
-		if err != nil {
-			log.Error(
-				err,
-				"create role error")
-			return err
-		}
-	}
-
-	var dbName, roleName string
-	row = db.QueryRow("SELECT datname, rolname FROM pg_database AS db, "+
-		"pg_roles AS roles WHERE db.datname = $1 AND db.datdba = roles.oid",
-		info.ApplicationDatabase)
-
-	err = row.Scan(&dbName, &roleName)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// create the application database and set owner to the user
-			_, err := db.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
-				pq.QuoteIdentifier(info.ApplicationDatabase),
-				pq.QuoteIdentifier(info.ApplicationUser)))
-			if err != nil {
-				log.Error(err, "create database error")
-				return err
-			}
-		} else {
-			log.Error(err, "scan rows error")
-			return err
-		}
-	}
-
-	if roleName != info.ApplicationUser {
-		return fmt.Errorf("the specified database restored isn't owned by the provided user")
-	}
-
-	return nil
 }
