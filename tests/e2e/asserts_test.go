@@ -1225,7 +1225,7 @@ func AssertStorageCredentialsAreCreatedOnAzurite(namespace string) {
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
+func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableName string) {
 	restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -1265,6 +1265,34 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
 		const newPassword = "eeh2Zahohx"                  //nolint:gosec
 		AssertUpdateSecret("password", newPassword, secretName, namespace, restoredClusterName, 30, env)
 		AssertApplicationDatabaseConnection(namespace, restoredClusterName, "appuser", "appdb", newPassword, secretName)
+	})
+}
+
+func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
+	restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
+	Expect(err).ToNot(HaveOccurred())
+
+	By("Restoring a backup in a new cluster", func() {
+		CreateResourceFromFile(namespace, restoreClusterFile)
+
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, restoredClusterName, 800, env)
+
+		// Test data should be present on restored primary
+		primary := restoredClusterName + "-1"
+		AssertDataExpectedCount(namespace, primary, tableName, 2)
+
+		// Restored primary should be on timeline 2
+		cmd := "psql -U postgres app -tAc 'select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)'"
+		out, _, err := testsUtils.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primary,
+			cmd))
+		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
+
+		// Restored standby should be attached to restored primary
+		assertClusterStandbysAreStreaming(namespace, restoredClusterName)
 	})
 }
 
@@ -1372,7 +1400,7 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 	})
 }
 
-func AssertClusterRestorePITR(namespace, clusterName, tableName, lsn string) {
+func AssertClusterRestorePITRWithApplicationDB(namespace, clusterName, tableName, lsn string) {
 	primaryInfo := &corev1.Pod{}
 	var err error
 	commandTimeout := time.Second * 5
@@ -1410,6 +1438,35 @@ func AssertClusterRestorePITR(namespace, clusterName, tableName, lsn string) {
 		const newPassword = "eeh2Zahohx" //nolint:gosec
 		AssertUpdateSecret("password", newPassword, secretName, namespace, clusterName, 30, env)
 		AssertApplicationDatabaseConnection(namespace, clusterName, "appuser", "appdb", newPassword, secretName)
+	})
+}
+
+func AssertClusterRestorePITR(namespace, clusterName, tableName, lsn string) {
+	primaryInfo := &corev1.Pod{}
+	var err error
+	commandTimeout := time.Second * 5
+
+	By("restoring a backup cluster with PITR in a new cluster", func() {
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, clusterName, 800, env)
+
+		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Restored primary should be on timeline 3
+		query := "select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)"
+		stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *primaryInfo, specs.PostgresContainerName,
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Trim(stdOut, "\n"), err).To(Equal(lsn))
+
+		// Restored standby should be attached to restored primary
+		Expect(testsUtils.CountReplicas(env, primaryInfo)).To(BeEquivalentTo(2))
+	})
+
+	By(fmt.Sprintf("after restored, 3rd entry should not be exists in table '%v'", tableName), func() {
+		// Only 2 entries should be present
+		AssertDataExpectedCount(namespace, primaryInfo.GetName(), tableName, 2)
 	})
 }
 

@@ -141,21 +141,6 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
 			AssertClusterIsReady(namespace, dstClusterName, 800, env)
 		})
 
-		By("checking the dst cluster with pre-defined app password connectable", func() {
-			const secretName = "postgresql-user-supplied-app" //nolint:gosec
-			// Get the app user password from the auto generated -app secret
-			const suppliedAppUserPassword = "4ls054f3" // NOSONAR
-			AssertApplicationDatabaseConnection(namespace, dstClusterName, "appuser", "app",
-				suppliedAppUserPassword, secretName)
-		})
-
-		By("update user application password for dst cluster and verify connectivity", func() {
-			const secretName = "postgresql-user-supplied-app" //nolint:gosec
-			const newPassword = "eeh2Zahohx"                  //nolint:gosec
-			AssertUpdateSecret("password", newPassword, secretName, namespace, dstClusterName, 30, env)
-			AssertApplicationDatabaseConnection(namespace, dstClusterName, "appuser", "app", newPassword, secretName)
-		})
-
 		By("checking data have been copied correctly", func() {
 			// Test data should be present on restored primary
 			out, _, err := utils.Run(fmt.Sprintf(

@@ -403,7 +403,6 @@ resource, the following considerations apply:
 from the backup that is being restored. The operator does not currently attempt 
 to back up the underlying secrets, as this is part of the usual maintenance
 activity of the Kubernetes cluster itself.
-- You can supp
 - In case you don't supply any `superuserSecret`, a new one is automatically
 generated with a secure and random password. The secret is then used to
 reset the password for the `postgres` user of the cluster.

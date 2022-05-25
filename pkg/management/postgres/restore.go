@@ -568,7 +568,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 		}
 	}
 
-	// if the application database or user are not specific
+	// if the application database or user are not specified
 	// we ignore the application database configuration
 	if info.ApplicationDatabase == "" || info.ApplicationUser == "" {
 		return nil

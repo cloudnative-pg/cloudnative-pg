@@ -108,8 +108,6 @@ func CreateClusterFromBackupUsingPITR(
 
 			Bootstrap: &apiv1.BootstrapConfiguration{
 				Recovery: &apiv1.BootstrapRecovery{
-					Database: "appdb",
-					Owner:    "appuser",
 					Backup: &apiv1.BackupSource{
 						LocalObjectReference: apiv1.LocalObjectReference{
 							Name: backupName,

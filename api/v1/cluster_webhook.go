@@ -49,9 +49,9 @@ const (
 	// DefaultMonitoringSecretName is the name of the target secret with the default monitoring queries,
 	// if configured
 	DefaultMonitoringSecretName = DefaultMonitoringConfigMapName
-	// DefaultApplicationDatabaseName is the name of application database if not specific
+	// DefaultApplicationDatabaseName is the name of application database if not specified
 	DefaultApplicationDatabaseName = "app"
-	// DefaultApplicationUserName is the name of application database owner if not specific
+	// DefaultApplicationUserName is the name of application database owner if not specified
 	DefaultApplicationUserName = DefaultApplicationDatabaseName
 )
 

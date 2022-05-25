@@ -228,7 +228,7 @@ var _ = Describe("Bootstrap via pg_basebackup", func() {
 		Expect(cluster.GetPgBaseBackupApplicationSecretName()).To(Equal("appSecret"))
 	})
 
-	It("will get default application secrets name if not specific", func() {
+	It("will get default application secrets name if not specified", func() {
 		cluster := Cluster{
 			ObjectMeta: v1.ObjectMeta{
 				Name: "clusterName",
