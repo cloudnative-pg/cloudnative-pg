@@ -1344,7 +1344,7 @@ func (cluster *Cluster) GetApplicationSecretName() string {
 
 	initDB := bootstrap.InitDB
 	if initDB != nil && initDB.Secret != nil && initDB.Secret.Name != "" {
-		return pgBaseBackup.Secret.Name
+		return initDB.Secret.Name
 	}
 
 	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
@@ -1614,8 +1614,8 @@ func (cluster *Cluster) ShouldPgBaseBackupCreateApplicationDatabase() bool {
 		return false
 	}
 
-	initDBParameters := cluster.Spec.Bootstrap.PgBaseBackup
-	return initDBParameters.Owner != "" && initDBParameters.Database != ""
+	pgBaseBackupParameters := cluster.Spec.Bootstrap.PgBaseBackup
+	return pgBaseBackupParameters.Owner != "" && pgBaseBackupParameters.Database != ""
 }
 
 // ShouldRecoveryCreateApplicationDatabase returns true if the application database needs to be created during the
@@ -1629,8 +1629,8 @@ func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
 		return false
 	}
 
-	initDBParameters := cluster.Spec.Bootstrap.Recovery
-	return initDBParameters.Owner != "" && initDBParameters.Database != ""
+	recoveryParameters := cluster.Spec.Bootstrap.Recovery
+	return recoveryParameters.Owner != "" && recoveryParameters.Database != ""
 }
 
 // GetPostgresUID returns the UID that is being used for the "postgres"

@@ -325,7 +325,7 @@ var _ = Describe("cluster configuration", func() {
 		Expect(cluster.Spec.Bootstrap.InitDB.Owner).To(Equal("appdb"))
 	})
 
-	It("defaults to creating an application database if recovery is used", func() {
+	It("defaults to not to create an application database if recovery is used", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{

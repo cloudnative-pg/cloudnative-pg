@@ -154,6 +154,7 @@ var _ = Describe("Bootstrap via initdb", func() {
 		}
 
 		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeTrue())
+		Expect(cluster.ShouldCreateApplicationSecret()).To(BeFalse())
 		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
 	})
 
@@ -164,6 +165,13 @@ var _ = Describe("Bootstrap via initdb", func() {
 			},
 		}
 		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeFalse())
+		Expect(cluster.ShouldCreateApplicationSecret()).To(BeFalse())
+
+		// InitDB is the default bootstrap method, and is triggered by
+		// the defaulting webhook if nothing else is specified by the user
+		cluster.Default()
+		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeTrue())
+		Expect(cluster.ShouldCreateApplicationSecret()).To(BeTrue())
 	})
 })
 
@@ -187,7 +195,9 @@ var _ = Describe("Bootstrap via recovery", func() {
 		}
 
 		Expect(cluster.ShouldRecoveryCreateApplicationDatabase()).To(BeTrue())
+		Expect(cluster.ShouldRecoveryCreateApplicationSecret()).To(BeFalse())
 		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
+		Expect(cluster.GetApplicationDatabaseOwner()).To(Equal("appOwner"))
 	})
 
 	It("will not create an application database if not requested", func() {
@@ -197,6 +207,7 @@ var _ = Describe("Bootstrap via recovery", func() {
 			},
 		}
 		Expect(cluster.ShouldRecoveryCreateApplicationDatabase()).To(BeFalse())
+		Expect(cluster.ShouldRecoveryCreateApplicationSecret()).To(BeFalse())
 	})
 })
 
@@ -220,7 +231,9 @@ var _ = Describe("Bootstrap via pg_basebackup", func() {
 		}
 
 		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).To(BeTrue())
+		Expect(cluster.ShouldPgBaseBackupCreateApplicationSecret()).To(BeFalse())
 		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
+		Expect(cluster.GetApplicationDatabaseOwner()).To(Equal("appOwner"))
 	})
 
 	It("will get default application secrets name if not specified", func() {
@@ -230,6 +243,7 @@ var _ = Describe("Bootstrap via pg_basebackup", func() {
 			},
 		}
 		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).To(BeFalse())
+		Expect(cluster.ShouldPgBaseBackupCreateApplicationSecret()).To(BeFalse())
 	})
 })
 

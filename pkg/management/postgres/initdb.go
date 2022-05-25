@@ -162,7 +162,7 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	}
 
 	_, err = dbSuperUser.Exec(fmt.Sprintf(
-		"CREATE USER %v",
+		"CREATE USER IF NOT EXISTS %v",
 		pq.QuoteIdentifier(info.ApplicationUser)))
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	}
 
 	if info.ApplicationDatabase != "" {
-		_, err = dbSuperUser.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
+		_, err = dbSuperUser.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v OWNER %v",
 			pq.QuoteIdentifier(info.ApplicationDatabase),
 			pq.QuoteIdentifier(info.ApplicationUser)))
 		if err != nil {
