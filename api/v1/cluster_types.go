@@ -1611,8 +1611,8 @@ func (cluster *Cluster) ShouldCreateApplicationDatabase() bool {
 		cluster.ShouldPgBaseBackupCreateApplicationDatabase()
 }
 
-// ShouldInitDBCreateApplicationDatabase returns true if for this cluster,
-// during the bootstrap phase using initDB, we need to create an application database
+// ShouldInitDBCreateApplicationDatabase returns true if the application database needs to be created during initdb
+// job
 func (cluster *Cluster) ShouldInitDBCreateApplicationDatabase() bool {
 	if cluster.Spec.Bootstrap == nil {
 		return false
@@ -1626,8 +1626,8 @@ func (cluster *Cluster) ShouldInitDBCreateApplicationDatabase() bool {
 	return initDBParameters.Owner != "" && initDBParameters.Database != ""
 }
 
-// ShouldPgBaseBackupCreateApplicationDatabase returns true if for this cluster,
-// during the bootstrap phase using pg_basebackup, we need to create an application database
+// ShouldPgBaseBackupCreateApplicationDatabase returns true if the application database needs to be created during the
+// pg_basebackup job
 func (cluster *Cluster) ShouldPgBaseBackupCreateApplicationDatabase() bool {
 	if cluster.Spec.Bootstrap == nil {
 		return false
@@ -1641,8 +1641,8 @@ func (cluster *Cluster) ShouldPgBaseBackupCreateApplicationDatabase() bool {
 	return initDBParameters.Owner != "" && initDBParameters.Database != ""
 }
 
-// ShouldRecoveryCreateApplicationDatabase returns true if for this cluster,
-// during the bootstrap phase using recovery, we need to create an application database
+// ShouldRecoveryCreateApplicationDatabase returns true if the application database needs to be created during the
+// recovery job
 func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
 	if cluster.Spec.Bootstrap == nil {
 		return false
