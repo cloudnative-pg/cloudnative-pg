@@ -826,7 +826,7 @@ kind: Cluster
 spec:
   bootstrap:
     pg_basebackup:
-      atabase: app
+      database: app
       owner: app
       secret:
         name: app-secret
