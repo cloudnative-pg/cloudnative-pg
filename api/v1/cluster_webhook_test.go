@@ -1533,6 +1533,25 @@ var _ = Describe("validation of the list of external clusters", func() {
 	})
 })
 
+var _ = Describe("bootstrap base backup validation", func() {
+	It("complain when the source cluster doesn't exist", func() {
+		bootstrap := BootstrapConfiguration{}
+		bpb := BootstrapPgBaseBackup{Source: "test"}
+		bootstrap.PgBaseBackup = &bpb
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Source: "test",
+					},
+				},
+			},
+		}
+		result := recoveryCluster.validateBootstrapPgBaseBackupSource()
+		Expect(result).ToNot(BeEmpty())
+	})
+})
+
 var _ = Describe("unix permissions identifiers change validation", func() {
 	It("complains if the PostgresGID is changed", func() {
 		oldCluster := &Cluster{
