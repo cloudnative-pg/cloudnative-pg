@@ -576,7 +576,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 
 	// Configure the application database information for restored instance
 	return instance.WithActiveInstance(func() error {
-		err = info.ConfigureApplicationForRestoredInstance(instance)
+		err = info.configureApplicationForRestoredInstance(instance)
 		if err != nil {
 			return fmt.Errorf("while configuring restored instance: %w", err)
 		}
@@ -655,8 +655,8 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 	})
 }
 
-// ConfigureApplicationForRestoredInstance configure the application database for the restored instance
-func (info InitInfo) ConfigureApplicationForRestoredInstance(instance *Instance) error {
+// configureApplicationForRestoredInstance configure the application database for the restored instance
+func (info InitInfo) configureApplicationForRestoredInstance(instance *Instance) error {
 	db, err := instance.GetSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while getting superuser database: %w", err)
