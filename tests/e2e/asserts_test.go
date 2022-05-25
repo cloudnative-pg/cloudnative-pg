@@ -244,9 +244,9 @@ func AssertClusterDefault(namespace string, clusterName string,
 
 		validationErr := cluster.Validate()
 		if isExpectedToDefault {
-			Expect(len(validationErr)).Should(BeZero())
+			Expect(len(validationErr)).Should(BeZero(), validationErr)
 		} else {
-			Expect(len(validationErr)).ShouldNot(BeZero())
+			Expect(len(validationErr)).ShouldNot(BeZero(), validationErr)
 		}
 	})
 }
