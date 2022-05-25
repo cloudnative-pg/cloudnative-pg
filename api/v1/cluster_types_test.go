@@ -155,7 +155,6 @@ var _ = Describe("Bootstrap via initdb", func() {
 
 		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeTrue())
 		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
-		Expect(cluster.GetInitDBApplicationSecretName()).To(Equal("appSecret"))
 	})
 
 	It("will not create an application database if not requested", func() {
@@ -165,7 +164,6 @@ var _ = Describe("Bootstrap via initdb", func() {
 			},
 		}
 		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeFalse())
-		Expect(cluster.GetInitDBApplicationSecretName()).To(Equal("clusterName-app"))
 	})
 })
 
@@ -190,7 +188,6 @@ var _ = Describe("Bootstrap via recovery", func() {
 
 		Expect(cluster.ShouldRecoveryCreateApplicationDatabase()).To(BeTrue())
 		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
-		Expect(cluster.GetRecoveryApplicationSecretName()).To(Equal("appSecret"))
 	})
 
 	It("will not create an application database if not requested", func() {
@@ -200,7 +197,6 @@ var _ = Describe("Bootstrap via recovery", func() {
 			},
 		}
 		Expect(cluster.ShouldRecoveryCreateApplicationDatabase()).To(BeFalse())
-		Expect(cluster.GetRecoveryApplicationSecretName()).To(Equal("clusterName-app"))
 	})
 })
 
@@ -225,7 +221,6 @@ var _ = Describe("Bootstrap via pg_basebackup", func() {
 
 		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).To(BeTrue())
 		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
-		Expect(cluster.GetPgBaseBackupApplicationSecretName()).To(Equal("appSecret"))
 	})
 
 	It("will get default application secrets name if not specified", func() {
@@ -235,7 +230,6 @@ var _ = Describe("Bootstrap via pg_basebackup", func() {
 			},
 		}
 		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).To(BeFalse())
-		Expect(cluster.GetPgBaseBackupApplicationSecretName()).To(Equal("clusterName-app"))
 	})
 })
 

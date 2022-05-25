@@ -1328,16 +1328,26 @@ func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 
 // GetApplicationSecretName get the name of the application secret for any bootstrap type
 func (cluster *Cluster) GetApplicationSecretName() string {
-	switch {
-	case cluster.Spec.Bootstrap == nil:
+	bootstrap := cluster.Spec.Bootstrap
+	if bootstrap == nil {
 		return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
-	case cluster.Spec.Bootstrap.Recovery != nil:
-		return cluster.GetRecoveryApplicationSecretName()
-	case cluster.Spec.Bootstrap.PgBaseBackup != nil:
-		return cluster.GetPgBaseBackupApplicationSecretName()
-	default:
-		return cluster.GetInitDBApplicationSecretName()
 	}
+	recovery := bootstrap.Recovery
+	if recovery != nil && recovery.Secret != nil && recovery.Secret.Name != "" {
+		return recovery.Secret.Name
+	}
+
+	pgBaseBackup := bootstrap.PgBaseBackup
+	if pgBaseBackup != nil && pgBaseBackup.Secret != nil && pgBaseBackup.Secret.Name != "" {
+		return pgBaseBackup.Secret.Name
+	}
+
+	initDB := bootstrap.InitDB
+	if initDB != nil && initDB.Secret != nil && initDB.Secret.Name != "" {
+		return pgBaseBackup.Secret.Name
+	}
+
+	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
 }
 
 // GetApplicationDatabaseName get the name of the application database for a specific bootstrap
@@ -1366,39 +1376,6 @@ func (cluster *Cluster) GetApplicationDatabaseOwner() string {
 	default:
 		return ""
 	}
-}
-
-// GetInitDBApplicationSecretName get the name of the secret of the application for initdb
-func (cluster *Cluster) GetInitDBApplicationSecretName() string {
-	if cluster.Spec.Bootstrap != nil &&
-		cluster.Spec.Bootstrap.InitDB != nil &&
-		cluster.Spec.Bootstrap.InitDB.Secret != nil &&
-		cluster.Spec.Bootstrap.InitDB.Secret.Name != "" {
-		return cluster.Spec.Bootstrap.InitDB.Secret.Name
-	}
-	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
-}
-
-// GetRecoveryApplicationSecretName get the name of the secret of the application for recovery
-func (cluster *Cluster) GetRecoveryApplicationSecretName() string {
-	if cluster.Spec.Bootstrap != nil &&
-		cluster.Spec.Bootstrap.Recovery != nil &&
-		cluster.Spec.Bootstrap.Recovery.Secret != nil &&
-		cluster.Spec.Bootstrap.Recovery.Secret.Name != "" {
-		return cluster.Spec.Bootstrap.Recovery.Secret.Name
-	}
-	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
-}
-
-// GetPgBaseBackupApplicationSecretName get the name of the secret of the application for pg_basebackup
-func (cluster *Cluster) GetPgBaseBackupApplicationSecretName() string {
-	if cluster.Spec.Bootstrap != nil &&
-		cluster.Spec.Bootstrap.PgBaseBackup != nil &&
-		cluster.Spec.Bootstrap.PgBaseBackup.Secret != nil &&
-		cluster.Spec.Bootstrap.PgBaseBackup.Secret.Name != "" {
-		return cluster.Spec.Bootstrap.PgBaseBackup.Secret.Name
-	}
-	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
 }
 
 // GetServerCASecretName get the name of the secret containing the CA
