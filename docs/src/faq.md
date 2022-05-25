@@ -311,6 +311,43 @@ enhances:
     time)
 
 
+**How can I specify a time zone in the PostgreSQL cluster?**
+
+PostgreSQL has an extensive support for time zones, as explained in the official
+documentation:
+
+- [Date time data types](https://www.postgresql.org/docs/current/datatype-datetime.html)
+- [Client connections config options](https://www.postgresql.org/docs/current/runtime-config-client.html#GUC-TIMEZONE)
+
+Although time zones can even be used at session, transaction and even as part
+of a query in PostgreSQL, a very common way is to set them up globally. With
+CloudNativePG you can configure the cluster level time zone in the
+`spec.postgresql.parameters` section as in the following example:
+
+``` yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-italy
+spec:
+  instances: 1
+
+  postgresql:
+    parameters:
+      timezone: "Europe/Rome"
+
+  storage:
+    size: 1Gi
+```
+
+The time zone can be verified with:
+
+``` console
+$ k exec -ti pg-italy-1 -c postgres -- psql -x -c "SHOW timezone"
+-[ RECORD 1 ]---------
+TimeZone | Europe/Rome
+```
+
 <!--
 **What is the recommended architecture for best business continuity
 outcomes?**
