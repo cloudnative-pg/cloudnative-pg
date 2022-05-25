@@ -161,11 +161,21 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("while getting superuser database: %w", err)
 	}
 
-	_, err = dbSuperUser.Exec(fmt.Sprintf(
-		"CREATE USER IF NOT EXISTS %v",
-		pq.QuoteIdentifier(info.ApplicationUser)))
+	var existsRole bool
+	userRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = $1",
+		info.ApplicationUser)
+	err = userRow.Scan(&existsRole)
 	if err != nil {
 		return err
+	}
+
+	if !existsRole {
+		_, err = dbSuperUser.Exec(fmt.Sprintf(
+			"CREATE ROLE %v LOGIN",
+			pq.QuoteIdentifier(info.ApplicationUser)))
+		if err != nil {
+			return err
+		}
 	}
 
 	// Execute the custom set of init queries
@@ -184,22 +194,34 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("could not execute init Template queries: %w", err)
 	}
 
-	if info.ApplicationDatabase != "" {
-		_, err = dbSuperUser.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %v OWNER %v",
-			pq.QuoteIdentifier(info.ApplicationDatabase),
-			pq.QuoteIdentifier(info.ApplicationUser)))
-		if err != nil {
-			return fmt.Errorf("could not create ApplicationDatabase: %w", err)
-		}
-		appDB, err := instance.ConnectionPool().Connection(info.ApplicationDatabase)
-		if err != nil {
-			return fmt.Errorf("could not get connection to ApplicationDatabase: %w", err)
-		}
-		// Execute the custom set of init queries of the application database
-		log.Info("Executing Application instructions")
-		if err = info.executeQueries(appDB, info.PostInitApplicationSQL); err != nil {
-			return fmt.Errorf("could not execute init Application queries: %w", err)
-		}
+	if info.ApplicationDatabase == "" {
+		return nil
+	}
+
+	var existsDB bool
+	dbRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_database WHERE datname = $1", info.ApplicationDatabase)
+	err = dbRow.Scan(&existsDB)
+	if err != nil {
+		return err
+	}
+
+	if existsDB {
+		return nil
+	}
+	_, err = dbSuperUser.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
+		pq.QuoteIdentifier(info.ApplicationDatabase),
+		pq.QuoteIdentifier(info.ApplicationUser)))
+	if err != nil {
+		return fmt.Errorf("could not create ApplicationDatabase: %w", err)
+	}
+	appDB, err := instance.ConnectionPool().Connection(info.ApplicationDatabase)
+	if err != nil {
+		return fmt.Errorf("could not get connection to ApplicationDatabase: %w", err)
+	}
+	// Execute the custom set of init queries of the application database
+	log.Info("executing Application instructions")
+	if err = info.executeQueries(appDB, info.PostInitApplicationSQL); err != nil {
+		return fmt.Errorf("could not execute init Application queries: %w", err)
 	}
 
 	return nil

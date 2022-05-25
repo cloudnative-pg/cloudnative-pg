@@ -566,9 +566,8 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 		}
 	}
 
-	// if the application database or user are not specified
-	// we ignore the application database configuration
-	if info.ApplicationDatabase == "" || info.ApplicationUser == "" {
+	if info.ApplicationUser == "" || info.ApplicationDatabase == "" {
+		log.Debug("configure new instance not ran, missing user or database")
 		return nil
 	}
 
