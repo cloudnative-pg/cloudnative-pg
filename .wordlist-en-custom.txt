@@ -345,6 +345,7 @@ baseDN
 basebackup
 bb
 bdr
+benchmarked
 benchmarking
 bindDN
 bindPassword

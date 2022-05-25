@@ -310,6 +310,20 @@ enhances:
     major version of PostgreSQL and at what conditions (e.g., cutover
     time)
 
+**Is there an upper limit in database size for not considering Kubernetes?**
+
+No, as Kubernetes is no different from virtual machines and bare metal as far
+as this is regarded.
+Practically, however, it depends on the available resources of your Kubernetes
+cluster. Our advice with very large databases (VLDB) is to consider a shared
+nothing architecture, where a Kubernetes worker node is dedicated to a single
+Postgres instance, with dedicated storage.
+We proved that this extreme architectural pattern works when we benchmarked
+[running PostgreSQL on bare metal Kubernetes with local persistent
+volumes](https://www.2ndquadrant.com/en/blog/local-persistent-volumes-and-postgresql-usage-in-kubernetes/).
+A current limitation of CloudNativePG, which will be overcome in future
+releases, is the lack of support for tablespaces so that horizontal
+partitioning can be easily implemented.
 
 **How can I specify a time zone in the PostgreSQL cluster?**
 
