@@ -128,7 +128,8 @@ func (info InitInfo) Restore(ctx context.Context) error {
 			return err
 		}
 
-		_, err = UpdateReplicaConfigurationForPrimary(info.PgData, connectionString, info.PodName)
+		// TODO: Using a replication slot on replica cluster is not supported (yet?)
+		_, err = UpdateReplicaConfigurationForPrimary(info.PgData, connectionString, "")
 		return err
 	}
 
@@ -140,7 +141,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	return info.ConfigureInstanceAfterRestore(env)
+	return info.ConfigureInstanceAfterRestore(cluster, env)
 }
 
 // restoreCustomWalDir moves the current pg_wal data to the specified custom wal dir and applies the symlink
@@ -572,7 +573,7 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 // of the instance to be coherent with the one specified in the
 // cluster. This function also ensures that we can really connect
 // to this cluster using the password in the secrets
-func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
+func (info InitInfo) ConfigureInstanceAfterRestore(cluster *apiv1.Cluster, env []string) error {
 	instance := info.GetInstance()
 	instance.Env = env
 
@@ -602,7 +603,8 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 
 	if majorVersion >= 12 {
 		primaryConnInfo := buildPrimaryConnInfo(info.ClusterName, info.PodName)
-		_, err = configurePostgresAutoConfFile(info.PgData, primaryConnInfo, info.PodName)
+		slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
+		_, err = configurePostgresAutoConfFile(info.PgData, primaryConnInfo, slotName)
 		if err != nil {
 			return fmt.Errorf("while configuring replica: %w", err)
 		}

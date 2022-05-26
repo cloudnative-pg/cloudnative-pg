@@ -181,14 +181,19 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 
 // UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL
-func UpdateReplicaConfiguration(pgData string, clusterName string, podName string) (changed bool, err error) {
+func UpdateReplicaConfiguration(
+	pgData string,
+	clusterName string,
+	podName string,
+	slotName string,
+) (changed bool, err error) {
 	primaryConnInfo := buildPrimaryConnInfo(clusterName+"-rw", podName)
-	return UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, podName)
+	return UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, slotName)
 }
 
 // UpdateReplicaConfigurationForPrimary updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
-func UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, podName string) (changed bool, err error) {
+func UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	major, err := postgresutils.GetMajorVersion(pgData)
 	if err != nil {
 		return false, err
@@ -202,7 +207,7 @@ func UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, podName strin
 		return false, err
 	}
 
-	return configurePostgresAutoConfFile(pgData, primaryConnInfo, podName)
+	return configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName)
 }
 
 // configureRecoveryConfFile configures replication in the recovery.conf file
@@ -235,12 +240,8 @@ func configureRecoveryConfFile(pgData string, primaryConnInfo string) (changed b
 
 // configurePostgresAutoConfFile configures replication in the postgresql.auto.conf file
 // for PostgreSQL 12 and newer
-func configurePostgresAutoConfFile(pgData, primaryConnInfo, podName string) (changed bool, err error) {
+func configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, "postgresql.auto.conf")
-	slotName, err := GetSlotName(podName)
-	if err != nil {
-		return false, err
-	}
 
 	options := map[string]string{
 		"restore_command": fmt.Sprintf(

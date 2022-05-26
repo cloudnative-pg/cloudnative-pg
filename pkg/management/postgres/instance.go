@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -159,10 +160,6 @@ type Instance struct {
 
 	// MaxStopDelay is the current MaxStopDelay of the cluster
 	MaxStopDelay int32
-
-	// ReplicationSlots contains the current list of active replication slots
-	// living in the current primary instance
-	ReplicationSlots *ReplicationSlotList
 
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
@@ -545,16 +542,12 @@ func (instance *Instance) IsPrimary() (bool, error) {
 	return true, nil
 }
 
-// Demote demote an existing PostgreSQL instance
-func (instance *Instance) Demote() error {
+// Demote demotes an existing PostgreSQL instance
+func (instance *Instance) Demote(cluster *apiv1.Cluster) error {
 	log.Info("Demoting instance",
 		"pgpdata", instance.PgData)
-
-	if err := instance.DeleteReplicationSlot(instance.PodName); err != nil {
-		return err
-	}
-
-	_, err := UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName)
+	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
+	_, err := UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName, slotName)
 	return err
 }
 

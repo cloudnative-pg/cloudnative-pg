@@ -817,7 +817,7 @@ ReplicationSlotsHAConfiguration encapsulates the configuration of replication sl
 Name       | Description                                                                                                                                                                                                                                                  | Type  
 ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------
 `enabled   ` | If replication slots for high availability are enabled, the operator will automatically manage replication slots on the primary and designated primary instances and use them in the standby replication connections. This can only be set at creation time. - *mandatory*  | bool  
-`slotPrefix` | Prefix for replication slots managed by the operator for HA. This can only be set at creation time.                                                                                                                                                          | string
+`slotPrefix` | Prefix for replication slots managed by the operator for HA. It may only contain lower case letters, numbers, and the underscore character. This can only be set at creation time.                                                                           | string
 
 <a id='RollingUpdateStatus'></a>
 

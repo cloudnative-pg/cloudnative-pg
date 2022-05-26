@@ -18,10 +18,8 @@ package postgres
 
 import (
 	"fmt"
-	"reflect"
-	"regexp"
 
-	"github.com/lib/pq"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // SlotType represents the type of replication slot
@@ -30,79 +28,69 @@ type SlotType string
 // SlotTypePhysical represents the physical replication slot
 const SlotTypePhysical = "physical"
 
-const SlotPrefix = "_cnpg_slot_"
-
 // ReplicationSlot represent the unit of a replication slot
 type ReplicationSlot struct {
-	PodName  string   `json:"podName,omitempty"`
-	SlotName string   `json:"slotName,omitempty"`
-	Type     SlotType `json:"type,omitempty"`
+	InstanceName string   `json:"instanceName,omitempty"`
+	SlotName     string   `json:"slotName,omitempty"`
+	Type         SlotType `json:"type,omitempty"`
+	Active       bool     `json:"active"`
 }
 
 // ReplicationSlotList contains a list of replication slot
 type ReplicationSlotList struct {
-	ClusterName string `json:"clusterName,omitempty"`
-	Items       []ReplicationSlot
+	Items []ReplicationSlot
 }
 
-var podSerialNumber = regexp.MustCompile(".*-(?P<wat>[0-9]+)$")
-var slotSerialNumber = regexp.MustCompile(".*_(?P<wat>[0-9]+)$")
-
-// GetSlotName return the slot name based in the current pod name
-func GetSlotName(podName string) (string, error) {
-	match := podSerialNumber.FindStringSubmatch(podName)
-	if len(match) != 2 {
-		return "", fmt.Errorf("can't parse podName looking for serial number")
-	}
-	slotName := fmt.Sprintf("%s%s", SlotPrefix, match[1])
-
-	return slotName, nil
-
-}
-func (rs *ReplicationSlotList) getPodNameBySlot(slotName string) (string, error) {
-	match := slotSerialNumber.FindStringSubmatch(slotName)
-	if len(match) != 2 {
-		return "", fmt.Errorf("can't parse slot name looking for serial number")
-	}
-	podName := fmt.Sprintf("%s-%s", rs.ClusterName, match[1])
-
-	return podName, nil
-}
-func (rs *ReplicationSlotList) getSlotByPodName(podName string) *ReplicationSlot {
+// GetSlotBySlotName returns a slot searching by slot name
+func (rs *ReplicationSlotList) GetSlotBySlotName(slotName string) *ReplicationSlot {
 	if rs == nil || len(rs.Items) == 0 {
 		return nil
 	}
+
 	for k, v := range rs.Items {
-		if v.PodName == podName {
+		if v.SlotName == slotName {
 			return &rs.Items[k]
 		}
 	}
+
 	return nil
 }
 
-// Has returns true if the slotName it's found in the current replication slot list
-func (rs *ReplicationSlotList) Has(podNAme string) bool {
-	return rs.getSlotByPodName(podNAme) != nil
+// GetSlotByInstanceName returns a slot searching by instance name
+func (rs *ReplicationSlotList) GetSlotByInstanceName(instanceName string) *ReplicationSlot {
+	if rs == nil || len(rs.Items) == 0 {
+		return nil
+	}
+
+	for k, v := range rs.Items {
+		if v.InstanceName == instanceName {
+			return &rs.Items[k]
+		}
+	}
+
+	return nil
 }
 
-// TODO compare against the active nodes in the cluster status
-func (instance *Instance) getCurrentReplicationSlot() (*ReplicationSlotList, error) {
+// GetCurrentHAReplicationSlots retrieve the list of high availability replication slots
+func (instance *Instance) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (*ReplicationSlotList, error) {
+	if cluster.Spec.ReplicationSlots == nil ||
+		cluster.Spec.ReplicationSlots.HighAvailability == nil {
+		return nil, fmt.Errorf("unexpected HA replication slots configuration")
+	}
+
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return nil, err
 	}
 
-	replicationSlots := ReplicationSlotList{
-		ClusterName: instance.ClusterName,
-	}
+	var replicationSlots ReplicationSlotList
 
 	rows, err := superUserDB.Query(
-		`SELECT
-slot_name,
-slot_type
-FROM pg_replication_slots 
-WHERE NOT temporary AND slot_type = 'physical'
-`)
+		`SELECT slot_name, slot_type, active FROM pg_replication_slots 
+            WHERE NOT temporary AND slot_name ^@ $1 AND slot_name != $2`,
+		cluster.Spec.ReplicationSlots.HighAvailability.GetSlotPrefix(),
+		cluster.GetSlotNameFromInstanceName(instance.PodName),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -118,14 +106,13 @@ WHERE NOT temporary AND slot_type = 'physical'
 		err := rows.Scan(
 			&slot.SlotName,
 			&slot.Type,
+			&slot.Active,
 		)
 		if err != nil {
 			return nil, err
 		}
-		slot.PodName, err = replicationSlots.getPodNameBySlot(slot.SlotName)
-		if err != nil {
-			return nil, err
-		}
+
+		slot.InstanceName = cluster.GetInstanceNameFromSlotName(slot.SlotName)
 
 		replicationSlots.Items = append(replicationSlots.Items, slot)
 	}
@@ -133,75 +120,29 @@ WHERE NOT temporary AND slot_type = 'physical'
 	return &replicationSlots, nil
 }
 
-// UpdateReplicationsSlot will update the ReplicationSlots list in the instance list
-func (instance *Instance) UpdateReplicationsSlot() error {
-	if isPrimary, _ := instance.IsPrimary(); !isPrimary {
-		return nil
-	}
-	replicationslots, err := instance.getCurrentReplicationSlot()
-	if err != nil {
-		return err
-	}
-
-	if !reflect.DeepEqual(instance.ReplicationSlots, replicationslots) {
-		instance.ReplicationSlots = replicationslots
-	}
-
-	return nil
-}
-
 // CreateReplicationSlot will create a physical replication slot in the primary instance
-func (instance *Instance) CreateReplicationSlot(podName string) error {
-	if isPrimary, _ := instance.IsPrimary(); !isPrimary {
-		return nil
-	}
-
-	slotName, err := GetSlotName(podName)
-	if err != nil {
-		return err
-	}
-
+func (instance *Instance) CreateReplicationSlot(slotName string) error {
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return err
 	}
 
-	query := fmt.Sprintf(
-		"SELECT * FROM pg_create_physical_replication_slot('%s')", slotName)
-	row := superUserDB.QueryRow(query)
+	row := superUserDB.QueryRow("SELECT * FROM pg_create_physical_replication_slot($1)", slotName)
 	if row.Err() != nil {
 		return err
 	}
-
-	instance.ReplicationSlots.Items = append(instance.ReplicationSlots.Items,
-		ReplicationSlot{
-			PodName:  podName,
-			SlotName: slotName,
-			Type:     SlotTypePhysical,
-		})
 
 	return nil
 }
 
 // DeleteReplicationSlot drop the specified replication slot in the primary
-func (instance *Instance) DeleteReplicationSlot(podName string) error {
-	if isPrimary, _ := instance.IsPrimary(); !isPrimary {
-		return nil
-	}
-
-	slotName, err := GetSlotName(podName)
-	if err != nil {
-		return err
-	}
-
+func (instance *Instance) DeleteReplicationSlot(slotName string) error {
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return err
 	}
 
-	_, err = superUserDB.Exec(fmt.Sprintf(
-		"SELECT pg_drop_replication_slot('%s')",
-		pq.QuoteIdentifier(slotName)))
+	_, err = superUserDB.Exec("SELECT pg_drop_replication_slot($1)", slotName)
 	if err != nil {
 		return err
 	}
