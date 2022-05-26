@@ -378,6 +378,16 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pods: %w", err)
 	}
 
+	// Update any modified/new labels coming from the cluster resource
+	if err := r.updateClusterLabelsOnPVCs(ctx, cluster, resources.pvcs); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
+	}
+
+	// Update any modified/new annotations coming from the cluster resource
+	if err := r.updateClusterAnnotationsOnPVCs(ctx, cluster, resources.pvcs); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pvcs: %w", err)
+	}
+
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
 	if runningJobs := resources.countRunningJobs(); runningJobs > 0 {
 		contextLogger.Debug("A job is currently running. Waiting", "count", runningJobs)
