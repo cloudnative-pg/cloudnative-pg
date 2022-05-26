@@ -81,17 +81,20 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		return false, fmt.Errorf("expected 1 primary PostgreSQL but none found")
 	}
 
+	// from now on we know we have a primary instance
+
+	// we first check whether a restart is needed given the provided condition
 	shouldRestart, inPlacePossible, reason := conditionFunc(*primaryPostgresqlStatus, cluster)
 	if !shouldRestart {
 		return false, nil
 	}
-	// usually PendingRestartForDecrease status changed in instance reconcile and primary
-	// pod reach to this location has no pending restart for decrease.
-	// but sometime, the instance reconcile to handle the pending restart for decrease is slower
-	// than cluster reconcile, which will leads to switchover first.
-	if primaryPostgresqlStatus.IsPrimary && primaryPostgresqlStatus.PendingRestartForDecrease {
+
+	// if the primary instance is marked for restart due to hot standby sensitive parameter decrease,
+	// it should be restarted by the instance manager itself
+	if primaryPostgresqlStatus.PendingRestartForDecrease {
 		return false, nil
 	}
+
 	// we need to check whether a manual switchover is required
 	primaryPod := primaryPostgresqlStatus.Pod
 	contextLogger = contextLogger.WithValues("primaryPod", primaryPod.Name)
