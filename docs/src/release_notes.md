@@ -1,7 +1,7 @@
 # Release notes
 
 History of user-visible changes for CloudNativePG.
-For a full list of changes, please refer to the
+For a complete list of changes, please refer to the
 [commits](https://github.com/cloudnative-pg/cloudnative-pg/commits/main)
 in GitHub.
 For information on the community support policy for CloudNativePG, please
@@ -31,14 +31,14 @@ Fixes:
 - Enable the CSV log pipe inside the `WithActiveInstance` function to collect
   logs from recovery bootstrap jobs and help in the troubleshooting phase
 - Prevent bootstrapping a new cluster with a non-empty backup object store,
-  removing the risk to overwrite existing backups
+  removing the risk of overwriting existing backups
 - With the `recovery` bootstrap method, make sure that the recovery object
   store and the backup object store are different to avoid overwriting existing
   backups
 - Re-queue the reconciliation loop if the RBAC for backups is not yet created
 - Fix an issue with backups and the wrong specification of the cluster name
   property
-- Ensures that operator pods have always the latest certificates in the case of
+- Ensures that operator pods always have the latest certificates in the case of
   a deployment of the operator in high availability, with more than one replica
 - Fix the `cnpg report operator` command to correctly handle the case of a
   deployment of the operator in high availability, with more than one replica
@@ -48,7 +48,7 @@ Fixes:
 - Fix the `cnpg` plugin to correctly parse any custom configmap and secret name
   defined in the operator deployment, instead of relying just on the default
   values
-- Fix local building of the documentation by using the `minidocks/mkdocs` image
+- Fix the local building of the documentation by using the `minidocks/mkdocs` image
   for `mkdocs`
 
 ## Version 1.15.0
