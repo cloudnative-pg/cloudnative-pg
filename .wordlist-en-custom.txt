@@ -282,6 +282,7 @@ VOLNAME
 Valerio
 VirtualBox
 WAL
+WAL's
 WALBackupConfiguration
 WALs
 Wadle
@@ -701,6 +702,7 @@ readthedocs
 readyInstances
 reconciliationLoop
 recoverability
+recoveredCluster
 recoveryTarget
 recoverytarget
 recv
