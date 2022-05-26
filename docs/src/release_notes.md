@@ -28,7 +28,7 @@ Minor changes:
 Fixes:
 
 - Fix fencing by killing orphaned processes related to `postgres`
-- Enable the CSV logpipe inside the `WithActiveInstance` function to collect
+- Enable the CSV log pipe inside the `WithActiveInstance` function to collect
   logs from recovery bootstrap jobs and help in the troubleshooting phase
 - Prevent bootstrapping a new cluster with a non-empty backup object store,
   removing the risk to overwrite existing backups
