@@ -405,16 +405,16 @@ func GetConditionsInClusterStatus(
 	clusterName string,
 	env *TestingEnvironment,
 	conditionType apiv1.ClusterConditionType,
-) (*apiv1.ClusterCondition, error) {
+) (*v1.Condition, error) {
 	var cluster *apiv1.Cluster
 	var err error
-	var backupConditionInCluster *apiv1.ClusterCondition
+	var backupConditionInCluster *v1.Condition
 	cluster, err = env.GetCluster(namespace, clusterName)
 	if err != nil {
-		return &apiv1.ClusterCondition{}, nil
+		return &v1.Condition{}, nil
 	}
 	for index, cond := range cluster.Status.Conditions {
-		if cond.Type == conditionType {
+		if cond.Type == string(conditionType) {
 			backupConditionInCluster = &cluster.Status.Conditions[index]
 			break
 		}

@@ -375,7 +375,7 @@ type ClusterStatus struct {
 	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
 
 	// Conditions for cluster object
-	Conditions []ClusterCondition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // These are valid conditions of a Cluster, some of the conditions could be owned by
@@ -402,20 +402,6 @@ const (
 
 // ClusterConditionType is of string type
 type ClusterConditionType string
-
-// ClusterCondition describes the state of a cluster object at a certain point
-type ClusterCondition struct {
-	// Type of the condition.
-	Type ClusterConditionType `json:"type,omitempty"`
-	// Status of the condition, one of True, False, Unknown.
-	Status ConditionStatus `json:"status,omitempty"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
-	// The reason for the condition's last transition.
-	Reason string `json:"reason,omitempty"`
-	// A human readable message indicating details about the transition.
-	Message string `json:"message,omitempty"`
-}
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
 type EmbeddedObjectMetadata struct {
