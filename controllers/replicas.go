@@ -424,7 +424,10 @@ func (r *ClusterReconciler) updateClusterAnnotationsOnPVCs(
 
 		// if all the required annotations are already set and with the correct value,
 		// we proceed to the next item
-		if utils.IsAnnotationSubset(pvc.Annotations, cluster.Annotations, configuration.Current) &&
+		if utils.IsAnnotationSubset(pvc.Annotations,
+			cluster.Annotations,
+			cluster.GetFixedInheritedLabels(),
+			configuration.Current) &&
 			utils.IsAnnotationAppArmorPresentInObject(&pvc.ObjectMeta, cluster.Annotations) {
 			contextLogger.Debug(
 				"Skipping cluster annotations reconciliation, because they are already present on pvc",
@@ -464,7 +467,10 @@ func (r *ClusterReconciler) updateClusterLabelsOnPVCs(
 
 		// if all the required labels are already set and with the correct value,
 		// we proceed to the next item
-		if utils.IsLabelSubset(pvc.Labels, cluster.Labels, configuration.Current) {
+		if utils.IsLabelSubset(pvc.Labels,
+			cluster.Labels,
+			cluster.GetFixedInheritedAnnotations(),
+			configuration.Current) {
 			contextLogger.Debug(
 				"Skipping cluster label reconciliation, because they are already present on pvc",
 				"pvc", pvc.Name,
