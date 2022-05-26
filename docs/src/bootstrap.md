@@ -400,7 +400,7 @@ Whether you recover from a recovery object store or an existing `Backup`
 resource, the following considerations apply:
 
 - The application database name and the application database user are preserved
-from the backup that is being restored. The operator does not currently attempt 
+from the backup that is being restored. The operator does not currently attempt
 to back up the underlying secrets, as this is part of the usual maintenance
 activity of the Kubernetes cluster itself.
 - In case you don't supply any `superuserSecret`, a new one is automatically
