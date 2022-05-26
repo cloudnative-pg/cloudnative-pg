@@ -386,7 +386,8 @@ func (r *ClusterReconciler) updateClusterLabelsOnPods(
 
 		// if all the required labels are already set and with the correct value,
 		// we proceed to the next item
-		if utils.IsLabelSubset(pod.Labels, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current) {
+		if utils.IsLabelSubset(pod.Labels, cluster.Labels, cluster.GetFixedInheritedLabels(),
+			configuration.Current) {
 			contextLogger.Debug(
 				"Skipping cluster label reconciliation, because they are already present on pod",
 				"pod", pod.Name,

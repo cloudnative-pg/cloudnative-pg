@@ -90,17 +90,21 @@ func isResourceListSubset(resourceList, subResourceList corev1.ResourceList) boo
 	return true
 }
 
-// IsLabelSubset checks if a label map is a subset of another
-func IsLabelSubset(mapSet map[string]string, mapSubset map[string]string, fixedLabels map[string]string,
+// IsLabelSubset checks if a collection of labels is a subset of another
+//
+// NOTE: there are two parameters for the labels to check. The `fixed` one
+// is for labels that certainly should be inherited (`inheritedMetadata` in the spec)
+// The other labels may or may not be inherited depending on the configuration
+func IsLabelSubset(mapSet, clusterLabels, fixedInheritedLabels map[string]string,
 	configuration *config.Data,
 ) bool {
 	mapToEvaluate := map[string]string{}
 
-	for key, value := range fixedLabels {
+	for key, value := range fixedInheritedLabels {
 		mapToEvaluate[key] = value
 	}
 
-	for key, value := range mapSubset {
+	for key, value := range clusterLabels {
 		if configuration.IsLabelInherited(key) {
 			mapToEvaluate[key] = value
 		}
@@ -109,17 +113,21 @@ func IsLabelSubset(mapSet map[string]string, mapSubset map[string]string, fixedL
 	return isMapSubset(mapSet, mapToEvaluate)
 }
 
-// IsAnnotationSubset checks if an annotation map is a subset of another
-func IsAnnotationSubset(mapSet map[string]string, mapSubset map[string]string, fixedAnnotations map[string]string,
+// IsAnnotationSubset checks if a collection of annotations is a subset of another
+//
+// NOTE: there are two parameters for the annotations to check. The `fixed` one
+// is for labels that certainly should be inherited (`inheritedMetadata` in the spec)
+// The other labels may or may not be inherited depending on the configuration
+func IsAnnotationSubset(mapSet, clusterAnnotations, fixedInheritedAnnotations map[string]string,
 	configuration *config.Data,
 ) bool {
 	mapToEvaluate := map[string]string{}
 
-	for key, value := range fixedAnnotations {
+	for key, value := range fixedInheritedAnnotations {
 		mapToEvaluate[key] = value
 	}
 
-	for key, value := range mapSubset {
+	for key, value := range clusterAnnotations {
 		if configuration.IsAnnotationInherited(key) {
 			mapToEvaluate[key] = value
 		}
