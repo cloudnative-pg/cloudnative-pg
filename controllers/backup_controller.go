@@ -23,7 +23,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -229,14 +228,8 @@ func StartBackup(
 		status.CommandError = stdout
 
 		// Update backup status in cluster conditions
-		condition := metav1.Condition{
-			Type:    string(apiv1.ConditionBackup),
-			Status:  metav1.ConditionFalse,
-			Reason:  "LastBackupFailed",
-			Message: err.Error(),
-		}
-		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
-			log.FromContext(ctx).Error(errCond, "Error while updating conditions")
+		if errCond := manager.UpdateCondition(ctx, client, cluster, postgres.BuildBackupCondition(err)); errCond != nil {
+			log.FromContext(ctx).Error(err, "Error status.UpdateCondition()")
 		}
 		return postgres.UpdateBackupStatusAndRetry(ctx, client, backup)
 	}

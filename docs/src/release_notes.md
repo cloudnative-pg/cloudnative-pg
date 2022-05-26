@@ -21,8 +21,6 @@ Minor changes:
   backup object), and `cluster` (owned by the Postgres cluster object)
 - Introduce automated collection of `pg_stat_wal` metrics for PostgreSQL 14 or
   higher in the native Prometheus exporter
-- Refactor the code to directly use the conditions type from Kubernetes’ meta
-  API
 - Set the default operand image to PostgreSQL 14.3
 
 Fixes:
