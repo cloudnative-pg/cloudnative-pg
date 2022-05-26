@@ -116,8 +116,8 @@ func IsLabelSubset(mapSet, clusterLabels, fixedInheritedLabels map[string]string
 // IsAnnotationSubset checks if a collection of annotations is a subset of another
 //
 // NOTE: there are two parameters for the annotations to check. The `fixed` one
-// is for labels that certainly should be inherited (`inheritedMetadata` in the spec)
-// The other labels may or may not be inherited depending on the configuration
+// is for annotations that certainly should be inherited (`inheritedMetadata` in the spec)
+// The other annotations may or may not be inherited depending on the configuration
 func IsAnnotationSubset(mapSet, clusterAnnotations, fixedInheritedAnnotations map[string]string,
 	configuration *config.Data,
 ) bool {
