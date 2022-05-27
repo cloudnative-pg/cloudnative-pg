@@ -9,7 +9,7 @@ refer to ["Supported releases"](supported_releases.md).
 
 ##  Version 1.15.1
 
-**Release date:** May 26, 2022 (patch release)
+**Release date:** May 27, 2022 (patch release)
 
 Minor changes:
 
