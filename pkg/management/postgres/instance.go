@@ -445,11 +445,6 @@ func (instance Instance) Run() (*execlog.StreamingCmd, error) {
 // WithActiveInstance execute the internal function while this
 // PostgreSQL instance is running
 func (instance Instance) WithActiveInstance(inner func() error) error {
-	err := instance.Startup()
-	if err != nil {
-		return fmt.Errorf("while activating instance: %w", err)
-	}
-
 	// Start the CSV logpipe to redirect log to stdout
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	csvPipe := logpipe.NewLogPipe()
@@ -461,11 +456,19 @@ func (instance Instance) WithActiveInstance(inner func() error) error {
 	}()
 
 	defer func() {
+		ctxCancel()
+		csvPipe.GetExitedCondition().Wait()
+	}()
+
+	err := instance.Startup()
+	if err != nil {
+		return fmt.Errorf("while activating instance: %w", err)
+	}
+
+	defer func() {
 		if err := instance.Shutdown(DefaultShutdownOptions); err != nil {
 			log.Info("Error while deactivating instance", "err", err)
 		}
-		ctxCancel()
-		csvPipe.GetExitedCondition().Wait()
 	}()
 
 	return inner()
