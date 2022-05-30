@@ -30,4 +30,4 @@ jobs:
         if: ${{ startsWith(github.event.comment.body, '/ok-to-merge') }}
         with:
            github_token: ${{ secrets.REPO_GHA_PAT }}
-           labels: ok to merge
+           labels: "ok to merge :ok_hand:"
