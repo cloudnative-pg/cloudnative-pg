@@ -162,7 +162,7 @@ func envSetAWSCredentials(
 	return env, nil
 }
 
-// envSetAzureCredentials sets the AWS environment variables given the configuration
+// envSetAzureCredentials sets the Azure environment variables given the configuration
 // inside the cluster
 func envSetAzureCredentials(
 	ctx context.Context,
@@ -174,6 +174,10 @@ func envSetAzureCredentials(
 	// check if Azure credentials are defined
 	if configuration.AzureCredentials == nil {
 		return nil, fmt.Errorf("missing Azure credentials")
+	}
+
+	if configuration.AzureCredentials.InheritFromAzureAD {
+		return env, nil
 	}
 
 	var storageAccountSecret corev1.Secret

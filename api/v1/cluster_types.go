@@ -1052,6 +1052,8 @@ type S3Credentials struct {
 //
 // - storageKey
 // - storageSasToken
+//
+// - inheriting the credentials from the pod environment by setting inheritFromAzureAD to true
 type AzureCredentials struct {
 	// The connection string to be used
 	ConnectionString *SecretKeySelector `json:"connectionString,omitempty"`
@@ -1066,6 +1068,10 @@ type AzureCredentials struct {
 	// A shared-access-signature to be used in conjunction with
 	// the storage account name
 	StorageSasToken *SecretKeySelector `json:"storageSasToken,omitempty"`
+
+	// Use the Azure AD based authentication without providing explicitly the keys.
+	// +optional
+	InheritFromAzureAD bool `json:"inheritFromAzureAD"`
 }
 
 // GoogleCredentials is the type for the Google Cloud Storage credentials.

@@ -56,6 +56,8 @@ func Detect() (*Capabilities, error) {
 		newCapabilities.HasSnappy = true
 		// error codes for wal-restore command added in Barman >= 2.18
 		newCapabilities.HasErrorCodesForWALRestore = true
+		// azure-identity credential of type managed-identity added in Barman >= 2.18
+		newCapabilities.HasAzureManagedIdentity = true
 		fallthrough
 	case version.GE(semver.Version{Major: 2, Minor: 14}):
 		// Retention policy support, added in Barman >= 2.14

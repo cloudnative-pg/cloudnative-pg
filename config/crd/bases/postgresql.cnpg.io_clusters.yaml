@@ -761,6 +761,10 @@ spec:
                             - key
                             - name
                             type: object
+                          inheritFromAzureAD:
+                            description: Use the Azure AD based authentication without
+                              providing explicitly the keys.
+                            type: boolean
                           storageAccount:
                             description: The storage account where to upload data
                             properties:
@@ -1246,6 +1250,10 @@ spec:
                               - key
                               - name
                               type: object
+                            inheritFromAzureAD:
+                              description: Use the Azure AD based authentication without
+                                providing explicitly the keys.
+                              type: boolean
                             storageAccount:
                               description: The storage account where to upload data
                               properties:

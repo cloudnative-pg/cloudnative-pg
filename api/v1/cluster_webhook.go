@@ -1209,6 +1209,9 @@ func (azure *AzureCredentials) validateAzureCredentials(path *field.Path) field.
 	allErrors := field.ErrorList{}
 
 	secrets := 0
+	if azure.InheritFromAzureAD {
+		secrets++
+	}
 	if azure.StorageKey != nil {
 		secrets++
 	}

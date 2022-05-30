@@ -4,10 +4,10 @@ The operator can orchestrate a continuous backup infrastructure
 that is based on the [Barman](https://pgbarman.org) tool. Instead
 of using the classical architecture with a Barman server, which
 backs up many PostgreSQL instances, the operator relies on the
-`barman-cloud-wal-archive`, `barman-cloud-check-wal-archive`, 
-`barman-cloud-backup`, `barman-cloud-backup-list`, and 
-`barman-cloud-backup-delete` tools. As a result, base backups will 
-be *tarballs*. Both base backups and WAL files can be compressed 
+`barman-cloud-wal-archive`, `barman-cloud-check-wal-archive`,
+`barman-cloud-backup`, `barman-cloud-backup-list`, and
+`barman-cloud-backup-delete` tools. As a result, base backups will
+be *tarballs*. Both base backups and WAL files can be compressed
 and encrypted.
 
 For this, it is required to use an image with `barman-cli-cloud` included.
@@ -250,9 +250,27 @@ of credentials:
 
 - [**Connection String**](https://docs.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string#configure-a-connection-string-for-an-azure-storage-account)
 - **Storage account name** and [**Storage account access key**](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage)
-- **Storage account name** and [**Storage account SAS Token**](https://docs.microsoft.com/en-us/azure/storage/blobs/sas-service-create).
+- **Storage account name** and [**Storage account SAS Token**](https://docs.microsoft.com/en-us/azure/storage/blobs/sas-service-create)
+- **Storage account name** and [**Azure AD Workload Identity**](https://azure.github.io/azure-workload-identity/docs/introduction.html)
+properly configured.
 
-The credentials need to be stored inside a Kubernetes Secret, adding data entries only when
+Using **Azure AD Workload Identity**, you can avoid saving the credentials into a Kubernetes Secret,
+and have a Cluster configuration adding the `inheritFromAzureAD` as follows:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "<destination path here>"
+      azureCredentials:
+        inheritFromAzureAD: true
+```
+
+On the other side, using both **Storage account access key** or **Storage account SAS Token**,
+the credentials need to be stored inside a Kubernetes Secret, adding data entries only when
 needed. The following command performs that:
 
 ```

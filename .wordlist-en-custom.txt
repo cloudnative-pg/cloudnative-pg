@@ -282,6 +282,7 @@ VOLNAME
 Valerio
 VirtualBox
 WAL
+WAL's
 WALBackupConfiguration
 WALs
 Wadle
@@ -481,6 +482,7 @@ freddie
 gc
 gcc
 gce
+gcs
 gcsCredentials
 ghcr
 github
@@ -512,6 +514,7 @@ imagePullSecrets
 img
 immediateCheckpoint
 inProgress
+inheritFromAzureAD
 inheritFromIAMRole
 init
 initDB
@@ -699,6 +702,7 @@ readthedocs
 readyInstances
 reconciliationLoop
 recoverability
+recoveredCluster
 recoveryTarget
 recoverytarget
 recv

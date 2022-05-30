@@ -1,0 +1,15 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-backup-azure-inherit
+spec:
+  instances: 3
+  storage:
+    storageClass: standard
+    size: 1Gi
+  backup:
+    barmanObjectStore:
+      destinationPath: https://AZURE_STORAGE_ACCOUNT.blob.core.windows.net/pg-backup-azure-inherit/
+      azureCredentials:
+        inheritFromAzureAD: true
+    retentionPolicy: "30d"

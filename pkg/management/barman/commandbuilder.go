@@ -30,10 +30,16 @@ func AppendCloudProviderOptionsFromConfiguration(
 	options []string,
 	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
 ) ([]string, error) {
+	azureInheritFromAzureAD := false
+	if barmanConfiguration.AzureCredentials != nil && barmanConfiguration.AzureCredentials.InheritFromAzureAD {
+		azureInheritFromAzureAD = true
+	}
 	return appendCloudProviderOptions(options,
 		barmanConfiguration.S3Credentials != nil,
 		barmanConfiguration.AzureCredentials != nil,
-		barmanConfiguration.GoogleCredentials != nil)
+		barmanConfiguration.GoogleCredentials != nil,
+		azureInheritFromAzureAD,
+	)
 }
 
 // AppendCloudProviderOptionsFromBackup takes an options array and adds the cloud provider specified
@@ -42,10 +48,15 @@ func AppendCloudProviderOptionsFromBackup(
 	options []string,
 	backup *v1.Backup,
 ) ([]string, error) {
+	azureInheritFromAzureAD := false
+	if backup.Status.AzureCredentials != nil && backup.Status.AzureCredentials.InheritFromAzureAD {
+		azureInheritFromAzureAD = true
+	}
 	return appendCloudProviderOptions(options,
 		backup.Status.S3Credentials != nil,
 		backup.Status.AzureCredentials != nil,
-		backup.Status.GoogleCredentials != nil)
+		backup.Status.GoogleCredentials != nil,
+		azureInheritFromAzureAD)
 }
 
 // appendCloudProviderOptions takes an options array and adds the cloud provider specified as arguments
@@ -53,7 +64,8 @@ func appendCloudProviderOptions(
 	options []string,
 	s3Credentials,
 	azureCredentials,
-	googleCredentials bool,
+	googleCredentials,
+	azureInheritFromAzureAD bool,
 ) ([]string, error) {
 	capabilities, err := barmanCapabilities.CurrentCapabilities()
 	if err != nil {
@@ -69,31 +81,47 @@ func appendCloudProviderOptions(
 				"aws-s3")
 		}
 	case azureCredentials:
-		if capabilities.HasAzure {
-			options = append(
-				options,
-				"--cloud-provider",
-				"azure-blob-storage")
-		} else {
+		if !capabilities.HasAzure {
 			err := fmt.Errorf(
 				"barman >= 2.13 is required to use Azure object storage, current: %v",
 				capabilities.Version)
 			log.Error(err, "Barman version not supported")
 			return nil, err
 		}
+
+		options = append(
+			options,
+			"--cloud-provider",
+			"azure-blob-storage")
+
+		if !azureInheritFromAzureAD {
+			break
+		}
+
+		if !capabilities.HasAzureManagedIdentity {
+			err := fmt.Errorf(
+				"barman >= 2.18 is required to use azureInheritFromAzureAD, current: %v",
+				capabilities.Version)
+			log.Error(err, "Barman version not supported")
+			return nil, err
+		}
+
+		options = append(
+			options,
+			"--credential",
+			"managed-identity")
 	case googleCredentials:
-		if capabilities.HasGoogle {
-			options = append(
-				options,
-				"--cloud-provider",
-				"google-cloud-storage")
-		} else {
+		if !capabilities.HasGoogle {
 			err := fmt.Errorf(
 				"barman >= 2.19 is required to use Google Cloud Storage, current: %v",
 				capabilities.Version)
 			log.Error(err, "Barman version not supported")
 			return nil, err
 		}
+		options = append(
+			options,
+			"--cloud-provider",
+			"google-cloud-storage")
 	}
 
 	return options, nil
