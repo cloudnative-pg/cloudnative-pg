@@ -328,7 +328,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.
 		cmd = append(cmd, "--endpoint-url", backup.Status.EndpointURL)
 	}
 	cmd = append(cmd, backup.Status.DestinationPath)
-	cmd = append(cmd, backup.Spec.Cluster.Name)
+	cmd = append(cmd, backup.Status.ServerName)
 
 	cmd, err = barman.AppendCloudProviderOptionsFromBackup(cmd, backup)
 	if err != nil {
