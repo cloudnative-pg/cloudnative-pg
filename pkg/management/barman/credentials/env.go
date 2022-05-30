@@ -103,55 +103,44 @@ func envSetAWSCredentials(
 		return env, nil
 	}
 
-	var accessKeyIDSecret corev1.Secret
-	var secretAccessKeySecret corev1.Secret
-	var sessionSecret corev1.Secret
-
 	// Get access key ID
 	if s3credentials.AccessKeyIDReference == nil {
 		return nil, fmt.Errorf("missing access key ID")
 	}
-	secretName := s3credentials.AccessKeyIDReference.Name
-	secretKey := s3credentials.AccessKeyIDReference.Key
-	err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &accessKeyIDSecret)
-	if err != nil {
-		return nil, fmt.Errorf("while getting access key ID secret: %w", err)
-	}
-
-	accessKeyID, ok := accessKeyIDSecret.Data[secretKey]
-	if !ok {
-		return nil, fmt.Errorf("missing key inside access key ID secret")
+	accessKeyID, acessKeyErr := extractValueFromSecret(
+		ctx,
+		c,
+		s3credentials.AccessKeyIDReference,
+		namespace,
+	)
+	if acessKeyErr != nil {
+		return nil, acessKeyErr
 	}
 
 	// Get secret access key
 	if s3credentials.SecretAccessKeyReference == nil {
 		return nil, fmt.Errorf("missing secret access key")
 	}
-	secretName = s3credentials.SecretAccessKeyReference.Name
-	secretKey = s3credentials.SecretAccessKeyReference.Key
-	err = c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &secretAccessKeySecret)
-	if err != nil {
-		return nil, fmt.Errorf("while getting secret access key secret: %w", err)
-	}
-
-	secretAccessKey, ok := secretAccessKeySecret.Data[secretKey]
-	if !ok {
-		return nil, fmt.Errorf("missing key inside secret access key secret")
+	secretAccessKey, secretAccessErr := extractValueFromSecret(
+		ctx,
+		c,
+		s3credentials.SecretAccessKeyReference,
+		namespace,
+	)
+	if secretAccessErr != nil {
+		return nil, secretAccessErr
 	}
 
 	// Get session token secret
 	if s3credentials.SessionToken != nil {
-		secretName = s3credentials.SessionToken.Name
-		secretKey = s3credentials.SessionToken.Key
-
-		err = c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &sessionSecret)
-		if err != nil {
-			return nil, fmt.Errorf("while getting session secret: %w", err)
-		}
-
-		sessionKey, ok := sessionSecret.Data[secretKey]
-		if !ok {
-			return nil, fmt.Errorf("missing key inside session secret")
+		sessionKey, sessErr := extractValueFromSecret(
+			ctx,
+			c,
+			s3credentials.SessionToken,
+			namespace,
+		)
+		if sessErr != nil {
+			return nil, sessErr
 		}
 		env = append(env, fmt.Sprintf("AWS_SESSION_TOKEN=%s", sessionKey))
 	}
@@ -176,75 +165,59 @@ func envSetAzureCredentials(
 		return nil, fmt.Errorf("missing Azure credentials")
 	}
 
-	var storageAccountSecret corev1.Secret
-
 	// Get storage account name
 	if configuration.AzureCredentials.StorageAccount != nil {
-		storageAccountName := configuration.AzureCredentials.StorageAccount.Name
-		storageAccountKey := configuration.AzureCredentials.StorageAccount.Key
-		err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: storageAccountName}, &storageAccountSecret)
+		storageAccount, err := extractValueFromSecret(
+			ctx,
+			c,
+			configuration.AzureCredentials.StorageAccount,
+			namespace,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("while getting access key ID secret: %w", err)
-		}
-
-		storageAccount, ok := storageAccountSecret.Data[storageAccountKey]
-		if !ok {
-			return nil, fmt.Errorf("missing key inside storage account name secret")
+			return nil, err
 		}
 		env = append(env, fmt.Sprintf("AZURE_STORAGE_ACCOUNT=%s", storageAccount))
 	}
 
 	// Get the storage key
 	if configuration.AzureCredentials.StorageKey != nil {
-		var storageKeySecret corev1.Secret
-		storageKeyName := configuration.AzureCredentials.StorageKey.Name
-		storageKeyKey := configuration.AzureCredentials.StorageKey.Key
-
-		err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: storageKeyName}, &storageKeySecret)
+		storageKey, err := extractValueFromSecret(
+			ctx,
+			c,
+			configuration.AzureCredentials.StorageKey,
+			namespace,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("while getting access key ID secret: %w", err)
-		}
-
-		storageKey, ok := storageKeySecret.Data[storageKeyKey]
-		if !ok {
-			return nil, fmt.Errorf("missing key inside storage key secret")
+			return nil, err
 		}
 		env = append(env, fmt.Sprintf("AZURE_STORAGE_KEY=%s", storageKey))
 	}
 
 	// Get the SAS token
 	if configuration.AzureCredentials.StorageSasToken != nil {
-		var storageSasTokenSecret corev1.Secret
-		storageSasTokenName := configuration.AzureCredentials.StorageSasToken.Name
-		storageSasTokenKey := configuration.AzureCredentials.StorageSasToken.Key
-
-		err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: storageSasTokenName}, &storageSasTokenSecret)
+		storageSasToken, err := extractValueFromSecret(
+			ctx,
+			c,
+			configuration.AzureCredentials.StorageSasToken,
+			namespace,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("while getting storage SAS token secret: %w", err)
+			return nil, err
 		}
-
-		storageKey, ok := storageSasTokenSecret.Data[storageSasTokenKey]
-		if !ok {
-			return nil, fmt.Errorf("missing key inside storage SAS token secret")
-		}
-		env = append(env, fmt.Sprintf("AZURE_STORAGE_SAS_TOKEN=%s", storageKey))
+		env = append(env, fmt.Sprintf("AZURE_STORAGE_SAS_TOKEN=%s", storageSasToken))
 	}
 
 	if configuration.AzureCredentials.ConnectionString != nil {
-		var connectionStringSecret corev1.Secret
-		connectionStringName := configuration.AzureCredentials.ConnectionString.Name
-		connectionStringKey := configuration.AzureCredentials.ConnectionString.Key
-
-		err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: connectionStringName}, &connectionStringSecret)
+		connString, err := extractValueFromSecret(
+			ctx,
+			c,
+			configuration.AzureCredentials.ConnectionString,
+			namespace,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("while getting storage SAS token secret: %w", err)
+			return nil, err
 		}
-
-		storageKey, ok := connectionStringSecret.Data[connectionStringKey]
-		if !ok {
-			return nil, fmt.Errorf("missing key inside connection string secret")
-		}
-		env = append(env, fmt.Sprintf("AZURE_STORAGE_CONNECTION_STRING=%s", storageKey))
+		env = append(env, fmt.Sprintf("AZURE_STORAGE_CONNECTION_STRING=%s", connString))
 	}
 
 	return env, nil
@@ -264,18 +237,14 @@ func envSetGoogleCredentials(
 		return env, reconcileGoogleCredentials(googleCredentials, applicationCredentialsContent)
 	}
 
-	var applicationCredentialsSecret corev1.Secret
-
-	secretName := googleCredentials.ApplicationCredentials.Name
-	secretKey := googleCredentials.ApplicationCredentials.Key
-	err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretName}, &applicationCredentialsSecret)
+	applicationCredentialsContent, err := extractValueFromSecret(
+		ctx,
+		c,
+		googleCredentials.ApplicationCredentials,
+		namespace,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("while getting application credentials secret: %w", err)
-	}
-
-	applicationCredentialsContent, ok := applicationCredentialsSecret.Data[secretKey]
-	if !ok {
-		return nil, fmt.Errorf("missing key `%v` in application credentials secret", secretKey)
+		return nil, err
 	}
 
 	if err := reconcileGoogleCredentials(googleCredentials, applicationCredentialsContent); err != nil {
@@ -300,4 +269,24 @@ func reconcileGoogleCredentials(
 	_, err := fileutils.WriteFileAtomic(credentialsPath, applicationCredentialsContent, 0o600)
 
 	return err
+}
+
+func extractValueFromSecret(
+	ctx context.Context,
+	c client.Client,
+	secretReference *apiv1.SecretKeySelector,
+	namespace string,
+) ([]byte, error) {
+	secret := &corev1.Secret{}
+	err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: secretReference.Name}, secret)
+	if err != nil {
+		return nil, fmt.Errorf("while getting secret %s: %w", secretReference.Name, err)
+	}
+
+	value, ok := secret.Data[secretReference.Key]
+	if !ok {
+		return nil, fmt.Errorf("missing key %s, inside secret %s", secretReference.Key, secretReference.Name)
+	}
+
+	return value, nil
 }
