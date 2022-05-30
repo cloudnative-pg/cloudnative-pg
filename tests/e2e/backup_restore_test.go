@@ -19,6 +19,9 @@ package e2e
 import (
 	"fmt"
 	"os"
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -941,6 +944,213 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			Expect(err).NotTo(HaveOccurred())
 
 			AssertClusterRestorePITR(namespace, externalClusterRestoreName, tableName, "00000002")
+		})
+	})
+})
+
+var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), func() {
+	const (
+		level = tests.High
+
+		clusterSampleFile = fixturesDir + "/backup/backup_restore_safety/cluster-with-backup-minio.yaml"
+	)
+
+	var namespace, clusterName, namespace2 string
+
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpClusterEnv(namespace, clusterName,
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
+		}
+	})
+	Context("using minio as object storage", Ordered, func() {
+		// This is a set of tests using a minio server to ensure backup and safet
+		// in case user configures the same destination path for more backups
+
+		const (
+			clusterRestoreSampleFile  = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio.yaml"
+			clusterRestoreSampleFile2 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-2.yaml"
+			clusterRestoreSampleFile3 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-3.yaml"
+			clusterRestoreSampleFile4 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-4.yaml"
+			sourceBackup              = fixturesDir + "/backup/backup_restore_safety/backup-source-cluster.yaml"
+			restoreBackup             = fixturesDir + "/backup/backup_restore_safety/backup-cluster-2.yaml"
+		)
+		BeforeAll(func() {
+			isAKS, err := env.IsAKS()
+			Expect(err).ToNot(HaveOccurred())
+			if isAKS {
+				Skip("This test is not run on AKS")
+			}
+			if env.IsIBM() {
+				Skip("This test is not run on an IBM architecture")
+			}
+			namespace = "backup-safety-1"
+			namespace2 = "backup-safety-2"
+			clusterName, err = env.GetResourceNameFromYAML(clusterSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = env.CreateNamespace(namespace2)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("creating the credentials for minio", func() {
+				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+			})
+
+			// setting up default minio
+			By("setting up minio", func() {
+				minio, err := testUtils.MinioDefaultSetup(namespace)
+				Expect(err).ToNot(HaveOccurred())
+				err = testUtils.InstallMinio(env, minio, 300)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			// Create the minio client pod and wait for it to be ready.
+			// We'll use it to check if everything is archived correctly
+			By("setting up minio client pod", func() {
+				minioClient := testUtils.MinioDefaultClient(namespace)
+				err := testUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			// Creates the cluster
+			AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
+
+			// Taking backup of source cluster
+			testUtils.ExecuteBackup(namespace, sourceBackup, env)
+		})
+
+		AfterAll(func() {
+			err := env.DeleteNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			err = env.DeleteNamespace(namespace2)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("restore a cluster with same backup destination path as source and it fails", func() {
+			// Restoring cluster with same destination path.
+			_, stderr, err := testUtils.RunUnchecked("kubectl apply -n " + namespace + " -f " + clusterRestoreSampleFile)
+			Expect(err).To(HaveOccurred())
+			// Asserting if the cluster pods have this error info.
+			Expect(strings.Contains(stderr, "Cannot be equal to the ExternalCluster")).Should(BeTrue())
+		})
+
+		It("restore a cluster with different backup destination and creates another cluster with same path as "+
+			"source cluster and it fails", func() {
+			restoredClusterName, err := env.GetResourceNameFromYAML(clusterRestoreSampleFile2)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Deleting  source cluster since we have backup to restore.
+			_, _, err = testUtils.RunUnchecked("kubectl delete -f " + clusterSampleFile + " -n " + namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Restoring cluster form source backup
+			AssertCreateCluster(namespace, restoredClusterName, clusterRestoreSampleFile2, env)
+
+			// Taking backup of restore cluster which will be used to create another cluster further
+			testUtils.ExecuteBackup(namespace, restoreBackup, env)
+
+			// Restoring cluster from second backup
+			_, _, err = testUtils.RunUnchecked("kubectl apply -n " + namespace + " -f " + clusterRestoreSampleFile3)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verifying the cluster creation errors since it will fail
+			// it must have the error log message for barman cloud.
+			Eventually(func() (int, error) {
+				podList := &corev1.PodList{}
+				err := testUtils.GetObjectList(env, podList, ctrlclient.InNamespace(namespace),
+					ctrlclient.MatchingLabels{"job-name": "pg-backup-minio-1-full-recovery"})
+				if err != nil {
+					return -1, err
+				}
+				return len(podList.Items), nil
+			}, 60).Should(BeNumerically(">", 1))
+
+			podList := &corev1.PodList{}
+			err = testUtils.GetObjectList(env, podList, ctrlclient.InNamespace(namespace),
+				ctrlclient.MatchingLabels{"job-name": "pg-backup-minio-1-full-recovery"})
+			Expect(err).ToNot(HaveOccurred())
+			for _, pod := range podList.Items {
+				fmt.Println(pod.GetName())
+				Eventually(func() bool {
+					podLogs, err := env.GetPodLogs(namespace, pod.GetName())
+					fmt.Println(podLogs, err)
+					return strings.Contains(podLogs,
+						"ERROR: WAL archive check failed for server "+
+							"pg-backup-minio: Expected empty archive")
+				}, 60).Should(BeTrue())
+
+				break
+			}
+		})
+
+		It("restore a cluster with different backup destination and creates another cluster with same "+
+			"backup destination as restored cluster and it fails", func() {
+			_, _, err := testUtils.RunUnchecked("kubectl delete -f " + clusterRestoreSampleFile3 + " -n " + namespace)
+			Expect(err).ToNot(HaveOccurred())
+			By("creating the credentials for minio", func() {
+				AssertStorageCredentialsAreCreated(namespace2, "backup-storage-creds", "minio", "minio123")
+			})
+			_, _, err = testUtils.RunUnchecked("kubectl apply -n " + namespace2 + " -f " + clusterRestoreSampleFile4)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verifying the cluster creation errors since it will fail
+			// it must have the error log message for barman cloud.
+			Eventually(func() (int, error) {
+				podList := &corev1.PodList{}
+				err := testUtils.GetObjectList(env, podList, ctrlclient.InNamespace(namespace2),
+					ctrlclient.MatchingLabels{"job-name": "external-cluster-minio-1-1-full-recovery"})
+				if err != nil {
+					return -1, err
+				}
+				return len(podList.Items), nil
+			}, 60).Should(BeNumerically(">", 1))
+
+			podList := &corev1.PodList{}
+			err = testUtils.GetObjectList(env, podList, ctrlclient.InNamespace(namespace2),
+				ctrlclient.MatchingLabels{"job-name": "external-cluster-minio-1-1-full-recovery"})
+			Expect(err).ToNot(HaveOccurred())
+			for _, pod := range podList.Items {
+				fmt.Println("pod")
+				podLogs, _ := env.GetPodLogs(namespace2, pod.GetName())
+				Expect(strings.Contains(podLogs,
+					"ERROR: WAL archive check failed for server "+
+						"external-cluster-minio-1: Expected empty archive")).Should(BeTrue())
+				break
+			}
+		})
+
+		It("creates a cluster with backup and "+
+			"also creates a cluster with same backup location and it fails", func() {
+			_, _, err := testUtils.RunUnchecked("kubectl apply -n " + namespace2 + " -f " + clusterSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verifying the cluster creation errors since it will fail
+			// it must have the error log message for barman cloud.
+			Eventually(func() (int, error) {
+				podList := &corev1.PodList{}
+				err := testUtils.GetObjectList(env, podList, ctrlclient.InNamespace(namespace2),
+					ctrlclient.MatchingLabels{"postgresql": clusterName})
+				if err != nil {
+					return -1, err
+				}
+				return len(podList.Items), nil
+			}, 60).Should(BeNumerically(">", 1))
+
+			// fetching cluster condition
+			clusterCondition, err := testUtils.GetConditionsInClusterStatus(namespace2,
+				"pg-backup-minio", env, apiv1.ConditionContinuousArchiving)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(strings.Contains(clusterCondition.Message,
+				"unexpected failure invoking barman-cloud-wal-archive")).Should(BeTrue())
 		})
 	})
 })
