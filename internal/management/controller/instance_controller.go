@@ -506,10 +506,25 @@ func (r *InstanceReconciler) reconcileExtensions(
 
 	for _, extension := range postgres.ManagedExtensions {
 		extensionIsUsed := extension.IsUsed(userSettings)
-		if !extension.SkipCreateExtension && extensionIsUsed {
-			_, err = tx.Exec(fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s", extension.Name))
-		} else {
-			_, err = tx.Exec(fmt.Sprintf("DROP EXTENSION IF EXISTS %s", extension.Name))
+
+		row := tx.QueryRow("SELECT COUNT(*) > 0 FROM pg_extension WHERE extname = $1", extension.Name)
+		err = row.Err()
+		if err != nil {
+			break
+		}
+
+		var extensionIsInstalled bool
+		if err = row.Scan(&extensionIsInstalled); err != nil {
+			break
+		}
+
+		// We don't just use the "IF EXIST" to avoid stressing PostgreSQL with
+		// a DDL when it is not really needed.
+
+		if !extension.SkipCreateExtension && extensionIsUsed && !extensionIsInstalled {
+			_, err = tx.Exec(fmt.Sprintf("CREATE EXTENSION %s", extension.Name))
+		} else if extensionIsInstalled {
+			_, err = tx.Exec(fmt.Sprintf("DROP EXTENSION %s", extension.Name))
 		}
 		if err != nil {
 			break
