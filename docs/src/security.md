@@ -120,6 +120,16 @@ namespaced resources.
   failover/switchover operations in an automated way (by assigning, for example,
   the correct end-point of a service to the proper primary PostgreSQL instance).
 
+`validatingwebhookconfigurations` and `mutatingwebhookconfigurations`
+: The operator injects its self-signed webhook CA into both webhook
+  configurations, which are needed to validate and mutate all the resources it
+  manages. For more details, please see the
+  [Kubernetes documentation](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/).
+
+To see all the permissions required by the operator, you can run `kubectl
+describe clusterrole cnpg-manager`.
+
+
 ### Pod Security Policies
 
 A [Pod Security Policy](https://kubernetes.io/docs/concepts/policy/pod-security-policy/)
