@@ -1364,6 +1364,11 @@ func (in *S3Credentials) DeepCopyInto(out *S3Credentials) {
 		*out = new(SecretKeySelector)
 		**out = **in
 	}
+	if in.RegionReference != nil {
+		in, out := &in.RegionReference, &out.RegionReference
+		*out = new(SecretKeySelector)
+		**out = **in
+	}
 	if in.SessionToken != nil {
 		in, out := &in.SessionToken, &out.SessionToken
 		*out = new(SecretKeySelector)

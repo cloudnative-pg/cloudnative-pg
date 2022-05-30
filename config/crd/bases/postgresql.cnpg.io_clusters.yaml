@@ -921,6 +921,20 @@ spec:
                             description: Use the role based authentication without
                               providing explicitly the keys.
                             type: boolean
+                          region:
+                            description: The reference to the secret containing the
+                              region name
+                            properties:
+                              key:
+                                description: The key to select
+                                type: string
+                              name:
+                                description: Name of the referent.
+                                type: string
+                            required:
+                            - key
+                            - name
+                            type: object
                           secretAccessKey:
                             description: The reference to the secret access key
                             properties:
@@ -1410,6 +1424,20 @@ spec:
                               description: Use the role based authentication without
                                 providing explicitly the keys.
                               type: boolean
+                            region:
+                              description: The reference to the secret containing
+                                the region name
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
                             secretAccessKey:
                               description: The reference to the secret access key
                               properties:

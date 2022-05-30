@@ -89,7 +89,7 @@ func envSetCloudCredentials(
 // inside the cluster
 func envSetAWSCredentials(
 	ctx context.Context,
-	c client.Client,
+	client client.Client,
 	namespace string,
 	s3credentials *apiv1.S3Credentials,
 	env []string,
@@ -107,14 +107,14 @@ func envSetAWSCredentials(
 	if s3credentials.AccessKeyIDReference == nil {
 		return nil, fmt.Errorf("missing access key ID")
 	}
-	accessKeyID, acessKeyErr := extractValueFromSecret(
+	accessKeyID, accessKeyErr := extractValueFromSecret(
 		ctx,
-		c,
+		client,
 		s3credentials.AccessKeyIDReference,
 		namespace,
 	)
-	if acessKeyErr != nil {
-		return nil, acessKeyErr
+	if accessKeyErr != nil {
+		return nil, accessKeyErr
 	}
 
 	// Get secret access key
@@ -123,7 +123,7 @@ func envSetAWSCredentials(
 	}
 	secretAccessKey, secretAccessErr := extractValueFromSecret(
 		ctx,
-		c,
+		client,
 		s3credentials.SecretAccessKeyReference,
 		namespace,
 	)
@@ -131,11 +131,24 @@ func envSetAWSCredentials(
 		return nil, secretAccessErr
 	}
 
+	if s3credentials.RegionReference != nil {
+		region, regionErr := extractValueFromSecret(
+			ctx,
+			client,
+			s3credentials.RegionReference,
+			namespace,
+		)
+		if regionErr != nil {
+			return nil, regionErr
+		}
+		env = append(env, fmt.Sprintf("AWS_DEFAULT_REGION=%s", region))
+	}
+
 	// Get session token secret
 	if s3credentials.SessionToken != nil {
 		sessionKey, sessErr := extractValueFromSecret(
 			ctx,
-			c,
+			client,
 			s3credentials.SessionToken,
 			namespace,
 		)

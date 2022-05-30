@@ -761,6 +761,7 @@ Name               | Description                                                
 ------------------ | ------------------------------------------------------------------------ | ----------------------------------------
 `accessKeyId       ` | The reference to the access key id                                       | [*SecretKeySelector](#SecretKeySelector)
 `secretAccessKey   ` | The reference to the secret access key                                   | [*SecretKeySelector](#SecretKeySelector)
+`region            ` | The reference to the secret containing the region name                   | [*SecretKeySelector](#SecretKeySelector)
 `sessionToken      ` | The references to the session key                                        | [*SecretKeySelector](#SecretKeySelector)
 `inheritFromIAMRole` | Use the role based authentication without providing explicitly the keys. - *mandatory*  | bool                                    
 
