@@ -1037,6 +1037,9 @@ type S3Credentials struct {
 	// The reference to the secret access key
 	SecretAccessKeyReference *SecretKeySelector `json:"secretAccessKey,omitempty"`
 
+	// The reference to the secret containing the region name
+	RegionReference *SecretKeySelector `json:"region,omitempty"`
+
 	// The references to the session key
 	SessionToken *SecretKeySelector `json:"sessionToken,omitempty"`
 
