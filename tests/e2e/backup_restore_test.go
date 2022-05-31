@@ -948,7 +948,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	})
 })
 
-var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), func() {
+var _ = FDescribe("Backup and restore Safety", Label(tests.LabelBackupRestore), func() {
 	const (
 		level = tests.High
 
@@ -1116,13 +1116,17 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			err = testUtils.GetObjectList(env, podList, ctrlclient.InNamespace(namespace2),
 				ctrlclient.MatchingLabels{"job-name": "external-cluster-minio-1-1-full-recovery"})
 			Expect(err).ToNot(HaveOccurred())
+			isLogContainsFailure := false
 			for _, pod := range podList.Items {
 				podLogs, _ := env.GetPodLogs(namespace2, pod.GetName())
-				Expect(strings.Contains(podLogs,
+				if strings.Contains(podLogs,
 					"ERROR: WAL archive check failed for server "+
-						"external-cluster-minio-1: Expected empty archive")).Should(BeTrue())
-				break
+						"external-cluster-minio-1: Expected empty archive") {
+					isLogContainsFailure = true
+					break
+				}
 			}
+			Expect(isLogContainsFailure).Should(BeTrue())
 		})
 
 		It("creates a cluster with backup and "+
