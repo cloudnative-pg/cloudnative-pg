@@ -1079,10 +1079,8 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 				ctrlclient.MatchingLabels{"job-name": "pg-backup-minio-1-full-recovery"})
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range podList.Items {
-				fmt.Println(pod.GetName())
 				Eventually(func() bool {
-					podLogs, err := env.GetPodLogs(namespace, pod.GetName())
-					fmt.Println(podLogs, err)
+					podLogs, _ := env.GetPodLogs(namespace, pod.GetName())
 					return strings.Contains(podLogs,
 						"ERROR: WAL archive check failed for server "+
 							"pg-backup-minio: Expected empty archive")
@@ -1119,7 +1117,6 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 				ctrlclient.MatchingLabels{"job-name": "external-cluster-minio-1-1-full-recovery"})
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range podList.Items {
-				fmt.Println("pod")
 				podLogs, _ := env.GetPodLogs(namespace2, pod.GetName())
 				Expect(strings.Contains(podLogs,
 					"ERROR: WAL archive check failed for server "+
