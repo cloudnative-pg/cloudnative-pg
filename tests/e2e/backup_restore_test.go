@@ -948,7 +948,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	})
 })
 
-var _ = FDescribe("Backup and restore Safety", Label(tests.LabelBackupRestore), func() {
+var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), func() {
 	const (
 		level = tests.High
 
@@ -1147,11 +1147,18 @@ var _ = FDescribe("Backup and restore Safety", Label(tests.LabelBackupRestore), 
 			}, 60).Should(BeNumerically(">", 1))
 
 			// fetching cluster condition
-			clusterCondition, err := testUtils.GetConditionsInClusterStatus(namespace2,
-				"pg-backup-minio", env, apiv1.ConditionContinuousArchiving)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(strings.Contains(clusterCondition.Message,
-				"unexpected failure invoking barman-cloud-wal-archive")).Should(BeTrue())
+			Eventually(func() (bool, error) {
+				clusterCondition, err := testUtils.GetConditionsInClusterStatus(namespace2,
+					"pg-backup-minio", env, apiv1.ConditionContinuousArchiving)
+				if err != nil {
+					return false, err
+				}
+				if clusterCondition.Message != "" {
+					return strings.Contains(clusterCondition.Message,
+						"unexpected failure invoking barman-cloud-wal-archive"), nil
+				}
+				return false, nil
+			}, 60).Should(BeTrue())
 		})
 	})
 })
