@@ -1036,6 +1036,49 @@ spec:
                         description: The value to be passed as option `--encoding`
                           for initdb (default:`UTF8`)
                         type: string
+                      import:
+                        description: if provided bootstraps the DB data by doing a
+                          logical backup of an external cluster
+                        properties:
+                          databases:
+                            description: The database to import
+                            items:
+                              type: string
+                            type: array
+                          postImportApplicationSQL:
+                            description: List of SQL queries to be executed as a superuser
+                              in the application database right after is created -
+                              to be used with extreme care (by default empty). Only
+                              available in microservice type.
+                            items:
+                              type: string
+                            type: array
+                          roles:
+                            description: The roles to import
+                            items:
+                              type: string
+                            type: array
+                          source:
+                            description: The source of the import
+                            properties:
+                              externalCluster:
+                                description: The name of the externalCluster used
+                                  for import
+                                type: string
+                            required:
+                            - externalCluster
+                            type: object
+                          type:
+                            description: Type of logicalSnapshot. Can be
+                            enum:
+                            - microservice
+                            - monolith
+                            type: string
+                        required:
+                        - databases
+                        - source
+                        - type
+                        type: object
                       localeCType:
                         description: The value to be passed as option `--lc-ctype`
                           for initdb (default:`C`)

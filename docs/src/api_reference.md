@@ -49,6 +49,8 @@ Below you will find a description of the defined resources:
 - [LDAPBindSearchAuth](#LDAPBindSearchAuth)
 - [LDAPConfig](#LDAPConfig)
 - [LocalObjectReference](#LocalObjectReference)
+- [LogicalSnapshot](#LogicalSnapshot)
+- [LogicalSnapshotSource](#LogicalSnapshotSource)
 - [MonitoringConfiguration](#MonitoringConfiguration)
 - [NodeMaintenanceWindow](#NodeMaintenanceWindow)
 - [PgBouncerIntegrationStatus](#PgBouncerIntegrationStatus)
@@ -247,6 +249,7 @@ Name                   | Description                                            
 `postInitSQL           ` | List of SQL queries to be executed as a superuser immediately after the cluster has been created - to be used with extreme care (by default empty)                                                                                         | []string                                      
 `postInitApplicationSQL` | List of SQL queries to be executed as a superuser in the application database right after is created - to be used with extreme care (by default empty)                                                                                     | []string                                      
 `postInitTemplateSQL   ` | List of SQL queries to be executed as a superuser in the `template1` after the cluster has been created - to be used with extreme care (by default empty)                                                                                  | []string                                      
+`import                ` | if provided bootstraps the DB data by doing a logical backup of an external cluster                                                                                                                                                        | [*LogicalSnapshot](#LogicalSnapshot)          
 
 <a id='BootstrapPgBaseBackup'></a>
 
@@ -543,6 +546,30 @@ LocalObjectReference contains enough information to let you locate a local objec
 Name | Description           | Type  
 ---- | --------------------- | ------
 `name` | Name of the referent. - *mandatory*  | string
+
+<a id='LogicalSnapshot'></a>
+
+## LogicalSnapshot
+
+LogicalSnapshot contains the configuration to init a database from a logic snapshot of an externalCluster
+
+Name                     | Description                                                                                                                                                                                  | Type                                           
+------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------------------------
+`source                  ` | The source of the import                                                                                                                                                                     - *mandatory*  | [LogicalSnapshotSource](#LogicalSnapshotSource)
+`type                    ` | Type of logicalSnapshot. Can be                                                                                                                                                              - *mandatory*  | SnapshotType                                   
+`databases               ` | The database to import                                                                                                                                                                       - *mandatory*  | []string                                       
+`roles                   ` | The roles to import                                                                                                                                                                          | []string                                       
+`postImportApplicationSQL` | List of SQL queries to be executed as a superuser in the application database right after is created - to be used with extreme care (by default empty). Only available in microservice type. | []string                                       
+
+<a id='LogicalSnapshotSource'></a>
+
+## LogicalSnapshotSource
+
+LogicalSnapshotSource describes the source for the logical snapshot
+
+Name            | Description                                     | Type  
+--------------- | ----------------------------------------------- | ------
+`externalCluster` | The name of the externalCluster used for import - *mandatory*  | string
 
 <a id='MonitoringConfiguration'></a>
 

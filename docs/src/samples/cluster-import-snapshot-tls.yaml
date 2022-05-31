@@ -1,0 +1,44 @@
+# IMPORTANT: this configuration requires an appropriate line
+# in the host-based access rules allowing replication connections
+# to the postgres user.
+#
+# The following line meet the requisites:
+#
+# pg_hba:
+#  - hostssl all postgres all cert
+
+# You can generate the required TLS certificate with
+#
+# ./bin/kubectl-cnp  certificate cluster-example-superuser-tls --cnp-cluster cluster-example --cnp-user postgres
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-pgdump
+spec:
+  instances: 3
+
+  bootstrap:
+    initdb:
+      import:
+        type: microservice
+        databases:
+          - app
+        source:
+          externalCluster: cluster-example
+  storage:
+    size: 1Gi
+  externalClusters:
+    - name: cluster-example
+      connectionParameters:
+        host: cluster-example-rw.default.svc
+        user: postgres
+        dbname: postgres
+      sslKey:
+        name: cluster-example-superuser-tls
+        key: tls.key
+      sslCert:
+        name: cluster-example-superuser-tls
+        key: tls.crt
+      sslRootCert:
+        name: cluster-example-ca
+        key: ca.crt

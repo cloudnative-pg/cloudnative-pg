@@ -32,11 +32,20 @@ import (
 
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
 func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
-	initCommand := []string{
-		"/controller/manager",
-		"instance",
-		"init",
-		"--parent-node", cluster.GetServiceReadWriteName(),
+	var initCommand []string
+	if cluster.Spec.Bootstrap.InitDB.Import != nil {
+		initCommand = []string{
+			"/controller/manager",
+			"instance",
+			"logicalsnapshot",
+		}
+	} else {
+		initCommand = []string{
+			"/controller/manager",
+			"instance",
+			"init",
+			"--parent-node", cluster.GetServiceReadWriteName(),
+		}
 	}
 
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.InitDB != nil {
@@ -70,6 +79,9 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 			"--app-user", cluster.Spec.Bootstrap.InitDB.Owner)
 	}
 
+	if cluster.Spec.Bootstrap.InitDB.Import != nil {
+		return createPrimaryJob(cluster, nodeSerial, "logicalsnapshot", initCommand)
+	}
 	return createPrimaryJob(cluster, nodeSerial, "initdb", initCommand)
 }
 

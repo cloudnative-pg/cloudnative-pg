@@ -22,15 +22,13 @@ import (
 )
 
 var _ = Describe("Parsing version", func() {
-	instance := NewInstance()
-
 	It("properly works when version is malformed", func() {
-		_, err := instance.parseVersion("not-a-version")
+		_, err := parseVersion("not-a-version")
 		Expect(err).To(BeEquivalentTo(ErrMalformedServerVersion))
 	})
 
 	It("properly works when version is well-formed", func() {
-		_, err := instance.parseVersion("13.4.8 Debian")
+		_, err := parseVersion("13.4.8 Debian")
 		Expect(err).To(BeNil())
 	})
 })

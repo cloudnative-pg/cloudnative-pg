@@ -723,6 +723,46 @@ type BootstrapInitDB struct {
 	// after the cluster has been created - to be used with extreme care
 	// (by default empty)
 	PostInitTemplateSQL []string `json:"postInitTemplateSQL,omitempty"`
+
+	// if provided bootstraps the DB data by doing a logical backup of an external cluster
+	Import *LogicalSnapshot `json:"import,omitempty"`
+}
+
+// SnapshotType is a type of allowed import
+type SnapshotType string
+
+const (
+	// MonolithSnapshotType indicates to execute the monolith clone typology
+	MonolithSnapshotType SnapshotType = "monolith"
+	// MicroserviceSnapshotType indicates to execute the microservice clone typology
+	MicroserviceSnapshotType SnapshotType = "microservice"
+)
+
+// LogicalSnapshot contains the configuration to init a database from a logic snapshot of an externalCluster
+type LogicalSnapshot struct {
+	// The source of the import
+	Source LogicalSnapshotSource `json:"source"`
+
+	// Type of logicalSnapshot. Can be
+	// +kubebuilder:validation:Enum=microservice;monolith
+	Type SnapshotType `json:"type"`
+
+	// The database to import
+	Databases []string `json:"databases"`
+
+	// The roles to import
+	Roles []string `json:"roles,omitempty"`
+
+	// List of SQL queries to be executed as a superuser in the application
+	// database right after is created - to be used with extreme care
+	// (by default empty). Only available in microservice type.
+	PostImportApplicationSQL []string `json:"postImportApplicationSQL,omitempty"`
+}
+
+// LogicalSnapshotSource describes the source for the logical snapshot
+type LogicalSnapshotSource struct {
+	// The name of the externalCluster used for import
+	ExternalCluster string `json:"externalCluster"`
 }
 
 // BootstrapRecovery contains the configuration required to restore

@@ -485,42 +485,50 @@ func (instance *Instance) GetTemplateDB() (*sql.DB, error) {
 }
 
 // GetPgVersion queries the postgres instance to know the current version, parses it and memoize it for future uses
-func (instance *Instance) GetPgVersion() (semver.Version, error) {
+func (instance *Instance) GetPgVersion() (*semver.Version, error) {
 	// Better not to recompute what we already have
 	if instance.pgVersion != nil {
-		return *instance.pgVersion, nil
+		return instance.pgVersion, nil
 	}
 
 	db, err := instance.GetSuperUserDB()
 	if err != nil {
-		return semver.Version{}, err
+		return nil, err
 	}
 
+	parsedVersion, err := GetPgVersion(db)
+	if err != nil {
+		return nil, err
+	}
+	instance.pgVersion = parsedVersion
+	return parsedVersion, nil
+}
+
+// GetPgVersion returns the version of postgres in a semantic format or an error
+func GetPgVersion(db *sql.DB) (*semver.Version, error) {
 	var versionString string
 	row := db.QueryRow("SHOW server_version")
-	err = row.Scan(&versionString)
+	err := row.Scan(&versionString)
 	if err != nil {
-		return semver.Version{}, err
+		return nil, err
 	}
-
-	return instance.parseVersion(versionString)
+	return parseVersion(versionString)
 }
 
 // Version could contain more characters than just the version tag,
 // e.g. `13.4 (Debian 13.4-4.pgdg100+1)`.
 // Therefore, we extract the initial sequence of digits and dots, then we parse it
-func (instance *Instance) parseVersion(version string) (semver.Version, error) {
+func parseVersion(version string) (*semver.Version, error) {
 	if versionRegex.MatchString(version) {
 		parsedVersion, err := semver.ParseTolerant(versionRegex.FindStringSubmatch(version)[0])
 		if err != nil {
-			return semver.Version{}, err
+			return nil, err
 		}
 
-		instance.pgVersion = &parsedVersion
-		return *instance.pgVersion, nil
+		return &parsedVersion, nil
 	}
 
-	return semver.Version{}, ErrMalformedServerVersion
+	return nil, ErrMalformedServerVersion
 }
 
 // ConnectionPool gets or initializes the connection pool for this instance

@@ -27,7 +27,7 @@ The *bootstrap* method can be defined in the `bootstrap` section of the cluster
 specification.
 CloudNativePG currently supports the following bootstrap methods:
 
-- `initdb`: initialize an empty PostgreSQL cluster (default)
+- `initdb`: initialize a new PostgreSQL cluster (default)
 - `recovery`: create a PostgreSQL cluster by restoring from an existing cluster
   via a backup object store, and replaying all the available WAL files or up to
   a given *point in time*
@@ -268,6 +268,120 @@ spec:
     Please use the `postInitSQL`, `postInitApplicationSQL` and `postInitTemplateSQL` options with extreme care,
     as queries are run as a superuser and can disrupt the entire cluster.
     An error in any of those queries interrupts the bootstrap phase, leaving the cluster incomplete.
+
+### Import data after the bootstrap (`initdb.import`)
+
+The initdb bootstrap method also support the logical importing of data from an existing postgres cluster.
+
+There are two possible types of import: `microservice` and `monolith`.
+
+#### Microservice Import
+
+Microservice import copies the content of a specified database inside the new postgres Cluster.
+
+The import is done in three steps:
+
+- The first is the `pg_dump -Fc` of the chosen database that is specified inside the `databases` field.
+- The second step is the `pg_restore` of the dumped database inside the `initdb.database` while having`initdb.owner` as owner.
+- The third step executes, when populated, all the user defined queries inside `postImportApplicationSQL`.
+
+An example:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-microservice
+spec:
+  instances: 3
+  bootstrap:
+    initdb:
+      import:
+        type: microservice
+        databases:
+          - app
+        source:
+          externalCluster: cluster-example
+        postImportApplicationSQL:
+        - "INSERT YOUR QUERY HERE"
+  storage:
+    size: 1Gi
+  externalClusters:
+    - name: cluster-example
+      connectionParameters:
+        host: cluster-example-rw.default.svc
+        user: postgres
+        dbname: postgres
+      password:
+        name: cluster-example-superuser
+        key: password
+```
+
+
+There are several things to know while using `microservice` type:
+
+- It requires an `externalCluster` that contains the data to import
+- Traffic should be allowed between the Kubernetes cluster and the `externalCluster` during the operation.
+- Currently, the `pg_dump -Fc` result is stored temporarily inside an empty directory of the import job, so there should be
+  enough available space to contain the dump result on the assigned node.
+   - Only one database can be specified inside the databases array
+   - Roles are not imported, and so they cannot be specified inside`.initdb.import.roles`
+
+## Monolith Import
+
+Monolith import clones a set of databases and roles from the external cluster source into the new cluster.
+
+The minimum requirements to execute successfully a monolith clone:
+- an external cluster source where the data to clone resides
+- the specification of one or more databases to clone from the external cluster source
+- any role that is needed to correctly clone the databases
+
+An example:
+
+```yaml
+apiVersion: postgresql.k8s.enterprisedb.io/v1
+kind: Cluster
+metadata:
+  name: cluster-monolith
+spec:
+  instances: 3
+  bootstrap:
+    initdb:
+      import:
+        type: monolith
+        databases:
+          - accounting
+          - banking
+          - resort
+        roles:
+          - accountant
+          - bank_user
+        source:
+          externalCluster: cluster-example
+  storage:
+    size: 1Gi
+  externalClusters:
+    - name: cluster-example
+      connectionParameters:
+        host: cluster-example-rw.default.svc
+        user: postgres
+        dbname: postgres
+      password:
+        name: cluster-example-superuser
+        key: password
+```
+
+There are several things to know while using `monolith` type:
+
+- Currently, the `pg_dump -Fc` result is stored temporarily inside an empty directory of the import job, so there should be
+  enough available space to contain the dump result on the assigned node.
+   - Traffic should be allowed between the Kubernetes cluster and the `externalCluster` during the operation.
+   - Roles are downgraded from superusers to regular users
+   - The following roles, if present, are not imported: `postgres`, `streaming_replica`, `cnp_pooler_pgbouncer`
+   - Monolith type doesn't support `postImportApplicationSQL` field.
+   - Wildcard `"*"` can be used inside the `databases` or `roles` field to import everything.
+   - After the clone procedure is done, `ANALYZE VERBOSE` is executed for every database.
+
 
 ## Bootstrap from another cluster
 

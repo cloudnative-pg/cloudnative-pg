@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -412,6 +413,100 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 				field.NewPath("spec", "bootstrap", "initdb", "walSegmentSize"),
 				initDBOptions.WalSegmentSize,
 				"WAL segment size must be a power of 2"))
+	}
+
+	result = append(result, r.validateLogicalSnapshot()...)
+
+	return result
+}
+
+func (r *Cluster) validateLogicalSnapshot() field.ErrorList {
+	var result field.ErrorList
+	logicalSnapshot := r.Spec.Bootstrap.InitDB.Import
+	if logicalSnapshot == nil {
+		return result
+	}
+
+	switch logicalSnapshot.Type {
+	case MicroserviceSnapshotType:
+		result = append(result, r.validateLogicalSnapshotMicroservice()...)
+
+	case MonolithSnapshotType:
+		result = append(result, r.validateLogicalSnapshotMonolith()...)
+	}
+
+	return result
+}
+
+func (r *Cluster) validateLogicalSnapshotMicroservice() field.ErrorList {
+	var result field.ErrorList
+	logicalSnapshot := r.Spec.Bootstrap.InitDB.Import
+
+	if len(logicalSnapshot.Databases) != 1 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "databases"),
+				logicalSnapshot.Databases,
+				"You need to specify a single database for the microservice import type"),
+		)
+	}
+
+	if len(logicalSnapshot.Roles) != 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "roles"),
+				logicalSnapshot.Databases,
+				"You cannot specify roles to import for the microservice import type"),
+		)
+	}
+
+	if len(logicalSnapshot.Databases) == 1 && strings.Contains(logicalSnapshot.Databases[0], "*") {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "databases", "0"),
+				logicalSnapshot.Databases,
+				"You cannot wildcards for the microservice import type"),
+		)
+	}
+
+	return result
+}
+
+func (r *Cluster) validateLogicalSnapshotMonolith() field.ErrorList {
+	var result field.ErrorList
+	logicalSnapshot := r.Spec.Bootstrap.InitDB.Import
+
+	if len(logicalSnapshot.Databases) < 1 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "databases"),
+				logicalSnapshot.Databases,
+				"You need to specify at least a database for the monolith import type"),
+		)
+	}
+
+	if len(logicalSnapshot.Databases) > 1 && slices.Contains(logicalSnapshot.Databases, "*") {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "databases"),
+				logicalSnapshot.Databases,
+				"Wildcard import cannot be used along other databases"),
+		)
+	}
+
+	if len(logicalSnapshot.Roles) > 1 && slices.Contains(logicalSnapshot.Roles, "*") {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "roles"),
+				logicalSnapshot.Databases,
+				"Wildcard import cannot be used along other roles"),
+		)
 	}
 
 	return result

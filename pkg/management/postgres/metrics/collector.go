@@ -182,7 +182,7 @@ func (q QueriesCollector) checkRunOnServerMatches(runOnServer string, name strin
 		return false, err
 	}
 
-	return isVersionInRange(pgVersion), nil
+	return isVersionInRange(*pgVersion), nil
 }
 
 func (q QueriesCollector) expandTargetDatabases(

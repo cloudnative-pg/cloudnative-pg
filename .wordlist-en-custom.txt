@@ -26,6 +26,7 @@ Battiato
 Bok
 BootstrapConfiguration
 BootstrapInitDB
+BootstrapLogicalSnapshot
 BootstrapPgBaseBackup
 BootstrapRecovery
 CIS
@@ -143,6 +144,8 @@ ListMeta
 Liveness
 LoadBalancer
 LocalObjectReference
+LogicalSnapshot
+LogicalSnapshotSource
 MAPPEDMETRIC
 MetricDescription
 MetricName
@@ -264,6 +267,7 @@ ServiceAccount's
 ServiceMonitor
 Silvela
 Slonik
+SnapshotType
 StorageClass
 StorageConfiguration
 Storages
@@ -467,6 +471,7 @@ enterprisedb
 env
 executables
 extensibility
+externalCluster
 externalClusters
 facto
 failover
@@ -568,6 +573,7 @@ localeCollate
 localhost
 localobjectreference
 locktype
+logicalSnapshot
 lookups
 lsn
 lt
@@ -669,6 +675,7 @@ pooler
 poolers
 pos
 posix
+postImportApplicationSQL
 postInitSQL
 postgres
 postgresGID
