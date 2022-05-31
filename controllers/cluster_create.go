@@ -1111,8 +1111,7 @@ func (r *ClusterReconciler) reconcilePVCs(
 	contextLogger := log.FromContext(ctx)
 
 	if !cluster.IsNodeMaintenanceWindowInProgress() &&
-		cluster.Status.Instances-cluster.Status.ReadyInstances !=
-			instancesStatus.InstancesReportingMightBeUnavailable() {
+		instancesStatus.InstancesReportingStatus() != cluster.Status.Instances {
 		// A pod is not ready, let's retry
 		contextLogger.Debug("Waiting for node to be ready before attaching PVCs")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop

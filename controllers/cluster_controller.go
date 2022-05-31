@@ -423,7 +423,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// If we still need more instances, we need to wait before setting healthy status
-	if cluster.Status.ReadyInstances != cluster.Spec.Instances-instancesStatus.InstancesReportingMightBeUnavailable() {
+	if instancesStatus.InstancesReportingStatus() != cluster.Spec.Instances {
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
@@ -596,16 +596,14 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	// Stop acting here if there are non-ready Pods unless in maintenance reusing PVCs.
 	// The user have chosen to wait for the missing nodes to come up
 	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
-		cluster.Status.ReadyInstances+instancesStatus.InstancesReportingMightBeUnavailable() <
-			cluster.Status.Instances {
+		instancesStatus.InstancesReportingStatus() < cluster.Status.Instances {
 		contextLogger.Debug("Waiting for Pods to be ready")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	// Are there missing nodes? Let's create one
 	if cluster.Status.Instances < cluster.Spec.Instances &&
-		cluster.Status.ReadyInstances+instancesStatus.InstancesReportingMightBeUnavailable() ==
-			cluster.Status.Instances {
+		instancesStatus.InstancesReportingStatus() == cluster.Status.Instances {
 		newNodeSerial, err := r.generateNodeSerial(ctx, cluster)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
