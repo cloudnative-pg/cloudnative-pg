@@ -346,15 +346,6 @@ func barmanCloudWalRestoreOptions(
 	clusterName string,
 ) ([]string, error) {
 	var options []string
-	if configuration.Wal != nil {
-		if len(configuration.Wal.Encryption) != 0 {
-			options = append(
-				options,
-				"-e",
-				string(configuration.Wal.Encryption))
-		}
-	}
-
 	if len(configuration.EndpointURL) > 0 {
 		options = append(
 			options,
