@@ -227,13 +227,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioCustomSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			defer func() {
-				if CurrentSpecReport().Failed() {
-					env.DumpClusterEnv(namespace, clusterName,
-						"out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-			}()
-
 			// Create the cluster with custom serverName in the backup spec
 			AssertCreateCluster(namespace, clusterName, clusterWithMinioCustomSampleFile, env)
 
