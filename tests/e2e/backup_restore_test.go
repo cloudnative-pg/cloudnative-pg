@@ -286,7 +286,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		It("backs up and restore a cluster with PITR MinIO", func() {
 			restoredClusterName := "restore-cluster-pitr-minio"
 
-			prepareClusterForPITROnMinio(namespace, clusterName, backupFile, 2, currentTimestamp)
+			prepareClusterForPITROnMinio(namespace, clusterName, backupFile, 3, currentTimestamp)
 
 			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
 			Expect(err).NotTo(HaveOccurred())
