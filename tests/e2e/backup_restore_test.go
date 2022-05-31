@@ -210,15 +210,16 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			})
 		})
 
-		// We backup and restore a cluster, and verify some expected data to
-		// be there
+		// Test that the restore works if the source cluster has a custom
+		// backup.barmanObjectStore.serverName that is different than the cluster name
 		It("backs up and restores a cluster with custom backup serverName", func() {
 			const (
-				targetDBOne                      = "test"
-				targetDBTwo                      = "test1"
-				targetDBSecret                   = "secret_test"
-				testTableName                    = "test_table"
-				clusterRestoreSampleFile         = fixturesDir + "/backup/cluster-from-restore-custom.yaml"
+				targetDBOne              = "test"
+				targetDBTwo              = "test1"
+				targetDBSecret           = "secret_test"
+				testTableName            = "test_table"
+				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore-custom.yaml"
+				// clusterWithMinioCustomSampleFile has metadata.name != backup.barmanObjectStore.serverName
 				clusterWithMinioCustomSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-custom-servername.yaml"
 				backupFileCustom                 = fixturesDir + "/backup/minio/backup-minio-custom-servername.yaml"
 			)
