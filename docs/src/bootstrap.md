@@ -288,12 +288,13 @@ The import is done in three steps:
 An example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-microservice
 spec:
   instances: 3
+
   bootstrap:
     initdb:
       import:
@@ -339,7 +340,7 @@ The minimum requirements to execute successfully a monolith clone:
 An example:
 
 ```yaml
-apiVersion: postgresql.k8s.enterprisedb.io/v1
+apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: cluster-monolith

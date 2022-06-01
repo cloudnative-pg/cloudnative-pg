@@ -36,7 +36,6 @@ type LogicalDump struct {
 	PostInitSQLStr            string
 	PostInitApplicationSQLStr string
 	PostInitTemplateSQLStr    string
-	RedwoodStr                string
 	ParentNode                string
 	InitDBFlagsString         string
 }
@@ -79,8 +78,6 @@ func NewCmd() *cobra.Command {
 		"executed inside application database right after the database is created")
 	cmd.Flags().StringVar(&ld.PostInitTemplateSQLStr, "post-init-template-sql", "", "The list of SQL queries to be "+
 		"executed inside template1 database to configure the new instance")
-	cmd.Flags().StringVar(&ld.RedwoodStr, "redwood-compat", "", "Enable/disable redwood "+
-		"compatibility. This is available only for EPAS-based images. Default is false")
 	cmd.Flags().StringVar(&ld.ParentNode, "parent-node", "", "The origin node")
 	cmd.Flags().StringVar(&ld.InitDBFlagsString, "initdb-flags", "", "The list of flags to be passed "+
 		"to initdb while creating the initial database")
