@@ -850,9 +850,7 @@ func (r *InstanceReconciler) waitForConfigurationReload(ctx context.Context, clu
 	if status.IsPrimary && status.PendingRestartForDecrease {
 		if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategyUnsupervised {
 			contextLogger.Info("Restarting primary in-place due to hot standby sensible parameters decrease")
-			if err := r.Instance().RequestAndWaitRestartSmartFast(); err != nil {
-				return err
-			}
+			return r.Instance().RequestAndWaitRestartSmartFast()
 		}
 		reason := "decrease of hot standby sensitive parameters"
 		contextLogger.Info("Waiting for the user to request a restart of the primary instance or a switchover "+
