@@ -81,8 +81,17 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		return false, fmt.Errorf("expected 1 primary PostgreSQL but none found")
 	}
 
+	// from now on we know we have a primary instance
+
+	// we first check whether a restart is needed given the provided condition
 	shouldRestart, inPlacePossible, reason := conditionFunc(*primaryPostgresqlStatus, cluster)
 	if !shouldRestart {
+		return false, nil
+	}
+
+	// if the primary instance is marked for restart due to hot standby sensitive parameter decrease,
+	// it should be restarted by the instance manager itself
+	if primaryPostgresqlStatus.PendingRestartForDecrease {
 		return false, nil
 	}
 
