@@ -485,23 +485,23 @@ func (instance *Instance) GetTemplateDB() (*sql.DB, error) {
 }
 
 // GetPgVersion queries the postgres instance to know the current version, parses it and memoize it for future uses
-func (instance *Instance) GetPgVersion() (*semver.Version, error) {
+func (instance *Instance) GetPgVersion() (semver.Version, error) {
 	// Better not to recompute what we already have
 	if instance.pgVersion != nil {
-		return instance.pgVersion, nil
+		return *instance.pgVersion, nil
 	}
 
 	db, err := instance.GetSuperUserDB()
 	if err != nil {
-		return nil, err
+		return semver.Version{}, err
 	}
 
 	parsedVersion, err := GetPgVersion(db)
 	if err != nil {
-		return nil, err
+		return semver.Version{}, err
 	}
 	instance.pgVersion = parsedVersion
-	return parsedVersion, nil
+	return *parsedVersion, nil
 }
 
 // GetPgVersion returns the version of postgres in a semantic format or an error
