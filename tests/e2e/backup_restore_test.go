@@ -984,12 +984,14 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 		BeforeAll(func() {
 			isAKS, err := env.IsAKS()
 			Expect(err).ToNot(HaveOccurred())
+
 			if isAKS {
 				Skip("This test is not run on AKS")
 			}
 			if env.IsIBM() {
 				Skip("This test is not run on an IBM architecture")
 			}
+
 			namespace = "backup-safety-1"
 			namespace2 = "backup-safety-2"
 			clusterName, err = env.GetResourceNameFromYAML(clusterSampleFile)
@@ -1009,6 +1011,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			By("setting up minio", func() {
 				minio, err := testUtils.MinioDefaultSetup(namespace)
 				Expect(err).ToNot(HaveOccurred())
+
 				err = testUtils.InstallMinio(env, minio, 300)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -1078,6 +1081,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			err = testUtils.GetObjectList(env, podList, ctrlclient.InNamespace(namespace),
 				ctrlclient.MatchingLabels{"job-name": "pg-backup-minio-1-full-recovery"})
 			Expect(err).ToNot(HaveOccurred())
+
 			for _, pod := range podList.Items {
 				Eventually(func() bool {
 					podLogs, _ := env.GetPodLogs(namespace, pod.GetName())
@@ -1094,6 +1098,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			"backup destination as restored cluster and it fails", func() {
 			_, _, err := testUtils.RunUnchecked("kubectl delete -f " + clusterRestoreSampleFile3 + " -n " + namespace)
 			Expect(err).ToNot(HaveOccurred())
+
 			By("creating the credentials for minio", func() {
 				AssertStorageCredentialsAreCreated(namespace2, "backup-storage-creds", "minio", "minio123")
 			})
@@ -1116,6 +1121,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			err = testUtils.GetObjectList(env, podList, ctrlclient.InNamespace(namespace2),
 				ctrlclient.MatchingLabels{"job-name": "external-cluster-minio-1-1-full-recovery"})
 			Expect(err).ToNot(HaveOccurred())
+
 			isLogContainsFailure := false
 			for _, pod := range podList.Items {
 				podLogs, _ := env.GetPodLogs(namespace2, pod.GetName())
