@@ -224,33 +224,41 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				backupFileCustom                 = fixturesDir + "/backup/minio/backup-minio-custom-servername.yaml"
 			)
 
-			clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioCustomSampleFile)
+			customClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioCustomSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
+			// To also dump info. from `customClusterName` cluster after this spec gets executed
+			DeferCleanup(func() {
+				if CurrentSpecReport().Failed() {
+					env.DumpClusterEnv(namespace, customClusterName,
+						"out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+			})
+
 			// Create the cluster with custom serverName in the backup spec
-			AssertCreateCluster(namespace, clusterName, clusterWithMinioCustomSampleFile, env)
+			AssertCreateCluster(namespace, customClusterName, clusterWithMinioCustomSampleFile, env)
 
 			// Create required test data
-			AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBOne, testTableName)
-			AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBTwo, testTableName)
-			AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBSecret, testTableName)
+			AssertCreationOfTestDataForTargetDB(namespace, customClusterName, targetDBOne, testTableName)
+			AssertCreationOfTestDataForTargetDB(namespace, customClusterName, targetDBTwo, testTableName)
+			AssertCreationOfTestDataForTargetDB(namespace, customClusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(namespace, clusterName, tableName)
+			AssertCreateTestData(namespace, customClusterName, tableName)
 
-			AssertArchiveWalOnMinio(namespace, clusterName)
+			AssertArchiveWalOnMinio(namespace, customClusterName)
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
 				testUtils.ExecuteBackup(namespace, backupFileCustom, env)
-				AssertBackupConditionInClusterStatus(namespace, clusterName)
+				AssertBackupConditionInClusterStatus(namespace, customClusterName)
 				Eventually(func() (int, error) {
 					return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
 				}, 30).Should(BeEquivalentTo(2)) // this is the second backup we take on the bucket
 				Eventually(func() (string, error) {
 					cluster := &apiv1.Cluster{}
 					err := env.Client.Get(env.Ctx,
-						ctrlclient.ObjectKey{Namespace: namespace, Name: clusterName},
+						ctrlclient.ObjectKey{Namespace: namespace, Name: customClusterName},
 						cluster)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
