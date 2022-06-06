@@ -199,6 +199,8 @@ PodMonitor
 PodSpec
 PodStatus
 PodTemplateSpec
+PodTopology
+PodTopologyLabels
 Pooler
 Pooler's
 PoolerIntegrations
@@ -267,6 +269,7 @@ Slonik
 StorageClass
 StorageConfiguration
 Storages
+SyncReplicaElectionConstraints
 Synopsys
 TCP
 TLS

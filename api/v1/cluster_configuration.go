@@ -21,9 +21,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// GetSyncReplicasNumber computes the actual number of required synchronous replicas
-// given the requested min, max and the number of ready replicas in the cluster
-func (cluster *Cluster) GetSyncReplicasNumber() (syncReplicas int) {
+// GetSyncReplicasData computes the actual number of required synchronous replicas and the names of
+// the electable sync replicas given the requested min, max, the number of ready replicas in the cluster and the sync
+// replicas constraints (if any)
+func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncReplicas []string) {
 	// We start with the number of healthy replicas (healthy pods minus one)
 	// and verify it is greater than 0 and between minSyncReplicas and maxSyncReplicas.
 	// Formula: 1 <= minSyncReplicas <= SyncReplicas <= maxSyncReplicas < readyReplicas
@@ -42,11 +43,71 @@ func (cluster *Cluster) GetSyncReplicasNumber() (syncReplicas int) {
 	// temporarily unresponsive system)
 	if readyReplicas < cluster.Spec.MinSyncReplicas {
 		syncReplicas = readyReplicas
-		log.Info("Ignore minSyncReplicas to enforce self-healing",
+		log.Warning("Ignore minSyncReplicas to enforce self-healing",
 			"syncReplicas", readyReplicas,
 			"minSyncReplicas", cluster.Spec.MinSyncReplicas,
 			"maxSyncReplicas", cluster.Spec.MaxSyncReplicas)
 	}
 
-	return syncReplicas
+	electableSyncReplicas = cluster.getElectableSyncReplicas()
+	numberOfElectableSyncReplicas := len(electableSyncReplicas)
+	if numberOfElectableSyncReplicas < syncReplicas {
+		log.Warning("lowering electable sync replicas due to not enough electable instances for sync replication "+
+			"given the constraints",
+			"electableSyncReplicasWithoutConstraints", syncReplicas,
+			"electableSyncReplicasWithConstraints", numberOfElectableSyncReplicas,
+			"constraints", cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint)
+		syncReplicas = numberOfElectableSyncReplicas
+	}
+
+	return syncReplicas, electableSyncReplicas
+}
+
+// getElectableSyncReplicas computes the names of the instances that can be elected to sync replicas
+func (cluster *Cluster) getElectableSyncReplicas() []string {
+	var nonPrimaryInstances []string
+	for _, instances := range cluster.Status.InstancesStatus {
+		for _, instance := range instances {
+			if cluster.Status.CurrentPrimary != instance {
+				nonPrimaryInstances = append(nonPrimaryInstances, instance)
+			}
+		}
+	}
+
+	// We need to include every replica inside the list of possible synchronous standbys if we have no constraints
+	if !cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled {
+		return nonPrimaryInstances
+	}
+
+	currentPrimary := PodName(cluster.Status.CurrentPrimary)
+	// given that the constraints are based off the primary instance if we still don't have one we cannot continue
+	if currentPrimary == "" {
+		log.Info("no primary elected, cannot compute electable sync replicas")
+		return nil
+	}
+
+	currentPrimaryTopology, ok := cluster.Status.InstancesTopology[currentPrimary]
+	if !ok {
+		log.Warning("current primary topology not yet extracted, cannot computed electable sync replicas",
+			"instanceName", currentPrimary)
+		return nil
+	}
+
+	electableReplicas := make([]string, 0, len(nonPrimaryInstances))
+	for _, name := range nonPrimaryInstances {
+		name := PodName(name)
+
+		instanceTopology, ok := cluster.Status.InstancesTopology[name]
+		// if we still don't have the topology data for the node we skip it from inserting it in the electable pool
+		if !ok {
+			log.Warning("current instance topology not found", "instanceName", name)
+			continue
+		}
+
+		if !currentPrimaryTopology.hasSameLabels(instanceTopology) {
+			electableReplicas = append(electableReplicas, string(name))
+		}
+	}
+
+	return electableReplicas
 }

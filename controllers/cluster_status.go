@@ -61,9 +61,11 @@ var StatusRequestRetry = wait.Backoff{
 // managedResources contains the resources that are created a cluster
 // and need to be managed by the controller
 type managedResources struct {
-	pods corev1.PodList
-	pvcs corev1.PersistentVolumeClaimList
-	jobs batchv1.JobList
+	// map of [nodeName]corev1.Node
+	nodes map[string]corev1.Node
+	pods  corev1.PodList
+	pvcs  corev1.PersistentVolumeClaimList
+	jobs  batchv1.JobList
 }
 
 // Count the number of jobs that are still running
@@ -135,11 +137,31 @@ func (r *ClusterReconciler) getManagedResources(
 		return nil, err
 	}
 
+	nodes, err := r.getNodes(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return &managedResources{
-		pods: childPods,
-		pvcs: childPVCs,
-		jobs: childJobs,
+		pods:  childPods,
+		pvcs:  childPVCs,
+		jobs:  childJobs,
+		nodes: nodes,
 	}, nil
+}
+
+func (r *ClusterReconciler) getNodes(ctx context.Context) (map[string]corev1.Node, error) {
+	var nodes corev1.NodeList
+	if err := r.List(ctx, &nodes); err != nil {
+		return nil, err
+	}
+
+	data := make(map[string]corev1.Node, len(nodes.Items))
+	for _, item := range nodes.Items {
+		data[item.Name] = item
+	}
+
+	return data, nil
 }
 
 func (r *ClusterReconciler) getManagedPods(
@@ -258,6 +280,17 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	// Instances status
 	cluster.Status.InstancesStatus = utils.ListStatusPods(resources.pods.Items)
+
+	topology, topologyErr := getPodsTopology(
+		resources.pods.Items,
+		resources.nodes,
+		cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
+	)
+
+	if topologyErr != nil {
+		return topologyErr
+	}
+	cluster.Status.InstancesTopology = topology
 
 	// Services
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
@@ -789,4 +822,26 @@ func rawInstanceStatusRequest(
 	}
 
 	return result
+}
+
+// getPodsTopology returns a map with all the information about the pods topology
+func getPodsTopology(
+	podList []corev1.Pod,
+	nodes map[string]corev1.Node,
+	topology apiv1.SyncReplicaElectionConstraints,
+) (map[apiv1.PodName]apiv1.PodTopologyLabels, error) {
+	data := make(map[apiv1.PodName]apiv1.PodTopologyLabels)
+	for _, pod := range podList {
+		podName := apiv1.PodName(pod.Name)
+		data[podName] = make(map[string]string, 0)
+		node, ok := nodes[pod.Spec.NodeName]
+		if !ok {
+			return nil, fmt.Errorf("node not found: %s", pod.Spec.NodeName)
+		}
+		for _, labelName := range topology.NodeLabelsAntiAffinity {
+			data[podName][labelName] = node.Labels[labelName]
+		}
+	}
+
+	return data, nil
 }

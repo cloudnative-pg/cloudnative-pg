@@ -283,6 +283,24 @@ const (
 	PhaseApplyingConfiguration = "Applying configuration"
 )
 
+// PodTopologyLabels represent the topology of a Pod. map[labelName]labelValue
+type PodTopologyLabels map[string]string
+
+// hasSameTopology checks if the two topologies have
+// the same labels
+func (topologyLabels PodTopologyLabels) hasSameLabels(instanceTopology PodTopologyLabels) bool {
+	for mainLabelName, mainLabelValue := range topologyLabels {
+		if mainLabelValue != instanceTopology[mainLabelName] {
+			return false
+		}
+	}
+
+	return true
+}
+
+// PodName is the name of a Pod
+type PodName string
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// Total number of instances in the cluster
@@ -293,6 +311,9 @@ type ClusterStatus struct {
 
 	// Instances status
 	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
+
+	// Instances topology.
+	InstancesTopology map[PodName]PodTopologyLabels `json:"instancesZone,omitempty"`
 
 	// ID of the latest generated node (used to avoid node name clashing)
 	LatestGeneratedNode int `json:"latestGeneratedNode,omitempty"`
@@ -528,6 +549,10 @@ type PostgresConfiguration struct {
 	// to the pg_hba.conf file)
 	// +optional
 	PgHBA []string `json:"pg_hba,omitempty"`
+
+	// Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be
+	// set up.
+	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
 
 	// Specifies the maximum number of seconds to wait when promoting an instance to primary.
 	// Default value is 40000000, greater than one year in seconds,
@@ -845,6 +870,19 @@ type StorageConfiguration struct {
 	// Template to be used to generate the Persistent Volume Claim
 	// +optional
 	PersistentVolumeClaimTemplate *corev1.PersistentVolumeClaimSpec `json:"pvcTemplate,omitempty"`
+}
+
+// SyncReplicaElectionConstraints contains the constraints for sync replicas election.
+//
+// For anti-affinity parameters two instances are considered in the same location if all the labels values match
+//
+// In future synchronous replica election restriction by name will be supported
+type SyncReplicaElectionConstraints struct {
+	// This flag enabled the constraints for sync replicas
+	Enabled bool `json:"enabled"`
+
+	// A list of node labels values to extract and compare to evaluate if the pods reside in the same topology or not
+	NodeLabelsAntiAffinity []string `json:"nodeLabelsAntiAffinity,omitempty"`
 }
 
 // AffinityConfiguration contains the info we need to create the

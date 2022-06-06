@@ -75,6 +75,7 @@ Below you will find a description of the defined resources:
 - [SecretVersion](#SecretVersion)
 - [SecretsResourceVersion](#SecretsResourceVersion)
 - [StorageConfiguration](#StorageConfiguration)
+- [SyncReplicaElectionConstraints](#SyncReplicaElectionConstraints)
 - [WalBackupConfiguration](#WalBackupConfiguration)
 
 
@@ -386,6 +387,7 @@ Name                      | Description                                         
 `instances                ` | Total number of instances in the cluster                                                                                                                                           | int                                                  
 `readyInstances           ` | Total number of ready instances in the cluster                                                                                                                                     | int                                                  
 `instancesStatus          ` | Instances status                                                                                                                                                                   | map[utils.PodStatus][]string                         
+`instancesZone            ` | Instances topology.                                                                                                                                                                | map[PodName]PodTopologyLabels                        
 `latestGeneratedNode      ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                                 | int                                                  
 `currentPrimary           ` | Current primary instance                                                                                                                                                           | string                                               
 `targetPrimary            ` | Target primary instance, this is different from the previous one during a switchover or a failover                                                                                 | string                                               
@@ -707,13 +709,14 @@ Name      | Description                               | Type
 
 PostgresConfiguration defines the PostgreSQL configuration
 
-Name                     | Description                                                                                                                                                                                    | Type                      
------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------
-`parameters              ` | PostgreSQL configuration options (postgresql.conf)                                                                                                                                             | map[string]string         
-`pg_hba                  ` | PostgreSQL Host Based Authentication rules (lines to be appended to the pg_hba.conf file)                                                                                                      | []string                  
-`promotionTimeout        ` | Specifies the maximum number of seconds to wait when promoting an instance to primary. Default value is 40000000, greater than one year in seconds, big enough to simulate an infinite timeout | int32                     
-`shared_preload_libraries` | Lists of shared preload libraries to add to the default ones                                                                                                                                   | []string                  
-`ldap                    ` | Options to specify LDAP configuration                                                                                                                                                          | [*LDAPConfig](#LDAPConfig)
+Name                          | Description                                                                                                                                                                                    | Type                                                             
+----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------------------------------------------
+`parameters                   ` | PostgreSQL configuration options (postgresql.conf)                                                                                                                                             | map[string]string                                                
+`pg_hba                       ` | PostgreSQL Host Based Authentication rules (lines to be appended to the pg_hba.conf file)                                                                                                      | []string                                                         
+`syncReplicaElectionConstraint` | Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be set up.                                                                        | [SyncReplicaElectionConstraints](#SyncReplicaElectionConstraints)
+`promotionTimeout             ` | Specifies the maximum number of seconds to wait when promoting an instance to primary. Default value is 40000000, greater than one year in seconds, big enough to simulate an infinite timeout | int32                                                            
+`shared_preload_libraries     ` | Lists of shared preload libraries to add to the default ones                                                                                                                                   | []string                                                         
+`ldap                         ` | Options to specify LDAP configuration                                                                                                                                                          | [*LDAPConfig](#LDAPConfig)                                       
 
 <a id='RecoveryTarget'></a>
 
@@ -871,6 +874,21 @@ Name               | Description                                                
 `size              ` | Size of the storage. Required if not already specified in the PVC template. Changes to this field are automatically reapplied to the created PVCs. Size cannot be decreased.               - *mandatory*  | string                                                                                                                                 
 `resizeInUseVolumes` | Resize existent PVCs, defaults to true                                                                                                                                                     | *bool                                                                                                                                  
 `pvcTemplate       ` | Template to be used to generate the Persistent Volume Claim                                                                                                                                | [*corev1.PersistentVolumeClaimSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#persistentvolumeclaim-v1-core)
+
+<a id='SyncReplicaElectionConstraints'></a>
+
+## SyncReplicaElectionConstraints
+
+SyncReplicaElectionConstraints contains the constraints for sync replicas election.
+
+For anti-affinity parameters two instances are considered in the same location if all the labels values match
+
+In future synchronous replica election restriction by name will be supported
+
+Name                   | Description                                                                                                    | Type    
+---------------------- | -------------------------------------------------------------------------------------------------------------- | --------
+`enabled               ` | This flag enabled the constraints for sync replicas                                                            - *mandatory*  | bool    
+`nodeLabelsAntiAffinity` | A list of node labels values to extract and compare to evaluate if the pods reside in the same topology or not | []string
 
 <a id='WalBackupConfiguration'></a>
 

@@ -656,7 +656,10 @@ func (r *InstanceReconciler) reconcileMetrics(
 
 	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
 	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
-	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(cluster.GetSyncReplicasNumber()))
+
+	syncReplicas, _ := cluster.GetSyncReplicasData()
+	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(syncReplicas))
+
 	if cluster.IsReplica() {
 		exporter.Metrics.ReplicaCluster.Set(1)
 	} else {

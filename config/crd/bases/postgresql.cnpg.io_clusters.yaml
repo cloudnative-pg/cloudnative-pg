@@ -1879,6 +1879,23 @@ spec:
                     items:
                       type: string
                     type: array
+                  syncReplicaElectionConstraint:
+                    description: Requirements to be met by sync replicas. This will
+                      affect how the "synchronous_standby_names" parameter will be
+                      set up.
+                    properties:
+                      enabled:
+                        description: This flag enabled the constraints for sync replicas
+                        type: boolean
+                      nodeLabelsAntiAffinity:
+                        description: A list of node labels values to extract and compare
+                          to evaluate if the pods reside in the same topology or not
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - enabled
+                    type: object
                 type: object
               primaryUpdateMethod:
                 default: switchover
@@ -2306,6 +2323,15 @@ spec:
                     type: string
                   type: array
                 description: Instances status
+                type: object
+              instancesZone:
+                additionalProperties:
+                  additionalProperties:
+                    type: string
+                  description: PodTopologyLabels represent the topology of a Pod.
+                    map[labelName]labelValue
+                  type: object
+                description: Instances topology.
                 type: object
               jobCount:
                 description: How many Jobs have been created by this cluster
