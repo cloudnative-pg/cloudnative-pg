@@ -21,7 +21,7 @@ import json
 min_supported_major = 10
 
 pg_repo_name = "cloudnative-pg/postgresql"
-pg_version_re = re.compile(r"^(\d+)(?:\.\d+)(-\d+)?$")
+pg_version_re = re.compile(r"^(\d+)(?:\.\d+|beta\d+|rc\d+|alpha\d+)(-\d+)?$")
 pg_versions_file = ".github/pg_versions.json"
 
 
