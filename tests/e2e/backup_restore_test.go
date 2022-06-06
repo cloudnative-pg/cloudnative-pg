@@ -210,6 +210,64 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			})
 		})
 
+		// Test that the restore works if the source cluster has a custom
+		// backup.barmanObjectStore.serverName that is different than the cluster name
+		It("backs up and restores a cluster with custom backup serverName", func() {
+			const (
+				targetDBOne              = "test"
+				targetDBTwo              = "test1"
+				targetDBSecret           = "secret_test"
+				testTableName            = "test_table"
+				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore-custom.yaml"
+				// clusterWithMinioCustomSampleFile has metadata.name != backup.barmanObjectStore.serverName
+				clusterWithMinioCustomSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-custom-servername.yaml"
+				backupFileCustom                 = fixturesDir + "/backup/minio/backup-minio-custom-servername.yaml"
+			)
+
+			customClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioCustomSampleFile)
+			Expect(err).ToNot(HaveOccurred())
+
+			// To also dump info. from `customClusterName` cluster after this spec gets executed
+			DeferCleanup(func() {
+				if CurrentSpecReport().Failed() {
+					env.DumpClusterEnv(namespace, customClusterName,
+						"out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+			})
+
+			// Create the cluster with custom serverName in the backup spec
+			AssertCreateCluster(namespace, customClusterName, clusterWithMinioCustomSampleFile, env)
+
+			// Create required test data
+			AssertCreationOfTestDataForTargetDB(namespace, customClusterName, targetDBOne, testTableName)
+			AssertCreationOfTestDataForTargetDB(namespace, customClusterName, targetDBTwo, testTableName)
+			AssertCreationOfTestDataForTargetDB(namespace, customClusterName, targetDBSecret, testTableName)
+
+			// Write a table and some data on the "app" database
+			AssertCreateTestData(namespace, customClusterName, tableName)
+
+			AssertArchiveWalOnMinio(namespace, customClusterName)
+
+			// There should be a backup resource and
+			By("backing up a cluster and verifying it exists on minio", func() {
+				testUtils.ExecuteBackup(namespace, backupFileCustom, env)
+				AssertBackupConditionInClusterStatus(namespace, customClusterName)
+				Eventually(func() (int, error) {
+					return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
+				}, 30).Should(BeEquivalentTo(2)) // this is the second backup we take on the bucket
+				Eventually(func() (string, error) {
+					cluster := &apiv1.Cluster{}
+					err := env.Client.Get(env.Ctx,
+						ctrlclient.ObjectKey{Namespace: namespace, Name: customClusterName},
+						cluster)
+					return cluster.Status.FirstRecoverabilityPoint, err
+				}, 30).ShouldNot(BeEmpty())
+			})
+
+			// Restore backup in a new cluster
+			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
+		})
+
 		// Create a scheduled backup with the 'immediate' option enabled. We expect the backup to be available
 		It("immediately starts a backup using ScheduledBackups 'immediate' option", func() {
 			const scheduledBackupSampleFile = fixturesDir +
@@ -223,13 +281,13 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			// their base backups
 			Eventually(func() (int, error) {
 				return testUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
-			}, 30).Should(BeNumerically("==", 2))
+			}, 30).Should(BeNumerically("==", 3))
 		})
 
 		It("backs up and restore a cluster with PITR MinIO", func() {
 			restoredClusterName := "restore-cluster-pitr-minio"
 
-			prepareClusterForPITROnMinio(namespace, clusterName, backupFile, 2, currentTimestamp)
+			prepareClusterForPITROnMinio(namespace, clusterName, backupFile, 3, currentTimestamp)
 
 			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
 			Expect(err).NotTo(HaveOccurred())
