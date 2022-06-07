@@ -95,6 +95,7 @@ func (ds *databaseSnapshotter) exportDatabases(
 		contextLogger.Info("exporting database", "databaseName", database)
 		dsn := target.GetDsn(database)
 		options := []string{
+			"-U", "postgres",
 			"-Fc",
 			"-f", generateFileNameForDatabase(database),
 			"-d", dsn,
@@ -144,6 +145,7 @@ func (ds *databaseSnapshotter) importDatabases(
 			}
 
 			alwaysPresentOptions := []string{
+				"-U", "postgres",
 				"-d", targetDatabase,
 				"--section", section,
 				generateFileNameForDatabase(database),

@@ -16,7 +16,11 @@ limitations under the License.
 
 package logicalsnapshot
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+)
 
 type (
 	executable = string
@@ -29,5 +33,5 @@ const (
 )
 
 func generateFileNameForDatabase(database string) string {
-	return fmt.Sprintf("/var/lib/postgresql/data/%s.dump", database)
+	return fmt.Sprintf("%s/%s.dump", specs.PgDataPath, database)
 }

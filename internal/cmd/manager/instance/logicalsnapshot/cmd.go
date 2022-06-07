@@ -62,7 +62,7 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
-			ctx := context.Background()
+			ctx := cmd.Context()
 
 			if err = ld.executeLogicalDumpRestore(ctx, client); err != nil {
 				log.Error(err, "Unable to boostrap cluster")

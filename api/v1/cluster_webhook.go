@@ -429,13 +429,18 @@ func (r *Cluster) validateLogicalSnapshot() field.ErrorList {
 
 	switch logicalSnapshot.Type {
 	case MicroserviceSnapshotType:
-		result = append(result, r.validateLogicalSnapshotMicroservice()...)
-
+		return append(result, r.validateLogicalSnapshotMicroservice()...)
 	case MonolithSnapshotType:
-		result = append(result, r.validateLogicalSnapshotMonolith()...)
+		return append(result, r.validateLogicalSnapshotMonolith()...)
+	default:
+		return append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "type"),
+				logicalSnapshot.Type,
+				"Unrecognized clone type"),
+		)
 	}
-
-	return result
 }
 
 func (r *Cluster) validateLogicalSnapshotMicroservice() field.ErrorList {

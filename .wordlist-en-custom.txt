@@ -147,6 +147,7 @@ LocalObjectReference
 LogicalSnapshot
 LogicalSnapshotSource
 MAPPEDMETRIC
+MVCC
 MetricDescription
 MetricName
 MetricType
