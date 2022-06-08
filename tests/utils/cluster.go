@@ -124,11 +124,14 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 		return
 	}
 	w := bufio.NewWriter(f)
-	cluster, _ := env.GetCluster(namespace, clusterName)
+	clusterList := &v1.ClusterList{}
+	_ = GetObjectList(&env, clusterList, client.InNamespace(namespace))
 
-	out, _ := json.MarshalIndent(cluster, "", "    ")
-	_, _ = fmt.Fprintf(w, "Dumping %v/%v cluster\n", namespace, clusterName)
-	_, _ = fmt.Fprintln(w, string(out))
+	for _, cluster := range clusterList.Items {
+		out, _ := json.MarshalIndent(cluster, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v cluster\n", namespace, cluster.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
 
 	podList, _ := env.GetPodList(namespace)
 	for _, pod := range podList.Items {
@@ -152,7 +155,7 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 	}
 
 	eventList, _ := env.GetEventList(namespace)
-	out, _ = json.MarshalIndent(eventList.Items, "", "    ")
+	out, _ := json.MarshalIndent(eventList.Items, "", "    ")
 	_, _ = fmt.Fprintf(w, "Dumping events for namespace %v\n", namespace)
 	_, _ = fmt.Fprintln(w, string(out))
 
@@ -164,16 +167,18 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 	}
 
 	suffixes := []string{"-r", "-rw", "-any"}
-	for _, suffix := range suffixes {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName + suffix,
+	for _, cluster := range clusterList.Items {
+		for _, suffix := range suffixes {
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      cluster.Name + suffix,
+			}
+			endpoint := &corev1.Endpoints{}
+			_ = env.Client.Get(env.Ctx, namespacedName, endpoint)
+			out, _ := json.MarshalIndent(endpoint, "", "    ")
+			_, _ = fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
+			_, _ = fmt.Fprintln(w, string(out))
 		}
-		endpoint := &corev1.Endpoints{}
-		_ = env.Client.Get(env.Ctx, namespacedName, endpoint)
-		out, _ := json.MarshalIndent(endpoint, "", "    ")
-		_, _ = fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
-		_, _ = fmt.Fprintln(w, string(out))
 	}
 	err = w.Flush()
 	if err != nil {

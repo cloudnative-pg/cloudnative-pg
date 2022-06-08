@@ -968,7 +968,9 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
+				"out/"+namespace+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpClusterEnv(namespace2, clusterName,
+				"out/"+namespace2+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	Context("using minio as object storage", Ordered, func() {
