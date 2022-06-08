@@ -100,16 +100,17 @@ var _ = Describe("Configuration update", Ordered, func() {
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
+
 	It("01. reloading Pg when a parameter requiring reload is modified", func() {
 		// max_connection increase to 110
-		sample := fixturesDir + "/config_update/01-reload.yaml"
+		reloadSampleFile := fixturesDir + "/config_update/01-reload.yaml"
 
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("apply configuration update", func() {
 			// Update the configuration
-			CreateResourceFromFile(namespace, sample)
+			CreateResourceFromFile(namespace, reloadSampleFile)
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, 300)
 		})
 
@@ -128,7 +129,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 	})
 
 	It("02. reloading Pg when pg_hba rules are modified", func() {
-		sample := fixturesDir + "/config_update/02-pg_hba_reload.yaml"
+		pgHbaReloadSampleFile := fixturesDir + "/config_update/02-pg_hba_reload.yaml"
 		endpointName := clusterName + "-rw"
 
 		// Connection should fail now because we are not supplying a password
@@ -150,7 +151,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 		By("apply configuration update", func() {
 			// Update the configuration
-			CreateResourceFromFile(namespace, sample)
+			CreateResourceFromFile(namespace, pgHbaReloadSampleFile)
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, 300)
 		})
 
@@ -177,7 +178,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 	})
 	// nolint:dupl
 	It("03. restarting and switching Pg when a parameter requiring restart is modified", func() {
-		sample := fixturesDir + "/config_update/03-restart.yaml"
+		restartRequiredSampleFile := fixturesDir + "/config_update/03-restart.yaml"
 		timeout := 300
 
 		podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -190,7 +191,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 		By("apply configuration update", func() {
 			// Update the configuration
-			CreateResourceFromFile(namespace, sample)
+			CreateResourceFromFile(namespace, restartRequiredSampleFile)
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 		})
 
@@ -215,8 +216,9 @@ var _ = Describe("Configuration update", Ordered, func() {
 			}, timeout).ShouldNot(BeEquivalentTo(oldPrimary))
 		})
 	})
+
 	It("04. restarting and switching Pg when mixed parameters are modified", func() {
-		sample := fixturesDir + "/config_update/04-mixed-params.yaml"
+		mixParamsSampleFile := fixturesDir + "/config_update/04-mixed-params.yaml"
 		timeout := 300
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -228,7 +230,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 		By("apply configuration update", func() {
 			// Update the configuration
-			CreateResourceFromFile(namespace, sample)
+			CreateResourceFromFile(namespace, mixParamsSampleFile)
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 		})
 
@@ -261,13 +263,14 @@ var _ = Describe("Configuration update", Ordered, func() {
 		})
 	})
 
-	It("05. Erroring out when a fixedConfigurationParameter is modified", func() {
-		sample := fixturesDir + "/config_update/05-fixed-params.yaml"
-		checkErrorOutFixedAndBlockedConfigurationParameter(sample)
+	It("05. error out when a fixedConfigurationParameter is modified", func() {
+		fixedParamsSampleFile := fixturesDir + "/config_update/05-fixed-params.yaml"
+		checkErrorOutFixedAndBlockedConfigurationParameter(fixedParamsSampleFile)
 	})
-	It("06. Erroring out when a blockedConfigurationParameter is modified", func() {
-		sample := fixturesDir + "/config_update/06-blocked-params.yaml"
-		checkErrorOutFixedAndBlockedConfigurationParameter(sample)
+
+	It("06. error out when a blockedConfigurationParameter is modified", func() {
+		blockedParamsSampleFile := fixturesDir + "/config_update/06-blocked-params.yaml"
+		checkErrorOutFixedAndBlockedConfigurationParameter(blockedParamsSampleFile)
 	})
 
 	// nolint:dupl
@@ -275,7 +278,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 		"to restart first the primary instance is decreased",
 		func() {
 			// max_connection decrease to 105
-			sample := fixturesDir + "/config_update/07-restart-decrease.yaml"
+			restartOnDescreaseSampleFile := fixturesDir + "/config_update/07-restart-decrease.yaml"
 			timeout := 300
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -287,7 +290,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 			By("apply configuration update", func() {
 				// Update the configuration
-				CreateResourceFromFile(namespace, sample)
+				CreateResourceFromFile(namespace, restartOnDescreaseSampleFile)
 				AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 			})
 
@@ -318,7 +321,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 		"to restart first the primary instance is decreased, resetting to the default value",
 		func() {
 			// max_connection is removed (decrease to default)
-			sample := fixturesDir + "/config_update/08-restart-decrease-removing.yaml"
+			restartOnDecreaseSampleFile := fixturesDir + "/config_update/08-restart-decrease-removing.yaml"
 			timeout := 300
 
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -331,7 +334,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 			By("apply configuration update", func() {
 				// Update the configuration
-				CreateResourceFromFile(namespace, sample)
+				CreateResourceFromFile(namespace, restartOnDecreaseSampleFile)
 				AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 			})
 
@@ -493,6 +496,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", func() {
 				Expect(newStartTime).Should(BeTemporally(">", primaryStartTime))
 			})
 		})
+
 		It("work_mem config change should not require a restart", func() {
 			const expectedNewValueForWorkMem = "10MB"
 			commandTimeout := time.Second * 2
