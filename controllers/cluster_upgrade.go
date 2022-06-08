@@ -45,8 +45,6 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 	podList *postgres.PostgresqlStatusList,
 	conditionFunc func(postgres.PostgresqlStatus, *apiv1.Cluster) (bool, bool, string),
 ) (bool, error) {
-	contextLogger := log.FromContext(ctx)
-
 	// The following code works under the assumption that podList.Items list is ordered
 	// by lag (primary first)
 
@@ -103,8 +101,20 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		return false, nil
 	}
 
+	return r.updatePrimaryPod(ctx, cluster, podList, primaryPostgresqlStatus.Pod, inPlacePossible, reason)
+}
+
+func (r *ClusterReconciler) updatePrimaryPod(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	podList *postgres.PostgresqlStatusList,
+	primaryPod v1.Pod,
+	inPlacePossible bool,
+	reason string,
+) (bool, error) {
+	contextLogger := log.FromContext(ctx)
+
 	// we need to check whether a manual switchover is required
-	primaryPod := primaryPostgresqlStatus.Pod
 	contextLogger = contextLogger.WithValues("primaryPod", primaryPod.Name)
 	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
 		contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
