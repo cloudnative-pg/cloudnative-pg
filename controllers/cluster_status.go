@@ -689,18 +689,18 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 // in the result list
 func (r *ClusterReconciler) extractInstancesStatus(
 	ctx context.Context,
-	filteredPods []corev1.Pod,
+	activePods []corev1.Pod,
 ) postgres.PostgresqlStatusList {
 	var result postgres.PostgresqlStatusList
 
-	for idx := range filteredPods {
-		instanceStatus := r.getReplicaStatusFromPodViaHTTP(ctx, filteredPods[idx])
+	for idx := range activePods {
+		instanceStatus := r.getReplicaStatusFromPodViaHTTP(ctx, activePods[idx])
 
 		// IsReady is not populated by the instance manager, so we detect it from the
 		// Pod status
-		instanceStatus.IsReady = utils.IsPodActive(filteredPods[idx]) && utils.IsPodReady(filteredPods[idx])
-		instanceStatus.Node = filteredPods[idx].Spec.NodeName
-		instanceStatus.Pod = filteredPods[idx]
+		instanceStatus.IsReady = utils.IsPodReady(activePods[idx])
+		instanceStatus.Node = activePods[idx].Spec.NodeName
+		instanceStatus.Pod = activePods[idx]
 
 		result.Items = append(result.Items, instanceStatus)
 	}
