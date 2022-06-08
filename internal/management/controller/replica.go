@@ -82,5 +82,5 @@ func (r *InstanceReconciler) writeReplicaConfigurationForDesignatedPrimary(
 			pgpassfile)
 	}
 
-	return postgres.UpdateReplicaConfigurationForPrimary(r.instance.PgData, connectionString)
+	return postgres.UpdateReplicaConfigurationForPrimary(r.instance.PgData, connectionString, r.instance.PodName)
 }

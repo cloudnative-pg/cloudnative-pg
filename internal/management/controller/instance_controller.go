@@ -153,6 +153,11 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
+	// Reconcile replication slots
+	if err = r.reconcileReplicationSlots(ctx, cluster); err != nil {
+		contextLogger.Error(err, "while reconciling replication slot")
+	}
+
 	restarted, err := r.reconcileOldPrimary(ctx, cluster)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -1209,4 +1214,31 @@ func (r *InstanceReconciler) refreshPGHBA(ctx context.Context, cluster *apiv1.Cl
 	}
 	// Generate pg_hba.conf file
 	return r.instance.RefreshPGHBA(cluster, ldapBindPassword)
+}
+
+func (r *InstanceReconciler) reconcileReplicationSlots(ctx context.Context, cluster *apiv1.Cluster) error {
+	if isPrimary, _ := r.instance.IsPrimary(); !isPrimary {
+		return nil
+	}
+
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Info("Creating replication slot")
+	err := r.instance.UpdateReplicationsSlot()
+	if err != nil {
+		contextLogger.Error(err, "updating replication slots")
+		return err
+	}
+
+	for _, instance := range cluster.Status.InstancesStatus[pkgUtils.PodHealthy] {
+		if instance == cluster.Status.CurrentPrimary ||
+			r.instance.ReplicationSlots.Has(instance) {
+			continue
+		}
+
+		err = r.instance.CreateReplicationSlot(instance)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
