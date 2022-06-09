@@ -192,7 +192,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				}, 30).ShouldNot(BeEmpty())
 			})
 
-			/// Restore backup in a new cluster, also cover if no application database is configured
+			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
 
 			AssertMetricsData(namespace, restoredClusterName, curlPodName, targetDBOne, targetDBTwo, targetDBSecret)

@@ -29,8 +29,6 @@ import (
 
 // NewCmd creates the "restore" subcommand
 func NewCmd() *cobra.Command {
-	var appDBName string
-	var appUser string
 	var clusterName string
 	var namespace string
 	var pgData string
@@ -42,22 +40,15 @@ func NewCmd() *cobra.Command {
 			ctx := context.Background()
 
 			info := postgres.InitInfo{
-				ApplicationDatabase: appDBName,
-				ApplicationUser:     appUser,
-				ClusterName:         clusterName,
-				Namespace:           namespace,
-				PgData:              pgData,
+				ClusterName: clusterName,
+				Namespace:   namespace,
+				PgData:      pgData,
 			}
 
 			return restoreSubCommand(ctx, info)
 		},
 	}
-	// give empty default value of app-db-name and app-user, so application database configuration
-	// could be ignored
-	cmd.Flags().StringVar(&appDBName, "app-db-name", "",
-		"The name of the application containing the database")
-	cmd.Flags().StringVar(&appUser, "app-user", "",
-		"The name of the application user")
+
 	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of the "+
 		"current cluster in k8s, used to coordinate switchover and failover")
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+

@@ -87,6 +87,11 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
+	if cluster.ShouldRecoveryCreateApplicationDatabase() {
+		info.ApplicationUser = cluster.GetApplicationDatabaseOwner()
+		info.ApplicationDatabase = cluster.GetApplicationDatabaseName()
+	}
+
 	// Before starting the restore we check if the archive destination is safe to use
 	// otherwise, we stop creating the cluster
 	err = info.checkBackupDestination(ctx, typedClient, cluster)

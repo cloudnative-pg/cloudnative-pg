@@ -123,12 +123,6 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 		"restore",
 	}
 
-	if cluster.ShouldRecoveryCreateApplicationDatabase() {
-		initCommand = append(initCommand,
-			"--app-db-name", cluster.Spec.Bootstrap.Recovery.Database,
-			"--app-user", cluster.Spec.Bootstrap.Recovery.Owner)
-	}
-
 	job := createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
 
 	addBarmanEndpointCAToJob(cluster, backup, job)
@@ -204,11 +198,7 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *bat
 		"instance",
 		"pgbasebackup",
 	}
-	if cluster.ShouldPgBaseBackupCreateApplicationDatabase() {
-		initCommand = append(initCommand,
-			"--app-db-name", cluster.Spec.Bootstrap.PgBaseBackup.Database,
-			"--app-user", cluster.Spec.Bootstrap.PgBaseBackup.Owner)
-	}
+
 	return createPrimaryJob(cluster, nodeSerial, "pgbasebackup", initCommand)
 }
 
