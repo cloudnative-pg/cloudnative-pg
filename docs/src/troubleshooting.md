@@ -124,7 +124,7 @@ Cluster in healthy state
 Name:               cluster-example
 Namespace:          default
 System ID:          7044925089871458324
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:14.3-3
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:15beta1-3
 Primary instance:   cluster-example-1
 Instances:          3
 Ready instances:    3
@@ -200,7 +200,7 @@ kubectl describe cluster <CLUSTER_NAME> -n <NAMESPACE> | grep "Image Name"
 Output:
 
 ```shell
-  Image Name:    ghcr.io/cloudnative-pg/postgresql:14.3-3
+  Image Name:    ghcr.io/cloudnative-pg/postgresql:15beta1-3
 ```
 
 !!! Note
