@@ -523,7 +523,7 @@ func (r *InstanceReconciler) reconcileExtensions(
 
 		if !extension.SkipCreateExtension && extensionIsUsed && !extensionIsInstalled {
 			_, err = tx.Exec(fmt.Sprintf("CREATE EXTENSION %s", extension.Name))
-		} else if extensionIsInstalled {
+		} else if !extensionIsUsed && extensionIsInstalled {
 			_, err = tx.Exec(fmt.Sprintf("DROP EXTENSION %s", extension.Name))
 		}
 		if err != nil {
