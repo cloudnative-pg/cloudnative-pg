@@ -1106,10 +1106,12 @@ func (r *ClusterReconciler) reconcilePVCs(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	resources *managedResources,
+	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if !cluster.IsNodeMaintenanceWindowInProgress() && cluster.Status.ReadyInstances != cluster.Status.Instances {
+	if !cluster.IsNodeMaintenanceWindowInProgress() &&
+		instancesStatus.InstancesReportingStatus() != cluster.Status.Instances {
 		// A pod is not ready, let's retry
 		contextLogger.Debug("Waiting for node to be ready before attaching PVCs")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop

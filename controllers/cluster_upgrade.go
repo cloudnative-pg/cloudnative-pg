@@ -45,8 +45,6 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 	podList *postgres.PostgresqlStatusList,
 	conditionFunc func(postgres.PostgresqlStatus, *apiv1.Cluster) (bool, bool, string),
 ) (bool, error) {
-	contextLogger := log.FromContext(ctx)
-
 	// The following code works under the assumption that podList.Items list is ordered
 	// by lag (primary first)
 
@@ -58,6 +56,10 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		// If this pod is the current primary, we upgrade it in the last step
 		if cluster.Status.CurrentPrimary == postgresqlStatus.Pod.Name {
 			primaryPostgresqlStatus = &podList.Items[i]
+			continue
+		}
+
+		if cluster.IsInstanceFenced(postgresqlStatus.Pod.Name) {
 			continue
 		}
 
@@ -83,6 +85,10 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 
 	// from now on we know we have a primary instance
 
+	if cluster.IsInstanceFenced(primaryPostgresqlStatus.Pod.Name) {
+		return false, nil
+	}
+
 	// we first check whether a restart is needed given the provided condition
 	shouldRestart, inPlacePossible, reason := conditionFunc(*primaryPostgresqlStatus, cluster)
 	if !shouldRestart {
@@ -95,8 +101,20 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 		return false, nil
 	}
 
+	return r.updatePrimaryPod(ctx, cluster, podList, primaryPostgresqlStatus.Pod, inPlacePossible, reason)
+}
+
+func (r *ClusterReconciler) updatePrimaryPod(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	podList *postgres.PostgresqlStatusList,
+	primaryPod v1.Pod,
+	inPlacePossible bool,
+	reason string,
+) (bool, error) {
+	contextLogger := log.FromContext(ctx)
+
 	// we need to check whether a manual switchover is required
-	primaryPod := primaryPostgresqlStatus.Pod
 	contextLogger = contextLogger.WithValues("primaryPod", primaryPod.Name)
 	if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategySupervised {
 		contextLogger.Info("Waiting for the user to request a switchover to complete the rolling update",
@@ -209,7 +227,7 @@ func IsPodNeedingRollout(status postgres.PostgresqlStatus, cluster *apiv1.Cluste
 	inPlacePossible bool,
 	reason string,
 ) {
-	if !status.IsReady {
+	if !status.IsReady || cluster.IsInstanceFenced(status.Pod.Name) || status.MightBeUnavailable {
 		return false, false, ""
 	}
 

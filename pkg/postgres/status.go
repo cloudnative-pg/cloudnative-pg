@@ -18,6 +18,8 @@ package postgres
 
 import (
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PostgresqlStatus defines a status for every instance in the cluster
@@ -219,13 +221,25 @@ func (list PostgresqlStatusList) ArePodsWaitingForDecreasedSettings() bool {
 	return false
 }
 
-// ShouldSkipReconcile checks whether at least an instance is asking for the reconciliation loop to be skipped
-func (list PostgresqlStatusList) ShouldSkipReconcile() bool {
+// ReportingMightBeUnavailable checks whether the given instance might be unavailable
+func (list PostgresqlStatusList) ReportingMightBeUnavailable(instance string) bool {
 	for _, item := range list.Items {
-		if item.MightBeUnavailable {
+		if item.Pod.Name == instance && item.MightBeUnavailable {
 			return true
 		}
 	}
 
 	return false
+}
+
+// InstancesReportingStatus returns the number of instances that are Ready or MightBeUnavailable
+func (list PostgresqlStatusList) InstancesReportingStatus() int {
+	var n int
+	for _, item := range list.Items {
+		if utils.IsPodActive(item.Pod) && utils.IsPodReady(item.Pod) || item.MightBeUnavailable {
+			n++
+		}
+	}
+
+	return n
 }

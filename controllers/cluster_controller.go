@@ -216,17 +216,6 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// Get the replication status
 	instancesStatus := r.getStatusFromInstances(ctx, resources.pods)
 
-	// If at least one Pod reports a fenced status, we skip the
-	// reconcile loop.
-	//
-	// This is equivalent of a cluster-level fencing, but we should
-	// keep in mind that the logic handled by the instance manager
-	// is still working in the Pods which are not fenced.
-	if instancesStatus.ShouldSkipReconcile() {
-		contextLogger.Info("An instance asked to skip reconciliation, will retry")
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	}
-
 	// Verify the architecture of all the instances and update the OnlineUpdateEnabled
 	// field in the status
 	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
@@ -271,6 +260,12 @@ func (r *ClusterReconciler) handleSwitchover(
 	instancesStatus postgres.PostgresqlStatusList,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+	if cluster.IsInstanceFenced(cluster.Status.CurrentPrimary) ||
+		instancesStatus.ReportingMightBeUnavailable(cluster.Status.CurrentPrimary) {
+		contextLogger.Info("The current primary instance is fenced or is still recovering from it," +
+			" we won't trigger a switchover")
+		return nil, nil
+	}
 	if cluster.Status.Phase == apiv1.PhaseInplaceDeletePrimaryRestart {
 		if cluster.Status.ReadyInstances != cluster.Spec.Instances {
 			contextLogger.Info("Waiting for the primary to be restarted without triggering a switchover")
@@ -428,7 +423,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// If we still need more instances, we need to wait before setting healthy status
-	if cluster.Status.ReadyInstances != cluster.Spec.Instances {
+	if instancesStatus.InstancesReportingStatus() != cluster.Spec.Instances {
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
@@ -577,7 +572,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	// Work on the PVCs we currently have
 	pvcNeedingMaintenance := len(cluster.Status.DanglingPVC) + len(cluster.Status.InitializingPVC)
 	if pvcNeedingMaintenance > 0 {
-		return r.reconcilePVCs(ctx, cluster, resources)
+		return r.reconcilePVCs(ctx, cluster, resources, instancesStatus)
 	}
 
 	if err := r.ensureHealthyPVCsAnnotation(ctx, cluster, resources); err != nil {
@@ -601,14 +596,14 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	// Stop acting here if there are non-ready Pods unless in maintenance reusing PVCs.
 	// The user have chosen to wait for the missing nodes to come up
 	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
-		cluster.Status.ReadyInstances < cluster.Status.Instances {
+		instancesStatus.InstancesReportingStatus() < cluster.Status.Instances {
 		contextLogger.Debug("Waiting for Pods to be ready")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
 	// Are there missing nodes? Let's create one
 	if cluster.Status.Instances < cluster.Spec.Instances &&
-		cluster.Status.ReadyInstances == cluster.Status.Instances {
+		instancesStatus.InstancesReportingStatus() == cluster.Status.Instances {
 		newNodeSerial, err := r.generateNodeSerial(ctx, cluster)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)

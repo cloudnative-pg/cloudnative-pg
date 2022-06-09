@@ -128,9 +128,17 @@ var _ = Describe("PostgreSQL status", func() {
 				},
 			},
 		}
-		Expect(podList.ShouldSkipReconcile()).To(BeFalse())
+		Expect(podList.ReportingMightBeUnavailable(podList.Items[0].Pod.Name)).To(BeFalse())
+		Expect(podList.ReportingMightBeUnavailable(podList.Items[1].Pod.Name)).To(BeFalse())
+		Expect(podList.InstancesReportingStatus()).To(BeEquivalentTo(0))
+		podList.Items[1].MightBeUnavailable = true
+		Expect(podList.ReportingMightBeUnavailable(podList.Items[0].Pod.Name)).To(BeFalse())
+		Expect(podList.ReportingMightBeUnavailable(podList.Items[1].Pod.Name)).To(BeTrue())
+		Expect(podList.InstancesReportingStatus()).To(BeEquivalentTo(1))
 		podList.Items[0].MightBeUnavailable = true
-		Expect(podList.ShouldSkipReconcile()).To(BeTrue())
+		Expect(podList.ReportingMightBeUnavailable(podList.Items[0].Pod.Name)).To(BeTrue())
+		Expect(podList.ReportingMightBeUnavailable(podList.Items[1].Pod.Name)).To(BeTrue())
+		Expect(podList.InstancesReportingStatus()).To(BeEquivalentTo(2))
 	})
 
 	Describe("when sorted", func() {
