@@ -112,7 +112,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 		return fmt.Errorf("could not get operator pod: %w", err)
 	}
 
-	operatorSecrets, err := deployments.GetOperatorSecrets(ctx)
+	operatorSecrets, err := deployments.GetOperatorSecrets(ctx, operatorDeployment)
 	if err != nil {
 		return fmt.Errorf("could not get operator secrets: %w", err)
 	}
@@ -121,7 +121,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 		secrets = append(secrets, namedObject{Name: ss.Name + "(secret)", Object: secretRedactor(ss)})
 	}
 
-	operatorConfigMaps, err := deployments.GetOperatorConfigMaps(ctx)
+	operatorConfigMaps, err := deployments.GetOperatorConfigMaps(ctx, operatorDeployment)
 	if err != nil {
 		return fmt.Errorf("could not get operator configmap: %w", err)
 	}
