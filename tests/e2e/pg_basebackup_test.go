@@ -68,6 +68,18 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 			AssertClusterIsReady(namespace, dstClusterName, 800, env)
 		})
 
+		By("checking the dst cluster with auto generated app password connectable", func() {
+			secretName := dstClusterName + "-app"
+			AssertApplicationDatabaseConnection(namespace, dstClusterName, "appuser", "app", "", secretName)
+		})
+
+		By("update user application password for dst cluster and verify connectivity", func() {
+			secretName := dstClusterName + "-app"
+			const newPassword = "eeh2Zahohx" //nolint:gosec
+			AssertUpdateSecret("password", newPassword, secretName, namespace, dstClusterName, 30, env)
+			AssertApplicationDatabaseConnection(namespace, dstClusterName, "appuser", "app", newPassword, secretName)
+		})
+
 		By("checking data have been copied correctly", func() {
 			// Test data should be present on restored primary
 			out, _, err := utils.Run(fmt.Sprintf(

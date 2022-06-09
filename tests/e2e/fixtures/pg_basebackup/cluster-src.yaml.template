@@ -17,6 +17,10 @@ spec:
     pg_hba:
       - host replication postgres all md5
       - hostssl app streaming_replica all cert
+  bootstrap:
+    initdb:
+      database: app
+      owner: appuser
 
   storage:
     size: 1Gi

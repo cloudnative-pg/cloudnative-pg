@@ -192,7 +192,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				}, 30).ShouldNot(BeEmpty())
 			})
 
-			// Restore backup in a new cluster
+			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
 
 			AssertMetricsData(namespace, restoredClusterName, curlPodName, targetDBOne, targetDBTwo, targetDBSecret)
@@ -295,6 +295,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
 			Expect(err).NotTo(HaveOccurred())
 
+			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterRestorePITR(namespace, restoredClusterName, tableName, "00000003")
 		})
 
@@ -436,7 +437,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Restore backup in a new cluster
+			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterRestorePITR(namespace, restoredClusterName, tableName, "00000002")
 		})
 
@@ -507,7 +508,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 		It("restores a backed up cluster", func() {
 			// Restore backup in a new cluster
-			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
+			AssertClusterRestoreWithApplicationDB(namespace, clusterRestoreSampleFile, tableName)
 		})
 
 		// Create a scheduled backup with the 'immediate' option enabled.
@@ -533,6 +534,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			err := testUtils.CreateClusterFromBackupUsingPITR(namespace, restoredClusterName, backupFile, *currentTimestamp, env)
 			Expect(err).NotTo(HaveOccurred())
 
+			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterRestorePITR(namespace, restoredClusterName, tableName, "00000002")
 		})
 
@@ -736,7 +738,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					namespace, externalClusterRestoreName, clusterName, *currentTimestamp, env)
 				Expect(err).NotTo(HaveOccurred())
 			})
-			AssertClusterRestorePITR(namespace, externalClusterRestoreName, tableName, "00000002")
+			AssertClusterRestorePITRWithApplicationDB(namespace, externalClusterRestoreName, tableName, "00000002")
 		})
 
 		It("restore cluster from barman object using replica option in spec", func() {
@@ -825,7 +827,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 				// Restoring cluster using a recovery barman object store, which is defined
 				// in the externalClusters section
-				AssertClusterRestorePITR(namespace, externalClusterName, tableName, "00000002")
+				AssertClusterRestorePITRWithApplicationDB(namespace, externalClusterName, tableName, "00000002")
 			})
 		})
 
@@ -880,7 +882,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				})
 
 				// Restore backup in a new cluster
-				AssertClusterRestore(namespace, clusterRestoreFileAzureSAS, tableName)
+				AssertClusterRestoreWithApplicationDB(namespace, clusterRestoreFileAzureSAS, tableName)
 			})
 
 			It("restores a cluster with 'PITR' from barman object using "+
@@ -896,7 +898,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 				// Restoring cluster using a recovery barman object store, which is defined
 				// in the externalClusters section
-				AssertClusterRestorePITR(namespace, externalClusterName, tableName, "00000002")
+				AssertClusterRestorePITRWithApplicationDB(namespace, externalClusterName, tableName, "00000002")
 			})
 		})
 	})
@@ -929,7 +931,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 		})
 		It("restore cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 			// Restore backup in a new cluster
-			AssertClusterRestore(namespace, externalClusterFileAzurite, tableName)
+			AssertClusterRestoreWithApplicationDB(namespace, externalClusterFileAzurite, tableName)
 		})
 
 		It("restores a cluster with 'PITR' from barman object using 'barmanObjectStore' "+
@@ -943,7 +945,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				namespace, externalClusterRestoreName, clusterName, *currentTimestamp, env)
 			Expect(err).NotTo(HaveOccurred())
 
-			AssertClusterRestorePITR(namespace, externalClusterRestoreName, tableName, "00000002")
+			AssertClusterRestorePITRWithApplicationDB(namespace, externalClusterRestoreName, tableName, "00000002")
 		})
 	})
 })

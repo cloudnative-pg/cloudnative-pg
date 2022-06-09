@@ -520,6 +520,40 @@ spec:
           maxParallel: 8
 ```
 
+#### Update application database password (recovery)
+
+By default, the user credentials for the application database are preserved. You can update 
+the application user password with additional configuration. You can generate your passwords, 
+store them as secrets, and update the database use your own secrets after recovery. Or you can 
+also let the operator generate a secret with randomly secure password for use.
+Please reference the  ["Bootstrap an empty cluster"](#bootstrap-an-empty-cluster-initdb) section
+for more information about secrets.
+
+The following example update the application user password with supplied secret `app-secret`
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  bootstrap:
+    recovery:
+      database: app
+      owner: app
+      secret:
+        name: app-secret
+      [...]
+```
+
+With the above configuration, following will happen after recovery
+
+1. if database `app` does not exist, a new database `app` will be created.
+2. if user `app` does not exist, a new user `app` will be created.
+3. if user `app` is not the owner of database, user `app` will be granted 
+as owner of database `app`.
+4. If value of `username` match value of `owner` in secret, the password of 
+application database will be changed to the value of `password` in secret. 
+
 ### Bootstrap from a live cluster (`pg_basebackup`)
 
 The `pg_basebackup` bootstrap mode lets you create a new cluster (*target*) as
@@ -772,3 +806,29 @@ This will open up two main use cases:
 - replication over different Kubernetes clusters in CloudNativePG
 - *0 cutover time* migrations to CloudNativePG with the `pg_basebackup`
   bootstrap method
+
+#### Update application database password (pg_basebackup)
+
+We also support update the password of application database after bootstrap from a live cluster.
+Similar to `initdb` and `recovery` bootstrap method, `pg_basebackup` section also support to configure 
+`database`, `owner` and `secret` attributes. 
+Please see more information in [Update application database password (recovery)](#update-application-database-password-recovery) 
+section.
+
+The following example update the application user password with supplied secret `app-secret` after bootstrap.
+
+
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  bootstrap:
+    pg_basebackup:
+      database: app
+      owner: app
+      secret:
+        name: app-secret
+      source: cluster-example
+```

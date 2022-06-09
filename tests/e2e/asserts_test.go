@@ -977,6 +977,47 @@ func AssertCreationOfTestDataForTargetDB(namespace, clusterName, targetDBName, t
 	})
 }
 
+// AssertApplicationDatabaseConnection check the connectivity of application database
+func AssertApplicationDatabaseConnection(
+	namespace string,
+	clusterName string,
+	appUser string,
+	appDB string,
+	appPassword string,
+	appSecretName string,
+) {
+	By("checking cluster can connect with application database user and password", func() {
+		// we use a pod in the cluster to have a psql client ready and
+		// internal access to the k8s cluster
+		podName := clusterName + "-1"
+		pod := corev1.Pod{}
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      podName,
+		}
+		err := env.Client.Get(env.Ctx, namespacedName, &pod)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Get the app user password from the auto generated -app secret if appPassword is not provided
+		if appPassword == "" {
+			if appSecretName == "" {
+				appSecretName = clusterName + "-app"
+			}
+			appSecret := &corev1.Secret{}
+			appSecretNamespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      appSecretName,
+			}
+			err = env.Client.Get(env.Ctx, appSecretNamespacedName, appSecret)
+			Expect(err).ToNot(HaveOccurred())
+			appPassword = string(appSecret.Data["password"])
+		}
+		rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
+
+		AssertConnection(rwService, appUser, appDB, appPassword, pod, 60, env)
+	})
+}
+
 func AssertMetricsData(namespace, clusterName, curlPodName, targetOne, targetTwo, targetSecret string) {
 	By("collect and verify metric being exposed with target databases", func() {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -1184,10 +1225,54 @@ func AssertStorageCredentialsAreCreatedOnAzurite(namespace string) {
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
+func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableName string) {
+	restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
+	Expect(err).ToNot(HaveOccurred())
+
 	By("Restoring a backup in a new cluster", func() {
-		restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
-		Expect(err).ToNot(HaveOccurred())
+		CreateResourceFromFile(namespace, restoreClusterFile)
+
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, restoredClusterName, 800, env)
+
+		// Test data should be present on restored primary
+		primary := restoredClusterName + "-1"
+		AssertDataExpectedCount(namespace, primary, tableName, 2)
+
+		// Restored primary should be on timeline 2
+		cmd := "psql -U postgres app -tAc 'select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)'"
+		out, _, err := testsUtils.Run(fmt.Sprintf(
+			"kubectl exec -n %v %v -- %v",
+			namespace,
+			primary,
+			cmd))
+		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
+
+		// Restored standby should be attached to restored primary
+		assertClusterStandbysAreStreaming(namespace, restoredClusterName)
+	})
+
+	By("checking the restored cluster with pre-defined app password connectable", func() {
+		// Get the app user password from the auto generated -app secret
+		const suppliedAppUserPassword = "4ls054f3"        // NOSONAR
+		const secretName = "postgresql-user-supplied-app" //nolint:gosec
+		AssertApplicationDatabaseConnection(namespace, restoredClusterName, "appuser", "appdb",
+			suppliedAppUserPassword, secretName)
+	})
+
+	By("update user application password for restored cluster and verify connectivity", func() {
+		const secretName = "postgresql-user-supplied-app" //nolint:gosec
+		const newPassword = "eeh2Zahohx"                  //nolint:gosec
+		AssertUpdateSecret("password", newPassword, secretName, namespace, restoredClusterName, 30, env)
+		AssertApplicationDatabaseConnection(namespace, restoredClusterName, "appuser", "appdb", newPassword, secretName)
+	})
+}
+
+func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
+	restoredClusterName, err := env.GetResourceNameFromYAML(restoreClusterFile)
+	Expect(err).ToNot(HaveOccurred())
+
+	By("Restoring a backup in a new cluster", func() {
 		CreateResourceFromFile(namespace, restoreClusterFile)
 
 		// We give more time than the usual 600s, since the recovery is slower
@@ -1312,6 +1397,47 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 			}
 			return currentBackupCount, err
 		}, 90).Should(BeNumerically(">", completedBackupsCount))
+	})
+}
+
+func AssertClusterRestorePITRWithApplicationDB(namespace, clusterName, tableName, lsn string) {
+	primaryInfo := &corev1.Pod{}
+	var err error
+	commandTimeout := time.Second * 5
+
+	By("restoring a backup cluster with PITR in a new cluster", func() {
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, clusterName, 800, env)
+
+		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Restored primary should be on timeline 3
+		query := "select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)"
+		stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *primaryInfo, specs.PostgresContainerName,
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Trim(stdOut, "\n"), err).To(Equal(lsn))
+
+		// Restored standby should be attached to restored primary
+		Expect(testsUtils.CountReplicas(env, primaryInfo)).To(BeEquivalentTo(2))
+	})
+
+	By(fmt.Sprintf("after restored, 3rd entry should not be exists in table '%v'", tableName), func() {
+		// Only 2 entries should be present
+		AssertDataExpectedCount(namespace, primaryInfo.GetName(), tableName, 2)
+	})
+
+	By("checking the restored cluster with auto generated app password connectable", func() {
+		secretName := clusterName + "-app"
+		AssertApplicationDatabaseConnection(namespace, clusterName, "appuser", "appdb", "", secretName)
+	})
+
+	By("update user application password for restored cluster and verify connectivity", func() {
+		secretName := clusterName + "-app"
+		const newPassword = "eeh2Zahohx" //nolint:gosec
+		AssertUpdateSecret("password", newPassword, secretName, namespace, clusterName, 30, env)
+		AssertApplicationDatabaseConnection(namespace, clusterName, "appuser", "appdb", newPassword, secretName)
 	})
 }
 

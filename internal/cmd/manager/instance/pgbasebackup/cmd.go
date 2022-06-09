@@ -88,6 +88,11 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 		return err
 	}
 
+	if cluster.ShouldPgBaseBackupCreateApplicationDatabase() {
+		env.info.ApplicationUser = cluster.GetApplicationDatabaseOwner()
+		env.info.ApplicationDatabase = cluster.GetApplicationDatabaseName()
+	}
+
 	server, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.PgBaseBackup.Source)
 	if !ok {
 		return fmt.Errorf("missing external cluster")

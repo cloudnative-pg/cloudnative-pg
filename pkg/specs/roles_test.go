@@ -35,13 +35,11 @@ var _ = Describe("Roles", func() {
 
 		Spec: apiv1.ClusterSpec{
 			Bootstrap: &apiv1.BootstrapConfiguration{
-				InitDB: &apiv1.BootstrapInitDB{
-					Secret: &apiv1.LocalObjectReference{
-						Name: "testSecretBootstrapInitDB",
-					},
-				},
 				PgBaseBackup: &apiv1.BootstrapPgBaseBackup{
 					Source: "testCluster",
+					Secret: &apiv1.LocalObjectReference{
+						Name: "testSecretBootstrapRecovery",
+					},
 				},
 			},
 
@@ -167,7 +165,7 @@ var _ = Describe("Roles", func() {
 			"testClientCASecret",
 			"testServerCASecret",
 			"testServerTLSSecret",
-			"testSecretBootstrapInitDB",
+			"testSecretBootstrapRecovery",
 			"testSuperUserSecretName",
 			"testLDAPBindPasswordSecret",
 			"testSecretKeySelector",

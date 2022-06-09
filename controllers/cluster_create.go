@@ -209,30 +209,26 @@ func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluste
 }
 
 func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster *apiv1.Cluster) error {
-	if cluster.ShouldCreateApplicationDatabase() &&
-		(cluster.Spec.Bootstrap.InitDB.Secret == nil ||
-			cluster.Spec.Bootstrap.InitDB.Secret.Name == "") {
+	if cluster.ShouldCreateApplicationSecret() {
 		appPassword, err := password.Generate(64, 10, 0, false, true)
 		if err != nil {
 			return err
 		}
-
 		appSecret := specs.CreateSecret(
 			cluster.GetApplicationSecretName(),
 			cluster.Namespace,
 			cluster.GetServiceReadWriteName(),
-			cluster.Spec.Bootstrap.InitDB.Database,
-			cluster.Spec.Bootstrap.InitDB.Owner,
+			cluster.GetApplicationDatabaseName(),
+			cluster.GetApplicationDatabaseOwner(),
 			appPassword)
-		SetClusterOwnerAnnotationsAndLabels(&appSecret.ObjectMeta, cluster)
 
+		SetClusterOwnerAnnotationsAndLabels(&appSecret.ObjectMeta, cluster)
 		if err := r.Create(ctx, appSecret); err != nil {
 			if !apierrs.IsAlreadyExists(err) {
 				return err
 			}
 		}
 	}
-
 	return nil
 }
 

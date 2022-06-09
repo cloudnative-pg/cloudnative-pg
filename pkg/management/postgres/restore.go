@@ -87,6 +87,11 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
+	if cluster.ShouldRecoveryCreateApplicationDatabase() {
+		info.ApplicationUser = cluster.GetApplicationDatabaseOwner()
+		info.ApplicationDatabase = cluster.GetApplicationDatabaseName()
+	}
+
 	// Before starting the restore we check if the archive destination is safe to use
 	// otherwise, we stop creating the cluster
 	err = info.checkBackupDestination(ctx, typedClient, cluster)
@@ -566,7 +571,20 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 		}
 	}
 
-	return nil
+	if info.ApplicationUser == "" || info.ApplicationDatabase == "" {
+		log.Debug("configure new instance not ran, missing user or database")
+		return nil
+	}
+
+	// Configure the application database information for restored instance
+	return instance.WithActiveInstance(func() error {
+		err = info.ConfigureNewInstance(instance)
+		if err != nil {
+			return fmt.Errorf("while configuring restored instance: %w", err)
+		}
+
+		return nil
+	})
 }
 
 func (info *InitInfo) checkBackupDestination(

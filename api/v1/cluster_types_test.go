@@ -137,21 +137,77 @@ var _ = Describe("Node maintenance window", func() {
 var _ = Describe("Bootstrap via initdb", func() {
 	It("will create an application database if specified", func() {
 		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
 					InitDB: &BootstrapInitDB{
-						Database: "app",
-						Owner:    "app",
+						Database: "appDB",
+						Owner:    "appOwner",
+						Secret: &LocalObjectReference{
+							Name: "appSecret",
+						},
 					},
 				},
 			},
 		}
 
 		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeTrue())
+		Expect(cluster.ShouldCreateApplicationSecret()).To(BeFalse())
+		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
 	})
 
 	It("will not create an application database if not requested", func() {
-		Expect(Cluster{}.ShouldCreateApplicationDatabase()).To(BeFalse())
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+		}
+		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeFalse())
+		Expect(cluster.ShouldCreateApplicationSecret()).To(BeFalse())
+
+		// InitDB is the default bootstrap method, and is triggered by
+		// the defaulting webhook if nothing else is specified by the user
+		cluster.Default()
+		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeTrue())
+		Expect(cluster.ShouldCreateApplicationSecret()).To(BeTrue())
+	})
+})
+
+var _ = Describe("Bootstrap via pg_basebackup", func() {
+	It("will create an application database if specified", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Database: "appDB",
+						Owner:    "appOwner",
+						Secret: &LocalObjectReference{
+							Name: "appSecret",
+						},
+					},
+				},
+			},
+		}
+
+		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).To(BeTrue())
+		Expect(cluster.ShouldPgBaseBackupCreateApplicationSecret()).To(BeFalse())
+		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
+		Expect(cluster.GetApplicationDatabaseOwner()).To(Equal("appOwner"))
+	})
+
+	It("will get default application secrets name if not specified", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+		}
+		Expect(cluster.ShouldPgBaseBackupCreateApplicationDatabase()).To(BeFalse())
+		Expect(cluster.ShouldPgBaseBackupCreateApplicationSecret()).To(BeFalse())
 	})
 })
 
