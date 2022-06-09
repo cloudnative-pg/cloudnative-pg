@@ -46,13 +46,23 @@ func Monolith(
 	if err != nil {
 		return err
 	}
+
+	if err := createDumpsDirectory(); err != nil {
+		return err
+	}
+
 	if err := ds.exportDatabases(ctx, origin, databases); err != nil {
 		return err
 	}
 	if err := ds.importDatabases(ctx, destination, databases); err != nil {
 		return err
 	}
+
 	if err := ds.analyze(ctx, destination, databases); err != nil {
+		return err
+	}
+
+	if err := cleanDumpDirectory(); err != nil {
 		return err
 	}
 

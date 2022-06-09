@@ -19,6 +19,8 @@ package logicalsnapshot
 import (
 	"fmt"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
@@ -30,8 +32,17 @@ const (
 	pgDump           executable = "pg_dump"
 	pgRestore        executable = "pg_restore"
 	postgresDatabase            = "postgres"
+	dumpDirectory               = specs.PgDataPath + "/dumps"
 )
 
+func createDumpsDirectory() error {
+	return fileutils.EnsureDirectoryExist(dumpDirectory)
+}
+
 func generateFileNameForDatabase(database string) string {
-	return fmt.Sprintf("%s/%s.dump", specs.PgDataPath, database)
+	return fmt.Sprintf("%s/%s.dump", dumpDirectory, database)
+}
+
+func cleanDumpDirectory() error {
+	return fileutils.RemoveDirectoryContent(dumpDirectory)
 }

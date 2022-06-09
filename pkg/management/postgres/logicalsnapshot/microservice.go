@@ -36,6 +36,9 @@ func Microservice(
 	databases := cluster.Spec.Bootstrap.InitDB.Import.Databases
 	contextLogger.Info("starting microservice clone process")
 
+	if err := createDumpsDirectory(); err != nil {
+		return nil
+	}
 	if err := ds.exportDatabases(ctx, origin, databases); err != nil {
 		return err
 	}
@@ -53,11 +56,16 @@ func Microservice(
 	); err != nil {
 		return err
 	}
+
 	if err := ds.executePostInitQueries(ctx, destination, cluster.Spec.Bootstrap.InitDB.Database); err != nil {
 		return err
 	}
 
 	if err := ds.analyze(ctx, destination, []string{cluster.Spec.Bootstrap.InitDB.Database}); err != nil {
+		return err
+	}
+
+	if err := cleanDumpDirectory(); err != nil {
 		return err
 	}
 
