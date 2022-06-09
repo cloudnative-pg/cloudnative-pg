@@ -18,6 +18,11 @@ As a result, the instructions in this section are suitable for both:
 - importing the database from any PostgreSQL version to one that is either the
   same or newer, enabling *major upgrades*
 
+!!! Warning
+    When performing major upgrades of PostgreSQL you are responsible for making
+    sure that the upgrade path of the objects contained in the database (including
+    extensions) is possible.
+
 In both cases, the operation is performed on a snapshot of the origin database.
 
 !!! Important
@@ -61,11 +66,13 @@ performed in 4 steps:
 - optional execution of the user defined SQL queries in the application
   database via the `postImportApplicationSQL` parameter
 
+![Example of microservice import type](./images/microservice-import.png)
+
 For example, the YAML below creates a new 3 instance PostgreSQL cluster (latest
 available major version) called `cluster-microservice` that imports the `angus`
-database from the `cluster-pg10` cluster (with PostgreSQL 10), by connecting to
-the `postgres` database using the `postgres` user, via the password stored in
-the `cluster-pg10-superuser` secret.
+database from the `cluster-pg96` cluster (with the unsupported PostgreSQL 9.6),
+by connecting to the `postgres` database using the `postgres` user, via the
+password stored in the `cluster-pg96-superuser` secret.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -82,19 +89,20 @@ spec:
         databases:
           - angus
         source:
-          externalCluster: cluster-pg10
+          externalCluster: cluster-pg96
         # postImportApplicationSQL:
         # - "INSERT YOUR SQL QUERIES HERE"
   storage:
     size: 1Gi
   externalClusters:
-    - name: cluster-pg10
+    - name: cluster-pg96
       connectionParameters:
-        host: cluster-pg10-rw.default.svc
+        # Use the correct IP or host name for the source database
+        host: pg96.local
         user: postgres
         dbname: postgres
       password:
-        name: cluster-pg10-superuser
+        name: cluster-pg96-superuser
         key: password
 ```
 
@@ -124,12 +132,14 @@ The operation is performed in the following steps: TODO
 
 -->
 
+![Example of monolith import type](./images/monolith-import.png)
+
 For example, the YAML below creates a new 3 instance PostgreSQL cluster (latest
 available major version) called `cluster-microservice` that imports the
 `accountant` and the `bank_user` roles, as well as the `accounting`, `banking`,
-`resort` databases from the `cluster-pg10` cluster (with PostgreSQL 10), by
-connecting to the `postgres` database using the `postgres` user, via the
-password stored in the `cluster-pg10-superuser` secret.
+`resort` databases from the `cluster-pg96` cluster (with the unsupported
+PostgreSQL 9.6), by connecting to the `postgres` database using the `postgres`
+user, via the password stored in the `cluster-pg96-superuser` secret.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -154,13 +164,14 @@ spec:
   storage:
     size: 1Gi
   externalClusters:
-    - name: cluster-pg10
+    - name: cluster-pg96
       connectionParameters:
-        host: cluster-pg10-rw.default.svc
+        # Use the correct IP or host name for the source database
+        host: pg96.local
         user: postgres
         dbname: postgres
       password:
-        name: cluster-pg10-superuser
+        name: cluster-pg96-superuser
         key: password
 ```
 
