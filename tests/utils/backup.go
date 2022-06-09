@@ -408,16 +408,14 @@ func GetConditionsInClusterStatus(
 ) (*apiv1.ClusterCondition, error) {
 	var cluster *apiv1.Cluster
 	var err error
-	var backupConditionInCluster *apiv1.ClusterCondition
 	cluster, err = env.GetCluster(namespace, clusterName)
 	if err != nil {
-		return &apiv1.ClusterCondition{}, nil
+		return nil, err
 	}
-	for index, cond := range cluster.Status.Conditions {
+	for _, cond := range cluster.Status.Conditions {
 		if cond.Type == conditionType {
-			backupConditionInCluster = &cluster.Status.Conditions[index]
-			break
+			return &cond, nil
 		}
 	}
-	return backupConditionInCluster, nil
+	return nil, fmt.Errorf("no condition matching requested type found: %v", conditionType)
 }
