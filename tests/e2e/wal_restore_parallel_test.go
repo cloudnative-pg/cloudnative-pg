@@ -41,7 +41,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		SpoolDirectory    = walrestore.SpoolDirectory
 	)
 
-	var namespace, clusterName string
+	var namespace string
 	var primary, standby, latestWAL, walFile1, walFile2, walFile3, walFile4, walFile5, walFile6 string
 
 	BeforeEach(func() {
@@ -55,8 +55,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 

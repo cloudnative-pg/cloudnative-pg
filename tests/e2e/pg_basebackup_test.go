@@ -45,10 +45,8 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, srcClusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+"-src.log")
-			env.DumpClusterEnv(namespace, dstClusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+"-dst.log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+"-src.log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+"-dst.log")
 		}
 	})
 	AfterEach(func() {
@@ -119,10 +117,8 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, srcClusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+"-src.log")
-			env.DumpClusterEnv(namespace, dstClusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+"-dst.log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+"-src.log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+"-dst.log")
 		}
 	})
 	AfterEach(func() {

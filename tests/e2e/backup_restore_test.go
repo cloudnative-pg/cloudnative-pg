@@ -54,8 +54,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	Context("using minio as object storage for backup", Ordered, func() {
@@ -233,8 +232,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			// To also dump info. from `customClusterName` cluster after this spec gets executed
 			DeferCleanup(func() {
 				if CurrentSpecReport().Failed() {
-					env.DumpClusterEnv(namespace, customClusterName,
-						"out/"+CurrentSpecReport().LeafNodeText+".log")
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 				}
 			})
 
@@ -597,8 +595,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 
@@ -967,10 +964,8 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+namespace+CurrentSpecReport().LeafNodeText+".log")
-			env.DumpClusterEnv(namespace2, clusterName,
-				"out/"+namespace2+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace, "out/"+namespace+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace2, "out/"+namespace2+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	Context("using minio as object storage", Ordered, func() {

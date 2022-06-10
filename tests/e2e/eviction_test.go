@@ -111,11 +111,8 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			}
 		})
 		JustAfterEach(func() {
-			clusterName, err := env.GetResourceNameFromYAML(singleInstanceSampleFile)
-			Expect(err).ToNot(HaveOccurred())
 			if CurrentSpecReport().Failed() {
-				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentSpecReport().LeafNodeText+".log")
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		BeforeAll(func() {
@@ -189,11 +186,8 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			}
 		})
 		JustAfterEach(func() {
-			clusterName, err := env.GetResourceNameFromYAML(multiInstanceSampleFile)
-			Expect(err).ToNot(HaveOccurred())
 			if CurrentSpecReport().Failed() {
-				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentSpecReport().LeafNodeText+".log")
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		BeforeAll(func() {

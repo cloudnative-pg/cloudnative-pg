@@ -116,8 +116,8 @@ func ClusterHasAnnotations(
 	return true
 }
 
-// DumpClusterEnv logs the JSON for the a cluster in a namespace, its pods and endpoints
-func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName string, filename string) {
+// DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
+func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename string) {
 	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		fmt.Println(err)
