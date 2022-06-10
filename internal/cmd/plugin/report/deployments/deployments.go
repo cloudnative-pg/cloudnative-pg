@@ -43,63 +43,49 @@ const (
 )
 
 // GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
-func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
-	deploymentList := &appsv1.DeploymentList{}
-
-	if err := plugin.Client.List(
-		ctx, deploymentList, ctrlclient.MatchingLabels{labelOperatorNameKey: labelOperatorName},
-	); err != nil {
-		return appsv1.Deployment{}, err
-	}
-	// We check if we have one or more deployments
-	if len(deploymentList.Items) > 1 {
-		err := fmt.Errorf("number of operator deployments bigger than 1")
-		return appsv1.Deployment{}, err
+func GetOperatorDeployment(ctx context.Context) (*appsv1.Deployment, error) {
+	deployment, err := tryGetOperatorDeployment(ctx, ctrlclient.MatchingLabels{labelOperatorNameKey: labelOperatorName})
+	if err != nil || deployment != nil {
+		return deployment, err
 	}
 
-	if len(deploymentList.Items) == 1 {
-		return deploymentList.Items[0], nil
-	}
-
-	if err := plugin.Client.List(
-		ctx,
-		deploymentList,
-		ctrlclient.HasLabels{labelOperatorKeyPrefix + "openshift-operators"},
-	); err != nil {
-		return appsv1.Deployment{}, err
-	}
-
-	// We check if we have one or more deployments
-	if len(deploymentList.Items) > 1 {
-		err := fmt.Errorf("number of operator deployments bigger than 1")
-		return appsv1.Deployment{}, err
-	}
-
-	if len(deploymentList.Items) == 1 {
-		return deploymentList.Items[0], nil
+	deployment, err = tryGetOperatorDeployment(ctx, ctrlclient.HasLabels{labelOperatorKeyPrefix + "openshift-operators"})
+	if err != nil || deployment != nil {
+		return deployment, err
 	}
 
 	namespace, err := getOperatorPodNamespace(ctx)
-	if err != nil || namespace == "" {
-		err := fmt.Errorf("can not find namespace with operator deployments installed")
-		return appsv1.Deployment{}, err
-	}
-	if err := plugin.Client.List(
-		ctx,
-		deploymentList,
-		ctrlclient.HasLabels{labelOperatorKeyPrefix + namespace},
-	); err != nil {
-		return appsv1.Deployment{}, err
+	if err != nil {
+		return nil, err
 	}
 
+	deployment, err = tryGetOperatorDeployment(ctx, ctrlclient.HasLabels{labelOperatorKeyPrefix + namespace})
+	if err != nil {
+		return nil, err
+	}
+	if deployment == nil {
+		return nil, fmt.Errorf("no operator deployments found under namespace %v", namespace)
+	}
+
+	return deployment, nil
+}
+
+func tryGetOperatorDeployment(ctx context.Context, options ...ctrlclient.ListOption) (*appsv1.Deployment, error) {
+	deploymentList := &appsv1.DeploymentList{}
+
+	if err := plugin.Client.List(ctx, deploymentList, options...); err != nil {
+		return nil, err
+	}
 	// We check if we have one or more deployments
-	if len(deploymentList.Items) > 1 || len(deploymentList.Items) < 1 {
-		err := fmt.Errorf("number of operator deployments is %v under namespace %v, "+
-			"not equals 1", namespace, len(deploymentList.Items))
-		return appsv1.Deployment{}, err
+	if len(deploymentList.Items) > 1 {
+		return nil, fmt.Errorf("number of operator deployments bigger than 1")
 	}
 
-	return deploymentList.Items[0], nil
+	if len(deploymentList.Items) == 1 {
+		return &deploymentList.Items[0], nil
+	}
+
+	return nil, nil
 }
 
 // GetOperatorPods returns the operator pods if found, error otherwise
@@ -245,8 +231,7 @@ func getOperatorPodNamespace(ctx context.Context) (string, error) {
 	}
 
 	if len(operatorPods) < 1 {
-		err := fmt.Errorf("can not get operator pod")
-		return "", err
+		return "", fmt.Errorf("can not find namespace with operator deployments installed")
 	}
 
 	return operatorPods[0].Namespace, nil
