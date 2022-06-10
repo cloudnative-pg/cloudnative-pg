@@ -51,10 +51,10 @@ var _ = Describe("Configuration update", Ordered, func() {
 	}
 	commandTimeout := time.Second * 2
 
-	checkErrorOutFixedAndBlockedConfigurationParameter := func(sample string) {
+	checkErrorOutFixedAndBlockedConfigurationParameter := func(sampleFile string) {
 		// Update the configuration
 		Eventually(func() error {
-			_, _, err := utils.RunUnchecked("kubectl apply -n " + namespace + " -f " + sample)
+			_, _, err := utils.RunUnchecked("kubectl apply -n " + namespace + " -f " + sampleFile)
 			return err
 			// Expecting an error when a blockedConfigurationParameter is modified
 		}, RetryTimeout, PollingTime).ShouldNot(BeNil())
