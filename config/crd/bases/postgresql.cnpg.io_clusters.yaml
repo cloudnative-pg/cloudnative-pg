@@ -2423,11 +2423,6 @@ spec:
               topology:
                 description: Instances topology.
                 properties:
-                  failedExtraction:
-                    description: FailedExtraction indicates if the topology data extraction
-                      failed. It is useful to enact fallback behaviors in synchronous
-                      replica election
-                    type: boolean
                   instances:
                     additionalProperties:
                       additionalProperties:
@@ -2437,6 +2432,11 @@ spec:
                       type: object
                     description: Instances contains the pod topology of the instances
                     type: object
+                  successfullyExtracted:
+                    description: SuccessfullyExtracted indicates if the topology data
+                      was extract. It is useful to enact fallback behaviors in synchronous
+                      replica election in case of failures
+                    type: boolean
                 type: object
               writeService:
                 description: Current write pod

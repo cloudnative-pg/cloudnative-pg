@@ -78,9 +78,14 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 	// We need to include every replica inside the list of possible synchronous standbys if we have no constraints
 	// or the topology extraction is failing. This avoids a continuous operator crash.
 	// One case this could happen is while draining nodes
+	if !cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled {
+		return nonPrimaryInstances
+	}
+
 	// The same happens if we have failed to extract topology, we want to preserve the current status by adding all the
 	// electable instances.
-	if !cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled || topology.FailedExtraction {
+	if !topology.SuccessfullyExtracted {
+		log.Warning("topology data not extracted, falling back to all electable sync replicas")
 		return nonPrimaryInstances
 	}
 

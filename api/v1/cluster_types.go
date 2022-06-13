@@ -303,9 +303,9 @@ type PodName string
 
 // Topology contains the cluster topology
 type Topology struct {
-	// FailedExtraction indicates if the topology data extraction failed. It is useful to enact fallback behaviors
-	// in synchronous replica election
-	FailedExtraction bool `json:"failedExtraction,omitempty"`
+	// SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors
+	// in synchronous replica election in case of failures
+	SuccessfullyExtracted bool `json:"successfullyExtracted,omitempty"`
 	// Instances contains the pod topology of the instances
 	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
 }

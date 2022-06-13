@@ -95,7 +95,6 @@ EndpointCA
 EnterpriseDB
 EnterpriseDB's
 ExternalCluster
-FailedExtraction
 Fei
 Filesystem
 Fluentd
@@ -270,6 +269,7 @@ Slonik
 StorageClass
 StorageConfiguration
 Storages
+SuccessfullyExtracted
 SyncReplicaElectionConstraints
 Synopsys
 TCP

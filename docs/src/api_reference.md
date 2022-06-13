@@ -897,10 +897,10 @@ Name                   | Description                                            
 
 Topology contains the cluster topology
 
-Name             | Description                                                                                                                                 | Type                         
----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------
-`failedExtraction` | FailedExtraction indicates if the topology data extraction failed. It is useful to enact fallback behaviors in synchronous replica election | bool                         
-`instances       ` | Instances contains the pod topology of the instances                                                                                        | map[PodName]PodTopologyLabels
+Name                  | Description                                                                                                                                                    | Type                         
+--------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------
+`successfullyExtracted` | SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors in synchronous replica election in case of failures | bool                         
+`instances            ` | Instances contains the pod topology of the instances                                                                                                           | map[PodName]PodTopologyLabels
 
 <a id='WalBackupConfiguration'></a>
 

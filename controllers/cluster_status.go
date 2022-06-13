@@ -837,13 +837,13 @@ func getPodsTopology(
 			// node not found, it means that:
 			// - the node could have been drained
 			// - others
-			contextLogger.Warning("node not found, skipping pod topology matching, enacting fallback logic")
-			return apiv1.Topology{FailedExtraction: true}
+			contextLogger.Debug("node not found, skipping pod topology matching")
+			return apiv1.Topology{}
 		}
 		for _, labelName := range topology.NodeLabelsAntiAffinity {
 			data[podName][labelName] = node.Labels[labelName]
 		}
 	}
 
-	return apiv1.Topology{FailedExtraction: false, Instances: data}
+	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data}
 }
