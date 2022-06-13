@@ -74,8 +74,13 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 		}
 	}
 
+	topology := cluster.Status.Topology
 	// We need to include every replica inside the list of possible synchronous standbys if we have no constraints
-	if !cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled {
+	// or the topology extraction is failing. This avoids a continuous operator crash.
+	// One case this could happen is while draining nodes
+	// The same happens if we have failed to extract topology, we want to preserve the current status by adding all the
+	// electable instances.
+	if !cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled || topology.FailedExtraction {
 		return nonPrimaryInstances
 	}
 
@@ -86,7 +91,7 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 		return nil
 	}
 
-	currentPrimaryTopology, ok := cluster.Status.InstancesTopology[currentPrimary]
+	currentPrimaryTopology, ok := topology.Instances[currentPrimary]
 	if !ok {
 		log.Warning("current primary topology not yet extracted, cannot computed electable sync replicas",
 			"instanceName", currentPrimary)
@@ -97,7 +102,7 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 	for _, name := range nonPrimaryInstances {
 		name := PodName(name)
 
-		instanceTopology, ok := cluster.Status.InstancesTopology[name]
+		instanceTopology, ok := topology.Instances[name]
 		// if we still don't have the topology data for the node we skip it from inserting it in the electable pool
 		if !ok {
 			log.Warning("current instance topology not found", "instanceName", name)

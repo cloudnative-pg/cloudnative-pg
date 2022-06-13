@@ -2324,15 +2324,6 @@ spec:
                   type: array
                 description: Instances status
                 type: object
-              instancesZone:
-                additionalProperties:
-                  additionalProperties:
-                    type: string
-                  description: PodTopologyLabels represent the topology of a Pod.
-                    map[labelName]labelValue
-                  type: object
-                description: Instances topology.
-                type: object
               jobCount:
                 description: How many Jobs have been created by this cluster
                 format: int32
@@ -2429,6 +2420,24 @@ spec:
                 description: The timestamp when the last request for a new primary
                   has occurred
                 type: string
+              topology:
+                description: Instances topology.
+                properties:
+                  failedExtraction:
+                    description: FailedExtraction indicates if the topology data extraction
+                      failed. It is useful to enact fallback behaviors in synchronous
+                      replica election
+                    type: boolean
+                  instances:
+                    additionalProperties:
+                      additionalProperties:
+                        type: string
+                      description: PodTopologyLabels represent the topology of a Pod.
+                        map[labelName]labelValue
+                      type: object
+                    description: Instances contains the pod topology of the instances
+                    type: object
+                type: object
               writeService:
                 description: Current write pod
                 type: string

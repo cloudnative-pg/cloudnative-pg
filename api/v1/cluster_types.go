@@ -301,6 +301,15 @@ func (topologyLabels PodTopologyLabels) hasSameLabels(instanceTopology PodTopolo
 // PodName is the name of a Pod
 type PodName string
 
+// Topology contains the cluster topology
+type Topology struct {
+	// FailedExtraction indicates if the topology data extraction failed. It is useful to enact fallback behaviors
+	// in synchronous replica election
+	FailedExtraction bool `json:"failedExtraction,omitempty"`
+	// Instances contains the pod topology of the instances
+	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// Total number of instances in the cluster
@@ -313,7 +322,7 @@ type ClusterStatus struct {
 	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
 
 	// Instances topology.
-	InstancesTopology map[PodName]PodTopologyLabels `json:"instancesZone,omitempty"`
+	Topology Topology `json:"topology,omitempty"`
 
 	// ID of the latest generated node (used to avoid node name clashing)
 	LatestGeneratedNode int `json:"latestGeneratedNode,omitempty"`

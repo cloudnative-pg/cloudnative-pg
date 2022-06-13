@@ -76,6 +76,7 @@ Below you will find a description of the defined resources:
 - [SecretsResourceVersion](#SecretsResourceVersion)
 - [StorageConfiguration](#StorageConfiguration)
 - [SyncReplicaElectionConstraints](#SyncReplicaElectionConstraints)
+- [Topology](#Topology)
 - [WalBackupConfiguration](#WalBackupConfiguration)
 
 
@@ -387,7 +388,7 @@ Name                      | Description                                         
 `instances                ` | Total number of instances in the cluster                                                                                                                                           | int                                                  
 `readyInstances           ` | Total number of ready instances in the cluster                                                                                                                                     | int                                                  
 `instancesStatus          ` | Instances status                                                                                                                                                                   | map[utils.PodStatus][]string                         
-`instancesZone            ` | Instances topology.                                                                                                                                                                | map[PodName]PodTopologyLabels                        
+`topology                 ` | Instances topology.                                                                                                                                                                | [Topology](#Topology)                                
 `latestGeneratedNode      ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                                 | int                                                  
 `currentPrimary           ` | Current primary instance                                                                                                                                                           | string                                               
 `targetPrimary            ` | Target primary instance, this is different from the previous one during a switchover or a failover                                                                                 | string                                               
@@ -889,6 +890,17 @@ Name                   | Description                                            
 ---------------------- | -------------------------------------------------------------------------------------------------------------- | --------
 `enabled               ` | This flag enabled the constraints for sync replicas                                                            - *mandatory*  | bool    
 `nodeLabelsAntiAffinity` | A list of node labels values to extract and compare to evaluate if the pods reside in the same topology or not | []string
+
+<a id='Topology'></a>
+
+## Topology
+
+Topology contains the cluster topology
+
+Name             | Description                                                                                                                                 | Type                         
+---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------
+`failedExtraction` | FailedExtraction indicates if the topology data extraction failed. It is useful to enact fallback behaviors in synchronous replica election | bool                         
+`instances       ` | Instances contains the pod topology of the instances                                                                                        | map[PodName]PodTopologyLabels
 
 <a id='WalBackupConfiguration'></a>
 

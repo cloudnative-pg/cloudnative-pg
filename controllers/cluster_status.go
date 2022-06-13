@@ -281,16 +281,12 @@ func (r *ClusterReconciler) updateResourceStatus(
 	// Instances status
 	cluster.Status.InstancesStatus = utils.ListStatusPods(resources.pods.Items)
 
-	topology, topologyErr := getPodsTopology(
+	cluster.Status.Topology = getPodsTopology(
+		ctx,
 		resources.pods.Items,
 		resources.nodes,
 		cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
 	)
-
-	if topologyErr != nil {
-		return topologyErr
-	}
-	cluster.Status.InstancesTopology = topology
 
 	// Services
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
@@ -826,22 +822,28 @@ func rawInstanceStatusRequest(
 
 // getPodsTopology returns a map with all the information about the pods topology
 func getPodsTopology(
+	ctx context.Context,
 	podList []corev1.Pod,
 	nodes map[string]corev1.Node,
 	topology apiv1.SyncReplicaElectionConstraints,
-) (map[apiv1.PodName]apiv1.PodTopologyLabels, error) {
+) apiv1.Topology {
+	contextLogger := log.FromContext(ctx)
 	data := make(map[apiv1.PodName]apiv1.PodTopologyLabels)
 	for _, pod := range podList {
 		podName := apiv1.PodName(pod.Name)
 		data[podName] = make(map[string]string, 0)
 		node, ok := nodes[pod.Spec.NodeName]
 		if !ok {
-			return nil, fmt.Errorf("node not found: %s", pod.Spec.NodeName)
+			// node not found, it means that:
+			// - the node could have been drained
+			// - others
+			contextLogger.Warning("node not found, skipping pod topology matching, enacting fallback logic")
+			return apiv1.Topology{FailedExtraction: true}
 		}
 		for _, labelName := range topology.NodeLabelsAntiAffinity {
 			data[podName][labelName] = node.Labels[labelName]
 		}
 	}
 
-	return data, nil
+	return apiv1.Topology{FailedExtraction: false, Instances: data}
 }
