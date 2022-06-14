@@ -61,7 +61,6 @@ var StatusRequestRetry = wait.Backoff{
 // managedResources contains the resources that are created a cluster
 // and need to be managed by the controller
 type managedResources struct {
-	// map of [nodeName]corev1.Node
 	nodes map[string]corev1.Node
 	pods  corev1.PodList
 	pvcs  corev1.PersistentVolumeClaimList

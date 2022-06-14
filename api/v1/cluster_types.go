@@ -286,9 +286,9 @@ const (
 // PodTopologyLabels represent the topology of a Pod. map[labelName]labelValue
 type PodTopologyLabels map[string]string
 
-// hasSameTopology checks if the two topologies have
-// the same labels
-func (topologyLabels PodTopologyLabels) hasSameLabels(instanceTopology PodTopologyLabels) bool {
+// matchesTopology checks if the two topologies have
+// the same label values (labels are specified in SyncReplicaElectionConstraints.NodeLabelsAntiAffinity)
+func (topologyLabels PodTopologyLabels) matchesTopology(instanceTopology PodTopologyLabels) bool {
 	for mainLabelName, mainLabelValue := range topologyLabels {
 		if mainLabelValue != instanceTopology[mainLabelName] {
 			return false

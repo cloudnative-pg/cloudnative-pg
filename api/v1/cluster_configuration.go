@@ -52,7 +52,7 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 	electableSyncReplicas = cluster.getElectableSyncReplicas()
 	numberOfElectableSyncReplicas := len(electableSyncReplicas)
 	if numberOfElectableSyncReplicas < syncReplicas {
-		log.Warning("lowering electable sync replicas due to not enough electable instances for sync replication "+
+		log.Warning("lowering sync replicas due to not enough electable instances for sync replication "+
 			"given the constraints",
 			"electableSyncReplicasWithoutConstraints", syncReplicas,
 			"electableSyncReplicasWithConstraints", numberOfElectableSyncReplicas,
@@ -92,7 +92,7 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 	currentPrimary := PodName(cluster.Status.CurrentPrimary)
 	// given that the constraints are based off the primary instance if we still don't have one we cannot continue
 	if currentPrimary == "" {
-		log.Info("no primary elected, cannot compute electable sync replicas")
+		log.Warning("no primary elected, cannot compute electable sync replicas")
 		return nil
 	}
 
@@ -114,7 +114,7 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 			continue
 		}
 
-		if !currentPrimaryTopology.hasSameLabels(instanceTopology) {
+		if !currentPrimaryTopology.matchesTopology(instanceTopology) {
 			electableReplicas = append(electableReplicas, string(name))
 		}
 	}
