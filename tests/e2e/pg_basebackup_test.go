@@ -45,8 +45,7 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+"-src.log")
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+"-dst.log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {
@@ -117,8 +116,7 @@ var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+"-src.log")
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+"-dst.log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {
