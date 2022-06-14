@@ -20,6 +20,7 @@ package report
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -30,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/report/deployments"
 )
 
 // operatorReport contains the data to be printed by the `report operator` plugin
@@ -102,17 +102,22 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 		fmt.Println("WARNING: secret Redaction is OFF. Use it with caution")
 	}
 
-	operatorDeployment, err := deployments.GetOperatorDeployment(ctx)
-	if err != nil {
+	operatorDeployment, err := getOperatorDeployment(ctx)
+	if errors.Is(err, errNoOperatorDeployment) {
+		// Try to be helpful to the user
+		return fmt.Errorf("%w\n"+
+			"HINT: Operator might be installed in another namespace."+
+			"Specify a namespace using the '-n' option", err)
+	} else if err != nil {
 		return fmt.Errorf("could not get operator deployment: %w", err)
 	}
 
-	operatorPods, err := deployments.GetOperatorPods(ctx)
+	operatorPods, err := getOperatorPods(ctx)
 	if err != nil {
 		return fmt.Errorf("could not get operator pod: %w", err)
 	}
 
-	operatorSecrets, err := deployments.GetOperatorSecrets(ctx, *operatorDeployment)
+	operatorSecrets, err := getOperatorSecrets(ctx, operatorDeployment)
 	if err != nil {
 		return fmt.Errorf("could not get operator secrets: %w", err)
 	}
@@ -121,7 +126,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 		secrets = append(secrets, namedObject{Name: ss.Name + "(secret)", Object: secretRedactor(ss)})
 	}
 
-	operatorConfigMaps, err := deployments.GetOperatorConfigMaps(ctx, *operatorDeployment)
+	operatorConfigMaps, err := getOperatorConfigMaps(ctx, operatorDeployment)
 	if err != nil {
 		return fmt.Errorf("could not get operator configmap: %w", err)
 	}
@@ -147,7 +152,7 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 	}
 
 	rep := operatorReport{
-		deployment:              *operatorDeployment,
+		deployment:              operatorDeployment,
 		operatorPods:            operatorPods,
 		secrets:                 secrets,
 		configs:                 configs,
