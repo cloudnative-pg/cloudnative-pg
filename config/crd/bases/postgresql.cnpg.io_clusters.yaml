@@ -1220,6 +1220,11 @@ spec:
                           (i.e., timestamp, transaction Id, LSN, ...). More info:
                           https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET'
                         properties:
+                          backupID:
+                            description: 'The backup ID chosen to be restored when
+                              one of the following targets is specified: TargetName,
+                              TargetXID and TargetImmediate.'
+                            type: string
                           exclusive:
                             description: Set the target to be exclusive (defaults
                               to true)

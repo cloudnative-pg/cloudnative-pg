@@ -482,6 +482,28 @@ Besides `targetTime`, you can use the following criteria to stop the recovery:
 - `targetImmediate` specify to stop as soon as a consistent state is
   reached
 
+!!! Note
+    `backupID` is mandatory when PITR is requested with either `targetName`, `targetXID`, or `targetImmediate`.
+
+While the operator is able to automatically retrieve the closest backup
+when either `targetTime` or `targetLSN` is specified, this is not possible
+for the remaining targets: `targetName`, `targetXID`, and `targetImmediate`.
+As such users must provide the `backupID` as well, in order to instruct the
+Operator to retrieve the right backup to restore. An example is given below:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+  bootstrap:
+    recovery:
+      source: clusterBackup
+      recoveryTarget:
+        backupID: 20220616T142236
+        targetName: "restore_point_1'
+[...]
+```
+
 You can choose only a single one among the targets above in each
 `recoveryTarget` configuration.
 

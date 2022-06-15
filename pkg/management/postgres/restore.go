@@ -233,9 +233,9 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	var targetBackup *catalog.BarmanBackup
 	if cluster.Spec.Bootstrap.Recovery != nil &&
 		cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
-		targetBackup, err = backupCatalog.FindClosestBackupInfo(cluster.Spec.Bootstrap.Recovery.RecoveryTarget)
+		targetBackup, err = backupCatalog.FindBackupInfo(cluster.Spec.Bootstrap.Recovery.RecoveryTarget)
 		if err != nil {
-			log.Error(err, "while finding the closest BackupInfo")
+			log.Error(err, "while finding the BackupInfo")
 		}
 	} else {
 		targetBackup = backupCatalog.LatestBackupInfo()

@@ -65,13 +65,13 @@ var _ = Describe("Backup catalog", func() {
 
 	It("can find the closest backup info when there is one", func() {
 		recoveryTarget := &v1.RecoveryTarget{TargetTime: time.Now().Format("2006-01-02 15:04:04")}
-		closestBackupInfo, err := catalog.FindClosestBackupInfo(recoveryTarget)
+		closestBackupInfo, err := catalog.FindBackupInfo(recoveryTarget)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(closestBackupInfo.ID).To(Equal("202101031200"))
 
 		recoveryTarget = &v1.RecoveryTarget{TargetTime: time.Date(2021, 1, 2, 12, 30, 0,
 			0, time.UTC).Format("2006-01-02 15:04:04")}
-		closestBackupInfo, err = catalog.FindClosestBackupInfo(recoveryTarget)
+		closestBackupInfo, err = catalog.FindBackupInfo(recoveryTarget)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(closestBackupInfo.ID).To(Equal("202101021200"))
 	})
@@ -79,8 +79,21 @@ var _ = Describe("Backup catalog", func() {
 	It("will return an empty result when the closest backup cannot be found", func() {
 		recoveryTarget := &v1.RecoveryTarget{TargetTime: time.Date(2019, 1, 2, 12, 30,
 			0, 0, time.UTC).Format("2006-01-02 15:04:04")}
-		closestBackupInfo, err := catalog.FindClosestBackupInfo(recoveryTarget)
+		closestBackupInfo, err := catalog.FindBackupInfo(recoveryTarget)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(closestBackupInfo).To(BeNil())
+	})
+
+	It("can find the backup info when BackupID is provided", func() {
+		recoveryTarget := &v1.RecoveryTarget{TargetName: "recovery_point_1", BackupID: "202101021200"}
+		BackupInfo, err := catalog.FindBackupInfo(recoveryTarget)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(BackupInfo.ID).To(Equal("202101021200"))
+
+		trueVal := true
+		recoveryTarget = &v1.RecoveryTarget{TargetImmediate: &trueVal, BackupID: "202101011200"}
+		BackupInfo, err = catalog.FindBackupInfo(recoveryTarget)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(BackupInfo.ID).To(Equal("202101011200"))
 	})
 })

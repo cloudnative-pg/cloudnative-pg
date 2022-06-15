@@ -891,6 +891,11 @@ type BootstrapPgBaseBackup struct {
 // RecoveryTarget allows to configure the moment where the recovery process
 // will stop. All the target options except TargetTLI are mutually exclusive.
 type RecoveryTarget struct {
+	// The backup ID chosen to be restored when one of
+	// the following targets is specified: TargetName,
+	// TargetXID and TargetImmediate.
+	BackupID string `json:"backupID,omitempty"`
+
 	// The target timeline ("latest" or a positive integer)
 	TargetTLI string `json:"targetTLI,omitempty"`
 

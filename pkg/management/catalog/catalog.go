@@ -75,9 +75,9 @@ func (catalog *Catalog) FirstRecoverabilityPoint() *time.Time {
 	return nil
 }
 
-// FindClosestBackupInfo finds the backup info that should
-// use to file a PITR request via target parameters specified within `RecoveryTarget`
-func (catalog *Catalog) FindClosestBackupInfo(recoveryTarget *v1.RecoveryTarget) (*BarmanBackup, error) {
+// FindBackupInfo finds the backup info that should use to file
+// a PITR request via target parameters specified within `RecoveryTarget`
+func (catalog *Catalog) FindBackupInfo(recoveryTarget *v1.RecoveryTarget) (*BarmanBackup, error) {
 	// the code below assumes the catalog to be sorted, therefore we enforce it first
 	sort.Sort(catalog)
 	targetTLI := recoveryTarget.TargetTLI
@@ -88,6 +88,14 @@ func (catalog *Catalog) FindClosestBackupInfo(recoveryTarget *v1.RecoveryTarget)
 
 	if t := recoveryTarget.TargetLSN; t != "" {
 		return catalog.findClosestBackupFromTargetLSN(t, targetTLI)
+	}
+
+	// TargetName, TargetXID, and TargetImmediate recovery targets require
+	// the BackupID field to be defined.
+	if recoveryTarget.TargetName != "" ||
+		recoveryTarget.TargetXID != "" ||
+		recoveryTarget.TargetImmediate != nil {
+		return catalog.findBackupFromID(recoveryTarget.BackupID)
 	}
 
 	// targetXID, targetName will be ignored in choosing the proper backup
@@ -154,6 +162,22 @@ func (catalog *Catalog) findlatestBackupFromTimeline(targetTLI string) *BarmanBa
 	}
 
 	return nil
+}
+
+func (catalog *Catalog) findBackupFromID(backupID string) (*BarmanBackup, error) {
+	if backupID == "" {
+		return nil, fmt.Errorf("no Backup ID provided. ")
+	}
+	for i := len(catalog.List) - 1; i >= 0; i-- {
+		barmanBackup := catalog.List[i]
+		if !barmanBackup.isBackupDone() {
+			continue
+		}
+		if barmanBackup.ID == backupID {
+			return &catalog.List[i], nil
+		}
+	}
+	return nil, nil
 }
 
 // BarmanBackup represent a backup as created
