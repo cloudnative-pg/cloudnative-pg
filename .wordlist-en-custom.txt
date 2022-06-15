@@ -476,6 +476,7 @@ facto
 failover
 failovers
 fastpath
+favourite
 fb
 fd
 ffd
@@ -794,6 +795,7 @@ storageclasses
 storageconfiguration
 strflocaltime
 subcommand
+subdirectory
 subresource
 substatement
 sudo

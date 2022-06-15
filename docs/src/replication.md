@@ -74,7 +74,6 @@ hostssl replication streaming_replica all cert
     to the ["Certificates" section](certificates.md#client-streaming_replica-certificate)
     in the documentation.
 
-
 ### Continuous backup integration
 
 In case continuous backup is configured in the cluster, CloudNativePG
@@ -124,6 +123,36 @@ requested number of synchronous standbys in the list*.
     synchronous replication settings, our recommendation is to plan for
     synchronous replication only in clusters with 3+ instances or,
     more generally, when `maxSyncReplicas < (instances - 1)`.
+
+#### Constraints on synchronous replicas
+
+It is possible to set anti-affinity rules specifically for sync replicas.
+(For the general pod affinity and anti-affinity rules, please check the
+[scheduling page.](scheduling.md))
+
+As an example use-case for this feature: in a cluster with a single sync replica,
+we would be able to ensure the sync replica will be in a different availability
+zone from the primary instance, and thus provide added robustness in case of
+outage of an AZ.
+
+As was pointed out in the previous section, the operator
+chooses self-healing over enforcement of sync replication parameters.
+This means that it could go lower than the configured `minSyncReplicas`
+if the eligible instances matching the constraints were fewer than that.
+
+The constraints are available in the `syncReplicaElectionConstraint` section
+within `spec.postgresql`. The `nodeLabelsAntiAffinity`
+allows to specify node labels that will be checked when determining if two pods
+are in the same topology:
+
+``` yaml
+spec:
+  instances: 3
+  postgresql:
+    syncReplicaElectionConstraint:
+      enabled: true
+      nodeLabelsAntiAffinity: [ "az" ]
+```
 
 ## Replication from an external PostgreSQL cluster
 
