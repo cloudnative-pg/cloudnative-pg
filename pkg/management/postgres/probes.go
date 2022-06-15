@@ -297,7 +297,11 @@ func (instance *Instance) fillStatusFromPrimary(result *postgres.PostgresqlStatu
 // fillWalStatus retrieves information about the WAL senders processes
 // and the on-disk WAL archives status
 func (instance *Instance) fillWalStatus(result *postgres.PostgresqlStatus) error {
+	if !result.IsPrimary {
+		return nil
+	}
 	var err error
+	var replicationInfo postgres.PgStatReplicationList
 
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
@@ -326,9 +330,7 @@ func (instance *Instance) fillWalStatus(result *postgres.PostgresqlStatus) error
 			err = closeErr
 		}
 	}()
-	if result.ReplicationInfo == nil {
-		result.ReplicationInfo = []postgres.PgStatReplication{}
-	}
+
 	for rows.Next() {
 		pgr := postgres.PgStatReplication{}
 		err := rows.Scan(
@@ -347,8 +349,9 @@ func (instance *Instance) fillWalStatus(result *postgres.PostgresqlStatus) error
 		if err != nil {
 			return err
 		}
-		result.ReplicationInfo = append(result.ReplicationInfo, pgr)
+		replicationInfo.Items = append(replicationInfo.Items, pgr)
 	}
+	result.ReplicationInfo = &replicationInfo
 
 	if err = rows.Err(); err != nil {
 		return err

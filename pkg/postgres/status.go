@@ -76,7 +76,7 @@ type PostgresqlStatus struct {
 	InstanceArch               string `json:"instanceArch"`
 
 	// contains the PgStatReplication rows content.
-	ReplicationInfo []PgStatReplication `json:"replicationInfo,omitempty"`
+	ReplicationInfo *PgStatReplicationList `json:"replicationInfo,omitempty"`
 }
 
 // PgStatReplication contains the replications of replicas as reported by the primary instance
@@ -92,6 +92,52 @@ type PgStatReplication struct {
 	ReplayLag       string `json:"replayLag,omitempty"`
 	SyncState       string `json:"syncState,omitempty"`
 	SyncPriority    string `json:"syncPriority,omitempty"`
+}
+
+// PgStatReplicationList is a list of PgStatReplication reported by the primary instance
+type PgStatReplicationList struct {
+	Items []PgStatReplication `json:"items"`
+}
+
+// Len implements sort.Interface extracting the length of the list
+func (list *PgStatReplicationList) Len() int {
+	return len(list.Items)
+}
+
+// Swap implements sort.Interface to swap elements
+func (list *PgStatReplicationList) Swap(i, j int) {
+	list.Items[i], list.Items[j] = list.Items[j], list.Items[i]
+}
+
+// Less implements sort.Interface
+func (list *PgStatReplicationList) Less(i, j int) bool {
+	// The current sync state
+	switch {
+	case list.Items[i].SyncState < list.Items[j].SyncState:
+		return true
+	case list.Items[i].SyncState > list.Items[j].SyncState:
+		return false
+	}
+
+	// The actual working state
+	switch {
+	case list.Items[i].State < list.Items[j].State:
+		return true
+	case list.Items[i].State > list.Items[j].State:
+		return false
+	}
+
+	// Compare sent LSN (bigger LSN orders first)
+	if list.Items[i].SentLsn != list.Items[j].SentLsn {
+		return !list.Items[i].SentLsn.Less(list.Items[j].SentLsn)
+	}
+
+	// Compare write LSN (bigger LSN orders first)
+	if list.Items[i].WriteLsn != list.Items[j].WriteLsn {
+		return !list.Items[i].WriteLsn.Less(list.Items[j].WriteLsn)
+	}
+
+	return list.Items[i].ApplicationName < list.Items[j].ApplicationName
 }
 
 // PostgresqlStatusList is a list of PostgreSQL instances status, useful to

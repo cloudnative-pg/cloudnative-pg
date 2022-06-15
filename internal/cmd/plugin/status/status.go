@@ -300,7 +300,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 		return
 	}
 
-	if len(primaryInstanceStatus.ReplicationInfo) == 0 {
+	if primaryInstanceStatus.ReplicationInfo == nil {
 		fmt.Println(aurora.Yellow("Not available yet").String())
 		fmt.Println()
 		return
@@ -322,13 +322,8 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 	)
 
 	replicationInfo := primaryInstanceStatus.ReplicationInfo
-
-	// Sort `replicationInfo` by `ApplicationName` asc
-	sort.Slice(replicationInfo, func(i, j int) bool {
-		return replicationInfo[i].ApplicationName < replicationInfo[j].ApplicationName
-	})
-
-	for _, replication := range replicationInfo {
+	sort.Sort(replicationInfo)
+	for _, replication := range replicationInfo.Items {
 		status.AddLine(
 			replication.ApplicationName,
 			replication.SentLsn,
@@ -372,6 +367,8 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		"Status",
 		"QoS",
 		"Manager Version")
+
+	sort.Sort(fullStatus.InstanceStatus)
 	for _, instance := range fullStatus.InstanceStatus.Items {
 		if instance.Error != nil {
 			status.AddLine(
@@ -457,7 +454,7 @@ func (fullStatus *PostgresqlStatus) printCertificatesStatus() {
 
 func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.PostgresqlStatus {
 	for idx, instanceStatus := range fullStatus.InstanceStatus.Items {
-		if instanceStatus.IsPrimary || len(instanceStatus.ReplicationInfo) > 0 {
+		if instanceStatus.IsPrimary || instanceStatus.ReplicationInfo != nil {
 			return &fullStatus.InstanceStatus.Items[idx]
 		}
 	}
@@ -476,7 +473,7 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	if instance.IsPrimary {
 		return "Primary"
 	}
-	if fullStatus.Cluster.IsReplica() && len(instance.ReplicationInfo) > 0 {
+	if fullStatus.Cluster.IsReplica() && instance.ReplicationInfo != nil {
 		return "Designated primary"
 	}
 
@@ -499,7 +496,7 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 		return "Unknown"
 	}
 
-	for _, state := range primaryInstanceStatus.ReplicationInfo {
+	for _, state := range primaryInstanceStatus.ReplicationInfo.Items {
 		// todo: handle others states other than 'streaming'
 		if !(state.ApplicationName == instance.Pod.Name && state.State == "streaming") {
 			continue
