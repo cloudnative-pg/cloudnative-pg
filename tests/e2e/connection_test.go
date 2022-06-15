@@ -84,8 +84,7 @@ var _ = Describe("Connection via services", func() {
 		const clusterName = "postgresql-auto-generated"
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
-				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentSpecReport().LeafNodeText+".log")
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
@@ -133,8 +132,7 @@ var _ = Describe("Connection via services", func() {
 		const clusterName = "postgresql-user-supplied"
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
-				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentSpecReport().LeafNodeText+".log")
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
