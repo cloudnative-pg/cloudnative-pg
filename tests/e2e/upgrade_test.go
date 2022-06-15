@@ -100,8 +100,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(upgradeNamespace, clusterName1,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(upgradeNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			// Dump the operator namespace, as operator is changing too
 			env.DumpOperator(operatorNamespace,
 				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")

@@ -44,8 +44,7 @@ var _ = Describe("Cluster setup", func() {
 	})
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {

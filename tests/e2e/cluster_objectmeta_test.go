@@ -30,7 +30,6 @@ var _ = Describe("Cluster objectmeta", func() {
 		clusterWithObjectMeta = fixturesDir + "/cluster_objectmeta/cluster-level-objectMeta.yaml"
 		namespace             = "objectmeta-inheritance"
 	)
-	var clusterName string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -39,8 +38,7 @@ var _ = Describe("Cluster objectmeta", func() {
 	})
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {

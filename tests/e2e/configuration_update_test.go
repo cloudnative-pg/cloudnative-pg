@@ -96,8 +96,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 
@@ -378,8 +377,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", func() {
 
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
-				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentSpecReport().LeafNodeText+".log")
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 

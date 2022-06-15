@@ -53,8 +53,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive), f
 		const namespace = "op-unavailable-e2e-zero-replicas"
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
-				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentSpecReport().LeafNodeText+".log")
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
@@ -167,8 +166,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive), f
 		const namespace = "op-unavailable-e2e-delete-operator"
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
-				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentSpecReport().LeafNodeText+".log")
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
