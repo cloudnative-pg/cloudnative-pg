@@ -48,8 +48,7 @@ var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisrupti
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 

@@ -116,19 +116,22 @@ func ClusterHasAnnotations(
 	return true
 }
 
-// DumpClusterEnv logs the JSON for the a cluster in a namespace, its pods and endpoints
-func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName string, filename string) {
+// DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
+func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename string) {
 	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	w := bufio.NewWriter(f)
-	cluster, _ := env.GetCluster(namespace, clusterName)
+	clusterList := &v1.ClusterList{}
+	_ = GetObjectList(&env, clusterList, client.InNamespace(namespace))
 
-	out, _ := json.MarshalIndent(cluster, "", "    ")
-	_, _ = fmt.Fprintf(w, "Dumping %v/%v cluster\n", namespace, clusterName)
-	_, _ = fmt.Fprintln(w, string(out))
+	for _, cluster := range clusterList.Items {
+		out, _ := json.MarshalIndent(cluster, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v cluster\n", namespace, cluster.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
 
 	podList, _ := env.GetPodList(namespace)
 	for _, pod := range podList.Items {
@@ -152,7 +155,7 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 	}
 
 	eventList, _ := env.GetEventList(namespace)
-	out, _ = json.MarshalIndent(eventList.Items, "", "    ")
+	out, _ := json.MarshalIndent(eventList.Items, "", "    ")
 	_, _ = fmt.Fprintf(w, "Dumping events for namespace %v\n", namespace)
 	_, _ = fmt.Fprintln(w, string(out))
 
@@ -164,16 +167,18 @@ func (env TestingEnvironment) DumpClusterEnv(namespace string, clusterName strin
 	}
 
 	suffixes := []string{"-r", "-rw", "-any"}
-	for _, suffix := range suffixes {
-		namespacedName := types.NamespacedName{
-			Namespace: namespace,
-			Name:      clusterName + suffix,
+	for _, cluster := range clusterList.Items {
+		for _, suffix := range suffixes {
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      cluster.Name + suffix,
+			}
+			endpoint := &corev1.Endpoints{}
+			_ = env.Client.Get(env.Ctx, namespacedName, endpoint)
+			out, _ := json.MarshalIndent(endpoint, "", "    ")
+			_, _ = fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
+			_, _ = fmt.Fprintln(w, string(out))
 		}
-		endpoint := &corev1.Endpoints{}
-		_ = env.Client.Get(env.Ctx, namespacedName, endpoint)
-		out, _ := json.MarshalIndent(endpoint, "", "    ")
-		_, _ = fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
-		_, _ = fmt.Fprintln(w, string(out))
 	}
 	err = w.Flush()
 	if err != nil {

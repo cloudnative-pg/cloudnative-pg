@@ -80,8 +80,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
-				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentSpecReport().LeafNodeText+".log")
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 
@@ -322,8 +321,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
-				env.DumpClusterEnv(namespace, clusterName,
-					"out/"+CurrentSpecReport().LeafNodeText+".log")
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		AfterEach(func() {
