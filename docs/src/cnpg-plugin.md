@@ -361,8 +361,14 @@ The command will generate a ZIP file containing various manifest in YAML format
 Use the `-f` flag to name a result file explicitly. If the `-f` flag is not used, a
 default time-stamped filename is created for the zip file.
 
+!!! Note
+    The report plugin obeys `kubectl` conventions, and will look for objects constrained
+    by namespace. The CNPG Operator will generally not be installed in the same
+    namespace as the clusters.
+    E.g. the default installation namespace is cnpg-system
+
 ``` shell
-kubectl cnpg report operator
+kubectl cnpg report operator -n <namespace>
 ```
 
 results in
@@ -374,7 +380,7 @@ Successfully written report to "report_operator_<TIMESTAMP>.zip" (format: "yaml"
 With the `-f` flag set:
 
 ```shell
-kubectl cnpg report operator -f reportRedacted.zip
+kubectl cnpg report operator -n <namespace> -f reportRedacted.zip
 ```
 
 Unzipping the file will produce a time-stamped top-level folder to keep the
@@ -422,7 +428,7 @@ metadata:
 With the `-S` (`--stopRedaction`) option activated, secrets are shown:
 
 ```shell
-kubectl cnpg report operator -f reportNonRedacted.zip -S
+kubectl cnpg report operator -n <namespace> -f reportNonRedacted.zip -S
 ```
 
 You'll get a reminder that you're about to view confidential information:

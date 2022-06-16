@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package deployments contains code to get operator deployment
-package deployments
+package report
 
 import (
 	"context"
@@ -37,53 +36,75 @@ const (
 	caSecretName            = "cnpg-ca-secret"                 // #nosec
 	defaultConfigSecretName = "cnpg-controller-manager-config" // #nosec
 	defaultConfigmapName    = "cnpg-controller-manager-config"
+	labelOperatorNameKey    = "app.kubernetes.io/name"
 	labelOperatorName       = "cloudnative-pg"
+	labelOperatorKeyPrefix  = "operators.coreos.com/cloudnative-pg."
 )
 
-// GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
-func GetOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
+var errNoOperatorDeployment = fmt.Errorf("no deployment found")
+
+// getOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
+func getOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
+	deployment, err := tryGetOperatorDeployment(ctx,
+		ctrlclient.MatchingLabels{labelOperatorNameKey: labelOperatorName},
+		ctrlclient.InNamespace(plugin.Namespace))
+	if err != errNoOperatorDeployment {
+		return deployment, err
+	}
+
+	deployment, err = tryGetOperatorDeployment(ctx,
+		ctrlclient.HasLabels{labelOperatorKeyPrefix + "openshift-operators"},
+		ctrlclient.InNamespace(plugin.Namespace))
+	if err != errNoOperatorDeployment {
+		return deployment, err
+	}
+
+	deployment, err = tryGetOperatorDeployment(ctx,
+		ctrlclient.HasLabels{labelOperatorKeyPrefix + plugin.Namespace},
+		ctrlclient.InNamespace(plugin.Namespace))
+	if err == errNoOperatorDeployment {
+		return appsv1.Deployment{},
+			fmt.Errorf("could not get operator in namespace '%s': %w",
+				plugin.Namespace, err)
+	}
+	if err != nil {
+		return appsv1.Deployment{}, err
+	}
+
+	return deployment, nil
+}
+
+// tryGetOperatorDeployment tries to fetch the operator deployment from the
+// configured namespace
+// May error with errNoOperatorDeployment if the deployment was not found
+func tryGetOperatorDeployment(ctx context.Context, options ...ctrlclient.ListOption) (appsv1.Deployment, error) {
 	deploymentList := &appsv1.DeploymentList{}
 
-	if err := plugin.Client.List(
-		ctx, deploymentList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": labelOperatorName},
-	); err != nil {
+	if err := plugin.Client.List(ctx, deploymentList, options...); err != nil {
 		return appsv1.Deployment{}, err
 	}
 	// We check if we have one or more deployments
-	if len(deploymentList.Items) > 1 || len(deploymentList.Items) < 1 {
-		err := fmt.Errorf("number of operator deployments not equal to 1")
-		return appsv1.Deployment{}, err
+	if len(deploymentList.Items) > 1 {
+		return appsv1.Deployment{}, fmt.Errorf("number of operator deployments bigger than 1")
 	}
 
 	if len(deploymentList.Items) == 1 {
 		return deploymentList.Items[0], nil
 	}
 
-	if err := plugin.Client.List(
-		ctx,
-		deploymentList,
-		ctrlclient.HasLabels{"operators.coreos.com/cloudnative-pg.openshift-operators"},
-	); err != nil {
-		return appsv1.Deployment{}, err
-	}
-
-	// We check if we have one or more deployments
-	if len(deploymentList.Items) > 1 || len(deploymentList.Items) < 1 {
-		err := fmt.Errorf("number of operator deployments not equal to 1")
-		return appsv1.Deployment{}, err
-	}
-
-	return deploymentList.Items[0], nil
+	return appsv1.Deployment{}, errNoOperatorDeployment
 }
 
-// GetOperatorPods returns the operator pods if found, error otherwise
-func GetOperatorPods(ctx context.Context) ([]corev1.Pod, error) {
+// getOperatorPods returns the operator pods if found, error otherwise
+func getOperatorPods(ctx context.Context) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 
 	// This will work for newer version of the operator, which are using
 	// our custom label
 	if err := plugin.Client.List(
-		ctx, podList, ctrlclient.MatchingLabels{"app.kubernetes.io/name": labelOperatorName}); err != nil {
+		ctx, podList,
+		ctrlclient.MatchingLabels{"app.kubernetes.io/name": labelOperatorName},
+		ctrlclient.InNamespace(plugin.Namespace)); err != nil {
 		return nil, err
 	}
 
@@ -94,30 +115,17 @@ func GetOperatorPods(ctx context.Context) ([]corev1.Pod, error) {
 	return nil, fmt.Errorf("operator pods not found")
 }
 
-// GetOperatorNamespaceName returns the namespace the operator Deployment is running in
-func GetOperatorNamespaceName(ctx context.Context) (string, error) {
-	deployment, err := GetOperatorDeployment(ctx)
-	if err != nil {
-		return "", err
-	}
-	return deployment.GetNamespace(), err
-}
-
-// GetOperatorSecrets returns the secrets used by the operator
-func GetOperatorSecrets(ctx context.Context) ([]corev1.Secret, error) {
+// getOperatorSecrets returns the secrets used by the operator
+func getOperatorSecrets(ctx context.Context, deployment appsv1.Deployment) ([]corev1.Secret, error) {
 	contextLogger := log.FromContext(ctx)
-
-	operatorNamespace, err := GetOperatorNamespaceName(ctx)
-	if err != nil {
-		return nil, err
-	}
+	operatorNamespace := deployment.GetNamespace()
 	// default secrets name
 	secretNames := []string{
 		webhookSecretName,
 		caSecretName,
 	}
 	// get the operator config secrets name from deployment
-	configSecretName, err := getOperatorConfigSecretName(ctx)
+	configSecretName, err := getOperatorConfigSecretName(deployment)
 	if err != nil {
 		return nil, err
 	}
@@ -144,17 +152,15 @@ func GetOperatorSecrets(ctx context.Context) ([]corev1.Secret, error) {
 	return secrets, nil
 }
 
-// GetOperatorConfigMaps returns the configmap referenced by the operator
-func GetOperatorConfigMaps(ctx context.Context) ([]corev1.ConfigMap, error) {
+// getOperatorConfigMaps returns the configmap referenced by the operator
+func getOperatorConfigMaps(ctx context.Context, deployment appsv1.Deployment) ([]corev1.ConfigMap, error) {
 	contextLogger := log.FromContext(ctx)
 
 	var configMaps []string
-	operatorNamespace, err := GetOperatorNamespaceName(ctx)
-	if err != nil {
-		return nil, err
-	}
+	operatorNamespace := deployment.GetNamespace()
+
 	// get the operator configmap name from deployment
-	configMapName, err := getOperatorConfigMapName(ctx)
+	configMapName, err := getOperatorConfigMapName(deployment)
 	if err != nil {
 		return nil, err
 	}
@@ -180,15 +186,11 @@ func GetOperatorConfigMaps(ctx context.Context) ([]corev1.ConfigMap, error) {
 }
 
 // getOperatorConfigMapName return the name of configmap for operator configuration
-func getOperatorConfigMapName(ctx context.Context) (string, error) {
+func getOperatorConfigMapName(deployment appsv1.Deployment) (string, error) {
 	const configMapArgPrefix = "--config-map-name="
-	deployment, err := GetOperatorDeployment(ctx)
-	if err != nil {
-		return "", err
-	}
 	container := getManagerContainer(deployment)
 	if container == nil {
-		err = fmt.Errorf("can not find manager container from deployment")
+		err := fmt.Errorf("can not find manager container from deployment")
 		return "", err
 	}
 	var configMapName string
@@ -202,15 +204,11 @@ func getOperatorConfigMapName(ctx context.Context) (string, error) {
 }
 
 // getOperatorConfigSecretName return the name of secret for operator configuration
-func getOperatorConfigSecretName(ctx context.Context) (string, error) {
+func getOperatorConfigSecretName(deployment appsv1.Deployment) (string, error) {
 	const secretArgPrefix = "--secret-name="
-	deployment, err := GetOperatorDeployment(ctx)
-	if err != nil {
-		return "", err
-	}
 	container := getManagerContainer(deployment)
 	if container == nil {
-		err = fmt.Errorf("can not find manager container from deployment")
+		err := fmt.Errorf("can not find manager container from deployment")
 		return "", err
 	}
 	var secretName string
