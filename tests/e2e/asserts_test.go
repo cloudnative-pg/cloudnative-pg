@@ -573,7 +573,9 @@ func AssertStorageCredentialsAreCreated(namespace string, name string, id string
 }
 
 // AssertArchiveWalOnMinio to archive walls and verify that exists
-func AssertArchiveWalOnMinio(namespace, clusterName string) {
+// add serverName in case the cluster backup configured the serverName option
+func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
+	var latestWALPath string
 	// Create a WAL on the primary and check if it arrives at minio, within a short time
 	By("archiving WALs and verifying they exist", func() {
 		pod, err := env.GetClusterPrimary(namespace, clusterName)
@@ -585,12 +587,14 @@ func AssertArchiveWalOnMinio(namespace, clusterName string) {
 			primary,
 			switchWalCmd))
 		Expect(err).ToNot(HaveOccurred())
+		latestWALPath = fmt.Sprintf("*\\/%v\\/*\\/*\\/%v.gz", serverName, strings.TrimSpace(out))
+	})
 
-		latestWAL := strings.TrimSpace(out)
+	By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {
 		Eventually(func() (int, error) {
 			// WALs are compressed with gzip in the fixture
-			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestWAL+".gz")
-		}, 30).Should(BeEquivalentTo(1))
+			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestWALPath)
+		}, 60).Should(BeEquivalentTo(1))
 	})
 }
 
@@ -1204,7 +1208,7 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		Expect(err).ToNot(HaveOccurred())
 
 		insertRecordIntoTable(namespace, sourceClusterName, tableName, 3)
-		AssertArchiveWalOnMinio(namespace, sourceClusterName)
+		AssertArchiveWalOnMinio(namespace, sourceClusterName, sourceClusterName)
 
 		AssertDataExpectedCount(namespace, primary.Name, tableName, 3)
 
@@ -1523,7 +1527,7 @@ func AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azSto
 		// Verifying on blob storage using az
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, path)
-		}, 30).Should(BeEquivalentTo(1))
+		}, 60).Should(BeEquivalentTo(1))
 	})
 }
 
@@ -1538,10 +1542,11 @@ func prepareClusterForPITROnMinio(
 
 	By("backing up a cluster and verifying it exists on minio", func() {
 		testsUtils.ExecuteBackup(namespace, backupSampleFile, env)
-
+		latestTar := fmt.Sprintf("*\\/%v\\/*\\/*\\/data.tar", clusterName)
 		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
-		}, 30).Should(BeEquivalentTo(expectedVal))
+			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
+		}, 60).Should(BeEquivalentTo(expectedVal),
+			fmt.Sprintf("verify the number of backups %v is equals to %v", latestTar, expectedVal))
 		Eventually(func() (string, error) {
 			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx,
@@ -1563,7 +1568,7 @@ func prepareClusterForPITROnMinio(
 	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableNamePitr), func() {
 		insertRecordIntoTable(namespace, clusterName, tableNamePitr, 3)
 	})
-	AssertArchiveWalOnMinio(namespace, clusterName)
+	AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 	AssertArchiveConditionMet(namespace, clusterName, "5m")
 	AssertBackupConditionInClusterStatus(namespace, clusterName)
 }

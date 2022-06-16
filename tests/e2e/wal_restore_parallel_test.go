@@ -51,6 +51,21 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		if env.IsIBM() {
 			Skip("This test is not run on an IBM architecture")
 		}
+		isAKS, err := env.IsAKS()
+		Expect(err).ToNot(HaveOccurred())
+		if isAKS {
+			Skip("This test is not run on AKS")
+		}
+		isEKS, err := env.IsEKS()
+		Expect(err).ToNot(HaveOccurred())
+		if isEKS {
+			Skip("This test is not run on EKS")
+		}
+		isGKE, err := env.IsGKE()
+		Expect(err).ToNot(HaveOccurred())
+		if isGKE {
+			Skip("This test is not run on GKE")
+		}
 	})
 
 	JustAfterEach(func() {
@@ -132,10 +147,12 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Expect(err).ToNot(HaveOccurred())
 
 			latestWAL = strings.TrimSpace(out)
+			latestWALPath := fmt.Sprintf("*\\/%v\\/*\\/*\\/%v.gz", clusterName, latestWAL)
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture
-				return testUtils.CountFilesOnMinio(namespace, minioClientName, latestWAL+".gz")
-			}, 30).Should(BeEquivalentTo(1))
+				return testUtils.CountFilesOnMinio(namespace, minioClientName, latestWALPath)
+			}, 60).Should(BeEquivalentTo(1),
+				fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath))
 		})
 
 		By("forging 5 wals on Minio by copying and renaming an existing archive file", func() {
