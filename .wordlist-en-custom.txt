@@ -5,6 +5,7 @@ AcolumnName
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
+AntiAffinity
 AppArmor
 AppArmorProfile
 AuthQuery
