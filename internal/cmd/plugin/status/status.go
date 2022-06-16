@@ -300,7 +300,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 		return
 	}
 
-	if primaryInstanceStatus.ReplicationInfo == nil {
+	if len(primaryInstanceStatus.ReplicationInfo) == 0 {
 		fmt.Println(aurora.Yellow("Not available yet").String())
 		fmt.Println()
 		return
@@ -323,7 +323,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 
 	replicationInfo := primaryInstanceStatus.ReplicationInfo
 	sort.Sort(replicationInfo)
-	for _, replication := range replicationInfo.Items {
+	for _, replication := range replicationInfo {
 		status.AddLine(
 			replication.ApplicationName,
 			replication.SentLsn,
@@ -454,7 +454,7 @@ func (fullStatus *PostgresqlStatus) printCertificatesStatus() {
 
 func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.PostgresqlStatus {
 	for idx, instanceStatus := range fullStatus.InstanceStatus.Items {
-		if instanceStatus.IsPrimary || instanceStatus.ReplicationInfo != nil {
+		if instanceStatus.IsPrimary || len(instanceStatus.ReplicationInfo) > 0 {
 			return &fullStatus.InstanceStatus.Items[idx]
 		}
 	}
@@ -496,7 +496,7 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 		return "Unknown"
 	}
 
-	for _, state := range primaryInstanceStatus.ReplicationInfo.Items {
+	for _, state := range primaryInstanceStatus.ReplicationInfo {
 		// todo: handle others states other than 'streaming'
 		if !(state.ApplicationName == instance.Pod.Name && state.State == "streaming") {
 			continue

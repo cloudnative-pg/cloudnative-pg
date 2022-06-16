@@ -76,7 +76,7 @@ type PostgresqlStatus struct {
 	InstanceArch               string `json:"instanceArch"`
 
 	// contains the PgStatReplication rows content.
-	ReplicationInfo *PgStatReplicationList `json:"replicationInfo,omitempty"`
+	ReplicationInfo PgStatReplicationList `json:"replicationInfo,omitempty"`
 }
 
 // PgStatReplication contains the replications of replicas as reported by the primary instance
@@ -95,49 +95,48 @@ type PgStatReplication struct {
 }
 
 // PgStatReplicationList is a list of PgStatReplication reported by the primary instance
-type PgStatReplicationList struct {
-	Items []PgStatReplication `json:"items"`
-}
+type PgStatReplicationList []PgStatReplication
 
 // Len implements sort.Interface extracting the length of the list
-func (list *PgStatReplicationList) Len() int {
-	return len(list.Items)
+func (list PgStatReplicationList) Len() int {
+	return len(list)
 }
 
 // Swap implements sort.Interface to swap elements
-func (list *PgStatReplicationList) Swap(i, j int) {
-	list.Items[i], list.Items[j] = list.Items[j], list.Items[i]
+func (list PgStatReplicationList) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
 }
 
-// Less implements sort.Interface
-func (list *PgStatReplicationList) Less(i, j int) bool {
+// Less implements sort.Interface to determine the sort order of the replication list
+// Orders by: Sync State, Working State, Sent LSN, Write LSN, ApplicationName
+func (list PgStatReplicationList) Less(i, j int) bool {
 	// The current sync state
 	switch {
-	case list.Items[i].SyncState < list.Items[j].SyncState:
+	case list[i].SyncState < list[j].SyncState:
 		return true
-	case list.Items[i].SyncState > list.Items[j].SyncState:
+	case list[i].SyncState > list[j].SyncState:
 		return false
 	}
 
 	// The actual working state
 	switch {
-	case list.Items[i].State < list.Items[j].State:
+	case list[i].State < list[j].State:
 		return true
-	case list.Items[i].State > list.Items[j].State:
+	case list[i].State > list[j].State:
 		return false
 	}
 
 	// Compare sent LSN (bigger LSN orders first)
-	if list.Items[i].SentLsn != list.Items[j].SentLsn {
-		return !list.Items[i].SentLsn.Less(list.Items[j].SentLsn)
+	if list[i].SentLsn != list[j].SentLsn {
+		return !list[i].SentLsn.Less(list[j].SentLsn)
 	}
 
 	// Compare write LSN (bigger LSN orders first)
-	if list.Items[i].WriteLsn != list.Items[j].WriteLsn {
-		return !list.Items[i].WriteLsn.Less(list.Items[j].WriteLsn)
+	if list[i].WriteLsn != list[j].WriteLsn {
+		return !list[i].WriteLsn.Less(list[j].WriteLsn)
 	}
 
-	return list.Items[i].ApplicationName < list.Items[j].ApplicationName
+	return list[i].ApplicationName < list[j].ApplicationName
 }
 
 // PostgresqlStatusList is a list of PostgreSQL instances status, useful to

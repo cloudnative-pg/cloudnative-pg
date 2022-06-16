@@ -349,9 +349,9 @@ func (instance *Instance) fillWalStatus(result *postgres.PostgresqlStatus) error
 		if err != nil {
 			return err
 		}
-		replicationInfo.Items = append(replicationInfo.Items, pgr)
+		replicationInfo = append(replicationInfo, pgr)
 	}
-	result.ReplicationInfo = &replicationInfo
+	result.ReplicationInfo = replicationInfo
 
 	if err = rows.Err(); err != nil {
 		return err
