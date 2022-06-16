@@ -473,7 +473,7 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	if instance.IsPrimary {
 		return "Primary"
 	}
-	if fullStatus.Cluster.IsReplica() && instance.ReplicationInfo != nil {
+	if fullStatus.Cluster.IsReplica() && len(instance.ReplicationInfo) > 0 {
 		return "Designated primary"
 	}
 
