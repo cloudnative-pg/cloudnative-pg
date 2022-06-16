@@ -61,6 +61,7 @@ var StatusRequestRetry = wait.Backoff{
 // managedResources contains the resources that are created a cluster
 // and need to be managed by the controller
 type managedResources struct {
+	// nodes this is a map composed of [nodeName]corev1.Node
 	nodes map[string]corev1.Node
 	pods  corev1.PodList
 	pvcs  corev1.PersistentVolumeClaimList
@@ -822,13 +823,13 @@ func rawInstanceStatusRequest(
 // getPodsTopology returns a map with all the information about the pods topology
 func getPodsTopology(
 	ctx context.Context,
-	podList []corev1.Pod,
+	pods []corev1.Pod,
 	nodes map[string]corev1.Node,
 	topology apiv1.SyncReplicaElectionConstraints,
 ) apiv1.Topology {
 	contextLogger := log.FromContext(ctx)
 	data := make(map[apiv1.PodName]apiv1.PodTopologyLabels)
-	for _, pod := range podList {
+	for _, pod := range pods {
 		podName := apiv1.PodName(pod.Name)
 		data[podName] = make(map[string]string, 0)
 		node, ok := nodes[pod.Spec.NodeName]
