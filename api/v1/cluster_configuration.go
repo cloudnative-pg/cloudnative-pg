@@ -21,9 +21,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// GetSyncReplicasNumber computes the actual number of required synchronous replicas
-// given the requested min, max and the number of ready replicas in the cluster
-func (cluster *Cluster) GetSyncReplicasNumber() (syncReplicas int) {
+// GetSyncReplicasData computes the actual number of required synchronous replicas and the names of
+// the electable sync replicas given the requested min, max, the number of ready replicas in the cluster and the sync
+// replicas constraints (if any)
+func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncReplicas []string) {
 	// We start with the number of healthy replicas (healthy pods minus one)
 	// and verify it is greater than 0 and between minSyncReplicas and maxSyncReplicas.
 	// Formula: 1 <= minSyncReplicas <= SyncReplicas <= maxSyncReplicas < readyReplicas
@@ -42,11 +43,81 @@ func (cluster *Cluster) GetSyncReplicasNumber() (syncReplicas int) {
 	// temporarily unresponsive system)
 	if readyReplicas < cluster.Spec.MinSyncReplicas {
 		syncReplicas = readyReplicas
-		log.Info("Ignore minSyncReplicas to enforce self-healing",
+		log.Warning("Ignore minSyncReplicas to enforce self-healing",
 			"syncReplicas", readyReplicas,
 			"minSyncReplicas", cluster.Spec.MinSyncReplicas,
 			"maxSyncReplicas", cluster.Spec.MaxSyncReplicas)
 	}
 
-	return syncReplicas
+	electableSyncReplicas = cluster.getElectableSyncReplicas()
+	numberOfElectableSyncReplicas := len(electableSyncReplicas)
+	if numberOfElectableSyncReplicas < syncReplicas {
+		log.Warning("lowering sync replicas due to not enough electable instances for sync replication "+
+			"given the constraints",
+			"electableSyncReplicasWithoutConstraints", syncReplicas,
+			"electableSyncReplicasWithConstraints", numberOfElectableSyncReplicas,
+			"constraints", cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint)
+		syncReplicas = numberOfElectableSyncReplicas
+	}
+
+	return syncReplicas, electableSyncReplicas
+}
+
+// getElectableSyncReplicas computes the names of the instances that can be elected to sync replicas
+func (cluster *Cluster) getElectableSyncReplicas() []string {
+	var nonPrimaryInstances []string
+	for _, instances := range cluster.Status.InstancesStatus {
+		for _, instance := range instances {
+			if cluster.Status.CurrentPrimary != instance {
+				nonPrimaryInstances = append(nonPrimaryInstances, instance)
+			}
+		}
+	}
+
+	topology := cluster.Status.Topology
+	// We need to include every replica inside the list of possible synchronous standbys if we have no constraints
+	// or the topology extraction is failing. This avoids a continuous operator crash.
+	// One case this could happen is while draining nodes
+	if !cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint.Enabled {
+		return nonPrimaryInstances
+	}
+
+	// The same happens if we have failed to extract topology, we want to preserve the current status by adding all the
+	// electable instances.
+	if !topology.SuccessfullyExtracted {
+		log.Warning("topology data not extracted, falling back to all electable sync replicas")
+		return nonPrimaryInstances
+	}
+
+	currentPrimary := PodName(cluster.Status.CurrentPrimary)
+	// given that the constraints are based off the primary instance if we still don't have one we cannot continue
+	if currentPrimary == "" {
+		log.Warning("no primary elected, cannot compute electable sync replicas")
+		return nil
+	}
+
+	currentPrimaryTopology, ok := topology.Instances[currentPrimary]
+	if !ok {
+		log.Warning("current primary topology not yet extracted, cannot computed electable sync replicas",
+			"instanceName", currentPrimary)
+		return nil
+	}
+
+	electableReplicas := make([]string, 0, len(nonPrimaryInstances))
+	for _, name := range nonPrimaryInstances {
+		name := PodName(name)
+
+		instanceTopology, ok := topology.Instances[name]
+		// if we still don't have the topology data for the node we skip it from inserting it in the electable pool
+		if !ok {
+			log.Warning("current instance topology not found", "instanceName", name)
+			continue
+		}
+
+		if !currentPrimaryTopology.matchesTopology(instanceTopology) {
+			electableReplicas = append(electableReplicas, string(name))
+		}
+	}
+
+	return electableReplicas
 }

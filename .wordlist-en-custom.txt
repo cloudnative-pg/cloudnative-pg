@@ -5,6 +5,7 @@ AcolumnName
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
+AntiAffinity
 AppArmor
 AppArmorProfile
 AuthQuery
@@ -199,6 +200,8 @@ PodMonitor
 PodSpec
 PodStatus
 PodTemplateSpec
+PodTopology
+PodTopologyLabels
 Pooler
 Pooler's
 PoolerIntegrations
@@ -267,6 +270,8 @@ Slonik
 StorageClass
 StorageConfiguration
 Storages
+SuccessfullyExtracted
+SyncReplicaElectionConstraints
 Synopsys
 TCP
 TLS
@@ -472,6 +477,7 @@ facto
 failover
 failovers
 fastpath
+favourite
 fb
 fd
 ffd
@@ -790,6 +796,7 @@ storageclasses
 storageconfiguration
 strflocaltime
 subcommand
+subdirectory
 subresource
 substatement
 sudo

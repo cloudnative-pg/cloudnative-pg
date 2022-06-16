@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -283,6 +284,33 @@ const (
 	PhaseApplyingConfiguration = "Applying configuration"
 )
 
+// PodTopologyLabels represent the topology of a Pod. map[labelName]labelValue
+type PodTopologyLabels map[string]string
+
+// matchesTopology checks if the two topologies have
+// the same label values (labels are specified in SyncReplicaElectionConstraints.NodeLabelsAntiAffinity)
+func (topologyLabels PodTopologyLabels) matchesTopology(instanceTopology PodTopologyLabels) bool {
+	log.Debug("matching topology", "main", topologyLabels, "second", instanceTopology)
+	for mainLabelName, mainLabelValue := range topologyLabels {
+		if mainLabelValue != instanceTopology[mainLabelName] {
+			return false
+		}
+	}
+	return true
+}
+
+// PodName is the name of a Pod
+type PodName string
+
+// Topology contains the cluster topology
+type Topology struct {
+	// SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors
+	// in synchronous replica election in case of failures
+	SuccessfullyExtracted bool `json:"successfullyExtracted,omitempty"`
+	// Instances contains the pod topology of the instances
+	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// Total number of instances in the cluster
@@ -293,6 +321,9 @@ type ClusterStatus struct {
 
 	// Instances status
 	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
+
+	// Instances topology.
+	Topology Topology `json:"topology,omitempty"`
 
 	// ID of the latest generated node (used to avoid node name clashing)
 	LatestGeneratedNode int `json:"latestGeneratedNode,omitempty"`
@@ -528,6 +559,10 @@ type PostgresConfiguration struct {
 	// to the pg_hba.conf file)
 	// +optional
 	PgHBA []string `json:"pg_hba,omitempty"`
+
+	// Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be
+	// set up.
+	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
 
 	// Specifies the maximum number of seconds to wait when promoting an instance to primary.
 	// Default value is 40000000, greater than one year in seconds,
@@ -845,6 +880,19 @@ type StorageConfiguration struct {
 	// Template to be used to generate the Persistent Volume Claim
 	// +optional
 	PersistentVolumeClaimTemplate *corev1.PersistentVolumeClaimSpec `json:"pvcTemplate,omitempty"`
+}
+
+// SyncReplicaElectionConstraints contains the constraints for sync replicas election.
+//
+// For anti-affinity parameters two instances are considered in the same location if all the labels values match
+//
+// In future synchronous replica election restriction by name will be supported
+type SyncReplicaElectionConstraints struct {
+	// This flag enabled the constraints for sync replicas
+	Enabled bool `json:"enabled"`
+
+	// A list of node labels values to extract and compare to evaluate if the pods reside in the same topology or not
+	NodeLabelsAntiAffinity []string `json:"nodeLabelsAntiAffinity,omitempty"`
 }
 
 // AffinityConfiguration contains the info we need to create the

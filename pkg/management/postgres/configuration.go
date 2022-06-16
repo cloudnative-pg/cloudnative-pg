@@ -302,21 +302,13 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster) (string, string, erro
 		IsReplicaCluster:                 cluster.IsReplica(),
 	}
 
-	// We need to include every replica inside the list of possible synchronous standbys
-	info.Replicas = nil
-	for _, instances := range cluster.Status.InstancesStatus {
-		for _, instance := range instances {
-			if cluster.Status.CurrentPrimary != instance {
-				info.Replicas = append(info.Replicas, instance)
-			}
-		}
-	}
+	// Compute the actual number of sync replicas
+	syncReplicas, electable := cluster.GetSyncReplicasData()
+	info.SyncReplicas = syncReplicas
+	info.SyncReplicasElectable = electable
 
 	// Ensure a consistent ordering to avoid spurious configuration changes
-	sort.Strings(info.Replicas)
-
-	// Compute the actual number of sync replicas
-	info.SyncReplicas = cluster.GetSyncReplicasNumber()
+	sort.Strings(info.SyncReplicasElectable)
 
 	// Set cluster name
 	info.ClusterName = cluster.Name
