@@ -104,7 +104,7 @@ func getDataConfiguration(
 	if len(configuration.Data.Encryption) != 0 {
 		options = append(
 			options,
-			"--encrypt",
+			"--encryption",
 			string(configuration.Data.Encryption))
 	}
 

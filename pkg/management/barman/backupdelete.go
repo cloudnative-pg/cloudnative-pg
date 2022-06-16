@@ -53,10 +53,6 @@ func DeleteBackupsByPolicy(backupConfig *v1.BackupConfiguration, serverName stri
 		options = append(options, "--endpoint-url", barmanConfiguration.EndpointURL)
 	}
 
-	if barmanConfiguration.Data != nil && barmanConfiguration.Data.Encryption != "" {
-		options = append(options, "-e", string(barmanConfiguration.Data.Encryption))
-	}
-
 	options, err = AppendCloudProviderOptionsFromConfiguration(options, barmanConfiguration)
 	if err != nil {
 		return err
