@@ -141,9 +141,6 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	if backup.Status.EndpointURL != "" {
 		options = append(options, "--endpoint-url", backup.Status.EndpointURL)
 	}
-	if backup.Status.Encryption != "" {
-		options = append(options, "-e", backup.Status.Encryption)
-	}
 	options = append(options, backup.Status.DestinationPath)
 	options = append(options, backup.Status.ServerName)
 	options = append(options, backup.Status.BackupID)
@@ -321,9 +318,6 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.
 	const barmanCloudWalRestoreName = "barman-cloud-wal-restore"
 
 	cmd := []string{barmanCloudWalRestoreName}
-	if backup.Status.Encryption != "" {
-		cmd = append(cmd, "-e", backup.Status.Encryption)
-	}
 	if backup.Status.EndpointURL != "" {
 		cmd = append(cmd, "--endpoint-url", backup.Status.EndpointURL)
 	}
