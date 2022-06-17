@@ -19,6 +19,7 @@ package e2e
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -572,8 +573,15 @@ func AssertStorageCredentialsAreCreated(namespace string, name string, id string
 	}, 60, 5).Should(BeNil())
 }
 
-// AssertArchiveWalOnMinio to archive walls and verify that exists
-// add serverName in case the cluster backup configured the serverName option
+// minioPath gets the MinIO file string for WAL/backup objects in a configured bucket
+func minioPath(serverName, fileName string) string {
+	// the * regexes enable matching these typical paths:
+	// 	minio/backups/serverName/base/20220618T140300/data.tar
+	// 	minio/backups/serverName/wals/0000000100000000/000000010000000000000002.gz
+	return filepath.Join("*", serverName, "*", "*", fileName)
+}
+
+// AssertArchiveWalOnMinio archives WALs and verifies that they are in the storage
 func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 	var latestWALPath string
 	// Create a WAL on the primary and check if it arrives at minio, within a short time
@@ -587,7 +595,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 			primary,
 			switchWalCmd))
 		Expect(err).ToNot(HaveOccurred())
-		latestWALPath = fmt.Sprintf("*\\/%v\\/*\\/*\\/%v.gz", serverName, strings.TrimSpace(out))
+		latestWALPath = minioPath(serverName, strings.TrimSpace(out)+".gz")
 	})
 
 	By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {
@@ -1542,7 +1550,7 @@ func prepareClusterForPITROnMinio(
 
 	By("backing up a cluster and verifying it exists on minio", func() {
 		testsUtils.ExecuteBackup(namespace, backupSampleFile, env)
-		latestTar := fmt.Sprintf("*\\/%v\\/*\\/*\\/data.tar", clusterName)
+		latestTar := minioPath(clusterName, "data.tar")
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
 		}, 60).Should(BeEquivalentTo(expectedVal),

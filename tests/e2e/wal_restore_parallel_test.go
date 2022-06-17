@@ -147,7 +147,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Expect(err).ToNot(HaveOccurred())
 
 			latestWAL = strings.TrimSpace(out)
-			latestWALPath := fmt.Sprintf("*\\/%v\\/*\\/*\\/%v.gz", clusterName, latestWAL)
+			latestWALPath := minioPath(clusterName, latestWAL+".gz")
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture
 				return testUtils.CountFilesOnMinio(namespace, minioClientName, latestWALPath)
