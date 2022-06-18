@@ -126,6 +126,13 @@ namespaced resources.
   manages. For more details, please see the
   [Kubernetes documentation](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/).
 
+`nodes`
+: The operator needs to get the labels for Affinity and AntiAffinity, so it can
+  decide in which nodes a pod can be scheduled preventing the replicas to be
+  in the same node, specially if nodes are in different availability zones. This
+  permission is also used to determine if a node is schedule or not, avoiding
+  the creation of pods that cannot be created at all.
+
 To see all the permissions required by the operator, you can run `kubectl
 describe clusterrole cnpg-manager`.
 

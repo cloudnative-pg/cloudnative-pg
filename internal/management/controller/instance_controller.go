@@ -188,6 +188,15 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
 
+	// Extremely important.
+	// It could happen that current primary is reconciled before all the topology is extracted by the operator.
+	// We should detect that and schedule the instance manager for another run otherwise we will end up having
+	// an incoherent state of electable synchronous_names inside the configuration.
+	// This is only relevant if syncReplicaElectionConstraint is enabled
+	if !requeue {
+		requeue = r.shouldRequeueForMissingTopology(cluster)
+	}
+
 	if requeue {
 		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -656,7 +665,10 @@ func (r *InstanceReconciler) reconcileMetrics(
 
 	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
 	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
-	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(cluster.GetSyncReplicasNumber()))
+
+	syncReplicas, _ := cluster.GetSyncReplicasData()
+	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(syncReplicas))
+
 	if cluster.IsReplica() {
 		exporter.Metrics.ReplicaCluster.Set(1)
 	} else {
@@ -1208,4 +1220,23 @@ func (r *InstanceReconciler) refreshPGHBA(ctx context.Context, cluster *apiv1.Cl
 	}
 	// Generate pg_hba.conf file
 	return r.instance.RefreshPGHBA(cluster, ldapBindPassword)
+}
+
+func (r *InstanceReconciler) shouldRequeueForMissingTopology(cluster *apiv1.Cluster) shoudRequeue {
+	syncReplicaConstraint := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint
+	if !syncReplicaConstraint.Enabled {
+		return false
+	}
+	if primary, _ := r.instance.IsPrimary(); !primary {
+		return false
+	}
+
+	topologyStatus := cluster.Status.Topology
+	if !topologyStatus.SuccessfullyExtracted || len(topologyStatus.Instances) != cluster.Spec.Instances {
+		log.Info("missing topology information while syncReplicaElectionConstraint are enabled, " +
+			"will requeue to calculate correctly the synchronous names")
+		return true
+	}
+
+	return false
 }

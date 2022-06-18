@@ -214,7 +214,7 @@ type ConfigurationInfo struct {
 	PreserveFixedSettingsFromUser bool
 
 	// The list of replicas
-	Replicas []string
+	SyncReplicasElectable []string
 
 	// The number of desired number of synchronous replicas
 	SyncReplicas int
@@ -589,9 +589,9 @@ func setUserSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConf
 
 // setReplicasListConfigurations sets the standby node list
 func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
-	if info.Replicas != nil && info.SyncReplicas > 0 {
-		escapedReplicas := make([]string, len(info.Replicas))
-		for idx, name := range info.Replicas {
+	if info.SyncReplicasElectable != nil && info.SyncReplicas > 0 {
+		escapedReplicas := make([]string, len(info.SyncReplicasElectable))
+		for idx, name := range info.SyncReplicasElectable {
 			escapedReplicas[idx] = escapePostgresConfLiteral(name)
 		}
 		configuration.OverwriteConfig(SynchronousStandbyNames, fmt.Sprintf(
