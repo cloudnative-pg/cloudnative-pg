@@ -529,6 +529,15 @@ var _ = Describe("Image name validation", func() {
 		Expect(len(cluster.validateImageName())).To(Equal(1))
 	})
 
+	It("doesn't complain when a beta tag is used", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:15beta1",
+			},
+		}
+		Expect(len(cluster.validateImageName())).To(Equal(0))
+	})
+
 	It("complains when only the sha is passed", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
