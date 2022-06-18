@@ -1179,7 +1179,7 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string,
 		return fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, username)
 	}
 
-	_, err = tx.Exec(fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
+	_, err = tx.Exec(fmt.Sprintf("ALTER ROLE \"%v\" WITH PASSWORD %v",
 		username,
 		pq.QuoteLiteral(password)))
 	if err == nil {
