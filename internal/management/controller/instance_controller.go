@@ -1154,7 +1154,7 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string,
 	}
 
 	_, err = tx.Exec(fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
-		username,
+		pq.QuoteIdentifier(username),
 		pq.QuoteLiteral(password)))
 	if err == nil {
 		r.secretVersions[secret.Name] = secret.ResourceVersion
