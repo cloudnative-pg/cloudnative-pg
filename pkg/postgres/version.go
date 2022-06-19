@@ -82,8 +82,13 @@ func GetPostgresVersionFromTag(version string) (int, error) {
 
 // GetPostgresMajorVersionFromTag retrieves the major version from a version tag
 func GetPostgresMajorVersionFromTag(version string) (int, error) {
-	if versionDelimiter := strings.IndexAny(version, "_-"); versionDelimiter >= 0 {
-		version = version[:versionDelimiter]
+	if !semanticVersionRegex.MatchString(version) {
+		return 0,
+			fmt.Errorf("version not starting with a semantic version regex (%v): %s", semanticVersionRegex, version)
+	}
+
+	if versionOnly := semanticVersionRegex.FindString(version); versionOnly != "" {
+		version = versionOnly
 	}
 
 	splitVersion := strings.Split(version, ".")
