@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sort"
 	"time"
 
 	"github.com/cheynewallace/tabby"
@@ -319,7 +320,10 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus() {
 		"Sync State",
 		"Sync Priority",
 	)
-	for _, replication := range primaryInstanceStatus.ReplicationInfo {
+
+	replicationInfo := primaryInstanceStatus.ReplicationInfo
+	sort.Sort(replicationInfo)
+	for _, replication := range replicationInfo {
 		status.AddLine(
 			replication.ApplicationName,
 			replication.SentLsn,
@@ -363,6 +367,8 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		"Status",
 		"QoS",
 		"Manager Version")
+
+	sort.Sort(fullStatus.InstanceStatus)
 	for _, instance := range fullStatus.InstanceStatus.Items {
 		if instance.Error != nil {
 			status.AddLine(
@@ -397,16 +403,26 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 
 func (fullStatus *PostgresqlStatus) printCertificatesStatus() {
 	status := tabby.New()
-
 	status.AddHeader("Certificate Name", "Expiration Date", "Days Left Until Expiration")
 
 	hasExpiringCertificate := false
 	hasExpiredCertificate := false
 
-	for certificateName, expirationDate := range fullStatus.Cluster.Status.Certificates.Expirations {
+	certExpirations := fullStatus.Cluster.Status.Certificates.Expirations
+
+	// Sort `fullStatus.Cluster.Status.Certificates.Expirations` by `certificationName` asc
+	certNames := make([]string, 0, len(certExpirations))
+	for certName := range certExpirations {
+		certNames = append(certNames, certName)
+	}
+	sort.Strings(certNames)
+
+	for _, certName := range certNames {
+		expirationDate := certExpirations[certName]
 		expirationTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", expirationDate)
 		if err != nil {
-			fmt.Printf("\n error while parsing the following certificate: %s, date: %s", certificateName, expirationDate)
+			fmt.Printf("\n error while parsing the following certificate: %s, date: %s",
+				certName, expirationDate)
 		}
 
 		validityLeft := time.Until(expirationTime)
@@ -420,8 +436,7 @@ func (fullStatus *PostgresqlStatus) printCertificatesStatus() {
 			validityLeftInDays += " - Expires Soon"
 			hasExpiringCertificate = true
 		}
-
-		status.AddLine(certificateName, expirationDate, validityLeftInDays)
+		status.AddLine(certName, expirationDate, validityLeftInDays)
 	}
 
 	color := aurora.Green
