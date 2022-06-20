@@ -63,23 +63,33 @@ const (
 )
 
 // ParseBarmanCloudBackupList parses the output of barman-cloud-backup-list
+//
+// Barman's output is a JSON object with a field `"backups_list"` containing
+// an array of backups.
+// See: https://github.com/EnterpriseDB/barman/blob/master/barman/clients/cloud_backup_list.py
 func ParseBarmanCloudBackupList(output string) (catalog.Catalog, error) {
-	result := catalog.Catalog{}
+	// barman outputs a JSON object with a list of backups called `backups_list`
+	type fromBarman struct {
+		BackupList catalog.Catalog `json:"backups_list"`
+	}
+	var result fromBarman
 	err := json.Unmarshal([]byte(output), &result)
 	if err != nil {
 		return nil, err
 	}
 
-	for idx := range result {
-		if result[idx].BeginTimeString != "" {
-			result[idx].BeginTime, err = time.Parse(barmanTimeLayout, result[idx].BeginTimeString)
+	backups := result.BackupList
+
+	for idx := range backups {
+		if backups[idx].BeginTimeString != "" {
+			backups[idx].BeginTime, err = time.Parse(barmanTimeLayout, backups[idx].BeginTimeString)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		if result[idx].EndTimeString != "" {
-			result[idx].EndTime, err = time.Parse(barmanTimeLayout, result[idx].EndTimeString)
+		if backups[idx].EndTimeString != "" {
+			backups[idx].EndTime, err = time.Parse(barmanTimeLayout, backups[idx].EndTimeString)
 			if err != nil {
 				return nil, err
 			}
@@ -87,9 +97,9 @@ func ParseBarmanCloudBackupList(output string) (catalog.Catalog, error) {
 	}
 
 	// Sort the list of backups in order of time
-	sort.Sort(result)
+	sort.Sort(backups)
 
-	return result, nil
+	return backups, nil
 }
 
 // GetBackupList returns the catalog reading it from the object store
@@ -97,7 +107,7 @@ func GetBackupList(
 	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
 	serverName string,
 	env []string,
-) (*catalog.Catalog, error) {
+) (catalog.Catalog, error) {
 	options := []string{"--format", "json"}
 
 	if barmanConfiguration.EndpointURL != "" {
@@ -133,5 +143,5 @@ func GetBackupList(
 		return nil, err
 	}
 
-	return &backupList, nil
+	return backupList, nil
 }

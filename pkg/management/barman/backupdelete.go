@@ -95,7 +95,7 @@ func DeleteBackupsNotInCatalog(
 	ctx context.Context,
 	cli client.Client,
 	cluster *v1.Cluster,
-	catalog *catalog.Catalog,
+	catalog catalog.Catalog,
 ) error {
 	// We had two options:
 	//
@@ -132,7 +132,7 @@ func DeleteBackupsNotInCatalog(
 			continue
 		}
 		var found bool
-		for _, barmanBackup := range *catalog {
+		for _, barmanBackup := range catalog {
 			if backup.Status.BackupID == barmanBackup.ID {
 				found = true
 				break

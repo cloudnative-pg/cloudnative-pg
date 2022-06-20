@@ -22,7 +22,8 @@ import (
 )
 
 const (
-	barmanCloudListOutput = `[
+	barmanCloudListOutput = `{
+  "backups_list": [
     {
       "backup_label": "'START WAL LOCATION:[...]",
       "begin_offset": 40,
@@ -72,8 +73,8 @@ const (
 	{
       "backup_id": "20191020T115231"
 	}
-]
-`
+  ]
+}`
 )
 
 var _ = Describe("barman-cloud-backup-list parsing", func() {

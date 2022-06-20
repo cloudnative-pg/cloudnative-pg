@@ -164,29 +164,27 @@ var _ = Describe("PostgreSQL status", func() {
 })
 
 var _ = Describe("PostgreSQL status real", func() {
-	f, err := os.Open("testdata/lsn_overflow.json")
-	Expect(err).ToNot(HaveOccurred())
-	defer func() {
-		_ = f.Close()
-	}()
-	defer GinkgoRecover()
-
 	var list PostgresqlStatusList
-	err = json.NewDecoder(f).Decode(&list)
-	Expect(err).ToNot(HaveOccurred())
+	It("can parse the JSON status list", func() {
+		f, err := os.Open("testdata/lsn_overflow.json")
+		Expect(err).ToNot(HaveOccurred())
+		err = json.NewDecoder(f).Decode(&list)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(f.Close()).To(Succeed())
+		Expect(list).To(HaveLen(2))
+	})
 
 	Context("when sorted", func() {
-		sort.Sort(&list)
-
 		It("most advanced server comes first", func() {
+			sort.Sort(list)
+			Expect(list).To(HaveLen(2))
 			Expect(list[0].IsPrimary).To(BeFalse())
 			Expect(list[0].Pod.Name).To(Equal("sandbox-3"))
 		})
 
-		// order again to verify that the result is stable
-		sort.Sort(&list)
-
 		It("most advanced server comes first (stable order)", func() {
+			// order again to verify that the result is stable
+			sort.Sort(list)
 			Expect(list[0].IsPrimary).To(BeFalse())
 			Expect(list[0].Pod.Name).To(Equal("sandbox-3"))
 		})

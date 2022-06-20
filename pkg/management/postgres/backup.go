@@ -461,7 +461,7 @@ func (b *BackupCommand) setupBackupStatus() {
 
 // updateCompletedBackupStatus updates the backup calling barman-cloud-backup-list
 // to retrieve all the relevant data
-func (b *BackupCommand) updateCompletedBackupStatus(backupList *catalog.Catalog) {
+func (b *BackupCommand) updateCompletedBackupStatus(backupList catalog.Catalog) {
 	backupStatus := b.Backup.GetStatus()
 
 	// Update the backup with the data from the backup list retrieved
