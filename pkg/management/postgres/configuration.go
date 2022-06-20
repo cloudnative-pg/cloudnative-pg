@@ -21,7 +21,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
@@ -306,9 +305,6 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster) (string, string, erro
 	syncReplicas, electable := cluster.GetSyncReplicasData()
 	info.SyncReplicas = syncReplicas
 	info.SyncReplicasElectable = electable
-
-	// Ensure a consistent ordering to avoid spurious configuration changes
-	sort.Strings(info.SyncReplicasElectable)
 
 	// Set cluster name
 	info.ClusterName = cluster.Name

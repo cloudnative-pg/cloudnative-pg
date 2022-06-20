@@ -564,6 +564,9 @@ type PostgresConfiguration struct {
 	// set up.
 	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
 
+	// An array of replica names to append to the start of "synchronous_standby_names"
+	ExternalElectableSyncReplicaNames []string `json:"externalElectableSyncReplicaNames,omitempty"`
+
 	// Specifies the maximum number of seconds to wait when promoting an instance to primary.
 	// Default value is 40000000, greater than one year in seconds,
 	// big enough to simulate an infinite timeout

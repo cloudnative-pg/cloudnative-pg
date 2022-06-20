@@ -1306,6 +1306,11 @@ func (in *PostgresConfiguration) DeepCopyInto(out *PostgresConfiguration) {
 		copy(*out, *in)
 	}
 	in.SyncReplicaElectionConstraint.DeepCopyInto(&out.SyncReplicaElectionConstraint)
+	if in.ExternalElectableSyncReplicaNames != nil {
+		in, out := &in.ExternalElectableSyncReplicaNames, &out.ExternalElectableSyncReplicaNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.AdditionalLibraries != nil {
 		in, out := &in.AdditionalLibraries, &out.AdditionalLibraries
 		*out = make([]string, len(*in))

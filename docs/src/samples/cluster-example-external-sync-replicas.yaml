@@ -1,0 +1,13 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  minSyncReplicas: 1
+  maxSyncReplicas: 1
+  logLevel: debug
+  postgresql:
+    externalElectableSyncReplicaNames: ["cluster-replica-example"]
+  storage:
+    size: 1Gi

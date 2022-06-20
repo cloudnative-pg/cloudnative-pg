@@ -1788,6 +1788,12 @@ spec:
               postgresql:
                 description: Configuration of the PostgreSQL server
                 properties:
+                  externalElectableSyncReplicaNames:
+                    description: An array of replica names to append to the start
+                      of "synchronous_standby_names"
+                    items:
+                      type: string
+                    type: array
                   ldap:
                     description: Options to specify LDAP configuration
                     properties:

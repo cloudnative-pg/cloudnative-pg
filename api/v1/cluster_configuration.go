@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"sort"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -60,7 +62,36 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 		syncReplicas = numberOfElectableSyncReplicas
 	}
 
-	return syncReplicas, electableSyncReplicas
+	// Ensure a consistent ordering to avoid spurious configuration changes
+	sort.Strings(electableSyncReplicas)
+
+	return addExternalSyncReplicas(cluster, electableSyncReplicas, syncReplicas)
+}
+
+func addExternalSyncReplicas(cluster *Cluster, electableSyncReplicas []string, syncReplicas int) (int, []string) {
+	externalSyncReplicaNames := cluster.Spec.PostgresConfiguration.ExternalElectableSyncReplicaNames
+	externalSyncReplicasNumber := len(externalSyncReplicaNames)
+	if externalSyncReplicasNumber <= 0 {
+		return syncReplicas, electableSyncReplicas
+	}
+
+	log.Debug("appending external sync replica names at the beginning of synchronous_standby_names list")
+	electableSyncReplicas = append(externalSyncReplicaNames, electableSyncReplicas...)
+
+	potentialSyncReplicas := syncReplicas + externalSyncReplicasNumber
+	// if the potential available sync replicas are more than the MaxSyncReplicas we take this last value
+	if potentialSyncReplicas >= cluster.Spec.MaxSyncReplicas {
+		log.Debug(
+			"raising the number of sync replicas to maxSyncReplicas due to external sync replicas",
+			"potentialSyncReplicas", potentialSyncReplicas,
+			"maxSyncReplicas", cluster.Spec.MaxSyncReplicas,
+			"syncReplicasBefore", syncReplicas,
+		)
+		return cluster.Spec.MaxSyncReplicas, electableSyncReplicas
+	}
+
+	log.Debug("raising the number of the sync replicas given the presence of externalSyncReplicasNames")
+	return potentialSyncReplicas, electableSyncReplicas
 }
 
 // getElectableSyncReplicas computes the names of the instances that can be elected to sync replicas
