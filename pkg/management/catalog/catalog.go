@@ -75,7 +75,7 @@ func (catalog *Catalog) FirstRecoverabilityPoint() *time.Time {
 	return nil
 }
 
-// FindBackupInfo finds the backup info that should use to file
+// FindBackupInfo finds the backup info that should be used to file
 // a PITR request via target parameters specified within `RecoveryTarget`
 func (catalog *Catalog) FindBackupInfo(recoveryTarget *v1.RecoveryTarget) (*BarmanBackup, error) {
 	// the code below assumes the catalog to be sorted, therefore we enforce it first
@@ -166,7 +166,7 @@ func (catalog *Catalog) findlatestBackupFromTimeline(targetTLI string) *BarmanBa
 
 func (catalog *Catalog) findBackupFromID(backupID string) (*BarmanBackup, error) {
 	if backupID == "" {
-		return nil, fmt.Errorf("no backupID provided. ")
+		return nil, fmt.Errorf("no backupID provided")
 	}
 	for i := len(catalog.List) - 1; i >= 0; i-- {
 		barmanBackup := catalog.List[i]

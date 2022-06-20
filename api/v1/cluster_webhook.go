@@ -1009,19 +1009,17 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 	}
 
 	// validate BackupID is defined when TargetName or TargetXID or TargetImmediate are set
-	if recoveryTarget.TargetName != "" ||
+	if (recoveryTarget.TargetName != "" ||
 		recoveryTarget.TargetXID != "" ||
-		recoveryTarget.TargetImmediate != nil {
-		if recoveryTarget.BackupID == "" {
-			result = append(result, field.Required(
-				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
-				"BackupID is missing"))
-		}
+		recoveryTarget.TargetImmediate != nil) && recoveryTarget.BackupID == "" {
+		result = append(result, field.Required(
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
+			"BackupID is missing"))
 	}
 
 	switch recoveryTarget.TargetTLI {
 	case "", "latest":
-		// Allowed non numeric values
+		// Allowed non-numeric values
 	default:
 		// Everything else must be a valid positive integer
 		if tli, err := strconv.Atoi(recoveryTarget.TargetTLI); err != nil || tli < 1 {

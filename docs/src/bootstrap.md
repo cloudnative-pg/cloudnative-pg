@@ -530,6 +530,7 @@ spec:
     recovery:
       source: clusterBackup
       recoveryTarget:
+        backupID: 20220616T142236
         targetName: "maintenance-activity"
         exclusive: false
 
