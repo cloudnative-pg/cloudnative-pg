@@ -63,23 +63,23 @@ const (
 )
 
 // ParseBarmanCloudBackupList parses the output of barman-cloud-backup-list
-func ParseBarmanCloudBackupList(output string) (*catalog.Catalog, error) {
-	result := &catalog.Catalog{}
-	err := json.Unmarshal([]byte(output), result)
+func ParseBarmanCloudBackupList(output string) (catalog.Catalog, error) {
+	result := catalog.Catalog{}
+	err := json.Unmarshal([]byte(output), &result)
 	if err != nil {
 		return nil, err
 	}
 
-	for idx := range result.List {
-		if result.List[idx].BeginTimeString != "" {
-			result.List[idx].BeginTime, err = time.Parse(barmanTimeLayout, result.List[idx].BeginTimeString)
+	for idx := range result {
+		if result[idx].BeginTimeString != "" {
+			result[idx].BeginTime, err = time.Parse(barmanTimeLayout, result[idx].BeginTimeString)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		if result.List[idx].EndTimeString != "" {
-			result.List[idx].EndTime, err = time.Parse(barmanTimeLayout, result.List[idx].EndTimeString)
+		if result[idx].EndTimeString != "" {
+			result[idx].EndTime, err = time.Parse(barmanTimeLayout, result[idx].EndTimeString)
 			if err != nil {
 				return nil, err
 			}
@@ -133,5 +133,5 @@ func GetBackupList(
 		return nil, err
 	}
 
-	return backupList, nil
+	return &backupList, nil
 }

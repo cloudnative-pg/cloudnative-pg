@@ -1,5 +1,4 @@
-{
-  "items": [
+[
     {
       "receivedLsn": "3BB/AA000000",
       "replayLsn": "3BB/A9FFFBE8",
@@ -1620,5 +1619,4 @@
       "instanceManagerVersion": "1.10.0",
       "instanceArch": "amd64"
     }
-  ]
-}
+]

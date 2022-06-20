@@ -22,8 +22,7 @@ import (
 )
 
 const (
-	barmanCloudListOutput = `{
-  "backups_list": [
+	barmanCloudListOutput = `[
     {
       "backup_label": "'START WAL LOCATION:[...]",
       "begin_offset": 40,
@@ -73,19 +72,19 @@ const (
 	{
       "backup_id": "20191020T115231"
 	}
-  ]
-}`
+]
+`
 )
 
 var _ = Describe("barman-cloud-backup-list parsing", func() {
 	It("must parse a correct output", func() {
 		result, err := ParseBarmanCloudBackupList(barmanCloudListOutput)
 		Expect(err).To(BeNil())
-		Expect(len(result.List)).To(Equal(2))
-		Expect(result.List[0].ID).To(Equal("20201020T115231"))
-		Expect(result.List[0].SystemID).To(Equal("6885668674852188181"))
-		Expect(result.List[0].BeginTimeString).To(Equal("Tue Oct 20 11:52:31 2020"))
-		Expect(result.List[0].EndTimeString).To(Equal("Tue Oct 20 11:52:34 2020"))
+		Expect(len(result)).To(Equal(2))
+		Expect(result[0].ID).To(Equal("20201020T115231"))
+		Expect(result[0].SystemID).To(Equal("6885668674852188181"))
+		Expect(result[0].BeginTimeString).To(Equal("Tue Oct 20 11:52:31 2020"))
+		Expect(result[0].EndTimeString).To(Equal("Tue Oct 20 11:52:34 2020"))
 	})
 
 	It("must extract the latest backup id", func() {

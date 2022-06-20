@@ -137,16 +137,16 @@ var _ = Describe("Check pods not on primary node", func() {
 		Node:      "node-2",
 		Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-2"}},
 	}
-	statusList := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{item1, item2}}
+	statusList := postgres.PostgresqlStatusList{item1, item2}
 
 	It("if primary is nil", func() {
-		Expect(GetPodsNotOnPrimaryNode(statusList, nil).Items).To(BeEmpty())
+		Expect(GetPodsNotOnPrimaryNode(statusList, nil)).To(BeEmpty())
 	})
 
 	item1.IsPrimary = true
-	statusList2 := postgres.PostgresqlStatusList{Items: []postgres.PostgresqlStatus{item1, item2}}
+	statusList2 := postgres.PostgresqlStatusList{item1, item2}
 
 	It("first status element is primary", func() {
-		Expect(GetPodsNotOnPrimaryNode(statusList2, &statusList2.Items[0]).Items).ToNot(BeEmpty())
+		Expect(GetPodsNotOnPrimaryNode(statusList2, &statusList2[0])).ToNot(BeEmpty())
 	})
 })

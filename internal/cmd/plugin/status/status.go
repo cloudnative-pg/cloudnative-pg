@@ -48,7 +48,7 @@ type PostgresqlStatus struct {
 
 	// InstanceStatus is the status of each instance, extracted directly
 	// from the instance manager running into each Pod
-	InstanceStatus *postgres.PostgresqlStatusList `json:"instanceStatus"`
+	InstanceStatus postgres.PostgresqlStatusList `json:"instanceStatus"`
 
 	// PrimaryPod contains the primary Pod
 	PrimaryPod corev1.Pod
@@ -129,7 +129,7 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 	// Extract the status from the instances
 	status := PostgresqlStatus{
 		Cluster:        &cluster,
-		InstanceStatus: &instancesStatus,
+		InstanceStatus: instancesStatus,
 		PrimaryPod:     primaryPod,
 	}
 	return &status, nil
@@ -367,9 +367,8 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		"Status",
 		"QoS",
 		"Manager Version")
-
 	sort.Sort(fullStatus.InstanceStatus)
-	for _, instance := range fullStatus.InstanceStatus.Items {
+	for _, instance := range fullStatus.InstanceStatus {
 		if instance.Error != nil {
 			status.AddLine(
 				instance.Pod.Name,
@@ -453,9 +452,9 @@ func (fullStatus *PostgresqlStatus) printCertificatesStatus() {
 }
 
 func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.PostgresqlStatus {
-	for idx, instanceStatus := range fullStatus.InstanceStatus.Items {
+	for idx, instanceStatus := range fullStatus.InstanceStatus {
 		if instanceStatus.IsPrimary || len(instanceStatus.ReplicationInfo) > 0 {
-			return &fullStatus.InstanceStatus.Items[idx]
+			return &fullStatus.InstanceStatus[idx]
 		}
 	}
 
@@ -526,7 +525,7 @@ func extractInstancesStatus(
 		instanceStatus := getReplicaStatusFromPodViaExec(
 			ctx, config, filteredPods[idx], postgresContainerName)
 		instanceStatus.IsReady = utils.IsPodReady(filteredPods[idx])
-		result.Items = append(result.Items, instanceStatus)
+		result = append(result, instanceStatus)
 	}
 
 	return result

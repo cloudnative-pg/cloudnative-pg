@@ -30,23 +30,20 @@ import (
 )
 
 // Catalog is a list of backup infos belonging to the same server
-type Catalog struct {
-	// The list of backups
-	List []BarmanBackup `json:"backups_list"`
-}
+type Catalog []BarmanBackup
 
 var currentTLIRegex = regexp.MustCompile("^(|latest)$")
 
 // LatestBackupInfo gets the information about the latest successful backup
-func (catalog *Catalog) LatestBackupInfo() *BarmanBackup {
+func (catalog Catalog) LatestBackupInfo() *BarmanBackup {
 	if catalog.Len() == 0 {
 		return nil
 	}
 
 	// Skip errored backups and return the latest valid one
-	for i := len(catalog.List) - 1; i >= 0; i-- {
-		if catalog.List[i].isBackupDone() {
-			return &catalog.List[i]
+	for i := len(catalog) - 1; i >= 0; i-- {
+		if catalog[i].isBackupDone() {
+			return &catalog[i]
 		}
 	}
 
@@ -55,7 +52,7 @@ func (catalog *Catalog) LatestBackupInfo() *BarmanBackup {
 
 // FirstRecoverabilityPoint gets the start time of the first backup in
 // the catalog
-func (catalog *Catalog) FirstRecoverabilityPoint() *time.Time {
+func (catalog Catalog) FirstRecoverabilityPoint() *time.Time {
 	if catalog.Len() == 0 {
 		return nil
 	}
@@ -64,12 +61,12 @@ func (catalog *Catalog) FirstRecoverabilityPoint() *time.Time {
 	sort.Sort(catalog)
 
 	// Skip errored backups and return the first valid one
-	for i := 0; i < len(catalog.List); i++ {
-		if !catalog.List[i].isBackupDone() {
+	for i := 0; i < len(catalog); i++ {
+		if !catalog[i].isBackupDone() {
 			continue
 		}
 
-		return &catalog.List[i].EndTime
+		return &catalog[i].EndTime
 	}
 
 	return nil
@@ -94,7 +91,7 @@ func (catalog *Catalog) FindClosestBackupInfo(recoveryTarget *v1.RecoveryTarget)
 	return catalog.findlatestBackupFromTimeline(targetTLI), nil
 }
 
-func (catalog *Catalog) findClosestBackupFromTargetLSN(
+func (catalog Catalog) findClosestBackupFromTargetLSN(
 	targetLSNString string,
 	targetTLI string,
 ) (*BarmanBackup, error) {
@@ -102,8 +99,8 @@ func (catalog *Catalog) findClosestBackupFromTargetLSN(
 	if _, err := targetLSN.Parse(); err != nil {
 		return nil, fmt.Errorf("while parsing recovery target targetLSN: " + err.Error())
 	}
-	for i := len(catalog.List) - 1; i >= 0; i-- {
-		barmanBackup := catalog.List[i]
+	for i := len(catalog) - 1; i >= 0; i-- {
+		barmanBackup := catalog[i]
 		if !barmanBackup.isBackupDone() {
 			continue
 		}
@@ -111,13 +108,13 @@ func (catalog *Catalog) findClosestBackupFromTargetLSN(
 			// if targetTLI is not an integer, it will be ignored actually
 			currentTLIRegex.MatchString(targetTLI)) &&
 			postgres.LSN(barmanBackup.BeginLSN).Less(targetLSN) {
-			return &catalog.List[i], nil
+			return &catalog[i], nil
 		}
 	}
 	return nil, nil
 }
 
-func (catalog *Catalog) findClosestBackupFromTargetTime(
+func (catalog Catalog) findClosestBackupFromTargetTime(
 	targetTimeString string,
 	targetTLI string,
 ) (*BarmanBackup, error) {
@@ -125,31 +122,31 @@ func (catalog *Catalog) findClosestBackupFromTargetTime(
 	if err != nil {
 		return nil, fmt.Errorf("while parsing recovery target targetTime: " + err.Error())
 	}
-	for i := len(catalog.List) - 1; i >= 0; i-- {
-		barmanBackup := catalog.List[i]
+	for i := len(catalog) - 1; i >= 0; i-- {
+		barmanBackup := catalog[i]
 		if !barmanBackup.isBackupDone() {
 			continue
 		}
 		if (strconv.Itoa(barmanBackup.TimeLine) == targetTLI ||
 			// if targetTLI is not an integer, it will be ignored actually
 			currentTLIRegex.MatchString(targetTLI)) &&
-			barmanBackup.EndTime.Before(targetTime) {
-			return &catalog.List[i], nil
+			barmanBackup.BeginTime.Before(targetTime) {
+			return &catalog[i], nil
 		}
 	}
 	return nil, nil
 }
 
-func (catalog *Catalog) findlatestBackupFromTimeline(targetTLI string) *BarmanBackup {
-	for i := len(catalog.List) - 1; i >= 0; i-- {
-		barmanBackup := catalog.List[i]
+func (catalog Catalog) findlatestBackupFromTimeline(targetTLI string) *BarmanBackup {
+	for i := len(catalog) - 1; i >= 0; i-- {
+		barmanBackup := catalog[i]
 		if !barmanBackup.isBackupDone() {
 			continue
 		}
 		if strconv.Itoa(barmanBackup.TimeLine) == targetTLI ||
 			// if targetTLI is not an integer, it will be ignored actually
 			currentTLIRegex.MatchString(targetTLI) {
-			return &catalog.List[i]
+			return &catalog[i]
 		}
 	}
 
@@ -205,10 +202,8 @@ func (b *BarmanBackup) isBackupDone() bool {
 
 // NewCatalog creates a new sorted backup catalog, given a list of backup infos
 // belonging to the same server.
-func NewCatalog(list []BarmanBackup) *Catalog {
-	result := &Catalog{
-		List: list,
-	}
+func NewCatalog(list []BarmanBackup) Catalog {
+	result := Catalog(list)
 	sort.Sort(result)
 
 	return result

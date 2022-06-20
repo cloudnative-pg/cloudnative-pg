@@ -42,7 +42,7 @@ import (
 func (r *ClusterReconciler) rolloutDueToCondition(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	podList *postgres.PostgresqlStatusList,
+	podList postgres.PostgresqlStatusList,
 	conditionFunc func(postgres.PostgresqlStatus, *apiv1.Cluster) (bool, bool, string),
 ) (bool, error) {
 	// The following code works under the assumption that podList.Items list is ordered
@@ -50,12 +50,12 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 
 	// upgrade all the replicas starting from the more lagged
 	var primaryPostgresqlStatus *postgres.PostgresqlStatus
-	for i := len(podList.Items) - 1; i >= 0; i-- {
-		postgresqlStatus := podList.Items[i]
+	for i := len(podList) - 1; i >= 0; i-- {
+		postgresqlStatus := podList[i]
 
 		// If this pod is the current primary, we upgrade it in the last step
 		if cluster.Status.CurrentPrimary == postgresqlStatus.Pod.Name {
-			primaryPostgresqlStatus = &podList.Items[i]
+			primaryPostgresqlStatus = &podList[i]
 			continue
 		}
 
@@ -107,7 +107,7 @@ func (r *ClusterReconciler) rolloutDueToCondition(
 func (r *ClusterReconciler) updatePrimaryPod(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	podList *postgres.PostgresqlStatusList,
+	podList postgres.PostgresqlStatusList,
 	primaryPod v1.Pod,
 	inPlacePossible bool,
 	reason string,
@@ -150,18 +150,18 @@ func (r *ClusterReconciler) updatePrimaryPod(
 	}
 
 	// if the cluster has more than one instance, we should trigger a switchover before upgrading
-	if cluster.Status.Instances > 1 && len(podList.Items) > 1 {
-		// If this is not a replica cluster, podList.Items[1] is the first replica,
+	if cluster.Status.Instances > 1 && len(podList) > 1 {
+		// If this is not a replica cluster, podList[1] is the first replica,
 		// as the pod list is sorted in the same order we use for switchover / failover.
 		// This may not be true for replica clusters, where every instance is a replica
 		// from the PostgreSQL point-of-view.
-		targetPrimary := podList.Items[1].Pod.Name
+		targetPrimary := podList[1].Pod.Name
 
 		// If this is a replica cluster, the target primary we chose may be
 		// the one we're trying to upgrade, as the list isn't sorted. In
 		// this case, we promote the first instance of the list
 		if targetPrimary == primaryPod.Name {
-			targetPrimary = podList.Items[0].Pod.Name
+			targetPrimary = podList[0].Pod.Name
 		}
 
 		contextLogger.Info("The primary needs to be restarted, we'll trigger a switchover to do that",
@@ -380,7 +380,7 @@ func (r *ClusterReconciler) upgradePod(ctx context.Context, cluster *apiv1.Clust
 func (r *ClusterReconciler) upgradeInstanceManager(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	podList *postgres.PostgresqlStatusList,
+	podList postgres.PostgresqlStatusList,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -392,8 +392,8 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 	//
 	// In both ways, we are skipping this automatic update and we rely
 	// on the rollout strategy
-	for i := len(podList.Items) - 1; i >= 0; i-- {
-		postgresqlStatus := podList.Items[i]
+	for i := len(podList) - 1; i >= 0; i-- {
+		postgresqlStatus := podList[i]
 		instanceManagerHash := postgresqlStatus.ExecutableHash
 
 		if instanceManagerHash == "" {
@@ -411,8 +411,8 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 	}
 
 	// We start upgrading the instance managers we have
-	for i := len(podList.Items) - 1; i >= 0; i-- {
-		postgresqlStatus := podList.Items[i]
+	for i := len(podList) - 1; i >= 0; i-- {
+		postgresqlStatus := podList[i]
 		instanceManagerHash := postgresqlStatus.ExecutableHash
 		instanceManagerIsUpgrading := postgresqlStatus.IsInstanceManagerUpgrading
 		if instanceManagerHash != "" && instanceManagerHash != operatorHash && !instanceManagerIsUpgrading {

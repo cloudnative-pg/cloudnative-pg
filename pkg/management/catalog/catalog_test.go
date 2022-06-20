@@ -48,10 +48,10 @@ var _ = Describe("Backup catalog", func() {
 	})
 
 	It("contains sorted data", func() {
-		Expect(len(catalog.List)).To(Equal(3))
-		Expect(catalog.List[0].ID).To(Equal("202101011200"))
-		Expect(catalog.List[1].ID).To(Equal("202101021200"))
-		Expect(catalog.List[2].ID).To(Equal("202101031200"))
+		Expect(len(catalog)).To(Equal(3))
+		Expect(catalog[0].ID).To(Equal("202101011200"))
+		Expect(catalog[1].ID).To(Equal("202101021200"))
+		Expect(catalog[2].ID).To(Equal("202101031200"))
 	})
 
 	It("can detect the first recoverability point", func() {

@@ -132,7 +132,7 @@ func DeleteBackupsNotInCatalog(
 			continue
 		}
 		var found bool
-		for _, barmanBackup := range catalog.List {
+		for _, barmanBackup := range *catalog {
 			if backup.Status.BackupID == barmanBackup.ID {
 				found = true
 				break

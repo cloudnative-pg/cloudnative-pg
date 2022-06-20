@@ -141,77 +141,75 @@ func (list PgStatReplicationList) Less(i, j int) bool {
 
 // PostgresqlStatusList is a list of PostgreSQL instances status, useful to
 // be easily sorted
-type PostgresqlStatusList struct {
-	Items []PostgresqlStatus `json:"items"`
-}
+type PostgresqlStatusList []PostgresqlStatus
 
 // Len implements sort.Interface extracting the length of the list
-func (list *PostgresqlStatusList) Len() int {
-	return len(list.Items)
+func (list PostgresqlStatusList) Len() int {
+	return len(list)
 }
 
 // Swap swaps two elements, implements sort.Interface
-func (list *PostgresqlStatusList) Swap(i, j int) {
-	list.Items[i], list.Items[j] = list.Items[j], list.Items[i]
+func (list PostgresqlStatusList) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
 }
 
 // Less compares two elements. Primary instances always go first, ordered by their Pod
 // name (split brain?), and secondaries always go by their replication status with
 // the more updated one coming as first
-func (list *PostgresqlStatusList) Less(i, j int) bool {
+func (list PostgresqlStatusList) Less(i, j int) bool {
 	// Incomplete status records go to the bottom of
 	// the list, since this is used to elect a new primary
 	// when needed.
 	switch {
-	case list.Items[i].Error != nil && list.Items[j].Error == nil:
+	case list[i].Error != nil && list[j].Error == nil:
 		return false
-	case list.Items[i].Error == nil && list.Items[j].Error != nil:
+	case list[i].Error == nil && list[j].Error != nil:
 		return true
 	}
 
 	// Non-ready Pods go to the bottom of the list
 	// since we prefer ready Pods as new primary
 	switch {
-	case list.Items[i].IsReady && !list.Items[j].IsReady:
+	case list[i].IsReady && !list[j].IsReady:
 		return true
-	case !list.Items[i].IsReady && list.Items[j].IsReady:
+	case !list[i].IsReady && list[j].IsReady:
 		return false
 	}
 
 	// Manage primary servers
 	switch {
-	case list.Items[i].IsPrimary && list.Items[j].IsPrimary:
-		return list.Items[i].Pod.Name < list.Items[j].Pod.Name
+	case list[i].IsPrimary && list[j].IsPrimary:
+		return list[i].Pod.Name < list[j].Pod.Name
 
-	case list.Items[i].IsPrimary:
+	case list[i].IsPrimary:
 		return true
 
-	case list.Items[j].IsPrimary:
+	case list[j].IsPrimary:
 		return false
 	}
 
 	// Compare received LSN (bigger LSN orders first)
-	if list.Items[i].ReceivedLsn != list.Items[j].ReceivedLsn {
-		return !list.Items[i].ReceivedLsn.Less(list.Items[j].ReceivedLsn)
+	if list[i].ReceivedLsn != list[j].ReceivedLsn {
+		return !list[i].ReceivedLsn.Less(list[j].ReceivedLsn)
 	}
 
 	// Compare replay LSN (bigger LSN orders first)
-	if list.Items[i].ReplayLsn != list.Items[j].ReplayLsn {
-		return !list.Items[i].ReplayLsn.Less(list.Items[j].ReplayLsn)
+	if list[i].ReplayLsn != list[j].ReplayLsn {
+		return !list[i].ReplayLsn.Less(list[j].ReplayLsn)
 	}
 
-	return list.Items[i].Pod.Name < list.Items[j].Pod.Name
+	return list[i].Pod.Name < list[j].Pod.Name
 }
 
 // AreWalReceiversDown checks if every WAL receiver of the cluster is down
 // ignoring the status of the primary, that does not matter during
 // a switchover or a failover
 func (list PostgresqlStatusList) AreWalReceiversDown(primaryName string) bool {
-	for idx := range list.Items {
-		if list.Items[idx].Pod.Name == primaryName {
+	for idx := range list {
+		if list[idx].Pod.Name == primaryName {
 			continue
 		}
-		if list.Items[idx].IsWalReceiverActive {
+		if list[idx].IsWalReceiverActive {
 			return false
 		}
 	}
@@ -221,7 +219,7 @@ func (list PostgresqlStatusList) AreWalReceiversDown(primaryName string) bool {
 
 // IsPodReporting if a pod is ready
 func (list PostgresqlStatusList) IsPodReporting(podname string) bool {
-	for _, item := range list.Items {
+	for _, item := range list {
 		if item.Pod.Name == podname {
 			return item.Error == nil
 		}
@@ -234,8 +232,8 @@ func (list PostgresqlStatusList) IsPodReporting(podname string) bool {
 // contain errors. Returns true if everything is green and
 // false otherwise
 func (list PostgresqlStatusList) IsComplete() bool {
-	for idx := range list.Items {
-		if list.Items[idx].Error != nil {
+	for idx := range list {
+		if list[idx].Error != nil {
 			return false
 		}
 	}
@@ -245,7 +243,7 @@ func (list PostgresqlStatusList) IsComplete() bool {
 
 // ArePodsUpgradingInstanceManager checks if there are pods on which we are upgrading the instance manager
 func (list PostgresqlStatusList) ArePodsUpgradingInstanceManager() bool {
-	for _, item := range list.Items {
+	for _, item := range list {
 		if item.IsInstanceManagerUpgrading {
 			return true
 		}
@@ -257,7 +255,7 @@ func (list PostgresqlStatusList) ArePodsUpgradingInstanceManager() bool {
 // ArePodsWaitingForDecreasedSettings checks if a rollout due to hot standby
 // sensible parameters being decreased is ongoing
 func (list PostgresqlStatusList) ArePodsWaitingForDecreasedSettings() bool {
-	for _, item := range list.Items {
+	for _, item := range list {
 		if item.PendingRestartForDecrease {
 			return true
 		}
@@ -268,7 +266,7 @@ func (list PostgresqlStatusList) ArePodsWaitingForDecreasedSettings() bool {
 
 // ReportingMightBeUnavailable checks whether the given instance might be unavailable
 func (list PostgresqlStatusList) ReportingMightBeUnavailable(instance string) bool {
-	for _, item := range list.Items {
+	for _, item := range list {
 		if item.Pod.Name == instance && item.MightBeUnavailable {
 			return true
 		}
@@ -280,7 +278,7 @@ func (list PostgresqlStatusList) ReportingMightBeUnavailable(instance string) bo
 // InstancesReportingStatus returns the number of instances that are Ready or MightBeUnavailable
 func (list PostgresqlStatusList) InstancesReportingStatus() int {
 	var n int
-	for _, item := range list.Items {
+	for _, item := range list {
 		if utils.IsPodActive(item.Pod) && utils.IsPodReady(item.Pod) || item.MightBeUnavailable {
 			n++
 		}

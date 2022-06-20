@@ -731,7 +731,7 @@ func (r *ClusterReconciler) extractInstancesStatus(
 		instanceStatus.Node = activePods[idx].Spec.NodeName
 		instanceStatus.Pod = activePods[idx]
 
-		result.Items = append(result.Items, instanceStatus)
+		result = append(result, instanceStatus)
 	}
 	return result
 }

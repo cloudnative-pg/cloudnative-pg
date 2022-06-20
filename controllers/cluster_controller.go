@@ -219,7 +219,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// Verify the architecture of all the instances and update the OnlineUpdateEnabled
 	// field in the status
 	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
-	isArchitectureConsistent := r.checkPodsArchitecture(ctx, &instancesStatus)
+	isArchitectureConsistent := r.checkPodsArchitecture(ctx, instancesStatus)
 	if !isArchitectureConsistent && onlineUpdateEnabled {
 		contextLogger.Info("Architecture mismatch detected, disabling instance manager online updates")
 		onlineUpdateEnabled = false
@@ -470,11 +470,11 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 }
 
 // checkPodsArchitecture checks whether the architecture of the instances is consistent with the runtime one
-func (r *ClusterReconciler) checkPodsArchitecture(ctx context.Context, status *postgres.PostgresqlStatusList) bool {
+func (r *ClusterReconciler) checkPodsArchitecture(ctx context.Context, status postgres.PostgresqlStatusList) bool {
 	contextLogger := log.FromContext(ctx)
 	isConsistent := true
 
-	for _, podStatus := range status.Items {
+	for _, podStatus := range status {
 		// Ignore architecture in podStatus with errors
 		if podStatus.Error != nil {
 			continue
@@ -623,7 +623,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 	// cluster.Status.Instances == cluster.Spec.Instances and
 	// we don't need to modify the cluster topology
 	if cluster.Status.ReadyInstances != cluster.Status.Instances ||
-		cluster.Status.ReadyInstances != len(instancesStatus.Items) ||
+		cluster.Status.ReadyInstances != len(instancesStatus) ||
 		!instancesStatus.IsComplete() {
 		contextLogger.Debug("Waiting for Pods to be ready")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
@@ -671,7 +671,7 @@ func (r *ClusterReconciler) handleRollingUpdate(
 
 	// If we need to roll out a restart of any instance, this is the right moment
 	// Do I have to roll out a new image?
-	done, err := r.rolloutDueToCondition(ctx, cluster, &instancesStatus, IsPodNeedingRollout)
+	done, err := r.rolloutDueToCondition(ctx, cluster, instancesStatus, IsPodNeedingRollout)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -695,7 +695,7 @@ func (r *ClusterReconciler) handleRollingUpdate(
 
 	// Execute online update, if enabled and if not already executing
 	if cluster.Status.OnlineUpdateEnabled && cluster.Status.Phase != apiv1.PhaseOnlineUpgrading {
-		if err := r.upgradeInstanceManager(ctx, cluster, &instancesStatus); err != nil {
+		if err := r.upgradeInstanceManager(ctx, cluster, instancesStatus); err != nil {
 			return ctrl.Result{}, err
 		}
 		// Stop the reconciliation loop if upgradeInstanceManager initiated an upgrade
