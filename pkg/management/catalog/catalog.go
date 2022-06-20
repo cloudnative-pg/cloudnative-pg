@@ -166,7 +166,7 @@ func (catalog *Catalog) findlatestBackupFromTimeline(targetTLI string) *BarmanBa
 
 func (catalog *Catalog) findBackupFromID(backupID string) (*BarmanBackup, error) {
 	if backupID == "" {
-		return nil, fmt.Errorf("no Backup ID provided. ")
+		return nil, fmt.Errorf("no backupID provided. ")
 	}
 	for i := len(catalog.List) - 1; i >= 0; i-- {
 		barmanBackup := catalog.List[i]
