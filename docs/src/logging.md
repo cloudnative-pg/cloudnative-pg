@@ -13,6 +13,13 @@ Each log entry has the following fields:
   `logger` type)
 - `logging_podName`: the pod where the log was created generated
 
+!!! Warning
+    Long-term storage and management of logs is outside the operator's purview,
+    and needs to be provided at the level of the Kubernetes installation. Please
+    refer to the
+    [Kubernetes Logging Architecture](https://kubernetes.io/docs/concepts/cluster-administration/logging/)
+    documentation.
+
 ## Operator log
 
 A log level can be specified in the cluster spec with the option `logLevel` and
