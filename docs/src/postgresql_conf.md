@@ -318,7 +318,7 @@ host all all all scram-sha-256 # (or md5 for PostgreSQL version <= 13)
 Refer to the PostgreSQL documentation for [more information on `pg_hba.conf`](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html).
 
 Inside the cluster manifest, `pg_hba` lines are added as list items
-in `spec.postgresql.pg_hba`. e.g.:
+in `spec.postgresql.pg_hba`, as in the following excerpt:
 
 ``` yaml
   postgresql:
