@@ -317,6 +317,19 @@ host all all all scram-sha-256 # (or md5 for PostgreSQL version <= 13)
 
 Refer to the PostgreSQL documentation for [more information on `pg_hba.conf`](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html).
 
+Inside the cluster manifest, `pg_hba` lines are added as list items
+in `spec.postgresql.pg_hba`, as in the following excerpt:
+
+``` yaml
+  postgresql:
+    pg_hba:
+      - hostssl app app 10.244.0.0/16 md5
+```
+
+In the above example we are enabling access for the `app` user to the `app`
+database using MD5 password authentication (you can use `scram-sha-256`
+if you prefer) via a secure channel (`hostssl`).
+
 ### LDAP Configuration
 
 Under the `postgres` section of the cluster spec there is an optional `ldap` section available to define an LDAP
