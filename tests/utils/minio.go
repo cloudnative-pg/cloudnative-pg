@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	minioImage       = "minio/minio:RELEASE.2020-04-23T00-58-49Z"
+	minioImage       = "minio/minio:RELEASE.2022-06-20T23-13-45Z"
 	minioClientImage = "minio/mc:RELEASE.2022-06-11T21-10-36Z"
 )
 
