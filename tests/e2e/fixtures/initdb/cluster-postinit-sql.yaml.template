@@ -31,6 +31,13 @@ spec:
       postInitApplicationSQL:
         - create table application_numbers (i integer)
         - insert into application_numbers (select generate_series(1,10000))
+      postInitApplicationSQLRefs:
+        configMapRefs:
+        - name: post-init-sql-configmap
+          key: configmap.sql
+        secretRefs:
+        - name: post-init-sql-secret
+          key: secret.sql
 
   # Persistent storage configuration
   storage:

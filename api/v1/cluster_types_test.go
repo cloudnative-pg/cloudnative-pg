@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -156,6 +157,89 @@ var _ = Describe("Bootstrap via initdb", func() {
 		Expect(cluster.ShouldCreateApplicationDatabase()).To(BeTrue())
 		Expect(cluster.ShouldCreateApplicationSecret()).To(BeFalse())
 		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
+	})
+
+	It("will run post application sql refs if specified for secrets", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "appDB",
+						Owner:    "appOwner",
+						Secret: &LocalObjectReference{
+							Name: "appSecret",
+						},
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							SecretRefs: []corev1.SecretKeySelector{
+								{
+									Key: "secretKey",
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "secretName",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(cluster.ShouldInitDBRunPostInitApplicationSQLRefs()).To(BeTrue())
+	})
+
+	It("will run post application sql refs if specified for configmaps", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "appDB",
+						Owner:    "appOwner",
+						Secret: &LocalObjectReference{
+							Name: "appSecret",
+						},
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							ConfigMapRefs: []corev1.ConfigMapKeySelector{
+								{
+									Key: "configMapKey",
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "configMapName",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(cluster.ShouldInitDBRunPostInitApplicationSQLRefs()).To(BeTrue())
+	})
+
+	It("will not run post application sql refs if not specified", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "appDB",
+						Owner:    "appOwner",
+						Secret: &LocalObjectReference{
+							Name: "appSecret",
+						},
+					},
+				},
+			},
+		}
+
+		Expect(cluster.ShouldInitDBRunPostInitApplicationSQLRefs()).To(BeFalse())
 	})
 
 	It("will not create an application database if not requested", func() {
