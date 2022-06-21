@@ -35,6 +35,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
+const (
+	minioImage       = "minio/minio:RELEASE.2020-04-23T00-58-49Z"
+	minioClientImage = "minio/mc:RELEASE.2022-06-11T21-10-36Z"
+)
+
 // MinioSetup contains the resources needed for a working minio server deployment:
 // a PersistentVolumeClaim, a Deployment and a Service
 type MinioSetup struct {
@@ -135,7 +140,7 @@ func MinioDefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeCl
 						{
 							Name: "minio",
 							// Latest Apache License release
-							Image:   "minio/minio:RELEASE.2020-04-23T00-58-49Z",
+							Image:   minioImage,
 							Command: nil,
 							Args:    []string{"server", "data"},
 							Ports: []corev1.ContainerPort{
@@ -321,7 +326,7 @@ func MinioDefaultClient(namespace string) corev1.Pod {
 			Containers: []corev1.Container{
 				{
 					Name:  "mc",
-					Image: "minio/mc:RELEASE.2022-06-11T21-10-36Z",
+					Image: minioClientImage,
 					Env: []corev1.EnvVar{
 						{
 							Name:  "MC_HOST_minio",
