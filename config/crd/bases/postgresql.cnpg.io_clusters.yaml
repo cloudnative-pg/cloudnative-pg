@@ -1221,9 +1221,9 @@ spec:
                           https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET'
                         properties:
                           backupID:
-                            description: 'The backup ID chosen to be restored when
-                              one of the following targets is specified: TargetName,
-                              TargetXID and TargetImmediate.'
+                            description: 'The backup ID to restore when one of the
+                              following targets is specified: targetName, targetXID
+                              and targetImmediate.'
                             type: string
                           exclusive:
                             description: Set the target to be exclusive (defaults
