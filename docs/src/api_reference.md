@@ -251,7 +251,7 @@ Name                   | Description                                            
 `postInitSQL           ` | List of SQL queries to be executed as a superuser immediately after the cluster has been created - to be used with extreme care (by default empty)                                                                                         | []string                                      
 `postInitApplicationSQL` | List of SQL queries to be executed as a superuser in the application database right after is created - to be used with extreme care (by default empty)                                                                                     | []string                                      
 `postInitTemplateSQL   ` | List of SQL queries to be executed as a superuser in the `template1` after the cluster has been created - to be used with extreme care (by default empty)                                                                                  | []string                                      
-`import                ` | if provided bootstraps the DB data by doing a logical backup of an external cluster                                                                                                                                                        | [*LogicalSnapshot](#LogicalSnapshot)          
+`import                ` | Bootstraps the new cluster by importing data from an existing PostgreSQL instance using logical backup (`pg_dump` and `pg_restore`)                                                                                                        | [*LogicalSnapshot](#LogicalSnapshot)          
 
 <a id='BootstrapPgBaseBackup'></a>
 

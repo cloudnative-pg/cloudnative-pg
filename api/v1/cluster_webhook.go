@@ -453,7 +453,7 @@ func (r *Cluster) validateLogicalSnapshotMicroservice() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "initdb", "import", "databases"),
 				logicalSnapshot.Databases,
-				"You need to specify a single database for the microservice import type"),
+				"You need to specify a single database for the `microservice` import type"),
 		)
 	}
 
@@ -463,7 +463,7 @@ func (r *Cluster) validateLogicalSnapshotMicroservice() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "initdb", "import", "roles"),
 				logicalSnapshot.Databases,
-				"You cannot specify roles to import for the microservice import type"),
+				"You cannot specify roles to import for the `microservice` import type"),
 		)
 	}
 
@@ -473,7 +473,7 @@ func (r *Cluster) validateLogicalSnapshotMicroservice() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "initdb", "import", "databases", "0"),
 				logicalSnapshot.Databases,
-				"You cannot wildcards for the microservice import type"),
+				"You cannot specify any wildcard for the `microservice` import type"),
 		)
 	}
 
@@ -490,7 +490,7 @@ func (r *Cluster) validateLogicalSnapshotMonolith() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "initdb", "import", "databases"),
 				logicalSnapshot.Databases,
-				"You need to specify at least a database for the monolith import type"),
+				"You need to specify at least a database for the `monolith` import type"),
 		)
 	}
 

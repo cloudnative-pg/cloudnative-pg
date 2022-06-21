@@ -52,6 +52,13 @@ into the destination cluster:
 The first import method is available via the `microservice` type, while the
 latter by the `monolith` type.
 
+!!! Warning
+    It is your responsibility to ensure that the destination cluster can
+    access the source cluster with a superuser or a user having enough
+    privileges to take a logical backup with `pg_dump`. Please refer to the
+    [PostgreSQL documentation on "SQL Dump"](https://www.postgresql.org/docs/current/app-pgdump.html)
+    for further information.
+
 ## The `microservice` type
 
 With the microservice approach, you can specify a single database you want to
@@ -65,6 +72,7 @@ performed in 4 steps:
   `initdb.database` (application database) owned by the `initdb.owner` user
 - optional execution of the user defined SQL queries in the application
   database via the `postImportApplicationSQL` parameter
+- cleanup of the database dump file
 
 ![Example of microservice import type](./images/microservice-import.png)
 
@@ -116,9 +124,11 @@ There are a few things you need to be aware of when using the `microservice` typ
 - Connection to the source database must be granted with the specified user
   that needs to run `pg_dump` and read roles information (*superuser* is
   OK)
-- Currently, the `pg_dump -Fc` result is stored temporarily inside an empty
-  directory of the import job, so there should be enough available space to
-  temporarily contain the dump result on the assigned node
+- Currently, the `pg_dump -Fc` result is stored temporarily inside the `dumps`
+  folder in the `PGDATA` volume, so there should be enough available space to
+  temporarily contain the dump result on the assigned node, as well as the
+  restored data and indexes. Once the import operation is completed, this
+  folder is automatically deleted by the operator.
 - Only one database can be specified inside the `initdb.import.databases` array
 - Roles are not imported - and as such they cannot be specified inside `initdb.import.roles`
 
@@ -126,11 +136,15 @@ There are a few things you need to be aware of when using the `microservice` typ
 
 With the monolith approach, you can specify a set of roles and databases you
 want to import from the source cluster into the destination cluster.
+The operation is performed in the following steps:
 
-<!--
-The operation is performed in the following steps: TODO
-
--->
+- `initdb` bootstrap of the new cluster
+- export and import of the selected roles
+- export of the selected databases (in `initdb.import.databases`), one at a time,
+  using `pg_dump -Fc`
+- create each of the selected databases and import data using `pg_restore`
+- run `ANALYZE` on each imported database
+- cleanup of the database dump files
 
 ![Example of monolith import type](./images/monolith-import.png)
 
@@ -160,7 +174,7 @@ spec:
           - accountant
           - bank_user
         source:
-          externalCluster: cluster-example
+          externalCluster: cluster-pg96
   storage:
     size: 1Gi
   externalClusters:
@@ -184,9 +198,11 @@ There are a few things you need to be aware of when using the `monolith` type:
 - Connection to the source database must be granted with the specified user
   that needs to run `pg_dump` and retrieve roles information (*superuser* is
   OK)
-- Currently, the `pg_dump -Fc` result is stored temporarily inside an empty
-  directory of the import job, so there should be enough available space to
-  temporarily contain the dump result on the assigned node
+- Currently, the `pg_dump -Fc` result is stored temporarily inside the `dumps`
+  folder in the `PGDATA` volume, so there should be enough available space to
+  temporarily contain the dump result on the assigned node, as well as the
+  restored data and indexes. Once the import operation is completed, this
+  folder is automatically deleted by the operator.
 - At least one database to be specified in the `initdb.import.databases` array
 - Any role that is required by the imported databases must be specified inside
   `initdb.import.roles`, if the limitations below:
@@ -197,3 +213,4 @@ There are a few things you need to be aware of when using the `monolith` type:
 - After the clone procedure is done, `ANALYZE VERBOSE` is executed for every
   database.
 - `postImportApplicationSQL` field is not supported
+

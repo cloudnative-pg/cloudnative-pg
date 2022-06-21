@@ -759,7 +759,8 @@ type BootstrapInitDB struct {
 	// (by default empty)
 	PostInitTemplateSQL []string `json:"postInitTemplateSQL,omitempty"`
 
-	// if provided bootstraps the DB data by doing a logical backup of an external cluster
+	// Bootstraps the new cluster by importing data from an existing PostgreSQL
+	// instance using logical backup (`pg_dump` and `pg_restore`)
 	Import *LogicalSnapshot `json:"import,omitempty"`
 }
 

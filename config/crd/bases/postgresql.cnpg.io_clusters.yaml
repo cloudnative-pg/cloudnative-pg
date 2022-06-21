@@ -1037,8 +1037,9 @@ spec:
                           for initdb (default:`UTF8`)
                         type: string
                       import:
-                        description: if provided bootstraps the DB data by doing a
-                          logical backup of an external cluster
+                        description: Bootstraps the new cluster by importing data
+                          from an existing PostgreSQL instance using logical backup
+                          (`pg_dump` and `pg_restore`)
                         properties:
                           databases:
                             description: The database to import
