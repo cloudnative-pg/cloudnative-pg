@@ -29,3 +29,5 @@ tests/e2e/out/
 
 # Spellcheck dictionary
 dictionary.dic
+
+vendor

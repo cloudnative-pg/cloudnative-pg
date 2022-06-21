@@ -17,6 +17,8 @@ limitations under the License.
 package specs
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -75,7 +77,66 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 		)
 	}
 
+	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
+		result = append(result, createPostgresVolumesForPostInitApplicationSQLRefs(
+			cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs,
+		)...)
+	}
+
 	return result
+}
+
+func createPostgresVolumesForPostInitApplicationSQLRefs(refs *apiv1.PostInitApplicationSQLRefs) []corev1.Volume {
+	length := len(refs.ConfigMapRefs) + len(refs.SecretRefs)
+	res := make([]corev1.Volume, 0, length)
+
+	count := 0
+	for {
+		if length < 10 {
+			count++
+			break
+		}
+		length /= 10
+		count++
+	}
+
+	for i := range refs.SecretRefs {
+		res = append(res, corev1.Volume{
+			Name: fmt.Sprintf("%0*d-post-init-application-sql", count, i),
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: refs.SecretRefs[i].Name,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  refs.SecretRefs[i].Key,
+							Path: fmt.Sprintf("%0*d.sql", count, i),
+						},
+					},
+				},
+			},
+		})
+	}
+
+	for i := range refs.ConfigMapRefs {
+		res = append(res, corev1.Volume{
+			Name: fmt.Sprintf("%0*d-post-init-application-sql", count, i+len(refs.SecretRefs)),
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: refs.ConfigMapRefs[i].Name,
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  refs.ConfigMapRefs[i].Key,
+							Path: fmt.Sprintf("%0*d.sql", count, i+len(refs.SecretRefs)),
+						},
+					},
+				},
+			},
+		})
+	}
+
+	return res
 }
 
 func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
@@ -116,5 +177,48 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		)
 	}
 
+	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
+		volumeMounts = append(volumeMounts, createPostgresVolumeMountsForPostInitApplicationSQLRefs(
+			cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs,
+		)...)
+	}
+
 	return volumeMounts
+}
+
+func createPostgresVolumeMountsForPostInitApplicationSQLRefs(
+	refs *apiv1.PostInitApplicationSQLRefs,
+) []corev1.VolumeMount {
+	length := len(refs.ConfigMapRefs) + len(refs.SecretRefs)
+	res := make([]corev1.VolumeMount, 0, length)
+
+	count := 0
+	for {
+		if length < 10 {
+			count++
+			break
+		}
+		length /= 10
+		count++
+	}
+
+	for i := range refs.SecretRefs {
+		res = append(res, corev1.VolumeMount{
+			Name:      fmt.Sprintf("%0*d-post-init-application-sql", count, i),
+			MountPath: fmt.Sprintf("/etc/post-init-application-sql-refs/%0*d.sql", count, i),
+			SubPath:   fmt.Sprintf("%0*d.sql", count, i),
+			ReadOnly:  true,
+		})
+	}
+
+	for i := range refs.ConfigMapRefs {
+		res = append(res, corev1.VolumeMount{
+			Name:      fmt.Sprintf("%0*d-post-init-application-sql", count, i+len(refs.SecretRefs)),
+			MountPath: fmt.Sprintf("/etc/post-init-application-sql-refs/%0*d.sql", count, i+len(refs.SecretRefs)),
+			SubPath:   fmt.Sprintf("%0*d.sql", count, i+len(refs.SecretRefs)),
+			ReadOnly:  true,
+		})
+	}
+
+	return res
 }

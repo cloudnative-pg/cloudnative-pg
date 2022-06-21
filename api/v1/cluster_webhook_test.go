@@ -279,6 +279,136 @@ var _ = Describe("initdb options validation", func() {
 		Expect(result).To(BeEmpty())
 	})
 
+	It("complain if key is missing in the secretRefs", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							SecretRefs: []v1.SecretKeySelector{
+								{
+									LocalObjectReference: v1.LocalObjectReference{Name: "secret1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateInitDB()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("complain if name is missing in the secretRefs", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							SecretRefs: []v1.SecretKeySelector{
+								{
+									Key: "key",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateInitDB()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("complain if key is missing in the configMapRefs", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							ConfigMapRefs: []v1.ConfigMapKeySelector{
+								{
+									LocalObjectReference: v1.LocalObjectReference{Name: "configmap1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateInitDB()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("complain if name is missing in the configMapRefs", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							ConfigMapRefs: []v1.ConfigMapKeySelector{
+								{
+									Key: "key",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateInitDB()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("doesn't complain if configmapRefs and secretRefs are valid", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							ConfigMapRefs: []v1.ConfigMapKeySelector{
+								{
+									LocalObjectReference: v1.LocalObjectReference{Name: "configmap1"},
+									Key:                  "key",
+								},
+								{
+									LocalObjectReference: v1.LocalObjectReference{Name: "configmap2"},
+									Key:                  "key",
+								},
+							},
+							SecretRefs: []v1.SecretKeySelector{
+								{
+									LocalObjectReference: v1.LocalObjectReference{Name: "secret1"},
+									Key:                  "key",
+								},
+								{
+									LocalObjectReference: v1.LocalObjectReference{Name: "secret2"},
+									Key:                  "key",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateInitDB()
+		Expect(result).To(BeEmpty())
+	})
+
 	It("doesn't complain if superuser secret it's empty", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{},

@@ -144,6 +144,16 @@ var _ = Describe("Job created via InitDB", func() {
 						PostInitSQL:            []string{"testPostInitSql"},
 						PostInitTemplateSQL:    []string{"testPostInitTemplateSql"},
 						PostInitApplicationSQL: []string{"testPostInitApplicationSql"},
+						PostInitApplicationSQLRefs: &apiv1.PostInitApplicationSQLRefs{
+							SecretRefs: []corev1.SecretKeySelector{
+								{
+									Key: "secretKey1",
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "secretName1",
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -152,5 +162,6 @@ var _ = Describe("Job created via InitDB", func() {
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitTemplateSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitApplicationSql"))
+		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("/etc/post-init-application-sql-refs"))
 	})
 })
