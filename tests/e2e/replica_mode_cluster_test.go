@@ -54,10 +54,8 @@ var _ = Describe("Replica Mode", func() {
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(replicaNamespace, srcClusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+"-source-cluster.log")
-			env.DumpClusterEnv(replicaNamespace, replicaClusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+"-replica-cluster.log")
+			env.DumpNamespaceObjects(replicaNamespace,
+				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	AfterEach(func() {

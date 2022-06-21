@@ -1922,6 +1922,23 @@ spec:
                     items:
                       type: string
                     type: array
+                  syncReplicaElectionConstraint:
+                    description: Requirements to be met by sync replicas. This will
+                      affect how the "synchronous_standby_names" parameter will be
+                      set up.
+                    properties:
+                      enabled:
+                        description: This flag enabled the constraints for sync replicas
+                        type: boolean
+                      nodeLabelsAntiAffinity:
+                        description: A list of node labels values to extract and compare
+                          to evaluate if the pods reside in the same topology or not
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - enabled
+                    type: object
                 type: object
               primaryUpdateMethod:
                 default: switchover
@@ -2446,6 +2463,24 @@ spec:
                 description: The timestamp when the last request for a new primary
                   has occurred
                 type: string
+              topology:
+                description: Instances topology.
+                properties:
+                  instances:
+                    additionalProperties:
+                      additionalProperties:
+                        type: string
+                      description: PodTopologyLabels represent the topology of a Pod.
+                        map[labelName]labelValue
+                      type: object
+                    description: Instances contains the pod topology of the instances
+                    type: object
+                  successfullyExtracted:
+                    description: SuccessfullyExtracted indicates if the topology data
+                      was extract. It is useful to enact fallback behaviors in synchronous
+                      replica election in case of failures
+                    type: boolean
+                type: object
               writeService:
                 description: Current write pod
                 type: string

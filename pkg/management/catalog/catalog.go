@@ -133,7 +133,7 @@ func (catalog *Catalog) findClosestBackupFromTargetTime(
 		if (strconv.Itoa(barmanBackup.TimeLine) == targetTLI ||
 			// if targetTLI is not an integer, it will be ignored actually
 			currentTLIRegex.MatchString(targetTLI)) &&
-			barmanBackup.BeginTime.Before(targetTime) {
+			barmanBackup.EndTime.Before(targetTime) {
 			return &catalog.List[i], nil
 		}
 	}

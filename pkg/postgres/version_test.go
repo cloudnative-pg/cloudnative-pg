@@ -38,6 +38,7 @@ var _ = Describe("PostgreSQL version handling", func() {
 			Expect(GetPostgresVersionFromTag("10.11.12")).To(Equal(100011))
 			Expect(GetPostgresVersionFromTag("9.4_beautiful")).To(Equal(90400))
 			Expect(GetPostgresVersionFromTag("11-1")).To(Equal(110000))
+			Expect(GetPostgresVersionFromTag("15beta1")).To(Equal(150000))
 		})
 
 		It("should gracefully handle errors", func() {

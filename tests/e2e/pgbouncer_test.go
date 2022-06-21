@@ -40,8 +40,7 @@ var _ = Describe("PGBouncer Connections", func() {
 	})
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, clusterName,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			env.DumpPoolerResourcesInfo(namespace, CurrentSpecReport().LeafNodeText)
 		}
 	})

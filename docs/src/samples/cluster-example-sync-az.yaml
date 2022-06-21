@@ -1,0 +1,14 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-az
+spec:
+  instances: 3
+  minSyncReplicas: 1
+  maxSyncReplicas: 1
+  postgresql:
+    syncReplicaElectionConstraint:
+      enabled: true
+      nodeLabelsAntiAffinity: [ "az" ]
+  storage:
+    size: 1Gi

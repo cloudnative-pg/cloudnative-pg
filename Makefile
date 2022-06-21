@@ -165,7 +165,7 @@ woke: ## Runs the woke checks on project.
 	docker run --rm -v $(PWD):/src -w /src getwoke/woke:0.18.1 woke -c .woke.yaml
 
 wordlist-ordered: ## Order the wordlist using sort
-	LANG=C sort .wordlist-en-custom.txt > .wordlist-en-custom.txt.new && \
+	LANG=C LC_ALL=C sort .wordlist-en-custom.txt > .wordlist-en-custom.txt.new && \
 	mv -f .wordlist-en-custom.txt.new .wordlist-en-custom.txt
 
 checks: generate manifests apidoc fmt spellcheck wordlist-ordered woke vet lint ## Runs all the checks on the project.

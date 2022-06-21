@@ -30,12 +30,12 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 
 	It("apply the default settings", func() {
 		info := ConfigurationInfo{
-			Settings:           CnpgConfigurationSettings,
-			MajorVersion:       100000,
-			UserSettings:       settings,
-			IncludingMandatory: true,
-			Replicas:           nil,
-			SyncReplicas:       0,
+			Settings:              CnpgConfigurationSettings,
+			MajorVersion:          100000,
+			UserSettings:          settings,
+			IncludingMandatory:    true,
+			SyncReplicasElectable: nil,
+			SyncReplicas:          0,
 		}
 		config := CreatePostgresqlConfiguration(info)
 		Expect(len(config.configs)).To(BeNumerically(">", 1))
@@ -49,9 +49,9 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			UserSettings: map[string]string{
 				"hot_standby": "off",
 			},
-			IncludingMandatory: true,
-			Replicas:           nil,
-			SyncReplicas:       0,
+			IncludingMandatory:    true,
+			SyncReplicasElectable: nil,
+			SyncReplicas:          0,
 		}
 		config := CreatePostgresqlConfiguration(info)
 		Expect(config.GetConfig("hot_standby")).To(Equal("true"))
@@ -59,12 +59,12 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 
 	It("generate a config file", func() {
 		info := ConfigurationInfo{
-			Settings:           CnpgConfigurationSettings,
-			MajorVersion:       100000,
-			UserSettings:       settings,
-			IncludingMandatory: true,
-			Replicas:           nil,
-			SyncReplicas:       0,
+			Settings:              CnpgConfigurationSettings,
+			MajorVersion:          100000,
+			UserSettings:          settings,
+			IncludingMandatory:    true,
+			SyncReplicasElectable: nil,
+			SyncReplicas:          0,
 		}
 		conf := CreatePostgresqlConfiguration(info)
 		confFile, sha256 := CreatePostgresqlConfFile(conf)
@@ -86,12 +86,12 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	When("version is 10", func() {
 		It("will use appropriate settings", func() {
 			info := ConfigurationInfo{
-				Settings:           CnpgConfigurationSettings,
-				MajorVersion:       100000,
-				UserSettings:       settings,
-				IncludingMandatory: true,
-				Replicas:           nil,
-				SyncReplicas:       0,
+				Settings:              CnpgConfigurationSettings,
+				MajorVersion:          100000,
+				UserSettings:          settings,
+				IncludingMandatory:    true,
+				SyncReplicasElectable: nil,
+				SyncReplicas:          0,
 			}
 			config := CreatePostgresqlConfiguration(info)
 			Expect(config.GetConfig("wal_keep_segments")).To(Equal("32"))
@@ -101,12 +101,12 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	When("version is 13", func() {
 		It("will use appropriate settings", func() {
 			info := ConfigurationInfo{
-				Settings:           CnpgConfigurationSettings,
-				MajorVersion:       130000,
-				UserSettings:       settings,
-				IncludingMandatory: true,
-				Replicas:           nil,
-				SyncReplicas:       0,
+				Settings:              CnpgConfigurationSettings,
+				MajorVersion:          130000,
+				UserSettings:          settings,
+				IncludingMandatory:    true,
+				SyncReplicasElectable: nil,
+				SyncReplicas:          0,
 			}
 			config := CreatePostgresqlConfiguration(info)
 			Expect(config.GetConfig("wal_keep_size")).To(Equal("512MB"))
@@ -116,13 +116,13 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	When("replica cluster is being configured", func() {
 		It("will set archive_mode to always", func() {
 			info := ConfigurationInfo{
-				Settings:           CnpgConfigurationSettings,
-				MajorVersion:       130000,
-				UserSettings:       settings,
-				IncludingMandatory: true,
-				Replicas:           nil,
-				SyncReplicas:       0,
-				IsReplicaCluster:   true,
+				Settings:              CnpgConfigurationSettings,
+				MajorVersion:          130000,
+				UserSettings:          settings,
+				IncludingMandatory:    true,
+				SyncReplicasElectable: nil,
+				SyncReplicas:          0,
+				IsReplicaCluster:      true,
 			}
 			config := CreatePostgresqlConfiguration(info)
 			Expect(config.GetConfig("archive_mode")).To(Equal("always"))
@@ -132,13 +132,13 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 	When("a primary cluster is configured", func() {
 		It("will set archive_mode to on", func() {
 			info := ConfigurationInfo{
-				Settings:           CnpgConfigurationSettings,
-				MajorVersion:       130000,
-				UserSettings:       settings,
-				IncludingMandatory: true,
-				Replicas:           nil,
-				SyncReplicas:       0,
-				IsReplicaCluster:   false,
+				Settings:              CnpgConfigurationSettings,
+				MajorVersion:          130000,
+				UserSettings:          settings,
+				IncludingMandatory:    true,
+				SyncReplicasElectable: nil,
+				SyncReplicas:          0,
+				IsReplicaCluster:      false,
 			}
 			config := CreatePostgresqlConfiguration(info)
 			Expect(config.GetConfig("archive_mode")).To(Equal("on"))
@@ -168,7 +168,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 				MajorVersion:       130000,
 				UserSettings:       settings,
 				IncludingMandatory: true,
-				Replicas: []string{
+				SyncReplicasElectable: []string{
 					"one",
 					"two",
 					"three",
@@ -189,8 +189,8 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 				"ssl":                  "off",
 				"recovery_target_name": "test",
 			},
-			Replicas:     nil,
-			SyncReplicas: 0,
+			SyncReplicasElectable: nil,
+			SyncReplicas:          0,
 		}
 		By("making sure it enforces fixed parameters if false", func() {
 			info.PreserveFixedSettingsFromUser = false

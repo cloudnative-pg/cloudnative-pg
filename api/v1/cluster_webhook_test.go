@@ -529,6 +529,33 @@ var _ = Describe("Image name validation", func() {
 		Expect(len(cluster.validateImageName())).To(Equal(1))
 	})
 
+	It("doesn't complain when a alpha tag is used", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:15alpha1",
+			},
+		}
+		Expect(len(cluster.validateImageName())).To(Equal(0))
+	})
+
+	It("doesn't complain when a beta tag is used", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:15beta1",
+			},
+		}
+		Expect(len(cluster.validateImageName())).To(Equal(0))
+	})
+
+	It("doesn't complain when a release candidate tag is used", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:15rc1",
+			},
+		}
+		Expect(len(cluster.validateImageName())).To(Equal(0))
+	})
+
 	It("complains when only the sha is passed", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
@@ -542,6 +569,15 @@ var _ = Describe("Image name validation", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				ImageName: "postgres:10.4",
+			},
+		}
+		Expect(cluster.validateImageName()).To(BeEmpty())
+	})
+
+	It("doesn't complain if the tag is valid", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ImageName: "postgres:14.4-1",
 			},
 		}
 		Expect(cluster.validateImageName()).To(BeEmpty())
