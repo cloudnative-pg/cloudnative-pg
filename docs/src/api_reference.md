@@ -556,13 +556,13 @@ Name | Description           | Type
 
 LogicalSnapshot contains the configuration to init a database from a logic snapshot of an externalCluster
 
-Name                     | Description                                                                                                                                                                                  | Type                                           
------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------------------------
-`source                  ` | The source of the import                                                                                                                                                                     - *mandatory*  | [LogicalSnapshotSource](#LogicalSnapshotSource)
-`type                    ` | Type of logicalSnapshot. Can be                                                                                                                                                              - *mandatory*  | SnapshotType                                   
-`databases               ` | The database to import                                                                                                                                                                       - *mandatory*  | []string                                       
-`roles                   ` | The roles to import                                                                                                                                                                          | []string                                       
-`postImportApplicationSQL` | List of SQL queries to be executed as a superuser in the application database right after is created - to be used with extreme care (by default empty). Only available in microservice type. | []string                                       
+Name                     | Description                                                                                                                                                                                   | Type                                           
+------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------------------------
+`source                  ` | The source of the import                                                                                                                                                                      - *mandatory*  | [LogicalSnapshotSource](#LogicalSnapshotSource)
+`type                    ` | Type of logicalSnapshot. Can be                                                                                                                                                               - *mandatory*  | SnapshotType                                   
+`databases               ` | The database to import                                                                                                                                                                        - *mandatory*  | []string                                       
+`roles                   ` | The roles to import                                                                                                                                                                           | []string                                       
+`postImportApplicationSQL` | List of SQL queries to be executed as a superuser in the application database right after is imported - to be used with extreme care (by default empty). Only available in microservice type. | []string                                       
 
 <a id='LogicalSnapshotSource'></a>
 

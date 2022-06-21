@@ -32,6 +32,7 @@ import (
 )
 
 type databaseSnapshotter struct {
+	// TODO: Only Import is required here
 	cluster *v1.Cluster
 }
 
@@ -78,8 +79,8 @@ func (ds *databaseSnapshotter) getDatabaseList(ctx context.Context, target *pool
 		databases = append(databases, database)
 	}
 
-	if rows.Err() != nil {
-		return nil, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return databases, nil
@@ -95,7 +96,6 @@ func (ds *databaseSnapshotter) exportDatabases(
 		contextLogger.Info("exporting database", "databaseName", database)
 		dsn := target.GetDsn(database)
 		options := []string{
-			"-U", "postgres",
 			"-Fc",
 			"-f", generateFileNameForDatabase(database),
 			"-d", dsn,
@@ -245,7 +245,7 @@ func (ds *databaseSnapshotter) doesDatabaseExists(target *pool.ConnectionPool, d
 	var exists bool
 	row := db.QueryRow(
 		fmt.Sprintf(
-			"SELECT EXISTS(SELECT datname FROM pg_catalog.pg_database WHERE lower(datname) = lower(%s))",
+			"SELECT EXISTS(SELECT datname FROM pg_catalog.pg_database WHERE datname = %s)",
 			pq.QuoteLiteral(dbName),
 		),
 	)

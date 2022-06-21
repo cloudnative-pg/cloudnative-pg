@@ -144,7 +144,7 @@ func (ld *LogicalDump) executeLogicalDumpRestore(ctx context.Context, client ctr
 		return err
 	}
 
-	contextLogger.Info("getting the instance")
+	// TODO: use WithActiveInstance otherwise we have no log
 	instance := info.GetInstance()
 	if err := instance.Startup(); err != nil {
 		return err

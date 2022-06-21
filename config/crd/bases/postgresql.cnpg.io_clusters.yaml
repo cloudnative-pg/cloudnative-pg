@@ -1048,8 +1048,8 @@ spec:
                             type: array
                           postImportApplicationSQL:
                             description: List of SQL queries to be executed as a superuser
-                              in the application database right after is created -
-                              to be used with extreme care (by default empty). Only
+                              in the application database right after is imported
+                              - to be used with extreme care (by default empty). Only
                               available in microservice type.
                             items:
                               type: string
