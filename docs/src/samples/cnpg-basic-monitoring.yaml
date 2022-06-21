@@ -419,6 +419,7 @@ data:
             description: "Number of times this table has been analyzed by the autovacuum daemon"
 
     pg_stat_replication:
+      primary: true
       query: |
        SELECT usename
          , COALESCE(application_name, '') AS application_name
