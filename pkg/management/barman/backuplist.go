@@ -66,7 +66,6 @@ const (
 //
 // Barman's output is a JSON object with a field `"backups_list"` containing
 // an array of backups.
-// See: https://github.com/EnterpriseDB/barman/blob/master/barman/clients/cloud_backup_list.py
 func ParseBarmanCloudBackupList(output string) (catalog.Catalog, error) {
 	// barman outputs a JSON object with a list of backups called `backups_list`
 	type fromBarman struct {
