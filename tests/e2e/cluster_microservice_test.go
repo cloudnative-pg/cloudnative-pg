@@ -54,9 +54,9 @@ var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpClusterEnv(namespace, clusterName,
+			env.DumpNamespaceObjects(namespace,
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
-			env.DumpClusterEnv(namespace, importedClusterName,
+			env.DumpNamespaceObjects(namespace,
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
