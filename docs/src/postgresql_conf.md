@@ -317,6 +317,15 @@ host all all all scram-sha-256 # (or md5 for PostgreSQL version <= 13)
 
 Refer to the PostgreSQL documentation for [more information on `pg_hba.conf`](https://www.postgresql.org/docs/current/auth-pg-hba-conf.html).
 
+Inside the operator manifest, `pg_hba` lines are added as list items
+in `spec.postgresql.pg_hba`. e.g.:
+
+``` yaml
+  postgresql:
+    pg_hba:
+      - host all all 10.244.0.0/16 md5
+```
+
 ### LDAP Configuration
 
 Under the `postgres` section of the cluster spec there is an optional `ldap` section available to define an LDAP
