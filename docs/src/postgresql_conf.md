@@ -323,7 +323,7 @@ in `spec.postgresql.pg_hba`, as in the following excerpt:
 ``` yaml
   postgresql:
     pg_hba:
-      - host all all 10.244.0.0/16 md5
+      - hostssl app app 10.244.0.0/16 md5
 ```
 
 ### LDAP Configuration
