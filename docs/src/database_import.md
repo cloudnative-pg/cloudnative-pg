@@ -70,9 +70,9 @@ performed in 4 steps:
   `pg_dump -Fc`
 - import of the database using `pg_restore --no-acl --no-owner` into the
   `initdb.database` (application database) owned by the `initdb.owner` user
+- cleanup of the database dump file
 - optional execution of the user defined SQL queries in the application
   database via the `postImportApplicationSQL` parameter
-- cleanup of the database dump file
 
 ![Example of microservice import type](./images/microservice-import.png)
 
@@ -205,7 +205,7 @@ There are a few things you need to be aware of when using the `monolith` type:
   folder is automatically deleted by the operator.
 - At least one database to be specified in the `initdb.import.databases` array
 - Any role that is required by the imported databases must be specified inside
-  `initdb.import.roles`, if the limitations below:
+  `initdb.import.roles`, with the limitations below:
     - The following roles, if present, are not imported: `postgres`, `streaming_replica`, `cnp_pooler_pgbouncer`
     - The `SUPERUSER` option is removed from any imported role
 - Wildcard `"*"` can be used as the only element in the `databases` and/or
@@ -213,4 +213,3 @@ There are a few things you need to be aware of when using the `monolith` type:
 - After the clone procedure is done, `ANALYZE VERBOSE` is executed for every
   database.
 - `postImportApplicationSQL` field is not supported
-

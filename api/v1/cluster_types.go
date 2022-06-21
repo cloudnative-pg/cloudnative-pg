@@ -770,6 +770,7 @@ type SnapshotType string
 const (
 	// MonolithSnapshotType indicates to execute the monolith clone typology
 	MonolithSnapshotType SnapshotType = "monolith"
+
 	// MicroserviceSnapshotType indicates to execute the microservice clone typology
 	MicroserviceSnapshotType SnapshotType = "microservice"
 )
@@ -790,7 +791,7 @@ type LogicalSnapshot struct {
 	Roles []string `json:"roles,omitempty"`
 
 	// List of SQL queries to be executed as a superuser in the application
-	// database right after is created - to be used with extreme care
+	// database right after is imported - to be used with extreme care
 	// (by default empty). Only available in microservice type.
 	PostImportApplicationSQL []string `json:"postImportApplicationSQL,omitempty"`
 }

@@ -39,10 +39,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
 		initCommand = append(initCommand, "logicalsnapshot")
 	} else {
-		initCommand = append(initCommand, []string{
-			"init",
-			"--parent-node", cluster.GetServiceReadWriteName(),
-		}...)
+		initCommand = append(initCommand, "init")
 	}
 
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.InitDB != nil {

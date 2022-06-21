@@ -57,15 +57,15 @@ func Microservice(
 		return err
 	}
 
-	if err := ds.executePostInitQueries(ctx, destination, cluster.Spec.Bootstrap.InitDB.Database); err != nil {
+	if err := cleanDumpDirectory(); err != nil {
+		return err
+	}
+
+	if err := ds.executePostImportQueries(ctx, destination, cluster.Spec.Bootstrap.InitDB.Database); err != nil {
 		return err
 	}
 
 	if err := ds.analyze(ctx, destination, []string{cluster.Spec.Bootstrap.InitDB.Database}); err != nil {
-		return err
-	}
-
-	if err := cleanDumpDirectory(); err != nil {
 		return err
 	}
 

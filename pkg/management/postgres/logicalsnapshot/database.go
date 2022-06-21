@@ -255,13 +255,13 @@ func (ds *databaseSnapshotter) doesDatabaseExists(target *pool.ConnectionPool, d
 	return exists, nil
 }
 
-func (ds *databaseSnapshotter) executePostInitQueries(
+func (ds *databaseSnapshotter) executePostImportQueries(
 	ctx context.Context,
 	target *pool.ConnectionPool,
 	database string,
 ) error {
-	postInitQueries := ds.cluster.Spec.Bootstrap.InitDB.Import.PostImportApplicationSQL
-	if len(postInitQueries) == 0 {
+	postImportQueries := ds.cluster.Spec.Bootstrap.InitDB.Import.PostImportApplicationSQL
+	if len(postImportQueries) == 0 {
 		return nil
 	}
 
@@ -273,7 +273,7 @@ func (ds *databaseSnapshotter) executePostInitQueries(
 		return err
 	}
 
-	for _, query := range postInitQueries {
+	for _, query := range postImportQueries {
 		_, err := db.Exec(query)
 		if err != nil {
 			return err
