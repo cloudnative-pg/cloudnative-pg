@@ -116,17 +116,17 @@ var _ = Describe("Replica Mode", func() {
 						return err
 					}
 					_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
-						&replicaCommandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+						&replicaCommandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", query)
 					return err
 				}, 300, 15).ShouldNot(HaveOccurred())
 			})
 
 			By("writing some new data to the source cluster", func() {
-				insertRecordIntoTable(replicaNamespace, srcClusterName, "test_replica", 4)
+				insertRecordIntoTableWithDatabaseName(replicaNamespace, srcClusterName, "appSrc", "test_replica", 4)
 			})
 
 			By("verifying that replica cluster was not modified", func() {
-				AssertDataExpectedCount(replicaNamespace, primaryReplicaCluster.Name, "test_replica", 3)
+				AssertDataExpectedCountWithDatabaseName(replicaNamespace, primaryReplicaCluster.Name, "appSrc", "test_replica", 3)
 			})
 		})
 	})
@@ -171,7 +171,7 @@ var _ = Describe("Replica Mode", func() {
 				query := "show archive_mode;"
 				Eventually(func() (string, error) {
 					stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
-						&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+						&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", query)
 					return strings.Trim(stdOut, "\n"), err
 				}, 30).Should(BeEquivalentTo("always"))
 			})

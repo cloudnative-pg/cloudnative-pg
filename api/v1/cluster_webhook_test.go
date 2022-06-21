@@ -1252,7 +1252,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 			},
 		}
 
-		result := cluster.validatePgBaseBackup()
+		result := cluster.validatePgBaseBackupApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1267,7 +1267,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 			},
 		}
 
-		result := cluster.validatePgBaseBackup()
+		result := cluster.validatePgBaseBackupApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1283,7 +1283,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 			},
 		}
 
-		result := cluster.validatePgBaseBackup()
+		result := cluster.validatePgBaseBackupApplicationDatabase()
 		Expect(result).To(BeEmpty())
 	})
 
@@ -1310,6 +1310,94 @@ var _ = Describe("bootstrap base backup validation", func() {
 		result := recoveryCluster.validateBootstrapPgBaseBackupSource()
 		Expect(result).ToNot(BeEmpty())
 	})
+
+	It("complains if specify application database in replica mode in pg_basebackup", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Database: "app",
+						Source:   "test",
+					},
+				},
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+						BarmanObjectStore: &BarmanObjectStoreConfiguration{
+							DestinationPath: "xxx",
+							EndpointURL:     "xxx",
+							S3Credentials:   &S3Credentials{},
+						},
+					},
+				},
+			},
+		}
+		result := cluster.validatePgBaseBackupApplicationDatabase()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("complains if specify application database secrets in replica mode in pg_basebackup", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Source: "test",
+						Secret: &LocalObjectReference{
+							Name: "app-secrets",
+						},
+					},
+				},
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+						BarmanObjectStore: &BarmanObjectStoreConfiguration{
+							DestinationPath: "xxx",
+							EndpointURL:     "xxx",
+							S3Credentials:   &S3Credentials{},
+						},
+					},
+				},
+			},
+		}
+		result := cluster.validatePgBaseBackupApplicationDatabase()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("no complains if no specify application database in replica mode in pg_basebackup", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{
+						Source: "test",
+					},
+				},
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+						BarmanObjectStore: &BarmanObjectStoreConfiguration{
+							DestinationPath: "xxx",
+							EndpointURL:     "xxx",
+							S3Credentials:   &S3Credentials{},
+						},
+					},
+				},
+			},
+		}
+		result := cluster.validatePgBaseBackupApplicationDatabase()
+		Expect(len(result)).To(Equal(0))
+	})
 })
 
 var _ = Describe("bootstrap recovery validation", func() {
@@ -1324,7 +1412,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 			},
 		}
 
-		result := cluster.validateRecovery()
+		result := cluster.validateRecoveryApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1339,7 +1427,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 			},
 		}
 
-		result := cluster.validateRecovery()
+		result := cluster.validateRecoveryApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1355,7 +1443,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 			},
 		}
 
-		result := cluster.validateRecovery()
+		result := cluster.validateRecoveryApplicationDatabase()
 		Expect(result).To(BeEmpty())
 	})
 
@@ -1395,6 +1483,80 @@ var _ = Describe("bootstrap recovery validation", func() {
 		}
 		errorsList := recoveryCluster.validateBootstrapRecoverySource()
 		Expect(errorsList).ToNot(BeEmpty())
+	})
+
+	It("complains when bootstrap recovery in replica mode with application database configuration", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Source:   "test",
+						Database: "app",
+						Owner:    "owner",
+					},
+				},
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		errorsList := recoveryCluster.validateRecoveryApplicationDatabase()
+		Expect(errorsList).ToNot(BeEmpty())
+	})
+
+	It("complains when bootstrap recovery in replica mode with application secrets configuration", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Source: "test",
+						Secret: &LocalObjectReference{
+							Name: "app-secrets",
+						},
+					},
+				},
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		errorsList := recoveryCluster.validateRecoveryApplicationDatabase()
+		Expect(errorsList).ToNot(BeEmpty())
+	})
+
+	It("not complains when bootstrap recovery in replica mode with application secrets configuration", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Source: "test",
+					},
+				},
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		errorsList := recoveryCluster.validateRecoveryApplicationDatabase()
+		Expect(errorsList).To(BeEmpty())
 	})
 })
 

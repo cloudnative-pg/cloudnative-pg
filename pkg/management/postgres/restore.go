@@ -567,7 +567,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 	}
 
 	if info.ApplicationUser == "" || info.ApplicationDatabase == "" {
-		log.Debug("configure new instance not ran, missing user or database")
+		log.Debug("configure new instance not ran, cluster is running in replica mode or missing user or database")
 		return nil
 	}
 

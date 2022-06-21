@@ -560,6 +560,11 @@ as owner of database `app`.
 4. If value of `username` match value of `owner` in secret, the password of 
 application database will be changed to the value of `password` in secret. 
 
+!!! Important
+    Configuration for application `database`, `owner` and `secret`is not allowed 
+    if replica mode is enabled in new cluster. All application database default
+    configuration will also be skipped for **replica cluster**.
+
 ### Bootstrap from a live cluster (`pg_basebackup`)
 
 The `pg_basebackup` bootstrap mode lets you create a new cluster (*target*) as
@@ -817,7 +822,9 @@ This will open up two main use cases:
 
 We also support update the password of application database after bootstrap from a live cluster.
 Similar to `initdb` and `recovery` bootstrap method, `pg_basebackup` section also support to configure 
-`database`, `owner` and `secret` attributes. 
+`database`, `owner` and `secret` attributes. Similar to bootstrap from recovery option, if the new cluster 
+is created as **replica cluster**, configuration for `database`, `owner` and `secret` is not allowed and all
+default application database configuration will be skipped.
 Please see more information in [Update application database password (recovery)](#update-application-database-password-recovery) 
 section.
 
