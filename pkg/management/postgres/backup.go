@@ -61,6 +61,7 @@ type BackupCommand struct {
 	Recorder record.EventRecorder
 	Env      []string
 	Log      log.Logger
+	Instance *Instance
 }
 
 // NewBackupCommand initializes a BackupCommand object
@@ -69,6 +70,7 @@ func NewBackupCommand(
 	backup *apiv1.Backup,
 	client client.Client,
 	recorder record.EventRecorder,
+	instance *Instance,
 	log log.Logger,
 ) *BackupCommand {
 	return &BackupCommand{
@@ -77,6 +79,7 @@ func NewBackupCommand(
 		Client:   client,
 		Recorder: recorder,
 		Env:      os.Environ(),
+		Instance: instance,
 		Log:      log,
 	}
 }
@@ -226,6 +229,10 @@ func waitForWalArchiveWorking() error {
 // Start initiates a backup for this instance using
 // barman-cloud-backup
 func (b *BackupCommand) Start(ctx context.Context) error {
+	if err := b.ensureBarmanCompatibility(); err != nil {
+		return err
+	}
+
 	b.setupBackupStatus()
 
 	err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup)
@@ -262,6 +269,28 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 	go b.run(ctx)
 
 	return nil
+}
+
+func (b *BackupCommand) ensureBarmanCompatibility() error {
+	postgresVers, err := b.Instance.GetPgVersion()
+	if err != nil {
+		return err
+	}
+	brmCapabilities, err := barmanCapabilities.Detect()
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case postgresVers.Major == 15 && brmCapabilities.Version.Major < 3:
+		return fmt.Errorf(
+			"the postgres major version: %d, is not supported by barman major version: %d",
+			postgresVers.Major,
+			brmCapabilities.Version.Major,
+		)
+	default:
+		return nil
+	}
 }
 
 // run executes the barman-cloud-backup command and updates the status
