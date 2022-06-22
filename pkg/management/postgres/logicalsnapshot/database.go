@@ -130,7 +130,7 @@ func (ds *databaseSnapshotter) importDatabases(
 				"section", section,
 			)
 
-			exists, err := ds.doesDatabaseExists(target, database)
+			exists, err := ds.databaseExists(target, database)
 			if err != nil {
 				return err
 			}
@@ -138,7 +138,7 @@ func (ds *databaseSnapshotter) importDatabases(
 			var options []string
 
 			if !exists {
-				contextLogger.Info("database not found, creating", "databaseName", database)
+				contextLogger.Debug("database not found, creating", "databaseName", database)
 				options = append(options, "--create")
 				// if the database doesn't exist we need to connect to postgres
 				targetDatabase = target.GetDsn(postgresDatabase)
@@ -199,29 +199,21 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 			"section", section,
 		)
 
-		var options []string
-		contextLogger.Debug("adding no inherit ACL flags")
-		options = append(
-			options,
+		options := []string{
 			"--no-owner",
-			"-x",
+			"--no-privileges",
 			fmt.Sprintf("--role=%s", owner),
-		)
-
-		alwaysPresentOptions := []string{
 			"-d", targetDatabase,
 			"--section", section,
 			generateFileNameForDatabase(database),
 		}
-
-		options = append(options, alwaysPresentOptions...)
 
 		contextLogger.Info("Running pg_restore",
 			"cmd", pgRestore,
 			"options", options)
 
 		pgRestoreCommand := exec.Command(pgRestore, options...) // #nosec
-		err := execlog.RunStreaming(pgRestoreCommand, pgRestore)
+		err = execlog.RunStreaming(pgRestoreCommand, pgRestore)
 		if err != nil {
 			return fmt.Errorf("error while executing pg_restore, section:%s, %w", section, err)
 		}
@@ -236,7 +228,10 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 	return nil
 }
 
-func (ds *databaseSnapshotter) doesDatabaseExists(target *pool.ConnectionPool, dbName string) (bool, error) {
+func (ds *databaseSnapshotter) databaseExists(
+	target *pool.ConnectionPool,
+	dbName string,
+) (bool, error) {
 	db, err := target.Connection(postgresDatabase)
 	if err != nil {
 		return false, err
@@ -244,10 +239,8 @@ func (ds *databaseSnapshotter) doesDatabaseExists(target *pool.ConnectionPool, d
 
 	var exists bool
 	row := db.QueryRow(
-		fmt.Sprintf(
-			"SELECT EXISTS(SELECT datname FROM pg_catalog.pg_database WHERE datname = %s)",
-			pq.QuoteLiteral(dbName),
-		),
+		"SELECT EXISTS(SELECT datname FROM pg_catalog.pg_database WHERE datname = $1)",
+		dbName,
 	)
 	if err := row.Scan(&exists); err != nil {
 		return false, err
@@ -283,7 +276,11 @@ func (ds *databaseSnapshotter) executePostImportQueries(
 	return nil
 }
 
-func (ds *databaseSnapshotter) analyze(ctx context.Context, target *pool.ConnectionPool, databases []string) error {
+func (ds *databaseSnapshotter) analyze(
+	ctx context.Context,
+	target *pool.ConnectionPool,
+	databases []string,
+) error {
 	contextLogger := log.FromContext(ctx)
 
 	for _, database := range databases {
@@ -321,9 +318,9 @@ func (ds *databaseSnapshotter) dropExtensionsFromDatabase(
 		return err
 	}
 	defer func() {
-		err := rows.Close()
-		if err != nil {
-			contextLogger.Error(err, "error closing cursor, skipped")
+		closeErr := rows.Close()
+		if closeErr != nil {
+			contextLogger.Error(closeErr, "error closing cursor, skipped")
 		}
 	}()
 

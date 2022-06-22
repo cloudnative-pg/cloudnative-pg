@@ -255,7 +255,7 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 				ctx,
 				cluster,
 				replicationSecretName,
-				postgres.PGBouncerPoolerUserName,
+				apiv1.PGBouncerPoolerUserName,
 				&clientCaSecret,
 				certs.CertTypeClient,
 				nil,

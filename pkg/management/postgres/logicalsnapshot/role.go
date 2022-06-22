@@ -20,10 +20,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
+	"github.com/blang/semver"
 	"github.com/lib/pq"
-
 	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -63,7 +62,7 @@ func cloneRoles(
 	origin *pool.ConnectionPool,
 ) error {
 	rs := roleManager{origin: origin, destination: destination, cluster: cluster}
-	roles, err := rs.getRoles(ctx, true)
+	roles, err := rs.getRoles(ctx)
 	if err != nil {
 		return err
 	}
@@ -136,7 +135,7 @@ func (rs *roleManager) createSQLStatement(role Role) string {
 	return query
 }
 
-func (rs *roleManager) getRoles(ctx context.Context, downgradeSuperUser bool) ([]Role, error) {
+func (rs *roleManager) getRoles(ctx context.Context) ([]Role, error) {
 	contextLogger := log.FromContext(ctx)
 	originDatabase, err := rs.origin.Connection(postgresDatabase)
 	if err != nil {
@@ -151,8 +150,9 @@ func (rs *roleManager) getRoles(ctx context.Context, downgradeSuperUser bool) ([
 	var rows *sql.Rows
 	var query string
 
-	//nolint:gocritic
-	if vers.Major > 9 || (vers.Major == 9 && vers.Minor >= 6) {
+	// Retrieve the roles excluding those that are owned by the postgres catalog
+	// see FirstNormalObjectId in https://github.com/postgres/postgres/blob/662dbe2/src/include/access/transam.h#L197
+	if vers.GTE(semver.MustParse("9.5")) {
 		query = "SELECT oid, rolname, rolsuper, rolinherit, " +
 			"rolcreaterole, rolcreatedb, " +
 			"rolcanlogin, rolconnlimit, rolpassword, " +
@@ -160,16 +160,7 @@ func (rs *roleManager) getRoles(ctx context.Context, downgradeSuperUser bool) ([
 			"pg_catalog.shobj_description(oid, 'pg_authid') as rolcomment, " +
 			"rolname = current_user AS is_current_user " +
 			"FROM pg_authid " +
-			"WHERE rolname !~ '^pg_' " +
-			"ORDER BY 2"
-	} else if vers.Major == 9 && vers.Minor == 5 {
-		query = "SELECT oid, rolname, rolsuper, rolinherit, " +
-			"rolcreaterole, rolcreatedb, " +
-			"rolcanlogin, rolconnlimit, rolpassword, " +
-			"rolvaliduntil, rolreplication, rolbypassrls, " +
-			"pg_catalog.shobj_description(oid, 'pg_authid') as rolcomment, " +
-			"rolname = current_user AS is_current_user " +
-			"FROM pg_authid " +
+			"WHERE oid >= 16384 " +
 			"ORDER BY 2"
 	} else {
 		query = "SELECT oid, rolname, rolsuper, rolinherit, " +
@@ -180,6 +171,7 @@ func (rs *roleManager) getRoles(ctx context.Context, downgradeSuperUser bool) ([
 			"pg_catalog.shobj_description(oid, 'pg_authid') as rolcomment, " +
 			"rolname = current_user AS is_current_user " +
 			"FROM pg_authid " +
+			"WHERE oid >= 16384 " +
 			"ORDER BY 2"
 	}
 
@@ -198,8 +190,8 @@ func (rs *roleManager) getRoles(ctx context.Context, downgradeSuperUser bool) ([
 	rolesToImport := rs.cluster.Spec.Bootstrap.InitDB.Import.Roles
 	rolesToSkip := []string{
 		"postgres",
-		"streaming_replica",
-		"cnp_pooler_pgbouncer",
+		apiv1.StreamingReplicationUser,
+		apiv1.PGBouncerPoolerUserName,
 		rs.cluster.Spec.Bootstrap.InitDB.Owner,
 	}
 
@@ -225,8 +217,7 @@ func (rs *roleManager) getRoles(ctx context.Context, downgradeSuperUser bool) ([
 			return nil, err
 		}
 
-		normalizedRoleName := strings.ToLower(r.Rolname)
-		if slices.Contains(rolesToSkip, normalizedRoleName) {
+		if slices.Contains(rolesToSkip, r.Rolname) {
 			contextLogger.Info(
 				"found a role that needs to be skipped",
 				"rolesToSkip", rolesToSkip,
@@ -235,7 +226,7 @@ func (rs *roleManager) getRoles(ctx context.Context, downgradeSuperUser bool) ([
 			continue
 		}
 
-		if !slices.Contains(rolesToImport, normalizedRoleName) && !slices.Contains(rolesToImport, "*") {
+		if !shouldImportRole(r.Rolname, rolesToImport) {
 			contextLogger.Info(
 				"found a role that doesn't need to be imported",
 				"rolesToImport", rolesToImport,
@@ -244,7 +235,7 @@ func (rs *roleManager) getRoles(ctx context.Context, downgradeSuperUser bool) ([
 			continue
 		}
 
-		if downgradeSuperUser && r.Rolsuper {
+		if r.Rolsuper {
 			contextLogger.Debug(
 				"found a superUser, downgrading permissions",
 				"role", r,
@@ -254,8 +245,22 @@ func (rs *roleManager) getRoles(ctx context.Context, downgradeSuperUser bool) ([
 
 		roles = append(roles, r)
 	}
+
 	if rows.Err() != nil {
 		return nil, rows.Err()
 	}
+
 	return roles, nil
+}
+
+func shouldImportRole(rolname string, rolesToImport []string) bool {
+	if slices.Contains(rolesToImport, "*") {
+		return true
+	}
+
+	if slices.Contains(rolesToImport, rolname) {
+		return true
+	}
+
+	return false
 }

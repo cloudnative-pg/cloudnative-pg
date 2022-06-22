@@ -572,17 +572,17 @@ func (r *InstanceReconciler) reconcilePoolers(
 
 	var existsRole bool
 	row := tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_roles WHERE rolname = '%s'",
-		postgres.PGBouncerPoolerUserName))
+		apiv1.PGBouncerPoolerUserName))
 	err = row.Scan(&existsRole)
 	if err != nil {
 		return err
 	}
 	if !existsRole {
-		_, err := tx.Exec(fmt.Sprintf("CREATE ROLE %s WITH LOGIN", postgres.PGBouncerPoolerUserName))
+		_, err := tx.Exec(fmt.Sprintf("CREATE ROLE %s WITH LOGIN", apiv1.PGBouncerPoolerUserName))
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", dbName, postgres.PGBouncerPoolerUserName))
+		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", dbName, apiv1.PGBouncerPoolerUserName))
 		if err != nil {
 			return err
 		}
@@ -612,7 +612,7 @@ func (r *InstanceReconciler) reconcilePoolers(
 		}
 		_, err = tx.Exec(fmt.Sprintf("GRANT EXECUTE ON FUNCTION %s(text) TO %s",
 			userSearchFunctionName,
-			postgres.PGBouncerPoolerUserName))
+			apiv1.PGBouncerPoolerUserName))
 		if err != nil {
 			return err
 		}

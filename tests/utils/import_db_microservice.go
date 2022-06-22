@@ -58,7 +58,7 @@ func CreateClusterFromExternalCluster(namespace, importedClusterName, sourceClus
 						Source: apiv1.LogicalSnapshotSource{
 							ExternalCluster: sourceClusterName,
 						},
-						PostImportApplicationSQL: []string{"SELECT 1;"},
+						PostImportApplicationSQL: []string{"SELECT 1"},
 					},
 				},
 			},

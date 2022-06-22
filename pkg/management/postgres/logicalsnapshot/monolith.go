@@ -37,6 +37,7 @@ func Monolith(
 	if err := cloneRoles(ctx, cluster, destination, origin); err != nil {
 		return err
 	}
+
 	if err := cloneRoleInheritance(ctx, destination, origin); err != nil {
 		return err
 	}
@@ -54,15 +55,16 @@ func Monolith(
 	if err := ds.exportDatabases(ctx, origin, databases); err != nil {
 		return err
 	}
+
 	if err := ds.importDatabases(ctx, destination, databases); err != nil {
 		return err
 	}
 
-	if err := ds.analyze(ctx, destination, databases); err != nil {
+	if err := cleanDumpDirectory(); err != nil {
 		return err
 	}
 
-	if err := cleanDumpDirectory(); err != nil {
+	if err := ds.analyze(ctx, destination, databases); err != nil {
 		return err
 	}
 

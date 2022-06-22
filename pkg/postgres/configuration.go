@@ -144,9 +144,6 @@ host all all all {{.DefaultAuthenticationMethod}}
 
 	// SynchronousStandbyNames is the postgresql parameter key for synchronous standbys
 	SynchronousStandbyNames = "synchronous_standby_names"
-
-	// PGBouncerPoolerUserName is the name of the role to be used for
-	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 )
 
 // hbaTemplate is the template used to create the HBA configuration

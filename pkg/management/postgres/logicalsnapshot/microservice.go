@@ -39,6 +39,7 @@ func Microservice(
 	if err := createDumpsDirectory(); err != nil {
 		return nil
 	}
+
 	if err := ds.exportDatabases(ctx, origin, databases); err != nil {
 		return err
 	}

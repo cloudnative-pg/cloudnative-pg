@@ -99,6 +99,9 @@ const (
 
 	// PendingFailoverMarker is used as target primary to signal that a failover is required
 	PendingFailoverMarker = "pending"
+
+	// PGBouncerPoolerUserName is the name of the role to be used for
+	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 )
 
 // ClusterSpec defines the desired state of Cluster
