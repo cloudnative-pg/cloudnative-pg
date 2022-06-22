@@ -523,7 +523,7 @@ func (s LogicalSnapshot) validateLogicalSnapshotMonolith() field.ErrorList {
 			result,
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "initdb", "import", "postImportApplicationSQL"),
-				s.Databases,
+				s.PostImportApplicationSQL,
 				"postImportApplicationSQL is not allowed for the `monolith` import type"),
 		)
 	}
