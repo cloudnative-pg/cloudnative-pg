@@ -134,11 +134,10 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 		return
 	}
 
-	err := ws.typedClient.Get(ctx, client.ObjectKey{
+	if err := ws.typedClient.Get(ctx, client.ObjectKey{
 		Namespace: ws.instance.Namespace,
 		Name:      ws.instance.ClusterName,
-	}, &cluster)
-	if err != nil {
+	}, &cluster); err != nil {
 		http.Error(
 			w,
 			fmt.Sprintf("error while getting cluster: %v", err.Error()),
@@ -146,11 +145,10 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 		return
 	}
 
-	err = ws.typedClient.Get(ctx, client.ObjectKey{
+	if err := ws.typedClient.Get(ctx, client.ObjectKey{
 		Namespace: ws.instance.Namespace,
 		Name:      backupName,
-	}, &backup)
-	if err != nil {
+	}, &backup); err != nil {
 		http.Error(
 			w,
 			fmt.Sprintf("error while getting backup: %v", err.Error()),
@@ -172,10 +170,10 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 		&backup,
 		ws.typedClient,
 		ws.eventRecorder,
+		ws.instance,
 		backupLog,
 	)
-	err = backupCommand.Start(ctx)
-	if err != nil {
+	if err := backupCommand.Start(ctx); err != nil {
 		http.Error(
 			w,
 			fmt.Sprintf("error while starting backup: %v", err.Error()),
