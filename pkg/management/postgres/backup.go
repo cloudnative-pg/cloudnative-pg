@@ -276,17 +276,17 @@ func (b *BackupCommand) ensureBarmanCompatibility() error {
 	if err != nil {
 		return err
 	}
-	brmCapabilities, err := barmanCapabilities.Detect()
+	capabilities, err := barmanCapabilities.Detect()
 	if err != nil {
 		return err
 	}
 
 	switch {
-	case postgresVers.Major == 15 && brmCapabilities.Version.Major < 3:
+	case postgresVers.Major == 15 && capabilities.Version.Major < 3:
 		return fmt.Errorf(
-			"the postgres major version: %d, is not supported by barman major version: %d",
+			"PostgreSQL %d is not supported by Barman %d.x",
 			postgresVers.Major,
-			brmCapabilities.Version.Major,
+			capabilities.Version.Major,
 		)
 	default:
 		return nil
