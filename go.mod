@@ -21,7 +21,7 @@ require (
 	github.com/prometheus/client_golang v1.12.2
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.2.0
-	github.com/spf13/cobra v1.4.0
+	github.com/spf13/cobra v1.5.0
 	github.com/spf13/pflag v1.0.5
 	github.com/thoas/go-funk v0.9.2
 	go.uber.org/atomic v1.9.0
