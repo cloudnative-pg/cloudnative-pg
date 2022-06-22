@@ -17,18 +17,27 @@ limitations under the License.
 package postgres
 
 import (
+	"github.com/blang/semver"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Parsing version", func() {
+var _ = Describe("Parsing versions", func() {
 	It("properly works when version is malformed", func() {
-		_, err := parseVersion("not-a-version")
-		Expect(err).To(BeEquivalentTo(ErrMalformedServerVersion))
+		_, err := parseVersionNum("not-a-version")
+		Expect(err).Should(HaveOccurred())
 	})
 
-	It("properly works when version is well-formed", func() {
-		_, err := parseVersion("13.4.8 Debian")
+	It("properly works when version is well-formed and >= 10", func() {
+		v, err := parseVersionNum("120034")
 		Expect(err).To(BeNil())
+		Expect(v).To(Equal(&semver.Version{Major: 12, Patch: 34}))
+	})
+
+	It("properly works when version is well-formed and < 10", func() {
+		v, err := parseVersionNum("090807")
+		Expect(err).To(BeNil())
+		Expect(v).To(Equal(&semver.Version{Major: 9, Minor: 8, Patch: 7}))
 	})
 })

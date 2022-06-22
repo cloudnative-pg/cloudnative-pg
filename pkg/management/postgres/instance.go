@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"syscall"
 	"time"
@@ -105,12 +104,6 @@ var (
 
 	// ErrNoConnectionEstablished postgres is alive, but rejecting connections
 	ErrNoConnectionEstablished = fmt.Errorf("could not establish connection")
-
-	// In a version string we need only the initial sequence of digits and dots
-	versionRegex = regexp.MustCompile(`^[\d.]+`)
-
-	// ErrMalformedServerVersion the version string is not recognised
-	ErrMalformedServerVersion = fmt.Errorf("unrecognized server version")
 )
 
 // Instance represent a PostgreSQL instance to be executed
@@ -507,28 +500,25 @@ func (instance *Instance) GetPgVersion() (semver.Version, error) {
 // GetPgVersion returns the version of postgres in a semantic format or an error
 func GetPgVersion(db *sql.DB) (*semver.Version, error) {
 	var versionString string
-	row := db.QueryRow("SHOW server_version")
+	row := db.QueryRow("SHOW server_version_num")
 	err := row.Scan(&versionString)
 	if err != nil {
 		return nil, err
 	}
-	return parseVersion(versionString)
+	return parseVersionNum(versionString)
 }
 
-// Version could contain more characters than just the version tag,
-// e.g. `13.4 (Debian 13.4-4.pgdg100+1)`.
-// Therefore, we extract the initial sequence of digits and dots, then we parse it
-func parseVersion(version string) (*semver.Version, error) {
-	if versionRegex.MatchString(version) {
-		parsedVersion, err := semver.ParseTolerant(versionRegex.FindStringSubmatch(version)[0])
-		if err != nil {
-			return nil, err
-		}
-
-		return &parsedVersion, nil
+func parseVersionNum(versionNum string) (*semver.Version, error) {
+	versionInt, err := strconv.Atoi(versionNum)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, ErrMalformedServerVersion
+	return &semver.Version{
+		Major: uint64(versionInt / 10000),
+		Minor: uint64((versionInt / 100) % 100),
+		Patch: uint64(versionInt % 100),
+	}, nil
 }
 
 // ConnectionPool gets or initializes the connection pool for this instance
