@@ -1311,7 +1311,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 		Expect(result).ToNot(BeEmpty())
 	})
 
-	It("complains if specify application database in replica mode in pg_basebackup", func() {
+	It("complains if you specify an application database in pg_basebackup while in replica mode", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
@@ -1340,7 +1340,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 		Expect(len(result)).To(Equal(1))
 	})
 
-	It("complains if specify application database secrets in replica mode in pg_basebackup", func() {
+	It("complains if you specify an application database secret in pg_basebackup while in replica mode", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
@@ -1371,7 +1371,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 		Expect(len(result)).To(Equal(1))
 	})
 
-	It("no complains if no specify application database in replica mode in pg_basebackup", func() {
+	It("succeeds if you do not specify an application database in pg_basebackup while in replica mode", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{
@@ -1536,7 +1536,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 		Expect(errorsList).ToNot(BeEmpty())
 	})
 
-	It("not complains when bootstrap recovery in replica mode with application secrets configuration", func() {
+	It("does not complain when bootstrap recovery in replica mode with application secrets configuration", func() {
 		recoveryCluster := &Cluster{
 			Spec: ClusterSpec{
 				Bootstrap: &BootstrapConfiguration{

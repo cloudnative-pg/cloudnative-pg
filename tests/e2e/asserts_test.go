@@ -386,8 +386,6 @@ func insertRecordIntoTableWithDatabaseName(namespace, clusterName, databaseName 
 // insertRecordIntoTable insert an entry into a table
 func insertRecordIntoTable(namespace, clusterName, tableName string, value int) {
 	commandTimeout := time.Second * 5
-
-
 	primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 	Expect(err).NotTo(HaveOccurred())
 
