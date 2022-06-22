@@ -152,7 +152,7 @@ func (rs *roleManager) getRoles(ctx context.Context) ([]Role, error) {
 
 	// Retrieve the roles excluding those that are owned by the postgres catalog
 	// see FirstNormalObjectId in https://github.com/postgres/postgres/blob/662dbe2/src/include/access/transam.h#L197
-	if vers.GTE(semver.MustParse("9.5")) {
+	if vers.GTE(semver.Version{Major: 9, Minor: 5}) {
 		query = "SELECT oid, rolname, rolsuper, rolinherit, " +
 			"rolcreaterole, rolcreatedb, " +
 			"rolcanlogin, rolconnlimit, rolpassword, " +
