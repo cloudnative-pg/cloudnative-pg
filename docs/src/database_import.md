@@ -210,8 +210,8 @@ There are a few things you need to be aware of when using the `monolith` type:
     - The `SUPERUSER` option is removed from any imported role
 - Wildcard `"*"` can be used as the only element in the `databases` and/or
   `roles` arrays to import every object of the kind; When matching databases
-  the wildcard will ignore databases not allowing connections, template databases,
-  and `postgres` database
+  the wildcard will ignore the `postgres` database, template databases,
+  and those databases not allowing connections
 - After the clone procedure is done, `ANALYZE VERBOSE` is executed for every
   database.
 - `postImportApplicationSQL` field is not supported
