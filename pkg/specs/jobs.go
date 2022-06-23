@@ -234,5 +234,14 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 		utils.AnnotateAppArmor(&job.ObjectMeta, cluster.Annotations)
 	}
 
+	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
+		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
+			cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs,
+		)
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
+	}
+
 	return job
 }

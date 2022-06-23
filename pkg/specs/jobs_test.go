@@ -145,10 +145,10 @@ var _ = Describe("Job created via InitDB", func() {
 						PostInitTemplateSQL:    []string{"testPostInitTemplateSql"},
 						PostInitApplicationSQL: []string{"testPostInitApplicationSql"},
 						PostInitApplicationSQLRefs: &apiv1.PostInitApplicationSQLRefs{
-							SecretRefs: []corev1.SecretKeySelector{
+							SecretRefs: []apiv1.SecretKeySelector{
 								{
 									Key: "secretKey1",
-									LocalObjectReference: corev1.LocalObjectReference{
+									LocalObjectReference: apiv1.LocalObjectReference{
 										Name: "secretName1",
 									},
 								},

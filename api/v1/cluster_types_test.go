@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -173,10 +172,10 @@ var _ = Describe("Bootstrap via initdb", func() {
 							Name: "appSecret",
 						},
 						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
-							SecretRefs: []corev1.SecretKeySelector{
+							SecretRefs: []SecretKeySelector{
 								{
 									Key: "secretKey",
-									LocalObjectReference: corev1.LocalObjectReference{
+									LocalObjectReference: LocalObjectReference{
 										Name: "secretName",
 									},
 								},
@@ -204,10 +203,10 @@ var _ = Describe("Bootstrap via initdb", func() {
 							Name: "appSecret",
 						},
 						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
-							ConfigMapRefs: []corev1.ConfigMapKeySelector{
+							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									Key: "configMapKey",
-									LocalObjectReference: corev1.LocalObjectReference{
+									LocalObjectReference: LocalObjectReference{
 										Name: "configMapName",
 									},
 								},

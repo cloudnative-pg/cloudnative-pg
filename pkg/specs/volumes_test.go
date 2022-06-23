@@ -25,32 +25,33 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-var _ = Describe("test create postgresql volume mounts for post init application sql refs", func() {
+var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs", func() {
 	It("input is empty", func() {
 		input := &apiv1.PostInitApplicationSQLRefs{}
-		res := createPostgresVolumeMountsForPostInitApplicationSQLRefs(input)
-		Expect(res).To(BeEmpty())
+		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(input)
+		Expect(volumes).To(BeEmpty())
+		Expect(volumeMounts).To(BeEmpty())
 	})
 
 	It("we have reference to secrets only", func() {
 		input := &apiv1.PostInitApplicationSQLRefs{
-			SecretRefs: []corev1.SecretKeySelector{
+			SecretRefs: []apiv1.SecretKeySelector{
 				{
-					LocalObjectReference: corev1.LocalObjectReference{
+					LocalObjectReference: apiv1.LocalObjectReference{
 						Name: "secretName1",
 					},
 					Key: "secretKey1",
 				},
 				{
-					LocalObjectReference: corev1.LocalObjectReference{
+					LocalObjectReference: apiv1.LocalObjectReference{
 						Name: "secretName2",
 					},
 					Key: "secretKey2",
 				},
 			},
 		}
-		res := createPostgresVolumeMountsForPostInitApplicationSQLRefs(input)
-		Expect(res).To(Equal([]corev1.VolumeMount{
+		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(input)
+		Expect(volumeMounts).To(Equal([]corev1.VolumeMount{
 			{
 				Name:      "0-post-init-application-sql",
 				MountPath: "/etc/post-init-application-sql-refs/0.sql",
@@ -64,129 +65,8 @@ var _ = Describe("test create postgresql volume mounts for post init application
 				ReadOnly:  true,
 			},
 		}))
-	})
 
-	It("we have reference to configmaps only", func() {
-		input := &apiv1.PostInitApplicationSQLRefs{
-			ConfigMapRefs: []corev1.ConfigMapKeySelector{
-				{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "configMapName1",
-					},
-					Key: "configMapKey1",
-				},
-				{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "configMapName2",
-					},
-					Key: "configMapKey2",
-				},
-			},
-		}
-		res := createPostgresVolumeMountsForPostInitApplicationSQLRefs(input)
-		Expect(res).To(Equal([]corev1.VolumeMount{
-			{
-				Name:      "0-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/0.sql",
-				SubPath:   "0.sql",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "1-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/1.sql",
-				SubPath:   "1.sql",
-				ReadOnly:  true,
-			},
-		}))
-	})
-
-	It("we have reference to both configmaps and secrets", func() {
-		input := &apiv1.PostInitApplicationSQLRefs{
-			SecretRefs: []corev1.SecretKeySelector{
-				{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "secretName1",
-					},
-					Key: "secretKey1",
-				},
-				{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "secretName2",
-					},
-					Key: "secretKey2",
-				},
-			},
-			ConfigMapRefs: []corev1.ConfigMapKeySelector{
-				{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "configMapName1",
-					},
-					Key: "configMapKey1",
-				},
-				{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "configMapName2",
-					},
-					Key: "configMapKey2",
-				},
-			},
-		}
-		res := createPostgresVolumeMountsForPostInitApplicationSQLRefs(input)
-		Expect(res).To(Equal([]corev1.VolumeMount{
-			{
-				Name:      "0-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/0.sql",
-				SubPath:   "0.sql",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "1-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/1.sql",
-				SubPath:   "1.sql",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "2-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/2.sql",
-				SubPath:   "2.sql",
-				ReadOnly:  true,
-			},
-			{
-				Name:      "3-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/3.sql",
-				SubPath:   "3.sql",
-				ReadOnly:  true,
-			},
-		}))
-	})
-})
-
-var _ = Describe("test create postgresql volumes for post init application sql refs", func() {
-	It("input is empty", func() {
-		input := &apiv1.PostInitApplicationSQLRefs{}
-		res := createPostgresVolumesForPostInitApplicationSQLRefs(input)
-		Expect(res).To(BeEmpty())
-	})
-
-	It("we have reference to secrets only", func() {
-		input := &apiv1.PostInitApplicationSQLRefs{
-			SecretRefs: []corev1.SecretKeySelector{
-				{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "secretName1",
-					},
-					Key: "secretKey1",
-				},
-				{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "secretName2",
-					},
-					Key: "secretKey2",
-				},
-			},
-		}
-		res := createPostgresVolumesForPostInitApplicationSQLRefs(input)
-		Expect(res).To(Equal([]corev1.Volume{
+		Expect(volumes).To(Equal([]corev1.Volume{
 			{
 				Name: "0-post-init-application-sql",
 				VolumeSource: corev1.VolumeSource{
@@ -218,25 +98,40 @@ var _ = Describe("test create postgresql volumes for post init application sql r
 		}))
 	})
 
-	It("we have reference to configMaps only", func() {
+	It("we have reference to configmaps only", func() {
 		input := &apiv1.PostInitApplicationSQLRefs{
-			ConfigMapRefs: []corev1.ConfigMapKeySelector{
+			ConfigMapRefs: []apiv1.ConfigMapKeySelector{
 				{
-					LocalObjectReference: corev1.LocalObjectReference{
+					LocalObjectReference: apiv1.LocalObjectReference{
 						Name: "configMapName1",
 					},
 					Key: "configMapKey1",
 				},
 				{
-					LocalObjectReference: corev1.LocalObjectReference{
+					LocalObjectReference: apiv1.LocalObjectReference{
 						Name: "configMapName2",
 					},
 					Key: "configMapKey2",
 				},
 			},
 		}
-		res := createPostgresVolumesForPostInitApplicationSQLRefs(input)
-		Expect(res).To(Equal([]corev1.Volume{
+		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(input)
+		Expect(volumeMounts).To(Equal([]corev1.VolumeMount{
+			{
+				Name:      "0-post-init-application-sql",
+				MountPath: "/etc/post-init-application-sql-refs/0.sql",
+				SubPath:   "0.sql",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "1-post-init-application-sql",
+				MountPath: "/etc/post-init-application-sql-refs/1.sql",
+				SubPath:   "1.sql",
+				ReadOnly:  true,
+			},
+		}))
+
+		Expect(volumes).To(Equal([]corev1.Volume{
 			{
 				Name: "0-post-init-application-sql",
 				VolumeSource: corev1.VolumeSource{
@@ -274,37 +169,64 @@ var _ = Describe("test create postgresql volumes for post init application sql r
 
 	It("we have reference to both configmaps and secrets", func() {
 		input := &apiv1.PostInitApplicationSQLRefs{
-			ConfigMapRefs: []corev1.ConfigMapKeySelector{
+			SecretRefs: []apiv1.SecretKeySelector{
 				{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "configMapName1",
-					},
-					Key: "configMapKey1",
-				},
-				{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "configMapName2",
-					},
-					Key: "configMapKey2",
-				},
-			},
-			SecretRefs: []corev1.SecretKeySelector{
-				{
-					LocalObjectReference: corev1.LocalObjectReference{
+					LocalObjectReference: apiv1.LocalObjectReference{
 						Name: "secretName1",
 					},
 					Key: "secretKey1",
 				},
 				{
-					LocalObjectReference: corev1.LocalObjectReference{
+					LocalObjectReference: apiv1.LocalObjectReference{
 						Name: "secretName2",
 					},
 					Key: "secretKey2",
 				},
 			},
+			ConfigMapRefs: []apiv1.ConfigMapKeySelector{
+				{
+					LocalObjectReference: apiv1.LocalObjectReference{
+						Name: "configMapName1",
+					},
+					Key: "configMapKey1",
+				},
+				{
+					LocalObjectReference: apiv1.LocalObjectReference{
+						Name: "configMapName2",
+					},
+					Key: "configMapKey2",
+				},
+			},
 		}
-		res := createPostgresVolumesForPostInitApplicationSQLRefs(input)
-		Expect(res).To(Equal([]corev1.Volume{
+		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(input)
+		Expect(volumeMounts).To(Equal([]corev1.VolumeMount{
+			{
+				Name:      "0-post-init-application-sql",
+				MountPath: "/etc/post-init-application-sql-refs/0.sql",
+				SubPath:   "0.sql",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "1-post-init-application-sql",
+				MountPath: "/etc/post-init-application-sql-refs/1.sql",
+				SubPath:   "1.sql",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "2-post-init-application-sql",
+				MountPath: "/etc/post-init-application-sql-refs/2.sql",
+				SubPath:   "2.sql",
+				ReadOnly:  true,
+			},
+			{
+				Name:      "3-post-init-application-sql",
+				MountPath: "/etc/post-init-application-sql-refs/3.sql",
+				SubPath:   "3.sql",
+				ReadOnly:  true,
+			},
+		}))
+
+		Expect(volumes).To(Equal([]corev1.Volume{
 			{
 				Name: "0-post-init-application-sql",
 				VolumeSource: corev1.VolumeSource{

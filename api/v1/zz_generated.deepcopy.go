@@ -1357,17 +1357,13 @@ func (in *PostInitApplicationSQLRefs) DeepCopyInto(out *PostInitApplicationSQLRe
 	*out = *in
 	if in.SecretRefs != nil {
 		in, out := &in.SecretRefs, &out.SecretRefs
-		*out = make([]corev1.SecretKeySelector, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
+		*out = make([]SecretKeySelector, len(*in))
+		copy(*out, *in)
 	}
 	if in.ConfigMapRefs != nil {
 		in, out := &in.ConfigMapRefs, &out.ConfigMapRefs
-		*out = make([]corev1.ConfigMapKeySelector, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
+		*out = make([]ConfigMapKeySelector, len(*in))
+		copy(*out, *in)
 	}
 }
 

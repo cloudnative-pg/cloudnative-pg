@@ -287,9 +287,9 @@ var _ = Describe("initdb options validation", func() {
 						Database: "app",
 						Owner:    "app",
 						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
-							SecretRefs: []v1.SecretKeySelector{
+							SecretRefs: []SecretKeySelector{
 								{
-									LocalObjectReference: v1.LocalObjectReference{Name: "secret1"},
+									LocalObjectReference: LocalObjectReference{Name: "secret1"},
 								},
 							},
 						},
@@ -310,7 +310,7 @@ var _ = Describe("initdb options validation", func() {
 						Database: "app",
 						Owner:    "app",
 						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
-							SecretRefs: []v1.SecretKeySelector{
+							SecretRefs: []SecretKeySelector{
 								{
 									Key: "key",
 								},
@@ -333,9 +333,9 @@ var _ = Describe("initdb options validation", func() {
 						Database: "app",
 						Owner:    "app",
 						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
-							ConfigMapRefs: []v1.ConfigMapKeySelector{
+							ConfigMapRefs: []ConfigMapKeySelector{
 								{
-									LocalObjectReference: v1.LocalObjectReference{Name: "configmap1"},
+									LocalObjectReference: LocalObjectReference{Name: "configmap1"},
 								},
 							},
 						},
@@ -356,7 +356,7 @@ var _ = Describe("initdb options validation", func() {
 						Database: "app",
 						Owner:    "app",
 						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
-							ConfigMapRefs: []v1.ConfigMapKeySelector{
+							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									Key: "key",
 								},
@@ -379,23 +379,23 @@ var _ = Describe("initdb options validation", func() {
 						Database: "app",
 						Owner:    "app",
 						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
-							ConfigMapRefs: []v1.ConfigMapKeySelector{
+							ConfigMapRefs: []ConfigMapKeySelector{
 								{
-									LocalObjectReference: v1.LocalObjectReference{Name: "configmap1"},
+									LocalObjectReference: LocalObjectReference{Name: "configmap1"},
 									Key:                  "key",
 								},
 								{
-									LocalObjectReference: v1.LocalObjectReference{Name: "configmap2"},
+									LocalObjectReference: LocalObjectReference{Name: "configmap2"},
 									Key:                  "key",
 								},
 							},
-							SecretRefs: []v1.SecretKeySelector{
+							SecretRefs: []SecretKeySelector{
 								{
-									LocalObjectReference: v1.LocalObjectReference{Name: "secret1"},
+									LocalObjectReference: LocalObjectReference{Name: "secret1"},
 									Key:                  "key",
 								},
 								{
-									LocalObjectReference: v1.LocalObjectReference{Name: "secret2"},
+									LocalObjectReference: LocalObjectReference{Name: "secret2"},
 									Key:                  "key",
 								},
 							},

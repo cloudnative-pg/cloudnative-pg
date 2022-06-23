@@ -845,10 +845,10 @@ type ImportSource struct {
 // the implementation order is same as the order of each array.
 type PostInitApplicationSQLRefs struct {
 	// SecretRefs holds a list of references to secrets.
-	SecretRefs []corev1.SecretKeySelector `json:"secretRefs,omitempty"`
+	SecretRefs []SecretKeySelector `json:"secretRefs,omitempty"`
 
 	// ConfigMapRefs holds a list of references to configmaps.
-	ConfigMapRefs []corev1.ConfigMapKeySelector `json:"configMapRefs,omitempty"`
+	ConfigMapRefs []ConfigMapKeySelector `json:"configMapRefs,omitempty"`
 }
 
 // BootstrapRecovery contains the configuration required to restore
