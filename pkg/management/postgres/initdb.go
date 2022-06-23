@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sort"
 
 	"github.com/lib/pq"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
@@ -257,6 +258,8 @@ func (info InitInfo) executePostInitApplicationSQLRefs(sqlUser *sql.DB) error {
 		return fmt.Errorf("could not get directory content from: %s, err: %w",
 			info.PostInitApplicationSQLRefsFolder, err)
 	}
+
+	sort.Strings(files)
 
 	for _, file := range files {
 		sql, ioErr := fileutils.ReadFile(path.Join(info.PostInitApplicationSQLRefsFolder, file))
