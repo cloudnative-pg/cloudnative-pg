@@ -73,7 +73,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:14.3
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:14.4
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
@@ -118,7 +118,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:14.3
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:14.4
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
