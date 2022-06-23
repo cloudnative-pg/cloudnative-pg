@@ -206,9 +206,11 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	cluster *apiv1.Cluster,
 ) (*apiv1.Backup, []string, error) {
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
+
 	if sourceName == "" {
 		return nil, nil, fmt.Errorf("recovery source not specified")
 	}
+
 	log.Info("Recovering from external cluster", "sourceName", sourceName)
 
 	server, found := cluster.ExternalCluster(sourceName)
