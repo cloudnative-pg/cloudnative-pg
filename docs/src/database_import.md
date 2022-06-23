@@ -1,34 +1,40 @@
 # Importing Postgres databases
 
 This section describes how to import one or more existing PostgreSQL
-databases inside a brand new CloudNativePG instance.
+databases inside a brand new CloudNativePG cluster.
 
 The import operation is based on the concept of online logical backups in PostgreSQL,
-and relies on `pg_dump` and `pg_restore`, via a network connection.
+and relies on `pg_dump` via a network connection to the origin host, and `pg_restore`.
 Thanks to native Multi-Version Concurrency Control (MVCC) and snapshots,
 PostgreSQL enables taking consistent backups over the network, in a concurrent
-manner, without stopping any write activity. Logical backups are also the most
-common, flexible and reliable technique to perform major upgrades of PostgreSQL
-versions.
+manner, without stopping any write activity.
+
+Logical backups are also the most common, flexible and reliable technique to
+perform major upgrades of PostgreSQL versions.
 
 As a result, the instructions in this section are suitable for both:
 
 - importing one or more databases from an existing PostgreSQL instance, even
   outside Kubernetes
 - importing the database from any PostgreSQL version to one that is either the
-  same or newer, enabling *major upgrades*
+  same or newer, enabling *major upgrades* of PostgreSQL (e.g. from version 10.x
+  to version 14.x)
 
 !!! Warning
     When performing major upgrades of PostgreSQL you are responsible for making
-    sure that the upgrade path of the objects contained in the database (including
-    extensions) is possible.
+    sure that applications are compatible with the new version and that the
+    upgrade path of the objects contained in the database (including extensions) is
+    feasible.
 
-In both cases, the operation is performed on a snapshot of the origin database.
+In both cases, the operation is performed on a consistent **snapshot** of the
+origin database.
 
 !!! Important
     For this reason we suggest to stop write operations on the source before
-    the final import in the `Cluster` resource - hence why this feature is
-    referred to as "offline import" or "offline major upgrade".
+    the final import in the `Cluster` resource, as changes done to the source
+    database after the start of the backup will not be in the destination cluster -
+    hence why this feature is referred to as "offline import" or "offline major
+    upgrade".
 
 ## How it works
 
@@ -73,14 +79,16 @@ performed in 4 steps:
 - cleanup of the database dump file
 - optional execution of the user defined SQL queries in the application
   database via the `postImportApplicationSQL` parameter
+- execution of `ANALYZE VERBOSE` on the imported database
 
 ![Example of microservice import type](./images/microservice-import.png)
 
 For example, the YAML below creates a new 3 instance PostgreSQL cluster (latest
-available major version) called `cluster-microservice` that imports the `angus`
-database from the `cluster-pg96` cluster (with the unsupported PostgreSQL 9.6),
-by connecting to the `postgres` database using the `postgres` user, via the
-password stored in the `cluster-pg96-superuser` secret.
+available major version at the time the operator was released) called
+`cluster-microservice` that imports the `angus` database from the
+`cluster-pg96` cluster (with the unsupported PostgreSQL 9.6), by connecting to
+the `postgres` database using the `postgres` user, via the password stored in
+the `cluster-pg96-superuser` secret.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -114,6 +122,18 @@ spec:
         key: password
 ```
 
+!!! Warning
+    The example above deliberately uses a source database running a version of
+    PostgreSQL that is not supported anymore by the Community, and consequently by
+    CloudNativePG.
+    Data export from the source instance is performed using the version of
+    `pg_dump` in the destination cluster, which must be a supported one, and
+    equal or greater than the source one.
+    Based on our experience, this way of exporting data should work on older
+    and unsupported versions of Postgres too, giving you the chance to move your
+    legacy data to a better system, inside Kubernetes.
+    This is the main reason why we used 9.6 in the examples of this section.
+    We'd be interested to hear from you should you experience any issues in this area.
 
 There are a few things you need to be aware of when using the `microservice` type:
 
@@ -149,11 +169,12 @@ The operation is performed in the following steps:
 ![Example of monolith import type](./images/monolith-import.png)
 
 For example, the YAML below creates a new 3 instance PostgreSQL cluster (latest
-available major version) called `cluster-microservice` that imports the
-`accountant` and the `bank_user` roles, as well as the `accounting`, `banking`,
-`resort` databases from the `cluster-pg96` cluster (with the unsupported
-PostgreSQL 9.6), by connecting to the `postgres` database using the `postgres`
-user, via the password stored in the `cluster-pg96-superuser` secret.
+available major version at the time the operator was released) called
+`cluster-microservice` that imports the `accountant` and the `bank_user` roles,
+as well as the `accounting`, `banking`, `resort` databases from the
+`cluster-pg96` cluster (with the unsupported PostgreSQL 9.6), by connecting to
+the `postgres` database using the `postgres` user, via the password stored in
+the `cluster-pg96-superuser` secret.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
