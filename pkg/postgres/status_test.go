@@ -29,48 +29,8 @@ import (
 )
 
 var _ = Describe("PostgreSQL status", func() {
-	list := PostgresqlStatusList{
-		{
-			Pod:     corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-04"}},
-			Error:   fmt.Errorf("cannot find postgres container"),
-			IsReady: true,
-		},
-		{
-			Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-06"}},
-			IsPrimary:   false,
-			ReceivedLsn: "1/23",
-			ReplayLsn:   "1/22",
-			IsReady:     false,
-		},
-		{
-			Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-30"}},
-			IsPrimary:   false,
-			ReceivedLsn: "1/23",
-			ReplayLsn:   "1/22",
-			IsReady:     true,
-		},
-		{
-			Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
-			IsPrimary:   false,
-			ReceivedLsn: "1/21",
-			IsReady:     true,
-		},
-		{
-			Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
-			IsPrimary: true,
-			IsReady:   true,
-		},
-		{
-			Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-40"}},
-			IsPrimary:   false,
-			ReceivedLsn: "1/23",
-			ReplayLsn:   "1/23",
-			IsReady:     true,
-		},
-	}
-
 	It("checks for errors in the Pod status", func() {
-		greenList := PostgresqlStatusList{
+		list := PostgresqlStatusList{
 			{
 				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
 				IsPrimary:   false,
@@ -84,8 +44,23 @@ var _ = Describe("PostgreSQL status", func() {
 			},
 		}
 
+		Expect(list.IsComplete()).To(BeTrue())
+
+		list = append(list, PostgresqlStatus{
+			Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-30"}},
+			IsPrimary:   false,
+			ReceivedLsn: "1/21",
+			IsReady:     false,
+			Error:       fmt.Errorf("cannot find postgres container"),
+		},
+			PostgresqlStatus{
+				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-40"}},
+				IsPrimary:   false,
+				ReceivedLsn: "1/21",
+				IsReady:     false,
+			})
+
 		Expect(list.IsComplete()).To(BeFalse())
-		Expect(greenList.IsComplete()).To(BeTrue())
 	})
 
 	It("checks for pods on which we are upgrading the instance manager", func() {
@@ -134,9 +109,49 @@ var _ = Describe("PostgreSQL status", func() {
 	})
 
 	Context("when sorted", func() {
+		list := PostgresqlStatusList{
+			{
+				Pod:     corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-04"}},
+				Error:   fmt.Errorf("cannot find postgres container"),
+				IsReady: true,
+			},
+			{
+				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-06"}},
+				IsPrimary:   false,
+				ReceivedLsn: "1/23",
+				ReplayLsn:   "1/22",
+				IsReady:     false,
+			},
+			{
+				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-30"}},
+				IsPrimary:   false,
+				ReceivedLsn: "1/23",
+				ReplayLsn:   "1/22",
+				IsReady:     true,
+			},
+			{
+				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-20"}},
+				IsPrimary:   false,
+				ReceivedLsn: "1/21",
+				IsReady:     true,
+			},
+			{
+				Pod:       corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-10"}},
+				IsPrimary: true,
+				IsReady:   true,
+			},
+			{
+				Pod:         corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "server-40"}},
+				IsPrimary:   false,
+				ReceivedLsn: "1/23",
+				ReplayLsn:   "1/23",
+				IsReady:     true,
+			},
+		}
+
 		sort.Sort(&list)
 
-		It("primary servers are come first", func() {
+		It("primary servers are coming first", func() {
 			Expect(list[0].IsPrimary).To(BeTrue())
 			Expect(list[0].Pod.Name).To(Equal("server-10"))
 		})
