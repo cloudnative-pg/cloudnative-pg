@@ -168,16 +168,15 @@ func (catalog *Catalog) findBackupFromID(backupID string) (*BarmanBackup, error)
 	if backupID == "" {
 		return nil, fmt.Errorf("no backupID provided")
 	}
-	for i := len(catalog.List) - 1; i >= 0; i-- {
-		barmanBackup := catalog.List[i]
+	for _, barmanBackup := range catalog.List {
 		if !barmanBackup.isBackupDone() {
 			continue
 		}
 		if barmanBackup.ID == backupID {
-			return &catalog.List[i], nil
+			return &barmanBackup, nil
 		}
 	}
-	return nil, nil
+	return nil, fmt.Errorf("no backup found with ID %s", backupID)
 }
 
 // BarmanBackup represent a backup as created
