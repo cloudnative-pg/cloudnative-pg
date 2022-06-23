@@ -26,10 +26,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -152,7 +149,7 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 		By("creating target cluster", func() {
 			postgresImage := os.Getenv("POSTGRES_IMG")
 			Expect(postgresImage).ShouldNot(BeEmpty(), "POSTGRES_IMG env could not be empty")
-			expectedImageName, err := getExpectedPostgresImageNameForTargetCluster(postgresImage)
+			expectedImageName, err := testsUtils.BumpPostgresImageVersion(postgresImage)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(expectedImageName).ShouldNot(BeEmpty(), "imageName could not be empty")
 			err = createTargetCluster(namespace,
@@ -199,30 +196,6 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 		})
 	})
 })
-
-func getExpectedPostgresImageNameForTargetCluster(postgresImage string) (string, error) {
-	imageReference := utils.NewReference(postgresImage)
-
-	postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
-	if err != nil {
-		return "", err
-	}
-
-	targetPostgresImageVersionInt := postgresImageVersion + 1_00_00
-
-	defaultImageVersion, err := postgres.GetPostgresVersionFromTag(utils.GetImageTag(versions.DefaultImageName))
-	if err != nil {
-		return "", err
-	}
-
-	if targetPostgresImageVersionInt >= defaultImageVersion {
-		return postgresImage, nil
-	}
-
-	imageReference.Tag = fmt.Sprintf("%d", postgresImageVersion/10000)
-
-	return imageReference.GetNormalizedName(), nil
-}
 
 func createTargetCluster(
 	namespace,
