@@ -139,7 +139,7 @@ func (q *QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error
 
 func (q QueriesCollector) toBeChecked(name string, userQuery UserQuery, isPrimary bool, queryLogger log.Logger) bool {
 	if (userQuery.Primary || userQuery.Master) && !isPrimary { // wokeignore:rule=master
-		queryLogger.Info("Skipping because runs only on primary")
+		queryLogger.Debug("Skipping because runs only on primary")
 		return false
 	}
 
@@ -152,7 +152,7 @@ func (q QueriesCollector) toBeChecked(name string, userQuery UserQuery, isPrimar
 			q.reportUserQueryErrorMetric(name)
 			return false
 		} else if !matchesVersion {
-			queryLogger.Info("Skipping because runs only on other postgres versions",
+			queryLogger.Debug("Skipping because runs only on other postgres versions",
 				"runOnServer", runOnServer)
 			return false
 		}
