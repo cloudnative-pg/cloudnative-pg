@@ -17,8 +17,12 @@ limitations under the License.
 package postgres
 
 import (
+	"context"
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -143,6 +147,34 @@ func (list PgStatReplicationList) Less(i, j int) bool {
 // be easily sorted
 type PostgresqlStatusList struct {
 	Items []PostgresqlStatus `json:"items"`
+}
+
+// LogStatus logs the current status of the instances
+func (list *PostgresqlStatusList) LogStatus(ctx context.Context, logLevel string) {
+	contextLogger := log.FromContext(ctx)
+
+	for _, item := range list.Items {
+		message := fmt.Sprintf(
+			"instance status, name: %s, currentLsn: %s, receivedLsn: %s, replayLsn: %s, isPrimary: %v,"+
+				"isReady: %v, pendingRestart: %v, pendingRestartForDecrease: %v",
+			item.Pod.Name,
+			item.CurrentLsn,
+			item.ReceivedLsn,
+			item.ReplayLsn,
+			item.IsPrimary,
+			item.IsReady,
+			item.PendingRestart,
+			item.PendingRestartForDecrease,
+		)
+		contextLogger.Info(message)
+	}
+
+	if logLevel == log.DebugLevelString {
+		contextLogger.Debug(
+			`detailed instances status`,
+			"data", list,
+		)
+	}
 }
 
 // Len implements sort.Interface extracting the length of the list
