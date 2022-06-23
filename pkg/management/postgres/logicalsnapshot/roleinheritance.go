@@ -91,6 +91,9 @@ func (rs *roleInheritanceManager) getRoleInheritance(ctx context.Context) ([]Rol
 	if err != nil {
 		return nil, err
 	}
+
+	// Retrieve the roles inheritance excluding roles that are owned by the postgres catalog
+	// see FirstNormalObjectId in https://github.com/postgres/postgres/blob/662dbe2/src/include/access/transam.h#L197
 	query := "SELECT ur.rolname AS roleid, " +
 		"um.rolname AS member, " +
 		"a.admin_option, " +
@@ -99,7 +102,7 @@ func (rs *roleInheritanceManager) getRoleInheritance(ctx context.Context) ([]Rol
 		"LEFT JOIN pg_authid ur on ur.oid = a.roleid " +
 		"LEFT JOIN pg_authid um on um.oid = a.member " +
 		"LEFT JOIN pg_authid ug on ug.oid = a.grantor " +
-		"WHERE NOT (ur.rolname ~ '^pg_' AND um.rolname ~ '^pg_')"
+		"WHERE ur.oid >= 16384 AND um.oid >= 16384"
 
 	rows, err := originDB.Query(query)
 	if err != nil {
@@ -111,8 +114,8 @@ func (rs *roleInheritanceManager) getRoleInheritance(ctx context.Context) ([]Rol
 			contextLogger.Error(closeErr, "while closing rows: %w")
 		}
 	}()
-	var ris []RoleInheritance
 
+	var ris []RoleInheritance
 	for rows.Next() {
 		var ri RoleInheritance
 		if err := rows.Scan(

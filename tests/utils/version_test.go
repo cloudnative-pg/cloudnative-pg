@@ -23,7 +23,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
-var _ = Describe("Guess teh correct version of a postgres image", func() {
+var _ = Describe("Guess the correct version of a postgres image", func() {
 	It("works with 9.6", func() {
 		version, err := BumpPostgresImageVersion("docker.io/library/postgres:9.6.4")
 		Expect(err).ShouldNot(HaveOccurred())
