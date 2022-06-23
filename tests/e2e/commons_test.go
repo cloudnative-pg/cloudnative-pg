@@ -18,5 +18,6 @@ package e2e
 
 const (
 	minioClientName = "mc"
-	switchWalCmd    = "psql -U postgres app -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"
+	checkPointCmd   = "psql -U postgres app -tAc 'CHECKPOINT;'"
+	getLatestWalCmd = "psql -U postgres app -tAc 'SELECT pg_walfile_name(pg_switch_wal());'"
 )

@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -139,14 +138,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			pod, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			primary := pod.GetName()
-			out, _, err := testUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				primary,
-				switchWalCmd))
-			Expect(err).ToNot(HaveOccurred())
-
-			latestWAL = strings.TrimSpace(out)
+			latestWAL = switchWalAndGetLatestArchive(namespace, primary)
 			latestWALPath := minioPath(clusterName, latestWAL+".gz")
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture

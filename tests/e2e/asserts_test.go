@@ -589,13 +589,8 @@ func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 		pod, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		primary := pod.GetName()
-		out, _, err := testsUtils.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			namespace,
-			primary,
-			switchWalCmd))
-		Expect(err).ToNot(HaveOccurred())
-		latestWALPath = minioPath(serverName, strings.TrimSpace(out)+".gz")
+		latestWAL := switchWalAndGetLatestArchive(namespace, primary)
+		latestWALPath = minioPath(serverName, latestWAL+".gz")
 	})
 
 	By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {
@@ -1497,14 +1492,7 @@ func AssertArchiveWalOnAzurite(namespace, clusterName string) {
 	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
 	By("archiving WALs and verifying they exist", func() {
 		primary := clusterName + "-1"
-		out, _, err := testsUtils.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			namespace,
-			primary,
-			switchWalCmd))
-		Expect(err).ToNot(HaveOccurred())
-
-		latestWAL := strings.TrimSpace(out)
+		latestWAL := switchWalAndGetLatestArchive(namespace, primary)
 		// verifying on blob storage using az
 		// Define what file we are looking for in Azurite.
 		// Escapes are required since az expects forward slashes to be escaped
@@ -1521,14 +1509,7 @@ func AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azSto
 	By("archiving WALs and verifying they exist", func() {
 		primary, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		out, _, err := testsUtils.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			primary.Namespace,
-			primary.Name,
-			switchWalCmd))
-		Expect(err).ToNot(HaveOccurred())
-
-		latestWAL := strings.TrimSpace(out)
+		latestWAL := switchWalAndGetLatestArchive(primary.Namespace, primary.Name)
 		// Define what file we are looking for in Azure.
 		// Escapes are required since az expects forward slashes to be escaped
 		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
@@ -1537,6 +1518,25 @@ func AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azSto
 			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, path)
 		}, 60).Should(BeEquivalentTo(1))
 	})
+}
+
+// switchWalAndGetLatestArchive trigger a new wal and get the name of latest wal file
+func switchWalAndGetLatestArchive(namespace, podName string) string {
+	_, _, err := testsUtils.Run(fmt.Sprintf(
+		"kubectl exec -n %v %v -- %v",
+		namespace,
+		podName,
+		checkPointCmd))
+	Expect(err).ToNot(HaveOccurred())
+
+	out, _, err := testsUtils.Run(fmt.Sprintf(
+		"kubectl exec -n %v %v -- %v",
+		namespace,
+		podName,
+		getLatestWalCmd))
+	Expect(err).ToNot(HaveOccurred())
+
+	return strings.TrimSpace(out)
 }
 
 func prepareClusterForPITROnMinio(
