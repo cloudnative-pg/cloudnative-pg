@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -27,7 +26,10 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -199,32 +201,27 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 })
 
 func getExpectedPostgresImageNameForTargetCluster(postgresImage string) (string, error) {
-	var expectedPostgresVersion int
-	var imageRepo, imageVersion, imageName string
-	var err error
-	// split the postgres imageName with ':' and store in imageRepo and imageVersion
-	splitPostgresImageInfo := strings.Split(postgresImage, ":")
-	if len(splitPostgresImageInfo) == 2 {
-		imageRepo, imageVersion = splitPostgresImageInfo[0], splitPostgresImageInfo[1]
-		// if minor version will present then split using "." and get major version value
-		if strings.Contains(imageVersion, ".") {
-			imageVersionAfterSplit := strings.Split(imageVersion, ".")
-			expectedPostgresVersion, err = strconv.Atoi(imageVersionAfterSplit[0])
-		} else {
-			expectedPostgresVersion, err = strconv.Atoi(imageVersion)
-		}
-		if err != nil {
-			return "", err
-		}
-		// if major version value is 14 then keep as same otherwise increase this with 1
-		// e.g. if major version of source cluster is 11, then target cluster would be 12
-		if expectedPostgresVersion != 14 {
-			expectedPostgresVersion++
-		}
-		imageName = imageRepo + ":" + fmt.Sprintf("%v", expectedPostgresVersion)
-		return imageName, err
+	imageReference := utils.NewReference(postgresImage)
+
+	postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
+	if err != nil {
+		return "", err
 	}
-	return "", nil
+
+	targetPostgresImageVersionInt := postgresImageVersion + 1_00_00
+
+	defaultImageVersion, err := postgres.GetPostgresVersionFromTag(utils.GetImageTag(versions.DefaultImageName))
+	if err != nil {
+		return "", err
+	}
+
+	if targetPostgresImageVersionInt >= defaultImageVersion {
+		return postgresImage, nil
+	}
+
+	imageReference.Tag = fmt.Sprintf("%d", postgresImageVersion/10000)
+
+	return imageReference.GetNormalizedName(), nil
 }
 
 func createTargetCluster(
