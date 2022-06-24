@@ -1986,3 +1986,226 @@ var _ = Describe("Recovery and Backup Target", func() {
 		Expect(result).To(BeEmpty())
 	})
 })
+
+var _ = Describe("validation of imports", func() {
+	It("rejects unrecognized import type", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						Import: &LogicalSnapshot{
+							Type: "fooBar",
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateLogicalSnapshot()
+		Expect(result).To(HaveLen(1))
+	})
+
+	It("rejects microservice import with roles", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						Import: &LogicalSnapshot{
+							Type:      MicroserviceSnapshotType,
+							Databases: []string{"foo"},
+							Roles:     []string{"bar"},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateLogicalSnapshot()
+		Expect(result).To(HaveLen(1))
+	})
+
+	It("rejects microservice import without exactly one database", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						Import: &LogicalSnapshot{
+							Type:      MicroserviceSnapshotType,
+							Databases: []string{"foo", "bar"},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateLogicalSnapshot()
+		Expect(result).To(HaveLen(1))
+	})
+
+	It("rejects microservice import with a wildcard on the database name", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						Import: &LogicalSnapshot{
+							Type:      MicroserviceSnapshotType,
+							Databases: []string{"*foo"},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateLogicalSnapshot()
+		Expect(result).To(HaveLen(1))
+	})
+
+	It("accepts microservice import when well specified", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						Import: &LogicalSnapshot{
+							Type:      MicroserviceSnapshotType,
+							Databases: []string{"foo"},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateLogicalSnapshot()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("rejects monolith import with no databases", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						Import: &LogicalSnapshot{
+							Type:      MonolithSnapshotType,
+							Databases: []string{},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateLogicalSnapshot()
+		Expect(result).To(HaveLen(1))
+	})
+
+	It("rejects monolith import with PostImport Application SQL", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						Import: &LogicalSnapshot{
+							Type:                     MonolithSnapshotType,
+							Databases:                []string{"foo"},
+							PostImportApplicationSQL: []string{"select * from bar"},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateLogicalSnapshot()
+		Expect(result).To(HaveLen(1))
+	})
+
+	It("rejects monolith import with wildcards alongside specific values", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						Import: &LogicalSnapshot{
+							Type:      MonolithSnapshotType,
+							Databases: []string{"bar", "*"},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateLogicalSnapshot()
+		Expect(result).To(HaveLen(1))
+
+		cluster = &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						Import: &LogicalSnapshot{
+							Type:      MonolithSnapshotType,
+							Databases: []string{"foo"},
+							Roles:     []string{"baz", "*"},
+						},
+					},
+				},
+			},
+		}
+
+		result = cluster.validateLogicalSnapshot()
+		Expect(result).To(HaveLen(1))
+	})
+
+	It("accepts monolith import with proper values", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						Import: &LogicalSnapshot{
+							Type:      MonolithSnapshotType,
+							Databases: []string{"foo"},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateLogicalSnapshot()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("accepts monolith import with wildcards", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						Import: &LogicalSnapshot{
+							Type:      MonolithSnapshotType,
+							Databases: []string{"*"},
+							Roles:     []string{"*"},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateLogicalSnapshot()
+		Expect(result).To(BeEmpty())
+	})
+})
