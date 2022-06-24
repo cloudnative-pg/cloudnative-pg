@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package logicalsnapshot contains the logic needed to execute a logical snapshot
-package logicalsnapshot
+// Package logicalimport contains the logic needed to import a logical snapshot
+package logicalimport

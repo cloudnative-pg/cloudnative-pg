@@ -264,10 +264,10 @@ func (r *Cluster) ValidateCreate() error {
 
 // Validate groups the validation logic for clusters returning a list of all encountered errors
 func (r *Cluster) Validate() (allErrs field.ErrorList) {
-	type validation func() field.ErrorList
-	validations := []validation{
+	type validationFunc func() field.ErrorList
+	validations := []validationFunc{
 		r.validateInitDB,
-		r.validateLogicalSnapshot,
+		r.validateImport,
 		r.validateSuperuserSecret,
 		r.validateCerts,
 		r.validateBootstrapMethod,
@@ -419,7 +419,7 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) validateLogicalSnapshot() field.ErrorList {
+func (r *Cluster) validateImport() field.ErrorList {
 	// If it's not configured, everything is ok
 	if r.Spec.Bootstrap == nil {
 		return nil
@@ -429,27 +429,27 @@ func (r *Cluster) validateLogicalSnapshot() field.ErrorList {
 		return nil
 	}
 
-	logicalSnapshot := r.Spec.Bootstrap.InitDB.Import
-	if logicalSnapshot == nil {
+	importSpec := r.Spec.Bootstrap.InitDB.Import
+	if importSpec == nil {
 		return nil
 	}
 
-	switch logicalSnapshot.Type {
+	switch importSpec.Type {
 	case MicroserviceSnapshotType:
-		return logicalSnapshot.validateLogicalSnapshotMicroservice()
+		return importSpec.validateMicroservice()
 	case MonolithSnapshotType:
-		return logicalSnapshot.validateLogicalSnapshotMonolith()
+		return importSpec.validateMonolith()
 	default:
 		return field.ErrorList{
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "initdb", "import", "type"),
-				logicalSnapshot.Type,
+				importSpec.Type,
 				"Unrecognized import type"),
 		}
 	}
 }
 
-func (s LogicalSnapshot) validateLogicalSnapshotMicroservice() field.ErrorList {
+func (s Import) validateMicroservice() field.ErrorList {
 	var result field.ErrorList
 
 	if len(s.Databases) != 1 {
@@ -485,7 +485,7 @@ func (s LogicalSnapshot) validateLogicalSnapshotMicroservice() field.ErrorList {
 	return result
 }
 
-func (s LogicalSnapshot) validateLogicalSnapshotMonolith() field.ErrorList {
+func (s Import) validateMonolith() field.ErrorList {
 	var result field.ErrorList
 
 	if len(s.Databases) < 1 {

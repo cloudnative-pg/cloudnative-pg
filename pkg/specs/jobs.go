@@ -74,7 +74,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 	}
 
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
-		return createPrimaryJob(cluster, nodeSerial, "logicalsnapshot", initCommand)
+		return createPrimaryJob(cluster, nodeSerial, "import", initCommand)
 	}
 	return createPrimaryJob(cluster, nodeSerial, "initdb", initCommand)
 }

@@ -27,7 +27,6 @@ Battiato
 Bok
 BootstrapConfiguration
 BootstrapInitDB
-BootstrapLogicalSnapshot
 BootstrapPgBaseBackup
 BootstrapRecovery
 CIS
@@ -123,6 +122,7 @@ IAM
 INPLACE
 Ibryam
 IfNotPresent
+ImportSource
 InfoSec
 Innocenti
 InstanceID
@@ -145,8 +145,6 @@ ListMeta
 Liveness
 LoadBalancer
 LocalObjectReference
-LogicalSnapshot
-LogicalSnapshotSource
 MAPPEDMETRIC
 MVCC
 MetricDescription
@@ -581,7 +579,6 @@ localeCollate
 localhost
 localobjectreference
 locktype
-logicalSnapshot
 lookups
 lsn
 lt

@@ -52,10 +52,10 @@ func CreateClusterFromExternalCluster(namespace, importedClusterName, sourceClus
 
 			Bootstrap: &apiv1.BootstrapConfiguration{
 				InitDB: &apiv1.BootstrapInitDB{
-					Import: &apiv1.LogicalSnapshot{
+					Import: &apiv1.Import{
 						Type:      "microservice",
 						Databases: []string{databaseName},
-						Source: apiv1.LogicalSnapshotSource{
+						Source: apiv1.ImportSource{
 							ExternalCluster: sourceClusterName,
 						},
 						PostImportApplicationSQL: []string{"SELECT 1"},

@@ -764,7 +764,7 @@ type BootstrapInitDB struct {
 
 	// Bootstraps the new cluster by importing data from an existing PostgreSQL
 	// instance using logical backup (`pg_dump` and `pg_restore`)
-	Import *LogicalSnapshot `json:"import,omitempty"`
+	Import *Import `json:"import,omitempty"`
 }
 
 // SnapshotType is a type of allowed import
@@ -778,16 +778,16 @@ const (
 	MicroserviceSnapshotType SnapshotType = "microservice"
 )
 
-// LogicalSnapshot contains the configuration to init a database from a logic snapshot of an externalCluster
-type LogicalSnapshot struct {
+// Import contains the configuration to init a database from a logic snapshot of an externalCluster
+type Import struct {
 	// The source of the import
-	Source LogicalSnapshotSource `json:"source"`
+	Source ImportSource `json:"source"`
 
-	// Type of logicalSnapshot. Can be
+	// The import type. Can be `microservice` or `monolith`.
 	// +kubebuilder:validation:Enum=microservice;monolith
 	Type SnapshotType `json:"type"`
 
-	// The database to import
+	// The databases to import
 	Databases []string `json:"databases"`
 
 	// The roles to import
@@ -799,8 +799,8 @@ type LogicalSnapshot struct {
 	PostImportApplicationSQL []string `json:"postImportApplicationSQL,omitempty"`
 }
 
-// LogicalSnapshotSource describes the source for the logical snapshot
-type LogicalSnapshotSource struct {
+// ImportSource describes the source for the logical snapshot
+type ImportSource struct {
 	// The name of the externalCluster used for import
 	ExternalCluster string `json:"externalCluster"`
 }

@@ -152,7 +152,7 @@ var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
 			By("having a imported Cluster in failed state", func() {
 				namespacedName := types.NamespacedName{
 					Namespace: namespace,
-					Name:      importedClusterName + "-1-logicalsnapshot",
+					Name:      importedClusterName + "-1-import",
 				}
 				// Eventually the number of failed job should be greater than 1
 				// which will ensure the cluster not getting created

@@ -222,11 +222,11 @@ func createTargetCluster(
 
 			Bootstrap: &apiv1.BootstrapConfiguration{
 				InitDB: &apiv1.BootstrapInitDB{
-					Import: &apiv1.LogicalSnapshot{
+					Import: &apiv1.Import{
 						Type:      "monolith",
 						Databases: databaseNames,
 						Roles:     roles,
-						Source: apiv1.LogicalSnapshotSource{
+						Source: apiv1.ImportSource{
 							ExternalCluster: sourceClusterName,
 						},
 					},

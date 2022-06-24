@@ -31,7 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logicalsnapshot"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logicalimport"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
 
@@ -168,9 +168,9 @@ func (ld *LogicalDump) executeLogicalDumpRestore(ctx context.Context, client ctr
 	cloneType := cluster.Spec.Bootstrap.InitDB.Import.Type
 	switch cloneType {
 	case apiv1.MicroserviceSnapshotType:
-		return logicalsnapshot.Microservice(ctx, &cluster, destinationPool, originPool)
+		return logicalimport.Microservice(ctx, &cluster, destinationPool, originPool)
 	case apiv1.MonolithSnapshotType:
-		return logicalsnapshot.Monolith(ctx, &cluster, destinationPool, originPool)
+		return logicalimport.Monolith(ctx, &cluster, destinationPool, originPool)
 	default:
 		return fmt.Errorf("unrecognized clone type %s", cloneType)
 	}

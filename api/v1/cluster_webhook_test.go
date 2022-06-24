@@ -1995,7 +1995,7 @@ var _ = Describe("validation of imports", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						Import: &LogicalSnapshot{
+						Import: &Import{
 							Type: "fooBar",
 						},
 					},
@@ -2003,7 +2003,7 @@ var _ = Describe("validation of imports", func() {
 			},
 		}
 
-		result := cluster.validateLogicalSnapshot()
+		result := cluster.validateImport()
 		Expect(result).To(HaveLen(1))
 	})
 
@@ -2014,7 +2014,7 @@ var _ = Describe("validation of imports", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						Import: &LogicalSnapshot{
+						Import: &Import{
 							Type:      MicroserviceSnapshotType,
 							Databases: []string{"foo"},
 							Roles:     []string{"bar"},
@@ -2024,7 +2024,7 @@ var _ = Describe("validation of imports", func() {
 			},
 		}
 
-		result := cluster.validateLogicalSnapshot()
+		result := cluster.validateImport()
 		Expect(result).To(HaveLen(1))
 	})
 
@@ -2035,7 +2035,7 @@ var _ = Describe("validation of imports", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						Import: &LogicalSnapshot{
+						Import: &Import{
 							Type:      MicroserviceSnapshotType,
 							Databases: []string{"foo", "bar"},
 						},
@@ -2044,7 +2044,7 @@ var _ = Describe("validation of imports", func() {
 			},
 		}
 
-		result := cluster.validateLogicalSnapshot()
+		result := cluster.validateImport()
 		Expect(result).To(HaveLen(1))
 	})
 
@@ -2055,7 +2055,7 @@ var _ = Describe("validation of imports", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						Import: &LogicalSnapshot{
+						Import: &Import{
 							Type:      MicroserviceSnapshotType,
 							Databases: []string{"*foo"},
 						},
@@ -2064,7 +2064,7 @@ var _ = Describe("validation of imports", func() {
 			},
 		}
 
-		result := cluster.validateLogicalSnapshot()
+		result := cluster.validateImport()
 		Expect(result).To(HaveLen(1))
 	})
 
@@ -2075,7 +2075,7 @@ var _ = Describe("validation of imports", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						Import: &LogicalSnapshot{
+						Import: &Import{
 							Type:      MicroserviceSnapshotType,
 							Databases: []string{"foo"},
 						},
@@ -2084,7 +2084,7 @@ var _ = Describe("validation of imports", func() {
 			},
 		}
 
-		result := cluster.validateLogicalSnapshot()
+		result := cluster.validateImport()
 		Expect(result).To(BeEmpty())
 	})
 
@@ -2095,7 +2095,7 @@ var _ = Describe("validation of imports", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						Import: &LogicalSnapshot{
+						Import: &Import{
 							Type:      MonolithSnapshotType,
 							Databases: []string{},
 						},
@@ -2104,7 +2104,7 @@ var _ = Describe("validation of imports", func() {
 			},
 		}
 
-		result := cluster.validateLogicalSnapshot()
+		result := cluster.validateImport()
 		Expect(result).To(HaveLen(1))
 	})
 
@@ -2115,7 +2115,7 @@ var _ = Describe("validation of imports", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						Import: &LogicalSnapshot{
+						Import: &Import{
 							Type:                     MonolithSnapshotType,
 							Databases:                []string{"foo"},
 							PostImportApplicationSQL: []string{"select * from bar"},
@@ -2125,7 +2125,7 @@ var _ = Describe("validation of imports", func() {
 			},
 		}
 
-		result := cluster.validateLogicalSnapshot()
+		result := cluster.validateImport()
 		Expect(result).To(HaveLen(1))
 	})
 
@@ -2136,7 +2136,7 @@ var _ = Describe("validation of imports", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						Import: &LogicalSnapshot{
+						Import: &Import{
 							Type:      MonolithSnapshotType,
 							Databases: []string{"bar", "*"},
 						},
@@ -2145,7 +2145,7 @@ var _ = Describe("validation of imports", func() {
 			},
 		}
 
-		result := cluster.validateLogicalSnapshot()
+		result := cluster.validateImport()
 		Expect(result).To(HaveLen(1))
 
 		cluster = &Cluster{
@@ -2154,7 +2154,7 @@ var _ = Describe("validation of imports", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						Import: &LogicalSnapshot{
+						Import: &Import{
 							Type:      MonolithSnapshotType,
 							Databases: []string{"foo"},
 							Roles:     []string{"baz", "*"},
@@ -2164,7 +2164,7 @@ var _ = Describe("validation of imports", func() {
 			},
 		}
 
-		result = cluster.validateLogicalSnapshot()
+		result = cluster.validateImport()
 		Expect(result).To(HaveLen(1))
 	})
 
@@ -2175,7 +2175,7 @@ var _ = Describe("validation of imports", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						Import: &LogicalSnapshot{
+						Import: &Import{
 							Type:      MonolithSnapshotType,
 							Databases: []string{"foo"},
 						},
@@ -2184,7 +2184,7 @@ var _ = Describe("validation of imports", func() {
 			},
 		}
 
-		result := cluster.validateLogicalSnapshot()
+		result := cluster.validateImport()
 		Expect(result).To(BeEmpty())
 	})
 
@@ -2195,7 +2195,7 @@ var _ = Describe("validation of imports", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						Import: &LogicalSnapshot{
+						Import: &Import{
 							Type:      MonolithSnapshotType,
 							Databases: []string{"*"},
 							Roles:     []string{"*"},
@@ -2205,7 +2205,7 @@ var _ = Describe("validation of imports", func() {
 			},
 		}
 
-		result := cluster.validateLogicalSnapshot()
+		result := cluster.validateImport()
 		Expect(result).To(BeEmpty())
 	})
 })
