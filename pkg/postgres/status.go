@@ -153,10 +153,13 @@ type PostgresqlStatusList struct {
 func (list *PostgresqlStatusList) LogStatus(ctx context.Context, logLevel string) {
 	contextLogger := log.FromContext(ctx)
 
-	for _, item := range list.Items {
+	total := len(list.Items)
+	for idx, item := range list.Items {
 		message := fmt.Sprintf(
-			"instance status, name: %s, currentLsn: %s, receivedLsn: %s, replayLsn: %s, isPrimary: %v,"+
+			"instance (%d of %d) status, name: %s, currentLsn: %s, receivedLsn: %s, replayLsn: %s, isPrimary: %v,"+
 				"isReady: %v, pendingRestart: %v, pendingRestartForDecrease: %v",
+			idx+1,
+			total,
 			item.Pod.Name,
 			item.CurrentLsn,
 			item.ReceivedLsn,
