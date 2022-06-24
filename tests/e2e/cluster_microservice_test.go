@@ -37,11 +37,10 @@ import (
 
 var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
 	const (
-		level                 = tests.Medium
-		sourceSampleFile      = fixturesDir + "/cluster_microservice/cluster-base.yaml"
-		ImportClusterFile     = fixturesDir + "/cluster_microservice/cluster_microservice.yaml"
-		tableName             = "to_import"
-		expectedEpasImageName = "quay.io/enterprisedb/edb-postgres-advanced:14.2"
+		level             = tests.Medium
+		sourceSampleFile  = fixturesDir + "/cluster_microservice/cluster-base.yaml"
+		ImportClusterFile = fixturesDir + "/cluster_microservice/cluster_microservice.yaml"
+		tableName         = "to_import"
 	)
 
 	var namespace, clusterName, importedClusterName string
@@ -179,11 +178,6 @@ var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
 				namespace = "cnp-microservice-different-db-version"
 				importedClusterName = "cluster-pgdump-different-db-version"
 				expectedImageNameForImportedCluster := versions.DefaultImageName
-				// if redwood env value is true/false then will take image type as epas
-				// else image type as postgreSQL
-				if os.Getenv("E2E_ENABLE_REDWOOD") != "" {
-					expectedImageNameForImportedCluster = expectedEpasImageName
-				}
 				assertImportDataUsingDifferentDatabases(namespace, sourceSampleFile, importedClusterName,
 					tableName, expectedImageNameForImportedCluster)
 			}
