@@ -35,23 +35,23 @@ import (
 )
 
 // On the source cluster we
-// 1. have some different roles, and one of then should be a superuser
-// 2. have multiple databases, owned by different role
+// 1. have several roles, and one of them should be a superuser
+// 2. have multiple databases, owned by different roles
 // we should check on the target cluster :
-// 1. contains any database in the source database, owned by the respective role
+// 1. imported all the specified databases, keeping the correct owner
 // 2. the superuser role should have been downgraded to a normal user
 // and testData :
 // Taking two database i.e. db1 and db2 and two roles testuserone and testusertwo
-var _ = Describe("Monolithic Approach To Cluster Import", func() {
+var _ = Describe("Imports with Monolithic Approach", func() {
 	const (
-		level                       = tests.Medium
-		sourceClusterFile           = fixturesDir + "/base/cluster-storage-class.yaml"
-		targetClusterName           = "cluster-target"
-		tableName                   = "to_import"
-		databaseUserAsSuperUserRole = "testuserone"
-		databaseUserTwo             = "testusertwo"
-		databaseOne                 = "db1"
-		databaseTwo                 = "db2"
+		level             = tests.Medium
+		sourceClusterFile = fixturesDir + "/base/cluster-storage-class.yaml"
+		targetClusterName = "cluster-target"
+		tableName         = "to_import"
+		databaseSuperUser = "testuserone" // one of the DB users should be a superuser
+		databaseUserTwo   = "testusertwo"
+		databaseOne       = "db1"
+		databaseTwo       = "db2"
 	)
 
 	var namespace, sourceClusterName string
@@ -73,16 +73,15 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 		err := env.DeleteNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	It("can import data from a PostgreSQL cluster with a different major version "+
-		"using monolithic approach", func() {
+	It("can import data from a cluster with a different major version", func() {
 		var primaryPod *corev1.Pod
 		var targetDatabasePrimaryPod *corev1.Pod
 		var err error
-		expectedDatabases := []string{databaseOne, databaseTwo}
-		expectedRoles := []string{databaseUserAsSuperUserRole, databaseUserTwo}
+		sourceDatabases := []string{databaseOne, databaseTwo}
+		sourceRoles := []string{databaseSuperUser, databaseUserTwo}
 		commandTimeout := time.Second * 5
 
-		By("creating source cluster", func() {
+		By("creating the source cluster", func() {
 			namespace = "cluster-monolith"
 			sourceClusterName, err = env.GetResourceNameFromYAML(sourceClusterFile)
 			Expect(err).ToNot(HaveOccurred())
@@ -91,12 +90,12 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 			AssertCreateCluster(namespace, sourceClusterName, sourceClusterFile, env)
 		})
 
-		By("creating some different roles, and one of then should be a superuser", func() {
+		By("creating several roles, one of them a superuser", func() {
 			primaryPod, err = env.GetClusterPrimary(namespace, sourceClusterName)
 			Expect(err).ToNot(HaveOccurred())
 			// create 1st user with superuser role
 			createSuperUserQuery := fmt.Sprintf("create user %v with superuser password '123';",
-				databaseUserAsSuperUserRole)
+				databaseSuperUser)
 			_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", createSuperUserQuery)
 			Expect(err).ToNot(HaveOccurred())
@@ -108,34 +107,22 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("have multiple databases, owned by different role", func() {
-			// create 1st database
-			createDatabaseQuery := fmt.Sprintf("create database %v;", databaseOne)
-			_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", createDatabaseQuery)
-			Expect(err).ToNot(HaveOccurred())
+		By("creating the source databases", func() {
+			queries := []string{
+				fmt.Sprintf("create database %v;", databaseOne),
+				fmt.Sprintf("alter database %v owner to %v;", databaseOne, databaseSuperUser),
+				fmt.Sprintf("create database %v", databaseTwo),
+				fmt.Sprintf("alter database %v owner to %v;", databaseTwo, databaseUserTwo),
+			}
 
-			// assign ownership as superuser role
-			alterDatabaseRoleQuery := fmt.Sprintf("alter database %v owner to %v;",
-				databaseOne, databaseUserAsSuperUserRole)
-			_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", alterDatabaseRoleQuery)
-			Expect(err).ToNot(HaveOccurred())
-
-			// create 2nd database
-			createDatabaseQuery = fmt.Sprintf("create database %v", databaseTwo)
-			_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", createDatabaseQuery)
-			Expect(err).ToNot(HaveOccurred())
-
-			// assign ownership as normal user
-			alterDatabaseRoleQuery = fmt.Sprintf("alter database %v owner to %v;", databaseTwo, databaseUserTwo)
-			_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", alterDatabaseRoleQuery)
-			Expect(err).ToNot(HaveOccurred())
+			for _, query := range queries {
+				_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
+					&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", query)
+				Expect(err).ToNot(HaveOccurred())
+			}
 
 			// create test data and insert some records in both databases
-			for _, database := range expectedDatabases {
+			for _, database := range sourceDatabases {
 				query := fmt.Sprintf("CREATE TABLE %v AS VALUES (1), (2);", tableName)
 				_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
 					&commandTimeout, "psql", "-U", "postgres", fmt.Sprintf("%v", database),
@@ -146,24 +133,24 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 
 		By("creating target cluster", func() {
 			postgresImage := os.Getenv("POSTGRES_IMG")
-			Expect(postgresImage).ShouldNot(BeEmpty(), "POSTGRES_IMG env could not be empty")
+			Expect(postgresImage).ShouldNot(BeEmpty(), "POSTGRES_IMG env should not be empty")
 			expectedImageName, err := testsUtils.BumpPostgresImageMajorVersion(postgresImage)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(expectedImageName).ShouldNot(BeEmpty(), "imageName could not be empty")
-			err = createTargetCluster(namespace,
+			err = importDatabasesMonolith(namespace,
 				sourceClusterName,
 				targetClusterName,
 				expectedImageName,
-				expectedDatabases,
-				expectedRoles)
+				sourceDatabases,
+				sourceRoles)
 			Expect(err).ToNot(HaveOccurred())
 			AssertClusterIsReady(namespace, targetClusterName, 600, env)
 		})
 
-		By("verify that any database in the source database, owned by the respective role", func() {
+		By("verifying that the specified source databases were imported", func() {
 			targetDatabasePrimaryPod, err = env.GetClusterPrimary(namespace, targetClusterName)
 			Expect(err).ToNot(HaveOccurred())
-			for _, database := range expectedDatabases {
+			for _, database := range sourceDatabases {
 				databaseEntryQuery := fmt.Sprintf("SELECT datname FROM pg_database where datname='%v'", database)
 				stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *targetDatabasePrimaryPod,
 					specs.PostgresContainerName, &commandTimeout,
@@ -173,17 +160,17 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 			}
 		})
 
-		By(fmt.Sprintf("verify that superuser '%v' role should downgraded to a normal user",
-			databaseUserAsSuperUserRole), func() {
+		By(fmt.Sprintf("verifying that the source superuser '%s' became a normal user in target",
+			databaseSuperUser), func() {
 			getSuperUserQuery := "select * from pg_user where usesuper"
 			stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *targetDatabasePrimaryPod, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", getSuperUserQuery)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(strings.Contains(stdOut, databaseUserAsSuperUserRole)).Should(BeFalse())
+			Expect(strings.Contains(stdOut, databaseSuperUser)).Should(BeFalse())
 		})
 
-		By("verifying test data in databases on targeted cluster", func() {
-			for _, database := range expectedDatabases {
+		By("verifying the test data was imported from the source databases", func() {
+			for _, database := range sourceDatabases {
 				selectQuery := fmt.Sprintf("select count(*) from %v", tableName)
 				stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *targetDatabasePrimaryPod,
 					specs.PostgresContainerName, &commandTimeout, "psql", "-U", "postgres",
@@ -195,7 +182,10 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 	})
 })
 
-func createTargetCluster(
+// importDatabasesMonolith creates a new cluster spec importing from a sourceCluster
+// using the Monolith approach.
+// Imports all the specified `databaseNames` and `roles` from the source cluster
+func importDatabasesMonolith(
 	namespace,
 	sourceClusterName,
 	importedClusterName,

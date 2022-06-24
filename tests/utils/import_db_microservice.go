@@ -26,9 +26,9 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CreateClusterFromExternalCluster creates a cluster, starting from an external cluster
+// ImportDatabaseMicroservice creates a cluster, starting from an external cluster
 // using microservice approach
-func CreateClusterFromExternalCluster(namespace, importedClusterName, sourceClusterName,
+func ImportDatabaseMicroservice(namespace, importedClusterName, sourceClusterName,
 	databaseName string, env *TestingEnvironment, imageName string,
 ) error {
 	if imageName == "" {

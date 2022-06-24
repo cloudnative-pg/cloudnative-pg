@@ -35,15 +35,21 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
+// Tests using a microservice approach to import a database from external cluster
+// It covers four scenarios
+// 1. With large object
+// 2. Normal use case
+// 3. Different database names
+// 4. Failure
+// 5. Different versions of Postgres
+var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRestore), func() {
 	const (
-		level             = tests.Medium
-		sourceSampleFile  = fixturesDir + "/cluster_microservice/cluster-base.yaml"
-		ImportClusterFile = fixturesDir + "/cluster_microservice/cluster_microservice.yaml"
-		tableName         = "to_import"
+		level            = tests.Medium
+		sourceSampleFile = fixturesDir + "/cluster_microservice/cluster-base.yaml"
+		tableName        = "to_import"
 	)
 
-	var namespace, clusterName, importedClusterName string
+	var namespace, sourceClusterName, importedClusterName string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -63,127 +69,98 @@ var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	Context("using microservice approach", func() {
-		// This is a set of tests using a microservice to import database from external cluster
-		// It covers four scenarios
-		// 1. positive with large object 2.Normalization
-		// 3. Different db 4. Negative
-		It("with large objects", func() {
-			// Test case to import DB having large object
-			var err error
-			// Namespace name
-			namespace = "microservice-large-object"
-			// Fetching Source Cluster Name
-			clusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
-			Expect(err).ToNot(HaveOccurred())
-			// Name of the cluster to be created using source cluster
-			importedClusterName = "cluster-pgdump-large-object"
-			// Creating NameSpace.
-			err = env.CreateNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-			// Creating source cluster
-			AssertCreateCluster(namespace, clusterName, sourceSampleFile, env)
-			// Create required test data on source db
-			// Write a table and some data on the "app" database
-			AssertCreateTestData(namespace, clusterName, tableName)
-			// Creating Large Objects on source DB.
-			AssertCreateTestDataLargeObject(namespace, clusterName)
-			// Creating new cluster using source cluster.
-			AssertClusterImport(namespace, importedClusterName, clusterName, "app")
-			// Test data should be present on restored primary and on app database
-			primary := importedClusterName + "-1"
-			AssertDataExpectedCount(namespace, primary, tableName, 2)
-			// Large object should be present on restored cluster primary.
-			AssertLargeObjectValue(namespace, primary, 16393)
-		})
+	It("can import a database with large objects", func() {
+		var err error
+		namespace = "microservice-large-object"
+		sourceClusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
+		Expect(err).ToNot(HaveOccurred())
 
-		It("having normalization", func() {
-			// This test case includes data insertion on a new table on source db
-			// assigning app user as read only rights and importing the same.
-			var err error
-			// NameSpace Name
-			namespace = "microservice-normalization"
-			// Fetching Source Cluster Name
-			clusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
-			Expect(err).ToNot(HaveOccurred())
-			// Name of the cluster to be created using source cluster
-			importedClusterName = "cluster-pgdump-normalization"
-			// Creating NameSpace.
-			err = env.CreateNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-			// Creating source cluster
-			AssertCreateCluster(namespace, clusterName, sourceSampleFile, env)
-			// Create table user and assign ownership on source DB table and insert records
-			assertDataOnSourceCluster(namespace, tableName, clusterName)
-			// Creating new cluster using source cluster.
-			AssertClusterImport(namespace, importedClusterName, clusterName, "app")
-			// Test data should be present on restored primary and on app DB
-			primary := importedClusterName + "-1"
-			AssertDataExpectedCount(namespace, primary, tableName, 2)
-			// Verify Data on Imported cluster Like tables and user not present as on source.
-			assertDataOnImportedCluster(namespace, tableName, importedClusterName)
-		})
+		oid := 16393
+		err = env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
+		AssertCreateTestData(namespace, sourceClusterName, tableName)
+		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid)
 
-		It("using different database ", func() {
-			namespace = "microservice-different-db"
-			importedClusterName = "cluster-pgdump-different-db"
-			assertImportDataUsingDifferentDatabases(namespace, sourceSampleFile,
-				importedClusterName, tableName, "")
-		})
+		importedClusterName = "cluster-pgdump-large-object"
+		AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
+		primary := importedClusterName + "-1"
+		AssertDataExpectedCount(namespace, primary, tableName, 2)
+		AssertLargeObjectValue(namespace, primary, oid)
+	})
 
-		It("having a non existing db on source", func() {
-			// Test case which will check cluster is not created when we use a
-			// nonexistent database in cluster definition while importing
-			var err error
-			// NameSpace Name
-			namespace = "cnpg-microservice-error"
-			// Fetching Source Cluster Name
-			clusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
-			Expect(err).ToNot(HaveOccurred())
-			// Name of the cluster to be created using source cluster
-			importedClusterName = "cluster-pgdump-error"
-			// Creating NameSpace.
-			err = env.CreateNamespace(namespace)
-			Expect(err).ToNot(HaveOccurred())
-			// Creating source cluster
-			AssertCreateCluster(namespace, clusterName, sourceSampleFile, env)
-			// Creating new cluster using source cluster.
-			CreateResourceFromFile(namespace, ImportClusterFile)
-			By("having a imported Cluster in failed state", func() {
-				namespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      importedClusterName + "-1-import",
-				}
-				// Eventually the number of failed job should be greater than 1
-				// which will ensure the cluster not getting created
-				job := &batchv1.Job{}
-				Eventually(func(g Gomega) int32 {
-					err := env.Client.Get(env.Ctx, namespacedName, job)
-					g.Expect(err).ToNot(HaveOccurred())
-					return job.Status.Failed
-				}, 100).Should(BeEquivalentTo(1))
-			})
-		})
+	It("can import database", func() {
+		var err error
+		namespace = "microservice-normalization"
+		sourceClusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
+		Expect(err).ToNot(HaveOccurred())
+		err = env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
+		assertCreateTableWithDataOnSourceCluster(namespace, tableName, sourceClusterName)
 
-		// verify the PostgreSQL 11 as source DB, and PostgreSQL 14 as target DB
-		It("can import the PostgreSQL 11 as source, and PostgreSQL 14 as target", func() {
-			postgresImage := os.Getenv("POSTGRES_IMG")
-			desiredSourceVersion := "11"
-			if !strings.Contains(postgresImage, ":"+desiredSourceVersion) {
-				Skip("This test is only applicable for PostgreSQL " + desiredSourceVersion)
-			} else {
-				namespace = "microservice-different-db-version"
-				importedClusterName = "cluster-pgdump-different-db-version"
-				expectedImageNameForImportedCluster := versions.DefaultImageName
-				assertImportDataUsingDifferentDatabases(namespace, sourceSampleFile, importedClusterName,
-					tableName, expectedImageNameForImportedCluster)
+		importedClusterName = "cluster-pgdump-normalization"
+		AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
+		primary := importedClusterName + "-1"
+		AssertDataExpectedCount(namespace, primary, tableName, 2)
+		assertTableAndDataOnImportedCluster(namespace, tableName, importedClusterName)
+	})
+
+	It("can select one from several databases to import", func() {
+		namespace = "microservice-different-db"
+		importedClusterName = "cluster-pgdump-different-db"
+		assertImportRenamesSelectedDatabase(namespace, sourceSampleFile,
+			importedClusterName, tableName, "")
+	})
+
+	It("fails importing when db does not exist in source cluster", func() {
+		// Test case which will check cluster is not created when we use a
+		// nonexistent database in cluster definition while importing
+		var err error
+		namespace = "cnpg-microservice-error"
+		sourceClusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
+		Expect(err).ToNot(HaveOccurred())
+		err = env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
+
+		importedClusterName = "cluster-pgdump-error"
+		importClusterNonexistentDB := fixturesDir + "/cluster_microservice/cluster_microservice.yaml"
+		CreateResourceFromFile(namespace, importClusterNonexistentDB)
+		By("having a imported Cluster in failed state", func() {
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      importedClusterName + "-1-logicalsnapshot",
 			}
+			// Eventually the number of failed job should be greater than 1
+			// which will ensure the cluster not getting created
+			job := &batchv1.Job{}
+			Eventually(func(g Gomega) int32 {
+				err := env.Client.Get(env.Ctx, namespacedName, job)
+				g.Expect(err).ToNot(HaveOccurred())
+				return job.Status.Failed
+			}, 100).Should(BeEquivalentTo(1))
 		})
+	})
+
+	It("can import from a PostgreSQL 11 cluster into a PostgreSQL 14 cluster", func() {
+		postgresImage := os.Getenv("POSTGRES_IMG")
+		desiredSourceVersion := "11"
+		if !strings.Contains(postgresImage, ":"+desiredSourceVersion) {
+			Skip("This test is only applicable for PostgreSQL " + desiredSourceVersion)
+		} else {
+			namespace = "microservice-different-db-version"
+			importedClusterName = "cluster-pgdump-different-db-version"
+			expectedImageNameForImportedCluster := versions.DefaultImageName
+			assertImportRenamesSelectedDatabase(namespace, sourceSampleFile, importedClusterName,
+				tableName, expectedImageNameForImportedCluster)
+		}
 	})
 })
 
-// assertDataOnSourceCluster will generate super password and necessary assert on db
-func assertDataOnSourceCluster(
+// assertCreateTableWithDataOnSourceCluster creates a new user `micro` in the source cluster,
+// and uses the `postgres` superuser to generate a new table and assign ownership to `micro`
+func assertCreateTableWithDataOnSourceCluster(
 	namespace,
 	tableName,
 	clusterName string,
@@ -206,13 +183,13 @@ func assertDataOnSourceCluster(
 	})
 }
 
-// assertDataOnImportedCluster  will generate super password and necessary assert on imported cluster
-func assertDataOnImportedCluster(
+// assertTableAndDataOnImportedCluster  verifies the data created in source was imported
+func assertTableAndDataOnImportedCluster(
 	namespace,
 	tableName,
 	importedClusterName string,
 ) {
-	By("generate super user password,rw service name on Imported cluster", func() {
+	By("verifying presence of table and data from source in imported cluster", func() {
 		// Fetch import cluster name
 		importedPrimaryPod, err := env.GetClusterPrimary(namespace, importedClusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -229,7 +206,7 @@ func assertDataOnImportedCluster(
 				generatedSuperuserPassword, queryImported, env)
 			Expect(strings.Contains(out, tableName), err).Should(BeTrue())
 		})
-		By("Verify created user on source is not present on imported database", func() {
+		By("verifying the user named 'micro' on source is not in imported database", func() {
 			outUser, _, err := testsUtils.RunQueryFromPod(
 				importedPrimaryPod, importedrwService, "app", "postgres",
 				generatedSuperuserPassword, "\\du", env)
@@ -238,7 +215,10 @@ func assertDataOnImportedCluster(
 	})
 }
 
-func assertImportDataUsingDifferentDatabases(
+// assertImportRenamesSelectedDatabase verifies that a single DB from a source cluster
+// with several DB's can be imported, and that in the imported cluster, the table is
+// called 'app'
+func assertImportRenamesSelectedDatabase(
 	namespace,
 	sampleFile,
 	importedClusterName,
@@ -255,7 +235,7 @@ func assertImportDataUsingDifferentDatabases(
 	Expect(err).ToNot(HaveOccurred())
 	AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
-	By("create multiple db on source and set ownership to app", func() {
+	By("creating multiple dbs on source and set ownership to app", func() {
 		sourceClusterPrimaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		timeout := time.Second * 2
@@ -272,7 +252,7 @@ func assertImportDataUsingDifferentDatabases(
 		}
 	})
 
-	By(fmt.Sprintf("create table '%s' and insert records on db %v", tableName, dbToImport), func() {
+	By(fmt.Sprintf("creating table '%s' and insert records on selected db %v", tableName, dbToImport), func() {
 		var getSuperUserPassword string
 		getSuperUserPassword, err = testsUtils.GetPassword(clusterName, namespace, "superuser", env)
 		Expect(err).ToNot(HaveOccurred())
@@ -290,32 +270,27 @@ func assertImportDataUsingDifferentDatabases(
 	})
 
 	By("importing Database with microservice approach in a new cluster", func() {
-		err = testsUtils.CreateClusterFromExternalCluster(namespace, importedClusterName,
+		err = testsUtils.ImportDatabaseMicroservice(namespace, importedClusterName,
 			clusterName, dbToImport, env, imageName)
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
 		AssertClusterIsReady(namespace, importedClusterName, 800, env)
-		// Restored standby should be attached to restored primary
 		assertClusterStandbysAreStreaming(namespace, importedClusterName)
 	})
 
-	// Test data should be present on restored primary
 	importedClusterPrimaryInfo, err = env.GetClusterPrimary(namespace, importedClusterName)
 	Expect(err).ToNot(HaveOccurred())
-	// Check the data created in "db2" is now present in "app" in the created cluster
 	AssertDataExpectedCount(namespace, importedClusterPrimaryInfo.Name, tableName, 2)
 
-	By("verify that only 'app' DB exists in the imported cluster", func() {
+	By("verifying that only 'app' DB exists in the imported cluster", func() {
 		var getSuperUserPassword string
 		getSuperUserPassword, err = testsUtils.GetPassword(importedClusterName, namespace, "superuser", env)
 		Expect(err).ToNot(HaveOccurred())
 		rwService := fmt.Sprintf("%v-rw.%v.svc", importedClusterName, namespace)
-		stdOut, _, err := testsUtils.RunQueryFromPod(importedClusterPrimaryInfo, rwService,
+		dbList, _, err := testsUtils.RunQueryFromPod(importedClusterPrimaryInfo, rwService,
 			"postgres", "postgres", getSuperUserPassword, "\\l", env)
 		Expect(err).ToNot(HaveOccurred(), err)
-		// “db2” database should not exist in the destination cluster
-		Expect(strings.Contains(stdOut, "db2"), err).Should(BeFalse())
-		// “app” database is the only one existing in the destination cluster
-		Expect(strings.Contains(stdOut, "app"), err).Should(BeTrue())
+		Expect(strings.Contains(dbList, "db2"), err).Should(BeFalse())
+		Expect(strings.Contains(dbList, "app"), err).Should(BeTrue())
 	})
 }

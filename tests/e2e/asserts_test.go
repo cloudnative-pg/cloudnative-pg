@@ -357,13 +357,13 @@ func AssertCreateTestData(namespace, clusterName, tableName string) {
 }
 
 // AssertCreateTestDataLargeObject create large objects on primary pod
-func AssertCreateTestDataLargeObject(namespace, clusterName string) {
+func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int) {
 	By("creating large object", func() {
 		primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).NotTo(HaveOccurred())
 		commandTimeout := time.Second * 5
-		query := fmt.Sprintf("CREATE TABLE image (name text,raster oid); " +
-			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_import('/etc/motd', 16393));")
+		query := fmt.Sprintf("CREATE TABLE image (name text,raster oid); "+
+			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_import('/etc/motd', %d));", oid)
 		_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		Expect(err).ToNot(HaveOccurred())
@@ -407,7 +407,7 @@ func AssertDataExpectedCount(namespace, podName, tableName string, expectedValue
 	})
 }
 
-// AssertLargeObjectValue verifies that an expected large objects  exist on the table using OID
+// AssertLargeObjectValue verifies the presence of a Large Object given by its OID
 func AssertLargeObjectValue(namespace, podName string, oid int) {
 	By(fmt.Sprintf("verifying large object on pod %v", podName), func() {
 		query := fmt.Sprintf("SELECT lo_get(%v);", oid)
@@ -1339,9 +1339,11 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
 	})
 }
 
+// AssertClusterImport verifies that a database has been imported into a new cluster,
+// and that the new cluster is functioning properly
 func AssertClusterImport(namespace, clusterWithExternalClusterName, clusterName, databaseName string) {
 	By("Importing Database in a new cluster", func() {
-		err := testsUtils.CreateClusterFromExternalCluster(namespace, clusterWithExternalClusterName,
+		err := testsUtils.ImportDatabaseMicroservice(namespace, clusterWithExternalClusterName,
 			clusterName, databaseName, env, "")
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
