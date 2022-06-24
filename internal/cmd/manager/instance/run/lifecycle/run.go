@@ -28,7 +28,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	postgresUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // runPostgresAndWait runs a goroutine which will run, configure and run Postgres itself,
@@ -95,7 +94,7 @@ func configureInstancePermissions(instance *postgres.Instance) error {
 		return nil
 	}
 
-	majorVersion, err := postgresUtils.GetMajorVersion(instance.PgData)
+	majorVersion, err := postgres.GetMajorVersion(instance.PgData)
 	if err != nil {
 		return fmt.Errorf("while getting major version: %w", err)
 	}

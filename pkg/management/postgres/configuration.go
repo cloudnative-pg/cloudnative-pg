@@ -189,7 +189,7 @@ func UpdateReplicaConfiguration(pgData string, clusterName string, podName strin
 // UpdateReplicaConfigurationForPrimary updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
 func UpdateReplicaConfigurationForPrimary(pgData string, primaryConnInfo string) (changed bool, err error) {
-	major, err := postgres.GetMajorVersion(pgData)
+	major, err := GetMajorVersion(pgData)
 	if err != nil {
 		return false, err
 	}

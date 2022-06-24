@@ -35,11 +35,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
-	}
-	if cluster.Spec.Bootstrap.InitDB.Import != nil {
-		initCommand = append(initCommand, "logicalsnapshot")
-	} else {
-		initCommand = append(initCommand, "init")
+		"init",
 	}
 
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.InitDB != nil {

@@ -20,18 +20,21 @@ limitations under the License.
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os/exec"
 	"path"
 
 	"github.com/lib/pq"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
@@ -245,16 +248,30 @@ func (info InitInfo) executeQueries(sqlUser *sql.DB, queries []string) error {
 	return nil
 }
 
+// BootstrapInitCallback allows the caller to execute operations after the initialization of a database
+// while the Postgres instance is still running
+type BootstrapInitCallback func(ctx context.Context, client ctrl.Client, instance *Instance, cluster *apiv1.Cluster) error
+
 // Bootstrap creates and configures this new PostgreSQL instance
-func (info InitInfo) Bootstrap() error {
-	err := info.CreateDataDirectory()
+func (info InitInfo) Bootstrap(ctx context.Context, initializationCallback BootstrapInitCallback) error {
+	typedClient, err := management.NewControllerRuntimeClient()
+	if err != nil {
+		return err
+	}
+
+	cluster, err := info.loadCluster(ctx, typedClient)
+	if err != nil {
+		return err
+	}
+
+	err = info.CreateDataDirectory()
 	if err != nil {
 		return err
 	}
 
 	instance := info.GetInstance()
 
-	majorVersion, err := postgres.GetMajorVersion(instance.PgData)
+	majorVersion, err := GetMajorVersion(instance.PgData)
 	if err != nil {
 		return fmt.Errorf("while reading major version: %w", err)
 	}
@@ -273,6 +290,10 @@ func (info InitInfo) Bootstrap() error {
 			return fmt.Errorf("while configuring new instance: %w", err)
 		}
 
+		err = initializationCallback(ctx, typedClient, instance, cluster)
+		if err != nil {
+			return fmt.Errorf("while initializing new instance: %w", err)
+		}
 		return nil
 	})
 }

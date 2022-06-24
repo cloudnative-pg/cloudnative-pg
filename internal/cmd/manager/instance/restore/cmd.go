@@ -37,7 +37,7 @@ func NewCmd() *cobra.Command {
 		Use:           "restore [flags]",
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := context.Background()
+			ctx := cmd.Context()
 
 			info := postgres.InitInfo{
 				ClusterName: clusterName,
