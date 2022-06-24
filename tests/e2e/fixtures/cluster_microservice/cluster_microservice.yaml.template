@@ -19,7 +19,7 @@ spec:
   externalClusters:
     - name: cluster-microservice
       connectionParameters:
-        host: cluster-microservice-rw.cnp-microservice-error.svc
+        host: cluster-microservice-rw.microservice-error.svc
         user: postgres
         dbname: postgres
       password:

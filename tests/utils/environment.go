@@ -206,6 +206,22 @@ func (env TestingEnvironment) IsAKS() (bool, error) {
 	return true, nil
 }
 
+// IsEKS returns true if we run on amazon EKS Service. We check that
+// by verifying if all the node names start with "ip-"
+func (env TestingEnvironment) IsEKS() (bool, error) {
+	nodeList := &corev1.NodeList{}
+	if err := GetObjectList(&env, nodeList, client.InNamespace("")); err != nil {
+		return false, err
+	}
+	for _, node := range nodeList.Items {
+		re := regexp.MustCompile("^ip-")
+		if len(re.FindAllString(node.Name, -1)) == 0 {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 // IsIBM returns true if we are running on IBM architecture. We check that
 // by verifying if IBM_ARCH env is equals to "true"
 func (env TestingEnvironment) IsIBM() bool {

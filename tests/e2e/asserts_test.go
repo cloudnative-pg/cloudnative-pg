@@ -19,6 +19,7 @@ package e2e
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -608,25 +609,31 @@ func AssertStorageCredentialsAreCreated(namespace string, name string, id string
 	}, 60, 5).Should(BeNil())
 }
 
-// AssertArchiveWalOnMinio to archive walls and verify that exists
-func AssertArchiveWalOnMinio(namespace, clusterName string) {
+// minioPath gets the MinIO file string for WAL/backup objects in a configured bucket
+func minioPath(serverName, fileName string) string {
+	// the * regexes enable matching these typical paths:
+	// 	minio/backups/serverName/base/20220618T140300/data.tar
+	// 	minio/backups/serverName/wals/0000000100000000/000000010000000000000002.gz
+	return filepath.Join("*", serverName, "*", "*", fileName)
+}
+
+// AssertArchiveWalOnMinio archives WALs and verifies that they are in the storage
+func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
+	var latestWALPath string
 	// Create a WAL on the primary and check if it arrives at minio, within a short time
 	By("archiving WALs and verifying they exist", func() {
 		pod, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		primary := pod.GetName()
-		out, _, err := testsUtils.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			namespace,
-			primary,
-			switchWalCmd))
-		Expect(err).ToNot(HaveOccurred())
+		latestWAL := switchWalAndGetLatestArchive(namespace, primary)
+		latestWALPath = minioPath(serverName, latestWAL+".gz")
+	})
 
-		latestWAL := strings.TrimSpace(out)
+	By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {
 		Eventually(func() (int, error) {
 			// WALs are compressed with gzip in the fixture
-			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestWAL+".gz")
-		}, 30).Should(BeEquivalentTo(1))
+			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestWALPath)
+		}, 60).Should(BeEquivalentTo(1))
 	})
 }
 
@@ -1240,7 +1247,7 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		Expect(err).ToNot(HaveOccurred())
 
 		insertRecordIntoTable(namespace, sourceClusterName, tableName, 3)
-		AssertArchiveWalOnMinio(namespace, sourceClusterName)
+		AssertArchiveWalOnMinio(namespace, sourceClusterName, sourceClusterName)
 
 		AssertDataExpectedCount(namespace, primary.Name, tableName, 3)
 
@@ -1533,14 +1540,7 @@ func AssertArchiveWalOnAzurite(namespace, clusterName string) {
 	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
 	By("archiving WALs and verifying they exist", func() {
 		primary := clusterName + "-1"
-		out, _, err := testsUtils.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			namespace,
-			primary,
-			switchWalCmd))
-		Expect(err).ToNot(HaveOccurred())
-
-		latestWAL := strings.TrimSpace(out)
+		latestWAL := switchWalAndGetLatestArchive(namespace, primary)
 		// verifying on blob storage using az
 		// Define what file we are looking for in Azurite.
 		// Escapes are required since az expects forward slashes to be escaped
@@ -1557,22 +1557,34 @@ func AssertArchiveWalOnAzureBlob(namespace, clusterName, azStorageAccount, azSto
 	By("archiving WALs and verifying they exist", func() {
 		primary, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		out, _, err := testsUtils.Run(fmt.Sprintf(
-			"kubectl exec -n %v %v -- %v",
-			primary.Namespace,
-			primary.Name,
-			switchWalCmd))
-		Expect(err).ToNot(HaveOccurred())
-
-		latestWAL := strings.TrimSpace(out)
+		latestWAL := switchWalAndGetLatestArchive(primary.Namespace, primary.Name)
 		// Define what file we are looking for in Azure.
 		// Escapes are required since az expects forward slashes to be escaped
 		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
 		// Verifying on blob storage using az
 		Eventually(func() (int, error) {
 			return testsUtils.CountFilesOnAzureBlobStorage(azStorageAccount, azStorageKey, clusterName, path)
-		}, 30).Should(BeEquivalentTo(1))
+		}, 60).Should(BeEquivalentTo(1))
 	})
+}
+
+// switchWalAndGetLatestArchive trigger a new wal and get the name of latest wal file
+func switchWalAndGetLatestArchive(namespace, podName string) string {
+	_, _, err := testsUtils.Run(fmt.Sprintf(
+		"kubectl exec -n %v %v -- %v",
+		namespace,
+		podName,
+		checkPointCmd))
+	Expect(err).ToNot(HaveOccurred())
+
+	out, _, err := testsUtils.Run(fmt.Sprintf(
+		"kubectl exec -n %v %v -- %v",
+		namespace,
+		podName,
+		getLatestWalCmd))
+	Expect(err).ToNot(HaveOccurred())
+
+	return strings.TrimSpace(out)
 }
 
 func prepareClusterForPITROnMinio(
@@ -1586,10 +1598,11 @@ func prepareClusterForPITROnMinio(
 
 	By("backing up a cluster and verifying it exists on minio", func() {
 		testsUtils.ExecuteBackup(namespace, backupSampleFile, env)
-
+		latestTar := minioPath(clusterName, "data.tar")
 		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnMinio(namespace, minioClientName, "data.tar")
-		}, 30).Should(BeEquivalentTo(expectedVal))
+			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
+		}, 60).Should(BeEquivalentTo(expectedVal),
+			fmt.Sprintf("verify the number of backups %v is equals to %v", latestTar, expectedVal))
 		Eventually(func() (string, error) {
 			cluster := &apiv1.Cluster{}
 			err := env.Client.Get(env.Ctx,
@@ -1611,7 +1624,7 @@ func prepareClusterForPITROnMinio(
 	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableNamePitr), func() {
 		insertRecordIntoTable(namespace, clusterName, tableNamePitr, 3)
 	})
-	AssertArchiveWalOnMinio(namespace, clusterName)
+	AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 	AssertArchiveConditionMet(namespace, clusterName, "5m")
 	AssertBackupConditionInClusterStatus(namespace, clusterName)
 }

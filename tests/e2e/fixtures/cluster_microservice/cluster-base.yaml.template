@@ -26,7 +26,6 @@ spec:
     initdb:
       database: app
       owner: app
-      redwood: ${E2E_ENABLE_REDWOOD}
 
   # Persistent storage configuration
   storage:

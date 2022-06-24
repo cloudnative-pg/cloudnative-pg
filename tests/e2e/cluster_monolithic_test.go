@@ -66,8 +66,6 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace,
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
-			env.DumpNamespaceObjects(namespace,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 
@@ -149,7 +147,7 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 		By("creating target cluster", func() {
 			postgresImage := os.Getenv("POSTGRES_IMG")
 			Expect(postgresImage).ShouldNot(BeEmpty(), "POSTGRES_IMG env could not be empty")
-			expectedImageName, err := testsUtils.BumpPostgresImageVersion(postgresImage)
+			expectedImageName, err := testsUtils.BumpPostgresImageMajorVersion(postgresImage)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(expectedImageName).ShouldNot(BeEmpty(), "imageName could not be empty")
 			err = createTargetCluster(namespace,

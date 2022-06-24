@@ -24,8 +24,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
-// BumpPostgresImageVersion returns a postgresImage incrementing the major version of the provided one (if available)
-func BumpPostgresImageVersion(postgresImage string) (string, error) {
+// BumpPostgresImageMajorVersion returns a postgresImage incrementing the major version of the argument (if available)
+func BumpPostgresImageMajorVersion(postgresImage string) (string, error) {
 	imageReference := utils.NewReference(postgresImage)
 
 	postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)

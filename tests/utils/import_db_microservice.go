@@ -27,7 +27,7 @@ import (
 )
 
 // CreateClusterFromExternalCluster creates a cluster, starting from an external cluster
-// using cnp microservice
+// using microservice approach
 func CreateClusterFromExternalCluster(namespace, importedClusterName, sourceClusterName,
 	databaseName string, env *TestingEnvironment, imageName string,
 ) error {
