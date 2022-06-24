@@ -19,3 +19,11 @@ docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" -p 8000:8000 \
     minidocks/mkdocs \
     mkdocs serve -a 0.0.0.0:8000
 ```
+
+## Reminders
+
+If you added samples to `docs/src/samples` or modified existing samples, please
+consider if they should be included in the curated [list of examples](src/samples.md)
+
+And please help keeping any samples named `cluster-example-*` in working
+condition. These can be a big help for beginners.

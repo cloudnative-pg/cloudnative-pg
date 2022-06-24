@@ -19,5 +19,7 @@ spec:
         - insert into application_numbers (select generate_series(1,10000))
       dataChecksums: true
       encoding: 'UTF8'
+      localeCollate: 'en_AU.UTF-8'
+      localeCType: 'en_AU.UTF-8'
   storage:
     size: 1Gi

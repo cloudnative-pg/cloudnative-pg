@@ -1,0 +1,30 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-replica-example-backup
+spec:
+  instances: 1
+
+  bootstrap:
+    recovery:
+      source: cluster-example-backup
+
+  replica:
+    enabled: true
+    source: cluster-example-backup
+
+  storage:
+    size: 1Gi
+
+  externalClusters:
+  - name: cluster-example-backup
+    barmanObjectStore:
+      destinationPath: s3://backups/
+      endpointURL: http://minio:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: minio
+          key: ACCESS_SECRET_KEY
