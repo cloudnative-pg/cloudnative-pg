@@ -55,8 +55,6 @@ var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace,
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
-			env.DumpNamespaceObjects(namespace,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	//
@@ -65,17 +63,16 @@ var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	Context("using cnp microservice", func() {
-		// This is a set of tests using a cnp microservice to import database
-		// from external cluster
-		// It cover four scenarios
+	Context("using microservice approach", func() {
+		// This is a set of tests using a microservice to import database from external cluster
+		// It covers four scenarios
 		// 1. positive with large object 2.Normalization
 		// 3. Different db 4. Negative
 		It("with large objects", func() {
 			// Test case to import DB having large object
 			var err error
 			// Namespace name
-			namespace = "cnp-microservice-large-object"
+			namespace = "microservice-large-object"
 			// Fetching Source Cluster Name
 			clusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
 			Expect(err).ToNot(HaveOccurred())
@@ -105,7 +102,7 @@ var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
 			// assigning app user as read only rights and importing the same.
 			var err error
 			// NameSpace Name
-			namespace = "cnp-microservice-normalization"
+			namespace = "microservice-normalization"
 			// Fetching Source Cluster Name
 			clusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
 			Expect(err).ToNot(HaveOccurred())
@@ -128,7 +125,7 @@ var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
 		})
 
 		It("using different database ", func() {
-			namespace = "cnp-microservice-different-db"
+			namespace = "microservice-different-db"
 			importedClusterName = "cluster-pgdump-different-db"
 			assertImportDataUsingDifferentDatabases(namespace, sourceSampleFile,
 				importedClusterName, tableName, "")
@@ -139,7 +136,7 @@ var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
 			// nonexistent database in cluster definition while importing
 			var err error
 			// NameSpace Name
-			namespace = "cnp-microservice-error"
+			namespace = "cnpg-microservice-error"
 			// Fetching Source Cluster Name
 			clusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
 			Expect(err).ToNot(HaveOccurred())
@@ -175,7 +172,7 @@ var _ = Describe("Importing Database", Label(tests.LabelBackupRestore), func() {
 			if !strings.Contains(postgresImage, ":"+desiredSourceVersion) {
 				Skip("This test is only applicable for PostgreSQL " + desiredSourceVersion)
 			} else {
-				namespace = "cnp-microservice-different-db-version"
+				namespace = "microservice-different-db-version"
 				importedClusterName = "cluster-pgdump-different-db-version"
 				expectedImageNameForImportedCluster := versions.DefaultImageName
 				assertImportDataUsingDifferentDatabases(namespace, sourceSampleFile, importedClusterName,

@@ -66,8 +66,6 @@ var _ = Describe("Monolithic Approach To Cluster Import", func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace,
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
-			env.DumpNamespaceObjects(namespace,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 
