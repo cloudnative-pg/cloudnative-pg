@@ -35,6 +35,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
+const (
+	minioImage       = "minio/minio:RELEASE.2022-06-20T23-13-45Z"
+	minioClientImage = "minio/mc:RELEASE.2022-06-11T21-10-36Z"
+)
+
 // MinioSetup contains the resources needed for a working minio server deployment:
 // a PersistentVolumeClaim, a Deployment and a Service
 type MinioSetup struct {
@@ -135,7 +140,7 @@ func MinioDefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeCl
 						{
 							Name: "minio",
 							// Latest Apache License release
-							Image:   "minio/minio:RELEASE.2020-04-23T00-58-49Z",
+							Image:   minioImage,
 							Command: nil,
 							Args:    []string{"server", "data"},
 							Ports: []corev1.ContainerPort{
@@ -232,7 +237,7 @@ func MinioDefaultPVC(namespace string) (corev1.PersistentVolumeClaim, error) {
 			},
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					"storage": resource.MustParse("2Gi"),
+					"storage": resource.MustParse("4Gi"),
 				},
 			},
 			StorageClassName: &storageClass,
@@ -321,7 +326,7 @@ func MinioDefaultClient(namespace string) corev1.Pod {
 			Containers: []corev1.Container{
 				{
 					Name:  "mc",
-					Image: "minio/mc:RELEASE.2021-04-22T17-40-00Z",
+					Image: minioClientImage,
 					Env: []corev1.EnvVar{
 						{
 							Name:  "MC_HOST_minio",
@@ -391,7 +396,7 @@ func CountFilesOnMinio(namespace string, minioClientName string, path string) (v
 
 // composeFindMinioCmd builds the Minio find command
 func composeFindMinioCmd(path string, serviceName string) string {
-	return fmt.Sprintf("sh -c 'mc find %v --name %v | wc -l'", serviceName, path)
+	return fmt.Sprintf("sh -c 'mc find %v --path %v | wc -l'", serviceName, path)
 }
 
 // GetFileTagsOnMinio will use the minioClient to retrieve the tags in a specified path

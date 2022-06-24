@@ -175,7 +175,9 @@ var _ = Describe("Replica Mode", func() {
 				}, 30).Should(BeEquivalentTo("always"))
 			})
 			By("verify the WALs are archived from the designated primary", func() {
-				AssertArchiveWalOnMinio(replicaNamespace, srcClusterName)
+				// only replica cluster has backup configure to minio,
+				// need the server name  be replica cluster name here
+				AssertArchiveWalOnMinio(replicaNamespace, srcClusterName, replicaClusterName)
 			})
 		})
 	})
