@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -50,6 +49,21 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		}
 		if env.IsIBM() {
 			Skip("This test is not run on an IBM architecture")
+		}
+		isAKS, err := env.IsAKS()
+		Expect(err).ToNot(HaveOccurred())
+		if isAKS {
+			Skip("This test is not run on AKS")
+		}
+		isEKS, err := env.IsEKS()
+		Expect(err).ToNot(HaveOccurred())
+		if isEKS {
+			Skip("This test is not run on EKS")
+		}
+		isGKE, err := env.IsGKE()
+		Expect(err).ToNot(HaveOccurred())
+		if isGKE {
+			Skip("This test is not run on GKE")
 		}
 	})
 
@@ -124,18 +138,13 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			pod, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			primary := pod.GetName()
-			out, _, err := testUtils.Run(fmt.Sprintf(
-				"kubectl exec -n %v %v -- %v",
-				namespace,
-				primary,
-				switchWalCmd))
-			Expect(err).ToNot(HaveOccurred())
-
-			latestWAL = strings.TrimSpace(out)
+			latestWAL = switchWalAndGetLatestArchive(namespace, primary)
+			latestWALPath := minioPath(clusterName, latestWAL+".gz")
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture
-				return testUtils.CountFilesOnMinio(namespace, minioClientName, latestWAL+".gz")
-			}, 30).Should(BeEquivalentTo(1))
+				return testUtils.CountFilesOnMinio(namespace, minioClientName, latestWALPath)
+			}, 60).Should(BeEquivalentTo(1),
+				fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath))
 		})
 
 		By("forging 5 wals on Minio by copying and renaming an existing archive file", func() {
