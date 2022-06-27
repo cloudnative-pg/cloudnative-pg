@@ -411,17 +411,20 @@ func GetConditionsInClusterStatus(
 	clusterName string,
 	env *TestingEnvironment,
 	conditionType apiv1.ClusterConditionType,
-) (*apiv1.ClusterCondition, error) {
+) (*v1.Condition, error) {
 	var cluster *apiv1.Cluster
 	var err error
+
 	cluster, err = env.GetCluster(namespace, clusterName)
 	if err != nil {
 		return nil, err
 	}
+
 	for _, cond := range cluster.Status.Conditions {
-		if cond.Type == conditionType {
+		if cond.Type == string(conditionType) {
 			return &cond, nil
 		}
 	}
+
 	return nil, fmt.Errorf("no condition matching requested type found: %v", conditionType)
 }

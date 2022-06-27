@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -74,6 +75,19 @@ func (r *Cluster) Default() {
 	clusterLog.Info("default", "name", r.Name, "namespace", r.Namespace)
 
 	r.setDefaults(true)
+}
+
+// removeConditionsWithInvalidReason will remove every condition which is not valid
+// anymore from the K8s API point-of-view
+func (r *Cluster) removeConditionsWithInvalidReason() {
+	conditions := make([]metav1.Condition, 0, len(r.Status.Conditions))
+	for _, entry := range r.Status.Conditions {
+		if utils.IsConditionReasonValid(entry.Reason) {
+			conditions = append(conditions, entry)
+		}
+	}
+
+	r.Status.Conditions = conditions
 }
 
 // SetDefaults apply the defaults to undefined values in a Cluster
@@ -132,6 +146,20 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	if !r.Spec.Monitoring.AreDefaultQueriesDisabled() {
 		r.defaultMonitoringQueries(configuration.Current)
 	}
+
+	// IMPORTANT: the following functions are not really setting any
+	// default value of the Cluster, but will just migrate the CNP
+	// definition from the one using the customized Condition structure
+	// from the one using the K8s ones.
+	//
+	// We need do to this because we were using invalid condition reasons.
+	// We are doing this here method because this code is going to be called
+	// in the underlying mutating webhook implementation.
+	//
+	// What about the conditions which are going to be deleted? They are
+	// going to be recreated at the next reconciliation loop by the
+	// operator and by the instance manager
+	r.removeConditionsWithInvalidReason()
 }
 
 // defaultMonitoringQueries adds the default monitoring queries configMap
