@@ -136,7 +136,9 @@ var _ = Describe("cluster_status unit tests", func() {
 		var pods []corev1.Pod
 		var pvcs []corev1.PersistentVolumeClaim
 
-		withManager(func(ctx context.Context, reconciler *ClusterReconciler, manager manager.Manager) {
+		withManager(func(ctx context.Context, crReconciler *ClusterReconciler, poolerReconciler *PoolerReconciler,
+			manager manager.Manager,
+		) {
 			By("creating the required resources", func() {
 				jobs = generateFakeInitDBJobs(cluster)
 				pods = generateFakeClusterPods(cluster, true)
@@ -150,7 +152,7 @@ var _ = Describe("cluster_status unit tests", func() {
 
 			By("making sure that the required resources are found", func() {
 				Eventually(func() (*managedResources, error) {
-					return reconciler.getManagedResources(ctx, cluster)
+					return crReconciler.getManagedResources(ctx, cluster)
 				}).Should(Satisfy(func(mr *managedResources) bool {
 					return len(mr.pods.Items) == len(pods) &&
 						len(mr.jobs.Items) == len(jobs) &&

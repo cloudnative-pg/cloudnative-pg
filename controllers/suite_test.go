@@ -360,10 +360,10 @@ func expectResourceDoesntExist(name, namespace string, resource client.Object) {
 }
 
 // withManager bootstraps a manager.Manager inside a ginkgo.It statement
-func withManager(callback func(context.Context, *ClusterReconciler, manager.Manager)) {
+func withManager(callback func(context.Context, *ClusterReconciler, *PoolerReconciler, manager.Manager)) {
 	ctx, ctxCancel := context.WithCancel(context.TODO())
 
-	crReconciler, _, mgr := createManagerWithReconcilers(ctx)
+	crReconciler, poolerReconciler, mgr := createManagerWithReconcilers(ctx)
 
 	wg := sync.WaitGroup{}
 
@@ -377,7 +377,7 @@ func withManager(callback func(context.Context, *ClusterReconciler, manager.Mana
 		}()
 	})
 
-	callback(ctx, crReconciler, mgr)
+	callback(ctx, crReconciler, poolerReconciler, mgr)
 
 	By("stopping the manager", func() {
 		ctxCancel()

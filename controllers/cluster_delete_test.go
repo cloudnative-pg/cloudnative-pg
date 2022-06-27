@@ -39,7 +39,9 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 	})
 
 	It("should make sure that a dangling monitoring queries config map is deleted", func() {
-		withManager(func(ctx context.Context, reconciler *ClusterReconciler, manager manager.Manager) {
+		withManager(func(ctx context.Context, crReconciler *ClusterReconciler, poolerReconciler *PoolerReconciler,
+			manager manager.Manager,
+		) {
 			namespace := newFakeNamespace()
 
 			By("creating the required monitoring configmap", func() {
@@ -50,7 +52,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 					},
 					BinaryData: map[string][]byte{},
 				}
-				err := reconciler.Create(ctx, cm)
+				err := crReconciler.Create(ctx, cm)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -62,7 +64,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 			})
 
 			By("deleting the dangling monitoring configmap", func() {
-				err := reconciler.deleteDanglingMonitoringQueries(ctx, namespace)
+				err := crReconciler.deleteDanglingMonitoringQueries(ctx, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -75,7 +77,9 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 	})
 
 	It("should make sure that the configmap is not deleted if a cluster is running", func() {
-		withManager(func(ctx context.Context, reconciler *ClusterReconciler, manager manager.Manager) {
+		withManager(func(ctx context.Context, crReconciler *ClusterReconciler, poolerReconciler *PoolerReconciler,
+			manager manager.Manager,
+		) {
 			namespace := newFakeNamespace()
 			var cluster *apiv1.Cluster
 
@@ -87,7 +91,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 					},
 					BinaryData: map[string][]byte{},
 				}
-				err := reconciler.Create(ctx, cm)
+				err := crReconciler.Create(ctx, cm)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -103,7 +107,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 			})
 
 			By("deleting the dangling monitoring configmap", func() {
-				err := reconciler.deleteDanglingMonitoringQueries(ctx, namespace)
+				err := crReconciler.deleteDanglingMonitoringQueries(ctx, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
