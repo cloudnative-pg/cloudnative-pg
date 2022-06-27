@@ -36,7 +36,7 @@ import (
 )
 
 // Tests using a microservice approach to import a database from external cluster
-// It covers four scenarios
+// It covers five scenarios:
 // 1. With large object
 // 2. Normal use case
 // 3. Different database names
@@ -89,17 +89,18 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRe
 		AssertLargeObjectValue(namespace, primary, oid)
 	})
 
-	It("can import database", func() {
+	It("can import a database", func() {
 		var err error
-		namespace = "microservice-normalization"
+		namespace = "microservice"
 		sourceClusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
 		Expect(err).ToNot(HaveOccurred())
+
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 		assertCreateTableWithDataOnSourceCluster(namespace, tableName, sourceClusterName)
 
-		importedClusterName = "cluster-pgdump-normalization"
+		importedClusterName = "cluster-pgdump"
 		AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
 		primary := importedClusterName + "-1"
 		AssertDataExpectedCount(namespace, primary, tableName, 2)
