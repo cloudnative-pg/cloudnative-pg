@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -340,7 +341,7 @@ func generateFakeCASecret(name, namespace, domain string) (*corev1.Secret, *cert
 	return secret, keyPair
 }
 
-func assertResourceExists(name, namespace string, resource client.Object) {
+func expectResourceExists(name, namespace string, resource client.Object) {
 	err := k8sClient.Get(
 		context.Background(),
 		types.NamespacedName{Name: name, Namespace: namespace},
@@ -349,11 +350,44 @@ func assertResourceExists(name, namespace string, resource client.Object) {
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func assertResourceDoesntExist(name, namespace string, resource client.Object) {
+func expectResourceDoesntExist(name, namespace string, resource client.Object) {
 	err := k8sClient.Get(
 		context.Background(),
 		types.NamespacedName{Name: name, Namespace: namespace},
 		resource,
 	)
 	Expect(apierrors.IsNotFound(err)).To(BeTrue())
+}
+
+// withManager bootstraps a manager.Manager inside a ginkgo.It statement
+func withManager(callback func(context.Context, *ClusterReconciler, manager.Manager)) {
+	ctx, ctxCancel := context.WithCancel(context.TODO())
+
+	crReconciler, _, mgr := createManagerWithReconcilers(ctx)
+
+	wg := sync.WaitGroup{}
+
+	By("starting the manager", func() {
+		wg.Add(1)
+		go func() {
+			defer GinkgoRecover()
+			defer wg.Done()
+			err := mgr.Start(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+		}()
+	})
+
+	callback(ctx, crReconciler, mgr)
+
+	By("stopping the manager", func() {
+		ctxCancel()
+		wg.Wait()
+	})
+}
+
+func assertRefreshManagerCache(ctx context.Context, manager manager.Manager) {
+	By("waiting the cache to sync", func() {
+		syncDone := manager.GetCache().WaitForCacheSync(ctx)
+		Expect(syncDone).To(BeTrue())
+	})
 }

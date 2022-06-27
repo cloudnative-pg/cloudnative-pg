@@ -94,10 +94,10 @@ var _ = Describe("cluster_create unit tests", func() {
 		})
 
 		By("making sure that the services have been created", func() {
-			assertResourceExists(cluster.GetServiceAnyName(), namespace, &corev1.Service{})
-			assertResourceExists(cluster.GetServiceReadOnlyName(), namespace, &corev1.Service{})
-			assertResourceExists(cluster.GetServiceReadWriteName(), namespace, &corev1.Service{})
-			assertResourceExists(cluster.GetServiceReadName(), namespace, &corev1.Service{})
+			expectResourceExists(cluster.GetServiceAnyName(), namespace, &corev1.Service{})
+			expectResourceExists(cluster.GetServiceReadOnlyName(), namespace, &corev1.Service{})
+			expectResourceExists(cluster.GetServiceReadWriteName(), namespace, &corev1.Service{})
+			expectResourceExists(cluster.GetServiceReadName(), namespace, &corev1.Service{})
 		})
 	})
 
@@ -114,7 +114,7 @@ var _ = Describe("cluster_create unit tests", func() {
 		sa := &corev1.ServiceAccount{}
 
 		By("making sure that the serviceaccount has been created", func() {
-			assertResourceExists(cluster.Name, namespace, sa)
+			expectResourceExists(cluster.Name, namespace, sa)
 		})
 
 		By("adding an annotation, a label and an image pull secret to the service account", func() {
@@ -134,7 +134,7 @@ var _ = Describe("cluster_create unit tests", func() {
 
 		By("making sure that the serviceaccount is untouched because there is no change in the cluster", func() {
 			updatedSa := &corev1.ServiceAccount{}
-			assertResourceExists(cluster.Name, namespace, updatedSa)
+			expectResourceExists(cluster.Name, namespace, updatedSa)
 			Expect(updatedSa).To(BeEquivalentTo(sa))
 		})
 
@@ -153,7 +153,7 @@ var _ = Describe("cluster_create unit tests", func() {
 
 		By("making sure that the serviceaccount is patched correctly", func() {
 			updatedSA := &corev1.ServiceAccount{}
-			assertResourceExists(cluster.Name, namespace, updatedSA)
+			expectResourceExists(cluster.Name, namespace, updatedSA)
 			Expect(updatedSA.Annotations["test"]).To(BeEquivalentTo("annotation"))
 			Expect(updatedSA.Labels["test"]).To(BeEquivalentTo("label"))
 			Expect(updatedSA.ImagePullSecrets).To(ContainElements(corev1.LocalObjectReference{
@@ -181,12 +181,12 @@ var _ = Describe("cluster_create unit tests", func() {
 		})
 
 		By("making sure PDB exists", func() {
-			assertResourceExists(
+			expectResourceExists(
 				pdbPrimaryName,
 				namespace,
 				&policyv1beta1.PodDisruptionBudget{},
 			)
-			assertResourceExists(
+			expectResourceExists(
 				pdbReplicaName,
 				namespace,
 				&policyv1beta1.PodDisruptionBudget{},
@@ -206,7 +206,7 @@ var _ = Describe("cluster_create unit tests", func() {
 		})
 
 		By("making sure that the replicas PDB are deleted", func() {
-			assertResourceDoesntExist(
+			expectResourceDoesntExist(
 				pdbReplicaName,
 				namespace,
 				&policyv1beta1.PodDisruptionBudget{},
@@ -223,12 +223,12 @@ var _ = Describe("cluster_create unit tests", func() {
 		})
 
 		By("making sure that both the replicas and main PDB are deleted", func() {
-			assertResourceDoesntExist(
+			expectResourceDoesntExist(
 				pdbPrimaryName,
 				namespace,
 				&policyv1beta1.PodDisruptionBudget{},
 			)
-			assertResourceDoesntExist(
+			expectResourceDoesntExist(
 				pdbReplicaName,
 				namespace,
 				&policyv1beta1.PodDisruptionBudget{},
