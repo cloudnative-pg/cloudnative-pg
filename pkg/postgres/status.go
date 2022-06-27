@@ -155,21 +155,16 @@ func (list *PostgresqlStatusList) LogStatus(ctx context.Context, logLevel string
 
 	total := len(list.Items)
 	for idx, item := range list.Items {
-		message := fmt.Sprintf(
-			"instance (%d of %d) status, name: %s, currentLsn: %s, receivedLsn: %s, replayLsn: %s, isPrimary: %v,"+
-				"isReady: %v, pendingRestart: %v, pendingRestartForDecrease: %v",
-			idx+1,
-			total,
-			item.Pod.Name,
-			item.CurrentLsn,
-			item.ReceivedLsn,
-			item.ReplayLsn,
-			item.IsPrimary,
-			item.IsReady,
-			item.PendingRestart,
-			item.PendingRestartForDecrease,
-		)
-		contextLogger.Info(message)
+		message := fmt.Sprintf("instance (%d or %d) status", idx+1, total)
+		contextLogger.Info(message,
+			"name", item.Pod.Name,
+			"currentLsn", item.CurrentLsn,
+			"receivedLsn", item.ReceivedLsn,
+			"replayLsn", item.ReplayLsn,
+			"isPrimary", item.IsPrimary,
+			"isReady", item.IsReady,
+			"pendingRestart", item.PendingRestart,
+			"pendingRestartForDecrease", item.PendingRestartForDecrease)
 	}
 
 	if logLevel == log.DebugLevelString {
