@@ -19,7 +19,7 @@ This framework is made up by two important components:
 
 ## The local Kubernetes cluster for testing
 
-The [`hack/setup-cluster.sh`](/hack/setup-cluster.sh) bash script is
+The [`hack/setup-cluster.sh`](../../hack/setup-cluster.sh) bash script is
 responsible for creating a local Kubernetes cluster to be used for both
 development and testing purposes.
 
