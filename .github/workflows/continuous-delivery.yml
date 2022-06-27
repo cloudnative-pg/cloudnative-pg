@@ -3,10 +3,8 @@ name: continuous-delivery
 on:
   push:
     branches:
-      - main
-      - 'dependabot/**'
+      - '**'
   pull_request:
-    types: [ opened ]
   workflow_dispatch:
     inputs:
       depth:
