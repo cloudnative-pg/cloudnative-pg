@@ -121,6 +121,10 @@ var _ = Describe("Replica Mode", func() {
 				}, 300, 15).ShouldNot(HaveOccurred())
 			})
 
+			By("verifying the appTgt database not exist in replica cluster", func() {
+				AssertDatabaseExists(replicaNamespace, primaryReplicaCluster.Name, "appTgt", false)
+			})
+
 			By("writing some new data to the source cluster", func() {
 				insertRecordIntoTableWithDatabaseName(replicaNamespace, srcClusterName, "appSrc", "test_replica", 4)
 			})

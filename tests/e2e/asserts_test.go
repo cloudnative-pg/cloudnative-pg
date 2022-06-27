@@ -395,6 +395,25 @@ func insertRecordIntoTable(namespace, clusterName, tableName string, value int) 
 	Expect(err).ToNot(HaveOccurred())
 }
 
+// AssertDatabaseExists assert if database is existed
+func AssertDatabaseExists(namespace, podName, databaseName string, expectedValue bool) {
+	By(fmt.Sprintf("verifying is database exists %v", databaseName), func() {
+		pod := &corev1.Pod{}
+		commandTimeout := time.Second * 10
+		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE lower(datname) = lower('%v'));", databaseName)
+		err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, pod)
+		Expect(err).ToNot(HaveOccurred())
+		stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+			&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+		if expectedValue {
+			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("t"))
+		} else {
+			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("f"))
+		}
+	})
+}
+
 // AssertDataExpectedCountWithDatabaseName verifies that an expected amount of rows exist on the table
 func AssertDataExpectedCountWithDatabaseName(namespace, podName, databaseName string,
 	tableName string, expectedValue int,

@@ -528,12 +528,12 @@ spec:
 
 #### Configure the application database
 
-After cluster is created, we can update the application database name, database owner and user 
-password with additional configuration. To update application database credentials, we can 
-generate our own passwords, store them as secrets, and update the database use the secrets. Or 
-we can also let the operator generate a secret with randomly secure password for use. Please 
-reference the ["Bootstrap an empty cluster"](#bootstrap-an-empty-cluster-initdb) section for more 
-information about secrets.
+For the cluster recovered, we can configure the application database name and credentials with 
+additional configuration. To update application database credentials, we can generate our own 
+passwords, store them as secrets, and update the database use the secrets. Or we can also let the 
+operator generate a secret with randomly secure password for use. Please reference the 
+["Bootstrap an empty cluster"](#bootstrap-an-empty-cluster-initdb) section for more information 
+about secrets.
 
 The following example configure the application database `app` with owner `app`,  and supplied secret
 `app-secret`.
@@ -591,14 +591,6 @@ cluster will be completely independent of the source instance.
     Configuring the network between the target instance and the source instance
     goes beyond the scope of CloudNativePG documentation, as it depends
     on the actual context and environment.
-
-!!! Note
-    We also support to configure the application database for cluster which bootstrap 
-    from a live cluster, just like the case of `recovery` bootstrap method. If the new 
-    cluster is created as a replica cluster (with replica mode enabled), application 
-    database configuration will be skipped. Please see more information 
-    in [Configure the application database](#configure-the-application-database)
-    section.
 
 The streaming replication client on the target instance, which will be
 transparently managed by `pg_basebackup`, can authenticate itself on the source
@@ -780,6 +772,42 @@ spec:
       name: cluster-example-ca
       key: ca.crt
 ```
+#### Configure the application database
+
+We also support to configure the application database for cluster which bootstrap
+from a live cluster, just like the case of `initdb` and  `recovery` bootstrap method.
+If the new cluster is created as a replica cluster (with replica mode enabled), application
+database configuration will be skipped.
+
+The following example configure the application database `app` with password in supplied secret `app-secret` after bootstrap 
+from a live cluster.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  bootstrap:
+    pg_basebackup:
+      database: app
+      owner: app
+      secret:
+        name: app-secret
+      source: cluster-example
+```
+
+With the above configuration, following will happen after bootstrap
+
+1. if database `app` does not exist, a new database `app` will be created.
+2. if user `app` does not exist, a new user `app` will be created.
+3. if user `app` is not the owner of database, user `app` will be granted
+   as owner of database `app`.
+4. If value of `username` match value of `owner` in secret, the password of
+   application database will be changed to the value of `password` in secret.
+
+!!! Important
+    Application database configuration will be disabled if the new cluster is
+    created as a replica cluster, with replica mode enabled.
 
 #### Current limitations
 
