@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 

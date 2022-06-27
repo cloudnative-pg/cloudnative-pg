@@ -17,10 +17,10 @@ limitations under the License.
 package utils
 
 import (
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 var _ = Describe("Guess the correct version of a postgres image", func() {

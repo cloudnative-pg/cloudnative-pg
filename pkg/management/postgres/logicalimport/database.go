@@ -22,10 +22,9 @@ import (
 	"os/exec"
 
 	"github.com/lib/pq"
-
 	"k8s.io/utils/strings/slices"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
@@ -33,7 +32,7 @@ import (
 
 type databaseSnapshotter struct {
 	// TODO: Only Import is required here
-	cluster *v1.Cluster
+	cluster *apiv1.Cluster
 }
 
 func (ds *databaseSnapshotter) getDatabaseList(ctx context.Context, target *pool.ConnectionPool) ([]string, error) {

@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/ginkgo/v2/types"
 	"github.com/thoas/go-funk"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
@@ -27,7 +28,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
-	"github.com/onsi/ginkgo/v2/types"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

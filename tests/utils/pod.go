@@ -22,18 +22,17 @@ import (
 	"io"
 	"time"
 
+	"github.com/avast/retry-go/v4"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"github.com/avast/retry-go/v4"
-	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PodCreateAndWaitForReady creates a given pod object and wait for it to be ready
-func PodCreateAndWaitForReady(env *TestingEnvironment, pod *v1.Pod, timeoutSeconds uint) error {
+func PodCreateAndWaitForReady(env *TestingEnvironment, pod *corev1.Pod, timeoutSeconds uint) error {
 	err := CreateObject(env, pod)
 	if err != nil {
 		return err
@@ -42,7 +41,7 @@ func PodCreateAndWaitForReady(env *TestingEnvironment, pod *v1.Pod, timeoutSecon
 }
 
 // PodWaitForReady waits for a pod to be ready
-func PodWaitForReady(env *TestingEnvironment, pod *v1.Pod, timeoutSeconds uint) error {
+func PodWaitForReady(env *TestingEnvironment, pod *corev1.Pod, timeoutSeconds uint) error {
 	err := retry.Do(
 		func() error {
 			if err := env.Client.Get(env.Ctx, client.ObjectKey{
@@ -65,7 +64,7 @@ func PodWaitForReady(env *TestingEnvironment, pod *v1.Pod, timeoutSeconds uint) 
 
 // PodHasLabels verifies that the labels of a pod contain a specified
 // labels map
-func PodHasLabels(pod v1.Pod, labels map[string]string) bool {
+func PodHasLabels(pod corev1.Pod, labels map[string]string) bool {
 	podLabels := pod.Labels
 	for k, v := range labels {
 		val, ok := podLabels[k]
@@ -78,7 +77,7 @@ func PodHasLabels(pod v1.Pod, labels map[string]string) bool {
 
 // PodHasAnnotations verifies that the annotations of a pod contain a specified
 // annotations map
-func PodHasAnnotations(pod v1.Pod, annotations map[string]string) bool {
+func PodHasAnnotations(pod corev1.Pod, annotations map[string]string) bool {
 	podAnnotations := pod.Annotations
 	for k, v := range annotations {
 		val, ok := podAnnotations[k]
@@ -105,7 +104,7 @@ func (env TestingEnvironment) DeletePod(namespace string, name string, opts ...c
 
 // GetPodLogs gathers pod logs
 func (env TestingEnvironment) GetPodLogs(namespace string, podName string) (string, error) {
-	req := env.Interface.CoreV1().Pods(namespace).GetLogs(podName, &v1.PodLogOptions{})
+	req := env.Interface.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{})
 	podLogs, err := req.Stream(env.Ctx)
 	if err != nil {
 		return "", err
@@ -127,8 +126,8 @@ func (env TestingEnvironment) GetPodLogs(namespace string, podName string) (stri
 }
 
 // GetPodList gathers the current list of pods in a namespace
-func (env TestingEnvironment) GetPodList(namespace string) (*v1.PodList, error) {
-	podList := &v1.PodList{}
+func (env TestingEnvironment) GetPodList(namespace string) (*corev1.PodList, error) {
+	podList := &corev1.PodList{}
 	err := GetObjectList(
 		&env, podList, client.InNamespace(namespace),
 	)

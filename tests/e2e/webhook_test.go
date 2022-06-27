@@ -19,13 +19,13 @@ package e2e
 import (
 	"fmt"
 
-	v13 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 /*
@@ -99,7 +99,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 		// only to one namespace simulating the action of disabling the webhooks
 		By(fmt.Sprintf("Disabling the mutating webhook %v namespace", operatorNamespace), func() {
 			newWebhook := mWebhook.DeepCopy()
-			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &v13.LabelSelector{
+			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "value"},
 			}
 			err := utils.UpdateCNPGsMutatingWebhookConf(env, newWebhook)
@@ -111,7 +111,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func(
 
 		By(fmt.Sprintf("Disabling the validating webhook %v namespace", operatorNamespace), func() {
 			newWebhook := vWebhook.DeepCopy()
-			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &v13.LabelSelector{
+			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "value"},
 			}
 			err := utils.UpdateCNPGsValidatingWebhookConf(env, newWebhook)

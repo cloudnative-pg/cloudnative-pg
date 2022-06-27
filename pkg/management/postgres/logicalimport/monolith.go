@@ -19,7 +19,7 @@ package logicalimport
 import (
 	"context"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
@@ -27,7 +27,7 @@ import (
 // Monolith executes the monolith clone type
 func Monolith(
 	ctx context.Context,
-	cluster *v1.Cluster,
+	cluster *apiv1.Cluster,
 	destination *pool.ConnectionPool,
 	origin *pool.ConnectionPool,
 ) error {

@@ -17,8 +17,9 @@ limitations under the License.
 package utils
 
 import (
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
 )
 
 // GetLeaderInfoFromLease gathers leader holderIdentity from the lease

@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"os"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // ImportDatabaseMicroservice creates a cluster, starting from an external cluster

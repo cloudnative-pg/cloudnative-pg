@@ -17,13 +17,13 @@ limitations under the License.
 package utils
 
 import (
-	v1 "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // GetStorageAllowExpansion returns the boolean value of the 'AllowVolumeExpansion' value of the storage class
 func GetStorageAllowExpansion(defaultStorageClass string, env *TestingEnvironment) (*bool, error) {
-	storageClass := &v1.StorageClass{}
+	storageClass := &storagev1.StorageClass{}
 	err := GetObject(env, client.ObjectKey{Name: defaultStorageClass}, storageClass)
 	return storageClass.AllowVolumeExpansion, err
 }
