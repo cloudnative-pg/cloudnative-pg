@@ -526,7 +526,7 @@ jobs:
         name: Prepare the environment
         uses: nick-fields/retry@v2
         with:
-          timeout_seconds: 30
+          timeout_seconds: 120
           max_attempts: 3
           on_retry_command: |
             # Clear-ups before retries
