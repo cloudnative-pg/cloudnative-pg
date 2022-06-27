@@ -431,6 +431,32 @@ const (
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
+// ConditionReason defines the reason why a certain
+// condition changed
+type ConditionReason string
+
+const (
+	// ConditionBackupStarted means that the condition changed because the debug
+	// started
+	ConditionBackupStarted ConditionReason = "BackupStarted"
+
+	// ConditionReasonLastBackupSucceeded means that the condition changed because the last backup
+	// has been taken successfully
+	ConditionReasonLastBackupSucceeded ConditionReason = "LastBackupSucceeded"
+
+	// ConditionReasonLastBackupFailed means that the condition changed because the last backup
+	// failed
+	ConditionReasonLastBackupFailed ConditionReason = "LastBackupFailed"
+
+	// ConditionReasonContinuousArchivingSuccess means that the condition changed because the
+	// WAL archiving was working correctly
+	ConditionReasonContinuousArchivingSuccess ConditionReason = "ContinuousArchivingSuccess"
+
+	// ConditionReasonContinuousArchivingFailing means that the condition has changed because
+	// the WAL archiving is not working correctly
+	ConditionReasonContinuousArchivingFailing ConditionReason = "ContinuousArchivingFailing"
+)
+
 // ClusterConditionType is of string type
 type ClusterConditionType string
 

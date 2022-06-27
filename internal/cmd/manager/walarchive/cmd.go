@@ -174,11 +174,11 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 		condition := metav1.Condition{
 			Type:    string(apiv1.ConditionContinuousArchiving),
 			Status:  metav1.ConditionFalse,
-			Reason:  "ContinuousArchivingFailing",
+			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 			Message: err.Error(),
 		}
 		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
-			log.Error(errCond, "Error status.UpdateCondition()")
+			log.Error(errCond, "Error updating wal archiving condition (wal archiving failed)")
 		}
 		return err
 	}
@@ -199,11 +199,11 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 	condition := metav1.Condition{
 		Type:    string(apiv1.ConditionContinuousArchiving),
 		Status:  metav1.ConditionTrue,
-		Reason:  "ContinuousArchivingSuccess",
+		Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
 		Message: "Continuous archiving is working",
 	}
 	if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
-		log.Error(errCond, "Error status.UpdateCondition()")
+		log.Error(errCond, "Error while updating wal archiving condition (wal archiving succeeded)")
 	}
 	// We return only the first error to PostgreSQL, because the first error
 	// is the one raised by the file that PostgreSQL has requested to archive.
@@ -364,11 +364,11 @@ func checkWalArchive(ctx context.Context,
 		condition := metav1.Condition{
 			Type:    string(apiv1.ConditionContinuousArchiving),
 			Status:  metav1.ConditionFalse,
-			Reason:  "ContinuousArchivingIsFailing",
+			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 			Message: err.Error(),
 		}
 		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
-			log.Error(errCond, "Error status.UpdateCondition()")
+			log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 		}
 		return err
 	}
@@ -383,11 +383,11 @@ func checkWalArchive(ctx context.Context,
 		condition := metav1.Condition{
 			Type:    string(apiv1.ConditionContinuousArchiving),
 			Status:  metav1.ConditionFalse,
-			Reason:  "ContinuousArchivingIsFailing",
+			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 			Message: err.Error(),
 		}
 		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
-			log.Error(errCond, "Error status.UpdateCondition()")
+			log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 		}
 		return err
 	}

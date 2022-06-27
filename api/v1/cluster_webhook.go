@@ -19,13 +19,11 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -33,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -80,60 +77,17 @@ func (r *Cluster) Default() {
 	r.setDefaults(true)
 }
 
-func (r *Cluster) handledOldVersionArchiveCondition() {
-	archiveCondition := meta.FindStatusCondition(r.Status.Conditions, string(ConditionContinuousArchiving))
-	re := regexp.MustCompile(`(?m)^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`)
-	if archiveCondition != nil {
-		if len(re.FindAllString(archiveCondition.Reason, -1)) == 0 || (archiveCondition.LastTransitionTime.IsZero()) {
-			clusterLog.Warning("Archive Condition fields 'LastTransitionTime and Reason` are not " +
-				"compatible with k8s condition meta api for operator version 1.15.1 and older versions.")
-			// For operator 1.15.1 and older, Archive Condition fields 'LastTransitionTime and Reason` are not compatible
-			// with newly implemented k8s meta api with following reasons -> Due to space between `Reason` field test
-			// and -> `LastTransitionTime` field has stored null.
-			// We need to remove those existing conditions first then need to add conditions with existing values
-			// with required formate and with latest `LastTransitionTime` field.
-			meta.RemoveStatusCondition(&r.Status.Conditions, string(ConditionContinuousArchiving))
-			// removing space from continuous archiving condition `reason` field
-			reasonAfterRemoveSpace := strings.ReplaceAll(archiveCondition.Reason, " ", "")
-			// updating conditions with existing latest value of `LastTransitionTime`
-			condition := metav1.Condition{
-				Type:    string(ConditionContinuousArchiving),
-				Status:  archiveCondition.Status,
-				Reason:  reasonAfterRemoveSpace,
-				Message: archiveCondition.Message,
-			}
-			clusterLog.Info("updating archive conditions")
-			meta.SetStatusCondition(&r.Status.Conditions, condition)
+// removeConditionsWithInvalidReason will remove every condition which is not valid
+// anymore from the K8s API point-of-view
+func (r *Cluster) removeConditionsWithInvalidReason() {
+	conditions := make([]metav1.Condition, 0, len(r.Status.Conditions))
+	for _, entry := range r.Status.Conditions {
+		if utils.IsConditionReasonValid(entry.Reason) {
+			conditions = append(conditions, entry)
 		}
 	}
-}
 
-func (r *Cluster) handledOldVersionBackupCondition() {
-	backupCondition := meta.FindStatusCondition(r.Status.Conditions, string(ConditionBackup))
-	re := regexp.MustCompile(`(?m)^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`)
-	if backupCondition != nil {
-		if (len(re.FindAllString(backupCondition.Reason, -1))) == 0 || (backupCondition.LastTransitionTime.IsZero()) {
-			clusterLog.Warning("Backup Condition fields 'LastTransitionTime and Reason` are not " +
-				"compatible with k8s condition meta api for operator version 1.15.1 and older versions.")
-			// For operator 1.15.1 and older version, Backup Condition fields 'LastTransitionTime and Reason` are not compatible
-			// in newly implemented k8s meta api with following reasons -> Due to space between `Reason` field test
-			// and -> `LastTransitionTime` field has stored null.
-			// We need to remove those existing conditions first then need to add conditions with existing values
-			// with required formate and with latest `LastTransitionTime` field.
-			meta.RemoveStatusCondition(&r.Status.Conditions, string(ConditionBackup))
-			// removing space from continuous archiving condition `reason` field
-			reasonAfterRemoveSpace := strings.ReplaceAll(backupCondition.Reason, " ", "")
-			// updating conditions with existing latest value of `LastTransitionTime`
-			condition := metav1.Condition{
-				Type:    string(ConditionBackup),
-				Status:  backupCondition.Status,
-				Reason:  reasonAfterRemoveSpace,
-				Message: backupCondition.Message,
-			}
-			clusterLog.Info("updating backup conditions")
-			meta.SetStatusCondition(&r.Status.Conditions, condition)
-		}
-	}
+	r.Status.Conditions = conditions
 }
 
 // SetDefaults apply the defaults to undefined values in a Cluster
@@ -193,8 +147,19 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.defaultMonitoringQueries(configuration.Current)
 	}
 
-	r.handledOldVersionArchiveCondition()
-	r.handledOldVersionBackupCondition()
+	// IMPORTANT: the following functions are not really setting any
+	// default value of the Cluster, but will just migrate the CNP
+	// definition from the one using the customized Condition structure
+	// from the one using the K8s ones.
+	//
+	// We need do to this because we were using invalid condition reasons.
+	// We are doing this here method because this code is going to be called
+	// in the underlying mutating webhook implementation.
+	//
+	// What about the conditions which are going to be deleted? They are
+	// going to be recreated at the next reconciliation loop by the
+	// operator and by the instance manager
+	r.removeConditionsWithInvalidReason()
 }
 
 // defaultMonitoringQueries adds the default monitoring queries configMap

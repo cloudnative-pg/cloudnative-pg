@@ -311,11 +311,11 @@ func (b *BackupCommand) run(ctx context.Context) {
 	condition := metav1.Condition{
 		Type:    string(apiv1.ConditionBackup),
 		Status:  metav1.ConditionFalse,
-		Reason:  "BackupStarted",
+		Reason:  string(apiv1.ConditionBackupStarted),
 		Message: "New Backup starting up",
 	}
 	if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, &condition); condErr != nil {
-		b.Log.Error(condErr, "Error status.UpdateCondition()")
+		b.Log.Error(condErr, "Error changing backup condition (backup started)")
 	}
 
 	if err := fileutils.EnsureDirectoryExist(postgres.BackupTemporaryDirectory); err != nil {
@@ -337,11 +337,11 @@ func (b *BackupCommand) run(ctx context.Context) {
 		condition = metav1.Condition{
 			Type:    string(apiv1.ConditionBackup),
 			Status:  metav1.ConditionFalse,
-			Reason:  "LastBackupFailed",
+			Reason:  string(apiv1.ConditionReasonLastBackupFailed),
 			Message: err.Error(),
 		}
 		if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, &condition); condErr != nil {
-			b.Log.Error(condErr, "Error status.UpdateConditionInClusterStatus()")
+			b.Log.Error(condErr, "Error changing backup condition (backup failed)")
 		}
 		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
 			b.Log.Error(err, "Can't mark backup as failed")
@@ -358,11 +358,11 @@ func (b *BackupCommand) run(ctx context.Context) {
 	condition = metav1.Condition{
 		Type:    string(apiv1.ConditionBackup),
 		Status:  metav1.ConditionTrue,
-		Reason:  "LastBackupSucceeded",
+		Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
 		Message: "Backup has successful",
 	}
 	if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, &condition); condErr != nil {
-		b.Log.Error(condErr, "Error status.UpdateCondition()")
+		b.Log.Error(condErr, "Error changing backup condition (backup succeeded)")
 	}
 
 	// Delete backups per policy

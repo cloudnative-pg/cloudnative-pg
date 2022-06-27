@@ -232,11 +232,11 @@ func StartBackup(
 		condition := metav1.Condition{
 			Type:    string(apiv1.ConditionBackup),
 			Status:  metav1.ConditionFalse,
-			Reason:  "LastBackupFailed",
+			Reason:  string(apiv1.ConditionReasonLastBackupFailed),
 			Message: err.Error(),
 		}
 		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
-			log.FromContext(ctx).Error(errCond, "Error while updating conditions")
+			log.FromContext(ctx).Error(errCond, "Error while updating backup condition (backup failed)")
 		}
 		return postgres.UpdateBackupStatusAndRetry(ctx, client, backup)
 	}
