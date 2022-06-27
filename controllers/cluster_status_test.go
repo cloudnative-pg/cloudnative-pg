@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"sync"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -27,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
@@ -130,53 +130,35 @@ var _ = Describe("cluster_status unit tests", func() {
 	})
 
 	It("makes sure that getManagedResources works correctly", func() {
-		ctx, cancel := context.WithCancel(context.TODO())
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
 		var jobs []batchv1.Job
 		var pods []corev1.Pod
 		var pvcs []corev1.PersistentVolumeClaim
-		crReconciler, _, mgr := createManagerWithReconcilers(ctx)
 
-		wg := sync.WaitGroup{}
+		withManager(func(ctx context.Context, crReconciler *ClusterReconciler, poolerReconciler *PoolerReconciler,
+			manager manager.Manager,
+		) {
+			By("creating the required resources", func() {
+				jobs = generateFakeInitDBJobs(cluster)
+				pods = generateFakeClusterPods(cluster, true)
+				pvcs = generateFakePVC(cluster)
+				name, isOwned := isOwnedByCluster(&pods[0])
+				Expect(isOwned).To(BeTrue())
+				Expect(name).To(Equal(cluster.Name))
+			})
 
-		By("starting the manager", func() {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				defer GinkgoRecover()
-				err := mgr.Start(ctx)
-				Expect(err).ShouldNot(HaveOccurred())
-			}()
-		})
+			assertRefreshManagerCache(ctx, manager)
 
-		By("creating the required resources", func() {
-			jobs = generateFakeInitDBJobs(cluster)
-			pods = generateFakeClusterPods(cluster, true)
-			pvcs = generateFakePVC(cluster)
-			name, isOwned := isOwnedByCluster(&pods[0])
-			Expect(isOwned).To(BeTrue())
-			Expect(name).To(Equal(cluster.Name))
-		})
-
-		By("waiting the cache to sync", func() {
-			syncDone := mgr.GetCache().WaitForCacheSync(ctx)
-			Expect(syncDone).To(BeTrue())
-		})
-
-		By("making sure that the required resources are found", func() {
-			Eventually(func() (*managedResources, error) {
-				return crReconciler.getManagedResources(ctx, cluster)
-			}).Should(Satisfy(func(mr *managedResources) bool {
-				return len(mr.pods.Items) == len(pods) &&
-					len(mr.jobs.Items) == len(jobs) &&
-					len(mr.pvcs.Items) == len(pvcs)
-			}))
-		})
-
-		By("stopping the manager", func() {
-			cancel()
-			wg.Wait()
+			By("making sure that the required resources are found", func() {
+				Eventually(func() (*managedResources, error) {
+					return crReconciler.getManagedResources(ctx, cluster)
+				}).Should(Satisfy(func(mr *managedResources) bool {
+					return len(mr.pods.Items) == len(pods) &&
+						len(mr.jobs.Items) == len(jobs) &&
+						len(mr.pvcs.Items) == len(pvcs)
+				}))
+			})
 		})
 	})
 })
