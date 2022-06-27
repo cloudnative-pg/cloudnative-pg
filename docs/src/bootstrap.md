@@ -526,16 +526,17 @@ spec:
           maxParallel: 8
 ```
 
-#### Update application database password (recovery)
+#### Configure the application database
 
-By default, the user credentials for the application database are preserved. You can update 
-the application user password with additional configuration. You can generate your passwords, 
-store them as secrets, and update the database use your own secrets after recovery. Or you can 
-also let the operator generate a secret with randomly secure password for use.
-Please reference the  ["Bootstrap an empty cluster"](#bootstrap-an-empty-cluster-initdb) section
-for more information about secrets.
+After cluster is created, we can update the application database name, database owner and user 
+password with additional configuration. To update application database credentials, we can 
+generate our own passwords, store them as secrets, and update the database use the secrets. Or 
+we can also let the operator generate a secret with randomly secure password for use. Please 
+reference the ["Bootstrap an empty cluster"](#bootstrap-an-empty-cluster-initdb) section for more 
+information about secrets.
 
-The following example update the application user password with supplied secret `app-secret`
+The following example configure the application database `app` with owner `app`,  and supplied secret
+`app-secret`.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -561,9 +562,8 @@ as owner of database `app`.
 application database will be changed to the value of `password` in secret. 
 
 !!! Important
-    Configuration for application `database`, `owner` and `secret`is not allowed 
-    if replica mode is enabled in new cluster. All application database default
-    configuration will also be skipped for **replica cluster**.
+    Application database configuration will be disabled if the new cluster is 
+    created as a replica cluster, with replica mode enabled. 
 
 ### Bootstrap from a live cluster (`pg_basebackup`)
 
@@ -591,6 +591,14 @@ cluster will be completely independent of the source instance.
     Configuring the network between the target instance and the source instance
     goes beyond the scope of CloudNativePG documentation, as it depends
     on the actual context and environment.
+
+!!! Note
+    We also support to configure the application database for cluster which bootstrap 
+    from a live cluster, just like the case of `recovery` bootstrap method. If the new 
+    cluster is created as a replica cluster (with replica mode enabled), application 
+    database configuration will be skipped. Please see more information 
+    in [Configure the application database](#configure-the-application-database)
+    section.
 
 The streaming replication client on the target instance, which will be
 transparently managed by `pg_basebackup`, can authenticate itself on the source
@@ -817,31 +825,3 @@ This will open up two main use cases:
 - replication over different Kubernetes clusters in CloudNativePG
 - *0 cutover time* migrations to CloudNativePG with the `pg_basebackup`
   bootstrap method
-
-#### Update application database password (pg_basebackup)
-
-We also support update the password of application database after bootstrap from a live cluster.
-Similar to `initdb` and `recovery` bootstrap method, `pg_basebackup` section also support to configure 
-`database`, `owner` and `secret` attributes. Similar to bootstrap from recovery option, if the new cluster 
-is created as **replica cluster**, configuration for `database`, `owner` and `secret` is not allowed and all
-default application database configuration will be skipped.
-Please see more information in [Update application database password (recovery)](#update-application-database-password-recovery) 
-section.
-
-The following example update the application user password with supplied secret `app-secret` after bootstrap.
-
-
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-[...]
-spec:
-  bootstrap:
-    pg_basebackup:
-      database: app
-      owner: app
-      secret:
-        name: app-secret
-      source: cluster-example
-```

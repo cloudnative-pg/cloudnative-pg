@@ -242,10 +242,6 @@ func (r *Cluster) defaultInitDB() {
 
 // defaultRecovery enriches the recovery with defaults if not all the required arguments were passed
 func (r *Cluster) defaultRecovery() {
-	// no application database configuration for replica cluster
-	if r.IsReplica() {
-		return
-	}
 	// if none area is provided, will ignore the application database configuration
 	if r.Spec.Bootstrap.Recovery.Database == "" &&
 		r.Spec.Bootstrap.Recovery.Owner == "" &&
@@ -262,10 +258,6 @@ func (r *Cluster) defaultRecovery() {
 
 // defaultPgBaseBackup enriches the pg_basebackup with defaults if not all the required arguments were passed
 func (r *Cluster) defaultPgBaseBackup() {
-	// no application database configuration for replica cluster
-	if r.IsReplica() {
-		return
-	}
 	// if none area is provided, will ignore the application database configuration
 	if r.Spec.Bootstrap.PgBaseBackup.Database == "" &&
 		r.Spec.Bootstrap.PgBaseBackup.Owner == "" &&
@@ -427,23 +419,8 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 	// If you specify the database name, then you need also to specify the
 	// owner user and vice-versa
 	initDBOptions := r.Spec.Bootstrap.InitDB
-
-	if initDBOptions.Database != "" && initDBOptions.Owner == "" {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "bootstrap", "initdb", "owner"),
-				"",
-				"You need to specify the database owner user"))
-	}
-	if initDBOptions.Database == "" && initDBOptions.Owner != "" {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "bootstrap", "initdb", "database"),
-				"",
-				"You need to specify the database name"))
-	}
+	result = r.validateApplicationDatabase(initDBOptions.Database, initDBOptions.Owner,
+		"initdb")
 
 	if initDBOptions.WalSegmentSize != 0 && !utils.IsPowerOfTwo(initDBOptions.WalSegmentSize) {
 		result = append(
@@ -585,7 +562,7 @@ func (r *Cluster) validateRecoveryApplicationDatabase() field.ErrorList {
 
 	recoveryOptions := r.Spec.Bootstrap.Recovery
 	return r.validateApplicationDatabase(recoveryOptions.Database, recoveryOptions.Owner,
-		recoveryOptions.Secret, r.IsReplica(), "recovery")
+		"recovery")
 }
 
 // validatePgBaseBackup validate the bootstrapping options when pg_basebackup
@@ -604,40 +581,30 @@ func (r *Cluster) validatePgBaseBackupApplicationDatabase() field.ErrorList {
 
 	pgBaseBackupOptions := r.Spec.Bootstrap.PgBaseBackup
 	return r.validateApplicationDatabase(pgBaseBackupOptions.Database, pgBaseBackupOptions.Owner,
-		pgBaseBackupOptions.Secret, r.IsReplica(), "pg_basebackup")
+		"pg_basebackup")
 }
 
 // validateApplicationDatabase validate the configuration for application database
-func (r *Cluster) validateApplicationDatabase(database string, owner string,
-	secrets *LocalObjectReference, replica bool, command string,
+func (r *Cluster) validateApplicationDatabase(database string, owner string, command string,
 ) field.ErrorList {
 	var result field.ErrorList
-	if !replica {
-		// If you specify the database name, then you need also to specify the
-		// owner user and vice-versa
-		if database != "" && owner == "" {
-			result = append(
-				result,
-				field.Invalid(
-					field.NewPath("spec", "bootstrap", command, "owner"),
-					"",
-					"You need to specify the database owner user"))
-		}
-		if database == "" && owner != "" {
-			result = append(
-				result,
-				field.Invalid(
-					field.NewPath("spec", "bootstrap", command, "database"),
-					"",
-					"You need to specify the database name"))
-		}
-	} else if database != "" || owner != "" || secrets != nil {
+	// If you specify the database name, then you need also to specify the
+	// owner user and vice-versa
+	if database != "" && owner == "" {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "bootstrap", command),
+				field.NewPath("spec", "bootstrap", command, "owner"),
 				"",
-				"Application database can not be configured when cluster is in replica mode"))
+				"You need to specify the database owner user"))
+	}
+	if database == "" && owner != "" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", command, "database"),
+				"",
+				"You need to specify the database name"))
 	}
 	return result
 }
