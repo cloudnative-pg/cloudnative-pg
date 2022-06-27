@@ -134,7 +134,12 @@ func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
 	return nil
 }
 
-func logicalImportCallback(ctx context.Context, client ctrl.Client, instance *postgres.Instance, cluster *apiv1.Cluster) error {
+func logicalImportCallback(
+	ctx context.Context,
+	client ctrl.Client,
+	instance *postgres.Instance,
+	cluster *apiv1.Cluster,
+) error {
 	if cluster.Spec.Bootstrap == nil ||
 		cluster.Spec.Bootstrap.InitDB == nil ||
 		cluster.Spec.Bootstrap.InitDB.Import == nil {

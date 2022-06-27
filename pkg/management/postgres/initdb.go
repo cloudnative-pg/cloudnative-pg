@@ -250,7 +250,12 @@ func (info InitInfo) executeQueries(sqlUser *sql.DB, queries []string) error {
 
 // BootstrapInitCallback allows the caller to execute operations after the initialization of a database
 // while the Postgres instance is still running
-type BootstrapInitCallback func(ctx context.Context, client ctrl.Client, instance *Instance, cluster *apiv1.Cluster) error
+type BootstrapInitCallback func(
+	ctx context.Context,
+	client ctrl.Client,
+	instance *Instance,
+	cluster *apiv1.Cluster,
+) error
 
 // Bootstrap creates and configures this new PostgreSQL instance
 func (info InitInfo) Bootstrap(ctx context.Context, initializationCallback BootstrapInitCallback) error {
