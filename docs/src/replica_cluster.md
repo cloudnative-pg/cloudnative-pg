@@ -1,5 +1,21 @@
 # Replica clusters
 
+A replica cluster is an independent CloudNativePG `Cluster` resource that has
+the main characteristic to be in replica from another Postgres instance,
+ideally also managed by CloudNativePG. Normally, a replica cluster is in another
+Kubernetes cluster in another region. Replica clusters can be cascading too,
+and they can solely rely on object stores for replication of the data from
+the source, as described further down.
+
+The diagram below - taken from the ["Architecture"
+section](architecture.md#multi-cluster-deployments) containing more
+information about this capability - shows just an example of architecture
+that you can implement with replica clusters.
+
+![An example of multi-cluster deployment with a primary and a replica cluster](./images/multi-cluster.png)
+
+## Basic concepts
+
 CloudNativePG relies on the foundations of the PostgreSQL replication
 framework even when a PostgreSQL cluster is created from an existing one (source)
 and kept synchronized through the
@@ -12,7 +28,7 @@ recovery level, are:
 - use streaming replication between the replica cluster and the source
   (this will certainly require some administrative and security related
   work to be done to make sure that the network connection between the
-  two clusters is correctly setup)
+  two clusters are correctly setup)
 - use a Barman Cloud object store for recovery of the base backups and
   the WAL files that are regularly shipped from the source to the object
   store and pulled by `barman-cloud-wal-restore` in the replica cluster
@@ -42,8 +58,8 @@ The created replica cluster can perform backups in a reserved object store from
 the designated primary, enabling symmetric architectures in a distributed
 fashion.
 
-You have full flexibility and freedom to decide your favourite
-distributed architecture for a PostgreSQL database, by choosing:
+You have full flexibility and freedom to decide your favorite
+distributed architecture for a PostgreSQL database by choosing:
 
 - a private cloud spanning over multiple Kubernetes clusters in different data
   centers
@@ -55,7 +71,7 @@ distributed architecture for a PostgreSQL database, by choosing:
 
 ## Setting up a replica cluster
 
-To setup a replica cluster from a source cluster, we need to create a cluster yaml
+To set up a replica cluster from a source cluster, we need to create a cluster YAML
 file and define the following parts accordingly:
 
 - define the `externalClusters` section in the replica cluster
@@ -109,8 +125,8 @@ in case the replica cluster is in a separate namespace.
       key: ca.crt
 ```
 
-The **second example** defines a replica cluster which bootstraps from an object
-store using the `recovery` section, and continuous recovery using both streaming
+The **second example** defines a replica cluster that bootstraps from an object
+store using the `recovery` section and continuous recovery using both streaming
 replication and the given object store. For streaming replication, the replica
 cluster connects to the source cluster using basic authentication.
 

@@ -4,7 +4,7 @@ Physical replication is one of the strengths of PostgreSQL and one of the
 reasons why some of the largest organizations in the world have chosen
 it for the management of their data in business continuity contexts.
 Primarily used to achieve high availability, physical replication also allows
-scale-out of read-only workloads and offloading some work from the primary.
+scale-out of read-only workloads and offloading of some work from the primary.
 
 !!! Important
     This section is about replication within the same `Cluster` resource
@@ -84,17 +84,17 @@ hostssl replication streaming_replica all cert
 
 In case continuous backup is configured in the cluster, CloudNativePG
 transparently configures replicas to take advantage of `restore_command` when
-in continuous recovery. As a result, PostgreSQL is able to use the WAL archive
+in continuous recovery. As a result, PostgreSQL can use the WAL archive
 as a fallback option whenever pulling WALs via streaming replication fails.
 
 ## Synchronous replication
 
-CloudNativePG supports configuration of **quorum-based synchronous
+CloudNativePG supports the configuration of **quorum-based synchronous
 streaming replication** via two configuration options called `minSyncReplicas`
-and `maxSyncReplicas` which are the minimum and maximum number of expected
+and `maxSyncReplicas`, which are the minimum and the maximum number of expected
 synchronous standby replicas available at any time.
 For self-healing purposes, the operator always compares these two values with
-the number of available replicas in order to determine the quorum.
+the number of available replicas to determine the quorum.
 
 Synchronous replication is disabled by default (`minSyncReplicas` and
 `maxSyncReplicas` are not defined).
@@ -113,9 +113,9 @@ Where:
 - `pod1, pod2, ...` is the list of all PostgreSQL pods in the cluster
 
 !!! Warning
-    To provide self-healing capabilities, the operator has the power
-    to ignore `minSyncReplicas` in case such value is higher than the currently
-    available number of replicas. Synchronous replication is automatically disabled
+    To provide self-healing capabilities, the operator can ignore
+    `minSyncReplicas` if such value is higher than the currently available
+    number of replicas. Synchronous replication is automatically disabled
     when `readyReplicas` is `0`.
 
 As stated in the

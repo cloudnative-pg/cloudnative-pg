@@ -786,6 +786,7 @@ storageclasses
 storageconfiguration
 strflocaltime
 subcommand
+subdirectory
 subresource
 substatement
 sudo
