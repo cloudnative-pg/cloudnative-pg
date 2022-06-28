@@ -803,12 +803,6 @@ func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
 		}
 	}
 
-	if err := validateSyncReplicaElectionConstraint(
-		r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
-	); err != nil {
-		result = append(result, err)
-	}
-
 	return result
 }
 
