@@ -106,8 +106,9 @@ spec:
           - angus
         source:
           externalCluster: cluster-pg96
-        # postImportApplicationSQL:
-        # - "INSERT YOUR SQL QUERIES HERE"
+        #postImportApplicationSQL:
+        #- |
+        #  INSERT YOUR SQL QUERIES HERE
   storage:
     size: 1Gi
   externalClusters:
@@ -142,8 +143,7 @@ There are a few things you need to be aware of when using the `microservice` typ
 - Traffic must be allowed between the Kubernetes cluster and the
   `externalCluster` during the operation
 - Connection to the source database must be granted with the specified user
-  that needs to run `pg_dump` and read roles information (*superuser* is
-  OK)
+  that needs to run `pg_dump` and read roles information (*superuser* is OK)
 - Currently, the `pg_dump -Fc` result is stored temporarily inside the `dumps`
   folder in the `PGDATA` volume, so there should be enough available space to
   temporarily contain the dump result on the assigned node, as well as the
@@ -227,7 +227,8 @@ There are a few things you need to be aware of when using the `monolith` type:
 - At least one database to be specified in the `initdb.import.databases` array
 - Any role that is required by the imported databases must be specified inside
   `initdb.import.roles`, with the limitations below:
-    - The following roles, if present, are not imported: `postgres`, `streaming_replica`, `cnp_pooler_pgbouncer`
+    - The following roles, if present, are not imported:
+      `postgres`, `streaming_replica`, `cnp_pooler_pgbouncer`
     - The `SUPERUSER` option is removed from any imported role
 - Wildcard `"*"` can be used as the only element in the `databases` and/or
   `roles` arrays to import every object of the kind; When matching databases
