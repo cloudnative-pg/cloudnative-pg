@@ -773,6 +773,12 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
+	if err := validateSyncReplicaElectionConstraint(
+		r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
+	); err != nil {
+		result = append(result, err)
+	}
+
 	return result
 }
 
@@ -798,6 +804,23 @@ func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
 	}
 
 	return result
+}
+
+func validateSyncReplicaElectionConstraint(constraints SyncReplicaElectionConstraints) *field.Error {
+	if !constraints.Enabled {
+		return nil
+	}
+	if len(constraints.NodeLabelsAntiAffinity) > 0 {
+		return nil
+	}
+
+	return field.Invalid(
+		field.NewPath(
+			"spec", "postgresql", "syncReplicaElectionConstraint", "nodeLabelsAntiAffinity",
+		),
+		nil,
+		"Can't enable syncReplicaConstraints without passing labels for comparison inside nodeLabelsAntiAffinity",
+	)
 }
 
 // validateImageChange validate the change from a certain image name
