@@ -152,3 +152,9 @@ CloudNativePG allows you to define multiple replica clusters.
 You can also define replica clusters with a lower number of replicas, and then
 increase this number when the cluster is promoted to primary.
 
+!!! Seealso "Replica clusters"
+    Please refer to the ["Replica Clusters" section](replica_cluster.md) for more
+    information about physical replica clusters work and how you can configure
+    read-only clusters in different Kubernetes cluster to improve your global
+    disaster recovery and HA strategy.
+
