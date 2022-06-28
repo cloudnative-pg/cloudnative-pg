@@ -150,12 +150,12 @@ type PostgresqlStatusList struct {
 }
 
 // LogStatus logs the current status of the instances
-func (list *PostgresqlStatusList) LogStatus(ctx context.Context, logLevel string) {
+func (list *PostgresqlStatusList) LogStatus(ctx context.Context) {
 	contextLogger := log.FromContext(ctx)
 
 	total := len(list.Items)
 	for idx, item := range list.Items {
-		message := fmt.Sprintf("instance (%d or %d) status", idx+1, total)
+		message := fmt.Sprintf("instance status (%d of %d)", idx+1, total)
 		contextLogger.Info(message,
 			"name", item.Pod.Name,
 			"currentLsn", item.CurrentLsn,
@@ -167,12 +167,10 @@ func (list *PostgresqlStatusList) LogStatus(ctx context.Context, logLevel string
 			"pendingRestartForDecrease", item.PendingRestartForDecrease)
 	}
 
-	if logLevel == log.DebugLevelString {
-		contextLogger.Debug(
-			`detailed instances status`,
-			"data", list,
-		)
-	}
+	contextLogger.Debug(
+		`detailed instances status`,
+		"data", list,
+	)
 }
 
 // Len implements sort.Interface extracting the length of the list
