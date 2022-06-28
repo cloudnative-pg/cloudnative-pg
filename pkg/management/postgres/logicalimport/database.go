@@ -31,7 +31,6 @@ import (
 )
 
 type databaseSnapshotter struct {
-	// TODO: Only Import is required here
 	cluster *apiv1.Cluster
 }
 

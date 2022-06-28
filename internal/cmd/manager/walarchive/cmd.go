@@ -30,6 +30,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -170,9 +171,14 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 	options, err := barmanCloudWalArchiveOptions(cluster, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
-		if errCond := manager.UpdateCondition(ctx, client,
-			cluster, buildArchiveCondition(err)); errCond != nil {
-			log.Error(errCond, "Error status.UpdateCondition()")
+		condition := metav1.Condition{
+			Type:    string(apiv1.ConditionContinuousArchiving),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
+			Message: err.Error(),
+		}
+		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
+			log.Error(errCond, "Error updating wal archiving condition (wal archiving failed)")
 		}
 		return err
 	}
@@ -190,9 +196,14 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 	}
 
 	// Update the condition if needed.
-	if errCond := manager.UpdateCondition(ctx, client,
-		cluster, buildArchiveCondition(walStatus[0].Err)); errCond != nil {
-		log.Error(errCond, "Error status.UpdateCondition()")
+	condition := metav1.Condition{
+		Type:    string(apiv1.ConditionContinuousArchiving),
+		Status:  metav1.ConditionTrue,
+		Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
+		Message: "Continuous archiving is working",
+	}
+	if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
+		log.Error(errCond, "Error while updating wal archiving condition (wal archiving succeeded)")
 	}
 	// We return only the first error to PostgreSQL, because the first error
 	// is the one raised by the file that PostgreSQL has requested to archive.
@@ -341,23 +352,6 @@ func barmanCloudWalArchiveOptions(
 	return options, nil
 }
 
-func buildArchiveCondition(err error) *apiv1.ClusterCondition {
-	if err != nil {
-		return &apiv1.ClusterCondition{
-			Type:    apiv1.ConditionContinuousArchiving,
-			Status:  apiv1.ConditionFalse,
-			Reason:  "Continuous Archiving is Failing",
-			Message: err.Error(),
-		}
-	}
-	return &apiv1.ClusterCondition{
-		Type:    apiv1.ConditionContinuousArchiving,
-		Status:  apiv1.ConditionTrue,
-		Reason:  "Continuous Archiving is Working",
-		Message: "",
-	}
-}
-
 func checkWalArchive(ctx context.Context,
 	cluster *apiv1.Cluster,
 	walArchiver *archiver.WALArchiver,
@@ -367,9 +361,14 @@ func checkWalArchive(ctx context.Context,
 	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
-		if errCond := manager.UpdateCondition(ctx, client,
-			cluster, buildArchiveCondition(err)); errCond != nil {
-			log.Error(errCond, "Error status.UpdateCondition()")
+		condition := metav1.Condition{
+			Type:    string(apiv1.ConditionContinuousArchiving),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
+			Message: err.Error(),
+		}
+		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
+			log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 		}
 		return err
 	}
@@ -381,9 +380,14 @@ func checkWalArchive(ctx context.Context,
 	if err := walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions); err != nil {
 		log.Error(err, "while barman-cloud-check-wal-archive")
 		// Update the condition if needed.
-		if errCond := manager.UpdateCondition(ctx, client,
-			cluster, buildArchiveCondition(err)); errCond != nil {
-			log.Error(errCond, "Error status.UpdateCondition()")
+		condition := metav1.Condition{
+			Type:    string(apiv1.ConditionContinuousArchiving),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
+			Message: err.Error(),
+		}
+		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
+			log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 		}
 		return err
 	}
