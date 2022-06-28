@@ -19,6 +19,7 @@ package utils
 import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -59,4 +60,21 @@ func CreateSecretCA(
 		return cluster, caPair, err
 	}
 	return cluster, caPair, nil
+}
+
+// GetPassword generates password and return it as per user prefix
+func GetPassword(clusterName, namespace, userPrefix string, env *TestingEnvironment) (string, error) {
+	// Get the superuser password from the user prefix secret
+	superuserSecretName := clusterName + "-" + userPrefix
+	superuserSecret := &corev1.Secret{}
+	superuserSecretNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      superuserSecretName,
+	}
+	err := env.Client.Get(env.Ctx, superuserSecretNamespacedName, superuserSecret)
+	if err != nil {
+		return "", err
+	}
+	generatedSuperuserPassword := string(superuserSecret.Data["password"])
+	return generatedSuperuserPassword, nil
 }

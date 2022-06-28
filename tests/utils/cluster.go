@@ -24,12 +24,10 @@ import (
 	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
-
 	"k8s.io/apimachinery/pkg/types"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // AllClusterPodsHaveLabels verifies if the labels defined in a map are included
@@ -87,7 +85,7 @@ func AllClusterPodsHaveAnnotations(
 // ClusterHasLabels verifies that the labels of a cluster contain a specified
 // labels map
 func ClusterHasLabels(
-	cluster *v1.Cluster,
+	cluster *apiv1.Cluster,
 	labels map[string]string,
 ) bool {
 	clusterLabels := cluster.Labels
@@ -103,7 +101,7 @@ func ClusterHasLabels(
 // ClusterHasAnnotations verifies that the annotations of a cluster contain a specified
 // annotations map
 func ClusterHasAnnotations(
-	cluster *v1.Cluster,
+	cluster *apiv1.Cluster,
 	annotations map[string]string,
 ) bool {
 	clusterAnnotations := cluster.Annotations
@@ -124,7 +122,7 @@ func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename st
 		return
 	}
 	w := bufio.NewWriter(f)
-	clusterList := &v1.ClusterList{}
+	clusterList := &apiv1.ClusterList{}
 	_ = GetObjectList(&env, clusterList, client.InNamespace(namespace))
 
 	for _, cluster := range clusterList.Items {
@@ -190,12 +188,12 @@ func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename st
 }
 
 // GetCluster gets a cluster given name and namespace
-func (env TestingEnvironment) GetCluster(namespace string, name string) (*v1.Cluster, error) {
+func (env TestingEnvironment) GetCluster(namespace string, name string) (*apiv1.Cluster, error) {
 	namespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}
-	cluster := &v1.Cluster{}
+	cluster := &apiv1.Cluster{}
 	err := GetObject(&env, namespacedName, cluster)
 	if err != nil {
 		return nil, err

@@ -43,6 +43,8 @@ Below you will find a description of the defined resources:
 - [EmbeddedObjectMetadata](#EmbeddedObjectMetadata)
 - [ExternalCluster](#ExternalCluster)
 - [GoogleCredentials](#GoogleCredentials)
+- [Import](#Import)
+- [ImportSource](#ImportSource)
 - [InstanceID](#InstanceID)
 - [LDAPBindAsAuth](#LDAPBindAsAuth)
 - [LDAPBindSearchAuth](#LDAPBindSearchAuth)
@@ -248,6 +250,7 @@ Name                   | Description                                            
 `postInitSQL           ` | List of SQL queries to be executed as a superuser immediately after the cluster has been created - to be used with extreme care (by default empty)                                                                                         | []string                                      
 `postInitApplicationSQL` | List of SQL queries to be executed as a superuser in the application database right after is created - to be used with extreme care (by default empty)                                                                                     | []string                                      
 `postInitTemplateSQL   ` | List of SQL queries to be executed as a superuser in the `template1` after the cluster has been created - to be used with extreme care (by default empty)                                                                                  | []string                                      
+`import                ` | Bootstraps the new cluster by importing data from an existing PostgreSQL instance using logical backup (`pg_dump` and `pg_restore`)                                                                                                        | [*Import](#Import)                            
 
 <a id='BootstrapPgBaseBackup'></a>
 
@@ -470,6 +473,30 @@ Name                   | Description                                            
 ---------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------
 `gkeEnvironment        ` | If set to true, will presume that it's running inside a GKE environment, default to false. - *mandatory*  | bool                                    
 `applicationCredentials` | The secret containing the Google Cloud Storage JSON file with the credentials              | [*SecretKeySelector](#SecretKeySelector)
+
+<a id='Import'></a>
+
+## Import
+
+Import contains the configuration to init a database from a logic snapshot of an externalCluster
+
+Name                     | Description                                                                                                                                                                                   | Type                         
+------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------
+`source                  ` | The source of the import                                                                                                                                                                      - *mandatory*  | [ImportSource](#ImportSource)
+`type                    ` | The import type. Can be `microservice` or `monolith`.                                                                                                                                         - *mandatory*  | SnapshotType                 
+`databases               ` | The databases to import                                                                                                                                                                       - *mandatory*  | []string                     
+`roles                   ` | The roles to import                                                                                                                                                                           | []string                     
+`postImportApplicationSQL` | List of SQL queries to be executed as a superuser in the application database right after is imported - to be used with extreme care (by default empty). Only available in microservice type. | []string                     
+
+<a id='ImportSource'></a>
+
+## ImportSource
+
+ImportSource describes the source for the logical snapshot
+
+Name            | Description                                     | Type  
+--------------- | ----------------------------------------------- | ------
+`externalCluster` | The name of the externalCluster used for import - *mandatory*  | string
 
 <a id='InstanceID'></a>
 

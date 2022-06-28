@@ -122,6 +122,7 @@ IAM
 INPLACE
 Ibryam
 IfNotPresent
+ImportSource
 InfoSec
 Innocenti
 InstanceID
@@ -145,6 +146,7 @@ Liveness
 LoadBalancer
 LocalObjectReference
 MAPPEDMETRIC
+MVCC
 MetricDescription
 MetricName
 MetricType
@@ -267,6 +269,7 @@ ServiceAccount's
 ServiceMonitor
 Silvela
 Slonik
+SnapshotType
 StorageClass
 StorageConfiguration
 Storages
@@ -450,6 +453,7 @@ destinationPath
 dev
 devel
 devsecops
+dir
 distro
 distroless
 distros
@@ -472,6 +476,7 @@ enterprisedb
 env
 executables
 extensibility
+externalCluster
 externalClusters
 facto
 failover
@@ -675,6 +680,7 @@ pooler
 poolers
 pos
 posix
+postImportApplicationSQL
 postInitSQL
 postgres
 postgresGID

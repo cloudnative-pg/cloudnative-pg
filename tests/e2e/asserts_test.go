@@ -356,6 +356,20 @@ func AssertCreateTestData(namespace, clusterName, tableName string) {
 	})
 }
 
+// AssertCreateTestDataLargeObject create large objects on primary pod
+func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int) {
+	By("creating large object", func() {
+		primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).NotTo(HaveOccurred())
+		commandTimeout := time.Second * 5
+		query := fmt.Sprintf("CREATE TABLE image (name text,raster oid); "+
+			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_import('/etc/motd', %d));", oid)
+		_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, specs.PostgresContainerName,
+			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+	})
+}
+
 // insertRecordIntoTable insert an entry into a table
 func insertRecordIntoTable(namespace, clusterName, tableName string, value int) {
 	commandTimeout := time.Second * 5
@@ -390,6 +404,28 @@ func AssertDataExpectedCount(namespace, podName, tableName string, expectedValue
 			nRows, err := strconv.Atoi(strings.Trim(stdout, "\n"))
 			return nRows, err
 		}, 300).Should(BeEquivalentTo(expectedValue))
+	})
+}
+
+// AssertLargeObjectValue verifies the presence of a Large Object given by its OID
+func AssertLargeObjectValue(namespace, podName string, oid int) {
+	By(fmt.Sprintf("verifying large object on pod %v", podName), func() {
+		query := fmt.Sprintf("SELECT lo_get(%v);", oid)
+		commandTimeout := time.Second * 10
+		Eventually(func() (string, error) {
+			// We keep getting the pod, since there could be a new pod with the same name
+			pod := &corev1.Pod{}
+			err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, pod)
+			if err != nil {
+				return "", err
+			}
+			stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+			if err != nil {
+				return "", err
+			}
+			return strings.Trim(stdout, "\n"), nil
+		}, 300).ShouldNot(BeEquivalentTo("\\x"))
 	})
 }
 
@@ -1300,6 +1336,20 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
 
 		// Restored standby should be attached to restored primary
 		assertClusterStandbysAreStreaming(namespace, restoredClusterName)
+	})
+}
+
+// AssertClusterImport verifies that a database has been imported into a new cluster,
+// and that the new cluster is functioning properly
+func AssertClusterImport(namespace, clusterWithExternalClusterName, clusterName, databaseName string) {
+	By("Importing Database in a new cluster", func() {
+		err := testsUtils.ImportDatabaseMicroservice(namespace, clusterWithExternalClusterName,
+			clusterName, databaseName, env, "")
+		Expect(err).ToNot(HaveOccurred())
+		// We give more time than the usual 600s, since the recovery is slower
+		AssertClusterIsReady(namespace, clusterWithExternalClusterName, 800, env)
+		// Restored standby should be attached to restored primary
+		assertClusterStandbysAreStreaming(namespace, clusterWithExternalClusterName)
 	})
 }
 

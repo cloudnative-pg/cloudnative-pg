@@ -25,7 +25,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
 
 // MetricMap stores the prometheus metric description which a given column will
@@ -120,7 +120,7 @@ func (columnMapping ColumnMapping) ToMetricMap(
 			Desc: prometheus.NewDesc(
 				fmt.Sprintf("%s_%s", namespace, columnName),
 				columnMapping.Description, variableLabels, nil),
-			Conversion: postgres.DBToFloat64,
+			Conversion: postgresutils.DBToFloat64,
 			Label:      false,
 		}
 
@@ -131,7 +131,7 @@ func (columnMapping ColumnMapping) ToMetricMap(
 			Desc: prometheus.NewDesc(
 				fmt.Sprintf("%s_%s", namespace, columnName),
 				columnMapping.Description, variableLabels, nil),
-			Conversion: postgres.DBToFloat64,
+			Conversion: postgresutils.DBToFloat64,
 			Label:      false,
 		}
 
@@ -143,7 +143,7 @@ func (columnMapping ColumnMapping) ToMetricMap(
 			Desc: prometheus.NewDesc(
 				fmt.Sprintf("%s_%s", namespace, columnName),
 				columnMapping.Description, variableLabels, nil),
-			Conversion: postgres.DBToFloat64,
+			Conversion: postgresutils.DBToFloat64,
 			Label:      false,
 		}
 		bucketColumnName := columnName + "_bucket"

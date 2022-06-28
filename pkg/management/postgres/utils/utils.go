@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package postgres
+package utils
 
 // This code is inspired on [postgres_exporter](https://github.com/prometheus-community/postgres_exporter)
 

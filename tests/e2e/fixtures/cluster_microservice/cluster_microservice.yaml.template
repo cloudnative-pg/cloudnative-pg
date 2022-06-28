@@ -1,0 +1,27 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-pgdump-error
+spec:
+  instances: 3
+  bootstrap:
+    initdb:
+      import:
+        type: microservice
+        databases:
+          - non_exist
+        source:
+          externalCluster: cluster-microservice
+        postImportApplicationSQL:
+          - "SELECT 1;"
+  storage:
+    size: 1Gi
+  externalClusters:
+    - name: cluster-microservice
+      connectionParameters:
+        host: cluster-microservice-rw.microservice-error.svc
+        user: postgres
+        dbname: postgres
+      password:
+        name: cluster-microservice-superuser
+        key: password

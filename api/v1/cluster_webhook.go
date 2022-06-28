@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -291,9 +292,10 @@ func (r *Cluster) ValidateCreate() error {
 
 // Validate groups the validation logic for clusters returning a list of all encountered errors
 func (r *Cluster) Validate() (allErrs field.ErrorList) {
-	type validation func() field.ErrorList
-	validations := []validation{
+	type validationFunc func() field.ErrorList
+	validations := []validationFunc{
 		r.validateInitDB,
+		r.validateImport,
 		r.validateSuperuserSecret,
 		r.validateCerts,
 		r.validateBootstrapMethod,
@@ -440,6 +442,118 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 				field.NewPath("spec", "bootstrap", "initdb", "walSegmentSize"),
 				initDBOptions.WalSegmentSize,
 				"WAL segment size must be a power of 2"))
+	}
+
+	return result
+}
+
+func (r *Cluster) validateImport() field.ErrorList {
+	// If it's not configured, everything is ok
+	if r.Spec.Bootstrap == nil {
+		return nil
+	}
+
+	if r.Spec.Bootstrap.InitDB == nil {
+		return nil
+	}
+
+	importSpec := r.Spec.Bootstrap.InitDB.Import
+	if importSpec == nil {
+		return nil
+	}
+
+	switch importSpec.Type {
+	case MicroserviceSnapshotType:
+		return importSpec.validateMicroservice()
+	case MonolithSnapshotType:
+		return importSpec.validateMonolith()
+	default:
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "type"),
+				importSpec.Type,
+				"Unrecognized import type"),
+		}
+	}
+}
+
+func (s Import) validateMicroservice() field.ErrorList {
+	var result field.ErrorList
+
+	if len(s.Databases) != 1 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "databases"),
+				s.Databases,
+				"You need to specify a single database for the `microservice` import type"),
+		)
+	}
+
+	if len(s.Roles) != 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "roles"),
+				s.Databases,
+				"You cannot specify roles to import for the `microservice` import type"),
+		)
+	}
+
+	if len(s.Databases) == 1 && strings.Contains(s.Databases[0], "*") {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "databases", "0"),
+				s.Databases,
+				"You cannot specify any wildcard for the `microservice` import type"),
+		)
+	}
+
+	return result
+}
+
+func (s Import) validateMonolith() field.ErrorList {
+	var result field.ErrorList
+
+	if len(s.Databases) < 1 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "databases"),
+				s.Databases,
+				"You need to specify at least a database for the `monolith` import type"),
+		)
+	}
+
+	if len(s.Databases) > 1 && slices.Contains(s.Databases, "*") {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "databases"),
+				s.Databases,
+				"Wildcard import cannot be used along other database names"),
+		)
+	}
+
+	if len(s.Roles) > 1 && slices.Contains(s.Roles, "*") {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "roles"),
+				s.Databases,
+				"Wildcard import cannot be used along other role names"),
+		)
+	}
+
+	if len(s.PostImportApplicationSQL) > 0 {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "bootstrap", "initdb", "import", "postImportApplicationSQL"),
+				s.PostImportApplicationSQL,
+				"postImportApplicationSQL is not allowed for the `monolith` import type"),
+		)
 	}
 
 	return result

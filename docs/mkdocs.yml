@@ -16,6 +16,7 @@ nav:
   - installation_upgrade.md
   - quickstart.md
   - bootstrap.md
+  - database_import.md
   - security.md
   - instance_manager.md
   - scheduling.md

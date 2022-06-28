@@ -24,16 +24,15 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/avast/retry-go/v4"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-
-	"github.com/avast/retry-go/v4"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ReloadOperatorDeployment finds and deletes the operator pod. Returns

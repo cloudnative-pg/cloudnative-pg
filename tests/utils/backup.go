@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -82,7 +82,7 @@ func CreateClusterFromBackupUsingPITR(
 	}
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 	restoreCluster := &apiv1.Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
 			Namespace: namespace,
 		},
@@ -138,7 +138,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/", azStorageAccount, sourceClusterName)
 
 	restoreCluster := &apiv1.Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      externalClusterName,
 			Namespace: namespace,
 		},
@@ -212,7 +212,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 
 	restoreCluster := &apiv1.Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      externalClusterName,
 			Namespace: namespace,
 		},
@@ -294,7 +294,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 	DestinationPath := fmt.Sprintf("https://azurite:10000/storageaccountname/%v", sourceClusterName)
 
 	restoreCluster := &apiv1.Cluster{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      externalClusterName,
 			Namespace: namespace,
 		},
@@ -411,7 +411,7 @@ func GetConditionsInClusterStatus(
 	clusterName string,
 	env *TestingEnvironment,
 	conditionType apiv1.ClusterConditionType,
-) (*v1.Condition, error) {
+) (*metav1.Condition, error) {
 	var cluster *apiv1.Cluster
 	var err error
 

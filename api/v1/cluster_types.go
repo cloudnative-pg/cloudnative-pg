@@ -99,6 +99,9 @@ const (
 
 	// PendingFailoverMarker is used as target primary to signal that a failover is required
 	PendingFailoverMarker = "pending"
+
+	// PGBouncerPoolerUserName is the name of the role to be used for
+	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
 )
 
 // ClusterSpec defines the desired state of Cluster
@@ -770,6 +773,48 @@ type BootstrapInitDB struct {
 	// after the cluster has been created - to be used with extreme care
 	// (by default empty)
 	PostInitTemplateSQL []string `json:"postInitTemplateSQL,omitempty"`
+
+	// Bootstraps the new cluster by importing data from an existing PostgreSQL
+	// instance using logical backup (`pg_dump` and `pg_restore`)
+	Import *Import `json:"import,omitempty"`
+}
+
+// SnapshotType is a type of allowed import
+type SnapshotType string
+
+const (
+	// MonolithSnapshotType indicates to execute the monolith clone typology
+	MonolithSnapshotType SnapshotType = "monolith"
+
+	// MicroserviceSnapshotType indicates to execute the microservice clone typology
+	MicroserviceSnapshotType SnapshotType = "microservice"
+)
+
+// Import contains the configuration to init a database from a logic snapshot of an externalCluster
+type Import struct {
+	// The source of the import
+	Source ImportSource `json:"source"`
+
+	// The import type. Can be `microservice` or `monolith`.
+	// +kubebuilder:validation:Enum=microservice;monolith
+	Type SnapshotType `json:"type"`
+
+	// The databases to import
+	Databases []string `json:"databases"`
+
+	// The roles to import
+	Roles []string `json:"roles,omitempty"`
+
+	// List of SQL queries to be executed as a superuser in the application
+	// database right after is imported - to be used with extreme care
+	// (by default empty). Only available in microservice type.
+	PostImportApplicationSQL []string `json:"postImportApplicationSQL,omitempty"`
+}
+
+// ImportSource describes the source for the logical snapshot
+type ImportSource struct {
+	// The name of the externalCluster used for import
+	ExternalCluster string `json:"externalCluster"`
 }
 
 // BootstrapRecovery contains the configuration required to restore

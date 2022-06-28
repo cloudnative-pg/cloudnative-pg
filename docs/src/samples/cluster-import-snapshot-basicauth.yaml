@@ -1,0 +1,26 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-pgdump
+spec:
+  instances: 3
+
+  bootstrap:
+    initdb:
+      import:
+        type: microservice
+        databases:
+          - app
+        source:
+          externalCluster: cluster-example
+  storage:
+    size: 1Gi
+  externalClusters:
+    - name: cluster-example
+      connectionParameters:
+        host: cluster-example-rw.default.svc
+        user: postgres
+        dbname: postgres
+      password:
+        name: cluster-example-superuser
+        key: password

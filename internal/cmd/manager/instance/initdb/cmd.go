@@ -18,6 +18,7 @@ limitations under the License.
 package initdb
 
 import (
+	"context"
 	"os"
 
 	"github.com/kballard/go-shellquote"
@@ -44,6 +45,8 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "init [options]",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+
 			initDBFlags, err := shellquote.Split(initDBFlagsString)
 			if err != nil {
 				log.Error(err, "Error while parsing initdb flags")
@@ -82,7 +85,7 @@ func NewCmd() *cobra.Command {
 				PostInitTemplateSQL:    postInitTemplateSQL,
 			}
 
-			return initSubCommand(info)
+			return initSubCommand(ctx, info)
 		},
 	}
 
@@ -110,13 +113,13 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func initSubCommand(info postgres.InitInfo) error {
+func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
 	err := info.VerifyPGData()
 	if err != nil {
 		return err
 	}
 
-	err = info.Bootstrap()
+	err = info.Bootstrap(ctx)
 	if err != nil {
 		log.Error(err, "Error while bootstrapping data directory")
 		return err

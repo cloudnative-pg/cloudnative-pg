@@ -69,8 +69,7 @@ func (pool *ConnectionPool) ShutdownConnections() {
 // newConnection creates a database connection connectionMap, connecting via
 // Unix domain socket to a database with a certain name
 func (pool *ConnectionPool) newConnection(dbname string) (*sql.DB, error) {
-	dsn := fmt.Sprintf(
-		"%s dbname=%s", pool.baseConnectionString, dbname)
+	dsn := pool.GetDsn(dbname)
 	db, err := sql.Open(
 		"postgres",
 		dsn)
@@ -82,4 +81,9 @@ func (pool *ConnectionPool) newConnection(dbname string) (*sql.DB, error) {
 	db.SetMaxIdleConns(0)
 
 	return db, nil
+}
+
+// GetDsn returns the connection string for a given database
+func (pool *ConnectionPool) GetDsn(dbname string) string {
+	return fmt.Sprintf("%s dbname=%s", pool.baseConnectionString, dbname)
 }
