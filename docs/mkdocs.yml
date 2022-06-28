@@ -25,6 +25,7 @@ nav:
   - rolling_update.md
   - replication.md
   - backup_recovery.md
+  - replica_cluster.md
   - postgresql_conf.md
   - operator_conf.md
   - storage.md
