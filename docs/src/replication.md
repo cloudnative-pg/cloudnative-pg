@@ -4,7 +4,7 @@ Physical replication is one of the strengths of PostgreSQL and one of the
 reasons why some of the largest organizations in the world have chosen
 it for the management of their data in business continuity contexts.
 Primarily used to achieve high availability, physical replication also allows
-scale-out of read-only workloads and offloading some work from the primary.
+scale-out of read-only workloads and offloading of some work from the primary.
 
 !!! Important
     This section is about replication within the same `Cluster` resource
@@ -83,17 +83,23 @@ hostssl replication streaming_replica all cert
 
 In case continuous backup is configured in the cluster, CloudNativePG
 transparently configures replicas to take advantage of `restore_command` when
-in continuous recovery. As a result, PostgreSQL is able to use the WAL archive
+in continuous recovery. As a result, PostgreSQL can use the WAL archive
 as a fallback option whenever pulling WALs via streaming replication fails.
 
 ## Synchronous replication
 
-CloudNativePG supports configuration of **quorum-based synchronous
+CloudNativePG supports the configuration of **quorum-based synchronous
 streaming replication** via two configuration options called `minSyncReplicas`
-and `maxSyncReplicas` which are the minimum and maximum number of expected
+and `maxSyncReplicas`, which are the minimum and the maximum number of expected
 synchronous standby replicas available at any time.
 For self-healing purposes, the operator always compares these two values with
-the number of available replicas in order to determine the quorum.
+the number of available replicas to determine the quorum.
+
+!!! Important
+    By default, synchronous replication selects among all the available
+    replicas indistinctively. You can limit on which nodes your synchronous
+    replicas can be scheduled, by working on node labels through the
+    `syncReplicaElectionConstraint` option as described in the next section.
 
 Synchronous replication is disabled by default (`minSyncReplicas` and
 `maxSyncReplicas` are not defined).
@@ -112,9 +118,9 @@ Where:
 - `pod1, pod2, ...` is the list of all PostgreSQL pods in the cluster
 
 !!! Warning
-    To provide self-healing capabilities, the operator has the power
-    to ignore `minSyncReplicas` in case such value is higher than the currently
-    available number of replicas. Synchronous replication is automatically disabled
+    To provide self-healing capabilities, the operator can ignore
+    `minSyncReplicas` if such value is higher than the currently available
+    number of replicas. Synchronous replication is automatically disabled
     when `readyReplicas` is `0`.
 
 As stated in the
@@ -129,26 +135,43 @@ requested number of synchronous standbys in the list*.
     synchronous replication only in clusters with 3+ instances or,
     more generally, when `maxSyncReplicas < (instances - 1)`.
 
-### Constraints on synchronous replicas
+### Select nodes for synchronous replication
 
-It is possible to set anti-affinity rules specifically for sync replicas.
-(For the general pod affinity and anti-affinity rules, please check the
-[scheduling page.](scheduling.md))
+CloudNativePG enables you to select which PostgreSQL instances are eligible to
+participate in a quorum-based synchronous replication set through anti-affinity
+rules based on the node labels where the PVC holding the PGDATA and the
+Postgres pod are.
+
+!!! Seealso "Scheduling"
+    For more information on the general pod affinity and anti-affinity rules,
+    please check the ["Scheduling" section](scheduling.md).
 
 As an example use-case for this feature: in a cluster with a single sync replica,
 we would be able to ensure the sync replica will be in a different availability
-zone from the primary instance, and thus provide added robustness in case of
-outage of an AZ.
+zone from the primary instance, usually identified by the `topology.kubernetes.io/zone`
+[label on a node](https://kubernetes.io/docs/reference/labels-annotations-taints/#topologykubernetesiozone).
+This would increase the robustness of the cluster in case of an outage in a single
+availability zone, especially in terms of recovery point objective (RPO).
 
-As was pointed out in the previous section, the operator
-chooses self-healing over enforcement of sync replication parameters.
-This means that it could go lower than the configured `minSyncReplicas`
-if the eligible instances matching the constraints were fewer than that.
+The idea of anti-affinity is to ensure that sync replicas that participate in
+the quorum are chosen from pods running on nodes that have different values for
+the selected labels (in this case, the availability zone label) then the node
+where the primary is currently in execution. If no node matches such criteria,
+the replicas are eligible for synchronous replication.
 
-The constraints are available in the `syncReplicaElectionConstraint` section
-within `spec.postgresql`. The `nodeLabelsAntiAffinity`
-allows to specify node labels that will be checked when determining if two pods
-are in the same topology:
+!!! Important
+    The self-healing enforcement still applies while defining additional
+    constraints for synchronous replica election
+    (see ["Synchronous replication"](replication.md#synchronous-replication)).
+
+The example below shows how this can be done through the
+`syncReplicaElectionConstraint` section within `spec.postgresql`.
+`nodeLabelsAntiAffinity` allows you to specify those node labels that need to
+be evaluated to make sure that synchronous replication will be dynamically
+configured by the operator between the current primary and the replicas which
+are located on nodes having a value of the availability zone label different
+from that of the node where the primary is:
+
 
 ``` yaml
 spec:
@@ -156,6 +179,10 @@ spec:
   postgresql:
     syncReplicaElectionConstraint:
       enabled: true
-      nodeLabelsAntiAffinity: [ "az" ]
+      nodeLabelsAntiAffinity:
+      - topology.kubernetes.io/zone
 ```
 
+As you can imagine, the availability zone is just an example, but you could
+customize this behavior based on other labels that describe the node, such
+as storage, CPU, or memory.
