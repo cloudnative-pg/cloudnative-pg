@@ -34,6 +34,7 @@ nav:
   - ssl_connections.md
   - applications.md
   - connection_pooling.md
+  - replica_cluster.md
   - kubernetes_upgrade.md
   - expose_pg_services.md
   - cnpg-plugin.md
