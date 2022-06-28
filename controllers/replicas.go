@@ -105,8 +105,8 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	// (if is still alive) to shut down by setting the apiv1.PendingFailoverMarker as
 	// target primary.
 	if cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
-		contextLogger.Info("Current primary isn't healthy, initiating a failover",
-			"clusterStatus", status)
+		contextLogger.Info("Current primary isn't healthy, initiating a failover")
+		status.LogStatus(ctx)
 		contextLogger.Debug("Cluster status before initiating the failover", "pods", resources.pods)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Current primary isn't healthy, initiating a failover from %v", cluster.Status.CurrentPrimary)
@@ -129,9 +129,8 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	// This may be tha last step of a failover if target primary is set to apiv1.PendingFailoverMarker
 	// or change the target primary if the current one is not valid anymore.
 	if cluster.Status.TargetPrimary == apiv1.PendingFailoverMarker {
-		contextLogger.Info("Failing over",
-			"newPrimary", status.Items[0].Pod.Name,
-			"clusterStatus", status)
+		contextLogger.Info("Failing over", "newPrimary", status.Items[0].Pod.Name)
+		status.LogStatus(ctx)
 		contextLogger.Debug("Cluster status before failover", "pods", resources.pods)
 		r.Recorder.Eventf(cluster, "Normal", "FailoverTarget",
 			"Failing over from %v to %v",
@@ -142,8 +141,8 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 		}
 	} else {
 		contextLogger.Info("Target primary isn't healthy, switching target",
-			"newPrimary", status.Items[0].Pod.Name,
-			"clusterStatus", status)
+			"newPrimary", status.Items[0].Pod.Name)
+		status.LogStatus(ctx)
 		contextLogger.Debug("Cluster status before switching target", "pods", resources.pods)
 		r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 			"Target primary isn't healthy, switching target from %v to %v",
@@ -221,6 +220,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 		contextLogger.Info("Current primary is running on unschedulable node, triggering a switchover",
 			"currentPrimary", primaryPod.Pod.Name, "currentPrimaryNode", primaryPod.Node,
 			"targetPrimary", candidate.Pod.Name, "targetPrimaryNode", candidate.Node)
+		status.LogStatus(ctx)
 		r.Recorder.Eventf(cluster, "Normal", "SwitchingOver",
 			"Current primary is running on unschedulable node %v, switching over from %v to %v",
 			primaryPod.Node, cluster.Status.TargetPrimary, candidate.Pod.Name)
@@ -239,6 +239,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 		"currentPrimary", status.Items[0].Pod.Name,
 		"primaryNode", status.Items[0].Node,
 		"pods", status.Items)
+	status.LogStatus(ctx)
 	return "", nil
 }
 
@@ -272,8 +273,8 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 	}
 
 	contextLogger.Info("Current target primary isn't healthy, failing over",
-		"newPrimary", status.Items[0].Pod.Name,
-		"clusterStatus", status)
+		"newPrimary", status.Items[0].Pod.Name)
+	status.LogStatus(ctx)
 	contextLogger.Debug("Cluster status before failover", "pods", resources.pods)
 	r.Recorder.Eventf(cluster, "Normal", "FailingOver",
 		"Current target primary isn't healthy, failing over from %v to %v",
