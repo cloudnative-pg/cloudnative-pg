@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-example-initdb
+  name: cluster-advanced-initdb
 spec:
   instances: 3
 

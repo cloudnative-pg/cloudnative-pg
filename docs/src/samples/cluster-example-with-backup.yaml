@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-example-backup
+  name: cluster-example-with-backup
 spec:
   instances: 3
   primaryUpdateStrategy: unsupervised

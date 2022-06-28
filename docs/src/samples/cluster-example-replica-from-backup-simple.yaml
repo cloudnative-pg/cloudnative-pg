@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-replica-example-backup
+  name: cluster-example-replica-from-backup-simple
 spec:
   instances: 1
 
