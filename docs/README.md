@@ -25,5 +25,6 @@ docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" -p 8000:8000 \
 If you added samples to `docs/src/samples` or modified existing samples, please
 consider if they should be included in the curated [list of examples](src/samples.md)
 
-And please help keeping any samples named `cluster-example-*` in working
-condition. These can be a big help for beginners.
+And please help keeping the samples in the curated list, as well as any samples
+named `cluster-example-*` in runnable condition.
+These can be a big help for beginners.
