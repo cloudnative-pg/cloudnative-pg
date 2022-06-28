@@ -19,19 +19,13 @@ package initdb
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/kballard/go-shellquote"
 	"github.com/spf13/cobra"
-	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logicalimport"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
 
 // NewCmd generates the "init" subcommand
@@ -125,79 +119,11 @@ func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
 		return err
 	}
 
-	err = info.Bootstrap(ctx, logicalImportCallback)
+	err = info.Bootstrap(ctx)
 	if err != nil {
 		log.Error(err, "Error while bootstrapping data directory")
 		return err
 	}
 
 	return nil
-}
-
-func logicalImportCallback(
-	ctx context.Context,
-	client ctrl.Client,
-	instance *postgres.Instance,
-	cluster *apiv1.Cluster,
-) error {
-	if cluster.Spec.Bootstrap == nil ||
-		cluster.Spec.Bootstrap.InitDB == nil ||
-		cluster.Spec.Bootstrap.InitDB.Import == nil {
-		return nil
-	}
-
-	destinationPool := instance.ConnectionPool()
-	defer destinationPool.ShutdownConnections()
-
-	originPool, err := getConnectionPoolerForExternalCluster(ctx, cluster, client, cluster.Namespace)
-	if err != nil {
-		return err
-	}
-	defer originPool.ShutdownConnections()
-
-	cloneType := cluster.Spec.Bootstrap.InitDB.Import.Type
-	switch cloneType {
-	case apiv1.MicroserviceSnapshotType:
-		return logicalimport.Microservice(ctx, cluster, destinationPool, originPool)
-	case apiv1.MonolithSnapshotType:
-		return logicalimport.Monolith(ctx, cluster, destinationPool, originPool)
-	default:
-		return fmt.Errorf("unrecognized clone type %s", cloneType)
-	}
-}
-
-func getConnectionPoolerForExternalCluster(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	client ctrl.Client,
-	namespaceOfNewCluster string,
-) (*pool.ConnectionPool, error) {
-	externalCluster, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.InitDB.Import.Source.ExternalCluster)
-	if !ok {
-		return nil, fmt.Errorf("missing external cluster")
-	}
-
-	tmp := externalCluster.DeepCopy()
-	delete(tmp.ConnectionParameters, "dbname")
-
-	sourceDBConnectionString, pgpass, err := external.ConfigureConnectionToServer(
-		ctx,
-		client,
-		namespaceOfNewCluster,
-		&externalCluster,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Unfortunately lib/pq doesn't support the passfile
-	// connection option so we must rely on an environment
-	// variable.
-	if pgpass != "" {
-		if err = os.Setenv("PGPASSFILE", pgpass); err != nil {
-			return nil, err
-		}
-	}
-
-	return pool.NewConnectionPool(sourceDBConnectionString), nil
 }

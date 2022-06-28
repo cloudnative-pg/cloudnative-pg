@@ -27,8 +27,8 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
 
 type roleManager struct {
@@ -141,7 +141,7 @@ func (rs *roleManager) getRoles(ctx context.Context) ([]Role, error) {
 	if err != nil {
 		return nil, err
 	}
-	vers, err := postgres.GetPgVersion(originDatabase)
+	vers, err := utils.GetPgVersion(originDatabase)
 	if err != nil {
 		return nil, err
 	}

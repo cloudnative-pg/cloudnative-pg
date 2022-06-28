@@ -23,6 +23,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"os/exec"
 	"path"
 
@@ -33,8 +34,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logicalimport"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
@@ -248,17 +253,8 @@ func (info InitInfo) executeQueries(sqlUser *sql.DB, queries []string) error {
 	return nil
 }
 
-// BootstrapInitCallback allows the caller to execute operations after the initialization of a database
-// while the Postgres instance is still running
-type BootstrapInitCallback func(
-	ctx context.Context,
-	client ctrl.Client,
-	instance *Instance,
-	cluster *apiv1.Cluster,
-) error
-
 // Bootstrap creates and configures this new PostgreSQL instance
-func (info InitInfo) Bootstrap(ctx context.Context, initializationCallback BootstrapInitCallback) error {
+func (info InitInfo) Bootstrap(ctx context.Context) error {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return err
@@ -276,7 +272,7 @@ func (info InitInfo) Bootstrap(ctx context.Context, initializationCallback Boots
 
 	instance := info.GetInstance()
 
-	majorVersion, err := GetMajorVersion(instance.PgData)
+	majorVersion, err := postgresutils.GetMajorVersion(instance.PgData)
 	if err != nil {
 		return fmt.Errorf("while reading major version: %w", err)
 	}
@@ -295,10 +291,77 @@ func (info InitInfo) Bootstrap(ctx context.Context, initializationCallback Boots
 			return fmt.Errorf("while configuring new instance: %w", err)
 		}
 
-		err = initializationCallback(ctx, typedClient, instance, cluster)
-		if err != nil {
-			return fmt.Errorf("while initializing new instance: %w", err)
+		if cluster.Spec.Bootstrap != nil &&
+			cluster.Spec.Bootstrap.InitDB != nil &&
+			cluster.Spec.Bootstrap.InitDB.Import != nil {
+			err = executeLogicalImport(ctx, typedClient, instance, cluster)
+			if err != nil {
+				return fmt.Errorf("while executing logical import: %w", err)
+			}
 		}
+
 		return nil
 	})
+}
+
+func executeLogicalImport(
+	ctx context.Context,
+	client ctrl.Client,
+	instance *Instance,
+	cluster *apiv1.Cluster,
+) error {
+	destinationPool := instance.ConnectionPool()
+	defer destinationPool.ShutdownConnections()
+
+	originPool, err := getConnectionPoolerForExternalCluster(ctx, cluster, client, cluster.Namespace)
+	if err != nil {
+		return err
+	}
+	defer originPool.ShutdownConnections()
+
+	cloneType := cluster.Spec.Bootstrap.InitDB.Import.Type
+	switch cloneType {
+	case apiv1.MicroserviceSnapshotType:
+		return logicalimport.Microservice(ctx, cluster, destinationPool, originPool)
+	case apiv1.MonolithSnapshotType:
+		return logicalimport.Monolith(ctx, cluster, destinationPool, originPool)
+	default:
+		return fmt.Errorf("unrecognized clone type %s", cloneType)
+	}
+}
+
+func getConnectionPoolerForExternalCluster(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	client ctrl.Client,
+	namespaceOfNewCluster string,
+) (*pool.ConnectionPool, error) {
+	externalCluster, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.InitDB.Import.Source.ExternalCluster)
+	if !ok {
+		return nil, fmt.Errorf("missing external cluster")
+	}
+
+	tmp := externalCluster.DeepCopy()
+	delete(tmp.ConnectionParameters, "dbname")
+
+	sourceDBConnectionString, pgpass, err := external.ConfigureConnectionToServer(
+		ctx,
+		client,
+		namespaceOfNewCluster,
+		&externalCluster,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unfortunately lib/pq doesn't support the passfile
+	// connection option so we must rely on an environment
+	// variable.
+	if pgpass != "" {
+		if err = os.Setenv("PGPASSFILE", pgpass); err != nil {
+			return nil, err
+		}
+	}
+
+	return pool.NewConnectionPool(sourceDBConnectionString), nil
 }

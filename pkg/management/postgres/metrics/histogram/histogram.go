@@ -24,7 +24,7 @@ import (
 
 	"github.com/lib/pq"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
 
 const (
@@ -59,13 +59,13 @@ func NewFromRawData(values []interface{}, columns []string, name string) (*Value
 				return nil, fmt.Errorf("cannot load histogram values: %w", err)
 			}
 		case name + sumSuffix:
-			histogramValue.Sum, ok = postgres.DBToFloat64(values[idx])
+			histogramValue.Sum, ok = postgresutils.DBToFloat64(values[idx])
 			if !ok {
 				return nil, fmt.Errorf("cannot convert histogram values")
 			}
 
 		case name + countSuffix:
-			histogramValue.Count, ok = postgres.DBToUint64(values[idx])
+			histogramValue.Count, ok = postgresutils.DBToUint64(values[idx])
 			if !ok {
 				return nil, fmt.Errorf("cannot convertg histogram depth")
 			}

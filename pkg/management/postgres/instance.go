@@ -39,6 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
@@ -489,36 +490,12 @@ func (instance *Instance) GetPgVersion() (semver.Version, error) {
 		return semver.Version{}, err
 	}
 
-	parsedVersion, err := GetPgVersion(db)
+	parsedVersion, err := utils.GetPgVersion(db)
 	if err != nil {
 		return semver.Version{}, err
 	}
 	instance.pgVersion = parsedVersion
 	return *parsedVersion, nil
-}
-
-// GetPgVersion returns the version of postgres in a semantic format or an error
-func GetPgVersion(db *sql.DB) (*semver.Version, error) {
-	var versionString string
-	row := db.QueryRow("SHOW server_version_num")
-	err := row.Scan(&versionString)
-	if err != nil {
-		return nil, err
-	}
-	return parseVersionNum(versionString)
-}
-
-func parseVersionNum(versionNum string) (*semver.Version, error) {
-	versionInt, err := strconv.Atoi(versionNum)
-	if err != nil {
-		return nil, err
-	}
-
-	return &semver.Version{
-		Major: uint64(versionInt / 10000),
-		Minor: uint64((versionInt / 100) % 100),
-		Patch: uint64(versionInt % 100),
-	}, nil
 }
 
 // ConnectionPool gets or initializes the connection pool for this instance

@@ -46,6 +46,7 @@ import (
 	postgresManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -490,7 +491,7 @@ func (r *InstanceReconciler) getAllAccessibleDatabases(
 		}
 	}()
 
-	databases, errors = postgresManagement.GetAllAccessibleDatabases(tx, "datallowconn")
+	databases, errors = postgresutils.GetAllAccessibleDatabases(tx, "datallowconn")
 	return databases, errors
 }
 

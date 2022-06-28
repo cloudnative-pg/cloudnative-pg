@@ -14,16 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package postgres
+package utils
 
 // This code is inspired on [postgres_exporter](https://github.com/prometheus-community/postgres_exporter)
 
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"math"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -161,15 +159,4 @@ func GetAllAccessibleDatabases(tx *sql.Tx, whereClause string) (databases []stri
 		return databases, errors
 	}
 	return databases, nil
-}
-
-// GetMajorVersion read the PG_VERSION file in the data directory
-// returning the major version of the database
-func GetMajorVersion(pgData string) (int, error) {
-	content, err := ioutil.ReadFile(path.Join(pgData, "PG_VERSION")) // #nosec
-	if err != nil {
-		return 0, err
-	}
-
-	return strconv.Atoi(strings.TrimSpace(string(content)))
 }

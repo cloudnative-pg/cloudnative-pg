@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics/histogram"
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
 
 // QueriesCollector is the implementation of PgCollector for a certain
@@ -219,7 +220,7 @@ func (q QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
 			log.Error(err, "Error while committing monitoring tx to retrieve accessible databases list")
 		}
 	}()
-	databases, errors := postgres.GetAllAccessibleDatabases(tx, "datallowconn AND NOT datistemplate")
+	databases, errors := postgresutils.GetAllAccessibleDatabases(tx, "datallowconn AND NOT datistemplate")
 	if errors != nil {
 		return nil, fmt.Errorf("while discovering databases for metrics: %v", errors)
 	}
@@ -382,7 +383,7 @@ func (c QueryCollector) collectLabels(columns []string, columnData []interface{}
 	var labels []string
 	for idx, columnName := range columns {
 		if mapping, ok := c.columnMapping[columnName]; ok && mapping.Label {
-			value, ok := postgres.DBToString(columnData[idx])
+			value, ok := postgresutils.DBToString(columnData[idx])
 			if !ok {
 				log.Warning("Label value cannot be converted to string",
 					"value", value,
@@ -475,7 +476,7 @@ func (c QueryCollector) describe(ch chan<- *prometheus.Desc) {
 func (c QueryCollector) collectConstMetric(
 	mapping MetricMap, value interface{}, variableLabels []string, ch chan<- prometheus.Metric,
 ) {
-	floatData, ok := postgres.DBToFloat64(value)
+	floatData, ok := postgresutils.DBToFloat64(value)
 	if !ok {
 		log.Warning("Error while parsing value",
 			"namespace", c.namespace,

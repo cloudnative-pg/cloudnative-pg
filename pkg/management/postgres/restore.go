@@ -49,6 +49,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
@@ -315,7 +316,7 @@ func (info InitInfo) loadBackupFromReference(
 func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.Cluster) error {
 	// Ensure restore_command is used to correctly recover WALs
 	// from the object storage
-	major, err := GetMajorVersion(info.PgData)
+	major, err := postgresutils.GetMajorVersion(info.PgData)
 	if err != nil {
 		return fmt.Errorf("cannot detect major version: %w", err)
 	}
@@ -533,7 +534,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore(env []string) error {
 	instance := info.GetInstance()
 	instance.Env = env
 
-	majorVersion, err := GetMajorVersion(info.PgData)
+	majorVersion, err := postgresutils.GetMajorVersion(info.PgData)
 	if err != nil {
 		return fmt.Errorf("cannot detect major version: %w", err)
 	}

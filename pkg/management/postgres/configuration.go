@@ -28,6 +28,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
@@ -189,7 +190,7 @@ func UpdateReplicaConfiguration(pgData string, clusterName string, podName strin
 // UpdateReplicaConfigurationForPrimary updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
 func UpdateReplicaConfigurationForPrimary(pgData string, primaryConnInfo string) (changed bool, err error) {
-	major, err := GetMajorVersion(pgData)
+	major, err := postgresutils.GetMajorVersion(pgData)
 	if err != nil {
 		return false, err
 	}
