@@ -227,7 +227,7 @@ func getPoolerDeployment(ctx context.Context, pooler *apiv1.Pooler) *appsv1.Depl
 	return deployment
 }
 
-func generateFakeClusterPods(cluster *apiv1.Cluster, markAsReady bool) []corev1.Pod {
+func generateFakeClusterPods(c client.Client, cluster *apiv1.Cluster, markAsReady bool) []corev1.Pod {
 	var idx int
 	var pods []corev1.Pod
 	for idx < cluster.Spec.Instances {
@@ -235,7 +235,7 @@ func generateFakeClusterPods(cluster *apiv1.Cluster, markAsReady bool) []corev1.
 		pod := specs.PodWithExistingStorage(*cluster, idx)
 		SetClusterOwnerAnnotationsAndLabels(&pod.ObjectMeta, cluster)
 
-		err := k8sClient.Create(context.Background(), pod)
+		err := c.Create(context.Background(), pod)
 		Expect(err).To(BeNil())
 
 		// we overwrite local status, needed for certain tests. The status returned from fake api server will be always
@@ -255,7 +255,11 @@ func generateFakeClusterPods(cluster *apiv1.Cluster, markAsReady bool) []corev1.
 	return pods
 }
 
-func generateFakeInitDBJobs(cluster *apiv1.Cluster) []batchv1.Job {
+func generateFakeClusterPodsWithDefaultClient(cluster *apiv1.Cluster, markAsReady bool) []corev1.Pod {
+	return generateFakeClusterPods(k8sClient, cluster, markAsReady)
+}
+
+func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.Job {
 	var idx int
 	var jobs []batchv1.Job
 	for idx < cluster.Spec.Instances {
@@ -263,14 +267,18 @@ func generateFakeInitDBJobs(cluster *apiv1.Cluster) []batchv1.Job {
 		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
 		SetClusterOwnerAnnotationsAndLabels(&job.ObjectMeta, cluster)
 
-		err := k8sClient.Create(context.Background(), job)
+		err := c.Create(context.Background(), job)
 		Expect(err).To(BeNil())
 		jobs = append(jobs, *job)
 	}
 	return jobs
 }
 
-func generateFakePVC(cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
+func generateFakeInitDBJobsWithDefaultClient(cluster *apiv1.Cluster) []batchv1.Job {
+	return generateFakeInitDBJobs(k8sClient, cluster)
+}
+
+func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
 	var idx int
 	var pvcs []corev1.PersistentVolumeClaim
 	for idx < cluster.Spec.Instances {
@@ -280,11 +288,15 @@ func generateFakePVC(cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
 		Expect(err).To(BeNil())
 		SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
 
-		err = k8sClient.Create(context.Background(), pvc)
+		err = c.Create(context.Background(), pvc)
 		Expect(err).To(BeNil())
 		pvcs = append(pvcs, *pvc)
 	}
 	return pvcs
+}
+
+func generateFakePVCWithDefaultClient(cluster *apiv1.Cluster) []corev1.PersistentVolumeClaim {
+	return generateFakePVC(k8sClient, cluster)
 }
 
 func createManagerWithReconcilers(ctx context.Context) (*ClusterReconciler, *PoolerReconciler, manager.Manager) {
@@ -320,7 +332,7 @@ func createManagerWithReconcilers(ctx context.Context) (*ClusterReconciler, *Poo
 }
 
 // generateFakeCASecret follows the conventions established by cert.GenerateCASecret
-func generateFakeCASecret(name, namespace, domain string) (*corev1.Secret, *certs.KeyPair) {
+func generateFakeCASecret(c client.Client, name, namespace, domain string) (*corev1.Secret, *certs.KeyPair) {
 	keyPair, err := certs.CreateRootCA(domain, namespace)
 	Expect(err).To(BeNil())
 	secret := &corev1.Secret{
@@ -335,14 +347,18 @@ func generateFakeCASecret(name, namespace, domain string) (*corev1.Secret, *cert
 		},
 	}
 
-	err = k8sClient.Create(context.Background(), secret)
+	err = c.Create(context.Background(), secret)
 	Expect(err).To(BeNil())
 
 	return secret, keyPair
 }
 
-func expectResourceExists(name, namespace string, resource client.Object) {
-	err := k8sClient.Get(
+func generateFakeCASecretWithDefaultClient(name, namespace, domain string) (*corev1.Secret, *certs.KeyPair) {
+	return generateFakeCASecret(k8sClient, name, namespace, domain)
+}
+
+func expectResourceExists(c client.Client, name, namespace string, resource client.Object) {
+	err := c.Get(
 		context.Background(),
 		types.NamespacedName{Name: name, Namespace: namespace},
 		resource,
@@ -350,13 +366,21 @@ func expectResourceExists(name, namespace string, resource client.Object) {
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func expectResourceDoesntExist(name, namespace string, resource client.Object) {
-	err := k8sClient.Get(
+func expectResourceExistsWithDefaultClient(name, namespace string, resource client.Object) {
+	expectResourceExists(k8sClient, name, namespace, resource)
+}
+
+func expectResourceDoesntExist(c client.Client, name, namespace string, resource client.Object) {
+	err := c.Get(
 		context.Background(),
 		types.NamespacedName{Name: name, Namespace: namespace},
 		resource,
 	)
 	Expect(apierrors.IsNotFound(err)).To(BeTrue())
+}
+
+func expectResourceDoesntExistWithDefaultClient(name, namespace string, resource client.Object) {
+	expectResourceDoesntExist(k8sClient, name, namespace, resource)
 }
 
 // withManager bootstraps a manager.Manager inside a ginkgo.It statement
