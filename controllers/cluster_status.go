@@ -31,7 +31,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/strings/slices"
@@ -336,6 +336,24 @@ func (r *ClusterReconciler) updateResourceStatus(
 	return nil
 }
 
+// removeConditionsWithInvalidReason will remove every condition which is not valid
+// anymore from the K8s API point-of-view
+func (r *ClusterReconciler) removeConditionsWithInvalidReason(ctx context.Context, cluster *apiv1.Cluster) error {
+	conditions := make([]metav1.Condition, 0, len(cluster.Status.Conditions))
+	for _, entry := range cluster.Status.Conditions {
+		if utils.IsConditionReasonValid(entry.Reason) {
+			conditions = append(conditions, entry)
+		}
+	}
+
+	if !reflect.DeepEqual(cluster.Status.Conditions, conditions) {
+		cluster.Status.Conditions = conditions
+		return r.Status().Update(ctx, cluster)
+	}
+
+	return nil
+}
+
 // updateOnlineUpdateEnabled updates the `OnlineUpdateEnabled` value in the cluster status
 func (r *ClusterReconciler) updateOnlineUpdateEnabled(
 	ctx context.Context, cluster *apiv1.Cluster, onlineUpdateEnabled bool,
@@ -351,7 +369,7 @@ func (r *ClusterReconciler) updateOnlineUpdateEnabled(
 
 // SetClusterOwnerAnnotationsAndLabels sets the cluster as owner of the passed object and then
 // sets all the needed annotations and labels
-func SetClusterOwnerAnnotationsAndLabels(obj *v1.ObjectMeta, cluster *apiv1.Cluster) {
+func SetClusterOwnerAnnotationsAndLabels(obj *metav1.ObjectMeta, cluster *apiv1.Cluster) {
 	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
 	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 	utils.LabelClusterName(obj, cluster.GetName())
