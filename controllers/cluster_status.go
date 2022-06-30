@@ -377,7 +377,11 @@ func (r *ClusterReconciler) removeConditionsWithInvalidReason(ctx context.Contex
 
 	if !reflect.DeepEqual(cluster.Status.Conditions, conditions) {
 		cluster.Status.Conditions = conditions
-		return r.Status().Update(ctx, cluster)
+		if err := r.Status().Update(ctx, cluster); err != nil {
+			return err
+		}
+		// stop this loop as status is patched
+		return ErrNextLoop
 	}
 
 	return nil
