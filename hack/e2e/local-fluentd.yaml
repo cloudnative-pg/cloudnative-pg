@@ -106,6 +106,8 @@ spec:
       tolerations:
       - key: node-role.kubernetes.io/master # wokeignore:rule=master
         effect: NoSchedule
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
       containers:
       - name: fluentd
         image: registry.dev:5000/fluentd-kubernetes-daemonset:local
