@@ -528,15 +528,16 @@ spec:
 
 #### Configure the application database
 
-For the cluster recovered, we can configure the application database name and credentials with 
-additional configuration. To update application database credentials, we can generate our own 
-passwords, store them as secrets, and update the database use the secrets. Or we can also let the 
-operator generate a secret with randomly secure password for use. Please reference the 
-["Bootstrap an empty cluster"](#bootstrap-an-empty-cluster-initdb) section for more information 
-about secrets.
+For the recoverd cluster, we can configure the application database name and
+credentials with additional configuration. To update application database
+credentials, we can generate our own passwords, store them as secrets, and
+update the database use the secrets. Or we can also let the operator generate a
+secret with randomly secure password for use. Please reference the
+["Bootstrap an empty cluster"](#bootstrap-an-empty-cluster-initdb)
+section for more information about secrets.
 
-The following example configure the application database `app` with owner `app`,  and supplied secret
-`app-secret`.
+The following example configure the application database `app` with owner
+`app`,  and supplied secret `app-secret`.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -552,7 +553,7 @@ spec:
       [...]
 ```
 
-With the above configuration, following will happen after recovery
+With the above configuration, the following will happen after recovery is completed:
 
 1. if database `app` does not exist, a new database `app` will be created.
 2. if user `app` does not exist, a new user `app` will be created.
@@ -562,8 +563,9 @@ as owner of database `app`.
 application database will be changed to the value of `password` in secret. 
 
 !!! Important
-    Application database configuration will be disabled if the new cluster is 
-    created as a replica cluster, with replica mode enabled. 
+    In case of a replica cluster with replica mode enabled, the operator
+    will not create any database or user in the PostgreSQL instance, expecting
+    that they match the original cluster they were recovered from.
 
 ### Bootstrap from a live cluster (`pg_basebackup`)
 
@@ -779,8 +781,8 @@ from a live cluster, just like the case of `initdb` and  `recovery` bootstrap me
 If the new cluster is created as a replica cluster (with replica mode enabled), application
 database configuration will be skipped.
 
-The following example configure the application database `app` with password in supplied secret `app-secret` after bootstrap 
-from a live cluster.
+The following example configure the application database `app` with password in
+supplied secret `app-secret` after bootstrap from a live cluster.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -806,8 +808,9 @@ With the above configuration, following will happen after bootstrap
    application database will be changed to the value of `password` in secret.
 
 !!! Important
-    Application database configuration will be disabled if the new cluster is
-    created as a replica cluster, with replica mode enabled.
+    In case of a replica cluster with replica mode enabled, the operator
+    will not create any database or user in the PostgreSQL instance, expecting
+    that they match the original cluster they were cloned from.
 
 #### Current limitations
 
