@@ -76,17 +76,18 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRe
 		Expect(err).ToNot(HaveOccurred())
 
 		oid := 16393
+		data := "large object test"
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 		AssertCreateTestData(namespace, sourceClusterName, tableName)
-		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid)
+		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data)
 
 		importedClusterName = "cluster-pgdump-large-object"
 		AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
 		primary := importedClusterName + "-1"
 		AssertDataExpectedCount(namespace, primary, tableName, 2)
-		AssertLargeObjectValue(namespace, primary, oid)
+		AssertLargeObjectValue(namespace, primary, oid, data)
 	})
 
 	It("can import a database", func() {

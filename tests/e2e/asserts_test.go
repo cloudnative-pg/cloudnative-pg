@@ -356,14 +356,14 @@ func AssertCreateTestData(namespace, clusterName, tableName string) {
 	})
 }
 
-// AssertCreateTestDataLargeObject create empty large objects on primary pod
-func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int) {
+// AssertCreateTestDataLargeObject create large objects on primary pod with oid and data
+func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int, data string) {
 	By("creating large object", func() {
 		primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).NotTo(HaveOccurred())
 		commandTimeout := time.Second * 5
 		query := fmt.Sprintf("CREATE TABLE image (name text,raster oid); "+
-			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_create(%d));", oid)
+			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_from_bytea(%d, '%s'));", oid, data)
 		_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		Expect(err).ToNot(HaveOccurred())
@@ -407,10 +407,10 @@ func AssertDataExpectedCount(namespace, podName, tableName string, expectedValue
 	})
 }
 
-// AssertLargeObjectValue verifies the presence of a Large Object given by its OID
-func AssertLargeObjectValue(namespace, podName string, oid int) {
+// AssertLargeObjectValue verifies the presence of a Large Object given by its OID and data
+func AssertLargeObjectValue(namespace, podName string, oid int, data string) {
 	By(fmt.Sprintf("verifying large object on pod %v", podName), func() {
-		query := fmt.Sprintf("SELECT lo_get(%v);", oid)
+		query := fmt.Sprintf("SELECT encode(lo_get(%v), 'escape');", oid)
 		commandTimeout := time.Second * 10
 		Eventually(func() (string, error) {
 			// We keep getting the pod, since there could be a new pod with the same name
@@ -425,7 +425,7 @@ func AssertLargeObjectValue(namespace, podName string, oid int) {
 				return "", err
 			}
 			return strings.Trim(stdout, "\n"), nil
-		}, 300).Should(BeEquivalentTo("\\x"))
+		}, 300).Should(BeEquivalentTo(data))
 	})
 }
 
