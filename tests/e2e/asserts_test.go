@@ -356,14 +356,14 @@ func AssertCreateTestData(namespace, clusterName, tableName string) {
 	})
 }
 
-// AssertCreateTestDataLargeObject create large objects on primary pod
+// AssertCreateTestDataLargeObject create empty large objects on primary pod
 func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int) {
 	By("creating large object", func() {
 		primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).NotTo(HaveOccurred())
 		commandTimeout := time.Second * 5
 		query := fmt.Sprintf("CREATE TABLE image (name text,raster oid); "+
-			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_import('/etc/motd', %d));", oid)
+			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_create(%d));", oid)
 		_, _, err = env.ExecCommand(env.Ctx, *primaryPodInfo, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
 		Expect(err).ToNot(HaveOccurred())

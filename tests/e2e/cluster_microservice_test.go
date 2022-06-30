@@ -275,7 +275,7 @@ func assertImportRenamesSelectedDatabase(
 			clusterName, dbToImport, env, imageName)
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
-		AssertClusterIsReady(namespace, importedClusterName, 800, env)
+		AssertClusterIsReady(namespace, importedClusterName, 1000, env)
 		assertClusterStandbysAreStreaming(namespace, importedClusterName)
 	})
 
