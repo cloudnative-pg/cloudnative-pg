@@ -366,7 +366,8 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		"Replication role",
 		"Status",
 		"QoS",
-		"Manager Version")
+		"Manager Version",
+		"Node")
 
 	sort.Sort(fullStatus.InstanceStatus)
 	for _, instance := range fullStatus.InstanceStatus.Items {
@@ -378,7 +379,9 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 				"-",
 				instance.Error.Error(),
 				instance.Pod.Status.QOSClass,
-				"-")
+				"-",
+				instance.Pod.Spec.NodeName,
+			)
 			continue
 		}
 		statusMsg := "OK"
@@ -395,6 +398,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 			statusMsg,
 			instance.Pod.Status.QOSClass,
 			instance.InstanceManagerVersion,
+			instance.Pod.Spec.NodeName,
 		)
 		continue
 	}
