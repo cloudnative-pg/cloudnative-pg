@@ -174,8 +174,22 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, nil
 	}
 
+	// IMPORTANT: the following call will delete conditions using
+	// invalid condition reasons.
+	//
+	// This operation is necessary to migrate from a version using
+	// the customized Condition structure to one using the standard
+	// one from K8S, that has more strict validations.
+	//
+	// The next reconciliation loop of the instance manager will
+	// recreate the dropped conditions.
+	err := r.removeConditionsWithInvalidReason(ctx, cluster)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Make sure default values are populated.
-	err := r.setDefaults(ctx, cluster)
+	err = r.setDefaults(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

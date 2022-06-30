@@ -18,12 +18,14 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -101,9 +103,23 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 
 			assertRefreshManagerCache(ctx, manager)
 
-			By("making sure configmap and cluster exists", func() {
+			By("making sure that the configmap and the cluster exists", func() {
 				expectResourceExists(cmName, namespace, &corev1.ConfigMap{})
 				expectResourceExists(cluster.Name, namespace, &apiv1.Cluster{})
+			})
+
+			By("making sure that the cache is indexed", func() {
+				Eventually(func(g Gomega) {
+					clustersUsingDefaultMetrics := apiv1.ClusterList{}
+					err := crReconciler.List(
+						ctx,
+						&clustersUsingDefaultMetrics,
+						client.InNamespace(namespace),
+						client.MatchingFields{disableDefaultQueriesSpecPath: "false"},
+					)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(clustersUsingDefaultMetrics.Items).To(HaveLen(1))
+				}, 20*time.Second).Should(Succeed())
 			})
 
 			By("deleting the dangling monitoring configmap", func() {
