@@ -425,7 +425,7 @@ func AssertLargeObjectValue(namespace, podName string, oid int) {
 				return "", err
 			}
 			return strings.Trim(stdout, "\n"), nil
-		}, 300).ShouldNot(BeEquivalentTo("\\x"))
+		}, 300).Should(BeEquivalentTo("\\x"))
 	})
 }
 
