@@ -704,6 +704,54 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 		return nil
 	}
 
+	result := validateTargetExclusiveness(recoveryTarget)
+
+	// validate format of TargetTime
+	if recoveryTarget.TargetTime != "" {
+		if _, err := utils.ParseTargetTime(nil, recoveryTarget.TargetTime); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
+				recoveryTarget.TargetTime,
+				"The format of TargetTime is invalid"))
+		}
+	}
+
+	// validate TargetLSN
+	if recoveryTarget.TargetLSN != "" {
+		if _, err := postgres.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
+				recoveryTarget.TargetLSN,
+				"Invalid TargetLSN"))
+		}
+	}
+
+	// validate BackupID is defined when TargetName or TargetXID or TargetImmediate are set
+	if (recoveryTarget.TargetName != "" ||
+		recoveryTarget.TargetXID != "" ||
+		recoveryTarget.TargetImmediate != nil) && recoveryTarget.BackupID == "" {
+		result = append(result, field.Required(
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
+			"BackupID is missing"))
+	}
+
+	switch recoveryTarget.TargetTLI {
+	case "", "latest":
+		// Allowed non-numeric values
+	default:
+		// Everything else must be a valid positive integer
+		if tli, err := strconv.Atoi(recoveryTarget.TargetTLI); err != nil || tli < 1 {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetTLI"),
+				recoveryTarget,
+				"recovery target timeline can be set to 'latest' or a positive integer"))
+		}
+	}
+
+	return result
+}
+
+func validateTargetExclusiveness(recoveryTarget *RecoveryTarget) field.ErrorList {
 	targets := 0
 	if recoveryTarget.TargetImmediate != nil {
 		targets++
@@ -729,40 +777,6 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 			recoveryTarget,
 			"Recovery target options are mutually exclusive"))
 	}
-
-	// validate format of TargetTime
-	if recoveryTarget.TargetTime != "" {
-		if _, err := utils.ParseTargetTime(nil, recoveryTarget.TargetTime); err != nil {
-			result = append(result, field.Invalid(
-				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
-				recoveryTarget.TargetTime,
-				"The format of TargetTime is invalid"))
-		}
-	}
-
-	// validate TargetLSN
-	if recoveryTarget.TargetLSN != "" {
-		if _, err := postgres.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
-			result = append(result, field.Invalid(
-				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
-				recoveryTarget.TargetLSN,
-				"Invalid TargetLSN"))
-		}
-	}
-
-	switch recoveryTarget.TargetTLI {
-	case "", "latest":
-		// Allowed non numeric values
-	default:
-		// Everything else must be a valid positive integer
-		if tli, err := strconv.Atoi(recoveryTarget.TargetTLI); err != nil || tli < 1 {
-			result = append(result, field.Invalid(
-				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetTLI"),
-				recoveryTarget,
-				"recovery target timeline can be set to 'latest' or a positive integer"))
-		}
-	}
-
 	return result
 }
 
