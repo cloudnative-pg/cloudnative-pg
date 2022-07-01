@@ -435,7 +435,8 @@ base backup. PostgreSQL uses this technique to achieve *point-in-time* recovery
 
 The operator will generate the configuration parameters required for this
 feature to work in case a recovery target is specified, like in the following
-example that uses a recovery object stored in Azure:
+example that uses a recovery object stored in Azure and a timestamp based
+goal:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -469,18 +470,78 @@ spec:
           maxParallel: 8
 ```
 
-Besides `targetTime`, you can use the following criteria to stop the recovery:
+You might have noticed that in the above example you only had to specify
+the `targetTime` in the form of a timestamp, without having to worry about
+specifying the base backup from which to start the recovery.
 
-- `targetXID` specify a transaction ID up to which recovery will proceed
+The `backupID` option is the one that allows you to specify the base backup
+from which to initiate the recovery process. By default, this value is
+empty.
 
-- `targetName` specify a restore point (created with `pg_create_restore_point`
-  to which recovery will proceed)
+If you assign a value to it (in the form of a Barman backup ID), the operator
+will use that backup as base for the recovery.
 
-- `targetLSN` specify the LSN of the write-ahead log location up to which
-  recovery will proceed
+!!! Important
+    You need to make sure that such a backup exists and is accessible.
 
-- `targetImmediate` specify to stop as soon as a consistent state is
-  reached
+If the backup ID is not specified, the operator will automatically detect the
+base backup for the recovery as follows:
+
+- when you use `targetTime` or `targetLSN`, the operator selects the closest
+  backup that was completed before that target
+- otherwise the operator selects the last available backup in chronological
+  order.
+
+Here are the recovery target criteria you can use:
+
+targetTime
+:  time stamp up to which recovery will proceed, expressed in
+   [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339) format
+   (the precise stopping point is also influenced by the `exclusive` option)
+
+targetXID
+:  transaction ID up to which recovery will proceed
+   (the precise stopping point is also influenced by the `exclusive` option);
+   keep in mind that while transaction IDs are assigned sequentially at
+   transaction start, transactions can complete in a different numeric order.
+   The transactions that will be recovered are those that committed before
+   (and optionally including) the specified one
+
+targetName
+:  named restore point (created with `pg_create_restore_point()`) to which
+   recovery will proceed
+
+targetLSN
+:  LSN of the write-ahead log location up to which recovery will proceed
+   (the precise stopping point is also influenced by the `exclusive` option)
+
+targetImmediate
+:  recovery should end as soon as a consistent state is reached - i.e. as early
+   as possible. When restoring from an online backup, this means the point where
+   taking the backup ended
+
+
+!!! Important
+    While the operator is able to automatically retrieve the closest backup
+    when either `targetTime` or `targetLSN` is specified, this is not possible
+    for the remaining targets: `targetName`, `targetXID`, and `targetImmediate`.
+    In such cases, it is important to specify `backupID`, unless you are OK with
+    the last available backup in the catalog.
+
+The example below uses a `targetName` based recovery target:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+  bootstrap:
+    recovery:
+      source: clusterBackup
+      recoveryTarget:
+        backupID: 20220616T142236
+        targetName: 'restore_point_1'
+[...]
+```
 
 You can choose only a single one among the targets above in each
 `recoveryTarget` configuration.
@@ -508,6 +569,7 @@ spec:
     recovery:
       source: clusterBackup
       recoveryTarget:
+        backupID: 20220616T142236
         targetName: "maintenance-activity"
         exclusive: false
 

@@ -891,6 +891,12 @@ type BootstrapPgBaseBackup struct {
 // RecoveryTarget allows to configure the moment where the recovery process
 // will stop. All the target options except TargetTLI are mutually exclusive.
 type RecoveryTarget struct {
+	// The ID of the backup from which to start the recovery process.
+	// If empty (default) the operator will automatically detect the backup
+	// based on targetTime or targetLSN if specified. Otherwise use the
+	// latest available backup in chronological order.
+	BackupID string `json:"backupID,omitempty"`
+
 	// The target timeline ("latest" or a positive integer)
 	TargetTLI string `json:"targetTLI,omitempty"`
 
@@ -904,8 +910,7 @@ type RecoveryTarget struct {
 	// The target LSN (Log Sequence Number)
 	TargetLSN string `json:"targetLSN,omitempty"`
 
-	// The target time, in any unambiguous representation
-	// allowed by PostgreSQL
+	// The target time as a timestamp in the RFC3339 standard
 	TargetTime string `json:"targetTime,omitempty"`
 
 	// End recovery as soon as a consistent state is reached

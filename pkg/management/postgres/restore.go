@@ -206,6 +206,11 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	cluster *apiv1.Cluster,
 ) (*apiv1.Backup, []string, error) {
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
+
+	if sourceName == "" {
+		return nil, nil, fmt.Errorf("recovery source not specified")
+	}
+
 	log.Info("Recovering from external cluster", "sourceName", sourceName)
 
 	server, found := cluster.ExternalCluster(sourceName)
@@ -233,9 +238,9 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	var targetBackup *catalog.BarmanBackup
 	if cluster.Spec.Bootstrap.Recovery != nil &&
 		cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
-		targetBackup, err = backupCatalog.FindClosestBackupInfo(cluster.Spec.Bootstrap.Recovery.RecoveryTarget)
+		targetBackup, err = backupCatalog.FindBackupInfo(cluster.Spec.Bootstrap.Recovery.RecoveryTarget)
 		if err != nil {
-			log.Error(err, "while finding the closest BackupInfo")
+			return nil, nil, err
 		}
 	} else {
 		targetBackup = backupCatalog.LatestBackupInfo()

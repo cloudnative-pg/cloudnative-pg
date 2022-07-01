@@ -75,22 +75,36 @@ func (catalog *Catalog) FirstRecoverabilityPoint() *time.Time {
 	return nil
 }
 
-// FindClosestBackupInfo finds the backup info that should
-// use to file a PITR request via target parameters specified within `RecoveryTarget`
-func (catalog *Catalog) FindClosestBackupInfo(recoveryTarget *v1.RecoveryTarget) (*BarmanBackup, error) {
-	// the code below assumes the catalog to be sorted, therefore we enforce it first
-	sort.Sort(catalog)
+// FindBackupInfo finds the backup info that should be used to file
+// a PITR request via target parameters specified within `RecoveryTarget`
+func (catalog *Catalog) FindBackupInfo(recoveryTarget *v1.RecoveryTarget) (*BarmanBackup, error) {
+	// Check that BackupID is not empty. In such case, always use the
+	// backup ID provided by the user.
+	if recoveryTarget.BackupID != "" {
+		return catalog.findBackupFromID(recoveryTarget.BackupID)
+	}
+
+	// The user has not specified any backup ID. As a result we need
+	// to automatically detect the backup from which to start the
+	// recovery process.
+
+	// Set the timeline
 	targetTLI := recoveryTarget.TargetTLI
 
+	// Sort the catalog, as that's what the code below expects
+	sort.Sort(catalog)
+
+	// The first step is to check any time based research
 	if t := recoveryTarget.TargetTime; t != "" {
 		return catalog.findClosestBackupFromTargetTime(t, targetTLI)
 	}
 
+	// The second step is to check any LSN based research
 	if t := recoveryTarget.TargetLSN; t != "" {
 		return catalog.findClosestBackupFromTargetLSN(t, targetTLI)
 	}
 
-	// targetXID, targetName will be ignored in choosing the proper backup
+	// The fallback is to use the latest available backup in chronological order
 	return catalog.findlatestBackupFromTimeline(targetTLI), nil
 }
 
@@ -154,6 +168,21 @@ func (catalog *Catalog) findlatestBackupFromTimeline(targetTLI string) *BarmanBa
 	}
 
 	return nil
+}
+
+func (catalog *Catalog) findBackupFromID(backupID string) (*BarmanBackup, error) {
+	if backupID == "" {
+		return nil, fmt.Errorf("no backupID provided")
+	}
+	for _, barmanBackup := range catalog.List {
+		if !barmanBackup.isBackupDone() {
+			continue
+		}
+		if barmanBackup.ID == backupID {
+			return &barmanBackup, nil
+		}
+	}
+	return nil, fmt.Errorf("no backup found with ID %s", backupID)
 }
 
 // BarmanBackup represent a backup as created
