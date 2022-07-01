@@ -365,10 +365,10 @@ func (r *ClusterReconciler) updateResourceStatus(
 	return nil
 }
 
-// removeConditionsWithInvalidReason will remove every condition which is not valid
-// anymore from the K8s API point-of-view
+// removeConditionsWithInvalidReason will remove every condition which has a not valid
+// reason from the K8s API point-of-view
 func (r *ClusterReconciler) removeConditionsWithInvalidReason(ctx context.Context, cluster *apiv1.Cluster) error {
-	// Avoid patch if cluster has no condition
+	// Nothing to do if cluster has no conditions
 	if len(cluster.Status.Conditions) == 0 {
 		return nil
 	}
@@ -382,12 +382,13 @@ func (r *ClusterReconciler) removeConditionsWithInvalidReason(ctx context.Contex
 	}
 
 	if !reflect.DeepEqual(cluster.Status.Conditions, conditions) {
-		contextLogger.Info("Cluster invalid status removed")
+		contextLogger.Info("Updating Cluster to remove conditions with invalid reason")
 		cluster.Status.Conditions = conditions
 		if err := r.Status().Update(ctx, cluster); err != nil {
 			return err
 		}
-		// stop this loop as status is patched
+
+		// Restart the reconciliation loop as the status is changed
 		return ErrNextLoop
 	}
 
