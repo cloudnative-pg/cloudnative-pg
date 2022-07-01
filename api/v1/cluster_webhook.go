@@ -736,7 +736,7 @@ func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
 	var result field.ErrorList
 
 	// This validation is only applicable for recovery based bootstrap
-	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.Backup != nil {
+	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.Source == "" {
 		return result
 	}
 
