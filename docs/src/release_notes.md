@@ -7,9 +7,7 @@ in GitHub.
 For information on the community support policy for CloudNativePG, please
 refer to ["Supported releases"](supported_releases.md).
 
-##  CloudNativePG 1.16
-
-###  Version 1.16.0
+##  Version 1.16.0
 
 **Release date:** Jul 7, 2022 (patch release)
 
@@ -79,9 +77,7 @@ Fixes:
     - Fix the `status` command to sort results and remove variability in the
       output
 
-##  CloudNativePG 1.15
-
-###  Version 1.15.1
+##  Version 1.15.1
 
 **Release date:** May 27, 2022 (patch release)
 
