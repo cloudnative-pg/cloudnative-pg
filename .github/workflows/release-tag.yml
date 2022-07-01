@@ -6,7 +6,7 @@ on:
     types:
       - closed
     branches:
-      - main
+      - release-*
 
 jobs:
   tag:
@@ -17,12 +17,12 @@ jobs:
         uses: actions/checkout@v3
       -
         name: Temporarily disable "include administrators" branch protection
-        if: ${{ always() && github.ref == 'refs/heads/main' }}
+        if: always()
         id: disable_include_admins
         uses: benjefferies/branch-protection-bot@1.0.7
         with:
           access_token: ${{ secrets.REPO_GHA_PAT }}
-          branch: main
+          branch: ${{ github.ref_name }}
           enforce_admins: false
       -
         name: Create tag
@@ -36,8 +36,8 @@ jobs:
       -
         name: Enable "include administrators" branch protection
         uses: benjefferies/branch-protection-bot@1.0.7
-        if: ${{ always() && github.ref == 'refs/heads/main' }}
+        if: always()
         with:
           access_token: ${{ secrets.REPO_GHA_PAT }}
-          branch: main
+          branch: ${{ github.ref_name }}
           enforce_admins: ${{ steps.disable_include_admins.outputs.initial_status }}

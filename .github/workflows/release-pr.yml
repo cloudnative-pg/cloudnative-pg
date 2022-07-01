@@ -17,13 +17,16 @@ jobs:
       -
         name: Get tag
         run: |
-          echo "TAG=${GITHUB_REF##*/}" >> $GITHUB_ENV
+          TAG=${GITHUB_REF##*/}
+          DEST=$(echo ${TAG#v} | awk -F '[.]' '{print "release-"$1"."$2}')
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+          echo "DEST=${DEST}" >> $GITHUB_ENV
       -
         name: Pull Request
         id: open-pr
         uses: repo-sync/pull-request@v2.6.2
         with:
-          destination_branch: "main"
+          destination_branch: ${{ env.DEST }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           pr_body: "Automated PR. Will trigger the ${{ env.TAG }} release when approved."
           pr_label: release
