@@ -737,15 +737,16 @@ Name                          | Description                                     
 
 RecoveryTarget allows to configure the moment where the recovery process will stop. All the target options except TargetTLI are mutually exclusive.
 
-Name            | Description                                                               | Type  
---------------- | ------------------------------------------------------------------------- | ------
-`targetTLI      ` | The target timeline ("latest" or a positive integer)                      | string
-`targetXID      ` | The target transaction ID                                                 | string
-`targetName     ` | The target name (to be previously created with `pg_create_restore_point`) | string
-`targetLSN      ` | The target LSN (Log Sequence Number)                                      | string
-`targetTime     ` | The target time, in any unambiguous representation allowed by PostgreSQL  | string
-`targetImmediate` | End recovery as soon as a consistent state is reached                     | *bool 
-`exclusive      ` | Set the target to be exclusive (defaults to true)                         | *bool 
+Name            | Description                                                                                                                                                                                                                                          | Type  
+--------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------
+`backupID       ` | The ID of the backup from which to start the recovery process. If empty (default) the operator will automatically detect the backup based on targetTime or targetLSN if specified. Otherwise use the latest available backup in chronological order. | string
+`targetTLI      ` | The target timeline ("latest" or a positive integer)                                                                                                                                                                                                 | string
+`targetXID      ` | The target transaction ID                                                                                                                                                                                                                            | string
+`targetName     ` | The target name (to be previously created with `pg_create_restore_point`)                                                                                                                                                                            | string
+`targetLSN      ` | The target LSN (Log Sequence Number)                                                                                                                                                                                                                 | string
+`targetTime     ` | The target time as a timestamp in the RFC3339 standard                                                                                                                                                                                               | string
+`targetImmediate` | End recovery as soon as a consistent state is reached                                                                                                                                                                                                | *bool 
+`exclusive      ` | Set the target to be exclusive (defaults to true)                                                                                                                                                                                                    | *bool 
 
 <a id='ReplicaClusterConfiguration'></a>
 

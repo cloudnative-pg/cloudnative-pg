@@ -435,7 +435,8 @@ base backup. PostgreSQL uses this technique to achieve *point-in-time* recovery
 
 The operator will generate the configuration parameters required for this
 feature to work in case a recovery target is specified, like in the following
-example that uses a recovery object stored in Azure:
+example that uses a recovery object stored in Azure and a timestamp based
+goal:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -469,18 +470,78 @@ spec:
           maxParallel: 8
 ```
 
-Besides `targetTime`, you can use the following criteria to stop the recovery:
+You might have noticed that in the above example you only had to specify
+the `targetTime` in the form of a timestamp, without having to worry about
+specifying the base backup from which to start the recovery.
 
-- `targetXID` specify a transaction ID up to which recovery will proceed
+The `backupID` option is the one that allows you to specify the base backup
+from which to initiate the recovery process. By default, this value is
+empty.
 
-- `targetName` specify a restore point (created with `pg_create_restore_point`
-  to which recovery will proceed)
+If you assign a value to it (in the form of a Barman backup ID), the operator
+will use that backup as base for the recovery.
 
-- `targetLSN` specify the LSN of the write-ahead log location up to which
-  recovery will proceed
+!!! Important
+    You need to make sure that such a backup exists and is accessible.
 
-- `targetImmediate` specify to stop as soon as a consistent state is
-  reached
+If the backup ID is not specified, the operator will automatically detect the
+base backup for the recovery as follows:
+
+- when you use `targetTime` or `targetLSN`, the operator selects the closest
+  backup that was completed before that target
+- otherwise the operator selects the last available backup in chronological
+  order.
+
+Here are the recovery target criteria you can use:
+
+targetTime
+:  time stamp up to which recovery will proceed, expressed in
+   [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339) format
+   (the precise stopping point is also influenced by the `exclusive` option)
+
+targetXID
+:  transaction ID up to which recovery will proceed
+   (the precise stopping point is also influenced by the `exclusive` option);
+   keep in mind that while transaction IDs are assigned sequentially at
+   transaction start, transactions can complete in a different numeric order.
+   The transactions that will be recovered are those that committed before
+   (and optionally including) the specified one
+
+targetName
+:  named restore point (created with `pg_create_restore_point()`) to which
+   recovery will proceed
+
+targetLSN
+:  LSN of the write-ahead log location up to which recovery will proceed
+   (the precise stopping point is also influenced by the `exclusive` option)
+
+targetImmediate
+:  recovery should end as soon as a consistent state is reached - i.e. as early
+   as possible. When restoring from an online backup, this means the point where
+   taking the backup ended
+
+
+!!! Important
+    While the operator is able to automatically retrieve the closest backup
+    when either `targetTime` or `targetLSN` is specified, this is not possible
+    for the remaining targets: `targetName`, `targetXID`, and `targetImmediate`.
+    In such cases, it is important to specify `backupID`, unless you are OK with
+    the last available backup in the catalog.
+
+The example below uses a `targetName` based recovery target:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+  bootstrap:
+    recovery:
+      source: clusterBackup
+      recoveryTarget:
+        backupID: 20220616T142236
+        targetName: 'restore_point_1'
+[...]
+```
 
 You can choose only a single one among the targets above in each
 `recoveryTarget` configuration.
@@ -508,6 +569,7 @@ spec:
     recovery:
       source: clusterBackup
       recoveryTarget:
+        backupID: 20220616T142236
         targetName: "maintenance-activity"
         exclusive: false
 
@@ -526,16 +588,18 @@ spec:
           maxParallel: 8
 ```
 
-#### Update application database password (recovery)
+#### Configure the application database
 
-By default, the user credentials for the application database are preserved. You can update 
-the application user password with additional configuration. You can generate your passwords, 
-store them as secrets, and update the database use your own secrets after recovery. Or you can 
-also let the operator generate a secret with randomly secure password for use.
-Please reference the  ["Bootstrap an empty cluster"](#bootstrap-an-empty-cluster-initdb) section
-for more information about secrets.
+For the recovered cluster, we can configure the application database name and
+credentials with additional configuration. To update application database
+credentials, we can generate our own passwords, store them as secrets, and
+update the database use the secrets. Or we can also let the operator generate a
+secret with randomly secure password for use. Please reference the
+["Bootstrap an empty cluster"](#bootstrap-an-empty-cluster-initdb)
+section for more information about secrets.
 
-The following example update the application user password with supplied secret `app-secret`
+The following example configure the application database `app` with owner
+`app`, and supplied secret `app-secret`.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -551,7 +615,7 @@ spec:
       [...]
 ```
 
-With the above configuration, following will happen after recovery
+With the above configuration, the following will happen after recovery is completed:
 
 1. if database `app` does not exist, a new database `app` will be created.
 2. if user `app` does not exist, a new user `app` will be created.
@@ -559,6 +623,11 @@ With the above configuration, following will happen after recovery
 as owner of database `app`.
 4. If value of `username` match value of `owner` in secret, the password of 
 application database will be changed to the value of `password` in secret. 
+
+!!! Important
+    For a replica cluster with replica mode enabled, the operator will not
+    create any database or user in the PostgreSQL instance, as these will be
+    recovered from the original cluster.
 
 ### Bootstrap from a live cluster (`pg_basebackup`)
 
@@ -767,6 +836,43 @@ spec:
       name: cluster-example-ca
       key: ca.crt
 ```
+#### Configure the application database
+
+We also support to configure the application database for cluster which bootstrap
+from a live cluster, just like the case of `initdb` and  `recovery` bootstrap method.
+If the new cluster is created as a replica cluster (with replica mode enabled), application
+database configuration will be skipped.
+
+The following example configure the application database `app` with password in
+supplied secret `app-secret` after bootstrap from a live cluster.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  bootstrap:
+    pg_basebackup:
+      database: app
+      owner: app
+      secret:
+        name: app-secret
+      source: cluster-example
+```
+
+With the above configuration, the following will happen after recovery is completed:
+
+1. if database `app` does not exist, a new database `app` will be created.
+2. if user `app` does not exist, a new user `app` will be created.
+3. if user `app` is not the owner of database, user `app` will be granted
+   as owner of database `app`.
+4. If value of `username` match value of `owner` in secret, the password of
+   application database will be changed to the value of `password` in secret.
+
+!!! Important
+    For a replica cluster with replica mode enabled, the operator will not
+    create any database or user in the PostgreSQL instance, as these will be
+    recovered from the original cluster.
 
 #### Current limitations
 
@@ -812,29 +918,3 @@ This will open up two main use cases:
 - replication over different Kubernetes clusters in CloudNativePG
 - *0 cutover time* migrations to CloudNativePG with the `pg_basebackup`
   bootstrap method
-
-#### Update application database password (pg_basebackup)
-
-We also support update the password of application database after bootstrap from a live cluster.
-Similar to `initdb` and `recovery` bootstrap method, `pg_basebackup` section also support to configure 
-`database`, `owner` and `secret` attributes. 
-Please see more information in [Update application database password (recovery)](#update-application-database-password-recovery) 
-section.
-
-The following example update the application user password with supplied secret `app-secret` after bootstrap.
-
-
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-[...]
-spec:
-  bootstrap:
-    pg_basebackup:
-      database: app
-      owner: app
-      secret:
-        name: app-secret
-      source: cluster-example
-```

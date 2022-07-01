@@ -267,6 +267,8 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 	type validationFunc func() field.ErrorList
 	validations := []validationFunc{
 		r.validateInitDB,
+		r.validateRecoveryApplicationDatabase,
+		r.validatePgBaseBackupApplicationDatabase,
 		r.validateImport,
 		r.validateSuperuserSecret,
 		r.validateCerts,
@@ -389,23 +391,8 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 	// If you specify the database name, then you need also to specify the
 	// owner user and vice-versa
 	initDBOptions := r.Spec.Bootstrap.InitDB
-
-	if initDBOptions.Database != "" && initDBOptions.Owner == "" {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "bootstrap", "initdb", "owner"),
-				"",
-				"You need to specify the database owner user"))
-	}
-	if initDBOptions.Database == "" && initDBOptions.Owner != "" {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "bootstrap", "initdb", "database"),
-				"",
-				"You need to specify the database name"))
-	}
+	result = r.validateApplicationDatabase(initDBOptions.Database, initDBOptions.Owner,
+		"initdb")
 
 	if initDBOptions.WalSegmentSize != 0 && !utils.IsPowerOfTwo(initDBOptions.WalSegmentSize) {
 		result = append(
@@ -533,7 +520,7 @@ func (s Import) validateMonolith() field.ErrorList {
 
 // validateRecovery validate the bootstrapping options when Recovery
 // method is used
-func (r *Cluster) validateRecovery() field.ErrorList {
+func (r *Cluster) validateRecoveryApplicationDatabase() field.ErrorList {
 	var result field.ErrorList
 
 	// If it's not configured, everything is ok
@@ -545,33 +532,14 @@ func (r *Cluster) validateRecovery() field.ErrorList {
 		return result
 	}
 
-	// If you specify the database name, then you need also to specify the
-	// owner user and vice-versa
 	recoveryOptions := r.Spec.Bootstrap.Recovery
-
-	if recoveryOptions.Database != "" && recoveryOptions.Owner == "" {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "bootstrap", "recovery", "owner"),
-				"",
-				"You need to specify the database owner user"))
-	}
-	if recoveryOptions.Database == "" && recoveryOptions.Owner != "" {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "bootstrap", "recovery", "database"),
-				"",
-				"You need to specify the database name"))
-	}
-
-	return result
+	return r.validateApplicationDatabase(recoveryOptions.Database, recoveryOptions.Owner,
+		"recovery")
 }
 
 // validatePgBaseBackup validate the bootstrapping options when pg_basebackup
 // method is used
-func (r *Cluster) validatePgBaseBackup() field.ErrorList {
+func (r *Cluster) validatePgBaseBackupApplicationDatabase() field.ErrorList {
 	var result field.ErrorList
 
 	// If it's not configured, everything is ok
@@ -583,27 +551,33 @@ func (r *Cluster) validatePgBaseBackup() field.ErrorList {
 		return result
 	}
 
+	pgBaseBackupOptions := r.Spec.Bootstrap.PgBaseBackup
+	return r.validateApplicationDatabase(pgBaseBackupOptions.Database, pgBaseBackupOptions.Owner,
+		"pg_basebackup")
+}
+
+// validateApplicationDatabase validate the configuration for application database
+func (r *Cluster) validateApplicationDatabase(database string, owner string, command string,
+) field.ErrorList {
+	var result field.ErrorList
 	// If you specify the database name, then you need also to specify the
 	// owner user and vice-versa
-	pgBaseBackupOptions := r.Spec.Bootstrap.PgBaseBackup
-
-	if pgBaseBackupOptions.Database != "" && pgBaseBackupOptions.Owner == "" {
+	if database != "" && owner == "" {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "bootstrap", "pg_basebackup", "owner"),
+				field.NewPath("spec", "bootstrap", command, "owner"),
 				"",
 				"You need to specify the database owner user"))
 	}
-	if pgBaseBackupOptions.Database == "" && pgBaseBackupOptions.Owner != "" {
+	if database == "" && owner != "" {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "bootstrap", "pg_basebackup", "database"),
+				field.NewPath("spec", "bootstrap", command, "database"),
 				"",
 				"You need to specify the database name"))
 	}
-
 	return result
 }
 
@@ -958,6 +932,54 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 		return nil
 	}
 
+	result := validateTargetExclusiveness(recoveryTarget)
+
+	// validate format of TargetTime
+	if recoveryTarget.TargetTime != "" {
+		if _, err := utils.ParseTargetTime(nil, recoveryTarget.TargetTime); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
+				recoveryTarget.TargetTime,
+				"The format of TargetTime is invalid"))
+		}
+	}
+
+	// validate TargetLSN
+	if recoveryTarget.TargetLSN != "" {
+		if _, err := postgres.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
+				recoveryTarget.TargetLSN,
+				"Invalid TargetLSN"))
+		}
+	}
+
+	// validate BackupID is defined when TargetName or TargetXID or TargetImmediate are set
+	if (recoveryTarget.TargetName != "" ||
+		recoveryTarget.TargetXID != "" ||
+		recoveryTarget.TargetImmediate != nil) && recoveryTarget.BackupID == "" {
+		result = append(result, field.Required(
+			field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
+			"BackupID is missing"))
+	}
+
+	switch recoveryTarget.TargetTLI {
+	case "", "latest":
+		// Allowed non-numeric values
+	default:
+		// Everything else must be a valid positive integer
+		if tli, err := strconv.Atoi(recoveryTarget.TargetTLI); err != nil || tli < 1 {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetTLI"),
+				recoveryTarget,
+				"recovery target timeline can be set to 'latest' or a positive integer"))
+		}
+	}
+
+	return result
+}
+
+func validateTargetExclusiveness(recoveryTarget *RecoveryTarget) field.ErrorList {
 	targets := 0
 	if recoveryTarget.TargetImmediate != nil {
 		targets++
@@ -983,40 +1005,6 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 			recoveryTarget,
 			"Recovery target options are mutually exclusive"))
 	}
-
-	// validate format of TargetTime
-	if recoveryTarget.TargetTime != "" {
-		if _, err := utils.ParseTargetTime(nil, recoveryTarget.TargetTime); err != nil {
-			result = append(result, field.Invalid(
-				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
-				recoveryTarget.TargetTime,
-				"The format of TargetTime is invalid"))
-		}
-	}
-
-	// validate TargetLSN
-	if recoveryTarget.TargetLSN != "" {
-		if _, err := postgres.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
-			result = append(result, field.Invalid(
-				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
-				recoveryTarget.TargetLSN,
-				"Invalid TargetLSN"))
-		}
-	}
-
-	switch recoveryTarget.TargetTLI {
-	case "", "latest":
-		// Allowed non numeric values
-	default:
-		// Everything else must be a valid positive integer
-		if tli, err := strconv.Atoi(recoveryTarget.TargetTLI); err != nil || tli < 1 {
-			result = append(result, field.Invalid(
-				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget", "targetTLI"),
-				recoveryTarget,
-				"recovery target timeline can be set to 'latest' or a positive integer"))
-		}
-	}
-
 	return result
 }
 
@@ -1257,7 +1245,6 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 			r.Spec.ReplicaCluster,
 			"replica mode is compatible only with bootstrap using pg_basebackup or recovery"))
 	}
-
 	_, found := r.ExternalCluster(r.Spec.ReplicaCluster.Source)
 	if !found {
 		result = append(

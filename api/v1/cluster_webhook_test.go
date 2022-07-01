@@ -696,10 +696,56 @@ var _ = Describe("recovery target", func() {
 					Recovery: &BootstrapRecovery{
 						RecoveryTarget: &RecoveryTarget{
 							TargetTLI:       "",
-							TargetXID:       "3",
+							TargetXID:       "",
+							TargetName:      "",
+							TargetLSN:       "1/1",
+							TargetTime:      "2021-09-01 10:22:47.000000+06",
+							TargetImmediate: nil,
+							Exclusive:       nil,
+						},
+					},
+				},
+			},
+		}
+
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(1))
+	})
+
+	It("Requires BackupID to perform PITR with TargetName", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						RecoveryTarget: &RecoveryTarget{
+							BackupID:        "20220616T031500",
+							TargetTLI:       "",
+							TargetXID:       "",
+							TargetName:      "restore_point_1",
+							TargetLSN:       "",
+							TargetTime:      "",
+							TargetImmediate: nil,
+							Exclusive:       nil,
+						},
+					},
+				},
+			},
+		}
+
+		Expect(len(cluster.validateRecoveryTarget())).To(Equal(0))
+	})
+
+	It("Fails when no BackupID is provided to perform PITR with TargetXID", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						RecoveryTarget: &RecoveryTarget{
+							BackupID:        "",
+							TargetTLI:       "",
+							TargetXID:       "1/1",
 							TargetName:      "",
 							TargetLSN:       "",
-							TargetTime:      "2021-09-01 10:22:47.000000+06",
+							TargetTime:      "",
 							TargetImmediate: nil,
 							Exclusive:       nil,
 						},
@@ -1252,7 +1298,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 			},
 		}
 
-		result := cluster.validatePgBaseBackup()
+		result := cluster.validatePgBaseBackupApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1267,7 +1313,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 			},
 		}
 
-		result := cluster.validatePgBaseBackup()
+		result := cluster.validatePgBaseBackupApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1283,7 +1329,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 			},
 		}
 
-		result := cluster.validatePgBaseBackup()
+		result := cluster.validatePgBaseBackupApplicationDatabase()
 		Expect(result).To(BeEmpty())
 	})
 
@@ -1324,7 +1370,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 			},
 		}
 
-		result := cluster.validateRecovery()
+		result := cluster.validateRecoveryApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1339,7 +1385,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 			},
 		}
 
-		result := cluster.validateRecovery()
+		result := cluster.validateRecoveryApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1355,7 +1401,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 			},
 		}
 
-		result := cluster.validateRecovery()
+		result := cluster.validateRecoveryApplicationDatabase()
 		Expect(result).To(BeEmpty())
 	})
 
