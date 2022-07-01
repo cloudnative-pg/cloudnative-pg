@@ -408,7 +408,14 @@ jobs:
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       always() &&
-      needs.buildx.result == 'success'
+      needs.buildx.result == 'success' &&
+      ( github.event_name == 'workflow_dispatch' ||
+        github.head_ref == 'main' ||
+        github.ref_name == 'main' ||
+        startsWith(github.head_ref, 'dependabot/') ||
+        startsWith(github.ref_name, 'dependabot/') ||
+        github.event_name == 'pull_request' && github.event.action == 'opened'
+       )
     runs-on: ubuntu-20.04
     outputs:
       image: ${{ needs.buildx.outputs.image }}
