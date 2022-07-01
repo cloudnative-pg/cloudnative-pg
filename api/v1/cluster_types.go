@@ -1690,9 +1690,8 @@ func (cluster *Cluster) ShouldRecoveryCreateApplicationSecret() bool {
 			cluster.Spec.Bootstrap.Recovery.Secret.Name == "")
 }
 
-// ShouldCreateApplicationDatabase returns true if for this cluster,
-// during the bootstrap phase, we need to create an application database
-func (cluster *Cluster) ShouldCreateApplicationDatabase() bool {
+// ShouldApplyDatabaseConfiguration returns true if we should apply application database name and password.
+func (cluster *Cluster) ShouldApplyDatabaseConfiguration() bool {
 	return cluster.ShouldInitDBCreateApplicationDatabase() ||
 		cluster.ShouldRecoveryCreateApplicationDatabase() ||
 		cluster.ShouldPgBaseBackupCreateApplicationDatabase()

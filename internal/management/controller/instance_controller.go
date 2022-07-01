@@ -687,7 +687,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	contextLogger.Debug("Reconciling custom monitoring queries")
 
 	dbname := "postgres"
-	if cluster.ShouldCreateApplicationDatabase() {
+	if cluster.ShouldApplyDatabaseConfiguration() {
 		dbname = cluster.GetApplicationDatabaseName()
 	}
 
@@ -1144,7 +1144,7 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 		}
 	}
 
-	if cluster.ShouldCreateApplicationDatabase() {
+	if cluster.ShouldApplyDatabaseConfiguration() {
 		err = r.reconcileUser(ctx, cluster.GetApplicationDatabaseOwner(), cluster.GetApplicationSecretName(), tx)
 		if err != nil {
 			return err

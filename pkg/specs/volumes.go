@@ -62,7 +62,7 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 		)
 	}
 
-	if cluster.ShouldCreateApplicationDatabase() {
+	if cluster.ShouldApplyDatabaseConfiguration() {
 		result = append(result,
 			corev1.Volume{
 				Name: "app-secret",
@@ -107,7 +107,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		)
 	}
 
-	if cluster.ShouldCreateApplicationDatabase() {
+	if cluster.ShouldApplyDatabaseConfiguration() {
 		volumeMounts = append(volumeMounts,
 			corev1.VolumeMount{
 				Name:      "app-secret",
