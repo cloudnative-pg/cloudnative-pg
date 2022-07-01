@@ -192,6 +192,21 @@ are properly reloaded or restarted, depending on the configuration option.
 *Current limitation:* changes with `ALTER SYSTEM` are not detected, meaning
 that the cluster state is not enforced.
 
+### Import of existing PostgreSQL databases
+
+Since version 1.16, the operator provides a declarative way to import existing
+Postgres databases in a new CloudNativePG `Cluster` in Kubernetes, using
+offline migrations.
+The same feature covers also offline major upgrades of PostgreSQL databases.
+Offline means that applications must stop their write operations at the source
+until the database is imported.
+The feature extends the `initdb` bootstrap method to create a new PostgreSQL
+cluster using a logical snapshot of the data available in another PostgreSQL
+database - which can be accessed via the network through a superuser
+connection. Import is from any supported version of Postgres and relies on
+`pg_dump` and `pg_restore` to be executed from the new cluster primary
+for all databases part of the operation and, if requested, for roles.
+
 ### Basic LDAP authentication for PostgreSQL
 
 The operator allows you to configure LDAP authentication for your PostgreSQL
