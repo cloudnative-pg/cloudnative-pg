@@ -78,27 +78,33 @@ func (catalog *Catalog) FirstRecoverabilityPoint() *time.Time {
 // FindBackupInfo finds the backup info that should be used to file
 // a PITR request via target parameters specified within `RecoveryTarget`
 func (catalog *Catalog) FindBackupInfo(recoveryTarget *v1.RecoveryTarget) (*BarmanBackup, error) {
-	// the code below assumes the catalog to be sorted, therefore we enforce it first
-	sort.Sort(catalog)
+	// Check that BackupID is not empty. In such case, always use the
+	// backup ID provided by the user.
+	if recoveryTarget.BackupID != "" {
+		return catalog.findBackupFromID(recoveryTarget.BackupID)
+	}
+
+	// The user has not specified any backup ID. As a result we need
+	// to automatically detect the backup from which to start the
+	// recovery process.
+
+	// Set the timeline
 	targetTLI := recoveryTarget.TargetTLI
 
+	// Sort the catalog, as that's what the code below expects
+	sort.Sort(catalog)
+
+	// The first step is to check any time based research
 	if t := recoveryTarget.TargetTime; t != "" {
 		return catalog.findClosestBackupFromTargetTime(t, targetTLI)
 	}
 
+	// The second step is to check any LSN based research
 	if t := recoveryTarget.TargetLSN; t != "" {
 		return catalog.findClosestBackupFromTargetLSN(t, targetTLI)
 	}
 
-	// TargetName, TargetXID, and TargetImmediate recovery targets require
-	// the BackupID field to be defined.
-	if recoveryTarget.TargetName != "" ||
-		recoveryTarget.TargetXID != "" ||
-		recoveryTarget.TargetImmediate != nil {
-		return catalog.findBackupFromID(recoveryTarget.BackupID)
-	}
-
-	// targetXID, targetName will be ignored in choosing the proper backup
+	// The fallback is to use the latest available backup in chronological order
 	return catalog.findlatestBackupFromTimeline(targetTLI), nil
 }
 

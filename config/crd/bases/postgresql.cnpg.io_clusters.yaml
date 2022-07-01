@@ -1221,9 +1221,11 @@ spec:
                           https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET'
                         properties:
                           backupID:
-                            description: 'The backup ID to restore when one of the
-                              following targets is specified: targetName, targetXID
-                              and targetImmediate.'
+                            description: The ID of the backup from which to start
+                              the recovery process. If empty (default) the operator
+                              will automatically detect the backup based on targetTime
+                              or targetLSN if specified. Otherwise use the latest
+                              available backup in chronological order.
                             type: string
                           exclusive:
                             description: Set the target to be exclusive (defaults
@@ -1245,8 +1247,8 @@ spec:
                               integer)
                             type: string
                           targetTime:
-                            description: The target time, in any unambiguous representation
-                              allowed by PostgreSQL
+                            description: The target time as a timestamp in the RFC3339
+                              standard
                             type: string
                           targetXID:
                             description: The target transaction ID
