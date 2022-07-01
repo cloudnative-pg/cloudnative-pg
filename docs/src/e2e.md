@@ -8,6 +8,7 @@ Moreover, the following Kubernetes versions are tested for each commit,
 ensuring failure and bugs detection at an early stage of the development
 process:
 
+* 1.24
 * 1.23
 * 1.22
 * 1.21
@@ -16,6 +17,7 @@ process:
 
 The following PostgreSQL versions are tested:
 
+* PostgreSQL 15 beta (**not for production!!!**)
 * PostgreSQL 14
 * PostgreSQL 13
 * PostgreSQL 12
