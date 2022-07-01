@@ -528,7 +528,7 @@ spec:
 
 #### Configure the application database
 
-For the recoverd cluster, we can configure the application database name and
+For the recovered cluster, we can configure the application database name and
 credentials with additional configuration. To update application database
 credentials, we can generate our own passwords, store them as secrets, and
 update the database use the secrets. Or we can also let the operator generate a
@@ -537,7 +537,7 @@ secret with randomly secure password for use. Please reference the
 section for more information about secrets.
 
 The following example configure the application database `app` with owner
-`app`,  and supplied secret `app-secret`.
+`app`, and supplied secret `app-secret`.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -563,9 +563,9 @@ as owner of database `app`.
 application database will be changed to the value of `password` in secret. 
 
 !!! Important
-    In case of a replica cluster with replica mode enabled, the operator
-    will not create any database or user in the PostgreSQL instance, expecting
-    that they match the original cluster they were recovered from.
+    For a replica cluster with replica mode enabled, the operator will not
+    create any database or user in the PostgreSQL instance, as these will be
+    recovered from the original cluster.
 
 ### Bootstrap from a live cluster (`pg_basebackup`)
 
@@ -798,7 +798,7 @@ spec:
       source: cluster-example
 ```
 
-With the above configuration, following will happen after bootstrap
+With the above configuration, the following will happen after recovery is completed:
 
 1. if database `app` does not exist, a new database `app` will be created.
 2. if user `app` does not exist, a new user `app` will be created.
@@ -808,9 +808,9 @@ With the above configuration, following will happen after bootstrap
    application database will be changed to the value of `password` in secret.
 
 !!! Important
-    In case of a replica cluster with replica mode enabled, the operator
-    will not create any database or user in the PostgreSQL instance, expecting
-    that they match the original cluster they were cloned from.
+    For a replica cluster with replica mode enabled, the operator will not
+    create any database or user in the PostgreSQL instance, as these will be
+    recovered from the original cluster.
 
 #### Current limitations
 
