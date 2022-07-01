@@ -20,8 +20,8 @@ spec:
 
   bootstrap:
     initdb:
-      database: app
-      owner: app
+      database: appSrc
+      owner: userSrc
 
   storage:
     size: 1Gi

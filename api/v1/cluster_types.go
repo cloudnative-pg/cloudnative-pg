@@ -1716,6 +1716,10 @@ func (cluster *Cluster) ShouldInitDBCreateApplicationDatabase() bool {
 // ShouldPgBaseBackupCreateApplicationDatabase returns true if the application database needs to be created during the
 // pg_basebackup job
 func (cluster *Cluster) ShouldPgBaseBackupCreateApplicationDatabase() bool {
+	// we skip creating the application database if cluster is a replica
+	if cluster.IsReplica() {
+		return false
+	}
 	if cluster.Spec.Bootstrap == nil {
 		return false
 	}
@@ -1731,6 +1735,11 @@ func (cluster *Cluster) ShouldPgBaseBackupCreateApplicationDatabase() bool {
 // ShouldRecoveryCreateApplicationDatabase returns true if the application database needs to be created during the
 // recovery job
 func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
+	// we skip creating the application database if cluster is a replica
+	if cluster.IsReplica() {
+		return false
+	}
+
 	if cluster.Spec.Bootstrap == nil {
 		return false
 	}

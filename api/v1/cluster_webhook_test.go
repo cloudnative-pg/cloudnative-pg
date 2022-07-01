@@ -1298,7 +1298,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 			},
 		}
 
-		result := cluster.validatePgBaseBackup()
+		result := cluster.validatePgBaseBackupApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1313,7 +1313,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 			},
 		}
 
-		result := cluster.validatePgBaseBackup()
+		result := cluster.validatePgBaseBackupApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1329,7 +1329,7 @@ var _ = Describe("bootstrap base backup validation", func() {
 			},
 		}
 
-		result := cluster.validatePgBaseBackup()
+		result := cluster.validatePgBaseBackupApplicationDatabase()
 		Expect(result).To(BeEmpty())
 	})
 
@@ -1370,7 +1370,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 			},
 		}
 
-		result := cluster.validateRecovery()
+		result := cluster.validateRecoveryApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1385,7 +1385,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 			},
 		}
 
-		result := cluster.validateRecovery()
+		result := cluster.validateRecoveryApplicationDatabase()
 		Expect(len(result)).To(Equal(1))
 	})
 
@@ -1401,7 +1401,7 @@ var _ = Describe("bootstrap recovery validation", func() {
 			},
 		}
 
-		result := cluster.validateRecovery()
+		result := cluster.validateRecoveryApplicationDatabase()
 		Expect(result).To(BeEmpty())
 	})
 
