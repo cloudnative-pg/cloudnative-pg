@@ -1132,7 +1132,7 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 		return err
 	}
 
-	if cluster.GetEnableSuperuserAccess() {
+	if cluster.GetEnableSuperuserAccess() && !cluster.IsReplica() {
 		err = r.reconcileUser(ctx, "postgres", cluster.GetSuperuserSecretName(), tx)
 		if err != nil {
 			return err
@@ -1144,7 +1144,7 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 		}
 	}
 
-	if cluster.ShouldApplyDatabaseConfiguration() {
+	if cluster.ShouldApplyDatabaseConfiguration() && !cluster.IsReplica() {
 		err = r.reconcileUser(ctx, cluster.GetApplicationDatabaseOwner(), cluster.GetApplicationSecretName(), tx)
 		if err != nil {
 			return err
