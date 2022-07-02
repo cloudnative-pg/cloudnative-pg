@@ -9,7 +9,7 @@ refer to ["Supported releases"](supported_releases.md).
 
 ##  Version 1.16.0
 
-**Release date:** Jul 7, 2022 (patch release)
+**Release date:** Jul 7, 2022 (minor release)
 
 Features:
 
