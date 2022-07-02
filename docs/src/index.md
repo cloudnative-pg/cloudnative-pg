@@ -31,7 +31,7 @@ The [source code repository is in Github](https://github.com/cloudnative-pg/clou
 
 ## Supported Kubernetes distributions
 
-CloudNativePG requires Kubernetes 1.19 or higher. For more information, please
+CloudNativePG requires Kubernetes 1.22 or higher. For more information, please
 refer to the ["Supported releases"](supported_releases.md) page.
 
 ## Container images
@@ -76,6 +76,7 @@ on multiple architectures, directly from the
 * Continuous backup to an object store  (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
 * Backup retention policies (based on recovery window)
 * Full recovery and Point-In-Time recovery from an existing backup in an object store
+* Offline import of existing PostgreSQL databases, including major upgrades of PostgreSQL
 * Parallel WAL archiving and restore to allow the database to keep up with WAL
   generation on high write systems
 * Support tagging backup files uploaded to an object store to enable optional
