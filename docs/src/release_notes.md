@@ -7,6 +7,46 @@ in GitHub.
 For information on the community support policy for CloudNativePG, please
 refer to ["Supported releases"](supported_releases.md).
 
+##  Version 1.15.2
+
+**Release date:** Jul 7, 2022 (patch release)
+
+Enhancements:
+
+- Improve logging of the instance manager during switchover and failover
+- Require Barman >= 3.0.0 for future support of PostgreSQL 15 in backup
+  and recovery
+- Support for Kubernetes 1.24
+
+Changes:
+
+- Set the default operand image to PostgreSQL 14.4
+
+Fixes:
+
+- Fix the initialization order inside the `WithActiveInstance` function that
+  starts the CSV log pipe
+- Avoid an unnecessary switchover when a hot standby sensitive parameter is
+  decreased, and the primary has already restarted
+- Properly quote role names in `ALTER ROLE` statements
+- Backup and recovery:
+    - Fix the algorithm detecting the closest Barman backup for PITR, which was
+      comparing the requested recovery timestamp with the backup start instead
+      of the end
+    - Fix Point in Time Recovery based on a transaction ID, a named restore
+      point, or the “immediate” target by providing a new field called
+      `backupID` in the `recoveryTarget` section
+    - Fix encryption parameters invoking `barman-cloud-wal-archive` and
+      `barman-cloud-backup` commands
+    - Stop ignoring `barmanObjectStore.serverName` option when recovering from
+      a backup object store using a server name that doesn’t match the current
+      cluster name
+- `cnpg` plug-in:
+    - Make sure that the plug-in complies with the `-n` parameter when
+      specified by the user
+    - Fix the `status` command to sort results and remove variability in the
+      output
+
 ##  Version 1.15.1
 
 **Release date:** May 27, 2022 (patch release)
