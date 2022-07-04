@@ -32,6 +32,16 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// Provider is an enum of supported providers
+type Provider string
+
+const (
+	// AWS provider
+	AWS Provider = "AWS"
+	// AZURE provider
+	AZURE Provider = "AZURE"
+)
+
 const (
 	// MetadataNamespace is the annotation and label namespace used by the operator
 	MetadataNamespace = "cnpg.io"
@@ -328,4 +338,62 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 		utils.AnnotateAppArmor(&pod.ObjectMeta, cluster.Annotations)
 	}
 	return pod
+}
+
+// BarmanCredentials an object containing the potential credentials for each cloud provider
+type BarmanCredentials struct {
+	Google *apiv1.GoogleCredentials
+	AWS    *apiv1.S3Credentials
+	Azure  *apiv1.AzureCredentials
+}
+
+// AddBarmanEndpointCAToPodSpec adds the required volumes and env variables needed by barman to work correctly
+func AddBarmanEndpointCAToPodSpec(
+	podSpec *corev1.PodSpec,
+	caSecret *apiv1.SecretKeySelector,
+	credentials BarmanCredentials,
+) {
+	if caSecret == nil || caSecret.Name == "" || caSecret.Key == "" {
+		return
+	}
+
+	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
+		Name: "barman-endpoint-ca",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: caSecret.Name,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  caSecret.Key,
+						Path: postgres.BarmanRestoreEndpointCACertificateFileName,
+					},
+				},
+			},
+		},
+	})
+
+	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts,
+		corev1.VolumeMount{
+			Name:      "barman-endpoint-ca",
+			MountPath: postgres.CertificatesDir,
+		},
+	)
+
+	var envVars []corev1.EnvVar
+	// todo: google
+	switch {
+	case credentials.Azure != nil:
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "REQUESTS_CA_BUNDLE",
+			Value: postgres.BarmanRestoreEndpointCACertificateLocation,
+		})
+	// If nothing is set we fall back to AWS, this is to avoid breaking changes with previous versions
+	default:
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "AWS_CA_BUNDLE",
+			Value: postgres.BarmanRestoreEndpointCACertificateLocation,
+		})
+	}
+
+	podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, envVars...)
 }

@@ -26,7 +26,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -127,70 +126,41 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 
 	job := createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
 
-	addBarmanEndpointCAToJob(cluster, backup, job)
+	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
 
 	return job
 }
 
-func addBarmanEndpointCAToJob(cluster apiv1.Cluster, backup *apiv1.Backup, job *batchv1.Job) {
-	var secretName, secretKey string
-	var isAzure bool
+func addBarmanEndpointCAToJobFromCluster(cluster apiv1.Cluster, backup *apiv1.Backup, job *batchv1.Job) {
+	var credentials BarmanCredentials
+	var secretReference *apiv1.SecretKeySelector
 	switch {
 	case cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA != nil:
-		secretName = cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA.Name
-		secretKey = cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA.Key
+		secretReference = cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA
+
 	case backup != nil && backup.Status.EndpointCA != nil:
-		secretName = backup.Status.EndpointCA.Name
-		secretKey = backup.Status.EndpointCA.Key
-		if backup.Status.AzureCredentials != nil {
-			isAzure = true
+		backupStatus := backup.Status
+		secretReference = backupStatus.EndpointCA
+		credentials = BarmanCredentials{
+			Google: backupStatus.GoogleCredentials,
+			AWS:    backupStatus.S3Credentials,
+			Azure:  backupStatus.AzureCredentials,
 		}
+
 	case cluster.Spec.Bootstrap.Recovery.Source != "":
 		externalCluster, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
 		if ok && externalCluster.BarmanObjectStore != nil && externalCluster.BarmanObjectStore.EndpointCA != nil {
-			secretName = externalCluster.BarmanObjectStore.EndpointCA.Name
-			secretKey = externalCluster.BarmanObjectStore.EndpointCA.Key
-			if externalCluster.BarmanObjectStore.AzureCredentials != nil {
-				isAzure = true
+			barmanStore := externalCluster.BarmanObjectStore
+			secretReference = barmanStore.EndpointCA
+			credentials = BarmanCredentials{
+				Google: barmanStore.GoogleCredentials,
+				AWS:    barmanStore.S3Credentials,
+				Azure:  barmanStore.AzureCredentials,
 			}
 		}
 	}
 
-	if secretName != "" && secretKey != "" {
-		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, corev1.Volume{
-			Name: "barman-endpoint-ca",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: secretName,
-					Items: []corev1.KeyToPath{
-						{
-							Key:  secretKey,
-							Path: postgres.BarmanRestoreEndpointCACertificateFileName,
-						},
-					},
-				},
-			},
-		})
-
-		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(job.Spec.Template.Spec.Containers[0].VolumeMounts,
-			corev1.VolumeMount{
-				Name:      "barman-endpoint-ca",
-				MountPath: postgres.CertificatesDir,
-			},
-		)
-
-		var CAEnvVariable string
-		if isAzure {
-			CAEnvVariable = "REQUESTS_CA_BUNDLE"
-		} else {
-			CAEnvVariable = "AWS_CA_BUNDLE"
-		}
-
-		job.Spec.Template.Spec.Containers[0].Env = append(job.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
-			Name:  CAEnvVariable,
-			Value: postgres.BarmanRestoreEndpointCACertificateLocation,
-		})
-	}
+	AddBarmanEndpointCAToPodSpec(&job.Spec.Template.Spec, secretReference, credentials)
 }
 
 // CreatePrimaryJobViaPgBaseBackup creates a new primary instance in a Pod
