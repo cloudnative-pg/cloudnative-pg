@@ -74,8 +74,8 @@ the CloudNativePG maintainers think is reasonable to support and to test.
 
 At the moment, the CloudNativePG community does not support any additional
 Kubernetes distribution, like Red Hat OpenShift (this might change in the
-future, but it will be addressed by an official policy written by the
-CloudNativePG maintainers).
+future. If it did change, that would be reflected in an official policy written
+by the CloudNativePG maintainers).
 
 ## Upcoming release
 
@@ -90,7 +90,7 @@ CloudNativePG maintainers).
 ## What we mean by support
 
 Our support window is roughly five months for each release branch (latest two
-minor release, plus an additional month), given that we produce a new final
+minor releases, plus an additional month), given that we produce a new final
 release every two months.
 
 In the below diagram, `release-1.16` is an example of a release branch.
@@ -98,7 +98,7 @@ In the below diagram, `release-1.16` is an example of a release branch.
 For example, imagining that the latest release is `v1.16.0`, you can expect
 support for both `v1.16.0` and `v1.15.0`.
 
-Only the last patch release of each branch is actually supported.
+Only the last patch release of each branch is supported.
 
 ```diagram
 ------+---------------------------------------------> main (trunk development)
@@ -119,7 +119,7 @@ We offer two types of support:
 
 Technical support
 :   Technical assistance is offered on a best-effort basis for supported
-    releases only. You can request support from the community on
+    releases only. You can request support from the community on the
     [CloudNativePG Slack](https://cloudnativepg.slack.com/) (in the `#general` channel),
     or using [GitHub Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions).
 
@@ -134,6 +134,6 @@ Security and bug fixes
 
 If you are looking for professional support, please refer to the
 ["Support" page in the website](https://cloudnative-pg.io/support/).
-Such vendors might provide service level agreements that include
+The vendors listed there might provide service level agreements that included
 extended support timeframes.
 
