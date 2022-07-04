@@ -25,7 +25,10 @@ Changes:
 Fixes:
 
 - Fix the initialization order inside the `WithActiveInstance` function that
-  starts the CSV log pipe
+  starts the CSV log pipe for the PostgreSQL server, ensuring proper logging in
+  the cluster initialization phase - this is especially useful in bootstrap
+  operations like recovery from a backup are failing (before this patch, such
+  logs were not sent to the standard output channel and were permanently lost)
 - Avoid an unnecessary switchover when a hot standby sensitive parameter is
   decreased, and the primary has already restarted
 - Properly quote role names in `ALTER ROLE` statements
