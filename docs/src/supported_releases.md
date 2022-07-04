@@ -1,8 +1,16 @@
 # Supported releases
 
 <!-- Inspired by https://raw.githubusercontent.com/istio/istio.io/master/content/en/docs/releases/supported-releases/index.md wokeignore:rule=master -->
+<!-- Inspired by https://raw.githubusercontent.com/cert-manager/website/master/content/docs/installation/supported-releases.md -->
 
-This page lists the status, timeline and policy for currently supported releases of CloudNativePG.
+*This page lists the status, timeline and policy for currently supported
+releases of CloudNativePG*.
+
+We support the latest two minor releases, and we aim to create a new minor
+release every two months. Each release is supported until the declared
+"End of Life" date in the [table below](#support-status-of-cloudnativepg-releases),
+which takes into account an additional month of extension to provide enough
+time to plan an upgrade.
 
 Supported releases of CloudNativePG include releases that are in the active
 maintenance window and are patched for security and bug fixes.
@@ -13,6 +21,7 @@ incompatible changes.
 * [Support Policy](#support-policy)
 * [Naming scheme](#naming-scheme)
 * [Support status of CloudNativePG releases](#support-status-of-cloudnativepg-releases)
+* [What we mean by support](#what-we-mean-by-support)
 
 ## Support policy
 
@@ -24,9 +33,8 @@ for issues found in minor releases.
 
 The various types of releases represent a different product quality level and
 level of assistance from the CloudNativePG community.
-
-In this context, *support* means that the community will produce patch releases
-for critical issues and offer technical assistance.
+For details on the support provided by the community, please refer to the
+["What we mean by support" section](#what-we-mean-by-support) below.
 
 | Type              | Support Level                                                                                                         | Quality and Recommended Use                                                                                    |
 |-------------------|-----------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
@@ -64,6 +72,11 @@ Git tags for versions are prepended with `v`.
 The list of supported Kubernetes versions in the above table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
 
+At the moment, the CloudNativePG community does not support any additional
+Kubernetes distribution, like Red Hat OpenShift (this might change in the
+future, but it will be addressed by an official policy written by the
+community itself).
+
 ## Upcoming release
 
 | Version         | Release Date       | End of Life              | Supported Kubernetes Versions |
@@ -73,3 +86,52 @@ the CloudNativePG maintainers think is reasonable to support and to test.
 
 !!! Note
     Dates in the future are uncertain and might change. This applies to Kubernetes versions too.
+
+## What we mean by support
+
+Our support window is roughly five months for each release branch (latest two
+minor release, plus an additional month), given that we produce a new final
+release every two months.
+
+In the below diagram, `release-1.16` is an example of a release branch.
+
+For example, imagining that the latest release is `v1.16.0`, you can expect
+support for both `v1.16.0` and `v1.15.0`.
+
+Only the last patch release of each branch is actually supported.
+
+```diagram
+------+---------------------------------------------> main (trunk development)
+       \             \
+        \             \
+         \             \             v1.16.0
+          \             \            Jul 7, 2022                    ^
+           \             \----------+---------------> release-1.16  |
+            \                                                       | SUPPORTED
+             \                                                      | RELEASES
+              \   v1.15.0                                           | = the two
+               \  Apr 21, 2022                                      |   last
+                +-------------------+---------------> release-1.15  |   releases
+                                                                    v
+```
+
+We offer two types of support:
+
+Technical support
+:   Technical assistance is offered on a best-effort basis for supported
+    releases only. You can request support from the community on
+    [CloudNativePG Slack](https://cloudnativepg.slack.com/) (in the `#general` channel),
+    or using [GitHub Discussions][https://github.com/cloudnative-pg/cloudnative-pg/discussions].
+
+Security and bug fixes
+:   We back-port important bug fixes — including security fixes - to all
+    currently supported releases. Before back-porting a patch, we ask ourselves:
+    *"Does this back-port improve `CloudNativePG`, bearing in mind that we really
+    value stability for already-released versions?"*
+
+
+## Professional support
+
+If you are looking for professional support, please refer to the
+["Support" page in the website](https://cloudnative-pg.io/support/).
+
