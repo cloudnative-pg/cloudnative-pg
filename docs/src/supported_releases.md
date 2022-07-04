@@ -9,8 +9,8 @@ releases of CloudNativePG*.
 We support the latest two minor releases, and we aim to create a new minor
 release every two months. Each release is supported until the declared
 "End of Life" date in the [table below](#support-status-of-cloudnativepg-releases),
-which takes into account an additional month of extension to provide enough
-time to plan an upgrade.
+which considers an additional month of assistance to allow for upgrade
+planning.
 
 Supported releases of CloudNativePG include releases that are in the active
 maintenance window and are patched for security and bug fixes.
@@ -75,7 +75,7 @@ the CloudNativePG maintainers think is reasonable to support and to test.
 At the moment, the CloudNativePG community does not support any additional
 Kubernetes distribution, like Red Hat OpenShift (this might change in the
 future, but it will be addressed by an official policy written by the
-community itself).
+CloudNativePG maintainers).
 
 ## Upcoming release
 
@@ -134,4 +134,6 @@ Security and bug fixes
 
 If you are looking for professional support, please refer to the
 ["Support" page in the website](https://cloudnative-pg.io/support/).
+Such vendors might provide service level agreements that include
+extended support timeframes.
 
