@@ -1,7 +1,7 @@
 # Supported releases
 
-<!-- Inspired by https://raw.githubusercontent.com/istio/istio.io/master/content/en/docs/releases/supported-releases/index.md wokeignore:rule=master -->
-<!-- Inspired by https://raw.githubusercontent.com/cert-manager/website/master/content/docs/installation/supported-releases.md -->
+<!-- Inspired by https://github.com/istio/istio.io/blob/933b896c/content/en/docs/releases/supported-releases/index.md -->
+<!-- Inspired by https://github.com/cert-manager/website/blob/009c5e41/content/docs/installation/supported-releases.md -->
 
 *This page lists the status, timeline and policy for currently supported
 releases of CloudNativePG*.
