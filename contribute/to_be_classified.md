@@ -14,6 +14,12 @@ make licenses
 
 ## Release procedure
 
+The release happens from a release branch.
+A release branch is of the form "release-X.Y", i.e. "release-1.16".
+
+The first two numbers in the version we are releasing must match the
+digits in the release branch.
+
 ### Initial verification
 
 - Make sure release notes for the release have been updated
@@ -25,13 +31,11 @@ make licenses
 
 ### Release steps
 
-The following steps assume version 1.15.0 as the one to be released. Alter the
+The following steps assume version 1.16.0 as the one to be released. Alter the
 instructions accordingly for your version.
 
-1. Run `hack/release.sh 1.15.0`.
-2. Approve the PR that is automatically generated.
-3. Merge the PR.
+1. Run `hack/release.sh 1.16.0`.
+2. Approve the PR that is automatically generated
+3. Merge the PR. Make sure that the commit message
+   title is `Version tag to 1.16.0` without prefixes.
 4. Wait until all [Github Actions](https://github.com/cloudnative-pg/cloudnative-pg/actions) finish.
-
----
-
