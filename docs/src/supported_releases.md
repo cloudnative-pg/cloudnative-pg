@@ -121,7 +121,7 @@ Technical support
 :   Technical assistance is offered on a best-effort basis for supported
     releases only. You can request support from the community on
     [CloudNativePG Slack](https://cloudnativepg.slack.com/) (in the `#general` channel),
-    or using [GitHub Discussions][https://github.com/cloudnative-pg/cloudnative-pg/discussions].
+    or using [GitHub Discussions](https://github.com/cloudnative-pg/cloudnative-pg/discussions).
 
 Security and bug fixes
 :   We back-port important bug fixes — including security fixes - to all
