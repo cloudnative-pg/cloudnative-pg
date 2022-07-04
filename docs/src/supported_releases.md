@@ -129,9 +129,6 @@ Security and bug fixes
     *"Does this back-port improve `CloudNativePG`, bearing in mind that we really
     value stability for already-released versions?"*
 
-
-## Professional support
-
 If you are looking for professional support, please refer to the
 ["Support" page in the website](https://cloudnative-pg.io/support/).
 The vendors listed there might provide service level agreements that included
