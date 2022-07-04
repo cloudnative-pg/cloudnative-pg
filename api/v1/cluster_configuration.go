@@ -66,11 +66,9 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 // getElectableSyncReplicas computes the names of the instances that can be elected to sync replicas
 func (cluster *Cluster) getElectableSyncReplicas() []string {
 	var nonPrimaryInstances []string
-	for _, instances := range cluster.Status.InstancesStatus {
-		for _, instance := range instances {
-			if cluster.Status.CurrentPrimary != instance {
-				nonPrimaryInstances = append(nonPrimaryInstances, instance)
-			}
+	for _, instance := range cluster.Status.InstancesStatus[utils.PodHealthy] {
+		if cluster.Status.CurrentPrimary != instance {
+			nonPrimaryInstances = append(nonPrimaryInstances, instance)
 		}
 	}
 
