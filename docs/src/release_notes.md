@@ -16,7 +16,6 @@ Enhancements:
 - Improve logging of the instance manager during switchover and failover
 - Require Barman >= 3.0.0 for future support of PostgreSQL 15 in backup
   and recovery
-- Support for Kubernetes 1.24
 
 Changes:
 
