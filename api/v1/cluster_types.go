@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -1916,6 +1917,35 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	}
 
 	return false
+}
+
+// LogTimestamps prints useful information about timestamps in stdout
+func (cluster *Cluster) LogTimestamps(ctx context.Context) {
+	contextLogger := log.FromContext(ctx)
+
+	currentTimestamp := utils.GetCurrentTimestamp()
+
+	targetPrimaryDifference, targetPrimaryDifferenceErr := utils.DifferenceBetweenTimestamps(
+		currentTimestamp,
+		cluster.Status.TargetPrimaryTimestamp,
+	)
+
+	currentPrimaryDifference, currentPrimaryDifferenceErr := utils.DifferenceBetweenTimestamps(
+		currentTimestamp,
+		cluster.Status.CurrentPrimaryTimestamp,
+	)
+
+	contextLogger.Info("cluster timestamps information",
+		"phase", cluster.Status.Phase,
+		"currentTimestamp", currentTimestamp,
+		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp,
+		"currentPrimaryTimestamp", cluster.Status.CurrentPrimaryTimestamp,
+		"secondsPassedSinceTargetPrimaryTimestamp", targetPrimaryDifference.Seconds(),
+		"secondsPassedSinceCurrentPrimaryTimestamp", currentPrimaryDifference.Seconds(),
+		// we report if there were any errors while parsing the timestamps
+		"errorEncounteredWhileParsingTimestamps", currentPrimaryDifferenceErr != nil,
+		"errorWhileParsingTargetPrimaryTimestamp", targetPrimaryDifferenceErr != nil,
+	)
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination
