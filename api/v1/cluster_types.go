@@ -1463,6 +1463,9 @@ func (cluster *Cluster) GetApplicationSecretName() string {
 // GetApplicationDatabaseName get the name of the application database for a specific bootstrap
 func (cluster *Cluster) GetApplicationDatabaseName() string {
 	bootstrap := cluster.Spec.Bootstrap
+	if bootstrap == nil {
+		return ""
+	}
 
 	if bootstrap.Recovery != nil && bootstrap.Recovery.Database != "" {
 		return bootstrap.Recovery.Database
@@ -1482,6 +1485,9 @@ func (cluster *Cluster) GetApplicationDatabaseName() string {
 // GetApplicationDatabaseOwner get the owner user of the application database for a specific bootstrap
 func (cluster *Cluster) GetApplicationDatabaseOwner() string {
 	bootstrap := cluster.Spec.Bootstrap
+	if bootstrap == nil {
+		return ""
+	}
 
 	if bootstrap.Recovery != nil && bootstrap.Recovery.Owner != "" {
 		return bootstrap.Recovery.Owner
