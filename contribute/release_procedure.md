@@ -83,7 +83,7 @@ releases of CloudNativePG:
 
 ## Helm chart release:
 
-After having created a new release of CloudNativePG you to create a release of
+After having created a new release of CloudNativePG you need to create a release of
 the `cloudnative-pg` and `cnpg-sandbox` charts, whose definitions can be found
 in the [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) repository.
 
