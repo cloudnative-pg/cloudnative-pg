@@ -154,10 +154,17 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
-	restarted, err := r.reconcileOldPrimary(ctx, cluster)
+	restarted, err := r.reconcilePrimary(ctx, cluster)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+
+	restartedFromOldPrimary, err := r.reconcileOldPrimary(ctx, cluster)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	restarted = restarted || restartedFromOldPrimary
 
 	if r.IsDBUp(ctx) != nil {
 		return reconcile.Result{RequeueAfter: time.Second}, nil
@@ -362,11 +369,8 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 	cluster *apiv1.Cluster,
 ) (restarted bool, err error) {
 	contextLogger := log.FromContext(ctx)
-	// db needed
+
 	if cluster.Status.TargetPrimary == r.instance.PodName {
-		if !cluster.IsReplica() {
-			return r.reconcilePrimary(ctx, cluster)
-		}
 		return false, nil
 	}
 
@@ -1002,9 +1006,14 @@ func (r *InstanceReconciler) refreshFileFromSecret(
 	return changed, nil
 }
 
-// Reconciler primary logic
+// Reconciler primary logic. DB needed.
 func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (restarted bool, err error) {
 	contextLogger := log.FromContext(ctx)
+
+	if cluster.Status.TargetPrimary != r.instance.PodName || cluster.IsReplica() {
+		return false, nil
+	}
+
 	oldCluster := cluster.DeepCopy()
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
