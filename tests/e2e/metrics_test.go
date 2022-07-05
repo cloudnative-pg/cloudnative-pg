@@ -18,10 +18,13 @@ package e2e
 
 import (
 	"regexp"
+	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -189,5 +192,60 @@ var _ = Describe("Metrics", func() {
 		AssertCreateCluster(namespace, metricsClusterName, defaultMonitoringQueriesDisableSampleFile, env)
 
 		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, curlPodName, false)
+	})
+
+	It("can gather metrics details on replica clusters", func() {
+		const (
+			replicaModeClusterDir    = "/replica_mode_cluster/"
+			replicaClusterSampleFile = fixturesDir + "/metrics/cluster-replica-tls-with-metrics.yaml"
+			srcClusterSampleFile     = fixturesDir + replicaModeClusterDir + "cluster-replica-src.yaml"
+			checkQuery               = "SELECT count(*) FROM test_replica"
+		)
+
+		namespace = "metrics-with-replica-mode"
+		replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSampleFile)
+		Expect(err).ToNot(HaveOccurred())
+		srcClusterName, err := env.GetResourceNameFromYAML(srcClusterSampleFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		// create namespace
+		err = env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+
+		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries-for-replica-cluster.yaml",
+			1, 0)
+
+		// Create the curl client pod and wait for it to be ready.
+		By("setting up curl client pod", func() {
+			curlClient := utils.CurlClient(namespace)
+			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
+			Expect(err).ToNot(HaveOccurred())
+			curlPodName = curlClient.GetName()
+		})
+		AssertReplicaModeCluster(namespace, srcClusterName, srcClusterSampleFile, replicaClusterName,
+			replicaClusterSampleFile, checkQuery)
+
+		By("grant select permission for test_replica table to pg_monitor", func() {
+			primarySrcCluster, err := env.GetClusterPrimary(namespace, srcClusterName)
+			Expect(err).ToNot(HaveOccurred())
+			commandTimeout := time.Second * 5
+			cmd := "grant select on test_replica to pg_monitor ;"
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *primarySrcCluster, specs.PostgresContainerName,
+				&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", cmd)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("collecting metrics on each pod", func() {
+			podList, err := env.GetClusterPodList(namespace, replicaClusterName)
+			Expect(err).ToNot(HaveOccurred())
+			// Gather metrics in each pod
+			for _, pod := range podList.Items {
+				podIP := pod.Status.PodIP
+				out, err := utils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
+				Expect(strings.Contains(out, "cnpg_replica_test_row_count 3"), err).Should(BeTrue(),
+					"Metric collection issues on %v.\nCollected metrics:\n%v", pod.GetName(), out)
+			}
+		})
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, replicaClusterName, curlPodName, true)
 	})
 })

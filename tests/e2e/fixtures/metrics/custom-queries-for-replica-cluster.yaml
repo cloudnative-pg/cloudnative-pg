@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-replica-cluster
+  labels:
+    e2e: metrics
+data:
+  queries.yaml: |
+    replica_test:
+      query: |
+        SELECT count(*) as row_count FROM test_replica
+      primary: false
+      metrics:
+        - row_count:
+            usage: "GAUGE"
+            description: "Number of rows present in test_replica table"
