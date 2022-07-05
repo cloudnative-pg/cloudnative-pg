@@ -6,7 +6,7 @@ on:
     types:
       - closed
     branches:
-      - main
+      - release-*
 
 jobs:
   tag:
@@ -16,28 +16,11 @@ jobs:
         name: Checkout
         uses: actions/checkout@v3
       -
-        name: Temporarily disable "include administrators" branch protection
-        if: ${{ always() && github.ref == 'refs/heads/main' }}
-        id: disable_include_admins
-        uses: benjefferies/branch-protection-bot@1.0.7
-        with:
-          access_token: ${{ secrets.REPO_GHA_PAT }}
-          branch: main
-          enforce_admins: false
-      -
         name: Create tag
-        if: github.event.pull_request.merged == true && startsWith(${{ github.head_ref }}, "release/v")
+        if: github.event.pull_request.merged == true && startsWith(github.head_ref, 'release/v')
         uses: christophebedard/tag-version-commit@v1.6.2
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           version_regex: '^Version tag to ([0-9]+\.[0-9]+\.[0-9]+)'
           version_tag_prefix: v
           dry_run: false
-      -
-        name: Enable "include administrators" branch protection
-        uses: benjefferies/branch-protection-bot@1.0.7
-        if: ${{ always() && github.ref == 'refs/heads/main' }}
-        with:
-          access_token: ${{ secrets.REPO_GHA_PAT }}
-          branch: main
-          enforce_admins: ${{ steps.disable_include_admins.outputs.initial_status }}
