@@ -65,7 +65,7 @@ var _ = Describe("Metrics", func() {
 			`cnpg_pg_stat_archiver_archived_count \d+|` +
 			`cnpg_pg_stat_archiver_failed_count \d+|` +
 			`cnpg_pg_locks_blocked_queries 0|` +
-			`cnpg_runonserver_match 42|` +
+			`cnpg_runonserver_match_fixed 42|` +
 			`cnpg_collector_last_collection_error 0)` +
 			`$)`)
 
@@ -109,7 +109,7 @@ var _ = Describe("Metrics", func() {
 				podIP := pod.Status.PodIP
 				out, err := utils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
 				matches := metricsRegexp.FindAllString(out, -1)
-				Expect(matches, err).To(HaveLen(8), "Metric collection issues on %v.\nCollected metrics:\n%v", pod.GetName(), out)
+				Expect(matches, err).To(HaveLen(9), "Metric collection issues on %v.\nCollected metrics:\n%v", pod.GetName(), out)
 			}
 		})
 	})
