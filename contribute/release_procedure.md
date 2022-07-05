@@ -44,9 +44,10 @@ directly.
 
 ## Planning the release
 
-One or two weeks before the release, you should start planning the following activities:
+One or two weeks before the release, you should start planning the following
+activities:
 
-- **Supported releases:** Make sure that you update the supported releases page
+- **Supported releases:** Make sure that you update the supported releases' page
   in `docs/src/supported_releases.md` and have been approved by the maintainers
 
 - **Release notes:** Make sure release notes for the release have been updated
@@ -60,7 +61,7 @@ One or two weeks before the release, you should start planning the following act
   [website project](https://github.com/cloudnative-pg/cloudnative-pg.github.io)
   for each of the supported releases via a PR.
 
-<!-- TODO: we should create an issue template with a checklist for the release process ->
+<!-- TODO: we should create an issue template with a checklist for the release process -->
 
 ## Release steps
 
@@ -80,3 +81,21 @@ releases of CloudNativePG:
 5. Perform manual smoke tests to verify that installation instructions work on
    your workstation using `kind`
 
+## Helm chart release:
+
+After having created a new release of CloudNativePG you to create a release of
+the `cloudnative-pg` and `cnpg-sandbox` charts, whose definitions can be found
+in the [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) repository.
+
+The following is a summary of the steps to be taken in that direction. The
+[RELEASE.md](https://github.com/cloudnative-pg/charts/blob/a47596cb/RELEASE.md)
+document inside the relative repo contains an in-depth discussion of the
+process.
+
+1. Copy the output of `kustomize build config/helm` to `charts/cloudnative-pg/templates/crds/crds.yaml`
+   in the [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) repository.
+2. Diff the new release version with the previous one
+   (e.g.: `vimdiff releases/cnpg-1.15.0.yaml releases/cnpg-1.15.1.yaml` using your IDE of choice)
+3. Port any diff to the templates in the helm chart accordingly
+4. Proceed with the release process described in the `RELEASE.md`
+   file in the [cloudnative-pg/charts](https://github.com/cloudnative-pg/charts) repository.
