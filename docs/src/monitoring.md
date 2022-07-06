@@ -36,9 +36,12 @@ Queries, by default, are run against the *main database*, as defined by
 the specified `bootstrap` method of the `Cluster` resource, according
 to the following logic:
 
-- using `initdb`: queries will be run against the specified database by default, so the
-  value passed as `initdb.database` or defaulting to `app` if not specified.
-- not using `initdb`: queries will run against the `postgres` database, by default.
+- using `initdb`: queries will be run by default against the specified database
+  in `initdb.database`, or `app` if not specified
+- using `recovery`: queries will be run by default against the specified database
+  in `recovery.database`, or `postgres` if not specified
+- using `pg_basebackup`: queries will be run by default against the specified database
+  in `pg_basebackup.database`, or `postgres` if not specified
 
 The default database can always be overridden for a given user-defined metric,
 by specifying a list of one or more databases in the `target_databases` option.
