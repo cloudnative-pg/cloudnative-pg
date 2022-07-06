@@ -1462,30 +1462,46 @@ func (cluster *Cluster) GetApplicationSecretName() string {
 
 // GetApplicationDatabaseName get the name of the application database for a specific bootstrap
 func (cluster *Cluster) GetApplicationDatabaseName() string {
-	switch {
-	case cluster.ShouldRecoveryCreateApplicationDatabase():
-		return cluster.Spec.Bootstrap.Recovery.Database
-	case cluster.ShouldPgBaseBackupCreateApplicationDatabase():
-		return cluster.Spec.Bootstrap.PgBaseBackup.Database
-	case cluster.ShouldInitDBCreateApplicationDatabase():
-		return cluster.Spec.Bootstrap.InitDB.Database
-	default:
+	bootstrap := cluster.Spec.Bootstrap
+	if bootstrap == nil {
 		return ""
 	}
+
+	if bootstrap.Recovery != nil && bootstrap.Recovery.Database != "" {
+		return bootstrap.Recovery.Database
+	}
+
+	if bootstrap.PgBaseBackup != nil && bootstrap.PgBaseBackup.Database != "" {
+		return bootstrap.PgBaseBackup.Database
+	}
+
+	if bootstrap.InitDB != nil && bootstrap.InitDB.Database != "" {
+		return bootstrap.InitDB.Database
+	}
+
+	return ""
 }
 
 // GetApplicationDatabaseOwner get the owner user of the application database for a specific bootstrap
 func (cluster *Cluster) GetApplicationDatabaseOwner() string {
-	switch {
-	case cluster.ShouldRecoveryCreateApplicationDatabase():
-		return cluster.Spec.Bootstrap.Recovery.Owner
-	case cluster.ShouldPgBaseBackupCreateApplicationDatabase():
-		return cluster.Spec.Bootstrap.PgBaseBackup.Owner
-	case cluster.ShouldInitDBCreateApplicationDatabase():
-		return cluster.Spec.Bootstrap.InitDB.Owner
-	default:
+	bootstrap := cluster.Spec.Bootstrap
+	if bootstrap == nil {
 		return ""
 	}
+
+	if bootstrap.Recovery != nil && bootstrap.Recovery.Owner != "" {
+		return bootstrap.Recovery.Owner
+	}
+
+	if bootstrap.PgBaseBackup != nil && bootstrap.PgBaseBackup.Owner != "" {
+		return bootstrap.PgBaseBackup.Owner
+	}
+
+	if bootstrap.InitDB != nil && bootstrap.InitDB.Owner != "" {
+		return bootstrap.InitDB.Owner
+	}
+
+	return ""
 }
 
 // GetServerCASecretName get the name of the secret containing the CA
