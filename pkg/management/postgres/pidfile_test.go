@@ -22,6 +22,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mitchellh/go-ps"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -49,7 +51,7 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 		instance := NewInstance()
 		instance.PgData = pgdata
 		instance.SocketDirectory = socketDir
-		process, err := instance.CheckForExistingPostmaster()
+		process, err := instance.CheckForExistingPostmaster(postgresName)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(process).To(BeNil())
 	})
@@ -67,7 +69,7 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 		err = ioutil.WriteFile(filepath.Join(socketDir, ".s.PGSQL.5432.lock"), []byte("1234"), 0o400)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		process, err := instance.CheckForExistingPostmaster()
+		process, err := instance.CheckForExistingPostmaster(postgresName)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(process).To(BeNil())
 
@@ -89,10 +91,16 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 			filepath.Join(pgdata, PostgresqlPidFile),
 			[]byte(fmt.Sprintf("%v", myPid)), 0o400)
 		Expect(err).ShouldNot(HaveOccurred())
-
-		process, err := instance.CheckForExistingPostmaster()
+		myProcess, err := ps.FindProcess(myPid)
 		Expect(err).ShouldNot(HaveOccurred())
-		// to be null because executable file name is not postgres
-		Expect(process).To(BeNil())
+		myExecutable := myProcess.Executable()
+
+		process, err := instance.CheckForExistingPostmaster(myExecutable)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(process).ToNot(BeNil())
+
+		_, err = instance.CheckForExistingPostmaster(myExecutable, "not_existent_executable")
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(process).ToNot(BeNil())
 	})
 })
