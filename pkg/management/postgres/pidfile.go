@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/mitchellh/go-ps"
+	"k8s.io/utils/strings/slices"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -39,7 +40,12 @@ const PostgresqlPidFile = "postmaster.pid" //wokeignore:rule=master
 // directory and check the existence of the relative process. If the
 // process exists, then that process entry is returned.
 // If it doesn't exist then the PID file is stale and is removed.
-func (instance *Instance) CheckForExistingPostmaster() (*os.Process, error) {
+//
+// We are requiring a list of PostgreSQL executables that is used
+// to check if the process with the ID read from the PID file
+// is really a postmaster. This isn't really needed per se, but
+// allows this function to be easier to test.
+func (instance *Instance) CheckForExistingPostmaster(postgresExecutables ...string) (*os.Process, error) {
 	pidFile := path.Join(instance.PgData, PostgresqlPidFile)
 	contextLog := log.WithValues("file", pidFile)
 	pidFileContents, pid, err := instance.GetPostmasterPidFromFile(pidFile)
@@ -64,7 +70,7 @@ func (instance *Instance) CheckForExistingPostmaster() (*os.Process, error) {
 		return nil, instance.CleanUpStalePid()
 	}
 
-	if process.Executable() != postgresName {
+	if !slices.Contains(postgresExecutables, process.Executable()) {
 		// The process is not running PostgreSQL and this PID file is stale
 		contextLog.Info("The PID file is stale (executable mismatch), deleting it",
 			"pidFileContents", pidFileContents, "postgresExecutable", process.Executable())
