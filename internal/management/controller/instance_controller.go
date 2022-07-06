@@ -687,7 +687,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 	contextLogger.Debug("Reconciling custom monitoring queries")
 
 	dbname := "postgres"
-	if cluster.ShouldCreateApplicationDatabase() {
+	if len(cluster.GetApplicationDatabaseName()) != 0 {
 		dbname = cluster.GetApplicationDatabaseName()
 	}
 
