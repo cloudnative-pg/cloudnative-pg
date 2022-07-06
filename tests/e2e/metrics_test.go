@@ -74,6 +74,7 @@ var _ = Describe("Metrics", func() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
+
 	AfterEach(func() {
 		err := env.DeleteNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
@@ -194,26 +195,30 @@ var _ = Describe("Metrics", func() {
 		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, curlPodName, false)
 	})
 
-	It("can gather metrics details on replica clusters", func() {
+	It("retrieve metrics details on replica cluster", func() {
 		const (
 			replicaModeClusterDir    = "/replica_mode_cluster/"
 			replicaClusterSampleFile = fixturesDir + "/metrics/cluster-replica-tls-with-metrics.yaml"
 			srcClusterSampleFile     = fixturesDir + replicaModeClusterDir + "cluster-replica-src.yaml"
+			configMapFIle            = fixturesDir + "/metrics/custom-queries-for-replica-cluster.yaml"
 			checkQuery               = "SELECT count(*) FROM test_replica"
 		)
 
 		namespace = "metrics-with-replica-mode"
-		replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSampleFile)
-		Expect(err).ToNot(HaveOccurred())
+		// Fetching the source cluster name
 		srcClusterName, err := env.GetResourceNameFromYAML(srcClusterSampleFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Fetching replica cluster name
+		replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
 		// create namespace
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries-for-replica-cluster.yaml",
-			1, 0)
+		// Creating and verifying configmap on namespace
+		AssertCustomMetricsResourcesExist(namespace, configMapFIle, 1, 0)
 
 		// Create the curl client pod and wait for it to be ready.
 		By("setting up curl client pod", func() {
@@ -222,6 +227,7 @@ var _ = Describe("Metrics", func() {
 			Expect(err).ToNot(HaveOccurred())
 			curlPodName = curlClient.GetName()
 		})
+
 		AssertReplicaModeCluster(namespace, srcClusterName, srcClusterSampleFile, replicaClusterName,
 			replicaClusterSampleFile, checkQuery)
 
