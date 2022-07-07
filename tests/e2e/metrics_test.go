@@ -195,7 +195,7 @@ var _ = Describe("Metrics", func() {
 		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, curlPodName, false)
 	})
 
-	It("retrieve metrics details on replica cluster", func() {
+	It("execute custom queries against the application database on replica clusters", func() {
 		const (
 			replicaModeClusterDir    = "/replica_mode_cluster/"
 			replicaClusterSampleFile = fixturesDir + "/metrics/cluster-replica-tls-with-metrics.yaml"
@@ -205,6 +205,7 @@ var _ = Describe("Metrics", func() {
 		)
 
 		namespace = "metrics-with-replica-mode"
+
 		// Fetching the source cluster name
 		srcClusterName, err := env.GetResourceNameFromYAML(srcClusterSampleFile)
 		Expect(err).ToNot(HaveOccurred())
@@ -217,10 +218,10 @@ var _ = Describe("Metrics", func() {
 		err = env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 
-		// Creating and verifying configmap on namespace
+		// Creating and verifying custom queries configmap
 		AssertCustomMetricsResourcesExist(namespace, configMapFIle, 1, 0)
 
-		// Create the curl client pod and wait for it to be ready.
+		// Create the curl client pod and wait for it to be ready
 		By("setting up curl client pod", func() {
 			curlClient := utils.CurlClient(namespace)
 			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
@@ -235,21 +236,21 @@ var _ = Describe("Metrics", func() {
 			primarySrcCluster, err := env.GetClusterPrimary(namespace, srcClusterName)
 			Expect(err).ToNot(HaveOccurred())
 			commandTimeout := time.Second * 5
-			cmd := "grant select on test_replica to pg_monitor ;"
+			cmd := "GRANT SELECT ON test_replica TO pg_monitor"
 			_, _, err = env.EventuallyExecCommand(env.Ctx, *primarySrcCluster, specs.PostgresContainerName,
 				&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", cmd)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("collecting metrics on each pod", func() {
+		By("collecting metrics on each pod and checking that the table has been found", func() {
 			podList, err := env.GetClusterPodList(namespace, replicaClusterName)
 			Expect(err).ToNot(HaveOccurred())
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				podIP := pod.Status.PodIP
 				out, err := utils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
-				Expect(strings.Contains(out, "cnpg_replica_test_row_count 3"), err).Should(BeTrue(),
-					"Metric collection issues on %v.\nCollected metrics:\n%v", pod.GetName(), out)
+				Expect(err).Should(Not(HaveOccurred()))
+				Expect(strings.Split(out, "\n")).Should(ContainElement("cnpg_replica_test_row_count 3"))
 			}
 		})
 		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, replicaClusterName, curlPodName, true)
