@@ -408,6 +408,7 @@ conf
 config
 config's
 configMap
+configMapRefs
 configmap
 configmapkeyselector
 configmaps
@@ -690,6 +691,7 @@ poolers
 pos
 posix
 postImportApplicationSQL
+postInitApplicationSQLRefs
 postInitSQL
 postgres
 postgresGID
@@ -763,6 +765,7 @@ searchAttribute
 secretAccessKey
 secretKeyRef
 secretName
+secretRefs
 secretkeyselector
 securego
 securityContext

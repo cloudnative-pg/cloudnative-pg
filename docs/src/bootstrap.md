@@ -275,6 +275,38 @@ spec:
     as queries are run as a superuser and can disrupt the entire cluster.
     An error in any of those queries interrupts the bootstrap phase, leaving the cluster incomplete.
 
+Moreover you can specify a list of secrets and/or configmaps which contains sql files that will be executed after the database is created and configured. These sql files will be executed as the *superuser* (`postgres`), connected to the database specified in the initdb:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-initdb
+spec:
+  instances: 3
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      postInitApplicationSQLRefs:
+        configMapRefs:
+        - name: my-configmap
+          key: configmap.sql
+        secretRefs:
+        - name: my-secret
+          key: secret.sql
+  storage:
+    size: 1Gi
+```
+
+!!! Note
+    SQL files in secrets will be executed before SQL files in configmaps, meanwhile SQL files in secrets will be executed in the order of the `secretRefs`, same as the `configMapRefs`.
+
+!!! Warning
+    Please make sure the existence of sql files inside configmaps or secrets specified in the `postInitApplicationSQLRefs`, otherwise the bootstrap will be interrupted.
+    An error in any of those sql files interrupts the bootstrap phase, leaving the cluster incomplete.
+
 ## Bootstrap from another cluster
 
 CloudNativePG enables the bootstrap of a cluster starting from
