@@ -7,12 +7,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.15.2.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.15/releases/cnpg-1.15.2.yaml)
 as follows:
 
 ```sh
 kubectl apply -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.15.2.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.15/releases/cnpg-1.15.2.yaml
 ```
 
 Once you have run the `kubectl` command, CloudNativePG will be installed in your Kubernetes cluster.
