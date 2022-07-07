@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: post-init-sql-configmap
+data:
+  configmap.sql: |
+    create table configmaps (i integer);
+    insert into configmaps (select generate_series(1,10000));
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: post-init-sql-secret
+stringData:
+  secret.sql: |
+    create table secrets (i integer);
+    insert into secrets (select generate_series(1,10000));
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-initdb
+spec:
+  instances: 3
+
+  bootstrap:
+    initdb:
+      database: appdb
+      owner: appuser
+      postInitSQL:
+        - create table numbers (i integer)
+        - insert into numbers (select generate_series(1,10000))
+      postInitTemplateSQL:
+        - create extension intarray
+      postInitApplicationSQL:
+        - create table application_numbers (i integer)
+        - insert into application_numbers (select generate_series(1,10000))
+      dataChecksums: true
+      encoding: 'UTF8'
+      localeCollate: 'en_AU.UTF-8'
+      localeCType: 'en_AU.UTF-8'
+      postInitApplicationSQLRefs:
+        configMapRefs:
+        - name: post-init-sql-configmap
+          key: configmap.sql
+        secretRefs:
+        - name: post-init-sql-secret
+          key: secret.sql
+
+  storage:
+    size: 1Gi
