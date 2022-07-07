@@ -18,7 +18,6 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -131,11 +130,6 @@ func (scheduledBackup *ScheduledBackup) GetSchedule() string {
 // GetStatus gets the status that the caller may update
 func (scheduledBackup *ScheduledBackup) GetStatus() *ScheduledBackupStatus {
 	return &scheduledBackup.Status
-}
-
-// GetKubernetesObject gets the kubernetes object
-func (scheduledBackup *ScheduledBackup) GetKubernetesObject() client.Object {
-	return scheduledBackup
 }
 
 // CreateBackup creates a backup from this scheduled backup
