@@ -90,7 +90,7 @@ var _ = Describe("Metrics", func() {
 
 		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries.yaml", 2, 1)
 
-		//Create the curl client pod and wait for it to be ready.
+		// Create the curl client pod and wait for it to be ready.
 		By("setting up curl client pod", func() {
 			curlClient := utils.CurlClient(namespace)
 			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
