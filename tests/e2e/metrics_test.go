@@ -57,20 +57,17 @@ var _ = Describe("Metrics", func() {
 	var err error
 	// We define a few metrics in the tests. We check that all of them exist and
 	// there are no errors during the collection.
-	metricsList := []interface{}{
-		"cnpg_pg_postmaster_start_time_seconds \\d+\\.\\d+|", // wokeignore:rule=master
-		"cnpg_pg_wal_files_total \\d+|",
-		"cnpg_pg_database_size_bytes{datname=\"app\"} [0-9e\\+\\.]+|",
-		"cnpg_pg_replication_slots_inactive 0|",
-		"cnpg_pg_stat_archiver_archived_count \\d+|",
-		"cnpg_pg_stat_archiver_failed_count \\d+|",
-		"cnpg_pg_locks_blocked_queries 0|",
-		"cnpg_runonserver_match_fixed 42|",
-		"cnpg_collector_last_collection_error 0)",
-	}
+	metricsList := `cnpg_pg_postmaster_start_time_seconds \d+\.\d+|` + // wokeignore:rule=master
+		`cnpg_pg_wal_files_total \d+|` +
+		`cnpg_pg_database_size_bytes{datname="app"} [0-9e\+\.]+|` +
+		`cnpg_pg_replication_slots_inactive 0|` +
+		`cnpg_pg_stat_archiver_archived_count \d+|` +
+		`cnpg_pg_stat_archiver_failed_count \d+|` +
+		`cnpg_pg_locks_blocked_queries 0|` +
+		`cnpg_runonserver_match_fixed 42|` +
+		`cnpg_collector_last_collection_error 0)`
 
-	metricsRegexp := regexp.MustCompile(fmt.Sprintf(`(?m:^(`+`%v`+`%v`+`%v`+`%v`+`%v`+`%v`+`%v`+`%v`+`%v`+`$)`,
-		metricsList...))
+	metricsRegexp := regexp.MustCompile(fmt.Sprintf(`(?m:^(` + metricsList + `$)`))
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
@@ -93,7 +90,7 @@ var _ = Describe("Metrics", func() {
 
 		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries.yaml", 2, 1)
 
-		// Create the curl client pod and wait for it to be ready.
+		//Create the curl client pod and wait for it to be ready.
 		By("setting up curl client pod", func() {
 			curlClient := utils.CurlClient(namespace)
 			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
@@ -112,7 +109,7 @@ var _ = Describe("Metrics", func() {
 				podIP := pod.Status.PodIP
 				out, err := utils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
 				matches := metricsRegexp.FindAllString(out, -1)
-				Expect(matches, err).To(HaveLen(len(metricsList)),
+				Expect(matches, err).To(HaveLen(len(strings.Split(metricsList, "|"))),
 					"Metric collection issues on %v.\nCollected metrics:\n%v", pod.GetName(), out)
 			}
 		})
