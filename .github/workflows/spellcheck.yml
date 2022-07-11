@@ -9,7 +9,6 @@ jobs:
   woke:
     name: Run woke
     runs-on:
-      - "ubuntu-20.04"
       - "self-hosted"
     steps:
       - name: Checkout
@@ -25,7 +24,6 @@ jobs:
   spellcheck:
     name: Run spellcheck
     runs-on:
-      - "ubuntu-20.04"
       - "self-hosted"
     steps:
       - name: Checkout
