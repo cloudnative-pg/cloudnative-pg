@@ -145,17 +145,16 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRe
 		})
 	})
 
-	It("can import from a PostgreSQL 11 cluster into a PostgreSQL 14 cluster", func() {
+	It("can import to a cluster with a different major version", func() {
 		postgresImage := os.Getenv("POSTGRES_IMG")
 		desiredSourceVersion := "11"
+		namespace = "microservice-different-db-version"
+		importedClusterName = "cluster-pgdump-different-db-version"
 		if !strings.Contains(postgresImage, ":"+desiredSourceVersion) {
 			Skip("This test is only applicable for PostgreSQL " + desiredSourceVersion)
 		} else {
-			namespace = "microservice-different-db-version"
-			importedClusterName = "cluster-pgdump-different-db-version"
-			expectedImageNameForImportedCluster := versions.DefaultImageName
 			assertImportRenamesSelectedDatabase(namespace, sourceSampleFile, importedClusterName,
-				tableName, expectedImageNameForImportedCluster)
+				tableName, versions.DefaultImageName)
 		}
 	})
 })
