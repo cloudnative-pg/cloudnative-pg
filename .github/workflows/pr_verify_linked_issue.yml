@@ -17,7 +17,9 @@ on:
 
 jobs:
   verify_linked_issue:
-    runs-on: ubuntu-latest
+    runs-on:
+      -  "ubuntu-20.04"
+      - "self-hosted"
     name: Ensure Pull Request has a linked issue.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-issue') }}
     steps:
