@@ -22,17 +22,17 @@ data:
             usage: "GAUGE"
             description: "Total no. of WAL files on disk"
     runonserver_match:
-      query: "SELECT 42"
+      query: "SELECT 42 as fixed"
       primary: false
-      runonserver: ">=10 <99"
+      runonserver: ">=10.0.0"
       metrics:
         - fixed:
             usage: "GAUGE"
             description: "Always 42, used to test runonserver"
     runonserver_nomatch:
-      query: "SELECT 99"
+      query: "SELECT 99 as fixed"
       primary: false
-      runonserver: "<10"
+      runonserver: "<10.0.0"
       metrics:
         - fixed:
             usage: "GAUGE"
