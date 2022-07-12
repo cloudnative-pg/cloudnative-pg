@@ -22,12 +22,13 @@ Customized storage class
    a basic cluster that uses a specified storage class of `standard`.
 
 Customized storage class and backups
-: **Prerequisites**: bucket storage should be available. The sample config is for AWS,  
+:   **Prerequisites**: bucket storage should be available. The sample config is for AWS,
     please change to suit your setup
-: [`cluster-storage-class-with-backup.yaml`](samples/cluster-storage-class-with-backup.yaml) a cluster` with backups configured
+: [`cluster-storage-class-with-backup.yaml`](samples/cluster-storage-class-with-backup.yaml) a cluster
+   with backups configured
 
 Backup
-: **Prerequisites**: [`cluster-storage-class-with-backup.yaml`](samples/cluster-storage-class-with-backup.yaml)
+:   **Prerequisites**: [`cluster-storage-class-with-backup.yaml`](samples/cluster-storage-class-with-backup.yaml)
     applied and Healthy
 : [`backup-example.yaml`](samples/backup-example.yaml):
   an example of a backup that runs against the previous sample
@@ -46,13 +47,13 @@ Replica cluster via streaming
 :   [`cluster-example-replica-streaming.yaml`](samples/cluster-example-replica-streaming.yaml): a replica cluster following `cluster-example` with streaming replication.
 
 Simple cluster with backup configured
-: **Prerequisites**: storage bucket available. The configuration assumes `minio`. Please
-    update `backup.barmanObjectStore` for your cloud solution
+:   **Prerequisites**: The configuration assumes `minio` is running and working.
+    Please update `backup.barmanObjectStore` with your `minio` parameters or your cloud solution
 :  [`cluster-example-with-backup.yaml`](samples/cluster-example-with-backup.yaml)
    a basic cluster with backups configured.
 
 Replica cluster via backup
-: **Prerequisites**:
+:   **Prerequisites**:
     [`cluster-storage-class-with-backup.yaml`](samples/cluster-storage-class-with-backup.yaml) applied and Healthy.
     And a backup
     [`cluster-example-trigger-backup.yaml`](samples/cluster-example-trigger-backup.yaml)

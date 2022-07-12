@@ -142,5 +142,5 @@ spec:
     to the image name, through the `<image>:<tag>@sha256:<digestValue>` format.
 
 !!! Note "There's more"
-    There are some example cluster configurations bundled with the operator.
+    There are some examples cluster configurations bundled with the operator.
     Please refer to the ["Examples" section](samples.md).
