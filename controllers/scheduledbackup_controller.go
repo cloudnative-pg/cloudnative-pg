@@ -138,7 +138,7 @@ func ReconcileScheduledBackup(
 		scheduledBackup.GetStatus().LastCheckTime = &metav1.Time{
 			Time: now,
 		}
-		err := client.Status().Update(ctx, scheduledBackup.GetKubernetesObject())
+		err := client.Status().Update(ctx, scheduledBackup)
 		if err != nil {
 			if apierrs.IsConflict(err) {
 				// Retry later, the cache is stale
@@ -148,15 +148,13 @@ func ReconcileScheduledBackup(
 		}
 
 		if scheduledBackup.IsImmediate() {
-			event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
-				"BackupSchedule", "Scheduled immediate backup now: %v", now)
+			event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled immediate backup now: %v", now)
 			return createBackup(ctx, event, client, scheduledBackup, now, now, schedule, true)
 		}
 
 		nextTime := schedule.Next(now)
 		contextLogger.Info("Next backup schedule", "next", nextTime)
-		event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
-			"BackupSchedule", "Scheduled first backup by %v", nextTime)
+		event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled first backup by %v", nextTime)
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
@@ -226,8 +224,7 @@ func createBackup(
 		contextLogger.Error(
 			err, "Error while creating backup object",
 			"backupName", backup.GetName())
-		event.Event(scheduledBackup.GetKubernetesObject(), "Warning",
-			"BackupCreation", "Error while creating backup object")
+		event.Event(scheduledBackup, "Warning", "BackupCreation", "Error while creating backup object")
 		return ctrl.Result{}, err
 	}
 
@@ -243,7 +240,7 @@ func createBackup(
 		Time: nextBackupTime,
 	}
 
-	if err := client.Status().Update(ctx, scheduledBackup.GetKubernetesObject()); err != nil {
+	if err := client.Status().Update(ctx, scheduledBackup); err != nil {
 		if apierrs.IsConflict(err) {
 			// Retry later, the cache is stale
 			return ctrl.Result{}, nil
@@ -252,8 +249,7 @@ func createBackup(
 	}
 
 	contextLogger.Info("Next backup schedule", "next", backupTime)
-	event.Eventf(scheduledBackup.GetKubernetesObject(), "Normal",
-		"BackupSchedule", "Next backup scheduled by %v", nextBackupTime)
+	event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Next backup scheduled by %v", nextBackupTime)
 	return ctrl.Result{RequeueAfter: nextBackupTime.Sub(now)}, nil
 }
 
