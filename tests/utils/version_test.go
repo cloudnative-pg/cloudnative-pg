@@ -17,6 +17,9 @@ limitations under the License.
 package utils
 
 import (
+	"bytes"
+	"os/exec"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,5 +37,14 @@ var _ = Describe("Guess the correct version of a postgres image", func() {
 		version, err := BumpPostgresImageMajorVersion(versions.DefaultImageName)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(version).To(Equal(versions.DefaultImageName))
+	})
+
+	It("can pull the default image", func() {
+		var stderr bytes.Buffer
+		cmd := exec.Command("docker", "pull", versions.DefaultImageName) // #nosec G204
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		Expect(stderr.String()).To(BeEmpty(), "while pulling "+versions.DefaultImageName)
+		Expect(err).ShouldNot(HaveOccurred())
 	})
 })
