@@ -338,7 +338,7 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 			log.Warning("Error while closing metrics extraction",
 				"err", err.Error())
 		}
-		if rows.Err() != nil {
+		if err := rows.Err(); err != nil {
 			log.Warning("Error while loading metrics",
 				"err", err.Error())
 		}
