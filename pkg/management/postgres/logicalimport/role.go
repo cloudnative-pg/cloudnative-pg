@@ -246,8 +246,8 @@ func (rs *roleManager) getRoles(ctx context.Context) ([]Role, error) {
 		roles = append(roles, r)
 	}
 
-	if rows.Err() != nil {
-		return nil, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return roles, nil
