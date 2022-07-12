@@ -140,3 +140,7 @@ spec:
     policies and version consistency in the cluster.
     For strict deterministic and repeatable deployments, you can add the digests
     to the image name, through the `<image>:<tag>@sha256:<digestValue>` format.
+
+!!! Note "There's more"
+    There are some examples cluster configurations bundled with the operator.
+    Please refer to the ["Examples" section](samples.md).
