@@ -18,7 +18,6 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // BackupPhase is the phase of the backup
@@ -208,11 +207,6 @@ func (backup *Backup) GetName() string {
 // GetNamespace get the backup namespace
 func (backup *Backup) GetNamespace() string {
 	return backup.Namespace
-}
-
-// GetKubernetesObject get the kubernetes object
-func (backup *Backup) GetKubernetesObject() client.Object {
-	return backup
 }
 
 func init() {
