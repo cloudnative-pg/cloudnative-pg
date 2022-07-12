@@ -145,20 +145,29 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRe
 		})
 	})
 
-	It("can import from a PostgreSQL 11 cluster into a PostgreSQL 14 cluster", func() {
-		postgresImage := os.Getenv("POSTGRES_IMG")
+	It("can import to a cluster with a different major version", func() {
 		desiredSourceVersion := "11"
-		if !strings.Contains(postgresImage, ":"+desiredSourceVersion) {
+		namespace = "microservice-different-db-version"
+		importedClusterName = "cluster-pgdump-different-db-version"
+
+		// this test case only applicable postgres version 11
+		if shouldSkip(desiredSourceVersion) {
 			Skip("This test is only applicable for PostgreSQL " + desiredSourceVersion)
-		} else {
-			namespace = "microservice-different-db-version"
-			importedClusterName = "cluster-pgdump-different-db-version"
-			expectedImageNameForImportedCluster := versions.DefaultImageName
-			assertImportRenamesSelectedDatabase(namespace, sourceSampleFile, importedClusterName,
-				tableName, expectedImageNameForImportedCluster)
 		}
+
+		targetImage := versions.DefaultImageName
+
+		By(fmt.Sprintf("import cluster with different major, target version is %s", targetImage), func() {
+			assertImportRenamesSelectedDatabase(namespace, sourceSampleFile, importedClusterName,
+				tableName, targetImage)
+		})
 	})
 })
+
+// check if current postgres version is pg 11
+func shouldSkip(expectedSourceVersion string) bool {
+	return !strings.Contains(os.Getenv("POSTGRES_IMG"), ":11"+expectedSourceVersion)
+}
 
 // assertCreateTableWithDataOnSourceCluster creates a new user `micro` in the source cluster,
 // and uses the `postgres` superuser to generate a new table and assign ownership to `micro`
