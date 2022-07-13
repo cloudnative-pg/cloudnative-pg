@@ -198,6 +198,7 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 		)
 
 		options := []string{
+			"-U", "postgres",
 			"--no-owner",
 			"--no-privileges",
 			fmt.Sprintf("--role=%s", owner),
