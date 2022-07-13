@@ -301,11 +301,11 @@ spec:
 ```
 
 !!! Note
-    SQL files in secrets will be executed before SQL files in configmaps, meanwhile SQL files in secrets will be executed in the order of the `secretRefs`, same as the `configMapRefs`.
+    SQL files in Secrets will be executed before SQL files in ConfigMaps, meanwhile SQL files in Secrets will be executed in the order of the `secretRefs`, same as the `configMapRefs`.
 
 !!! Warning
-    Please make sure the existence of sql files inside configmaps or secrets specified in the `postInitApplicationSQLRefs`, otherwise the bootstrap will be interrupted.
-    An error in any of those sql files interrupts the bootstrap phase, leaving the cluster incomplete.
+    Please make sure the existence of SQL files inside ConfigMaps or Secrets specified in the `postInitApplicationSQLRefs`, otherwise the bootstrap will be interrupted.
+    An error in any of those SQL files interrupts the bootstrap phase, leaving the cluster incomplete.
 
 ## Bootstrap from another cluster
 
