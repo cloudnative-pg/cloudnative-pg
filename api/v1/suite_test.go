@@ -17,13 +17,33 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 func TestApi(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "v1 API tests")
+}
+
+func createFakeCluster(name string) *Cluster {
+	primaryPod := fmt.Sprintf("%s-1", name)
+	cluster := &Cluster{}
+	cluster.Default()
+	cluster.Spec.Instances = 3
+	cluster.Spec.MaxSyncReplicas = 2
+	cluster.Spec.MinSyncReplicas = 1
+	cluster.Status = ClusterStatus{
+		CurrentPrimary: primaryPod,
+		InstancesStatus: map[utils.PodStatus][]string{
+			utils.PodHealthy: {primaryPod, fmt.Sprintf("%s-2", name), fmt.Sprintf("%s-3", name)},
+			utils.PodFailed:  {},
+		},
+	}
+	return cluster
 }
