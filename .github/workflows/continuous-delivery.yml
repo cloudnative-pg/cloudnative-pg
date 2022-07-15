@@ -23,6 +23,7 @@ env:
   KUBEBUILDER_VERSION: "2.3.1"
   KIND_VERSION: "v0.11.0"
   ROOK_VERSION: "v1.6.8"
+  CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
 
 defaults:
   run:
@@ -312,7 +313,7 @@ jobs:
         name: Build meta
         id: build-meta
         run: |
-          images='ghcr.io/cloudnative-pg/cloudnative-pg-testing'
+          images='${{ env.CNPG_IMAGE_NAME }}'
           tags=''
           labels=''
           commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
