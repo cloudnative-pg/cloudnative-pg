@@ -42,7 +42,7 @@ var _ = Describe("cluster_status unit tests", func() {
 		secretName := rand.String(10)
 
 		By("creating the required secret", func() {
-			secret, keyPair := generateFakeCASecret(secretName, namespace, "unittest.com")
+			secret, keyPair := generateFakeCASecretWithDefaultClient(secretName, namespace, "unittest.com")
 			Expect(secret.Name).To(Equal(secretName))
 
 			_, expDate, err := keyPair.IsExpiring()
@@ -140,9 +140,9 @@ var _ = Describe("cluster_status unit tests", func() {
 			manager manager.Manager,
 		) {
 			By("creating the required resources", func() {
-				jobs = generateFakeInitDBJobs(cluster)
-				pods = generateFakeClusterPods(cluster, true)
-				pvcs = generateFakePVC(cluster)
+				jobs = generateFakeInitDBJobs(crReconciler.Client, cluster)
+				pods = generateFakeClusterPods(crReconciler.Client, cluster, true)
+				pvcs = generateFakePVC(crReconciler.Client, cluster)
 				name, isOwned := isOwnedByCluster(&pods[0])
 				Expect(isOwned).To(BeTrue())
 				Expect(name).To(Equal(cluster.Name))

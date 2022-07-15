@@ -35,9 +35,9 @@ var _ = Describe("cluster_scale unit tests", func() {
 		cluster := newFakeCNPGCluster(namespace)
 
 		resources := &managedResources{
-			pvcs: corev1.PersistentVolumeClaimList{Items: generateFakePVC(cluster)},
-			jobs: batchv1.JobList{Items: generateFakeInitDBJobs(cluster)},
-			pods: corev1.PodList{Items: generateFakeClusterPods(cluster, true)},
+			pvcs: corev1.PersistentVolumeClaimList{Items: generateFakePVCWithDefaultClient(cluster)},
+			jobs: batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(cluster)},
+			pods: corev1.PodList{Items: generateFakeClusterPodsWithDefaultClient(cluster, true)},
 		}
 
 		sacrificialPodBefore := getSacrificialPod(resources.pods.Items)
