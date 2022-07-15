@@ -17,6 +17,10 @@ on:
   schedule:
     - cron:  '0 1 * * *'
 
+permissions:
+  contents: read
+  packages: write
+
 env:
   GOLANG_VERSION: "1.17.x"
   GOLANGCI_LINT_VERSION: "v1.45"
