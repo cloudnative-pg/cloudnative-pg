@@ -62,7 +62,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 
 			By("making sure configmap exists", func() {
 				cm := &corev1.ConfigMap{}
-				expectResourceExists(cmName, namespace, cm)
+				expectResourceExistsWithDefaultClient(cmName, namespace, cm)
 			})
 
 			By("deleting the dangling monitoring configmap", func() {
@@ -73,7 +73,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 			assertRefreshManagerCache(ctx, manager)
 
 			By("making sure it doesn't exist anymore", func() {
-				expectResourceDoesntExist(cmName, namespace, &corev1.ConfigMap{})
+				expectResourceDoesntExistWithDefaultClient(cmName, namespace, &corev1.ConfigMap{})
 			})
 		})
 	})
@@ -104,8 +104,8 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 			assertRefreshManagerCache(ctx, manager)
 
 			By("making sure that the configmap and the cluster exists", func() {
-				expectResourceExists(cmName, namespace, &corev1.ConfigMap{})
-				expectResourceExists(cluster.Name, namespace, &apiv1.Cluster{})
+				expectResourceExists(crReconciler.Client, cmName, namespace, &corev1.ConfigMap{})
+				expectResourceExists(crReconciler.Client, cluster.Name, namespace, &apiv1.Cluster{})
 			})
 
 			By("making sure that the cache is indexed", func() {
@@ -130,7 +130,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 			assertRefreshManagerCache(ctx, manager)
 
 			By("making sure it still exists", func() {
-				expectResourceExists(cmName, namespace, &corev1.ConfigMap{})
+				expectResourceExistsWithDefaultClient(cmName, namespace, &corev1.ConfigMap{})
 			})
 		})
 	})
