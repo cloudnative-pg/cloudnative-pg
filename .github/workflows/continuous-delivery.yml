@@ -5,6 +5,8 @@ on:
     branches:
       - '**'
   pull_request:
+  pull_request_target:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       depth:
@@ -23,6 +25,7 @@ env:
   KUBEBUILDER_VERSION: "2.3.1"
   KIND_VERSION: "v0.11.0"
   ROOK_VERSION: "v1.6.8"
+  CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
 
 defaults:
   run:
@@ -149,6 +152,10 @@ jobs:
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
         needs.change-triage.outputs.go-code-changed == 'true'
+      ) &&
+      (
+        github.event.client_payload.slash_command != null ||
+        contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:')
       )
     runs-on: ubuntu-20.04
     strategy:
@@ -312,7 +319,7 @@ jobs:
         name: Build meta
         id: build-meta
         run: |
-          images='ghcr.io/cloudnative-pg/cloudnative-pg-testing'
+          images='${{ env.CNPG_IMAGE_NAME }}'
           tags=''
           labels=''
           commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
