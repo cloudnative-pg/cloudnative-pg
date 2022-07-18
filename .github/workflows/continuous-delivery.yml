@@ -4,7 +4,9 @@ on:
   push:
     branches:
       - '**'
+  pull_request:
   pull_request_target:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       depth:
@@ -151,7 +153,9 @@ jobs:
         needs.change-triage.outputs.operator-changed == 'true' ||
         needs.change-triage.outputs.go-code-changed == 'true'
       ) &&
+      (
       contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:')
+      )
     runs-on: ubuntu-20.04
     strategy:
       matrix:
@@ -186,7 +190,8 @@ jobs:
         env:
           ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
         run: |
-          make test
+          echo ${{ github.event.pull_request }}
+          #make test
 
   apidoc:
     name: Verify API doc is up to date
