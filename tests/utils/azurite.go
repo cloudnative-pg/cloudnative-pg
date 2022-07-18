@@ -17,10 +17,10 @@ limitations under the License.
 package utils
 
 import (
-	"fmt"
-
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -28,6 +28,11 @@ import (
 	apiv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+)
+
+const (
+	azuriteImage       = "mcr.microsoft.com/azure-storage/azurite"
+	azuriteClientImage = "mcr.microsoft.com/azure-cli"
 )
 
 // CreateCertificateSecretsOnAzurite will create secrets for Azurite deployment
@@ -55,24 +60,18 @@ func CreateCertificateSecretsOnAzurite(
 }
 
 // CreateStorageCredentialsOnAzurite will create credentials for Azurite
-func CreateStorageCredentialsOnAzurite(namespace string) error {
-	secretFile := "../e2e/fixtures/backup/azurite/azurite-secret.yaml" // nolint
-	_, _, err := Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-		namespace, secretFile))
-	return err
+func CreateStorageCredentialsOnAzurite(namespace string, env *TestingEnvironment) error {
+	azuriteSecrets := getStorageCredentials(namespace)
+	return env.Client.Create(env.Ctx, &azuriteSecrets)
 }
 
 // InstallAzurite will setup Azurite in defined nameSpace and creates service
 func InstallAzurite(namespace string, env *TestingEnvironment) error {
-	azuriteDeploymentFile := "../e2e/fixtures/backup/azurite/azurite-deployment.yaml"
-	azuriteServiceFile := "../e2e/fixtures/backup/azurite/azurite-service.yaml"
-	// Create an Azurite for blob storage
-	_, _, err := Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-		namespace, azuriteDeploymentFile))
+	azuriteDeployment := getAzuriteDeployment(namespace)
+	err := env.Client.Create(env.Ctx, &azuriteDeployment)
 	if err != nil {
 		return err
 	}
-
 	// Wait for the Azurite pod to be ready
 	deploymentNamespacedName := types.NamespacedName{
 		Namespace: namespace,
@@ -83,22 +82,19 @@ func InstallAzurite(namespace string, env *TestingEnvironment) error {
 		err = env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
 		return deployment.Status.ReadyReplicas, err
 	}, 300).Should(gomega.BeEquivalentTo(1))
-
-	// Create an Azurite service
-	_, _, err = Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-		namespace, azuriteServiceFile))
+	azuriteService := getAzuriteService(namespace)
+	err = env.Client.Create(env.Ctx, &azuriteService)
 	return err
 }
 
 // InstallAzCli will install Az cli
 func InstallAzCli(namespace string, env *TestingEnvironment) error {
-	azCLiFile := "../e2e/fixtures/backup/azurite/az-cli.yaml"
-	_, _, err := Run(fmt.Sprintf(
-		"kubectl apply -n %v -f %v",
-		namespace, azCLiFile))
+	azCLiPod := getAzuriteClientPod(namespace)
+	err := env.Client.Create(env.Ctx, &azCLiPod)
 	if err != nil {
 		return err
 	}
+
 	azCliNamespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      "az-cli",
@@ -109,4 +105,196 @@ func InstallAzCli(namespace string, env *TestingEnvironment) error {
 		return utils.IsPodReady(*az), err
 	}, 180).Should(gomega.BeTrue())
 	return nil
+}
+
+// getAzuriteClientPod get the cli client pod
+func getAzuriteClientPod(namespace string) corev1.Pod {
+	cliClientPod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "az-cli",
+			Labels:    map[string]string{"run": "az-cli"},
+			Namespace: namespace,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "az-cli",
+					Image: azuriteClientImage,
+					Args:  []string{"/bin/bash", "-c", "sleep 500000"},
+					Env: []corev1.EnvVar{
+						{
+							Name: "AZURE_CONNECTION_STRING",
+							ValueFrom: &corev1.EnvVarSource{
+								SecretKeyRef: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "azurite",
+									},
+									Key: "AZURE_CONNECTION_STRING",
+								},
+							},
+						},
+						{
+							Name:  "REQUESTS_CA_BUNDLE",
+							Value: "/etc/ssl/certs/rootCA.pem",
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "cert",
+							MountPath: "/etc/ssl/certs",
+						},
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "cert",
+					VolumeSource: corev1.VolumeSource{
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: "azurite-ca-secret",
+							Items: []corev1.KeyToPath{
+								{
+									Key:  "ca.crt",
+									Path: "rootCA.pem",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return cliClientPod
+}
+
+// getAzuriteService get the service for azurite
+func getAzuriteService(namespace string) corev1.Service {
+	azuriteService := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "azurite",
+			Labels:    map[string]string{"app": "azurite"},
+			Namespace: namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Port:     10000,
+					Protocol: "TCP",
+					TargetPort: intstr.IntOrString{
+						IntVal: 10000,
+					},
+				},
+			},
+			Selector: map[string]string{"app": "azurite"},
+		},
+	}
+	return azuriteService
+}
+
+// getAzuriteDeployment get the deployment for Azurite
+func getAzuriteDeployment(namespace string) apiv1.Deployment {
+	replicas := int32(1)
+	azuriteDeployment := apiv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "azurite",
+			Namespace: namespace,
+			Labels:    map[string]string{"app": "azurite"},
+		},
+		Spec: apiv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "azurite"},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "azurite"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image:   azuriteImage,
+							Name:    "azurite",
+							Command: []string{"azurite"},
+							Args: []string{
+								"-l", "/data", "--cert", "/etc/ssl/certs/azurite.pem",
+								"--key", "/etc/ssl/certs/azurite-key.pem",
+								"--oauth", "basic", "--blobHost", "0.0.0.0",
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "AZURITE_ACCOUNTS",
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "azurite",
+											},
+											Key: "AZURITE_ACCOUNTS",
+										},
+									},
+								},
+							},
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 10000,
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/data",
+									Name:      "data-volume",
+								},
+								{
+									MountPath: "/etc/ssl/certs",
+									Name:      "cert",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "data-volume",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: "cert",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: "azurite-tls-secret",
+									Items: []corev1.KeyToPath{
+										{
+											Key:  "tls.crt",
+											Path: "azurite.pem",
+										},
+										{
+											Key:  "tls.key",
+											Path: "azurite-key.pem",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return azuriteDeployment
+}
+
+// getStorageCredentials get storageCredentials for azurite
+func getStorageCredentials(namespace string) corev1.Secret {
+	azuriteStorageSecrets := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "azurite",
+		},
+		StringData: map[string]string{
+			"AZURITE_ACCOUNTS": "storageaccountname:c3RvcmFnZWFjY291bnRrZXk=",
+			"AZURE_CONNECTION_STRING": "DefaultEndpointsProtocol=https;AccountName=storageaccountname;" +
+				"AccountKey=c3RvcmFnZWFjY291bnRrZXk=;BlobEndpoint=https://azurite:10000/storageaccountname;",
+		},
+	}
+	return azuriteStorageSecrets
 }

@@ -1705,7 +1705,7 @@ func prepareClusterForPITROnAzureBlob(namespace, clusterName, backupSampleFile,
 
 func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
 	By("creating the Azurite storage credentials", func() {
-		err := testsUtils.CreateStorageCredentialsOnAzurite(namespace)
+		err := testsUtils.CreateStorageCredentialsOnAzurite(namespace, env)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
