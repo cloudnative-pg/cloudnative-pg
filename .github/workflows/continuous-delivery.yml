@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - '**'
-  pull_request:
+  pull_request_target:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       depth:
@@ -16,10 +17,6 @@ on:
         required: false
   schedule:
     - cron:  '0 1 * * *'
-
-permissions:
-  contents: read
-  packages: write
 
 env:
   GOLANG_VERSION: "1.17.x"
@@ -283,7 +280,8 @@ jobs:
       (needs.shellcheck.result == 'success' || needs.shellcheck.result == 'skipped') &&
       (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
       (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
-      (needs.crd.result == 'success' || needs.crd.result == 'skipped')
+      (needs.crd.result == 'success' || needs.crd.result == 'skipped') &&
+      (contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:')
     runs-on: ubuntu-20.04
     permissions:
       contents: read

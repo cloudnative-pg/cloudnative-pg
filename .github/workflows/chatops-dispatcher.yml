@@ -14,8 +14,16 @@ jobs:
         )
     runs-on: ubuntu-20.04
     steps:
+      - name: Add "ready to test" label to CNPG PR
+        uses: actions-ecosystem/action-add-labels@v1.1.3
+        if: ${{ startsWith(github.event.comment.body, '/test') }}
+        with:
+           github_token: ${{ secrets.REPO_GHA_PAT }}
+           labels: "ready to test :elephant:"
+
       - name: Run E2E on CNPG
         uses: peter-evans/slash-command-dispatch@v3
+        if: ${{ startsWith(github.event.comment.body, '/test') }}
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           issue-type: pull-request
@@ -25,6 +33,7 @@ jobs:
           static-args: |
             test_level=4
             depth=main
+
       - name: Add "ok to merge" label to CNPG PR
         uses: actions-ecosystem/action-add-labels@v1.1.3
         if: ${{ startsWith(github.event.comment.body, '/ok-to-merge') }}
