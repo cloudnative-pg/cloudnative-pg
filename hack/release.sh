@@ -91,6 +91,9 @@ sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
 sed -i "s/cnpg-[0-9.]*.yaml/cnpg-${release_version}.yaml/g" \
     docs/src/installation_upgrade.md
 
+sed -i "s/\/\(release-[0-9.]*\|main\)\//\/${branch}\//g" \
+    docs/src/installation_upgrade.md
+
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
 (
