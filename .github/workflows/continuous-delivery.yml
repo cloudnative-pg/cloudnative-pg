@@ -187,6 +187,9 @@ jobs:
         env:
           ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
         run: |
+          echo ${{ github.event.pull_request.pull_request }}
+          echo ${{ github.event.pull_request.pull_request.repository }}
+          echo ${{ github.event.pull_request.pull_request.owner }}
           echo ${{ github.event.pull_request.repository }}
           echo ${{ github.event.pull_request.owner }}
           echo ${{ github.repository }}
