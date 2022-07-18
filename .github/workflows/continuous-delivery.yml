@@ -5,7 +5,6 @@ on:
     branches:
       - '**'
   pull_request_target:
-    types: [labeled]
   workflow_dispatch:
     inputs:
       depth:
@@ -151,7 +150,8 @@ jobs:
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
         needs.change-triage.outputs.go-code-changed == 'true'
-      )
+      ) &&
+      contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:')
     runs-on: ubuntu-20.04
     strategy:
       matrix:
