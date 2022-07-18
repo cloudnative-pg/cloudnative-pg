@@ -281,7 +281,7 @@ jobs:
       (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
       (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
       (needs.crd.result == 'success' || needs.crd.result == 'skipped') &&
-      (contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:'))
+      contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:')
     runs-on: ubuntu-20.04
     permissions:
       contents: read
