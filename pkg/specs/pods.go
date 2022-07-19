@@ -32,16 +32,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// Provider is an enum of supported providers
-type Provider string
-
-const (
-	// AWS provider
-	AWS Provider = "AWS"
-	// AZURE provider
-	AZURE Provider = "AZURE"
-)
-
 const (
 	// MetadataNamespace is the annotation and label namespace used by the operator
 	MetadataNamespace = "cnpg.io"
@@ -380,7 +370,7 @@ func AddBarmanEndpointCAToPodSpec(
 	)
 
 	var envVars []corev1.EnvVar
-	// todo: google
+	// todo: add a case for the Google provider
 	switch {
 	case credentials.Azure != nil:
 		envVars = append(envVars, corev1.EnvVar{
