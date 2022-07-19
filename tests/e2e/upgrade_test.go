@@ -77,11 +77,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		sampleFile2     = fixturesDir + "/upgrade/cluster2.yaml"
 		updateConfFile2 = fixturesDir + "/upgrade/conf-update2.yaml"
 
-		minioSecret         = fixturesDir + "/upgrade/minio-secret.yaml" //nolint:goƒsec
-		minioPVCFile        = fixturesDir + "/upgrade/minio-pvc.yaml"
-		minioDeploymentFile = fixturesDir + "/upgrade/minio-deployment.yaml"
-		serviceFile         = fixturesDir + "/upgrade/minio-service.yaml"
-		clientFile          = fixturesDir + "/upgrade/minio-client.yaml"
 		backupName          = "cluster-backup"
 		backupFile          = fixturesDir + "/upgrade/backup1.yaml"
 		restoreFile         = fixturesDir + "/upgrade/cluster-restore.yaml"
@@ -302,7 +297,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			CreateResourceFromFile(upgradeNamespace, pgSecrets)
 		})
 		By("creating the cloud storage credentials", func() {
-			CreateResourceFromFile(upgradeNamespace, minioSecret)
+			AssertStorageCredentialsAreCreated(upgradeNamespace, "aws-creds", "minio", "minio123")
 		})
 
 		// Create the cluster. Since it will take a while, we'll do more stuff
@@ -320,23 +315,18 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}, 120).ShouldNot(HaveOccurred())
 		})
 
-		// Create the minio deployment and the client in parallel.
-		By("creating minio resources", func() {
-			// Create a PVC-based deployment for the minio version
-			// minio/minio:RELEASE.2020-04-23T00-58-49Z
-			_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-				upgradeNamespace, minioPVCFile))
+		By("setting up minio", func() {
+			setup, err := testsUtils.MinioDefaultSetup(upgradeNamespace)
 			Expect(err).ToNot(HaveOccurred())
-			_, _, err = testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-				upgradeNamespace, minioDeploymentFile))
+			err = testsUtils.InstallMinio(env, setup, 300)
 			Expect(err).ToNot(HaveOccurred())
-			_, _, err = testsUtils.Run(fmt.Sprintf(
-				"kubectl apply -n %v -f %v",
-				upgradeNamespace, clientFile))
-			Expect(err).ToNot(HaveOccurred())
-			// Create a minio service
-			_, _, err = testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-				upgradeNamespace, serviceFile))
+		})
+
+		// Create the minio client pod and wait for it to be ready.
+		// We'll use it to check if everything is archived correctly
+		By("setting up minio client pod", func() {
+			minioClient := testsUtils.MinioDefaultClient(upgradeNamespace)
+			err := testsUtils.PodCreateAndWaitForReady(env, &minioClient, 240)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
