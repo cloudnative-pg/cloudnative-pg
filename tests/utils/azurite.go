@@ -18,16 +18,12 @@ package utils
 
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 
 	apiv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -42,21 +38,25 @@ func CreateCertificateSecretsOnAzurite(
 	azuriteCaSecName,
 	azuriteTLSSecName string,
 	env *TestingEnvironment,
-) {
-	ginkgo.By("creating ca and tls certificate secrets", func() {
-		// create CA certificates
-		_, caPair, err := CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-		// sign and create secret using CA certificate and key
-		serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,
-			[]string{"azurite.internal.mydomain.net, azurite.default.svc, azurite.default,"},
-		)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		serverSecret := serverPair.GenerateCertificateSecret(namespace, azuriteTLSSecName)
-		err = env.Client.Create(env.Ctx, serverSecret)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-	})
+) error {
+	// create CA certificates
+	_, caPair, err := CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
+	if err != nil {
+		return err
+	}
+	// sign and create secret using CA certificate and key
+	serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,
+		[]string{"azurite.internal.mydomain.net, azurite.default.svc, azurite.default,"},
+	)
+	if err != nil {
+		return err
+	}
+	serverSecret := serverPair.GenerateCertificateSecret(namespace, azuriteTLSSecName)
+	err = env.Client.Create(env.Ctx, serverSecret)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // CreateStorageCredentialsOnAzurite will create credentials for Azurite
@@ -65,7 +65,7 @@ func CreateStorageCredentialsOnAzurite(namespace string, env *TestingEnvironment
 	return env.Client.Create(env.Ctx, &azuriteSecrets)
 }
 
-// InstallAzurite will setup Azurite in defined nameSpace and creates service
+// InstallAzurite will set up Azurite in defined namespace and creates service
 func InstallAzurite(namespace string, env *TestingEnvironment) error {
 	azuriteDeployment := getAzuriteDeployment(namespace)
 	err := env.Client.Create(env.Ctx, &azuriteDeployment)
@@ -77,11 +77,15 @@ func InstallAzurite(namespace string, env *TestingEnvironment) error {
 		Namespace: namespace,
 		Name:      "azurite",
 	}
-	gomega.Eventually(func() (int32, error) {
-		deployment := &apiv1.Deployment{}
-		err = env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
-		return deployment.Status.ReadyReplicas, err
-	}, 300).Should(gomega.BeEquivalentTo(1))
+	deployment := &apiv1.Deployment{}
+	err = env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
+	if err != nil {
+		return err
+	}
+	err = DeploymentWaitForReady(env, deployment, 300)
+	if err != nil {
+		return err
+	}
 	azuriteService := getAzuriteService(namespace)
 	err = env.Client.Create(env.Ctx, &azuriteService)
 	return err
@@ -90,20 +94,10 @@ func InstallAzurite(namespace string, env *TestingEnvironment) error {
 // InstallAzCli will install Az cli
 func InstallAzCli(namespace string, env *TestingEnvironment) error {
 	azCLiPod := getAzuriteClientPod(namespace)
-	err := env.Client.Create(env.Ctx, &azCLiPod)
+	err := PodCreateAndWaitForReady(env, &azCLiPod, 180)
 	if err != nil {
 		return err
 	}
-
-	azCliNamespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      "az-cli",
-	}
-	gomega.Eventually(func() (bool, error) {
-		az := &corev1.Pod{}
-		err = env.Client.Get(env.Ctx, azCliNamespacedName, az)
-		return utils.IsPodReady(*az), err
-	}, 180).Should(gomega.BeTrue())
 	return nil
 }
 
@@ -167,7 +161,7 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 	return cliClientPod
 }
 
-// getAzuriteService get the service for azurite
+// getAzuriteService get the service for Azurite
 func getAzuriteService(namespace string) corev1.Service {
 	azuriteService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -283,7 +277,7 @@ func getAzuriteDeployment(namespace string) apiv1.Deployment {
 	return azuriteDeployment
 }
 
-// getStorageCredentials get storageCredentials for azurite
+// getStorageCredentials get storageCredentials for Azurite
 func getStorageCredentials(namespace string) corev1.Secret {
 	azuriteStorageSecrets := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
