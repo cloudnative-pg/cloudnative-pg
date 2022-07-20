@@ -1033,7 +1033,8 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 
 	// if the currentPrimary doesn't match the PodName we set the correct value.
 	if cluster.Status.CurrentPrimary != r.instance.PodName {
-		// we log the timestamp information before overriding them
+		// we log the timestamp information before overriding them. This is useful to know how much time it took.
+		contextLogger.Info("printing timestamp info before setting myself as the current primary")
 		cluster.LogTimestamps(ctx)
 		contextLogger.Info("Setting myself as the current primary")
 		cluster.Status.CurrentPrimary = r.instance.PodName

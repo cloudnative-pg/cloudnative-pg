@@ -1924,28 +1924,59 @@ func (cluster *Cluster) LogTimestamps(ctx context.Context) {
 	contextLogger := log.FromContext(ctx)
 
 	currentTimestamp := utils.GetCurrentTimestamp()
-
-	targetPrimaryDifference, targetPrimaryDifferenceErr := utils.DifferenceBetweenTimestamps(
-		currentTimestamp,
-		cluster.Status.TargetPrimaryTimestamp,
-	)
-
-	currentPrimaryDifference, currentPrimaryDifferenceErr := utils.DifferenceBetweenTimestamps(
-		currentTimestamp,
-		cluster.Status.CurrentPrimaryTimestamp,
-	)
-
-	contextLogger.Info("cluster timestamps information",
+	keysAndValues := []interface{}{
 		"phase", cluster.Status.Phase,
 		"currentTimestamp", currentTimestamp,
 		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp,
 		"currentPrimaryTimestamp", cluster.Status.CurrentPrimaryTimestamp,
-		"secondsPassedSinceTargetPrimaryTimestamp", targetPrimaryDifference.Seconds(),
-		"secondsPassedSinceCurrentPrimaryTimestamp", currentPrimaryDifference.Seconds(),
-		// we report if there were any errors while parsing the timestamps
-		"errorEncounteredWhileParsingTimestamps", currentPrimaryDifferenceErr != nil,
-		"errorWhileParsingTargetPrimaryTimestamp", targetPrimaryDifferenceErr != nil,
-	)
+	}
+
+	var errs []string
+
+	if diff, err := utils.DifferenceBetweenTimestamps(
+		currentTimestamp,
+		cluster.Status.TargetPrimaryTimestamp,
+	); err == nil {
+		keysAndValues = append(
+			keysAndValues,
+			"msPassedSinceTargetPrimaryTimestamp",
+			diff.Milliseconds(),
+		)
+	} else {
+		errs = append(errs, err.Error())
+	}
+
+	if currentPrimaryDifference, err := utils.DifferenceBetweenTimestamps(
+		currentTimestamp,
+		cluster.Status.CurrentPrimaryTimestamp,
+	); err == nil {
+		keysAndValues = append(
+			keysAndValues,
+			"msPassedSinceCurrentPrimaryTimestamp",
+			currentPrimaryDifference.Milliseconds(),
+		)
+	} else {
+		errs = append(errs, err.Error())
+	}
+
+	if currentPrimaryTargetDifference, err := utils.DifferenceBetweenTimestamps(
+		cluster.Status.CurrentPrimaryTimestamp,
+		cluster.Status.TargetPrimaryTimestamp,
+	); err == nil {
+		keysAndValues = append(
+			keysAndValues,
+			"msDifferenceBetweenCurrentAndTargetPrimary",
+			currentPrimaryTargetDifference.Milliseconds(),
+		)
+	} else {
+		errs = append(errs, err.Error())
+	}
+
+	if len(errs) > 0 {
+		keysAndValues = append(keysAndValues, "timestampParsingErrors", errs)
+	}
+
+	contextLogger.Info("cluster timestamps information", keysAndValues...)
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination
