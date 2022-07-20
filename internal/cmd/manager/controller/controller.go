@@ -40,6 +40,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -430,8 +431,10 @@ func startPprofDebugServer(ctx context.Context) {
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	pprofServer := http.Server{
-		Addr:    "0.0.0.0:6060",
-		Handler: mux,
+		Addr:              "0.0.0.0:6060",
+		Handler:           mux,
+		ReadTimeout:       webserver.DefaultReadTimeout,
+		ReadHeaderTimeout: webserver.DefaultReadHeaderTimeout,
 	}
 
 	setupLog.Info("Starting pprof HTTP server", "addr", pprofServer.Addr)

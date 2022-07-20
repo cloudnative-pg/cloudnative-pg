@@ -52,7 +52,12 @@ func New(serverInstance *postgres.Instance) (*MetricsServer, error) {
 	serveMux := http.NewServeMux()
 	serveMux.Handle(url.PathMetrics, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", url.PostgresMetricsPort), Handler: serveMux}
+	server := &http.Server{
+		Addr:              fmt.Sprintf(":%d", url.PostgresMetricsPort),
+		Handler:           serveMux,
+		ReadTimeout:       webserver.DefaultReadTimeout,
+		ReadHeaderTimeout: webserver.DefaultReadHeaderTimeout,
+	}
 
 	metricServer := &MetricsServer{
 		Webserver: webserver.NewWebServer(serverInstance, server),

@@ -59,7 +59,12 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathUpdate,
 		endpoints.updateInstanceManager(cancelFunc, exitedConditions))
 
-	server := &http.Server{Addr: fmt.Sprintf(":%d", url.StatusPort), Handler: serveMux}
+	server := &http.Server{
+		Addr:              fmt.Sprintf(":%d", url.StatusPort),
+		Handler:           serveMux,
+		ReadTimeout:       DefaultReadTimeout,
+		ReadHeaderTimeout: DefaultReadHeaderTimeout,
+	}
 
 	return NewWebServer(instance, server), nil
 }
