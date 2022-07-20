@@ -17,11 +17,10 @@ limitations under the License.
 package report
 
 import (
-	admissionv1 "k8s.io/api/admissionregistration/v1"
-	corev1 "k8s.io/api/core/v1"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var _ = Describe("Redact Secret", func() {

@@ -20,8 +20,6 @@ package nodes
 import (
 	"fmt"
 
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
-
 	. "github.com/onsi/ginkgo/v2" //nolint
 	. "github.com/onsi/gomega"    //nolint
 )

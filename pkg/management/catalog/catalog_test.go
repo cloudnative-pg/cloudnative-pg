@@ -19,10 +19,10 @@ package catalog
 import (
 	"time"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 var _ = Describe("Backup catalog", func() {

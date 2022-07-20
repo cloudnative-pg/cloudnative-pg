@@ -17,10 +17,10 @@ limitations under the License.
 package utils
 
 import (
-	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 var _ = Describe("Difference of values of maps", func() {

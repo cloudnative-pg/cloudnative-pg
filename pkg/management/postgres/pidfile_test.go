@@ -23,11 +23,10 @@ import (
 	"path/filepath"
 
 	"github.com/mitchellh/go-ps"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 )
 
 var _ = Describe("the detection of a postmaster process using the pid file", func() {

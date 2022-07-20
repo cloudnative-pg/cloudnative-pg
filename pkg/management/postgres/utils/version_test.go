@@ -18,7 +18,6 @@ package utils
 
 import (
 	"github.com/blang/semver"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

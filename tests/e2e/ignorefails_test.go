@@ -17,10 +17,10 @@ limitations under the License.
 package e2e
 
 import (
-	"github.com/cloudnative-pg/cloudnative-pg/tests"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
 )
 
 // A failing test to verify that our ignore-fails label is correctly ignored

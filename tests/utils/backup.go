@@ -21,12 +21,11 @@ import (
 	"fmt"
 	"os"
 
+	. "github.com/onsi/gomega" // nolint
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-
-	. "github.com/onsi/gomega" // nolint
 )
 
 // ExecuteBackup performs a backup and check the backup status

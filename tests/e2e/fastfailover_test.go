@@ -19,10 +19,10 @@ package e2e
 import (
 	"fmt"
 
-	"github.com/cloudnative-pg/cloudnative-pg/tests"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
 )
 
 var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() {

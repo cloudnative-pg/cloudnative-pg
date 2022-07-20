@@ -21,10 +21,10 @@ import (
 	"os"
 	"path"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 )
 
 var _ = Describe("Spool", func() {

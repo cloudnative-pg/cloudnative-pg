@@ -17,10 +17,9 @@ limitations under the License.
 package specs
 
 import (
-	v1 "k8s.io/api/core/v1"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	v1 "k8s.io/api/core/v1"
 )
 
 var _ = Describe("Service accounts", func() {

@@ -17,6 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	. "github.com/onsi/ginkgo/v2" // nolint
+	. "github.com/onsi/gomega"    // nolint
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,9 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-
-	. "github.com/onsi/ginkgo/v2" // nolint
-	. "github.com/onsi/gomega"    // nolint
 )
 
 // EnableOnlineUpgradeForInstanceManager creates the operator namespace and enables tho online upgrade for

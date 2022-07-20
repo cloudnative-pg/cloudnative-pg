@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/backup"
@@ -31,8 +32,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walarchive"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
-
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 func main() {

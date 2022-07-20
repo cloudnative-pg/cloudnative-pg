@@ -20,10 +20,10 @@ import (
 	"io"
 	"os"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/logtest"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/logtest"
 )
 
 var _ = Describe("pgbouncer log parsing", func() {

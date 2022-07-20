@@ -17,10 +17,10 @@ limitations under the License.
 package execlog
 
 import (
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 var _ = Describe("Writing to a LogWriter", func() {
