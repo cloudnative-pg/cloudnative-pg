@@ -1042,28 +1042,6 @@ func CreateAndAssertClientCertificatesSecrets(
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func CreateAndAssertCertificateSecretsOnAzurite(
-	namespace,
-	clusterName,
-	azuriteCaSecName,
-	azuriteTLSSecName string,
-) {
-	By("creating ca and tls certificate secrets", func() {
-		// create CA certificates
-		_, caPair, err := testsUtils.CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
-		Expect(err).ToNot(HaveOccurred())
-
-		// sign and create secret using CA certificate and key
-		serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,
-			[]string{"azurite.internal.mydomain.net, azurite.default.svc, azurite.default,"},
-		)
-		Expect(err).ToNot(HaveOccurred())
-		serverSecret := serverPair.GenerateCertificateSecret(namespace, azuriteTLSSecName)
-		err = env.Client.Create(env.Ctx, serverSecret)
-		Expect(err).ToNot(HaveOccurred())
-	})
-}
-
 func AssertSSLVerifyFullDBConnectionFromAppPod(namespace string, clusterName string, appPod corev1.Pod) {
 	By("creating an app Pod and connecting to DB, using Certificate authentication", func() {
 		// Connecting to DB, using Certificate authentication
@@ -1181,14 +1159,6 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		connectedReplicas, err := testsUtils.CountReplicas(env, primary)
 		Expect(connectedReplicas, err).To(BeEquivalentTo(expectedReplicas))
 	})
-}
-
-func AssertStorageCredentialsAreCreatedOnAzurite(namespace string) {
-	// This is required by Azurite deployment
-	secretFile := fixturesDir + "/backup/azurite/azurite-secret.yaml"
-	_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-		namespace, secretFile))
-	Expect(err).ToNot(HaveOccurred())
 }
 
 func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
@@ -1493,18 +1463,21 @@ func prepareClusterForPITROnAzureBlob(namespace, clusterName, backupSampleFile,
 
 func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
 	By("creating the Azurite storage credentials", func() {
-		AssertStorageCredentialsAreCreatedOnAzurite(namespace)
+		err := testsUtils.CreateStorageCredentialsOnAzurite(namespace, env)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	By("setting up Azurite to hold the backups", func() {
 		// Deploying azurite for blob storage
-		installAzurite(namespace)
+		err := testsUtils.InstallAzurite(namespace, env)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	By("setting up az-cli", func() {
 		// This is required as we have a service of Azurite running locally.
 		// In order to connect, we need az cli inside the namespace
-		installAzCli(namespace)
+		err := testsUtils.InstallAzCli(namespace, env)
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	// Creating cluster
@@ -1568,50 +1541,6 @@ func prepareClusterForPITROnAzurite(namespace, clusterName, backupSampleFile str
 		insertRecordIntoTable(namespace, clusterName, "for_restore", 3)
 	})
 	AssertArchiveWalOnAzurite(namespace, clusterName)
-}
-
-func installAzurite(namespace string) {
-	// Create an Azurite for blob storage
-	azuriteDeploymentFile := fixturesDir +
-		"/backup/azurite/azurite-deployment.yaml"
-
-	_, _, err := testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-		namespace, azuriteDeploymentFile))
-	Expect(err).ToNot(HaveOccurred())
-
-	// Wait for the Azurite pod to be ready
-	deploymentNamespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      "azurite",
-	}
-	Eventually(func() (int32, error) {
-		deployment := &appsv1.Deployment{}
-		err = env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
-		return deployment.Status.ReadyReplicas, err
-	}, 300).Should(BeEquivalentTo(1))
-
-	// Create an Azurite service
-	serviceFile := fixturesDir + "/backup/azurite/azurite-service.yaml"
-	_, _, err = testsUtils.Run(fmt.Sprintf("kubectl apply -n %v -f %v",
-		namespace, serviceFile))
-	Expect(err).ToNot(HaveOccurred())
-}
-
-func installAzCli(namespace string) {
-	clientFile := fixturesDir + "/backup/azurite/az-cli.yaml"
-	_, _, err := testsUtils.Run(fmt.Sprintf(
-		"kubectl apply -n %v -f %v",
-		namespace, clientFile))
-	Expect(err).ToNot(HaveOccurred())
-	azCliNamespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      "az-cli",
-	}
-	Eventually(func() (bool, error) {
-		az := &corev1.Pod{}
-		err = env.Client.Get(env.Ctx, azCliNamespacedName, az)
-		return utils.IsPodReady(*az), err
-	}, 180).Should(BeTrue())
 }
 
 func createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerYamlFilePath string, expectedInstanceCount int) {
