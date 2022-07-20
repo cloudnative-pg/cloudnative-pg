@@ -26,6 +26,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
 
@@ -56,12 +57,17 @@ func Setup() error {
 	return nil
 }
 
-// ListenAndServe starts a the web server handling metrics
+// ListenAndServe starts the web server handling metrics
 func ListenAndServe() error {
 	serveMux := http.NewServeMux()
 	serveMux.Handle(url.PathMetrics, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 
-	server = &http.Server{Addr: fmt.Sprintf(":%d", url.PgBouncerMetricsPort), Handler: serveMux}
+	server = &http.Server{
+		Addr:              fmt.Sprintf(":%d", url.PgBouncerMetricsPort),
+		Handler:           serveMux,
+		ReadTimeout:       webserver.DefaultReadTimeout,
+		ReadHeaderTimeout: webserver.DefaultReadHeaderTimeout,
+	}
 	err := server.ListenAndServe()
 
 	// The metricsServer has been shut down
