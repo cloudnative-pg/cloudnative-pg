@@ -53,7 +53,8 @@ type PVCUsageStatus struct {
 	// List of PVCs with Resizing condition. Requires a pod restart.
 	//
 	// INFO: https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/
-	Resizing []apiv1.ResizingPVCInformation
+	Resizing []string
+
 	// List of PVCs that are dangling (they don't have a corresponding Job nor a corresponding Pod)
 	Dangling []string
 
@@ -131,11 +132,7 @@ func DetectPVCs(
 		}
 
 		if isResizing(pvc) {
-			result.Resizing = append(result.Resizing, apiv1.ResizingPVCInformation{
-				Name:    pvc.Name,
-				Current: pvc.Status.Capacity.Storage().String(),
-				Desired: pvc.Spec.Resources.Requests.Storage().String(),
-			})
+			result.Resizing = append(result.Resizing, pvc.Name)
 		}
 
 		// Find a Pod corresponding to this PVC
