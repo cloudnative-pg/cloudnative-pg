@@ -190,6 +190,9 @@ func externalClusterSecrets(cluster apiv1.Cluster) []string {
 			result = append(
 				result,
 				azureCredentialsSecrets(barmanObjStore.AzureCredentials)...)
+			result = append(
+				result,
+				googleCredentialsSecrets(barmanObjStore.GoogleCredentials)...)
 			if barmanObjStore.EndpointCA != nil {
 				result = append(result, barmanObjStore.EndpointCA.Name)
 			}
@@ -229,6 +232,9 @@ func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 		result = append(
 			result,
 			azureCredentialsSecrets(backupOrigin.Status.AzureCredentials)...)
+		result = append(
+			result,
+			googleCredentialsSecrets(backupOrigin.Status.GoogleCredentials)...)
 	}
 
 	return result
