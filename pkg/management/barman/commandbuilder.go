@@ -31,13 +31,13 @@ func AppendCloudProviderOptionsFromConfiguration(
 	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
 ) ([]string, error) {
 	azureInheritFromAzureAD := false
-	if barmanConfiguration.AzureCredentials != nil && barmanConfiguration.AzureCredentials.InheritFromAzureAD {
+	if barmanConfiguration.Credentials.Azure != nil && barmanConfiguration.Credentials.Azure.InheritFromAzureAD {
 		azureInheritFromAzureAD = true
 	}
 	return appendCloudProviderOptions(options,
-		barmanConfiguration.S3Credentials != nil,
-		barmanConfiguration.AzureCredentials != nil,
-		barmanConfiguration.GoogleCredentials != nil,
+		barmanConfiguration.Credentials.AWS != nil,
+		barmanConfiguration.Credentials.Azure != nil,
+		barmanConfiguration.Credentials.Google != nil,
 		azureInheritFromAzureAD,
 	)
 }
@@ -49,13 +49,13 @@ func AppendCloudProviderOptionsFromBackup(
 	backup *v1.Backup,
 ) ([]string, error) {
 	azureInheritFromAzureAD := false
-	if backup.Status.AzureCredentials != nil && backup.Status.AzureCredentials.InheritFromAzureAD {
+	if backup.Status.Credentials.Azure != nil && backup.Status.Credentials.Azure.InheritFromAzureAD {
 		azureInheritFromAzureAD = true
 	}
 	return appendCloudProviderOptions(options,
-		backup.Status.S3Credentials != nil,
-		backup.Status.AzureCredentials != nil,
-		backup.Status.GoogleCredentials != nil,
+		backup.Status.Credentials.AWS != nil,
+		backup.Status.Credentials.Azure != nil,
+		backup.Status.Credentials.Google != nil,
 		azureInheritFromAzureAD)
 }
 

@@ -65,7 +65,7 @@ spec:
               not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
             properties:
               azureCredentials:
-                description: The credentials to be used to upload data to Azure Blob
+                description: The credentials to use to upload data to Google Cloud
                   Storage
                 properties:
                   connectionString:
@@ -179,8 +179,7 @@ spec:
                 description: The detected error
                 type: string
               googleCredentials:
-                description: The credentials to use to upload data to Google Cloud
-                  Storage
+                description: The credentials to use to upload data to S3
                 properties:
                   applicationCredentials:
                     description: The secret containing the Google Cloud Storage JSON
@@ -216,7 +215,7 @@ spec:
                 description: The last backup status
                 type: string
               s3Credentials:
-                description: The credentials to be used to upload data to S3
+                description: The credentials to use to upload data to Azure Blob Storage
                 properties:
                   accessKeyId:
                     description: The reference to the access key id

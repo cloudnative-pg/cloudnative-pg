@@ -170,7 +170,5 @@ func useSameBackupLocation(backup *v1.BackupStatus, cluster *v1.Cluster) bool {
 		(backup.ServerName == configuration.ServerName ||
 			// if not specified we use the cluster name as server name
 			(configuration.ServerName == "" && backup.ServerName == cluster.Name)) &&
-		reflect.DeepEqual(backup.S3Credentials, configuration.S3Credentials) &&
-		reflect.DeepEqual(backup.AzureCredentials, configuration.AzureCredentials) &&
-		reflect.DeepEqual(backup.GoogleCredentials, configuration.GoogleCredentials)
+		reflect.DeepEqual(backup.Credentials, configuration.Credentials)
 }

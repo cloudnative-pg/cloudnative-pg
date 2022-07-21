@@ -330,18 +330,11 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 	return pod
 }
 
-// BarmanCredentials an object containing the potential credentials for each cloud provider
-type BarmanCredentials struct {
-	Google *apiv1.GoogleCredentials
-	AWS    *apiv1.S3Credentials
-	Azure  *apiv1.AzureCredentials
-}
-
 // AddBarmanEndpointCAToPodSpec adds the required volumes and env variables needed by barman to work correctly
 func AddBarmanEndpointCAToPodSpec(
 	podSpec *corev1.PodSpec,
 	caSecret *apiv1.SecretKeySelector,
-	credentials BarmanCredentials,
+	credentials apiv1.BarmanCredentials,
 ) {
 	if caSecret == nil || caSecret.Name == "" || caSecret.Key == "" {
 		return
