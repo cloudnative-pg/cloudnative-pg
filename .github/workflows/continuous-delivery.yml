@@ -581,7 +581,7 @@ jobs:
         name: Cleanup test artifacts
         if: always()
         run:
-            rm -rf testartifacts-${{ env.MATRIX }}
+          rm -rf testartifacts-${{ env.MATRIX }}/
       -
         name: Cleanup ginkgo JSON report
         # Delete report.json after the analysis. File should always exist.
@@ -613,7 +613,7 @@ jobs:
           if-no-files-found: ignore
 
   summarize-e2e-tests:
-    name: Report E2E test summary
+    name: E2E test suite # GH Actions will append "summary"
     needs:
       - duplicate_runs
       - evaluate-test-level
@@ -628,21 +628,15 @@ jobs:
       - name: Create a folder for the artifacts
         run: mkdir test-artifacts
 
-      - uses: actions/download-artifact@v3
+      - name: Download all artifacts to the folder
+        uses: actions/download-artifact@v3
         with:
           name: testartifacts-local
           path: test-artifacts
 
-      - name: Display structure of downloaded files
-        run: ls -R
-
-      - name: Compute number of hits per test
+      - name: Compute the E2E test summary
         run: |
-          set +x
-          echo 'computing stuff'
-          echo python .github/summarize-test-results.py --dir test-artifacts -o $GITHUB_STEP_SUMMARY
-      - name: Summary
-        run: echo '### Hello world! :rocket:' >> $GITHUB_STEP_SUMMARY
+          python .github/summarize-test-results.py --dir test-artifacts >> $GITHUB_STEP_SUMMARY
 
   ok-to-merge:
     name: Label the PR as "ok to merge"
