@@ -31,6 +31,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -358,6 +359,9 @@ func (r *ClusterReconciler) updateResourceStatus(
 	if err := r.refreshConfigMapResourceVersions(ctx, cluster); err != nil {
 		return err
 	}
+
+	// set cluster conditions in cluster status
+	r.SetClusterConditionsInStatus(ctx, cluster)
 
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
@@ -908,4 +912,36 @@ func getPodsTopology(
 	}
 
 	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data}
+}
+
+// SetClusterConditionsInStatus is update condition in cluster status section,
+// it is based on number of pods in <cluster.spec.instance> is equal to cluster up/ready pods
+// then it will update condition type `Ready` with status `True` otherwise
+// with status `False`.
+func (r *ClusterReconciler) SetClusterConditionsInStatus(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) {
+	contextLogger := log.FromContext(ctx)
+	podList, err := r.getManagedPods(ctx, cluster)
+	if err != nil {
+		contextLogger.Error(err, "pods are not found, skipping to set cluster conditions")
+	}
+	var conditions metav1.Condition
+	if cluster.Spec.Instances == utils.CountReadyPods(podList.Items) {
+		conditions = metav1.Condition{
+			Type:    string(apiv1.ConditionClusterReady),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.ClusterReady),
+			Message: "Cluster is Ready",
+		}
+	} else {
+		conditions = metav1.Condition{
+			Type:    string(apiv1.ConditionClusterReady),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.ClusterIsNotReady),
+			Message: "Cluster Is Not Ready",
+		}
+	}
+	meta.SetStatusCondition(&cluster.Status.Conditions, conditions)
 }

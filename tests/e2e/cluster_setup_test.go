@@ -17,8 +17,10 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"time"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -32,11 +34,11 @@ import (
 
 var _ = Describe("Cluster setup", func() {
 	const (
-		namespace   = "cluster-storageclass-e2e"
 		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml"
 		clusterName = "postgresql-storage-class"
 		level       = tests.Highest
 	)
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -51,7 +53,9 @@ var _ = Describe("Cluster setup", func() {
 		err := env.DeleteNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 	})
+
 	It("sets up a cluster", func() {
+		namespace = "cluster-storageclass-e2e"
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
@@ -124,6 +128,50 @@ var _ = Describe("Cluster setup", func() {
 					"psql", "-U", "postgres", "app", "-tAc", query)
 				return err == nil, err
 			}, timeout).Should(BeTrue())
+		})
+	})
+
+	It("cluster conditions should work", func() {
+		namespace = "cluster-conditions"
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+
+		By(fmt.Sprintf("having a %v namespace", namespace), func() {
+			// Creating a namespace should be quick
+			timeout := 20
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      namespace,
+			}
+			Eventually(func() (string, error) {
+				namespaceResource := &corev1.Namespace{}
+				err := env.Client.Get(env.Ctx, namespacedName, namespaceResource)
+				return namespaceResource.GetName(), err
+			}, timeout).Should(BeEquivalentTo(namespace))
+		})
+
+		By(fmt.Sprintf("creating a Cluster in the %v namespace", namespace), func() {
+			CreateResourceFromFile(namespace, sampleFile)
+		})
+
+		By("verifying cluster conditions is ready", func() {
+			AssertClusterConditionIsReadyOrNot(namespace, clusterName, apiv1.ConditionTrue, 600, env)
+		})
+
+		// Add more replicas to the cluster and verify that while scaling up the cluster then conditions working
+		// as expected
+		By("scaling up the cluster size", func() {
+			err := env.ScaleClusterSize(namespace, clusterName, 5)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		By("verify cluster condition is not ready just after scale up the cluster", func() {
+			// Just after scale up the cluster, the condition status set to be `False` and cluster is not ready state.
+			AssertClusterConditionIsReadyOrNot(namespace, clusterName, apiv1.ConditionFalse, 180, env)
+		})
+
+		By("verify cluster condition is ready after scale up cluster", func() {
+			AssertClusterConditionIsReadyOrNot(namespace, clusterName, apiv1.ConditionTrue, 180, env)
 		})
 	})
 })

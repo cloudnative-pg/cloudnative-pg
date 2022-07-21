@@ -242,3 +242,18 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 	err = fmt.Errorf("no primary found")
 	return &corev1.Pod{}, err
 }
+
+// ScaleClusterSize is scale cluster as given require size
+func (env TestingEnvironment) ScaleClusterSize(namespace, clusterName string, newClusterSize int) error {
+	cluster, err := env.GetCluster(namespace, clusterName)
+	if err != nil {
+		return err
+	}
+	originalCluster := cluster.DeepCopy()
+	cluster.Spec.Instances = newClusterSize
+	err = env.Client.Patch(env.Ctx, cluster, client.MergeFrom(originalCluster))
+	if err != nil {
+		return err
+	}
+	return nil
+}

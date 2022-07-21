@@ -2284,3 +2284,22 @@ func AssertBackupConditionInClusterStatus(namespace, clusterName string) {
 		}, 300, 5).Should(BeEquivalentTo("True"))
 	})
 }
+
+func AssertClusterConditionIsReadyOrNot(
+	namespace,
+	clusterName string,
+	conditionStatus apiv1.ConditionStatus,
+	timeout int,
+	env *testsUtils.TestingEnvironment,
+) {
+	By(fmt.Sprintf("waiting for cluster condition status in cluster '%v'", clusterName), func() {
+		Eventually(func() (string, error) {
+			clusterCondition, err := testsUtils.GetConditionsInClusterStatus(
+				namespace, clusterName, env, apiv1.ConditionClusterReady)
+			if err != nil {
+				return "", err
+			}
+			return string(clusterCondition.Status), nil
+		}, timeout, 2).Should(BeEquivalentTo(conditionStatus))
+	})
+}
