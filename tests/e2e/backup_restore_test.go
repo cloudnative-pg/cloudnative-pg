@@ -513,7 +513,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 			// Create and assert ca and tls certificate secrets on Azurite
-			CreateAndAssertCertificateSecretsOnAzurite(namespace, clusterName, azuriteCaSecName, azuriteTLSSecName)
+			By("creating ca and tls certificate secrets", func() {
+				err := testUtils.CreateCertificateSecretsOnAzurite(namespace, clusterName,
+					azuriteCaSecName, azuriteTLSSecName, env)
+				Expect(err).ToNot(HaveOccurred())
+			})
 			// Setup Azurite and az cli along with Postgresql cluster
 			prepareClusterBackupOnAzurite(namespace, clusterName, azuriteBlobSampleFile, backupFile, tableName)
 		})
@@ -953,7 +957,11 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 			// Create and assert ca and tls certificate secrets on Azurite
-			CreateAndAssertCertificateSecretsOnAzurite(namespace, clusterName, azuriteCaSecName, azuriteTLSSecName)
+			By("creating ca and tls certificate secrets", func() {
+				err := testUtils.CreateCertificateSecretsOnAzurite(namespace, clusterName,
+					azuriteCaSecName, azuriteTLSSecName, env)
+				Expect(err).ToNot(HaveOccurred())
+			})
 			// Setup Azurite and az cli along with PostgreSQL cluster
 			prepareClusterBackupOnAzurite(namespace, clusterName, azuriteBlobSampleFile, backupFileAzurite, tableName)
 		})

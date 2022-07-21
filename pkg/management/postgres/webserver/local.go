@@ -62,7 +62,12 @@ func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
 	serveMux.HandleFunc(url.PathCache, endpoints.serveCache)
 	serveMux.HandleFunc(url.PathPgBackup, endpoints.requestBackup)
 
-	server := &http.Server{Addr: fmt.Sprintf("localhost:%d", url.LocalPort), Handler: serveMux}
+	server := &http.Server{
+		Addr:              fmt.Sprintf("localhost:%d", url.LocalPort),
+		Handler:           serveMux,
+		ReadHeaderTimeout: DefaultReadTimeout,
+		ReadTimeout:       DefaultReadTimeout,
+	}
 
 	webserver := NewWebServer(instance, server)
 

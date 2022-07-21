@@ -19,9 +19,17 @@ package webserver
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+)
+
+const (
+	// DefaultReadTimeout is the default value to be used by the webservers
+	DefaultReadTimeout = 20 * time.Second
+	// DefaultReadHeaderTimeout is the default value to be used by the webservers
+	DefaultReadHeaderTimeout = 3 * time.Second
 )
 
 // Webserver contains a server that interacts with postgres instance
