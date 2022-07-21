@@ -110,6 +110,8 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Install Go
         uses: actions/setup-go@v3
@@ -155,7 +157,11 @@ jobs:
       ) &&
       (
         github.event.client_payload.slash_command != null ||
-        contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:')
+        (
+           github.event_name == 'pull_request_target' &&
+           github.event.action == 'labeled' &&
+           contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:')
+        )
       )
     runs-on: ubuntu-20.04
     strategy:
@@ -171,6 +177,8 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Install Go
         uses: actions/setup-go@v3
@@ -300,6 +308,7 @@ jobs:
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Install Go
         uses: actions/setup-go@v3
@@ -323,7 +332,7 @@ jobs:
           tags=''
           labels=''
           commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
-          commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
+          commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
@@ -396,6 +405,7 @@ jobs:
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
           labels: ${{ steps.build-meta.outputs.labels }}
+          secrets: GIT_AUTH_TOKEN=${{ secrets.GITHUB_TOKEN }}
       -
         name: Image Meta
         id: image-meta
@@ -421,7 +431,8 @@ jobs:
         github.ref_name == 'main' ||
         startsWith(github.head_ref, 'dependabot/') ||
         startsWith(github.ref_name, 'dependabot/') ||
-        (github.event_name == 'pull_request' && github.event.action == 'opened')
+        (github.event_name == 'pull_request' && github.event.action == 'opened') ||
+        (github.event_name == 'pull_request_target' &&  github.event.action == 'labeled')
        )
     runs-on: ubuntu-20.04
     outputs:
@@ -456,7 +467,7 @@ jobs:
         id: evaluate-test-level
         run: |
           declare -A events
-          events=([push]=0 [pull_request]=2 [main]=3 [schedule]=4)
+          events=([push]=0 [pull_request]=2 [main]=3 [schedule]=4 [pull_request_target]=3)
           test_level_from_input="${{ github.event.inputs.test_level }}"
           if [ -n "${test_level_from_input}" ]
           then
@@ -703,7 +714,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          pr_number=$(gh pr view --json number -q .number || : )
+          pr_number=$(gh pr view --json number -q .number 2>/dev/null || : )
           echo "::set-output name=pr_number::${pr_number}"
           ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null || : | grep "ok to merge")
           echo "::set-output name=ok_label::${ok_label}"
