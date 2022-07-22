@@ -316,6 +316,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 				"pods", resources.pods)
 			cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
 			cluster.Status.TargetPrimaryTimestamp = utils.GetCurrentTimestamp()
+			cluster.LogTimestamps(ctx)
 		}
 	}
 
