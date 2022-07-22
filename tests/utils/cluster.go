@@ -178,6 +178,18 @@ func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename st
 			_, _ = fmt.Fprintln(w, string(out))
 		}
 	}
+	// dump backup info
+	backupList := &apiv1.BackupList{}
+	_ = GetObjectList(&env, backupList, client.InNamespace(namespace))
+	// dump backup object info if it's configure
+	if len(backupList.Items) > 0 {
+		for _, backup := range backupList.Items {
+			out, _ := json.MarshalIndent(backup, "", "    ")
+			_, _ = fmt.Fprintf(w, "Dumping %v/%v backup\n", namespace, backup.Name)
+			_, _ = fmt.Fprintln(w, string(out))
+		}
+	}
+
 	err = w.Flush()
 	if err != nil {
 		fmt.Println(err)
