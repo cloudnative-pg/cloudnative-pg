@@ -113,35 +113,37 @@ var _ = Describe("Roles", func() {
 
 	backupOrigin := apiv1.Backup{
 		Status: apiv1.BackupStatus{
-			AzureCredentials: &apiv1.AzureCredentials{
-				StorageAccount: &apiv1.SecretKeySelector{
-					LocalObjectReference: apiv1.LocalObjectReference{
-						Name: "testAzureStorageAccount",
+			Credentials: apiv1.BarmanCredentials{
+				Azure: &apiv1.AzureCredentials{
+					StorageAccount: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
+							Name: "testAzureStorageAccount",
+						},
+						Key: "storageAccount",
 					},
-					Key: "storageAccount",
-				},
-				StorageKey: &apiv1.SecretKeySelector{
-					LocalObjectReference: apiv1.LocalObjectReference{
-						Name: "testAzureStorageKey",
+					StorageKey: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
+							Name: "testAzureStorageKey",
+						},
+						Key: "storageKey",
 					},
-					Key: "storageKey",
-				},
-				StorageSasToken: &apiv1.SecretKeySelector{
-					LocalObjectReference: apiv1.LocalObjectReference{
-						Name: "testAzureStorageSasToken",
-					},
-					Key: "sasToken",
-				},
-			},
-			S3Credentials: &apiv1.S3Credentials{
-				SecretAccessKeyReference: &apiv1.SecretKeySelector{
-					LocalObjectReference: apiv1.LocalObjectReference{
-						Name: "testS3Secret",
+					StorageSasToken: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
+							Name: "testAzureStorageSasToken",
+						},
+						Key: "sasToken",
 					},
 				},
-				AccessKeyIDReference: &apiv1.SecretKeySelector{
-					LocalObjectReference: apiv1.LocalObjectReference{
-						Name: "testS3Access",
+				AWS: &apiv1.S3Credentials{
+					SecretAccessKeyReference: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
+							Name: "testS3Secret",
+						},
+					},
+					AccessKeyIDReference: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
+							Name: "testS3Access",
+						},
 					},
 				},
 			},
@@ -197,12 +199,14 @@ var _ = Describe("Secrets", func() {
 		cluster.Spec = apiv1.ClusterSpec{
 			Backup: &apiv1.BackupConfiguration{
 				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
-					S3Credentials: &apiv1.S3Credentials{
-						SecretAccessKeyReference: &apiv1.SecretKeySelector{
-							LocalObjectReference: apiv1.LocalObjectReference{Name: "test-secret"},
-						},
-						AccessKeyIDReference: &apiv1.SecretKeySelector{
-							LocalObjectReference: apiv1.LocalObjectReference{Name: "test-access"},
+					Credentials: apiv1.BarmanCredentials{
+						AWS: &apiv1.S3Credentials{
+							SecretAccessKeyReference: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-secret"},
+							},
+							AccessKeyIDReference: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-access"},
+							},
 						},
 					},
 					EndpointCA: &apiv1.SecretKeySelector{

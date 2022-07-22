@@ -178,18 +178,20 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 					Name: sourceClusterName,
 					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
 						DestinationPath: destinationPath,
-						AzureCredentials: &apiv1.AzureCredentials{
-							StorageAccount: &apiv1.SecretKeySelector{
-								LocalObjectReference: apiv1.LocalObjectReference{
-									Name: storageCredentialsSecretName,
+						Credentials: apiv1.BarmanCredentials{
+							Azure: &apiv1.AzureCredentials{
+								StorageAccount: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{
+										Name: storageCredentialsSecretName,
+									},
+									Key: "ID",
 								},
-								Key: "ID",
-							},
-							StorageKey: &apiv1.SecretKeySelector{
-								LocalObjectReference: apiv1.LocalObjectReference{
-									Name: storageCredentialsSecretName,
+								StorageKey: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{
+										Name: storageCredentialsSecretName,
+									},
+									Key: "KEY",
 								},
-								Key: "KEY",
 							},
 						},
 					},
@@ -259,18 +261,20 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 							},
 							Key: "ca.crt",
 						},
-						S3Credentials: &apiv1.S3Credentials{
-							AccessKeyIDReference: &apiv1.SecretKeySelector{
-								LocalObjectReference: apiv1.LocalObjectReference{
-									Name: "backup-storage-creds",
+						Credentials: apiv1.BarmanCredentials{
+							AWS: &apiv1.S3Credentials{
+								AccessKeyIDReference: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{
+										Name: "backup-storage-creds",
+									},
+									Key: "ID",
 								},
-								Key: "ID",
-							},
-							SecretAccessKeyReference: &apiv1.SecretKeySelector{
-								LocalObjectReference: apiv1.LocalObjectReference{
-									Name: "backup-storage-creds",
+								SecretAccessKeyReference: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{
+										Name: "backup-storage-creds",
+									},
+									Key: "KEY",
 								},
-								Key: "KEY",
 							},
 						},
 					},
@@ -340,12 +344,14 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 							},
 							Key: "ca.crt",
 						},
-						AzureCredentials: &apiv1.AzureCredentials{
-							ConnectionString: &apiv1.SecretKeySelector{
-								LocalObjectReference: apiv1.LocalObjectReference{
-									Name: "azurite",
+						Credentials: apiv1.BarmanCredentials{
+							Azure: &apiv1.AzureCredentials{
+								ConnectionString: &apiv1.SecretKeySelector{
+									LocalObjectReference: apiv1.LocalObjectReference{
+										Name: "azurite",
+									},
+									Key: "AZURE_CONNECTION_STRING",
 								},
-								Key: "AZURE_CONNECTION_STRING",
 							},
 						},
 					},

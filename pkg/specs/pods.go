@@ -329,3 +329,54 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 	}
 	return pod
 }
+
+// AddBarmanEndpointCAToPodSpec adds the required volumes and env variables needed by barman to work correctly
+func AddBarmanEndpointCAToPodSpec(
+	podSpec *corev1.PodSpec,
+	caSecret *apiv1.SecretKeySelector,
+	credentials apiv1.BarmanCredentials,
+) {
+	if caSecret == nil || caSecret.Name == "" || caSecret.Key == "" {
+		return
+	}
+
+	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
+		Name: "barman-endpoint-ca",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: caSecret.Name,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  caSecret.Key,
+						Path: postgres.BarmanRestoreEndpointCACertificateFileName,
+					},
+				},
+			},
+		},
+	})
+
+	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts,
+		corev1.VolumeMount{
+			Name:      "barman-endpoint-ca",
+			MountPath: postgres.CertificatesDir,
+		},
+	)
+
+	var envVars []corev1.EnvVar
+	// todo: add a case for the Google provider
+	switch {
+	case credentials.Azure != nil:
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "REQUESTS_CA_BUNDLE",
+			Value: postgres.BarmanRestoreEndpointCACertificateLocation,
+		})
+	// If nothing is set we fall back to AWS, this is to avoid breaking changes with previous versions
+	default:
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "AWS_CA_BUNDLE",
+			Value: postgres.BarmanRestoreEndpointCACertificateLocation,
+		})
+	}
+
+	podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, envVars...)
+}

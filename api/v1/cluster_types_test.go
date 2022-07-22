@@ -700,3 +700,15 @@ var _ = Describe("Fencing annotation", func() {
 		})
 	})
 })
+
+var _ = Describe("Barman credentials", func() {
+	It("can check when they are empty", func() {
+		Expect(BarmanCredentials{}.ArePopulated()).To(BeFalse())
+	})
+
+	It("can check when they are not empty", func() {
+		Expect(BarmanCredentials{
+			Azure: &AzureCredentials{},
+		}.ArePopulated()).To(BeTrue())
+	})
+})
