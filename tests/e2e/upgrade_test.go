@@ -381,7 +381,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				"kubectl exec -n %v %v -- %v",
 				upgradeNamespace,
 				primary,
-				"psql -U postgres appdb -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"))
+				"psql -U postgres appdb -v SHOW_ALL_RESULTS=off -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"))
 			Expect(err).ToNot(HaveOccurred())
 			latestWAL := strings.TrimSpace(out)
 
@@ -390,12 +390,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				findCmd := fmt.Sprintf(
 					"sh -c 'mc find minio --name %v.gz | wc -l'",
 					latestWAL)
-				out, _, err := testsUtils.RunUnchecked(fmt.Sprintf(
+				out, stderr, err := testsUtils.RunUnchecked(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					upgradeNamespace,
 					minioClientName,
 					findCmd))
 
+				Expect(stderr).Should(BeEmpty())
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr
 			}, 30).Should(BeEquivalentTo(1))
