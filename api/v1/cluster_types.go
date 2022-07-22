@@ -328,6 +328,9 @@ type ClusterStatus struct {
 	// the reported state of the instances during the last reconciliation loop
 	InstancesReportedState map[PodName]InstanceReportedState `json:"instancesReportedState,omitempty"`
 
+	// The timeline of the Postgres cluster
+	TimelineID int `json:"timelineID,omitempty"`
+
 	// Instances topology.
 	Topology Topology `json:"topology,omitempty"`
 

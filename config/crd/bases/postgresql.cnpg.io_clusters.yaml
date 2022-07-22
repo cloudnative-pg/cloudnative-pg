@@ -2534,6 +2534,9 @@ spec:
                 description: The timestamp when the last request for a new primary
                   has occurred
                 type: string
+              timelineID:
+                description: The timeline of the Postgres cluster
+                type: integer
               topology:
                 description: Instances topology.
                 properties:

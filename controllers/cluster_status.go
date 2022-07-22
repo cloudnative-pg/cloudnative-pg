@@ -757,6 +757,10 @@ func (r *ClusterReconciler) updateClusterInstancesReportedState(
 			IsPrimary:  item.IsPrimary,
 			TimeLineID: item.TimeLineID,
 		}
+
+		if item.IsPrimary && item.TimeLineID != 0 {
+			cluster.Status.TimelineID = item.TimeLineID
+		}
 	}
 
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
