@@ -37,9 +37,9 @@ const (
 	samplesDir  = "../../docs/src/samples"
 	fixturesDir = "./fixtures"
 	// RetryTimeout retry time when client api call or kubectl cli request get failed
-	RetryTimeout = 60
+	RetryTimeout = 61
 	// PollingTime polling between retry
-	PollingTime = 5
+	PollingTime = 6
 )
 
 var (
