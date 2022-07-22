@@ -322,8 +322,14 @@ type ClusterStatus struct {
 	// Total number of ready instances in the cluster
 	ReadyInstances int `json:"readyInstances,omitempty"`
 
-	// Instances status
+	// InstancesStatus indicates in which status the instances are
 	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
+
+	// the reported state of the instances during the last reconciliation loop
+	InstancesReportedState map[PodName]InstanceReportedState `json:"instancesReportedState,omitempty"`
+
+	// The timeline of the Postgres cluster
+	TimelineID int `json:"timelineID,omitempty"`
 
 	// Instances topology.
 	Topology Topology `json:"topology,omitempty"`
@@ -410,6 +416,14 @@ type ClusterStatus struct {
 
 	// Conditions for cluster object
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+// InstanceReportedState describes the last reported state of an instance during a reconciliation loop
+type InstanceReportedState struct {
+	// indicates if an instance is the primary one
+	IsPrimary bool `json:"isPrimary"`
+	// indicates on which TimelineId the instance is
+	TimeLineID int `json:"timeLineID,omitempty"`
 }
 
 // These are valid conditions of a Cluster, some of the conditions could be owned by
