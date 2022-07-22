@@ -419,6 +419,8 @@ const (
 	ConditionContinuousArchiving ClusterConditionType = "ContinuousArchiving"
 	// ConditionBackup this condition looking backup status :owned by InstanceManager.
 	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
+	// ConditionClusterReady this condition looking for cluster is to be ready
+	ConditionClusterReady ClusterConditionType = "Ready"
 )
 
 // ConditionStatus defines conditions of resources
@@ -458,6 +460,12 @@ const (
 	// ConditionReasonContinuousArchivingFailing means that the condition has changed because
 	// the WAL archiving is not working correctly
 	ConditionReasonContinuousArchivingFailing ConditionReason = "ContinuousArchivingFailing"
+
+	// ClusterReady means that the condition changed because the cluster to be ready and working properly
+	ClusterReady ConditionReason = "ClusterIsReady"
+
+	// ClusterIsNotReady means that the condition changed because the cluster is not ready
+	ClusterIsNotReady ConditionReason = "ClusterIsNotReady"
 )
 
 // ClusterConditionType is of string type
