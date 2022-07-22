@@ -402,7 +402,7 @@ jobs:
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
           labels: ${{ steps.build-meta.outputs.labels }}
-          secrets: GIT_AUTH_TOKEN=${{ secrets.REPO_GHA_PAT }}
+          secrets: GIT_AUTH_TOKEN=${{ secrets.GITHUB_TOKEN }}
       -
         name: Image Meta
         id: image-meta
@@ -428,7 +428,7 @@ jobs:
         github.ref_name == 'main' ||
         startsWith(github.head_ref, 'dependabot/') ||
         startsWith(github.ref_name, 'dependabot/') ||
-        (github.event_name == 'pull_request' && github.event.action == 'opened')
+        (github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'labeled'))
        )
     runs-on: ubuntu-20.04
     outputs:
