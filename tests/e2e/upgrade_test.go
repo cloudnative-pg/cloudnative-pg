@@ -390,13 +390,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				findCmd := fmt.Sprintf(
 					"sh -c 'mc find minio --name %v.gz | wc -l'",
 					latestWAL)
-				out, stderr, err := testsUtils.RunUnchecked(fmt.Sprintf(
+				out, _, err := testsUtils.RunUnchecked(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					upgradeNamespace,
 					minioClientName,
 					findCmd))
 
-				Expect(stderr).Should(BeEmpty())
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr
 			}, 30).Should(BeEquivalentTo(1))
