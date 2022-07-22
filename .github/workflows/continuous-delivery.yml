@@ -5,6 +5,8 @@ on:
     branches:
       - '**'
   pull_request:
+  pull_request_target:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       depth:
@@ -23,6 +25,7 @@ env:
   KUBEBUILDER_VERSION: "2.3.1"
   KIND_VERSION: "v0.11.0"
   ROOK_VERSION: "v1.6.8"
+  CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
 
 defaults:
   run:
@@ -107,6 +110,8 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Install Go
         uses: actions/setup-go@v3
@@ -149,6 +154,11 @@ jobs:
       (
         needs.change-triage.outputs.operator-changed == 'true' ||
         needs.change-triage.outputs.go-code-changed == 'true'
+      ) &&
+      (
+        github.event_name != 'pull_request' ||
+        github.event.action != 'labeled' ||
+        contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:')
       )
     runs-on: ubuntu-20.04
     strategy:
@@ -164,6 +174,8 @@ jobs:
       -
         name: Checkout code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Install Go
         uses: actions/setup-go@v3
@@ -293,6 +305,7 @@ jobs:
         with:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
       -
         name: Install Go
         uses: actions/setup-go@v3
@@ -312,11 +325,11 @@ jobs:
         name: Build meta
         id: build-meta
         run: |
-          images='ghcr.io/cloudnative-pg/cloudnative-pg-testing'
+          images='${{ env.CNPG_IMAGE_NAME }}'
           tags=''
           labels=''
           commit_sha=${{ github.event.pull_request.head.sha || github.sha }}
-          commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
+          commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
@@ -328,6 +341,14 @@ jobs:
           echo "::set-output name=version::${commit_version}"
           echo "::set-output name=commit::${commit_short}"
           echo "::set-output name=cnpg_version::${git_version_tag}"
+          event_name=${{github.event_name}}
+          echo "::set-output name=event_name::${event_name}"
+          event_action=${{github.event.action}}
+          echo "::set-output name=event_action::${event_action}"
+          head_ref=${{github.head_ref}}
+          echo "::set-output name=head_ref::${head_ref}"
+          ref_name=${{github.ref_name}}
+          echo "::set-output name=ref_name::${ref_name}"
       -
         name: Set GoReleaser environment
         run: |
@@ -389,6 +410,7 @@ jobs:
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
           labels: ${{ steps.build-meta.outputs.labels }}
+          secrets: GIT_AUTH_TOKEN=${{ secrets.GITHUB_TOKEN }}
       -
         name: Image Meta
         id: image-meta
@@ -414,7 +436,7 @@ jobs:
         github.ref_name == 'main' ||
         startsWith(github.head_ref, 'dependabot/') ||
         startsWith(github.ref_name, 'dependabot/') ||
-        (github.event_name == 'pull_request' && github.event.action == 'opened')
+        (github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'labeled'))
        )
     runs-on: ubuntu-20.04
     outputs:
@@ -670,7 +692,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          pr_number=$(gh pr view --json number -q .number || : )
+          pr_number=$(gh pr view --json number -q .number 2>/dev/null || : )
           echo "::set-output name=pr_number::${pr_number}"
           ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null || : | grep "ok to merge")
           echo "::set-output name=ok_label::${ok_label}"
