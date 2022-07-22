@@ -66,6 +66,7 @@ CompressionType
 ConditionStatus
 ConfigMap
 ConfigMapKeySelector
+ConfigMapRefs
 ConfigMapResourceVersion
 ConfigMaps
 ContinuousArchiving
@@ -214,6 +215,7 @@ PoolerSpec
 PoolerStatus
 PoolerType
 PostGIS
+PostInitApplicationSQLRefs
 Postgres
 PostgresConfiguration
 PrimaryUpdateMethod
@@ -258,6 +260,7 @@ ScheduledBackupStatus
 ScheduledBackups
 Scorsolini
 SecretKeySelector
+SecretRefs
 SecretVersion
 SecretsResourceVersion
 SecurityProfiles
@@ -401,6 +404,7 @@ conf
 config
 config's
 configMap
+configMapRefs
 configmap
 configmapkeyselector
 configmaps
@@ -681,6 +685,7 @@ poolers
 pos
 posix
 postImportApplicationSQL
+postInitApplicationSQLRefs
 postInitSQL
 postgres
 postgresGID
@@ -754,6 +759,7 @@ searchAttribute
 secretAccessKey
 secretKeyRef
 secretName
+secretRefs
 secretkeyselector
 securego
 securityContext

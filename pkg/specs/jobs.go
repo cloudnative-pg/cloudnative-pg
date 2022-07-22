@@ -72,6 +72,12 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
 		return createPrimaryJob(cluster, nodeSerial, "import", initCommand)
 	}
+
+	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
+		initCommand = append(initCommand,
+			"--post-init-application-sql-refs-folder", "/etc/post-init-application-sql-refs")
+	}
+
 	return createPrimaryJob(cluster, nodeSerial, "initdb", initCommand)
 }
 
@@ -264,6 +270,15 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
 		utils.AnnotateAppArmor(&job.ObjectMeta, cluster.Annotations)
+	}
+
+	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
+		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
+			cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs,
+		)
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
 	}
 
 	return job
