@@ -379,8 +379,7 @@ func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatu
 			"COALESCE(pg_last_wal_receive_lsn()::varchar, ''), " +
 			"COALESCE(pg_last_wal_replay_lsn()::varchar, ''), " +
 			"pg_is_wal_replay_paused()")
-	err = row.Scan(&result.ReceivedLsn, &result.ReplayLsn, &result.ReplayPaused)
-	if err != nil {
+	if err := row.Scan(&result.ReceivedLsn, &result.ReplayLsn, &result.ReplayPaused); err != nil {
 		return err
 	}
 
@@ -391,6 +390,11 @@ func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatu
 	// order, we fix the result here
 	if result.ReceivedLsn.Less(result.ReplayLsn) {
 		result.ReceivedLsn = result.ReplayLsn
+	}
+
+	timelineRow := superUserDB.QueryRow("SELECT timeline_id FROM pg_control_checkpoint()")
+	if err := timelineRow.Scan(&result.TimeLineID); err != nil {
+		return err
 	}
 
 	result.IsWalReceiverActive, err = instance.IsWALReceiverActive()

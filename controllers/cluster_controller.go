@@ -230,6 +230,14 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// Get the replication status
 	instancesStatus := r.getStatusFromInstances(ctx, resources.pods)
 
+	// we update all the cluster status fields that require the instances status
+	if err := r.updateClusterInstancesReportedState(ctx, cluster, instancesStatus); err != nil {
+		if apierrs.IsConflict(err) {
+			return ctrl.Result{Requeue: true}, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
+	}
+
 	// Verify the architecture of all the instances and update the OnlineUpdateEnabled
 	// field in the status
 	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
