@@ -402,6 +402,8 @@ jobs:
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
           labels: ${{ steps.build-meta.outputs.labels }}
+          secrets: |
+            GIT_AUTH_TOKEN=${{ secrets.REPO_GHA_PAT }}
       -
         name: Image Meta
         id: image-meta
