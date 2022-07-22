@@ -26,17 +26,17 @@ import (
 // e.g. "2006-01-02T15:04:05Z07:00" --> "2006-01-02 15:04:05.000000Z07:00"
 // If the conversion fails, the input timestamp is returned as it is.
 func ConvertToPostgresFormat(timestamp string) string {
-	parsedTimestamp, err := time.Parse(time.RFC3339, timestamp)
+	parsedTimestamp, err := time.Parse(time.RFC3339Nano, timestamp)
 	if err != nil {
 		return timestamp
 	}
 	return parsedTimestamp.Format("2006-01-02 15:04:05.000000Z07:00")
 }
 
-// GetCurrentTimestamp returns the current timestamp as a string in RFC3339 format
+// GetCurrentTimestamp returns the current timestamp as a string in RFC3339Nano format
 func GetCurrentTimestamp() string {
 	t := time.Now()
-	return t.Format(time.RFC3339)
+	return t.Format(time.RFC3339Nano)
 }
 
 // ParseTargetTime returns the parsed targetTime which is used for point-in-time-recovery
@@ -46,22 +46,20 @@ func GetCurrentTimestamp() string {
 // YYYY-MM-DD HH24:MI:SS.FF6TZH:TZM
 // YYYY-MM-DDTHH24:MI:SSZ            (time.RFC3339)
 // YYYY-MM-DDTHH24:MI:SS±TZH:TZM     (time.RFC3339)
+// YYYY-MM-DDTHH24:MI:SSS±TZH:TZM	 (time.RFC3339Nano)
 // YYYY-MM-DDTHH24:MI:SS             (modified time.RFC3339)
 func ParseTargetTime(currentLocation *time.Location, targetTime string) (time.Time, error) {
-	t, err := pq.ParseTimestamp(currentLocation, targetTime)
-	if err == nil {
+	if t, err := pq.ParseTimestamp(currentLocation, targetTime); err == nil {
 		return t, nil
 	}
 
-	t, err = time.Parse(time.RFC3339, targetTime)
-	if err == nil {
+	if t, err := time.Parse(time.RFC3339Nano, targetTime); err == nil {
 		return t, nil
 	}
 
-	t, err = time.Parse("2006-01-02T15:04:05", targetTime)
-	if err == nil {
+	if t, err := time.Parse(time.RFC3339, targetTime); err == nil {
 		return t, nil
 	}
 
-	return t, err
+	return time.Parse("2006-01-02T15:04:05", targetTime)
 }
