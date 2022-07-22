@@ -288,7 +288,6 @@ var (
 		"external_pid_file":         blockedConfigurationParameter,
 		"hba_file":                  blockedConfigurationParameter,
 		"hot_standby":               blockedConfigurationParameter,
-		"huge_pages":                blockedConfigurationParameter,
 		"ident_file":                blockedConfigurationParameter,
 		"jit_provider":              blockedConfigurationParameter,
 		"listen_addresses":          blockedConfigurationParameter,
