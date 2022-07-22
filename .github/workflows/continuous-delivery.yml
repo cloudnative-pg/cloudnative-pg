@@ -341,7 +341,7 @@ jobs:
           echo "::set-output name=version::${commit_version}"
           echo "::set-output name=commit::${commit_short}"
           echo "::set-output name=cnpg_version::${git_version_tag}"
-          event_name=${{github.event.name}}
+          event_name=${{github.event_name}}
           echo "::set-output name=event_name::${event_name}"
           event_action=${{github.event.action}}
           echo "::set-output name=event_action::${event_action}"
