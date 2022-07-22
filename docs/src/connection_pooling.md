@@ -144,25 +144,25 @@ To manually integrate the Pooler, in the case that you have specified your own s
 1. Create the role:
 
 
-   ```sql
+```sql
    CREATE ROLE cnpg_pooler_pgbouncer WITH LOGIN;
-   ```
+```
 
 2. For each application database, grant the permission for `cnpg_pooler_pgbouncer` to connect to it:
 
-   ```sql
+```sql
    GRANT CONNECT ON DATABASE { database name here } TO cnpg_pooler_pgbouncer;
-   ```
+```
 
 3. Connect in each application database, then create the authentication function inside each of the application databases:
 
-   ```sql
+```sql
    CREATE OR REPLACE FUNCTION user_search(uname TEXT) RETURNS TABLE (usename name, passwd text) as 'SELECT usename, passwd FROM pg_shadow WHERE usename=$1;' LANGUAGE sql SECURITY DEFINER;
 
    REVOKE ALL ON FUNCTION user_search(text) FROM public;
 
    GRANT EXECUTE ON FUNCTION user_search(text) TO cnpg_pooler_pgbouncer;
-   ```
+```
 
 
 ## PodTemplates
