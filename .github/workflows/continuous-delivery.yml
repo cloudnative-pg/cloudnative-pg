@@ -341,6 +341,14 @@ jobs:
           echo "::set-output name=version::${commit_version}"
           echo "::set-output name=commit::${commit_short}"
           echo "::set-output name=cnpg_version::${git_version_tag}"
+          event_name=${{github.event.name}}
+          echo "::set-output name=event_name::${event_name}"
+          event_action=${{github.event.action}}
+          echo "::set-output name=event_action::${event_action}"
+          head_ref=${{github.head_ref}}
+          echo "::set-output name=head_ref::${head_ref}"
+          ref_name=${{github.ref_name}}
+          echo "::set-output name=ref_name::${ref_name}"
       -
         name: Set GoReleaser environment
         run: |
