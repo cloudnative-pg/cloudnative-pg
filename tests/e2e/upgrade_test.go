@@ -381,7 +381,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				"kubectl exec -n %v %v -- %v",
 				upgradeNamespace,
 				primary,
-				"psql -U postgres appdb -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"))
+				"psql -U postgres appdb -v SHOW_ALL_RESULTS=off -tAc 'CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())'"))
 			Expect(err).ToNot(HaveOccurred())
 			latestWAL := strings.TrimSpace(out)
 
