@@ -199,6 +199,9 @@ PodMonitor
 PodSpec
 PodStatus
 PodTemplateSpec
+PodTemplates
+PodTopology
+PodTopologyLabels
 Pooler
 Pooler's
 PoolerIntegrations
@@ -625,6 +628,7 @@ ol
 olm
 openldap
 openshift
+operability
 operatorframework
 operatorgorup
 operatorgroup
@@ -664,6 +668,7 @@ podtemplates
 pood
 poolMode
 pooler
+poolerName
 poolers
 pos
 posix
