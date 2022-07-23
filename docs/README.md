@@ -35,7 +35,9 @@ mkdocs serve
 
 Even in this case, point your browser to `http://127.0.0.1:8000/`.
 
-Make sure you review what you have written by putting yourself in the end user's shoes. Once you are ready, proceed with the spell check and then with the pull request.
+Make sure you review what you have written by putting yourself in the end
+user's shoes. Once you are ready, proceed with the spell check and then with
+the pull request.
 
 ## How to run the spell checker
 
