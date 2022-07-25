@@ -1385,11 +1385,20 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 		allErrors = r.Spec.Backup.BarmanObjectStore.Credentials.Google.validateGCSCredentials(
 			field.NewPath("spec", "backupConfiguration", "googleCredentials"))
 	}
-	if credentialsCount != 1 {
+	if credentialsCount == 0 {
 		allErrors = append(allErrors, field.Invalid(
 			field.NewPath("spec", "backupConfiguration"),
 			r.Spec.Backup.BarmanObjectStore,
-			"one and only one of azureCredentials and s3Credentials are required",
+			"missing credentials. "+
+				"One and only one of azureCredentials, s3Credentials and googleCredentials are required",
+		))
+	}
+	if credentialsCount > 1 {
+		allErrors = append(allErrors, field.Invalid(
+			field.NewPath("spec", "backupConfiguration"),
+			r.Spec.Backup.BarmanObjectStore,
+			"too many credentials. "+
+				"One and only one of azureCredentials, s3Credentials and googleCredentials are required",
 		))
 	}
 
