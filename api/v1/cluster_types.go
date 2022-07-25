@@ -1928,8 +1928,8 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	keysAndValues := []interface{}{
 		"phase", cluster.Status.Phase,
 		"currentTimestamp", currentTimestamp,
-		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp,
-		"currentPrimaryTimestamp", cluster.Status.CurrentPrimaryTimestamp,
+		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp.Format(metav1.RFC3339Micro),
+		"currentPrimaryTimestamp", cluster.Status.CurrentPrimaryTimestamp.Format(metav1.RFC3339Micro),
 	}
 
 	var errs []string
@@ -1937,7 +1937,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	// Elapsed time since the last request of promotion (TargetPrimaryTimestamp)
 	if diff, err := utils.DifferenceBetweenTimestamps(
 		currentTimestamp,
-		cluster.Status.TargetPrimaryTimestamp,
+		cluster.Status.TargetPrimaryTimestamp.Format(metav1.RFC3339Micro),
 	); err == nil {
 		keysAndValues = append(
 			keysAndValues,
@@ -1951,7 +1951,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	// Elapsed time since the last promotion (CurrentPrimaryTimestamp)
 	if currentPrimaryDifference, err := utils.DifferenceBetweenTimestamps(
 		currentTimestamp,
-		cluster.Status.CurrentPrimaryTimestamp,
+		cluster.Status.CurrentPrimaryTimestamp.Format(metav1.RFC3339Micro),
 	); err == nil {
 		keysAndValues = append(
 			keysAndValues,
@@ -1967,8 +1967,8 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	// of a standby to a primary. If negative, it means we have a failover/switchover
 	// in progress, and the value represents the last measured uptime of the primary.
 	if currentPrimaryTargetDifference, err := utils.DifferenceBetweenTimestamps(
-		cluster.Status.CurrentPrimaryTimestamp,
-		cluster.Status.TargetPrimaryTimestamp,
+		cluster.Status.CurrentPrimaryTimestamp.Format(metav1.RFC3339Micro),
+		cluster.Status.TargetPrimaryTimestamp.Format(metav1.RFC3339Micro),
 	); err == nil {
 		keysAndValues = append(
 			keysAndValues,
@@ -2036,7 +2036,8 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 	if target.TargetTime != "" {
 		result += fmt.Sprintf(
 			"recovery_target_time = '%v'\n",
-			utils.ConvertToPostgresFormat(target.TargetTime))
+			utils.ConvertToPostgresFormat(target.TargetTime),
+		)
 	}
 	if target.TargetImmediate != nil && *target.TargetImmediate {
 		result += "recovery_target = immediate\n"

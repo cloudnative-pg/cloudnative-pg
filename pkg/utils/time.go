@@ -37,7 +37,7 @@ func ConvertToPostgresFormat(timestamp string) string {
 
 // GetCurrentTimestamp returns the current timestamp as a string in RFC3339Micro format
 func GetCurrentTimestamp() string {
-	t := time.Now()
+	t := metav1.NowMicro()
 	return t.Format(metav1.RFC3339Micro)
 }
 

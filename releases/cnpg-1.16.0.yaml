@@ -11011,14 +11011,14 @@ spec:
         - /manager
         env:
         - name: OPERATOR_IMAGE_NAME
-          value: ghcr.io/cloudnative-pg/cloudnative-pg:1.16.0
+          value: ghcr.io/cloudnative-pg/cloudnative-pg-testing:pr-504
         - name: OPERATOR_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
         - name: MONITORING_QUERIES_CONFIGMAP
           value: cnpg-default-monitoring
-        image: ghcr.io/cloudnative-pg/cloudnative-pg:1.16.0
+        image: ghcr.io/cloudnative-pg/cloudnative-pg-testing:pr-504
         livenessProbe:
           httpGet:
             path: /readyz

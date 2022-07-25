@@ -193,7 +193,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 				if c.Status.CurrentPrimary != oldPrimary {
 					return true, nil
-				} else if c.Status.CurrentPrimaryTimestamp != oldPrimaryTimestamp {
+				} else if c.Status.CurrentPrimaryTimestamp.Unix() != oldPrimaryTimestamp.Unix() {
 					return true, nil
 				}
 

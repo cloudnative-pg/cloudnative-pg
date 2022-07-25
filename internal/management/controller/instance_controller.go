@@ -49,7 +49,6 @@ import (
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -1032,7 +1031,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	// if the currentPrimary doesn't match the PodName we set the correct value.
 	if cluster.Status.CurrentPrimary != r.instance.PodName {
 		cluster.Status.CurrentPrimary = r.instance.PodName
-		cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
+		cluster.Status.CurrentPrimaryTimestamp = apiv1.NowMicro()
 		err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 		if err != nil {
 			return restarted, err

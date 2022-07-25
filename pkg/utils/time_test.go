@@ -26,9 +26,15 @@ var _ = Describe("Time conversion", func() {
 		res := ConvertToPostgresFormat("2021-09-01T10:22:47+03:00")
 		Expect(res).To(BeEquivalentTo("2021-09-01 10:22:47.000000+03:00"))
 	})
+
 	It("return same input string if not in RFC3339 format", func() {
 		res := ConvertToPostgresFormat("2001-09-29 01:02:03")
 		Expect(res).To(BeEquivalentTo("2001-09-29 01:02:03"))
+	})
+
+	It("properly works given a string in RFC3339Micro format", func() {
+		res := ConvertToPostgresFormat("2022-07-25T13:30:21.166753Z")
+		Expect(res).To(Equal("2022-07-25 13:30:21.166753Z"))
 	})
 })
 
