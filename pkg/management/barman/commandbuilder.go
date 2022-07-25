@@ -30,16 +30,7 @@ func AppendCloudProviderOptionsFromConfiguration(
 	options []string,
 	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
 ) ([]string, error) {
-	azureInheritFromAzureAD := false
-	if barmanConfiguration.Credentials.Azure != nil && barmanConfiguration.Credentials.Azure.InheritFromAzureAD {
-		azureInheritFromAzureAD = true
-	}
-	return appendCloudProviderOptions(options,
-		barmanConfiguration.Credentials.AWS != nil,
-		barmanConfiguration.Credentials.Azure != nil,
-		barmanConfiguration.Credentials.Google != nil,
-		azureInheritFromAzureAD,
-	)
+	return appendCloudProviderOptions(options, barmanConfiguration.Credentials)
 }
 
 // AppendCloudProviderOptionsFromBackup takes an options array and adds the cloud provider specified
@@ -48,39 +39,25 @@ func AppendCloudProviderOptionsFromBackup(
 	options []string,
 	backup *v1.Backup,
 ) ([]string, error) {
-	azureInheritFromAzureAD := false
-	if backup.Status.Credentials.Azure != nil && backup.Status.Credentials.Azure.InheritFromAzureAD {
-		azureInheritFromAzureAD = true
-	}
-	return appendCloudProviderOptions(options,
-		backup.Status.Credentials.AWS != nil,
-		backup.Status.Credentials.Azure != nil,
-		backup.Status.Credentials.Google != nil,
-		azureInheritFromAzureAD)
+	return appendCloudProviderOptions(options, backup.Status.Credentials)
 }
 
 // appendCloudProviderOptions takes an options array and adds the cloud provider specified as arguments
-func appendCloudProviderOptions(
-	options []string,
-	s3Credentials,
-	azureCredentials,
-	googleCredentials,
-	azureInheritFromAzureAD bool,
-) ([]string, error) {
+func appendCloudProviderOptions(options []string, credentials v1.BarmanCredentials) ([]string, error) {
 	capabilities, err := barmanCapabilities.CurrentCapabilities()
 	if err != nil {
 		return nil, err
 	}
 
 	switch {
-	case s3Credentials:
+	case credentials.AWS != nil:
 		if capabilities.HasS3 {
 			options = append(
 				options,
 				"--cloud-provider",
 				"aws-s3")
 		}
-	case azureCredentials:
+	case credentials.Azure != nil:
 		if !capabilities.HasAzure {
 			err := fmt.Errorf(
 				"barman >= 2.13 is required to use Azure object storage, current: %v",
@@ -94,7 +71,7 @@ func appendCloudProviderOptions(
 			"--cloud-provider",
 			"azure-blob-storage")
 
-		if !azureInheritFromAzureAD {
+		if !credentials.Azure.InheritFromAzureAD {
 			break
 		}
 
@@ -110,7 +87,7 @@ func appendCloudProviderOptions(
 			options,
 			"--credential",
 			"managed-identity")
-	case googleCredentials:
+	case credentials.Google != nil:
 		if !capabilities.HasGoogle {
 			err := fmt.Errorf(
 				"barman >= 2.19 is required to use Google Cloud Storage, current: %v",
