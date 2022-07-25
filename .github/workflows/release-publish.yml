@@ -27,15 +27,17 @@ jobs:
         run: |
           tag="${GITHUB_REF#refs/tags/v}"
           version="{$tag#v}"
+          file=$(echo ${version} | awk -F '[.]' '{print "release_notes/v"$1"."$2".md"}')
           echo "TAG=${tag}" >> $GITHUB_ENV
           echo "VERSION=${version}" >> $GITHUB_ENV
+          echo "FILE=${file}" >> $GITHUB_ENV
       -
         name: Generate release notes
         run: |
           docker run --rm -v $(pwd):/src mist/submark \
             submark -O --h2 "Version ${{ env.TAG }}" \
             --out-file /src/release_notes.md \
-            /src/docs/src/release_notes.md
+            /src/docs/src/${{ env.FILE }}
       -
         name: Release
         uses: softprops/action-gh-release@v1
