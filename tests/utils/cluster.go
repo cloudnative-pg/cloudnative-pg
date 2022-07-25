@@ -179,15 +179,20 @@ func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename st
 		}
 	}
 	// dump backup info
-	backupList := &apiv1.BackupList{}
-	_ = GetObjectList(&env, backupList, client.InNamespace(namespace))
+	backupList, _ := env.GetBackupList(namespace)
 	// dump backup object info if it's configure
-	if len(backupList.Items) > 0 {
-		for _, backup := range backupList.Items {
-			out, _ := json.MarshalIndent(backup, "", "    ")
-			_, _ = fmt.Fprintf(w, "Dumping %v/%v backup\n", namespace, backup.Name)
-			_, _ = fmt.Fprintln(w, string(out))
-		}
+	for _, backup := range backupList.Items {
+		out, _ := json.MarshalIndent(backup, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v backup\n", namespace, backup.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
+	// dump scheduledbackup info
+	scheduledBackupList, _ := env.GetScheduledBackupList(namespace)
+	// dump backup object info if it's configure
+	for _, scheduledBackup := range scheduledBackupList.Items {
+		out, _ := json.MarshalIndent(scheduledBackup, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v scheduledbackup\n", namespace, scheduledBackup.Name)
+		_, _ = fmt.Fprintln(w, string(out))
 	}
 
 	err = w.Flush()
