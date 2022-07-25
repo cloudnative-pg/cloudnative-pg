@@ -26,7 +26,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // Promote command implementation
@@ -55,7 +54,7 @@ func Promote(ctx context.Context, clusterName string, serverName string) error {
 
 	// The Pod exists, let's update status fields
 	cluster.Status.TargetPrimary = serverName
-	cluster.Status.TargetPrimaryTimestamp = utils.GetCurrentTimestamp()
+	cluster.Status.TargetPrimaryTimestamp = apiv1.NowMicro()
 	cluster.Status.Phase = apiv1.PhaseSwitchover
 	cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
 

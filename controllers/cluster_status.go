@@ -315,7 +315,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 				"targetPrimary", cluster.Status.TargetPrimary,
 				"pods", resources.pods)
 			cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
-			cluster.Status.TargetPrimaryTimestamp = utils.GetCurrentTimestamp()
+			cluster.Status.TargetPrimaryTimestamp = apiv1.NowMicro()
 		}
 	}
 
@@ -718,7 +718,7 @@ func (r *ClusterReconciler) setPrimaryInstance(
 	podName string,
 ) error {
 	cluster.Status.TargetPrimary = podName
-	cluster.Status.TargetPrimaryTimestamp = utils.GetCurrentTimestamp()
+	cluster.Status.TargetPrimaryTimestamp = apiv1.NowMicro()
 	return r.Status().Update(ctx, cluster)
 }
 

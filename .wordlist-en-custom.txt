@@ -153,6 +153,7 @@ MetricDescription
 MetricName
 MetricType
 MiB
+MicroTime
 MinIO
 Minikube
 MonitoringConfiguration

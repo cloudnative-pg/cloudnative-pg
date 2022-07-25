@@ -19,6 +19,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -398,10 +399,10 @@ type ClusterStatus struct {
 	CommitHash string `json:"cloudNativePGCommitHash,omitempty"`
 
 	// The timestamp when the last actual promotion to primary has occurred
-	CurrentPrimaryTimestamp string `json:"currentPrimaryTimestamp,omitempty"`
+	CurrentPrimaryTimestamp *metav1.MicroTime `json:"currentPrimaryTimestamp,omitempty"`
 
 	// The timestamp when the last request for a new primary has occurred
-	TargetPrimaryTimestamp string `json:"targetPrimaryTimestamp,omitempty"`
+	TargetPrimaryTimestamp *metav1.MicroTime `json:"targetPrimaryTimestamp,omitempty"`
 
 	// The integration needed by poolers referencing the cluster
 	PoolerIntegrations *PoolerIntegrations `json:"poolerIntegrations,omitempty"`
@@ -2050,6 +2051,11 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 	}
 
 	return result
+}
+
+// NowMicro returns the current local time.
+func NowMicro() *metav1.MicroTime {
+	return &metav1.MicroTime{Time: time.Now()}
 }
 
 func init() {

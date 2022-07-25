@@ -178,7 +178,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 
 			oldCluster := cluster.DeepCopy()
 			cluster.Status.CurrentPrimary = r.instance.PodName
-			cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
+			cluster.Status.CurrentPrimaryTimestamp = apiv1.NowMicro()
 			return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 		}
 		return nil

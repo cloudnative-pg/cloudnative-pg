@@ -2388,6 +2388,7 @@ spec:
               currentPrimaryTimestamp:
                 description: The timestamp when the last actual promotion to primary
                   has occurred
+                format: date-time
                 type: string
               danglingPVC:
                 description: List of all the PVCs created by this cluster and still
@@ -2533,6 +2534,7 @@ spec:
               targetPrimaryTimestamp:
                 description: The timestamp when the last request for a new primary
                   has occurred
+                format: date-time
                 type: string
               timelineID:
                 description: The timeline of the Postgres cluster

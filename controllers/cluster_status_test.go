@@ -88,12 +88,12 @@ var _ = Describe("cluster_status unit tests", func() {
 		ctx := context.Background()
 		namespace := newFakeNamespace()
 		cluster := newFakeCNPGCluster(namespace)
-		Expect(cluster.Status.TargetPrimaryTimestamp).To(BeEmpty())
+		Expect(cluster.Status.TargetPrimaryTimestamp).To(BeNil())
 
 		By("setting the primaryInstance and making sure the passed object is updated", func() {
 			err := clusterReconciler.setPrimaryInstance(ctx, cluster, podName)
 			Expect(err).To(BeNil())
-			Expect(cluster.Status.TargetPrimaryTimestamp).ToNot(BeEmpty())
+			Expect(cluster.Status.TargetPrimaryTimestamp).ToNot(BeNil())
 			Expect(cluster.Status.TargetPrimary).To(Equal(podName))
 		})
 
@@ -102,7 +102,7 @@ var _ = Describe("cluster_status unit tests", func() {
 
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, remoteCluster)
 			Expect(err).To(BeNil())
-			Expect(remoteCluster.Status.TargetPrimaryTimestamp).ToNot(BeEmpty())
+			Expect(remoteCluster.Status.TargetPrimaryTimestamp).ToNot(BeNil())
 			Expect(remoteCluster.Status.TargetPrimary).To(Equal(podName))
 		})
 	})

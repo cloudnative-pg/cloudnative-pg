@@ -689,6 +689,14 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	in.SecretsResourceVersion.DeepCopyInto(&out.SecretsResourceVersion)
 	in.ConfigMapResourceVersion.DeepCopyInto(&out.ConfigMapResourceVersion)
 	in.Certificates.DeepCopyInto(&out.Certificates)
+	if in.CurrentPrimaryTimestamp != nil {
+		in, out := &in.CurrentPrimaryTimestamp, &out.CurrentPrimaryTimestamp
+		*out = (*in).DeepCopy()
+	}
+	if in.TargetPrimaryTimestamp != nil {
+		in, out := &in.TargetPrimaryTimestamp, &out.TargetPrimaryTimestamp
+		*out = (*in).DeepCopy()
+	}
 	if in.PoolerIntegrations != nil {
 		in, out := &in.PoolerIntegrations, &out.PoolerIntegrations
 		*out = new(PoolerIntegrations)
