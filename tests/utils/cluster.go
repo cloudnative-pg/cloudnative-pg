@@ -180,6 +180,23 @@ func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename st
 			_, _ = fmt.Fprintln(w, string(out))
 		}
 	}
+	// dump backup info
+	backupList, _ := env.GetBackupList(namespace)
+	// dump backup object info if it's configure
+	for _, backup := range backupList.Items {
+		out, _ := json.MarshalIndent(backup, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v backup\n", namespace, backup.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
+	// dump scheduledbackup info
+	scheduledBackupList, _ := env.GetScheduledBackupList(namespace)
+	// dump backup object info if it's configure
+	for _, scheduledBackup := range scheduledBackupList.Items {
+		out, _ := json.MarshalIndent(scheduledBackup, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v scheduledbackup\n", namespace, scheduledBackup.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
+
 	err = w.Flush()
 	if err != nil {
 		fmt.Println(err)

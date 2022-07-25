@@ -174,6 +174,24 @@ func (env TestingEnvironment) GetNodeList() (*corev1.NodeList, error) {
 	return nodeList, err
 }
 
+// GetBackupList gathers the current list of backup in namespace
+func (env TestingEnvironment) GetBackupList(namespace string) (*apiv1.BackupList, error) {
+	backupList := &apiv1.BackupList{}
+	err := env.Client.List(
+		env.Ctx, backupList, client.InNamespace(namespace),
+	)
+	return backupList, err
+}
+
+// GetScheduledBackupList gathers the current list of scheduledBackup in namespace
+func (env TestingEnvironment) GetScheduledBackupList(namespace string) (*apiv1.ScheduledBackupList, error) {
+	scheduledBackupList := &apiv1.ScheduledBackupList{}
+	err := env.Client.List(
+		env.Ctx, scheduledBackupList, client.InNamespace(namespace),
+	)
+	return scheduledBackupList, err
+}
+
 // IsGKE returns true if we run on Google Kubernetes Engine. We check that
 // by verifying if all the node names start with "gke-"
 func (env TestingEnvironment) IsGKE() (bool, error) {
