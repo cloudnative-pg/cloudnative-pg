@@ -130,7 +130,7 @@ store using the `recovery` section and continuous recovery using both streaming
 replication and the given object store. For streaming replication, the replica
 cluster connects to the source cluster using basic authentication.
 
-You can check the [sample YAML](samples/cluster-example-replica-from-backup.yaml)
+You can check the [sample YAML](samples/cluster-example-replica-from-backup-simple.yaml)
 for it in the `samples/` subdirectory.
 
 Note the `bootstrap` and `replica` sections pointing to the source cluster.

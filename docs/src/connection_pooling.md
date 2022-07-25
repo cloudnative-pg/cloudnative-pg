@@ -139,30 +139,38 @@ Internally, our implementation relies on PgBouncer's `auth_user` and `auth_query
 !!! Important
     If you specify your own secrets the operator will not automatically integrate the Pooler.
 
-To manually integrate the Pooler, in the case that you have specified your own secrets, you must run the following queries from inside your cluster.
+To manually integrate the Pooler, in the case that you have specified your own
+secrets, you must run the following queries from inside your cluster.
 
-1. Create the role:
+First, you must create the role:
 
 
-   ```sql
-   CREATE ROLE cnpg_pooler_pgbouncer WITH LOGIN;
-   ```
+```sql
+CREATE ROLE cnpg_pooler_pgbouncer WITH LOGIN;
+```
 
-2. For each application database, grant the permission for `cnpg_pooler_pgbouncer` to connect to it:
+Then, for each application database, grant the permission for
+`cnpg_pooler_pgbouncer` to connect to it:
 
-   ```sql
-   GRANT CONNECT ON DATABASE { database name here } TO cnpg_pooler_pgbouncer;
-   ```
+```sql
+GRANT CONNECT ON DATABASE { database name here } TO cnpg_pooler_pgbouncer;
+```
 
-3. Connect in each application database, then create the authentication function inside each of the application databases:
+Finally, connect in each application database, then create the authentication
+function inside each of the application databases:
 
-   ```sql
-   CREATE OR REPLACE FUNCTION user_search(uname TEXT) RETURNS TABLE (usename name, passwd text) as 'SELECT usename, passwd FROM pg_shadow WHERE usename=$1;' LANGUAGE sql SECURITY DEFINER;
+```sql
+CREATE OR REPLACE FUNCTION user_search(uname TEXT)
+  RETURNS TABLE (usename name, passwd text)
+  LANGUAGE sql SECURITY DEFINER AS
+  'SELECT usename, passwd FROM pg_shadow WHERE usename=$1;';
 
-   REVOKE ALL ON FUNCTION user_search(text) FROM public;
+REVOKE ALL ON FUNCTION user_search(text)
+  FROM public;
 
-   GRANT EXECUTE ON FUNCTION user_search(text) TO cnpg_pooler_pgbouncer;
-   ```
+GRANT EXECUTE ON FUNCTION user_search(text)
+  TO cnpg_pooler_pgbouncer;
+```
 
 
 ## PodTemplates
