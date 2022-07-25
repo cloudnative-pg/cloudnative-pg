@@ -17,6 +17,7 @@
 import re
 import urllib.request
 import json
+from packaging import version
 
 min_supported_major = 10
 
@@ -43,22 +44,20 @@ def get_json(repo_name):
     return repo_json
 
 
-def version_sort_key(version):
-    """
-    This function works by returning an int array containing the version parts.
-    It returns an empty array if it is a non numeric version
-    """
-    try:
-        return [int(u) for u in re.split(r"[.-]", version)]
-    except ValueError:
-        return []
+def is_pre_release(v):
+    return version.Version(v).is_prerelease
 
 
 def write_json(repo_url, version_re, output_file):
     repo_json = get_json(repo_url)
 
     tags = repo_json["tags"]
-    tags.sort(key=version_sort_key, reverse=True)
+
+    # Filter out all the tags which do not match the version regexp
+    tags = [item for item in tags if version_re.search(item)]
+
+    # Sort the tags according to semantic versioning
+    tags.sort(key=version.Version, reverse=True)
 
     results = {}
     extra_results = {}
@@ -89,6 +88,10 @@ def write_json(repo_url, version_re, output_file):
     for major in results:
         if len(results[major]) < 2:
             results[major].append(extra_results[major])
+        # You cannot update between pre-release versions. If one of the two values is a pre-release
+        # make sure to update between two different names of the most recent version (it might be a release)
+        elif is_pre_release(results[major][0]) or is_pre_release(results[major][1]):
+            results[major] = [results[major][0], extra_results[major]]
 
     with open(output_file, "w") as json_file:
         json.dump(results, json_file, indent=2)
