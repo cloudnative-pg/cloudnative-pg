@@ -459,7 +459,6 @@ Users are not allowed to set the following configuration parameters in the
 - `full_page_writes`
 - `hba_file`
 - `hot_standby`
-- `huge_pages`
 - `ident_file`
 - `jit_provider`
 - `listen_addresses`
