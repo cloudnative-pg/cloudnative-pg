@@ -231,7 +231,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	instancesStatus := r.getStatusFromInstances(ctx, resources.pods)
 
 	// we update all the cluster status fields that require the instances status
-	if err := r.updateClusterInstancesReportedState(ctx, cluster, instancesStatus); err != nil {
+	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {
 		if apierrs.IsConflict(err) {
 			return ctrl.Result{Requeue: true}, nil
 		}
