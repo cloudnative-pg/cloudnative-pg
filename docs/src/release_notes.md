@@ -8,3 +8,6 @@ History of user-visible changes for CloudNativePG, classified for each minor rel
 For information on the community support policy for CloudNativePG, please
 refer to ["Supported releases"](supported_releases.md).
 
+We also keep record of all the
+[release notes from 1.0.0 to 1.14.0 of Cloud Native PostgreSQL by EDB](release_notes/edb-cloud-native-postgresql.md),
+the predecessor of CloudNativePG.
