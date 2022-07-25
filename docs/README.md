@@ -18,6 +18,8 @@ You can locally test the documentation in two ways:
 - using Docker
 - using `mkdocs` directly
 
+In both cases, you should issue the commands inside the `docs` folder.
+
 With Docker, you just need to execute the following command and point your
 browser to `http://127.0.0.1:8000/`:
 
@@ -41,19 +43,19 @@ the pull request.
 
 ## How to run the spell checker
 
-Everytime you work on the documentation, please run from the top directory:
+Every time you work on the documentation, please run from the top directory:
 
 ``` bash
 make spellcheck
 ```
 
-This will run a spell checker and highlights all the words that need to be
+This will run a spell checker and highlight all the words that need to be
 either fixed or added to the `.wordlist-en-custom.txt` file.
 
 ## How to build the documentation in HTML
 
-Run the following command to build the documentation
-in the `dist` directory:
+From the `docs` folder, run the following command to build the documentation
+and place it in the `dist` directory:
 
 ``` bash
 docker run --rm -v "$(pwd):$(pwd)" -w "$(pwd)" \
