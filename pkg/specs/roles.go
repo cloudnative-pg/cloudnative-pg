@@ -186,13 +186,13 @@ func externalClusterSecrets(cluster apiv1.Cluster) []string {
 		if barmanObjStore := server.BarmanObjectStore; barmanObjStore != nil {
 			result = append(
 				result,
-				s3CredentialsSecrets(barmanObjStore.Credentials.AWS)...)
+				s3CredentialsSecrets(barmanObjStore.BarmanCredentials.AWS)...)
 			result = append(
 				result,
-				azureCredentialsSecrets(barmanObjStore.Credentials.Azure)...)
+				azureCredentialsSecrets(barmanObjStore.BarmanCredentials.Azure)...)
 			result = append(
 				result,
-				googleCredentialsSecrets(barmanObjStore.Credentials.Google)...)
+				googleCredentialsSecrets(barmanObjStore.BarmanCredentials.Google)...)
 			if barmanObjStore.EndpointCA != nil {
 				result = append(result, barmanObjStore.EndpointCA.Name)
 			}
@@ -209,13 +209,13 @@ func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
 		result = append(
 			result,
-			s3CredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.Credentials.AWS)...)
+			s3CredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS)...)
 		result = append(
 			result,
-			azureCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.Credentials.Azure)...)
+			azureCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure)...)
 		result = append(
 			result,
-			googleCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.Credentials.Google)...)
+			googleCredentialsSecrets(cluster.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google)...)
 	}
 
 	// Secrets needed by Barman, if set
@@ -228,13 +228,13 @@ func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 	if backupOrigin != nil {
 		result = append(
 			result,
-			s3CredentialsSecrets(backupOrigin.Status.Credentials.AWS)...)
+			s3CredentialsSecrets(backupOrigin.Status.BarmanCredentials.AWS)...)
 		result = append(
 			result,
-			azureCredentialsSecrets(backupOrigin.Status.Credentials.Azure)...)
+			azureCredentialsSecrets(backupOrigin.Status.BarmanCredentials.Azure)...)
 		result = append(
 			result,
-			googleCredentialsSecrets(backupOrigin.Status.Credentials.Google)...)
+			googleCredentialsSecrets(backupOrigin.Status.BarmanCredentials.Google)...)
 	}
 
 	return result

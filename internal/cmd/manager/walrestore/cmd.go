@@ -294,9 +294,9 @@ func GetRecoverConfiguration(
 			return "", nil, nil, ErrNoBackupConfigured
 		}
 		configuration := externalCluster.BarmanObjectStore
-		if configuration.EndpointCA != nil && configuration.Credentials.AWS != nil {
+		if configuration.EndpointCA != nil && configuration.BarmanCredentials.AWS != nil {
 			env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanRestoreEndpointCACertificateLocation))
-		} else if configuration.EndpointCA != nil && configuration.Credentials.Azure != nil {
+		} else if configuration.EndpointCA != nil && configuration.BarmanCredentials.Azure != nil {
 			env = append(env, fmt.Sprintf("REQUESTS_CA_BUNDLE=%s", postgres.BarmanRestoreEndpointCACertificateLocation))
 		}
 		return externalCluster.Name, env, externalCluster.BarmanObjectStore, nil
@@ -306,9 +306,9 @@ func GetRecoverConfiguration(
 	// back up this cluster
 	if cluster.Spec.Backup != nil && cluster.Spec.Backup.BarmanObjectStore != nil {
 		configuration := cluster.Spec.Backup.BarmanObjectStore
-		if configuration.EndpointCA != nil && configuration.Credentials.AWS != nil {
+		if configuration.EndpointCA != nil && configuration.BarmanCredentials.AWS != nil {
 			env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanBackupEndpointCACertificateLocation))
-		} else if configuration.EndpointCA != nil && configuration.Credentials.Azure != nil {
+		} else if configuration.EndpointCA != nil && configuration.BarmanCredentials.Azure != nil {
 			env = append(env, fmt.Sprintf("REQUESTS_CA_BUNDLE=%s", postgres.BarmanBackupEndpointCACertificateLocation))
 		}
 		return cluster.Name, env, cluster.Spec.Backup.BarmanObjectStore, nil

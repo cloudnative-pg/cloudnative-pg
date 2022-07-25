@@ -178,7 +178,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 					Name: sourceClusterName,
 					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
 						DestinationPath: destinationPath,
-						Credentials: apiv1.BarmanCredentials{
+						BarmanCredentials: apiv1.BarmanCredentials{
 							Azure: &apiv1.AzureCredentials{
 								StorageAccount: &apiv1.SecretKeySelector{
 									LocalObjectReference: apiv1.LocalObjectReference{
@@ -261,7 +261,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 							},
 							Key: "ca.crt",
 						},
-						Credentials: apiv1.BarmanCredentials{
+						BarmanCredentials: apiv1.BarmanCredentials{
 							AWS: &apiv1.S3Credentials{
 								AccessKeyIDReference: &apiv1.SecretKeySelector{
 									LocalObjectReference: apiv1.LocalObjectReference{
@@ -344,7 +344,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 							},
 							Key: "ca.crt",
 						},
-						Credentials: apiv1.BarmanCredentials{
+						BarmanCredentials: apiv1.BarmanCredentials{
 							Azure: &apiv1.AzureCredentials{
 								ConnectionString: &apiv1.SecretKeySelector{
 									LocalObjectReference: apiv1.LocalObjectReference{

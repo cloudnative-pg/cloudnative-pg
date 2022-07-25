@@ -460,7 +460,7 @@ func (b *BackupCommand) setupBackupStatus() {
 	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
 
-	backupStatus.Credentials = barmanConfiguration.Credentials
+	backupStatus.BarmanCredentials = barmanConfiguration.BarmanCredentials
 	backupStatus.EndpointCA = barmanConfiguration.EndpointCA
 	backupStatus.EndpointURL = barmanConfiguration.EndpointURL
 	backupStatus.DestinationPath = barmanConfiguration.DestinationPath

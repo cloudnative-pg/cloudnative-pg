@@ -52,7 +52,7 @@ type BackupSpec struct {
 // BackupStatus defines the observed state of Backup
 type BackupStatus struct {
 	// The potential credentials for each cloud provider
-	Credentials BarmanCredentials `json:",inline"`
+	BarmanCredentials `json:",inline"`
 
 	// EndpointCA store the CA bundle of the barman endpoint.
 	// Useful when using self-signed certificates to avoid

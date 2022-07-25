@@ -1370,19 +1370,19 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 	}
 
 	credentialsCount := 0
-	if r.Spec.Backup.BarmanObjectStore.Credentials.Azure != nil {
+	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure != nil {
 		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.Credentials.Azure.validateAzureCredentials(
+		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure.validateAzureCredentials(
 			field.NewPath("spec", "backupConfiguration", "azureCredentials"))
 	}
-	if r.Spec.Backup.BarmanObjectStore.Credentials.AWS != nil {
+	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS != nil {
 		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.Credentials.AWS.validateAwsCredentials(
+		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS.validateAwsCredentials(
 			field.NewPath("spec", "backupConfiguration", "s3Credentials"))
 	}
-	if r.Spec.Backup.BarmanObjectStore.Credentials.Google != nil {
+	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google != nil {
 		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.Credentials.Google.validateGCSCredentials(
+		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google.validateGCSCredentials(
 			field.NewPath("spec", "backupConfiguration", "googleCredentials"))
 	}
 	if credentialsCount == 0 {

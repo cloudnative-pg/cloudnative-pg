@@ -30,7 +30,7 @@ func AppendCloudProviderOptionsFromConfiguration(
 	options []string,
 	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
 ) ([]string, error) {
-	return appendCloudProviderOptions(options, barmanConfiguration.Credentials)
+	return appendCloudProviderOptions(options, barmanConfiguration.BarmanCredentials)
 }
 
 // AppendCloudProviderOptionsFromBackup takes an options array and adds the cloud provider specified
@@ -39,7 +39,7 @@ func AppendCloudProviderOptionsFromBackup(
 	options []string,
 	backup *v1.Backup,
 ) ([]string, error) {
-	return appendCloudProviderOptions(options, backup.Status.Credentials)
+	return appendCloudProviderOptions(options, backup.Status.BarmanCredentials)
 }
 
 // appendCloudProviderOptions takes an options array and adds the cloud provider specified as arguments

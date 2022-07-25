@@ -1064,7 +1064,7 @@ func (crendentials BarmanCredentials) ArePopulated() bool {
 // using Barman against an S3-compatible object storage
 type BarmanObjectStoreConfiguration struct {
 	// The potential credentials for each cloud provider
-	Credentials BarmanCredentials `json:",inline"`
+	BarmanCredentials `json:",inline"`
 
 	// Endpoint to be used to upload data to the cloud,
 	// overriding the automatic endpoint discovery
@@ -1908,7 +1908,7 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 // is configured, false otherwise
 func (backupConfiguration *BackupConfiguration) IsBarmanBackupConfigured() bool {
 	return backupConfiguration != nil && backupConfiguration.BarmanObjectStore != nil &&
-		backupConfiguration.BarmanObjectStore.Credentials.ArePopulated()
+		backupConfiguration.BarmanObjectStore.BarmanCredentials.ArePopulated()
 }
 
 // IsBarmanEndpointCASet returns true if we have a CA bundle for the endpoint

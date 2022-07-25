@@ -113,7 +113,7 @@ var _ = Describe("Roles", func() {
 
 	backupOrigin := apiv1.Backup{
 		Status: apiv1.BackupStatus{
-			Credentials: apiv1.BarmanCredentials{
+			BarmanCredentials: apiv1.BarmanCredentials{
 				Azure: &apiv1.AzureCredentials{
 					StorageAccount: &apiv1.SecretKeySelector{
 						LocalObjectReference: apiv1.LocalObjectReference{
@@ -199,7 +199,7 @@ var _ = Describe("Secrets", func() {
 		cluster.Spec = apiv1.ClusterSpec{
 			Backup: &apiv1.BackupConfiguration{
 				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
-					Credentials: apiv1.BarmanCredentials{
+					BarmanCredentials: apiv1.BarmanCredentials{
 						AWS: &apiv1.S3Credentials{
 							SecretAccessKeyReference: &apiv1.SecretKeySelector{
 								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-secret"},

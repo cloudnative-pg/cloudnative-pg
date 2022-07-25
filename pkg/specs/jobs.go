@@ -140,13 +140,13 @@ func addBarmanEndpointCAToJobFromCluster(cluster apiv1.Cluster, backup *apiv1.Ba
 
 	case backup != nil && backup.Status.EndpointCA != nil:
 		endpointCA = backup.Status.EndpointCA
-		credentials = backup.Status.Credentials
+		credentials = backup.Status.BarmanCredentials
 
 	case cluster.Spec.Bootstrap.Recovery.Source != "":
 		externalCluster, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
 		if ok && externalCluster.BarmanObjectStore != nil && externalCluster.BarmanObjectStore.EndpointCA != nil {
 			endpointCA = externalCluster.BarmanObjectStore.EndpointCA
-			credentials = externalCluster.BarmanObjectStore.Credentials
+			credentials = externalCluster.BarmanObjectStore.BarmanCredentials
 		}
 	}
 

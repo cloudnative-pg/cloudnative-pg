@@ -1979,7 +1979,7 @@ var _ = Describe("Recovery and Backup Target", func() {
 			},
 			Backup: &BackupConfiguration{
 				BarmanObjectStore: &BarmanObjectStoreConfiguration{
-					Credentials: BarmanCredentials{
+					BarmanCredentials: BarmanCredentials{
 						AWS: &S3Credentials{
 							AccessKeyIDReference: &SecretKeySelector{
 								LocalObjectReference: LocalObjectReference{
@@ -2002,7 +2002,7 @@ var _ = Describe("Recovery and Backup Target", func() {
 				{
 					Name: "one",
 					BarmanObjectStore: &BarmanObjectStoreConfiguration{
-						Credentials: BarmanCredentials{
+						BarmanCredentials: BarmanCredentials{
 							AWS: &S3Credentials{
 								AccessKeyIDReference: &SecretKeySelector{
 									LocalObjectReference: LocalObjectReference{
