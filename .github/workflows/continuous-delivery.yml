@@ -625,10 +625,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Create a folder for the artifacts
+      - name: Create a directory for the artifacts
         run: mkdir test-artifacts
 
-      - name: Download all artifacts to the folder
+      - name: Download all artifacts to the directory
         uses: actions/download-artifact@v3
         with:
           name: testartifacts-local

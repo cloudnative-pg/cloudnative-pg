@@ -42,7 +42,7 @@ This is the JSON format of the test artifacts:
 }
 
 In a final GH action, after all the matrix branches running the E2E Test Suite
-are finished, all the artifacts are downloaded to a local folder.
+are finished, all the artifacts are downloaded to a local directory.
 
 The code in this file iterates over all the collected JSON artifacts to produce
 a summary in Markdown, which can then be rendered in GitHub using
@@ -53,17 +53,22 @@ import argparse
 import json
 import os
 
+
 def is_failed(e2e_test):
     """checks if the test failed. In ginkgo, the passing states are well defined
-    but ginkgo 1 -> 2 added new failure kinds. So, check for non-pass    
+    but ginkgo 1 -> 2 added new failure kinds. So, check for non-pass
     """
-    return (e2e_test["state"] != "passed" and e2e_test["state"] != "skipped"
-        and e2e_test["state"] != "ignoreFailed")
+    return (
+        e2e_test["state"] != "passed"
+        and e2e_test["state"] != "skipped"
+        and e2e_test["state"] != "ignoreFailed"
+    )
+
 
 def compute_test_summary(test_dir):
     """iterate over the JSON artifact files in `test_dir`, and
     bucket them for comprehension.
-    
+
     Produces a dictionary of dictionaries:
 
     {
@@ -146,73 +151,94 @@ def compute_test_summary(test_dir):
         "failed_pg_by_test": failed_pg_by_test,
     }
 
+
 def format_overview(summary, structure):
-    """print unbucketed test metrics
-    """
+    """print unbucketed test metrics"""
     print("## " + structure["title"])
     print()
     print("|" + " | ".join(structure["header"]) + "|")
     print("|" + "|".join(["---"] * len(structure["header"])) + "|")
-    print("| {failed} | {total} | {name} |".format(
-        name = structure["row1"][0],
-        failed = summary[structure["row1"][1]],
-        total = summary[structure["row1"][2]]))
-    print("| {failed} | {total} | {name} |".format(
-        name = structure["row2"][0],
-        failed = summary[structure["row2"][1]],
-        total = summary[structure["row2"][2]]))
+    print(
+        "| {failed} | {total} | {name} |".format(
+            name=structure["row1"][0],
+            failed=summary[structure["row1"][1]],
+            total=summary[structure["row1"][2]],
+        )
+    )
+    print(
+        "| {failed} | {total} | {name} |".format(
+            name=structure["row2"][0],
+            failed=summary[structure["row2"][1]],
+            total=summary[structure["row2"][2]],
+        )
+    )
     print()
+
 
 def format_by_matrix(summary, structure):
-    """print metrics bucketed by matrix branch
-    """
+    """print metrics bucketed by matrix branch"""
     print("## " + structure["title"])
     print()
     print("|" + " | ".join(structure["header"]) + "|")
     print("|" + "|".join(["---"] * len(structure["header"])) + "|")
-    sorted_by_fail = dict(sorted(summary["failed_by_matrix"].items(),
-        key=lambda item: item[1], reverse=True))
+    sorted_by_fail = dict(
+        sorted(
+            summary["failed_by_matrix"].items(), key=lambda item: item[1], reverse=True
+        )
+    )
 
     for bucket in sorted_by_fail:
-        print("| {failed} | {total} | {name} |".format(
-            name = bucket,
-            failed = summary["failed_by_matrix"][bucket],
-            total = summary["total_by_matrix"][bucket]))
+        print(
+            "| {failed} | {total} | {name} |".format(
+                name=bucket,
+                failed=summary["failed_by_matrix"][bucket],
+                total=summary["total_by_matrix"][bucket],
+            )
+        )
     print()
+
 
 def format_by_test(summary, structure):
-    """print metrics bucketed by test class
-    """
+    """print metrics bucketed by test class"""
     print("## " + structure["title"])
     print()
     print("|" + " | ".join(structure["header"]) + "|")
     print("|" + "|".join(["---"] * len(structure["header"])) + "|")
-    sorted_by_fail = dict(sorted(summary["failed_by_test"].items(),
-        key=lambda item: item[1], reverse=True))
+    sorted_by_fail = dict(
+        sorted(
+            summary["failed_by_test"].items(), key=lambda item: item[1], reverse=True
+        )
+    )
 
     for bucket in sorted_by_fail:
-        print("| {failed} | {total} | {failed_k8s} | {failed_pg} | {name} |".format(
-            name = bucket,
-            failed = summary["failed_by_test"][bucket],
-            total = summary["total_by_test"][bucket],
-            failed_k8s = ", ".join(summary["failed_k8s_by_test"][bucket]),
-            failed_pg = ", ".join(summary["failed_pg_by_test"][bucket])))
+        print(
+            "| {failed} | {total} | {failed_k8s} | {failed_pg} | {name} |".format(
+                name=bucket,
+                failed=summary["failed_by_test"][bucket],
+                total=summary["total_by_test"][bucket],
+                failed_k8s=", ".join(summary["failed_k8s_by_test"][bucket]),
+                failed_pg=", ".join(summary["failed_pg_by_test"][bucket]),
+            )
+        )
     print()
+
 
 def format_test_summary(summary):
     """creates a Markdown document with several tables rendering test results.
     Outputs to stdout like a good 12-factor-app citizen
     """
 
-    print("Note that there are three tables below: overview, bucketed " +
-        "by test, bucketed by matrix branch.")
+    print(
+        "Note that there are three tables below: overview, bucketed "
+        + "by test, bucketed by matrix branch."
+    )
     print()
 
     overview_section = {
         "title": "Overview",
         "header": ["failed", "total", ""],
-        "row1": [ "test combinations", "total_failed", "total_run"],
-        "row2": [ "unique tests", "unique_failed", "unique_run"],
+        "row1": ["test combinations", "total_failed", "total_run"],
+        "row2": ["unique tests", "unique_failed", "unique_run"],
     }
 
     format_overview(summary, overview_section)
@@ -235,16 +261,15 @@ def format_test_summary(summary):
 
     format_by_matrix(summary, by_matrix_section)
 
+
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(
-        description="Summarize the E2E Suite results"
-    )
+    parser = argparse.ArgumentParser(description="Summarize the E2E Suite results")
     parser.add_argument(
         "-d",
         "--dir",
         type=str,
-        help="folder with the JSON artifacts",
+        help="directory with the JSON artifacts",
     )
 
     args = parser.parse_args()
