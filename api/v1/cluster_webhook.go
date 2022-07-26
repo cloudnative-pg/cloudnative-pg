@@ -1370,26 +1370,35 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 	}
 
 	credentialsCount := 0
-	if r.Spec.Backup.BarmanObjectStore.AzureCredentials != nil {
+	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure != nil {
 		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.AzureCredentials.validateAzureCredentials(
+		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure.validateAzureCredentials(
 			field.NewPath("spec", "backupConfiguration", "azureCredentials"))
 	}
-	if r.Spec.Backup.BarmanObjectStore.S3Credentials != nil {
+	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS != nil {
 		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.S3Credentials.validateAwsCredentials(
+		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS.validateAwsCredentials(
 			field.NewPath("spec", "backupConfiguration", "s3Credentials"))
 	}
-	if r.Spec.Backup.BarmanObjectStore.GoogleCredentials != nil {
+	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google != nil {
 		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.GoogleCredentials.validateGCSCredentials(
+		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google.validateGCSCredentials(
 			field.NewPath("spec", "backupConfiguration", "googleCredentials"))
 	}
-	if credentialsCount != 1 {
+	if credentialsCount == 0 {
 		allErrors = append(allErrors, field.Invalid(
 			field.NewPath("spec", "backupConfiguration"),
 			r.Spec.Backup.BarmanObjectStore,
-			"one and only one of azureCredentials and s3Credentials are required",
+			"missing credentials. "+
+				"One and only one of azureCredentials, s3Credentials and googleCredentials are required",
+		))
+	}
+	if credentialsCount > 1 {
+		allErrors = append(allErrors, field.Invalid(
+			field.NewPath("spec", "backupConfiguration"),
+			r.Spec.Backup.BarmanObjectStore,
+			"too many credentials. "+
+				"One and only one of azureCredentials, s3Credentials and googleCredentials are required",
 		))
 	}
 

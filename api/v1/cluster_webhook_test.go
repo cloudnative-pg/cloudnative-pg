@@ -1979,28 +1979,8 @@ var _ = Describe("Recovery and Backup Target", func() {
 			},
 			Backup: &BackupConfiguration{
 				BarmanObjectStore: &BarmanObjectStoreConfiguration{
-					S3Credentials: &S3Credentials{
-						AccessKeyIDReference: &SecretKeySelector{
-							LocalObjectReference: LocalObjectReference{
-								Name: "s3-creds",
-							},
-							Key: "access_key",
-						},
-						SecretAccessKeyReference: &SecretKeySelector{
-							LocalObjectReference: LocalObjectReference{
-								Name: "s3-creds",
-							},
-							Key: "secret_key",
-						},
-					},
-					DestinationPath: "/destination/path",
-				},
-			},
-			ExternalClusters: []ExternalCluster{
-				{
-					Name: "one",
-					BarmanObjectStore: &BarmanObjectStoreConfiguration{
-						S3Credentials: &S3Credentials{
+					BarmanCredentials: BarmanCredentials{
+						AWS: &S3Credentials{
 							AccessKeyIDReference: &SecretKeySelector{
 								LocalObjectReference: LocalObjectReference{
 									Name: "s3-creds",
@@ -2012,6 +1992,30 @@ var _ = Describe("Recovery and Backup Target", func() {
 									Name: "s3-creds",
 								},
 								Key: "secret_key",
+							},
+						},
+					},
+					DestinationPath: "/destination/path",
+				},
+			},
+			ExternalClusters: []ExternalCluster{
+				{
+					Name: "one",
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{
+								AccessKeyIDReference: &SecretKeySelector{
+									LocalObjectReference: LocalObjectReference{
+										Name: "s3-creds",
+									},
+									Key: "access_key",
+								},
+								SecretAccessKeyReference: &SecretKeySelector{
+									LocalObjectReference: LocalObjectReference{
+										Name: "s3-creds",
+									},
+									Key: "secret_key",
+								},
 							},
 						},
 						DestinationPath: "/destination/path",

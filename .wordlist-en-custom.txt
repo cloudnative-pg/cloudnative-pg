@@ -21,6 +21,7 @@ BackupPhase
 BackupSource
 BackupSpec
 BackupStatus
+BarmanCredentials
 BarmanObjectStoreConfiguration
 Bartolini
 Battiato
