@@ -1043,17 +1043,29 @@ const (
 	EncryptionTypeNoneAWSKMS = EncryptionType("aws:kms")
 )
 
+// BarmanCredentials an object containing the potential credentials for each cloud provider
+type BarmanCredentials struct {
+	// The credentials to use to upload data to S3
+	Google *GoogleCredentials `json:"googleCredentials,omitempty"`
+
+	// The credentials to use to upload data to Azure Blob Storage
+	AWS *S3Credentials `json:"s3Credentials,omitempty"`
+
+	// The credentials to use to upload data to Google Cloud Storage
+	Azure *AzureCredentials `json:"azureCredentials,omitempty"`
+}
+
+// ArePopulated checks if the passed set of credentials contains
+// something
+func (crendentials BarmanCredentials) ArePopulated() bool {
+	return crendentials.Azure != nil || crendentials.AWS != nil || crendentials.Google != nil
+}
+
 // BarmanObjectStoreConfiguration contains the backup configuration
 // using Barman against an S3-compatible object storage
 type BarmanObjectStoreConfiguration struct {
-	// The credentials to use to upload data to S3
-	S3Credentials *S3Credentials `json:"s3Credentials,omitempty"`
-
-	// The credentials to use to upload data to Azure Blob Storage
-	AzureCredentials *AzureCredentials `json:"azureCredentials,omitempty"`
-
-	// The credentials to use to upload data to Google Cloud Storage
-	GoogleCredentials *GoogleCredentials `json:"googleCredentials,omitempty"`
+	// The potential credentials for each cloud provider
+	BarmanCredentials `json:",inline"`
 
 	// Endpoint to be used to upload data to the cloud,
 	// overriding the automatic endpoint discovery
@@ -1963,9 +1975,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 // is configured, false otherwise
 func (backupConfiguration *BackupConfiguration) IsBarmanBackupConfigured() bool {
 	return backupConfiguration != nil && backupConfiguration.BarmanObjectStore != nil &&
-		(backupConfiguration.BarmanObjectStore.AzureCredentials != nil ||
-			backupConfiguration.BarmanObjectStore.S3Credentials != nil ||
-			backupConfiguration.BarmanObjectStore.GoogleCredentials != nil)
+		backupConfiguration.BarmanObjectStore.BarmanCredentials.ArePopulated()
 }
 
 // IsBarmanEndpointCASet returns true if we have a CA bundle for the endpoint

@@ -51,14 +51,8 @@ type BackupSpec struct {
 
 // BackupStatus defines the observed state of Backup
 type BackupStatus struct {
-	// The credentials to be used to upload data to S3
-	S3Credentials *S3Credentials `json:"s3Credentials,omitempty"`
-
-	// The credentials to be used to upload data to Azure Blob Storage
-	AzureCredentials *AzureCredentials `json:"azureCredentials,omitempty"`
-
-	// The credentials to use to upload data to Google Cloud Storage
-	GoogleCredentials *GoogleCredentials `json:"googleCredentials,omitempty"`
+	// The potential credentials for each cloud provider
+	BarmanCredentials `json:",inline"`
 
 	// EndpointCA store the CA bundle of the barman endpoint.
 	// Useful when using self-signed certificates to avoid

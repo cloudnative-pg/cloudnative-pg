@@ -57,7 +57,7 @@ var _ = Describe("Barman endpoint CA", func() {
 				},
 			},
 		}
-		addBarmanEndpointCAToJob(cluster, nil, &job)
+		addBarmanEndpointCAToJobFromCluster(cluster, nil, &job)
 		Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.Secret.Items[0].Key).To(BeEmpty())
 	})
 
@@ -91,7 +91,7 @@ var _ = Describe("Barman endpoint CA", func() {
 				},
 			},
 		}
-		addBarmanEndpointCAToJob(cluster, nil, &job)
+		addBarmanEndpointCAToJobFromCluster(cluster, nil, &job)
 		Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.Secret.Items[0].Key).To(
 			BeEquivalentTo("test_key_endpoint"))
 	})
@@ -129,7 +129,7 @@ var _ = Describe("Barman endpoint CA", func() {
 				},
 			},
 		}
-		addBarmanEndpointCAToJob(cluster, &backup, &job)
+		addBarmanEndpointCAToJobFromCluster(cluster, &backup, &job)
 		Expect(job.Spec.Template.Spec.Volumes[0].VolumeSource.Secret.Items[0].Key).To(
 			BeEquivalentTo("test_key_endpoint"))
 	})

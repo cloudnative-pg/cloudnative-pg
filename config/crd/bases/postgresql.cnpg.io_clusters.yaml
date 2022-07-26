@@ -752,8 +752,8 @@ spec:
                     description: The configuration for the barman-cloud tool suite
                     properties:
                       azureCredentials:
-                        description: The credentials to use to upload data to Azure
-                          Blob Storage
+                        description: The credentials to use to upload data to Google
+                          Cloud Storage
                         properties:
                           connectionString:
                             description: The connection string to be used
@@ -880,8 +880,7 @@ spec:
                           overriding the automatic endpoint discovery
                         type: string
                       googleCredentials:
-                        description: The credentials to use to upload data to Google
-                          Cloud Storage
+                        description: The credentials to use to upload data to S3
                         properties:
                           applicationCredentials:
                             description: The secret containing the Google Cloud Storage
@@ -909,7 +908,8 @@ spec:
                           will be passed to the Barman --history-tags option.
                         type: object
                       s3Credentials:
-                        description: The credentials to use to upload data to S3
+                        description: The credentials to use to upload data to Azure
+                          Blob Storage
                         properties:
                           accessKeyId:
                             description: The reference to the access key id
@@ -1347,8 +1347,8 @@ spec:
                       description: The configuration for the barman-cloud tool suite
                       properties:
                         azureCredentials:
-                          description: The credentials to use to upload data to Azure
-                            Blob Storage
+                          description: The credentials to use to upload data to Google
+                            Cloud Storage
                           properties:
                             connectionString:
                               description: The connection string to be used
@@ -1475,8 +1475,7 @@ spec:
                             overriding the automatic endpoint discovery
                           type: string
                         googleCredentials:
-                          description: The credentials to use to upload data to Google
-                            Cloud Storage
+                          description: The credentials to use to upload data to S3
                           properties:
                             applicationCredentials:
                               description: The secret containing the Google Cloud
@@ -1504,7 +1503,8 @@ spec:
                             will be passed to the Barman --history-tags option.
                           type: object
                         s3Credentials:
-                          description: The credentials to use to upload data to S3
+                          description: The credentials to use to upload data to Azure
+                            Blob Storage
                           properties:
                             accessKeyId:
                               description: The reference to the access key id

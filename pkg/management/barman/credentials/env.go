@@ -38,9 +38,9 @@ func EnvSetBackupCloudCredentials(
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 	env []string,
 ) ([]string, error) {
-	if configuration.EndpointCA != nil && configuration.S3Credentials != nil {
+	if configuration.EndpointCA != nil && configuration.BarmanCredentials.AWS != nil {
 		env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanBackupEndpointCACertificateLocation))
-	} else if configuration.EndpointCA != nil && configuration.AzureCredentials != nil {
+	} else if configuration.EndpointCA != nil && configuration.BarmanCredentials.Azure != nil {
 		env = append(env, fmt.Sprintf("REQUESTS_CA_BUNDLE=%s", postgres.BarmanBackupEndpointCACertificateLocation))
 	}
 
@@ -56,9 +56,9 @@ func EnvSetRestoreCloudCredentials(
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 	env []string,
 ) ([]string, error) {
-	if configuration.EndpointCA != nil && configuration.S3Credentials != nil {
+	if configuration.EndpointCA != nil && configuration.BarmanCredentials.AWS != nil {
 		env = append(env, fmt.Sprintf("AWS_CA_BUNDLE=%s", postgres.BarmanRestoreEndpointCACertificateLocation))
-	} else if configuration.EndpointCA != nil && configuration.AzureCredentials != nil {
+	} else if configuration.EndpointCA != nil && configuration.BarmanCredentials.Azure != nil {
 		env = append(env, fmt.Sprintf("REQUESTS_CA_BUNDLE=%s", postgres.BarmanRestoreEndpointCACertificateLocation))
 	}
 	return envSetCloudCredentials(ctx, c, namespace, configuration, env)
@@ -73,12 +73,12 @@ func envSetCloudCredentials(
 	configuration *apiv1.BarmanObjectStoreConfiguration,
 	env []string,
 ) (envs []string, err error) {
-	if configuration.S3Credentials != nil {
-		return envSetAWSCredentials(ctx, c, namespace, configuration.S3Credentials, env)
+	if configuration.BarmanCredentials.AWS != nil {
+		return envSetAWSCredentials(ctx, c, namespace, configuration.BarmanCredentials.AWS, env)
 	}
 
-	if configuration.GoogleCredentials != nil {
-		return envSetGoogleCredentials(ctx, c, namespace, configuration.GoogleCredentials, env)
+	if configuration.BarmanCredentials.Google != nil {
+		return envSetGoogleCredentials(ctx, c, namespace, configuration.BarmanCredentials.Google, env)
 	}
 
 	return envSetAzureCredentials(ctx, c, namespace, configuration, env)
@@ -173,20 +173,20 @@ func envSetAzureCredentials(
 	env []string,
 ) ([]string, error) {
 	// check if Azure credentials are defined
-	if configuration.AzureCredentials == nil {
+	if configuration.BarmanCredentials.Azure == nil {
 		return nil, fmt.Errorf("missing Azure credentials")
 	}
 
-	if configuration.AzureCredentials.InheritFromAzureAD {
+	if configuration.BarmanCredentials.Azure.InheritFromAzureAD {
 		return env, nil
 	}
 
 	// Get storage account name
-	if configuration.AzureCredentials.StorageAccount != nil {
+	if configuration.BarmanCredentials.Azure.StorageAccount != nil {
 		storageAccount, err := extractValueFromSecret(
 			ctx,
 			c,
-			configuration.AzureCredentials.StorageAccount,
+			configuration.BarmanCredentials.Azure.StorageAccount,
 			namespace,
 		)
 		if err != nil {
@@ -196,11 +196,11 @@ func envSetAzureCredentials(
 	}
 
 	// Get the storage key
-	if configuration.AzureCredentials.StorageKey != nil {
+	if configuration.BarmanCredentials.Azure.StorageKey != nil {
 		storageKey, err := extractValueFromSecret(
 			ctx,
 			c,
-			configuration.AzureCredentials.StorageKey,
+			configuration.BarmanCredentials.Azure.StorageKey,
 			namespace,
 		)
 		if err != nil {
@@ -210,11 +210,11 @@ func envSetAzureCredentials(
 	}
 
 	// Get the SAS token
-	if configuration.AzureCredentials.StorageSasToken != nil {
+	if configuration.BarmanCredentials.Azure.StorageSasToken != nil {
 		storageSasToken, err := extractValueFromSecret(
 			ctx,
 			c,
-			configuration.AzureCredentials.StorageSasToken,
+			configuration.BarmanCredentials.Azure.StorageSasToken,
 			namespace,
 		)
 		if err != nil {
@@ -223,11 +223,11 @@ func envSetAzureCredentials(
 		env = append(env, fmt.Sprintf("AZURE_STORAGE_SAS_TOKEN=%s", storageSasToken))
 	}
 
-	if configuration.AzureCredentials.ConnectionString != nil {
+	if configuration.BarmanCredentials.Azure.ConnectionString != nil {
 		connString, err := extractValueFromSecret(
 			ctx,
 			c,
-			configuration.AzureCredentials.ConnectionString,
+			configuration.BarmanCredentials.Azure.ConnectionString,
 			namespace,
 		)
 		if err != nil {
