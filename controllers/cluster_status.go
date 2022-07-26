@@ -762,13 +762,9 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 
 	// we update any relevant cluster status that depends on the primary instance
 	for _, item := range statuses.Items {
-		if !item.IsPrimary {
-			continue
-		}
-
 		// we refresh the last known timeline on the status root.
 		// This avoids to have a zero timeline id in case that no primary instance is up during reconciliation.
-		if item.TimeLineID != 0 {
+		if item.IsPrimary && item.TimeLineID != 0 {
 			cluster.Status.TimelineID = item.TimeLineID
 		}
 	}
