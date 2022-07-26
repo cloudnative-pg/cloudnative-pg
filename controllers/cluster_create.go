@@ -103,19 +103,19 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 }
 
 func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
+
+	if cluster.Spec.Instances == 1 {
+		// If this a single-instance cluster, we need to delete
+		// the PodDisruptionBudget for the primary node too
+		// otherwise the user won't be able to drain the workloads
+		// from the underlying node.
+		return r.deletePrimaryPodDisruptionBudget(ctx, cluster)
+	}
 	// The PDB should not be enforced if we are inside a maintenance
 	// window, and we chose to avoid allocating more storage space.
 	if cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled() {
 		if err := r.deleteReplicasPodDisruptionBudget(ctx, cluster); err != nil {
 			return err
-		}
-
-		if cluster.Spec.Instances == 1 {
-			// If this a single-instance cluster, we need to delete
-			// the PodDisruptionBudget for the primary node too
-			// otherwise the user won't be able to drain the workloads
-			// from the underlying node.
-			return r.deletePrimaryPodDisruptionBudget(ctx, cluster)
 		}
 
 		// Make sure that if the cluster was scaled down and scaled up
