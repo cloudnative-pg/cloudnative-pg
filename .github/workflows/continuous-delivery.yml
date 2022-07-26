@@ -614,6 +614,32 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  summarize-e2e-tests:
+    name: E2E test suite # GH Actions will append "summary"
+    needs:
+      - duplicate_runs
+      - evaluate-test-level
+      - e2e-local
+    if: always() &&
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.evaluate-test-level.result == 'success'
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create a directory for the artifacts
+        run: mkdir test-artifacts
+
+      - name: Download all artifacts to the directory
+        uses: actions/download-artifact@v3
+        with:
+          name: testartifacts-local
+          path: test-artifacts
+
+      - name: Compute the E2E test summary
+        run: |
+          python .github/summarize-test-results.py --dir test-artifacts >> $GITHUB_STEP_SUMMARY
+
   ok-to-merge:
     name: Label the PR as "ok to merge"
     needs:
