@@ -1919,8 +1919,8 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	return false
 }
 
-// LogTimestamps prints useful information about timestamps in stdout
-func (cluster *Cluster) LogTimestamps(ctx context.Context) {
+// LogTimestampsWithMessage prints useful information about timestamps in stdout
+func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage string) {
 	contextLogger := log.FromContext(ctx)
 
 	currentTimestamp := utils.GetCurrentTimestamp()
@@ -1976,7 +1976,7 @@ func (cluster *Cluster) LogTimestamps(ctx context.Context) {
 		keysAndValues = append(keysAndValues, "timestampParsingErrors", errs)
 	}
 
-	contextLogger.Info("cluster timestamps information", keysAndValues...)
+	contextLogger.Info(logMessage, keysAndValues...)
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination

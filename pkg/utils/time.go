@@ -66,12 +66,12 @@ func ParseTargetTime(currentLocation *time.Location, targetTime string) (time.Ti
 
 // DifferenceBetweenTimestamps returns the time.Duration difference between two timestamps strings in time.RFC3339.
 func DifferenceBetweenTimestamps(first, second string) (time.Duration, error) {
-	parsedTimestamp, err := time.Parse(time.RFC3339, first)
+	parsedTimestamp, err := time.Parse(time.RFC3339Nano, first)
 	if err != nil {
 		return 0, err
 	}
 
-	parsedTimestampTwo, err := time.Parse(time.RFC3339, second)
+	parsedTimestampTwo, err := time.Parse(time.RFC3339Nano, second)
 	if err != nil {
 		return 0, err
 	}
