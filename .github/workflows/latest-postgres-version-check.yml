@@ -20,7 +20,6 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: 3.9
-          cache: 'pip'
 
       - name: Install Python dependencies
         run: |
