@@ -23,6 +23,8 @@ jobs:
 
       - name: Generate PostgreSQL JSON files
         run: |
+          pip3 install --upgrade pip-tools
+          pip3 install packaging
           python .github/postgres-versions-update.py
 
       - name: Get the latest version of PostgreSQL Docker image
