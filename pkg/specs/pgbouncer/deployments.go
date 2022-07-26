@@ -74,6 +74,7 @@ func Deployment(pooler *apiv1.Pooler,
 				},
 			},
 		}).
+		WithSecurityContext(specs.CreatePodSecurityContext(998, 996), true).
 		WithContainerImage("pgbouncer", DefaultPgbouncerImage, false).
 		WithContainerCommand("pgbouncer", []string{
 			"/controller/manager",
@@ -92,6 +93,9 @@ func Deployment(pooler *apiv1.Pooler,
 		WithInitContainerCommand(specs.BootstrapControllerContainerName,
 			[]string{"/manager", "bootstrap", "/controller/manager"},
 			true).
+		WithInitContainerSecurityContext(specs.BootstrapControllerContainerName,
+			specs.CreateContainerSecurityContext(),
+			true).
 		WithVolume(&corev1.Volume{
 			Name: "scratch-data",
 			VolumeSource: corev1.VolumeSource{
@@ -108,6 +112,7 @@ func Deployment(pooler *apiv1.Pooler,
 		}, true).
 		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "NAMESPACE", Value: pooler.Namespace}, true).
 		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "POOLER_NAME", Value: pooler.Name}, true).
+		WithContainerSecurityContext("pgbouncer", specs.CreateContainerSecurityContext(), true).
 		WithServiceAccountName(pooler.Name, true).
 		WithReadinessProbe("pgbouncer", &corev1.Probe{
 			TimeoutSeconds: 5,
