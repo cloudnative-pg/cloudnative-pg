@@ -376,11 +376,11 @@ func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatu
 	// replicas
 	row := superUserDB.QueryRow(
 		"SELECT " +
+			"(SELECT timeline_id FROM pg_control_checkpoint()), " +
 			"COALESCE(pg_last_wal_receive_lsn()::varchar, ''), " +
 			"COALESCE(pg_last_wal_replay_lsn()::varchar, ''), " +
 			"pg_is_wal_replay_paused()")
-	err = row.Scan(&result.ReceivedLsn, &result.ReplayLsn, &result.ReplayPaused)
-	if err != nil {
+	if err := row.Scan(&result.TimeLineID, &result.ReceivedLsn, &result.ReplayLsn, &result.ReplayPaused); err != nil {
 		return err
 	}
 

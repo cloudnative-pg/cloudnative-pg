@@ -2427,12 +2427,30 @@ spec:
               instances:
                 description: Total number of instances in the cluster
                 type: integer
+              instancesReportedState:
+                additionalProperties:
+                  description: InstanceReportedState describes the last reported state
+                    of an instance during a reconciliation loop
+                  properties:
+                    isPrimary:
+                      description: indicates if an instance is the primary one
+                      type: boolean
+                    timeLineID:
+                      description: indicates on which TimelineId the instance is
+                      type: integer
+                  required:
+                  - isPrimary
+                  type: object
+                description: the reported state of the instances during the last reconciliation
+                  loop
+                type: object
               instancesStatus:
                 additionalProperties:
                   items:
                     type: string
                   type: array
-                description: Instances status
+                description: InstancesStatus indicates in which status the instances
+                  are
                 type: object
               jobCount:
                 description: How many Jobs have been created by this cluster
@@ -2530,6 +2548,9 @@ spec:
                 description: The timestamp when the last request for a new primary
                   has occurred
                 type: string
+              timelineID:
+                description: The timeline of the Postgres cluster
+                type: integer
               topology:
                 description: Instances topology.
                 properties:

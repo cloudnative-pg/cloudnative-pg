@@ -743,6 +743,38 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	return nil
 }
 
+// updateClusterStatusThatRequiresInstancesState updates all the cluster status fields that require the instances status
+func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	statuses postgres.PostgresqlStatusList,
+) error {
+	existingClusterStatus := cluster.Status
+	cluster.Status.InstancesReportedState = make(map[apiv1.PodName]apiv1.InstanceReportedState, len(statuses.Items))
+
+	// we extract the instances reported state
+	for _, item := range statuses.Items {
+		cluster.Status.InstancesReportedState[apiv1.PodName(item.Pod.Name)] = apiv1.InstanceReportedState{
+			IsPrimary:  item.IsPrimary,
+			TimeLineID: item.TimeLineID,
+		}
+	}
+
+	// we update any relevant cluster status that depends on the primary instance
+	for _, item := range statuses.Items {
+		// we refresh the last known timeline on the status root.
+		// This avoids to have a zero timeline id in case that no primary instance is up during reconciliation.
+		if item.IsPrimary && item.TimeLineID != 0 {
+			cluster.Status.TimelineID = item.TimeLineID
+		}
+	}
+
+	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
+		return r.Status().Update(ctx, cluster)
+	}
+	return nil
+}
+
 // extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
 // the requested Pod, via the instance manager. In case of failure, errors are passed
 // in the result list

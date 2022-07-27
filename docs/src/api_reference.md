@@ -47,6 +47,7 @@ Below you will find a description of the defined resources:
 - [Import](#Import)
 - [ImportSource](#ImportSource)
 - [InstanceID](#InstanceID)
+- [InstanceReportedState](#InstanceReportedState)
 - [LDAPBindAsAuth](#LDAPBindAsAuth)
 - [LDAPBindSearchAuth](#LDAPBindSearchAuth)
 - [LDAPConfig](#LDAPConfig)
@@ -378,37 +379,39 @@ Name                  | Description                                             
 
 ClusterStatus defines the observed state of Cluster
 
-Name                      | Description                                                                                                                                                                        | Type                                                 
-------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------------------------------
-`instances                ` | Total number of instances in the cluster                                                                                                                                           | int                                                  
-`readyInstances           ` | Total number of ready instances in the cluster                                                                                                                                     | int                                                  
-`instancesStatus          ` | Instances status                                                                                                                                                                   | map[utils.PodStatus][]string                         
-`topology                 ` | Instances topology.                                                                                                                                                                | [Topology](#Topology)                                
-`latestGeneratedNode      ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                                 | int                                                  
-`currentPrimary           ` | Current primary instance                                                                                                                                                           | string                                               
-`targetPrimary            ` | Target primary instance, this is different from the previous one during a switchover or a failover                                                                                 | string                                               
-`pvcCount                 ` | How many PVCs have been created by this cluster                                                                                                                                    | int32                                                
-`jobCount                 ` | How many Jobs have been created by this cluster                                                                                                                                    | int32                                                
-`danglingPVC              ` | List of all the PVCs created by this cluster and still available which are not attached to a Pod                                                                                   | []string                                             
-`resizingPVC              ` | List of all the PVCs that have ResizingPVC condition.                                                                                                                              | []string                                             
-`initializingPVC          ` | List of all the PVCs that are being initialized by this cluster                                                                                                                    | []string                                             
-`healthyPVC               ` | List of all the PVCs not dangling nor initializing                                                                                                                                 | []string                                             
-`writeService             ` | Current write pod                                                                                                                                                                  | string                                               
-`readService              ` | Current list of read pods                                                                                                                                                          | string                                               
-`phase                    ` | Current phase of the cluster                                                                                                                                                       | string                                               
-`phaseReason              ` | Reason for the current phase                                                                                                                                                       | string                                               
-`secretsResourceVersion   ` | The list of resource versions of the secrets managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the secret data        | [SecretsResourceVersion](#SecretsResourceVersion)    
-`configMapResourceVersion ` | The list of resource versions of the configmaps, managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the configmap data | [ConfigMapResourceVersion](#ConfigMapResourceVersion)
-`certificates             ` | The configuration for the CA and related certificates, initialized with defaults.                                                                                                  | [CertificatesStatus](#CertificatesStatus)            
-`firstRecoverabilityPoint ` | The first recoverability point, stored as a date in RFC3339 format                                                                                                                 | string                                               
-`cloudNativePGCommitHash  ` | The commit hash number of which this operator running                                                                                                                              | string                                               
-`currentPrimaryTimestamp  ` | The timestamp when the last actual promotion to primary has occurred                                                                                                               | string                                               
-`targetPrimaryTimestamp   ` | The timestamp when the last request for a new primary has occurred                                                                                                                 | string                                               
-`poolerIntegrations       ` | The integration needed by poolers referencing the cluster                                                                                                                          | [*PoolerIntegrations](#PoolerIntegrations)           
-`cloudNativePGOperatorHash` | The hash of the binary of the operator                                                                                                                                             | string                                               
-`onlineUpdateEnabled      ` | OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster                                                                                                      | bool                                                 
-`azurePVCUpdateEnabled    ` | AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster                                                                                                  | bool                                                 
-`conditions               ` | Conditions for cluster object                                                                                                                                                      | []metav1.Condition                                   
+Name                      | Description                                                                                                                                                                        | Type                                                       
+------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------------------------------------------------------
+`instances                ` | Total number of instances in the cluster                                                                                                                                           | int                                                        
+`readyInstances           ` | Total number of ready instances in the cluster                                                                                                                                     | int                                                        
+`instancesStatus          ` | InstancesStatus indicates in which status the instances are                                                                                                                        | map[utils.PodStatus][]string                               
+`instancesReportedState   ` | the reported state of the instances during the last reconciliation loop                                                                                                            | [map[PodName]InstanceReportedState](#InstanceReportedState)
+`timelineID               ` | The timeline of the Postgres cluster                                                                                                                                               | int                                                        
+`topology                 ` | Instances topology.                                                                                                                                                                | [Topology](#Topology)                                      
+`latestGeneratedNode      ` | ID of the latest generated node (used to avoid node name clashing)                                                                                                                 | int                                                        
+`currentPrimary           ` | Current primary instance                                                                                                                                                           | string                                                     
+`targetPrimary            ` | Target primary instance, this is different from the previous one during a switchover or a failover                                                                                 | string                                                     
+`pvcCount                 ` | How many PVCs have been created by this cluster                                                                                                                                    | int32                                                      
+`jobCount                 ` | How many Jobs have been created by this cluster                                                                                                                                    | int32                                                      
+`danglingPVC              ` | List of all the PVCs created by this cluster and still available which are not attached to a Pod                                                                                   | []string                                                   
+`resizingPVC              ` | List of all the PVCs that have ResizingPVC condition.                                                                                                                              | []string                                                   
+`initializingPVC          ` | List of all the PVCs that are being initialized by this cluster                                                                                                                    | []string                                                   
+`healthyPVC               ` | List of all the PVCs not dangling nor initializing                                                                                                                                 | []string                                                   
+`writeService             ` | Current write pod                                                                                                                                                                  | string                                                     
+`readService              ` | Current list of read pods                                                                                                                                                          | string                                                     
+`phase                    ` | Current phase of the cluster                                                                                                                                                       | string                                                     
+`phaseReason              ` | Reason for the current phase                                                                                                                                                       | string                                                     
+`secretsResourceVersion   ` | The list of resource versions of the secrets managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the secret data        | [SecretsResourceVersion](#SecretsResourceVersion)          
+`configMapResourceVersion ` | The list of resource versions of the configmaps, managed by the operator. Every change here is done in the interest of the instance manager, which will refresh the configmap data | [ConfigMapResourceVersion](#ConfigMapResourceVersion)      
+`certificates             ` | The configuration for the CA and related certificates, initialized with defaults.                                                                                                  | [CertificatesStatus](#CertificatesStatus)                  
+`firstRecoverabilityPoint ` | The first recoverability point, stored as a date in RFC3339 format                                                                                                                 | string                                                     
+`cloudNativePGCommitHash  ` | The commit hash number of which this operator running                                                                                                                              | string                                                     
+`currentPrimaryTimestamp  ` | The timestamp when the last actual promotion to primary has occurred                                                                                                               | string                                                     
+`targetPrimaryTimestamp   ` | The timestamp when the last request for a new primary has occurred                                                                                                                 | string                                                     
+`poolerIntegrations       ` | The integration needed by poolers referencing the cluster                                                                                                                          | [*PoolerIntegrations](#PoolerIntegrations)                 
+`cloudNativePGOperatorHash` | The hash of the binary of the operator                                                                                                                                             | string                                                     
+`onlineUpdateEnabled      ` | OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster                                                                                                      | bool                                                       
+`azurePVCUpdateEnabled    ` | AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster                                                                                                  | bool                                                       
+`conditions               ` | Conditions for cluster object                                                                                                                                                      | []metav1.Condition                                         
 
 <a id='ConfigMapKeySelector'></a>
 
@@ -515,6 +518,17 @@ Name        | Description      | Type
 ----------- | ---------------- | ------
 `podName    ` | The pod name     | string
 `ContainerID` | The container ID | string
+
+<a id='InstanceReportedState'></a>
+
+## InstanceReportedState
+
+InstanceReportedState describes the last reported state of an instance during a reconciliation loop
+
+Name       | Description                                   | Type
+---------- | --------------------------------------------- | ----
+`isPrimary ` | indicates if an instance is the primary one   - *mandatory*  | bool
+`timeLineID` | indicates on which TimelineId the instance is | int 
 
 <a id='LDAPBindAsAuth'></a>
 
