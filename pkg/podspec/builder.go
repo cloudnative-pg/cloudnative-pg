@@ -80,6 +80,18 @@ func (builder *Builder) WithVolume(volume *corev1.Volume) *Builder {
 	return builder
 }
 
+// WithSecurityContext adds a securityContext to the current podTemplate is nil.
+// If `overwrite` is true the securityContext is overwritten even when it's not empty
+func (builder *Builder) WithSecurityContext(
+	securityCtx *corev1.PodSecurityContext,
+	overwrite bool,
+) *Builder {
+	if overwrite || builder.status.Spec.SecurityContext == nil {
+		builder.status.Spec.SecurityContext = securityCtx
+	}
+	return builder
+}
+
 // WithContainer ensures that in the current status there is a container
 // with the passed name
 func (builder *Builder) WithContainer(name string) *Builder {
@@ -249,6 +261,28 @@ func (builder *Builder) WithContainerPort(name string, value *corev1.ContainerPo
 	return builder
 }
 
+// WithContainerSecurityContext ensures that, if in the current status there is
+// a container with the passed name and the securityContext is empty, the securityContext will be
+// set to the one passed.
+// If `overwrite` is true the command is overwritten even when it's not empty
+func (builder *Builder) WithContainerSecurityContext(
+	name string,
+	ctx *corev1.SecurityContext,
+	overwrite bool,
+) *Builder {
+	builder.WithContainer(name)
+
+	for idx, value := range builder.status.Spec.Containers {
+		if value.Name == name {
+			if overwrite || value.SecurityContext == nil {
+				builder.status.Spec.Containers[idx].SecurityContext = ctx
+			}
+		}
+	}
+
+	return builder
+}
+
 // WithInitContainer ensures that in the current status there is an init container
 // with the passed name
 func (builder *Builder) WithInitContainer(name string) *Builder {
@@ -325,6 +359,27 @@ func (builder *Builder) WithInitContainerCommand(name string, command []string, 
 		}
 	}
 
+	return builder
+}
+
+// WithInitContainerSecurityContext ensures that, if in the current status there is
+// an init container with the passed name and the securityContext is empty, the securityContext will be
+// set to the one passed.
+// If `overwrite` is true the securityContext is overwritten even when it's not empty
+func (builder *Builder) WithInitContainerSecurityContext(
+	name string,
+	ctx *corev1.SecurityContext,
+	overwrite bool,
+) *Builder {
+	builder.WithInitContainer(name)
+
+	for idx, value := range builder.status.Spec.InitContainers {
+		if value.Name == name {
+			if overwrite || value.SecurityContext == nil {
+				builder.status.Spec.InitContainers[idx].SecurityContext = ctx
+			}
+		}
+	}
 	return builder
 }
 

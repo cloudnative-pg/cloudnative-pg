@@ -273,9 +273,8 @@ func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfig
 	return affinity
 }
 
-// CreatePostgresSecurityContext defines the security context under which
-// the PostgreSQL containers are running
-func CreatePostgresSecurityContext(postgresUser, postgresGroup int64) *corev1.PodSecurityContext {
+// CreatePodSecurityContext defines the security context under which the containers are running
+func CreatePodSecurityContext(user, group int64) *corev1.PodSecurityContext {
 	// Under Openshift we inherit SecurityContext from the restricted security context constraint
 	if utils.HaveSecurityContextConstraints() {
 		return nil
@@ -284,9 +283,9 @@ func CreatePostgresSecurityContext(postgresUser, postgresGroup int64) *corev1.Po
 	trueValue := true
 	return &corev1.PodSecurityContext{
 		RunAsNonRoot: &trueValue,
-		RunAsUser:    &postgresUser,
-		RunAsGroup:   &postgresGroup,
-		FSGroup:      &postgresGroup,
+		RunAsUser:    &user,
+		RunAsGroup:   &group,
+		FSGroup:      &group,
 	}
 }
 
@@ -315,7 +314,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 			},
 			Containers:                    createPostgresContainers(cluster, podName),
 			Volumes:                       createPostgresVolumes(cluster, podName),
-			SecurityContext:               CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
+			SecurityContext:               CreatePodSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
 			Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 			Tolerations:                   cluster.Spec.Affinity.Tolerations,
 			ServiceAccountName:            cluster.Name,
