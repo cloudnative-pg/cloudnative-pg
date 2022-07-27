@@ -35,7 +35,7 @@ spec:
         - /manager
         args:
         - controller
-        - --enable-leader-election
+        - --leader-elect
         - --config-map-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --secret-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --webhook-port=9443
