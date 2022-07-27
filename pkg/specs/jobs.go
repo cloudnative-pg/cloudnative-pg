@@ -210,7 +210,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 						},
 					},
 					Volumes:            createPostgresVolumes(cluster, podName),
-					SecurityContext:    CreatePostgresSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
+					SecurityContext:    CreatePodSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
 					Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 					Tolerations:        cluster.Spec.Affinity.Tolerations,
 					ServiceAccountName: cluster.Name,
