@@ -454,21 +454,21 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoCRD(
 	name string,
 	tlsSecret *v1.Secret,
 ) error {
-	crd, err := apiClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	if crd.Spec.Conversion == nil ||
-		crd.Spec.Conversion.Webhook == nil ||
-		crd.Spec.Conversion.Webhook.ClientConfig == nil ||
-		reflect.DeepEqual(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, tlsSecret.Data["tls.crt"]) {
-		return nil
-	}
-
-	crd.Spec.Conversion.Webhook.ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
-
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		crd, err := apiClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if crd.Spec.Conversion == nil ||
+			crd.Spec.Conversion.Webhook == nil ||
+			crd.Spec.Conversion.Webhook.ClientConfig == nil ||
+			reflect.DeepEqual(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, tlsSecret.Data["tls.crt"]) {
+			return nil
+		}
+
+		crd.Spec.Conversion.Webhook.ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
+
 		_, err = apiClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
 		return err
 	})
