@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"reflect"
 	"time"
 
 	"github.com/robfig/cron"
@@ -458,15 +459,19 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoCRD(
 		return err
 	}
 
-	if crd.Spec.Conversion != nil {
-		if crd.Spec.Conversion.Webhook != nil {
-			if crd.Spec.Conversion.Webhook.ClientConfig != nil {
-				crd.Spec.Conversion.Webhook.ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
-			}
-		}
+	if crd.Spec.Conversion == nil ||
+		crd.Spec.Conversion.Webhook == nil ||
+		crd.Spec.Conversion.Webhook.ClientConfig == nil ||
+		reflect.DeepEqual(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, tlsSecret.Data["tls.crt"]) {
+		return nil
 	}
-	_, err = apiClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
-	return err
+
+	crd.Spec.Conversion.Webhook.ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		_, err = apiClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, crd, metav1.UpdateOptions{})
+		return err
+	})
 }
 
 func isSecretsMountNotRefreshedError(err error) bool {
