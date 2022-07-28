@@ -103,7 +103,6 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 }
 
 func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
-
 	if cluster.Spec.Instances == 1 {
 		// If this a single-instance cluster, we need to delete
 		// the PodDisruptionBudget for the primary node too
