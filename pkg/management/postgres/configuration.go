@@ -163,7 +163,6 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 			"server", ldapConfig.Server,
 			"BaseDN", ldapConfig.BindSearchAuth.BaseDN,
 			"binDN", ldapConfig.BindSearchAuth.BindDN,
-			"secret name", ldapConfig.BindSearchAuth.BindPassword.Name,
 			"search attribute", ldapConfig.BindSearchAuth.SearchAttribute,
 			"search filter", ldapConfig.BindSearchAuth.SearchFilter)
 
