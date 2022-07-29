@@ -20,23 +20,25 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ConvertToPostgresFormat converts timestamps to PostgreSQL time format, if needed.
 // e.g. "2006-01-02T15:04:05Z07:00" --> "2006-01-02 15:04:05.000000Z07:00"
 // If the conversion fails, the input timestamp is returned as it is.
 func ConvertToPostgresFormat(timestamp string) string {
-	parsedTimestamp, err := time.Parse(time.RFC3339Nano, timestamp)
+	parsedTimestamp, err := time.Parse(time.RFC3339, timestamp)
 	if err != nil {
 		return timestamp
 	}
 	return parsedTimestamp.Format("2006-01-02 15:04:05.000000Z07:00")
 }
 
-// GetCurrentTimestamp returns the current timestamp as a string in RFC3339Nano format
+// GetCurrentTimestamp returns the current timestamp as a string in RFC3339Micro format
 func GetCurrentTimestamp() string {
 	t := time.Now()
-	return t.Format(time.RFC3339Nano)
+	return t.Format(metav1.RFC3339Micro)
 }
 
 // ParseTargetTime returns the parsed targetTime which is used for point-in-time-recovery
@@ -46,14 +48,14 @@ func GetCurrentTimestamp() string {
 // YYYY-MM-DD HH24:MI:SS.FF6TZH:TZM
 // YYYY-MM-DDTHH24:MI:SSZ            (time.RFC3339)
 // YYYY-MM-DDTHH24:MI:SS±TZH:TZM     (time.RFC3339)
-// YYYY-MM-DDTHH24:MI:SSS±TZH:TZM	 (time.RFC3339Nano)
+// YYYY-MM-DDTHH24:MI:SSS±TZH:TZM	 (time.RFC3339Micro)
 // YYYY-MM-DDTHH24:MI:SS             (modified time.RFC3339)
 func ParseTargetTime(currentLocation *time.Location, targetTime string) (time.Time, error) {
 	if t, err := pq.ParseTimestamp(currentLocation, targetTime); err == nil {
 		return t, nil
 	}
 
-	if t, err := time.Parse(time.RFC3339Nano, targetTime); err == nil {
+	if t, err := time.Parse(metav1.RFC3339Micro, targetTime); err == nil {
 		return t, nil
 	}
 
@@ -66,12 +68,12 @@ func ParseTargetTime(currentLocation *time.Location, targetTime string) (time.Ti
 
 // DifferenceBetweenTimestamps returns the time.Duration difference between two timestamps strings in time.RFC3339.
 func DifferenceBetweenTimestamps(first, second string) (time.Duration, error) {
-	parsedTimestamp, err := time.Parse(time.RFC3339Nano, first)
+	parsedTimestamp, err := time.Parse(time.RFC3339, first)
 	if err != nil {
 		return 0, err
 	}
 
-	parsedTimestampTwo, err := time.Parse(time.RFC3339Nano, second)
+	parsedTimestampTwo, err := time.Parse(metav1.RFC3339Micro, second)
 	if err != nil {
 		return 0, err
 	}
