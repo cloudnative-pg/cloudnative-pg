@@ -793,9 +793,9 @@ type BootstrapInitDB struct {
 	// instance using logical backup (`pg_dump` and `pg_restore`)
 	Import *Import `json:"import,omitempty"`
 
-	// PostInitApplicationSQLRefs points references to configmaps or secrets which
+	// PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
 	// contain SQL files, the general implementation order to these references is
-	// from all secrets to all configmaps, and inside secrets or configmaps,
+	// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
 	// the implementation order is same as the order of each array
 	// (by default empty)
 	PostInitApplicationSQLRefs *PostInitApplicationSQLRefs `json:"postInitApplicationSQLRefs,omitempty"`
@@ -839,15 +839,15 @@ type ImportSource struct {
 	ExternalCluster string `json:"externalCluster"`
 }
 
-// PostInitApplicationSQLRefs points references to configmaps or secrets which
+// PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
 // contain SQL files, the general implementation order to these references is
-// from all secrets to all configmaps, and inside secrets or configmaps,
-// the implementation order is same as the order of each array.
+// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
+// the implementation order is same as the order of each array
 type PostInitApplicationSQLRefs struct {
-	// SecretRefs holds a list of references to secrets.
+	// SecretRefs holds a list of references to Secrets
 	SecretRefs []SecretKeySelector `json:"secretRefs,omitempty"`
 
-	// ConfigMapRefs holds a list of references to configmaps.
+	// ConfigMapRefs holds a list of references to ConfigMaps
 	ConfigMapRefs []ConfigMapKeySelector `json:"configMapRefs,omitempty"`
 }
 

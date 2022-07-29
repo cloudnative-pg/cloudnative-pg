@@ -85,7 +85,7 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 	refs *apiv1.PostInitApplicationSQLRefs,
 ) ([]corev1.Volume, []corev1.VolumeMount) {
 	length := len(refs.ConfigMapRefs) + len(refs.SecretRefs)
-	digitsCount := utils.IterativeDigitsCount(length)
+	digitsCount := utils.CountDigits(length)
 	volumes := make([]corev1.Volume, 0, length)
 	volumeMounts := make([]corev1.VolumeMount, 0, length)
 

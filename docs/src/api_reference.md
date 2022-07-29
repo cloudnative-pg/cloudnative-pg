@@ -260,7 +260,7 @@ Name                       | Description                                        
 `postInitApplicationSQL    ` | List of SQL queries to be executed as a superuser in the application database right after is created - to be used with extreme care (by default empty)                                                                                                                                                      | []string                                                  
 `postInitTemplateSQL       ` | List of SQL queries to be executed as a superuser in the `template1` after the cluster has been created - to be used with extreme care (by default empty)                                                                                                                                                   | []string                                                  
 `import                    ` | Bootstraps the new cluster by importing data from an existing PostgreSQL instance using logical backup (`pg_dump` and `pg_restore`)                                                                                                                                                                         | [*Import](#Import)                                        
-`postInitApplicationSQLRefs` | PostInitApplicationSQLRefs points references to configmaps or secrets which contain SQL files, the general implementation order to these references is from all secrets to all configmaps, and inside secrets or configmaps, the implementation order is same as the order of each array (by default empty) | [*PostInitApplicationSQLRefs](#PostInitApplicationSQLRefs)
+`postInitApplicationSQLRefs` | PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which contain SQL files, the general implementation order to these references is from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps, the implementation order is same as the order of each array (by default empty) | [*PostInitApplicationSQLRefs](#PostInitApplicationSQLRefs)
 
 <a id='BootstrapPgBaseBackup'></a>
 
@@ -743,12 +743,12 @@ Name      | Description                               | Type
 
 ## PostInitApplicationSQLRefs
 
-PostInitApplicationSQLRefs points references to configmaps or secrets which contain SQL files, the general implementation order to these references is from all secrets to all configmaps, and inside secrets or configmaps, the implementation order is same as the order of each array.
+PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which contain SQL files, the general implementation order to these references is from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps, the implementation order is same as the order of each array
 
-Name          | Description                                             | Type                                           
-------------- | ------------------------------------------------------- | -----------------------------------------------
-`secretRefs   ` | SecretRefs holds a list of references to secrets.       | [[]SecretKeySelector](#SecretKeySelector)      
-`configMapRefs` | ConfigMapRefs holds a list of references to configmaps. | [[]ConfigMapKeySelector](#ConfigMapKeySelector)
+Name          | Description                                            | Type                                           
+------------- | ------------------------------------------------------ | -----------------------------------------------
+`secretRefs   ` | SecretRefs holds a list of references to Secrets       | [[]SecretKeySelector](#SecretKeySelector)      
+`configMapRefs` | ConfigMapRefs holds a list of references to ConfigMaps | [[]ConfigMapKeySelector](#ConfigMapKeySelector)
 
 <a id='PostgresConfiguration'></a>
 

@@ -16,16 +16,9 @@ limitations under the License.
 
 package utils
 
-// IterativeDigitsCount counts number of digits in an integer.
-func IterativeDigitsCount(number int) int {
-	count := 0
-	for {
-		if number < 10 {
-			count++
-			break
-		}
-		number /= 10
-		count++
-	}
-	return count
+import "fmt"
+
+// CountDigits counts number of digits in an integer.
+func CountDigits(number int) int {
+	return len(fmt.Sprintf("%d", number))
 }

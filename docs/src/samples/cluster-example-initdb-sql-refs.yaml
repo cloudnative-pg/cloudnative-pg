@@ -35,10 +35,6 @@ spec:
       postInitApplicationSQL:
         - create table application_numbers (i integer)
         - insert into application_numbers (select generate_series(1,10000))
-      dataChecksums: true
-      encoding: 'UTF8'
-      localeCollate: 'en_AU.UTF-8'
-      localeCType: 'en_AU.UTF-8'
       postInitApplicationSQLRefs:
         configMapRefs:
         - name: post-init-sql-configmap

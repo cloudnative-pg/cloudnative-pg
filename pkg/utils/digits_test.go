@@ -21,16 +21,18 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("test iterative digits count", func() {
-	for i := 0; i < 10; i++ {
-		Expect(IterativeDigitsCount(i)).To(Equal(1))
-	}
+var _ = Describe("test CountDigits", func() {
+	It("CountDigits", func() {
+		for i := 0; i < 10; i++ {
+			Expect(CountDigits(i)).To(Equal(1))
+		}
 
-	for i := 10; i < 100; i++ {
-		Expect(IterativeDigitsCount(i)).To(Equal(2))
-	}
+		for i := 10; i < 100; i++ {
+			Expect(CountDigits(i)).To(Equal(2))
+		}
 
-	for i := 100; i < 1000; i++ {
-		Expect(IterativeDigitsCount(i)).To(Equal(3))
-	}
+		for i := 100; i < 1000; i++ {
+			Expect(CountDigits(i)).To(Equal(3))
+		}
+	})
 })
