@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -35,7 +34,7 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	instance := Instance{
-		PgData: tempDir + "/testdata/primary",
+		PgData: filepath.Join(tempDir, "/testdata/primary"),
 	}
 
 	signalPath := filepath.Join(instance.PgData, "standby.signal")
@@ -44,7 +43,8 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 	pgControlOld := pgControl + ".old"
 
 	BeforeEach(func() {
-		fileutils.WriteStringToFile(instance.PgData+"/PG_VERSION", "14")
+		_, err := fileutils.WriteStringToFile(instance.PgData+"/PG_VERSION", "14")
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	assertFileExists := func(path, name string) {
@@ -121,7 +121,7 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 		err = instance.managePgControlFileBackup()
 		Expect(err).To(HaveOccurred())
 
-		err = os.Chmod(filepath.Join(instance.PgData, "global"), 0o755)
+		err = os.Chmod(filepath.Join(instance.PgData, "global"), 0o755) //nolint:gosec
 		Expect(err).ToNot(HaveOccurred())
 
 		err = instance.managePgControlFileBackup()
@@ -147,11 +147,11 @@ var _ = Describe("testing replica instance methods", Ordered, func() {
 	signalPath := filepath.Join(instance.PgData, "standby.signal")
 
 	BeforeEach(func() {
-		fileutils.WriteStringToFile(signalPath, "")
+		_, err := fileutils.WriteStringToFile(signalPath, "")
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should correctly recognize a replica instance", func() {
-
 		isPrimary, err := instance.IsPrimary()
 		Expect(err).ToNot(HaveOccurred())
 		Expect(isPrimary).To(BeFalse())
@@ -166,7 +166,7 @@ var _ = Describe("testing replica instance methods", Ordered, func() {
 	})
 })
 
-var _ = Describe("environment variables", func() {
+var _ = Describe("testing environment variables", func() {
 	It("should return the default Socket Directory", func() {
 		socketDir := GetSocketDir()
 		Expect(socketDir).To(BeEquivalentTo(postgres.SocketDirectory))
@@ -177,11 +177,13 @@ var _ = Describe("environment variables", func() {
 		Expect(pgPort).To(BeEquivalentTo(postgres.ServerPort))
 
 		pgPortEnv := 777
-		os.Setenv("PGPORT", fmt.Sprintf("%v", pgPortEnv))
+		err := os.Setenv("PGPORT", fmt.Sprintf("%v", pgPortEnv))
+		Expect(err).ShouldNot(HaveOccurred())
 		pgPort = GetServerPort()
 		Expect(pgPort).To(BeEquivalentTo(pgPortEnv))
 
-		os.Setenv("PGPORT", "peggie")
+		err = os.Setenv("PGPORT", "peggie")
+		Expect(err).ShouldNot(HaveOccurred())
 		pgPort = GetServerPort()
 		Expect(pgPort).To(BeEquivalentTo(postgres.ServerPort))
 	})
@@ -191,7 +193,7 @@ var _ = Describe("check atomic bool", func() {
 	instance := Instance{}
 	instance.mightBeUnavailable.Store(true)
 
-	It("fenced and unfenced", func() {
+	It("should indicate instance might be unavailable after fencing is set", func() {
 		isFenced := instance.IsFenced()
 		Expect(isFenced).To(BeFalse())
 
@@ -202,7 +204,7 @@ var _ = Describe("check atomic bool", func() {
 		Expect(unAvailable).To(BeTrue())
 	})
 
-	It("check readiness or not", func() {
+	It("should recognize whether readiness can be checked depending on the setting", func() {
 		instance.SetCanCheckReadiness(false)
 		canBeChecked := instance.CanCheckReadiness()
 		Expect(canBeChecked).To(BeFalse())
@@ -212,7 +214,7 @@ var _ = Describe("check atomic bool", func() {
 		Expect(canBeChecked).To(BeTrue())
 	})
 
-	It("unavailable or not", func() {
+	It("should recognize whether the instance might be unavailanle based on the setting", func() {
 		instance.SetMightBeUnavailable(false)
 		unAvailable := instance.MightBeUnavailable()
 		Expect(unAvailable).To(BeFalse())
