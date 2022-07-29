@@ -1022,6 +1022,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
+		cluster.LogTimestampsWithMessage(ctx, "setting myself as primary")
 		if err := r.promoteAndWait(ctx, cluster); err != nil {
 			return false, err
 		}
@@ -1030,8 +1031,6 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 
 	// if the currentPrimary doesn't match the PodName we set the correct value.
 	if cluster.Status.CurrentPrimary != r.instance.PodName {
-		// we log the timestamp information before overriding them. This is useful to know how much time it took.
-		cluster.LogTimestampsWithMessage(ctx, "setting myself as primary")
 		cluster.Status.CurrentPrimary = r.instance.PodName
 		cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
 		err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
