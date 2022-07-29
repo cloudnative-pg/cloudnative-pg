@@ -19,6 +19,10 @@ package e2e
 import (
 	"fmt"
 
+	"k8s.io/client-go/util/retry"
+
+	"k8s.io/apimachinery/pkg/types"
+
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -71,6 +75,24 @@ var _ = Describe("Certificates", func() {
 			sampleFile = fixturesCertificatesDir + "/cluster-ssl-enabled.yaml"
 		)
 
+		cleanClusterCertification := func() {
+			cluster := &apiv1.Cluster{}
+			namespacedName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      clusterName,
+			}
+			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				err := utils.GetObject(env, namespacedName, cluster)
+				Expect(err).ToNot(HaveOccurred())
+				cluster.Spec.Certificates.ServerTLSSecret = ""
+				cluster.Spec.Certificates.ServerCASecret = ""
+				cluster.Spec.Certificates.ReplicationTLSSecret = ""
+				cluster.Spec.Certificates.ClientCASecret = ""
+				return env.Client.Update(env.Ctx, cluster)
+			})
+			Expect(err).ToNot(HaveOccurred())
+		}
+
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace = "postgresql-cert"
@@ -87,7 +109,7 @@ var _ = Describe("Certificates", func() {
 		})
 		AfterEach(func() {
 			// deleting root CA certificates
-			CreateResourceFromFile(namespace, sampleFile)
+			cleanClusterCertification()
 		})
 
 		It("can authenticate using a Certificate that is generated from the 'kubectl-cnpg' plugin", func() {

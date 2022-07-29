@@ -304,15 +304,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// in parallel and check for it to be up later.
 		By(fmt.Sprintf("creating a Cluster in the '%v' upgradeNamespace",
 			upgradeNamespace), func() {
-			Eventually(func() error {
-				_, stderr, err := testsUtils.Run(
-					"kubectl create -n " + upgradeNamespace + " -f " + sampleFile)
-				if err != nil {
-					GinkgoWriter.Printf("stderr: %s\n", stderr)
-					return err
-				}
-				return nil
-			}, 120).ShouldNot(HaveOccurred())
+			CreateResourceFromFile(upgradeNamespace, sampleFile)
 		})
 
 		By("setting up minio", func() {
@@ -513,15 +505,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		AssertConfUpgrade(clusterName1, updateConfFile)
 
 		By("installing a second Cluster on the upgraded operator", func() {
-			Eventually(func() error {
-				_, _, err := testsUtils.Run(
-					"kubectl create -n " + upgradeNamespace + " -f " + sampleFile2)
-				if err != nil {
-					return err
-				}
-				return nil
-			}, 60, 5).Should(BeNil())
-
+			CreateResourceFromFile(upgradeNamespace, sampleFile2)
 			AssertClusterIsReady(upgradeNamespace, clusterName2, 600, env)
 		})
 

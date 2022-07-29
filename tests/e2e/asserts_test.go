@@ -19,6 +19,7 @@ package e2e
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -31,6 +32,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -2234,14 +2236,23 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 	})
 }
 
+// CreateResourceFromFile create the object defined by yaml file
 func CreateResourceFromFile(namespace, sampleFilePath string) {
-	Eventually(func() error {
-		_, _, err := testsUtils.RunUnchecked("kubectl apply -n " + namespace + " -f " + sampleFilePath)
-		if err != nil {
-			return err
+	objects, err := testsUtils.GetObjectFromYaml(sampleFilePath, namespace)
+	Expect(err).ToNot(HaveOccurred())
+	for _, obj := range objects {
+		if cluster, ok := obj.(*apiv1.Cluster); ok {
+			storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+			if storageClassName != "" {
+				cluster.Spec.StorageConfiguration.StorageClass = &storageClassName
+			}
+			err := testsUtils.CreateObject(env, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		} else {
+			err := testsUtils.CreateObject(env, obj)
+			Expect(err).ToNot(HaveOccurred())
 		}
-		return nil
-	}, RetryTimeout, PollingTime).Should(BeNil())
+	}
 }
 
 // Assert in the giving cluster, all the postgres db has no pending restart
