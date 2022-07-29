@@ -403,7 +403,7 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 	// When the termination has been requested, this context will be cancelled.
 	<-ctx.Done()
 
-	cluster.LogTimestampsWithMessage(ctx, "old primary shutdown complete")
+	cluster.LogTimestampsWithMessage(ctx, "Old primary shutdown complete")
 
 	return true, nil
 }
@@ -1022,7 +1022,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
-		cluster.LogTimestampsWithMessage(ctx, "setting myself as primary")
+		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
 		if err := r.promoteAndWait(ctx, cluster); err != nil {
 			return false, err
 		}
@@ -1037,7 +1037,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		if err != nil {
 			return restarted, err
 		}
-		cluster.LogTimestampsWithMessage(ctx, "finished setting myself as primary")
+		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
 		return restarted, nil
 	}
 
