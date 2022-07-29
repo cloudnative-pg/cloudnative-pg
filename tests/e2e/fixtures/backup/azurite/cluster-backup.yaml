@@ -1,0 +1,24 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-backup-azurite
+spec:
+  instances: 2
+
+  # Persistent storage configuration
+  storage:
+    size: 1Gi
+
+  # Backup properties
+  backup:
+    barmanObjectStore:
+      destinationPath: https://azurite:10000/storageaccountname/pg-backup-azurite
+      endpointCA:
+        key: ca.crt
+        name: azurite-ca-secret
+      azureCredentials:
+        connectionString:
+          name: azurite
+          key: AZURE_CONNECTION_STRING
+      wal:
+        compression: gzip

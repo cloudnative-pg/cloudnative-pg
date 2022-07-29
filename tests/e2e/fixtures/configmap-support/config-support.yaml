@@ -1,13 +1,21 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
-metadata:
-  name: cluster-restore
-spec:
-  instances: 3
-  imageName: "${POSTGRES_IMG}"
 
-  storage:
-    size: 1Gi
+metadata:
+  name: configmap-support
+
+  annotations:
+    categories: DatabaseApplication
+    example.com/qa: qa
+    example.com/prod: prod
+
+  labels:
+    environment: qaEnv
+    example.com/qa: qa
+    example.com/prod: prod
+
+spec:
+  instances: 1
 
   postgresql:
     parameters:
@@ -20,11 +28,9 @@ spec:
       log_replication_commands: 'on'
 
   bootstrap:
-    recovery:
-      backup:
-        name: cluster-backup
-      recoveryTarget:
-        targetTLI: "1"
+    initdb:
+      database: app
+      owner: appuser
 
-  superuserSecret:
-    name: cluster-superuser
+  storage:
+    size: 1Gi

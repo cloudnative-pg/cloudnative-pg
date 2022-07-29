@@ -1,9 +1,8 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-three-instances
+  name: cluster-pg-data-corruption
 spec:
-  imageName: ${E2E_PRE_ROLLING_UPDATE_IMG}
   instances: 3
 
   postgresql:
@@ -15,13 +14,6 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
-
-  # Example of rolling update strategy:
-  # - unsupervised: automated update of the primary once all
-  #                 replicas have been upgraded (default)
-  # - supervised: requires manual supervision to perform
-  #               the switchover of the primary
-  primaryUpdateStrategy: unsupervised
 
   bootstrap:
     initdb:

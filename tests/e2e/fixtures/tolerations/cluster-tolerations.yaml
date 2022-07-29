@@ -1,13 +1,15 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-restore
+  name: cluster-tolerations
 spec:
   instances: 3
-  imageName: "${POSTGRES_IMG}"
 
-  storage:
-    size: 1Gi
+  affinity:
+      tolerations:
+        - key: "test-tolerations"
+          operator: "Exists"
+          effect: "NoSchedule"
 
   postgresql:
     parameters:
@@ -20,11 +22,9 @@ spec:
       log_replication_commands: 'on'
 
   bootstrap:
-    recovery:
-      backup:
-        name: cluster-backup
-      recoveryTarget:
-        targetTLI: "1"
+    initdb:
+      database: app
+      owner: appuser
 
-  superuserSecret:
-    name: cluster-superuser
+  storage:
+    size: 1Gi

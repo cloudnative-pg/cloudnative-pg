@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: pg-backup-azure-blob
+  name: external-cluster-minio-replica
 spec:
   instances: 2
 
@@ -26,21 +26,26 @@ spec:
     size: 1Gi
 
   bootstrap:
-    initdb:
-      database: app
-      owner: app
+    recovery:
+      # cluster name in source cluster
+      source: source-cluster-minio
 
-  backup:
-    barmanObjectStore:
-        destinationPath: https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/pg-backup-azure-blob/
-        azureCredentials:
-          storageAccount:
+  replica:
+    enabled: true
+    source: source-cluster-minio
+
+  externalClusters:
+    - name: source-cluster-minio
+      barmanObjectStore:
+        destinationPath: s3://cluster-backups/
+        endpointURL: https://minio-service:9000
+        endpointCA:
+          key: ca.crt
+          name: minio-server-ca-secret
+        s3Credentials:
+          accessKeyId:
             name: backup-storage-creds
             key: ID
-          storageKey:
+          secretAccessKey:
             name: backup-storage-creds
             key: KEY
-        wal:
-          compression: gzip
-        data:
-          immediateCheckpoint: true

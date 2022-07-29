@@ -1,13 +1,14 @@
+# Example of PostgreSQL cluster using ssl enabled
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-three-instances
+  name: postgresql-cert
 spec:
-  imageName: ${E2E_PRE_ROLLING_UPDATE_IMG}
   instances: 3
 
   postgresql:
     parameters:
+      work_mem: "8MB"
       log_checkpoints: "on"
       log_lock_waits: "on"
       log_min_duration_statement: '1000'
@@ -15,13 +16,14 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
+    pg_hba:
+      - hostssl all all all cert
 
-  # Example of rolling update strategy:
-  # - unsupervised: automated update of the primary once all
-  #                 replicas have been upgraded (default)
-  # - supervised: requires manual supervision to perform
-  #               the switchover of the primary
-  primaryUpdateStrategy: unsupervised
+  certificates:
+    serverCASecret: ""
+    serverTLSSecret: ""
+    clientCASecret: ""
+    replicationTLSSecret: ""
 
   bootstrap:
     initdb:

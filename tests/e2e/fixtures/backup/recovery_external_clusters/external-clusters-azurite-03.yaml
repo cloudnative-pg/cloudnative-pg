@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: pg-backup-azure-blob
+  name: external-cluster-azurite
 spec:
   instances: 2
 
@@ -26,21 +26,35 @@ spec:
     size: 1Gi
 
   bootstrap:
-    initdb:
-      database: app
-      owner: app
+    recovery:
+      database: appdb
+      owner: appuser
+      secret:
+        name: postgresql-user-supplied-app
+      # cluster name in source cluster
+      source: pg-backup-azurite
 
-  backup:
-    barmanObjectStore:
-        destinationPath: https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/pg-backup-azure-blob/
+  externalClusters:
+    - name: pg-backup-azurite
+      barmanObjectStore:
+        destinationPath: https://azurite:10000/storageaccountname/pg-backup-azurite
+        endpointCA:
+          key: ca.crt
+          name: azurite-ca-secret
         azureCredentials:
-          storageAccount:
-            name: backup-storage-creds
-            key: ID
-          storageKey:
-            name: backup-storage-creds
-            key: KEY
+          connectionString:
+            name: azurite
+            key: AZURE_CONNECTION_STRING
         wal:
           compression: gzip
-        data:
-          immediateCheckpoint: true
+---
+apiVersion: v1
+data:
+  username: YXBwdXNlcg==
+  password: NGxzMDU0ZjM=
+kind: Secret
+metadata:
+  name: postgresql-user-supplied-app
+  labels:
+    cnpg.io/reload: ""
+type: kubernetes.io/basic-auth

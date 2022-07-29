@@ -1,13 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-restore
+  name: cluster-replica-src
 spec:
-  instances: 3
-  imageName: "${POSTGRES_IMG}"
-
-  storage:
-    size: 1Gi
+  instances: 1
 
   postgresql:
     parameters:
@@ -18,13 +14,14 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
+    pg_hba:
+      - host replication postgres all md5
+      - hostssl app streaming_replica all cert
 
   bootstrap:
-    recovery:
-      backup:
-        name: cluster-backup
-      recoveryTarget:
-        targetTLI: "1"
+    initdb:
+      database: appSrc
+      owner: userSrc
 
-  superuserSecret:
-    name: cluster-superuser
+  storage:
+    size: 1Gi
