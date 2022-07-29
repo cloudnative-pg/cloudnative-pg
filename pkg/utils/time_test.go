@@ -63,4 +63,22 @@ var _ = Describe("Parsing targetTime", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res.MarshalText()).To(BeEquivalentTo("2021-09-01T10:22:47Z"))
 	})
+	It("should calculate correctly the difference between two timestamps", func() {
+		By("having the first time bigger than the second", func() {
+			time1 := "2022-07-06T13:11:09Z"
+			time2 := "2022-07-06T13:11:07Z"
+			expectedSecondDifference := float64(2)
+			difference, err := DifferenceBetweenTimestamps(time1, time2)
+			Expect(err).To(BeNil())
+			Expect(difference.Seconds()).To(Equal(expectedSecondDifference))
+		})
+		By("having the first time smaller than the second", func() {
+			time1 := "2022-07-06T13:11:07Z"
+			time2 := "2022-07-06T13:11:09Z"
+			expectedSecondDifference := float64(-2)
+			difference, err := DifferenceBetweenTimestamps(time1, time2)
+			Expect(err).To(BeNil())
+			Expect(difference.Seconds()).To(Equal(expectedSecondDifference))
+		})
+	})
 })
