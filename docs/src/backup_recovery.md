@@ -22,7 +22,7 @@ as it is composed of a community PostgreSQL image and the latest
 
 A backup is performed from a primary or a designated primary instance in a
 `Cluster` (please refer to
-[replica clusters](replication.md#replication-from-an-external-postgresql-cluster)
+[replica clusters](replica_cluster.md)
 for more information about designated primary instances).
 
 ## Cloud provider support
