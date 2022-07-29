@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -1890,6 +1891,72 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	}
 
 	return false
+}
+
+// LogTimestampsWithMessage prints useful information about timestamps in stdout
+func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage string) {
+	contextLogger := log.FromContext(ctx)
+
+	currentTimestamp := utils.GetCurrentTimestamp()
+	keysAndValues := []interface{}{
+		"phase", cluster.Status.Phase,
+		"currentTimestamp", currentTimestamp,
+		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp,
+		"currentPrimaryTimestamp", cluster.Status.CurrentPrimaryTimestamp,
+	}
+
+	var errs []string
+
+	// Elapsed time since the last request of promotion (TargetPrimaryTimestamp)
+	if diff, err := utils.DifferenceBetweenTimestamps(
+		currentTimestamp,
+		cluster.Status.TargetPrimaryTimestamp,
+	); err == nil {
+		keysAndValues = append(
+			keysAndValues,
+			"msPassedSinceTargetPrimaryTimestamp",
+			diff.Milliseconds(),
+		)
+	} else {
+		errs = append(errs, err.Error())
+	}
+
+	// Elapsed time since the last promotion (CurrentPrimaryTimestamp)
+	if currentPrimaryDifference, err := utils.DifferenceBetweenTimestamps(
+		currentTimestamp,
+		cluster.Status.CurrentPrimaryTimestamp,
+	); err == nil {
+		keysAndValues = append(
+			keysAndValues,
+			"msPassedSinceCurrentPrimaryTimestamp",
+			currentPrimaryDifference.Milliseconds(),
+		)
+	} else {
+		errs = append(errs, err.Error())
+	}
+
+	// Difference between the last promotion and the last request of promotion
+	// When positive, it is the amount of time required in the last promotion
+	// of a standby to a primary. If negative, it means we have a failover/switchover
+	// in progress, and the value represents the last measured uptime of the primary.
+	if currentPrimaryTargetDifference, err := utils.DifferenceBetweenTimestamps(
+		cluster.Status.CurrentPrimaryTimestamp,
+		cluster.Status.TargetPrimaryTimestamp,
+	); err == nil {
+		keysAndValues = append(
+			keysAndValues,
+			"msDifferenceBetweenCurrentAndTargetPrimary",
+			currentPrimaryTargetDifference.Milliseconds(),
+		)
+	} else {
+		errs = append(errs, err.Error())
+	}
+
+	if len(errs) > 0 {
+		keysAndValues = append(keysAndValues, "timestampParsingErrors", errs)
+	}
+
+	contextLogger.Info(logMessage, keysAndValues...)
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination

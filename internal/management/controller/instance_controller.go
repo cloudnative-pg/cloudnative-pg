@@ -403,6 +403,8 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 	// When the termination has been requested, this context will be cancelled.
 	<-ctx.Done()
 
+	cluster.LogTimestampsWithMessage(ctx, "Old primary shutdown complete")
+
 	return true, nil
 }
 
@@ -1008,8 +1010,6 @@ func (r *InstanceReconciler) refreshFileFromSecret(
 
 // Reconciler primary logic. DB needed.
 func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (restarted bool, err error) {
-	contextLogger := log.FromContext(ctx)
-
 	if cluster.Status.TargetPrimary != r.instance.PodName || cluster.IsReplica() {
 		return false, nil
 	}
@@ -1020,23 +1020,28 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		return false, err
 	}
 
+	// If I'm not the primary, let's promote myself
 	if !isPrimary {
-		// If I'm not the primary, let's promote myself
-		err := r.promoteAndWait(ctx, cluster)
-		if err != nil {
+		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
+		if err := r.promoteAndWait(ctx, cluster); err != nil {
 			return false, err
 		}
 		restarted = true
 	}
 
-	// If it is already the current primary, everything is ok
+	// if the currentPrimary doesn't match the PodName we set the correct value.
 	if cluster.Status.CurrentPrimary != r.instance.PodName {
 		cluster.Status.CurrentPrimary = r.instance.PodName
 		cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
-		contextLogger.Info("Setting myself as the current primary")
-		return restarted, r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
+		err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
+		if err != nil {
+			return restarted, err
+		}
+		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
+		return restarted, nil
 	}
 
+	// If it is already the current primary, everything is ok
 	return restarted, nil
 }
 
