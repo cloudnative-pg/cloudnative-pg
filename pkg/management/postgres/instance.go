@@ -715,7 +715,7 @@ func (instance *Instance) managePgControlFileBackup() error {
 	if pgControlBackupExists {
 		err = fileutils.CopyFile(pgControlBackupFilePath, pgControlFilePath)
 		if err != nil {
-			return fmt.Errorf("while copying old pg_contorl to new pg_control: %w", err)
+			return fmt.Errorf("while copying old pg_control to new pg_control: %w", err)
 		}
 		return os.Chmod(pgControlFilePath, 0o600)
 	}
