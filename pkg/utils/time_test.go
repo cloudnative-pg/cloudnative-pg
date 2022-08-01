@@ -17,8 +17,11 @@ limitations under the License.
 package utils
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("Time conversion", func() {
@@ -38,47 +41,74 @@ var _ = Describe("Parsing targetTime", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res.MarshalText()).To(BeEquivalentTo("2021-09-01T10:22:47Z"))
 	})
+
 	It("parsing works given targetTime in `YYYY-MM-DD HH24:MI:SS.FF6TZH` format", func() {
 		res, err := ParseTargetTime(nil, "2021-09-01 10:22:47.000000+06")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res.MarshalText()).To(BeEquivalentTo("2021-09-01T10:22:47+06:00"))
 	})
+
 	It("parsing works given targetTime in `YYYY-MM-DD HH24:MI:SS.FF6TZH:TZM` format", func() {
 		res, err := ParseTargetTime(nil, "2021-09-01 10:22:47.000000+06:00")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res.MarshalText()).To(BeEquivalentTo("2021-09-01T10:22:47+06:00"))
 	})
+
 	It("parsing works given targetTime in `YYYY-MM-DDTHH24:MI:SSZ` format", func() {
 		res, err := ParseTargetTime(nil, "2021-09-01T10:22:47Z")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res.MarshalText()).To(BeEquivalentTo("2021-09-01T10:22:47Z"))
 	})
+
 	It("parsing works given targetTime in `YYYY-MM-DDTHH24:MI:SS±TZH:TZM` format", func() {
 		res, err := ParseTargetTime(nil, "2021-09-01T10:22:47+00:00")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res.MarshalText()).To(BeEquivalentTo("2021-09-01T10:22:47Z"))
 	})
+
 	It("parsing works given targetTime in `YYYY-MM-DDTHH24:MI:SS` format", func() {
 		res, err := ParseTargetTime(nil, "2021-09-01T10:22:47")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res.MarshalText()).To(BeEquivalentTo("2021-09-01T10:22:47Z"))
 	})
+
+	It("parsing works with RFC3339Micro format `YYYY-MM-DDTHH24:MI:SS.SSSSSSZ`", func() {
+		_, err := ParseTargetTime(nil, "2006-01-02T15:04:05.000000Z")
+		Expect(err).ToNot(HaveOccurred())
+	})
+
 	It("should calculate correctly the difference between two timestamps", func() {
 		By("having the first time bigger than the second", func() {
-			time1 := "2022-07-06T13:11:09Z"
-			time2 := "2022-07-06T13:11:07Z"
+			time1 := "2022-07-06T13:11:09.000000Z"
+			time2 := "2022-07-06T13:11:07.000000Z"
 			expectedSecondDifference := float64(2)
 			difference, err := DifferenceBetweenTimestamps(time1, time2)
 			Expect(err).To(BeNil())
 			Expect(difference.Seconds()).To(Equal(expectedSecondDifference))
 		})
 		By("having the first time smaller than the second", func() {
-			time1 := "2022-07-06T13:11:07Z"
-			time2 := "2022-07-06T13:11:09Z"
+			time1 := "2022-07-06T13:11:07.000000Z"
+			time2 := "2022-07-06T13:11:09.000000Z"
 			expectedSecondDifference := float64(-2)
 			difference, err := DifferenceBetweenTimestamps(time1, time2)
 			Expect(err).To(BeNil())
 			Expect(difference.Seconds()).To(Equal(expectedSecondDifference))
 		})
+		By("having first or second time wrong", func() {
+			time1 := "2022-07-06T13:12:09.000000Z"
+
+			_, err := DifferenceBetweenTimestamps(time1, "")
+			Expect(err).ToNot(BeNil())
+
+			_, err = DifferenceBetweenTimestamps("", time1)
+			Expect(err).ToNot(BeNil())
+		})
+	})
+
+	It("should be RFC3339Micro format", func() {
+		time1 := GetCurrentTimestamp()
+
+		_, err := time.Parse(metav1.RFC3339Micro, time1)
+		Expect(err).ToNot(HaveOccurred())
 	})
 })
