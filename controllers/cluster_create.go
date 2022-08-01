@@ -897,24 +897,20 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
-	pvcSpec, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
-	if err != nil {
-		if err == specs.ErrorInvalidSize {
-			// This error should have been caught by the validating
-			// webhook, but since we are here the user must have disabled server-side
-			// validation, and we must react.
-			contextLogger.Info("The size specified for the cluster is not valid",
-				"size",
-				cluster.Spec.StorageConfiguration.Size)
-			return ctrl.Result{RequeueAfter: time.Minute}, nil
-		}
-		return ctrl.Result{}, err
+	if err := r.createPVC(ctx, cluster, cluster.Spec.StorageConfiguration, cluster.Name, nodeSerial); err != nil {
+		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
-	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, cluster)
-	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-		contextLogger.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
-		return ctrl.Result{}, err
+	if cluster.ShouldCreateWalArchiveVolume() {
+		if err := r.createPVC(
+			ctx,
+			cluster,
+			*cluster.Spec.WalStorage,
+			cluster.GetWalArchiveVolumePrefix()+cluster.Name,
+			nodeSerial,
+		); err != nil {
+			return ctrl.Result{RequeueAfter: time.Minute}, err
+		}
 	}
 
 	// We are bootstrapping a cluster and in need to create the first node
@@ -1072,26 +1068,20 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	pvcSpec, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, nodeSerial)
-	if err != nil {
-		if err == specs.ErrorInvalidSize {
-			// This error should have been caught by the validating
-			// webhook, but since we are here the user must have disabled server-side
-			// validation and we must react.
-			contextLogger.Info("The size specified for the cluster is not valid",
-				"size",
-				cluster.Spec.StorageConfiguration.Size)
-			return ctrl.Result{RequeueAfter: time.Minute}, ErrNextLoop
-		}
-		return ctrl.Result{}, fmt.Errorf("unable to create a PVC spec for node with serial %v: %w", nodeSerial, err)
+	if err := r.createPVC(ctx, cluster, cluster.Spec.StorageConfiguration, cluster.Name, nodeSerial); err != nil {
+		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
-	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, cluster)
-
-	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-		return ctrl.Result{}, fmt.Errorf("unable to create a PVC for this node (nodeSerial: %d): %w",
+	if cluster.ShouldCreateWalArchiveVolume() {
+		if err := r.createPVC(
+			ctx,
+			cluster,
+			*cluster.Spec.WalStorage,
+			cluster.GetWalArchiveVolumePrefix()+cluster.Name,
 			nodeSerial,
-			err)
+		); err != nil {
+			return ctrl.Result{RequeueAfter: time.Minute}, err
+		}
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
@@ -1244,6 +1234,40 @@ func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *api
 			}
 			return fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
 		}
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) createPVC(
+	ctx context.Context,
+	ownedBy *apiv1.Cluster,
+	storageConfiguration apiv1.StorageConfiguration,
+	name string,
+	nodeSerial int,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	pvcSpec, err := specs.CreatePVC(storageConfiguration, name, ownedBy.Namespace, nodeSerial)
+	if err != nil {
+		if err == specs.ErrorInvalidSize {
+			// This error should have been caught by the validating
+			// webhook, but since we are here the user must have disabled server-side
+			// validation and we must react.
+			contextLogger.Info("The size specified for the cluster is not valid",
+				"size",
+				storageConfiguration.Size)
+			return ErrNextLoop
+		}
+		return fmt.Errorf("unable to create a PVC spec for node with serial %v: %w", nodeSerial, err)
+	}
+
+	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, ownedBy)
+
+	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
+		return fmt.Errorf("unable to create a PVC for this node (nodeSerial: %d): %w",
+			nodeSerial,
+			err)
 	}
 
 	return nil

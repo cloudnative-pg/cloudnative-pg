@@ -1084,8 +1084,7 @@ func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
 func (r *Cluster) validateStorageSize() field.ErrorList {
 	var result field.ErrorList
 
-	_, err := resource.ParseQuantity(r.Spec.StorageConfiguration.Size)
-	if err != nil {
+	if _, err := resource.ParseQuantity(r.Spec.StorageConfiguration.Size); err != nil {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "storage", "size"),
 			r.Spec.StorageConfiguration.Size,
