@@ -18,8 +18,9 @@ limitations under the License.
 package show
 
 import (
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/show/walarchivequeue"
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/show/walarchivequeue"
 )
 
 // NewCmd creates the new cobra command

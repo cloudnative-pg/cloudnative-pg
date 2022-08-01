@@ -23,13 +23,13 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const jobMatcherLabel = "job-name"

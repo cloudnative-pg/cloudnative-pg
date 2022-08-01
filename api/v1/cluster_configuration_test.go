@@ -17,10 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var _ = Describe("ensuring the correctness of synchronous replica data calculation", func() {
