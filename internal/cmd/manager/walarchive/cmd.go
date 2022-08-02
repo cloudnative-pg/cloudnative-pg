@@ -219,7 +219,7 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 // `parallel` is the maximum number of WALs that we can archive in parallel
 func gatherWALFilesToArchive(ctx context.Context, requestedWALFile string, parallel int) (walList []string) {
 	contextLog := log.FromContext(ctx)
-	pgWalDirectory := os.Getenv("PGWAL")
+	pgWalDirectory := path.Join(os.Getenv("PGDATA"), "pg_wal")
 	archiveStatusPath := path.Join(pgWalDirectory, "archive_status")
 	noMoreWALFilesNeeded := errors.New("no more files needed")
 
