@@ -229,6 +229,11 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=40000000
 	MaxSwitchoverDelay int32 `json:"switchoverDelay,omitempty"`
 
+	// The time in seconds a primary PostgreSQL instance
+	// should be deemed unhealthy before triggering a failover
+	// +kubebuilder:default:=0
+	FailoverDelay int32 `json:"failoverDelay,omitempty"`
+
 	// Affinity/Anti-affinity rules for Pods
 	// +optional
 	Affinity AffinityConfiguration `json:"affinity,omitempty"`
@@ -402,6 +407,9 @@ type ClusterStatus struct {
 
 	// Current primary instance
 	CurrentPrimary string `json:"currentPrimary,omitempty"`
+
+	// The timestamp when the current primary was deemed unhealthy
+	CurrentPrimaryFailingSince *metav1.Time `json:"currentPrimaryFailingSince,omitempty"`
 
 	// Target primary instance, this is different from the previous one
 	// during a switchover or a failover

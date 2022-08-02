@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -35,6 +37,17 @@ import (
 // ErrWalReceiversRunning is raised when a new primary server can't be elected
 // because there is a WAL receiver running in our Pod list
 var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
+
+// ErrWaitingOnFailoverDelay is an error type returned when we have new primary
+// but are waiting on the failover delay to trigger a failover
+type ErrWaitingOnFailoverDelay struct {
+	TimeLeft time.Duration
+}
+
+// Error implements error interface
+func (e ErrWaitingOnFailoverDelay) Error() string {
+	return fmt.Sprintf("Current primary isn't healthy, waiting %s before triggering a failover", e.TimeLeft)
+}
 
 // updateTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
 // this function will return the name of the new primary selected for promotion
@@ -97,6 +110,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 	// we have nothing to do here.
 	if cluster.Status.TargetPrimary == status.Items[0].Pod.Name {
 		return "", nil
+	}
+
+	if err := r.checkFailoverDelay(ctx, cluster); err != nil {
+		return "", err
 	}
 
 	// The current primary is not correctly working, and we need to elect a new one
@@ -264,6 +281,10 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
 		}
 	}
 
+	if err := r.checkFailoverDelay(ctx, cluster); err != nil {
+		return "", err
+	}
+
 	// The designated primary is not correctly working, and we need to elect a new one
 	// but before doing that we need to wait for all the WAL receivers to be
 	// terminated. This is needed to avoid losing the WAL data that is being received
@@ -302,6 +323,28 @@ func GetPodsNotOnPrimaryNode(
 		}
 	}
 	return podsOnOtherNodes
+}
+
+// checkFailoverDelay is called when the primary is unhealthy and we need to check
+// if it's been unhealthy for longer than the failover delay parameter
+// set on the cluster resource. It returns a non nil error of type ErrWaitingOnFailoverDelay
+// if still waiting for failover delay.
+func (r *ClusterReconciler) checkFailoverDelay(ctx context.Context, cluster *apiv1.Cluster) error {
+	now := r.clock.Now()
+	if cluster.Status.CurrentPrimaryFailingSince == nil || cluster.Status.CurrentPrimaryFailingSince.Time.IsZero() {
+		cluster.Status.CurrentPrimaryFailingSince = &metav1.Time{Time: now}
+		if err := r.Status().Update(ctx, cluster); err != nil {
+			return err
+		}
+	}
+	primaryFailingSince := now.Sub(cluster.Status.CurrentPrimaryFailingSince.Time)
+	if primaryFailingSince < time.Duration(cluster.Spec.FailoverDelay)*time.Second {
+		return &ErrWaitingOnFailoverDelay{
+			TimeLeft: time.Duration(cluster.Spec.FailoverDelay)*time.Second - primaryFailingSince,
+		}
+	}
+
+	return nil
 }
 
 // getStatusFromInstances gets the replication status from the PostgreSQL instances,
