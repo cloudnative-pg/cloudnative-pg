@@ -77,7 +77,7 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 	if cluster.ShouldCreateWalArchiveVolume() {
 		result = append(result,
 			corev1.Volume{
-				Name: "wal-archive",
+				Name: "pg_wal",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: cluster.GetWalArchiveVolumePrefix() + podName,
