@@ -14,7 +14,7 @@ spec:
             name: controller-manager-env
         args:
         - controller
-        - --enable-leader-election
+        - --leader-elect
         - --config-map-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --secret-name=$(OPERATOR_DEPLOYMENT_NAME)-config
         - --log-level=info
