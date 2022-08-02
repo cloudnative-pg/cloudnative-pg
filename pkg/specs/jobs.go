@@ -68,6 +68,10 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 			"--app-user", cluster.Spec.Bootstrap.InitDB.Owner)
 	}
 
+	if cluster.ShouldCreateWalArchiveVolume() {
+		initCommand = append(initCommand, "--pg-wal", pgWalVolumePath+"/pg_wal")
+	}
+
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
 		return createPrimaryJob(cluster, nodeSerial, "import", initCommand)
 	}

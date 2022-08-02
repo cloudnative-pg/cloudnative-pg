@@ -117,18 +117,6 @@ func createEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []core
 		},
 	}
 
-	if cluster.ShouldCreateWalArchiveVolume() {
-		envVar = append(envVar, corev1.EnvVar{
-			Name:  "PGWAL",
-			Value: pgWalVolumePath + "/pg_wal",
-		})
-	} else {
-		envVar = append(envVar, corev1.EnvVar{
-			Name:  "PGWAL",
-			Value: "/var/lib/postgresql/data/pg_wal",
-		})
-	}
-
 	return envVar
 }
 

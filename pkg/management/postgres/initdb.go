@@ -118,8 +118,9 @@ func (info InitInfo) CreateDataDirectory() error {
 		options = append(options, "--no-sync")
 	}
 
-	options = append(options, "--waldir", info.PgWal)
-
+	if info.PgWal != "" {
+		options = append(options, "--waldir", info.PgWal)
+	}
 	// Add custom initdb options from the user
 	options = append(options, info.InitDBOptions...)
 
