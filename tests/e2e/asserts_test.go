@@ -26,13 +26,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -41,6 +39,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+
+	"github.com/thoas/go-funk"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -2236,9 +2236,9 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 	})
 }
 
-// CreateResourceFromFile create the object defined by yaml file
+// CreateResourceFromFile creates the Kubernetes objects defined in a YAML sample file
 func CreateResourceFromFile(namespace, sampleFilePath string) {
-	objects, err := testsUtils.GetObjectFromYaml(sampleFilePath, namespace)
+	objects, err := testsUtils.CreateObjectsFromYAML(sampleFilePath, namespace)
 	Expect(err).ToNot(HaveOccurred())
 	for _, obj := range objects {
 		if cluster, ok := obj.(*apiv1.Cluster); ok {
