@@ -604,6 +604,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		copy(*out, *in)
 	}
 	in.StorageConfiguration.DeepCopyInto(&out.StorageConfiguration)
+	if in.WalStorage != nil {
+		in, out := &in.WalStorage, &out.WalStorage
+		*out = new(StorageConfiguration)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Affinity.DeepCopyInto(&out.Affinity)
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.Backup != nil {
