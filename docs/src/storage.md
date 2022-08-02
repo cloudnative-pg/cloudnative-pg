@@ -67,6 +67,13 @@ Briefly, `cnp-bench` is designed to operate at two levels:
 The operator creates a persistent volume claim (PVC) for each PostgreSQL
 instance, with the goal to store the `PGDATA`, and then mounts it into each Pod.
 
+Additionally `.spec.walStorage` can be specified to provision a PVC dedicated to the WAL storage. This parameter follows
+the same rules described for the `storage` field.
+
+!!! Important
+    `walStorage` initialization is only supported during cluster creation.
+
+
 ## Configuration via a storage class
 
 The easier way to configure the storage for a PostgreSQL class is to just
@@ -98,6 +105,22 @@ spec:
     storageClass: standard
     size: 1Gi
 ```
+
+In the following example we also create a PVC for the WAL storage
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgresql-storage-class
+spec:
+  instances: 3
+  storage:
+    size: 1Gi
+  walStorage:
+    size: 1Gi
+```
+
 
 !!! Important
     CloudNativePG has been designed to be storage class agnostic.
@@ -303,6 +326,6 @@ $ kubectl get pods
 NAME                           READY   STATUS      RESTARTS   AGE
 cluster-example-1              1/1     Running     0          5m58s
 cluster-example-2              1/1     Running     0          5m43s
-cluster-example-4-join-v2bfg   0/1     Completed   0          17s
+cluster-example-4-join-v2      0/1     Completed   0          17s
 cluster-example-4              1/1     Running     0          10s
 ```

@@ -860,6 +860,7 @@ volumeMode
 volumeMounts
 wal
 walSegmentSize
+walStorage
 walbackupconfiguration
 walkthrough
 walsender
