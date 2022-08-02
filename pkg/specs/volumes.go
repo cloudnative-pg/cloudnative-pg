@@ -131,7 +131,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		volumeMounts = append(volumeMounts,
 			corev1.VolumeMount{
 				Name:      "pg_wal",
-				MountPath: "/var/lib/postgresql/data/pg_wal",
+				MountPath: "/var/lib/postgresql/pg_wal",
 			},
 		)
 	}
