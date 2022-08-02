@@ -62,6 +62,14 @@ var (
 	scheme            *runtime.Scheme
 )
 
+type fakeClock struct {
+	t time.Time
+}
+
+func (f fakeClock) Now() time.Time {
+	return f.t
+}
+
 func init() {
 	rand.Seed(time.Now().UnixNano())
 }

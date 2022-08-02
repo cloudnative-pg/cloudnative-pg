@@ -710,6 +710,10 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		}
 	}
 	in.Topology.DeepCopyInto(&out.Topology)
+	if in.CurrentPrimaryFailingSince != nil {
+		in, out := &in.CurrentPrimaryFailingSince, &out.CurrentPrimaryFailingSince
+		*out = (*in).DeepCopy()
+	}
 	if in.DanglingPVC != nil {
 		in, out := &in.DanglingPVC, &out.DanglingPVC
 		*out = make([]string, len(*in))

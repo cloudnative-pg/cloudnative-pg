@@ -17,9 +17,15 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
+	"errors"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -56,3 +62,164 @@ var _ = Describe("Filtering cluster", func() {
 		Expect(req).ToNot(BeNil())
 	})
 })
+
+var _ = Describe("Updating target primary", func() {
+	It("selects the new target primary right away", func() {
+		withManager(func(ctx context.Context, crReconciler *ClusterReconciler, poolerReconciler *PoolerReconciler,
+			manager manager.Manager,
+		) {
+			var err error
+
+			now := time.Now()
+			crReconciler.clock = fakeClock{t: now}
+			namespace := newFakeNamespace()
+			cluster := newFakeCNPGCluster(namespace)
+
+			By("creating the cluster resources", func() {
+				generateFakeInitDBJobs(crReconciler.Client, cluster)
+				generateFakeClusterPods(crReconciler.Client, cluster, true)
+				generateFakePVC(crReconciler.Client, cluster)
+
+				assertRefreshManagerCache(ctx, manager)
+			})
+
+			var managedResources *managedResources
+			var statusList postgres.PostgresqlStatusList
+			By("creating the status list from the cluster pods", func() {
+				managedResources, statusList, err = getManagedResourcesAndStatusList(ctx, crReconciler, cluster)
+				Expect(err).To(BeNil())
+
+				cluster.Status.TargetPrimary = managedResources.pods.Items[0].Name
+			})
+
+			By("updating target primary pods for the cluster", func() {
+				selectedPrimary, err := crReconciler.updateTargetPrimaryFromPods(
+					ctx,
+					cluster,
+					statusList,
+					managedResources,
+				)
+
+				Expect(err).To(BeNil())
+				Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
+			})
+		})
+	})
+
+	It("it should wait the failover delay to select the new target primary", func() {
+		withManager(func(ctx context.Context, crReconciler *ClusterReconciler, poolerReconciler *PoolerReconciler,
+			manager manager.Manager,
+		) {
+			var err error
+
+			now := time.Now()
+			clock := &fakeClock{t: now}
+			crReconciler.clock = clock
+
+			namespace := newFakeNamespace()
+			cluster := newFakeCNPGCluster(namespace)
+
+			By("setting failover delay to 1 sec on the cluster", func() {
+				cluster.Spec.FailoverDelay = 2
+				err := crReconciler.Client.Update(ctx, cluster)
+				Expect(err).To(BeNil())
+			})
+
+			By("creating the cluster resources", func() {
+				generateFakeInitDBJobs(crReconciler.Client, cluster)
+				generateFakeClusterPods(crReconciler.Client, cluster, true)
+				generateFakePVC(crReconciler.Client, cluster)
+
+				assertRefreshManagerCache(ctx, manager)
+			})
+
+			var managedResources *managedResources
+			var statusList postgres.PostgresqlStatusList
+
+			By("creating the status list from the cluster pods", func() {
+				managedResources, statusList, err = getManagedResourcesAndStatusList(ctx, crReconciler, cluster)
+				Expect(err).To(BeNil())
+
+				cluster.Status.TargetPrimary = managedResources.pods.Items[0].Name
+			})
+
+			By("updating target primary pods for the cluster three times with a 1 second interval", func() {
+				selectedPrimary, err := crReconciler.updateTargetPrimaryFromPods(
+					ctx,
+					cluster,
+					statusList,
+					managedResources,
+				)
+
+				Expect(err).NotTo(BeNil())
+				var errWaitingOnFailoverDelay *ErrWaitingOnFailoverDelay
+				Expect(errors.As(err, &errWaitingOnFailoverDelay)).To(BeTrue())
+				Expect(selectedPrimary).To(Equal(""))
+
+				clock.t = clock.t.Add(time.Second)
+
+				selectedPrimary, err = crReconciler.updateTargetPrimaryFromPods(
+					ctx,
+					cluster,
+					statusList,
+					managedResources,
+				)
+
+				Expect(err).NotTo(BeNil())
+				Expect(errors.As(err, &errWaitingOnFailoverDelay)).To(BeTrue())
+				Expect(selectedPrimary).To(Equal(""))
+
+				clock.t = clock.t.Add(time.Second)
+
+				selectedPrimary, err = crReconciler.updateTargetPrimaryFromPods(
+					ctx,
+					cluster,
+					statusList,
+					managedResources,
+				)
+
+				Expect(err).To(BeNil())
+				Expect(selectedPrimary).To(Equal(statusList.Items[0].Pod.Name))
+			})
+		})
+	})
+})
+
+func getManagedResourcesAndStatusList(
+	ctx context.Context,
+	crReconciler *ClusterReconciler,
+	cluster *apiv1.Cluster,
+) (*managedResources, postgres.PostgresqlStatusList, error) {
+	managedResources, err := crReconciler.getManagedResources(ctx, cluster)
+	if err != nil {
+		return nil, postgres.PostgresqlStatusList{}, err
+	}
+
+	statusList := postgres.PostgresqlStatusList{
+		Items: []postgres.PostgresqlStatus{
+			{
+				CurrentLsn:  postgres.LSN("0/0"),
+				ReceivedLsn: postgres.LSN("0/0"),
+				ReplayLsn:   postgres.LSN("0/0"),
+				IsReady:     true,
+				Pod:         managedResources.pods.Items[1],
+			},
+			{
+				CurrentLsn:  postgres.LSN("0/0"),
+				ReceivedLsn: postgres.LSN("0/0"),
+				ReplayLsn:   postgres.LSN("0/0"),
+				IsReady:     true,
+				Pod:         managedResources.pods.Items[2],
+			},
+			{
+				CurrentLsn:  postgres.LSN("0/0"),
+				ReceivedLsn: postgres.LSN("0/0"),
+				ReplayLsn:   postgres.LSN("0/0"),
+				IsReady:     false,
+				Pod:         managedResources.pods.Items[0],
+			},
+		},
+	}
+
+	return managedResources, statusList, err
+}

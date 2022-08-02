@@ -1,7 +1,7 @@
 # Automated failover
 
-In the case of unexpected errors on the primary, the cluster will go into
-**failover mode**. This may happen, for example, when:
+In the case of unexpected errors on the primary for longer than the `spec.failoverDelay`, the cluster will go into
+**failover mode*. This may happen, for example, when:
 
 - The primary pod has a disk failure
 - The primary pod is deleted
