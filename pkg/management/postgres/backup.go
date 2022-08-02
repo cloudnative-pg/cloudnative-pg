@@ -26,8 +26,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -45,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // We wait up to 10 minutes to have a WAL archived correctly

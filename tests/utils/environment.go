@@ -28,14 +28,11 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/gomega" // nolint
-
-	eventsv1 "k8s.io/api/events/v1"
-
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,6 +49,8 @@ import (
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+
+	. "github.com/onsi/gomega" // nolint
 )
 
 const (

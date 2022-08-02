@@ -1,6 +1,13 @@
 linters-settings:
   lll:
     line-length: 120
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/cloudnative-pg/cloudnative-pg)
+      - blank
+      - dot
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
@@ -16,6 +23,7 @@ linters:
     - durationcheck
     - errcheck
     - exportloopref
+    - gci
     - gocognit
     - goconst
     - gocritic
@@ -75,7 +83,6 @@ linters:
   # - exhaustive
   # - exhaustivestruct
   # - funlen
-  # - gci
   # - gochecknoglobals
   # - gochecknoinits
   # - godot
