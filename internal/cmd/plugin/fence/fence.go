@@ -76,7 +76,9 @@ func ApplyFenceFunc(
 	}
 
 	fencedCluster := cluster.DeepCopy()
-
+	if fencedCluster.Annotations == nil {
+		fencedCluster.Annotations = make(map[string]string)
+	}
 	if err = fenceFunc(serverName, fencedCluster.Annotations); err != nil {
 		return err
 	}
