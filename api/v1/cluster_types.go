@@ -1805,7 +1805,7 @@ func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 
 // GetWalArchiveVolumePrefix gets the wal archive volume name prefix
 func (cluster *Cluster) GetWalArchiveVolumePrefix() string {
-	return "wal-archive-"
+	return "pg-wal-"
 }
 
 // GetPostgresUID returns the UID that is being used for the "postgres"

@@ -47,6 +47,9 @@ type InitInfo struct {
 	// The data directory where to generate the new cluster
 	PgData string
 
+	// the data directory where to store the WAL
+	PgWal string
+
 	// The name of the database to be generated for the applications
 	ApplicationDatabase string
 
@@ -114,6 +117,8 @@ func (info InitInfo) CreateDataDirectory() error {
 	if info.Temporary {
 		options = append(options, "--no-sync")
 	}
+
+	options = append(options, "--waldir", info.PgWal)
 
 	// Add custom initdb options from the user
 	options = append(options, info.InitDBOptions...)

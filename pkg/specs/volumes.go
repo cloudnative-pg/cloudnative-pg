@@ -17,10 +17,13 @@ limitations under the License.
 package specs
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	corev1 "k8s.io/api/core/v1"
 )
+
+const pgWalVolumePath = "/var/lib/postgresql/wal"
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
@@ -77,7 +80,7 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 	if cluster.ShouldCreateWalArchiveVolume() {
 		result = append(result,
 			corev1.Volume{
-				Name: "pg_wal",
+				Name: "pg-wal",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: cluster.GetWalArchiveVolumePrefix() + podName,
@@ -130,8 +133,8 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 	if cluster.ShouldCreateWalArchiveVolume() {
 		volumeMounts = append(volumeMounts,
 			corev1.VolumeMount{
-				Name:      "pg_wal",
-				MountPath: "/var/lib/postgresql/pg_wal",
+				Name:      "pg-wal",
+				MountPath: pgWalVolumePath,
 			},
 		)
 	}

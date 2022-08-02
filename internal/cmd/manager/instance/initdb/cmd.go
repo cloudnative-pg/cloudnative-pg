@@ -37,6 +37,7 @@ func NewCmd() *cobra.Command {
 	var namespace string
 	var parentNode string
 	var pgData string
+	var pgWal string
 	var podName string
 	var postInitSQLStr string
 	var postInitApplicationSQLStr string
@@ -79,6 +80,7 @@ func NewCmd() *cobra.Command {
 				Namespace:              namespace,
 				ParentNode:             parentNode,
 				PgData:                 pgData,
+				PgWal:                  pgWal,
 				PodName:                podName,
 				PostInitSQL:            postInitSQL,
 				PostInitApplicationSQL: postInitApplicationSQL,
@@ -101,6 +103,7 @@ func NewCmd() *cobra.Command {
 		"the cluster and the pod in k8s")
 	cmd.Flags().StringVar(&parentNode, "parent-node", "", "The origin node")
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
+	cmd.Flags().StringVar(&pgWal, "pg-wal", os.Getenv("PGWAL"), "the PGWAL to be created")
 	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The pod name to "+
 		"be checked against the cluster state")
 	cmd.Flags().StringVar(&postInitSQLStr, "post-init-sql", "", "The list of SQL queries to be "+
