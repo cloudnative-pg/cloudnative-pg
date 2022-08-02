@@ -17,10 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 var _ = Describe("Scheduled backup", func() {
