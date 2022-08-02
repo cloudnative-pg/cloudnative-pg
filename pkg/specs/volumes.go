@@ -130,7 +130,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 	if cluster.ShouldCreateWalArchiveVolume() {
 		volumeMounts = append(volumeMounts,
 			corev1.VolumeMount{
-				Name:      "wal-archive",
+				Name:      "pg_wal",
 				MountPath: "/var/lib/postgresql/data/pg_wal",
 			},
 		)
