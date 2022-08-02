@@ -11,8 +11,8 @@ spec:
       containers:
       - name: manager
         args:
-        - "--metrics-addr=127.0.0.1:8080"
-        - "--enable-leader-election"
+        - "--metrics-bind-address=127.0.0.1:8080"
+        - "--leader-elect"
       - name: kube-rbac-proxy
         image: gcr.io/kubebuilder/kube-rbac-proxy:v0.4.1
         args:

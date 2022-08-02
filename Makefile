@@ -37,6 +37,8 @@ POSTGRES_IMAGE_NAME ?= ghcr.io/cloudnative-pg/postgresql:14
 KUSTOMIZE_VERSION ?= v4.5.2
 KIND_CLUSTER_NAME ?= pg
 KIND_CLUSTER_VERSION ?= v1.24.2
+CONTROLLER_TOOLS_VERSION ?= v0.9.2
+GORELEASER_VERSION ?= v1.10.3
 
 export CONTROLLER_IMG
 export BUILD_IMAGE
@@ -79,7 +81,6 @@ help: ## Display this help.
 ##@ Development
 
 ENVTEST_ASSETS_DIR=$$(pwd)/testbin
-
 test: generate fmt vet manifests ## Run tests.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
 	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest ;\
@@ -120,13 +121,13 @@ deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cl
 	CONFIG_TMP_DIR=$$(mktemp -d) ;\
 	cp -r config/* $$CONFIG_TMP_DIR ;\
 	{ \
-	    cd $$CONFIG_TMP_DIR/default ;\
-	    $(KUSTOMIZE) edit add patch --path manager_image_pull_secret.yaml ;\
-	    cd $$CONFIG_TMP_DIR/manager ;\
-	    $(KUSTOMIZE) edit set image controller="${CONTROLLER_IMG}" ;\
-	    $(KUSTOMIZE) edit add patch --path env_override.yaml ;\
-	    $(KUSTOMIZE) edit add configmap controller-manager-env \
-	        --from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME}" ;\
+		cd $$CONFIG_TMP_DIR/default ;\
+		$(KUSTOMIZE) edit add patch --path manager_image_pull_secret.yaml ;\
+		cd $$CONFIG_TMP_DIR/manager ;\
+		$(KUSTOMIZE) edit set image controller="${CONTROLLER_IMG}" ;\
+		$(KUSTOMIZE) edit add patch --path env_override.yaml ;\
+		$(KUSTOMIZE) edit add configmap controller-manager-env \
+			--from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME}" ;\
 	} ;\
 	$(KUSTOMIZE) build $$CONFIG_TMP_DIR/default | kubectl apply -f - ;\
 	rm -fr $$CONFIG_TMP_DIR
@@ -193,25 +194,40 @@ apidoc: k8s-api-docgen ## Update the API Reference section of the documentation.
 
 ##@ Tools
 
-CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
-controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0)
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
 
-KUSTOMIZE = $(shell pwd)/bin/kustomize
+## Tool Binaries
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+
+.PHONY: controller-gen
+controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
+$(CONTROLLER_GEN): $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+
+KUSTOMIZE = $(LOCALBIN)/kustomize
 kustomize: ## Download kustomize locally if necessary.
 	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@$(KUSTOMIZE_VERSION))
 
-K8S_API_DOCGEN = $(shell pwd)/bin/k8s-api-docgen
+.PHONY: envtest
+envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+K8S_API_DOCGEN = $(LOCALBIN)/k8s-api-docgen
 k8s-api-docgen: ## Download k8s-api-docgen locally if necessary.
 	$(call go-install-tool,$(K8S_API_DOCGEN),github.com/EnterpriseDB/k8s-api-docgen/cmd/k8s-api-docgen@latest)
 
-GO_LICENSES = $(shell pwd)/bin/go-licenses
+GO_LICENSES = $(LOCALBIN)/go-licenses
 go-licenses: ## Download go-licenses locally if necessary.
 	$(call go-install-tool,$(GO_LICENSES),github.com/google/go-licenses@latest)
 
-GO_RELEASER = $(shell pwd)/bin/goreleaser
+GO_RELEASER = $(LOCALBIN)/goreleaser
 go-releaser: ## Download go-releaser locally if necessary.
-	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser@v1.8.3)
+	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser@$(GORELEASER_VERSION))
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 # go-install-tool will 'go install' any package $2 and install it to $1.
