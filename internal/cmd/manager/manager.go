@@ -26,7 +26,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"go.uber.org/zap/zapcore"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"

@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 func TestApi(t *testing.T) {
