@@ -23,7 +23,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
@@ -85,7 +84,7 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 	refs *apiv1.PostInitApplicationSQLRefs,
 ) ([]corev1.Volume, []corev1.VolumeMount) {
 	length := len(refs.ConfigMapRefs) + len(refs.SecretRefs)
-	digitsCount := utils.CountDigits(length)
+	digitsCount := len(fmt.Sprintf("%d", length))
 	volumes := make([]corev1.Volume, 0, length)
 	volumeMounts := make([]corev1.VolumeMount, 0, length)
 
