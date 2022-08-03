@@ -121,6 +121,7 @@ func DetectPVCs(
 	jobList []batchv1.Job,
 	pvcList []corev1.PersistentVolumeClaim,
 ) (result PVCUsageStatus) {
+pvcLoop:
 	for _, pvc := range pvcList {
 		if pvc.Status.Phase != corev1.ClaimPending &&
 			pvc.Status.Phase != corev1.ClaimBound {
@@ -137,34 +138,22 @@ func DetectPVCs(
 		}
 
 		// Find a Pod corresponding to this PVC
-		podFound := false
 		for idx := range podList {
 			if podList[idx].Name == pvc.Name {
-				podFound = true
-				break
+				// We found a Pod using this PVC so this
+				// PVC is not dangling
+				result.Healthy = append(result.Healthy, pvc.Name)
+				continue pvcLoop
 			}
 		}
 
-		if podFound {
-			// We found a Pod using this PVC so this
-			// PVC is not dangling
-			result.Healthy = append(result.Healthy, pvc.Name)
-			continue
-		}
-
-		jobFound := false
 		for idx := range jobList {
 			if IsJobOperatingOnPVC(jobList[idx], pvc) {
-				jobFound = true
-				break
+				// We have found a Job corresponding to this PVC, so we
+				// are initializing it or the initialization is just completed
+				result.Initializing = append(result.Initializing, pvc.Name)
+				continue pvcLoop
 			}
-		}
-
-		if jobFound {
-			// We have found a Job corresponding to this PVC, so we
-			// are initializing it or the initialization is just completed
-			result.Initializing = append(result.Initializing, pvc.Name)
-			continue
 		}
 
 		if pvc.Annotations[PVCStatusAnnotationName] != PVCStatusReady {
