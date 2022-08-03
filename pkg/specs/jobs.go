@@ -18,6 +18,7 @@ package specs
 
 import (
 	"fmt"
+	"path"
 
 	"github.com/kballard/go-shellquote"
 	batchv1 "k8s.io/api/batch/v1"
@@ -69,7 +70,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 	}
 
 	if cluster.ShouldCreateWalArchiveVolume() {
-		initCommand = append(initCommand, "--pg-wal", pgWalVolumePath+"/pg_wal")
+		initCommand = append(initCommand, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
 	}
 
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
