@@ -66,10 +66,11 @@ type PVCUsageStatus struct {
 func CreatePVC(
 	storageConfiguration apiv1.StorageConfiguration,
 	name string,
+	suffix string,
 	namespace string,
 	nodeSerial int,
 ) (*corev1.PersistentVolumeClaim, error) {
-	pvcName := fmt.Sprintf("%s-%v", name, nodeSerial)
+	pvcName := fmt.Sprintf("%s-%v%s", name, nodeSerial, suffix)
 
 	result := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{

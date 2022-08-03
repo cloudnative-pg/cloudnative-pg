@@ -897,7 +897,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
-	if err := r.createPVC(ctx, cluster, cluster.Spec.StorageConfiguration, cluster.Name, nodeSerial); err != nil {
+	if err := r.createPVC(ctx, cluster, "", cluster.Spec.StorageConfiguration, nodeSerial); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
@@ -905,8 +905,8 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		if err := r.createPVC(
 			ctx,
 			cluster,
+			cluster.GetWalArchiveVolumeSuffix(),
 			*cluster.Spec.WalStorage,
-			cluster.GetWalArchiveVolumePrefix()+cluster.Name,
 			nodeSerial,
 		); err != nil {
 			return ctrl.Result{RequeueAfter: time.Minute}, err
@@ -1068,7 +1068,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	if err := r.createPVC(ctx, cluster, cluster.Spec.StorageConfiguration, cluster.Name, nodeSerial); err != nil {
+	if err := r.createPVC(ctx, cluster, "", cluster.Spec.StorageConfiguration, nodeSerial); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
@@ -1076,8 +1076,8 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		if err := r.createPVC(
 			ctx,
 			cluster,
+			cluster.GetWalArchiveVolumeSuffix(),
 			*cluster.Spec.WalStorage,
-			cluster.GetWalArchiveVolumePrefix()+cluster.Name,
 			nodeSerial,
 		); err != nil {
 			return ctrl.Result{RequeueAfter: time.Minute}, err
@@ -1241,14 +1241,14 @@ func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *api
 
 func (r *ClusterReconciler) createPVC(
 	ctx context.Context,
-	ownedBy *apiv1.Cluster,
+	cluster *apiv1.Cluster,
+	suffix string,
 	storageConfiguration apiv1.StorageConfiguration,
-	name string,
 	nodeSerial int,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvcSpec, err := specs.CreatePVC(storageConfiguration, name, ownedBy.Namespace, nodeSerial)
+	pvcSpec, err := specs.CreatePVC(storageConfiguration, cluster.Name, suffix, cluster.Namespace, nodeSerial)
 	if err != nil {
 		if err == specs.ErrorInvalidSize {
 			// This error should have been caught by the validating
@@ -1262,7 +1262,7 @@ func (r *ClusterReconciler) createPVC(
 		return fmt.Errorf("unable to create a PVC spec for node with serial %v: %w", nodeSerial, err)
 	}
 
-	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, ownedBy)
+	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, cluster)
 
 	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
 		return fmt.Errorf("unable to create a PVC for this node (nodeSerial: %d): %w",
