@@ -289,16 +289,21 @@ func CreatePodSecurityContext(user, group int64) *corev1.PodSecurityContext {
 	}
 }
 
+func generateInstanceName(cluster apiv1.Cluster, nodeSerial int) string {
+	return fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+}
+
 // PodWithExistingStorage create a new instance with an existing storage
 func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
-	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	podName := generateInstanceName(cluster, nodeSerial)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				ClusterLabelName:       cluster.Name,
-				utils.ClusterLabelName: cluster.Name,
+				ClusterLabelName:        cluster.Name,
+				utils.ClusterLabelName:  cluster.Name,
+				utils.InstanceLabelName: podName,
 			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),

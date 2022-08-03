@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -65,17 +66,19 @@ type PVCUsageStatus struct {
 // CreatePVC create spec of a PVC, given its name and the storage configuration
 func CreatePVC(
 	storageConfiguration apiv1.StorageConfiguration,
-	name string,
+	cluster apiv1.Cluster,
 	suffix string,
-	namespace string,
 	nodeSerial int,
 ) (*corev1.PersistentVolumeClaim, error) {
-	pvcName := fmt.Sprintf("%s-%v%s", name, nodeSerial, suffix)
+	pvcName := fmt.Sprintf("%s-%v%s", cluster.Name, nodeSerial, suffix)
 
 	result := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
-			Namespace: namespace,
+			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.InstanceLabelName: generateInstanceName(cluster, nodeSerial),
+			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
 				PVCStatusAnnotationName:     PVCStatusInitializing,

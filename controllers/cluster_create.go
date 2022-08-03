@@ -897,7 +897,13 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
-	if err := r.createPVC(ctx, cluster, "", cluster.Spec.StorageConfiguration, nodeSerial); err != nil {
+	if err := r.createPVC(
+		ctx,
+		cluster,
+		"",
+		cluster.Spec.StorageConfiguration,
+		nodeSerial,
+	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
@@ -1068,7 +1074,13 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	if err := r.createPVC(ctx, cluster, "", cluster.Spec.StorageConfiguration, nodeSerial); err != nil {
+	if err := r.createPVC(
+		ctx,
+		cluster,
+		"",
+		cluster.Spec.StorageConfiguration,
+		nodeSerial,
+	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
@@ -1248,7 +1260,7 @@ func (r *ClusterReconciler) createPVC(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvcSpec, err := specs.CreatePVC(storageConfiguration, cluster.Name, suffix, cluster.Namespace, nodeSerial)
+	pvcSpec, err := specs.CreatePVC(storageConfiguration, *cluster, suffix, nodeSerial)
 	if err != nil {
 		if err == specs.ErrorInvalidSize {
 			// This error should have been caught by the validating
