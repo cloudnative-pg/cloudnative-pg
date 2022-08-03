@@ -129,6 +129,10 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 		"restore",
 	}
 
+	if cluster.ShouldCreateWalArchiveVolume() {
+		initCommand = append(initCommand, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
+	}
+
 	job := createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
@@ -168,6 +172,10 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *bat
 		"pgbasebackup",
 	}
 
+	if cluster.ShouldCreateWalArchiveVolume() {
+		initCommand = append(initCommand, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
+	}
+
 	return createPrimaryJob(cluster, nodeSerial, "pgbasebackup", initCommand)
 }
 
@@ -178,6 +186,10 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 		"instance",
 		"join",
 		"--parent-node", cluster.GetServiceReadWriteName(),
+	}
+
+	if cluster.ShouldCreateWalArchiveVolume() {
+		initCommand = append(initCommand, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
 	}
 
 	return createPrimaryJob(cluster, nodeSerial, "join", initCommand)

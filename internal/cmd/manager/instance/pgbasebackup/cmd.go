@@ -44,6 +44,7 @@ func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
 	var pgData string
+	var pgWal string
 
 	cmd := &cobra.Command{
 		Use: "pgbasebackup",
@@ -58,6 +59,7 @@ func NewCmd() *cobra.Command {
 					ClusterName: clusterName,
 					Namespace:   namespace,
 					PgData:      pgData,
+					PgWal:       pgWal,
 				},
 				client: client,
 			}
@@ -76,6 +78,7 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and of the Pod in k8s")
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
+	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "the PGWAL to be created")
 
 	return cmd
 }
@@ -112,7 +115,7 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 			return err
 		}
 	}
-	err = postgres.ClonePgData(connectionString, env.info.PgData)
+	err = postgres.ClonePgData(connectionString, env.info.PgData, env.info.PgWal)
 	if err != nil {
 		return err
 	}
