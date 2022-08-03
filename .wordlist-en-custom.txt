@@ -127,6 +127,7 @@ ImportSource
 InfoSec
 Innocenti
 InstanceID
+InstancePVC
 InstanceReportedState
 Istio
 JSON
@@ -536,6 +537,7 @@ initDB
 initdb
 initialise
 initializingPVC
+instanceName
 instancesStatus
 inuse
 io
@@ -709,6 +711,7 @@ psql
 pv
 pvc
 pvcCount
+pvcName
 pvcTemplate
 quantile
 queryable

@@ -309,6 +309,9 @@ func (topologyLabels PodTopologyLabels) matchesTopology(instanceTopology PodTopo
 // PodName is the name of a Pod
 type PodName string
 
+// InstanceName is the name of the instance
+type InstanceName string
+
 // Topology contains the cluster topology
 type Topology struct {
 	// SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors
@@ -316,6 +319,12 @@ type Topology struct {
 	SuccessfullyExtracted bool `json:"successfullyExtracted,omitempty"`
 	// Instances contains the pod topology of the instances
 	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
+}
+
+// InstancePVC contains the pvcName and the instanceName
+type InstancePVC struct {
+	InstanceName string `json:"instanceName,omitempty"`
+	PvcName      string `json:"pvcName,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
@@ -356,16 +365,16 @@ type ClusterStatus struct {
 
 	// List of all the PVCs created by this cluster and still available
 	// which are not attached to a Pod
-	DanglingPVC []string `json:"danglingPVC,omitempty"`
+	DanglingPVC []InstancePVC `json:"danglingPVC,omitempty"`
 
 	// List of all the PVCs that have ResizingPVC condition.
-	ResizingPVC []string `json:"resizingPVC,omitempty"`
+	ResizingPVC []InstancePVC `json:"resizingPVC,omitempty"`
 
 	// List of all the PVCs that are being initialized by this cluster
-	InitializingPVC []string `json:"initializingPVC,omitempty"`
+	InitializingPVC []InstancePVC `json:"initializingPVC,omitempty"`
 
 	// List of all the PVCs not dangling nor initializing
-	HealthyPVC []string `json:"healthyPVC,omitempty"`
+	HealthyPVC []InstancePVC `json:"healthyPVC,omitempty"`
 
 	// Current write pod
 	WriteService string `json:"writeService,omitempty"`
@@ -1796,6 +1805,17 @@ func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
 
 	recoveryParameters := cluster.Spec.Bootstrap.Recovery
 	return recoveryParameters.Owner != "" && recoveryParameters.Database != ""
+}
+
+// GetInstancePVCNames gets all the PVC names for a given instance
+func (cluster *Cluster) GetInstancePVCNames(instanceName string) []string {
+	names := []string{instanceName}
+
+	if cluster.ShouldCreateWalArchiveVolume() {
+		names = append(names, instanceName+cluster.GetWalArchiveVolumeSuffix())
+	}
+
+	return names
 }
 
 // ShouldCreateWalArchiveVolume returns if we should create the wal archive volume

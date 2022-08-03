@@ -47,6 +47,7 @@ Below you will find a description of the defined resources:
 - [Import](#Import)
 - [ImportSource](#ImportSource)
 - [InstanceID](#InstanceID)
+- [InstancePVC](#InstancePVC)
 - [InstanceReportedState](#InstanceReportedState)
 - [LDAPBindAsAuth](#LDAPBindAsAuth)
 - [LDAPBindSearchAuth](#LDAPBindSearchAuth)
@@ -393,10 +394,10 @@ Name                      | Description                                         
 `targetPrimary            ` | Target primary instance, this is different from the previous one during a switchover or a failover                                                                                 | string                                                     
 `pvcCount                 ` | How many PVCs have been created by this cluster                                                                                                                                    | int32                                                      
 `jobCount                 ` | How many Jobs have been created by this cluster                                                                                                                                    | int32                                                      
-`danglingPVC              ` | List of all the PVCs created by this cluster and still available which are not attached to a Pod                                                                                   | []string                                                   
-`resizingPVC              ` | List of all the PVCs that have ResizingPVC condition.                                                                                                                              | []string                                                   
-`initializingPVC          ` | List of all the PVCs that are being initialized by this cluster                                                                                                                    | []string                                                   
-`healthyPVC               ` | List of all the PVCs not dangling nor initializing                                                                                                                                 | []string                                                   
+`danglingPVC              ` | List of all the PVCs created by this cluster and still available which are not attached to a Pod                                                                                   | [[]InstancePVC](#InstancePVC)                              
+`resizingPVC              ` | List of all the PVCs that have ResizingPVC condition.                                                                                                                              | [[]InstancePVC](#InstancePVC)                              
+`initializingPVC          ` | List of all the PVCs that are being initialized by this cluster                                                                                                                    | [[]InstancePVC](#InstancePVC)                              
+`healthyPVC               ` | List of all the PVCs not dangling nor initializing                                                                                                                                 | [[]InstancePVC](#InstancePVC)                              
 `writeService             ` | Current write pod                                                                                                                                                                  | string                                                     
 `readService              ` | Current list of read pods                                                                                                                                                          | string                                                     
 `phase                    ` | Current phase of the cluster                                                                                                                                                       | string                                                     
@@ -519,6 +520,17 @@ Name        | Description      | Type
 ----------- | ---------------- | ------
 `podName    ` | The pod name     | string
 `ContainerID` | The container ID | string
+
+<a id='InstancePVC'></a>
+
+## InstancePVC
+
+InstancePVC contains the pvcName and the instanceName
+
+Name         | Description            | Type  
+------------ | --- | ------
+`instanceName` |  | string
+`pvcName     ` |  | string
 
 <a id='InstanceReportedState'></a>
 

@@ -662,8 +662,8 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 	contextLogger := log.FromContext(ctx)
 
 	// Make sure that all healthy PVCs are marked as ready
-	for _, pvcName := range cluster.Status.HealthyPVC {
-		pvc := resources.getPVC(pvcName)
+	for _, instancePVC := range cluster.Status.HealthyPVC {
+		pvc := resources.getPVC(instancePVC.PvcName)
 		if pvc == nil {
 			contextLogger.Warning("unable to find pvc to annotate it as ready", "pvc", pvc.Name)
 			continue

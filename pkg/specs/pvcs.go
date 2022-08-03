@@ -17,6 +17,7 @@ limitations under the License.
 package specs
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -25,8 +26,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -49,18 +52,18 @@ var ErrorInvalidSize = fmt.Errorf("invalid storage size")
 // PVCUsageStatus is the status of the PVC we generated
 type PVCUsageStatus struct {
 	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
-	Initializing []string
+	Initializing []apiv1.InstancePVC
 
 	// List of PVCs with Resizing condition. Requires a pod restart.
 	//
 	// INFO: https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/
-	Resizing []string
+	Resizing []apiv1.InstancePVC
 
 	// List of PVCs that are dangling (they don't have a corresponding Job nor a corresponding Pod)
-	Dangling []string
+	Dangling []apiv1.InstancePVC
 
 	// List of PVCs that are used (they have a corresponding Pod)
-	Healthy []string
+	Healthy []apiv1.InstancePVC
 }
 
 // CreatePVC create spec of a PVC, given its name and the storage configuration
@@ -119,11 +122,16 @@ func CreatePVC(
 
 // DetectPVCs fill the list with the PVCs which are dangling, given that
 // PVC are usually named after Pods
+// nolint: gocognit
 func DetectPVCs(
+	ctx context.Context,
+	cluster apiv1.Cluster,
 	podList []corev1.Pod,
 	jobList []batchv1.Job,
 	pvcList []corev1.PersistentVolumeClaim,
 ) (result PVCUsageStatus) {
+	contextLogger := log.FromContext(ctx)
+	var foundInstances []string
 pvcLoop:
 	for _, pvc := range pvcList {
 		if pvc.Status.Phase != corev1.ClaimPending &&
@@ -136,17 +144,32 @@ pvcLoop:
 			continue
 		}
 
+		// TODO optimize
+		// we save all the instance we found so far
+		instanceName := pvc.Labels[utils.InstanceLabelName]
+		if !slices.Contains(foundInstances, instanceName) {
+			foundInstances = append(foundInstances, instanceName)
+		}
+		// END TODO
+
+		instancePVC := apiv1.InstancePVC{
+			InstanceName: instanceName,
+			PvcName:      pvc.Name,
+		}
+
 		if isResizing(pvc) {
-			result.Resizing = append(result.Resizing, pvc.Name)
+			result.Resizing = append(result.Resizing, instancePVC)
 		}
 
 		// Find a Pod corresponding to this PVC
 		for idx := range podList {
-			if podList[idx].Name == pvc.Name {
-				// We found a Pod using this PVC so this
-				// PVC is not dangling
-				result.Healthy = append(result.Healthy, pvc.Name)
-				continue pvcLoop
+			for _, volume := range podList[idx].Spec.Volumes {
+				if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == instancePVC.PvcName {
+					// We found a Pod using this PVC so this
+					// PVC is not dangling
+					result.Healthy = append(result.Healthy, instancePVC)
+					continue pvcLoop
+				}
 			}
 		}
 
@@ -154,7 +177,7 @@ pvcLoop:
 			if IsJobOperatingOnPVC(jobList[idx], pvc) {
 				// We have found a Job corresponding to this PVC, so we
 				// are initializing it or the initialization is just completed
-				result.Initializing = append(result.Initializing, pvc.Name)
+				result.Initializing = append(result.Initializing, instancePVC)
 				continue pvcLoop
 			}
 		}
@@ -166,10 +189,45 @@ pvcLoop:
 		}
 
 		// This PVC has not a Job nor a Pod using it, it's dangling
-		result.Dangling = append(result.Dangling, pvc.Name)
+		result.Dangling = append(result.Dangling, instancePVC)
+	}
+
+	if !cluster.ShouldCreateWalArchiveVolume() {
+		return result
+	}
+
+	// NORMALIZE. TODO: refactor
+	for _, instance := range foundInstances {
+		expected := len(cluster.GetInstancePVCNames(instance))
+		var found []int
+		for idx, pvc := range result.Healthy {
+			if pvc.InstanceName == instance {
+				found = append(found, idx)
+			}
+		}
+		contextLogger.Info("detectPVC info", "instance", instance, "found", found, "expected", expected)
+		if expected == len(found) {
+			continue
+		}
+
+		if expected > len(found) {
+			// we lost some pvc null them all
+			for _, index := range found {
+				result.Dangling = append(result.Dangling, result.Healthy[index])
+				result.Healthy = removeElementByIndex(result.Healthy, index)
+			}
+		}
+
+		// if len(found) > expected {
+		// something terribly wrong
+		//}
 	}
 
 	return result
+}
+
+func removeElementByIndex[T any](slice []T, index int) []T {
+	return append(slice[:index], slice[index+1:]...)
 }
 
 // IsJobOperatingOnPVC checks if a Job is initializing the provided PVC
