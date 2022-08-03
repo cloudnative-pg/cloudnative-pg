@@ -360,9 +360,6 @@ func (r *ClusterReconciler) updateResourceStatus(
 		return err
 	}
 
-	// set cluster conditions in cluster status
-	r.SetClusterConditionsInStatus(ctx, cluster)
-
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
 	}
@@ -733,10 +730,32 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	phase string,
 	reason string,
 ) error {
-	existingClusterStatus := cluster.Status
+	// we ensure that the cluster conditions aren't nil before operating
+	if cluster.Status.Conditions == nil {
+		cluster.Status.Conditions = []metav1.Condition{}
+	}
 
+	existingClusterStatus := cluster.Status
 	cluster.Status.Phase = phase
 	cluster.Status.PhaseReason = reason
+
+	condition := metav1.Condition{
+		Type:    string(apiv1.ConditionClusterReady),
+		Status:  metav1.ConditionFalse,
+		Reason:  string(apiv1.ClusterIsNotReady),
+		Message: "Cluster Is Not Ready",
+	}
+
+	if cluster.Status.Phase == apiv1.PhaseHealthy {
+		condition = metav1.Condition{
+			Type:    string(apiv1.ConditionClusterReady),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.ClusterReady),
+			Message: "Cluster is Ready",
+		}
+	}
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		if err := r.Status().Update(ctx, cluster); err != nil {
@@ -912,36 +931,4 @@ func getPodsTopology(
 	}
 
 	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data}
-}
-
-// SetClusterConditionsInStatus is update condition in cluster status section,
-// it is based on number of pods in <cluster.spec.instance> is equal to cluster up/ready pods
-// then it will update condition type `Ready` with status `True` otherwise
-// with status `False`.
-func (r *ClusterReconciler) SetClusterConditionsInStatus(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-) {
-	contextLogger := log.FromContext(ctx)
-	podList, err := r.getManagedPods(ctx, cluster)
-	if err != nil {
-		contextLogger.Error(err, "pods are not found, skipping to set cluster conditions")
-	}
-	var conditions metav1.Condition
-	if cluster.Spec.Instances == utils.CountReadyPods(podList.Items) {
-		conditions = metav1.Condition{
-			Type:    string(apiv1.ConditionClusterReady),
-			Status:  metav1.ConditionTrue,
-			Reason:  string(apiv1.ClusterReady),
-			Message: "Cluster is Ready",
-		}
-	} else {
-		conditions = metav1.Condition{
-			Type:    string(apiv1.ConditionClusterReady),
-			Status:  metav1.ConditionFalse,
-			Reason:  string(apiv1.ClusterIsNotReady),
-			Message: "Cluster Is Not Ready",
-		}
-	}
-	meta.SetStatusCondition(&cluster.Status.Conditions, conditions)
 }
