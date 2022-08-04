@@ -398,6 +398,7 @@ event to occur instead of relying on the overall cluster health state. Available
 
 - LastBackupSucceeded
 - ContinuousArchiving
+- Ready
 
 ### How to wait for a particular condition
 
@@ -411,6 +412,10 @@ $ kubectl wait --for=condition=LastBackupSucceeded cluster/<CLUSTER-NAME> -n <NA
 $ kubectl wait --for=condition=ContinuousArchiving cluster/<CLUSTER-NAME> -n <NAMESPACE>
 ```
 
+- Ready (Cluster is ready or not):
+```bash
+$ kubectl wait --for=condition=Ready cluster/<CLUSTER-NAME> -n <NAMESPACE>
+```
 Below is a snippet of a `cluster.status` that contains a failing condition.
 
 ```bash
@@ -422,14 +427,21 @@ $ kubectl get cluster/<cluster-name> -o yaml
     conditions:
     - message: 'unexpected failure invoking barman-cloud-wal-archive: exit status
         2'
-      reason: Continuous Archiving is Failing
+      reason: ContinuousArchivingFailing
       status: "False"
       type: ContinuousArchiving
 
     - message: exit status 2
-      reason: Backup is failed
+      reason: LastBackupFailed
       status: "False"
       type: LastBackupSucceeded
+
+    - message: Cluster Is Not Ready
+      reason: ClusterIsNotReady
+      status: "False"
+      type: Ready
+
+
 ```
 
 ## Some common issues
