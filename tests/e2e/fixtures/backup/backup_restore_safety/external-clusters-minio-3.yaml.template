@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: external-cluster-minio-1
+  name: pg-backup-minio
 spec:
   instances: 2
 
@@ -23,12 +23,13 @@ spec:
 
   # Persistent storage configuration
   storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi
 
   bootstrap:
     recovery:
       # cluster name in source cluster
-      source: pg-backup-minio
+      source: external-cluster-minio-1
 
   backup:
     barmanObjectStore:
@@ -52,9 +53,9 @@ spec:
     retentionPolicy: "30d"
 
   externalClusters:
-    - name: pg-backup-minio
+    - name: external-cluster-minio-1
       barmanObjectStore:
-        destinationPath: s3://cluster-backups/
+        destinationPath: s3://cluster-backups/pg-backup-minio/
         endpointURL: http://minio-service:9000
         s3Credentials:
           accessKeyId:

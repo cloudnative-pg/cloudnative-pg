@@ -3,9 +3,7 @@ package utils
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"path/filepath"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -13,16 +11,11 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// ParseObjectsFromYAML parses a series of kubernetes objects defined in a YAML file,
+// ParseObjectsFromYAML parses a series of kubernetes objects defined in a YAML payload,
 // into the specified namespace
-func ParseObjectsFromYAML(yamlPath, namespace string) ([]client.Object, error) {
+func ParseObjectsFromYAML(data []byte, namespace string) ([]client.Object, error) {
 	wrapErr := func(err error) error { return fmt.Errorf("while parsingObjectsFromYAML: %w", err) }
-	data, err := ioutil.ReadFile(filepath.Clean(yamlPath))
-	if err != nil {
-		return nil, wrapErr(err)
-	}
-
-	err = apiv1.AddToScheme(scheme.Scheme)
+	err := apiv1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return nil, wrapErr(err)
 	}

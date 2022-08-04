@@ -20,9 +20,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"strings"
 )
 
 // ErrEnvVarNotFound is thrown when a SHELL-FORMAT var in a file does not
@@ -37,36 +34,35 @@ var ErrEnvVarNotFound = errors.New("could not find environment variable")
 // NOTE: If a variable embedded in the file is not provided in the `vars`
 // argument, this function will error out. This is different from the behavior
 // of the `envsubst` shell command: in testing we should avoid silent failures
-func Envsubst(vars map[string]string, file io.Reader) (io.Reader, error) {
-	bts, err := ioutil.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-	embeddedVars := findEmbeddedVars(string(bts))
+func Envsubst(vars map[string]string, data []byte) ([]byte, error) {
+	embeddedVars := findEmbeddedVars(data)
 	for _, v := range embeddedVars {
-		_, found := vars[v]
-		if !found {
+		value, found := vars[v]
+		if !found || value == "" {
 			return nil, fmt.Errorf("var %s: %w", v, ErrEnvVarNotFound)
 		}
 	}
 	var replaced []byte
-	replaced = bts
+	replaced = data
 	for key, value := range vars {
 		replaced = bytes.ReplaceAll(replaced, []byte("${"+key+"}"), []byte(value))
 	}
-	return bytes.NewBuffer(replaced), nil
+	return replaced, nil
 }
 
-func findEmbeddedVars(text string) []string {
+// findEmbeddedVars lists any SHELL-FORMAT ${my-var} variables embedded in the
+// text. It only counts variables once i.e. it de-duplicates variables
+func findEmbeddedVars(text []byte) []string {
 	envVars := make(map[string]bool)
 	subtext := text
-	for fst := strings.Index(subtext, "${"); fst != -1 && len(subtext) > 0; fst = strings.Index(subtext, "${") {
-		lst := strings.Index(subtext[fst:], "}")
-		fmt.Println("checking", subtext, fst)
+	fst := bytes.Index(subtext, []byte("${"))
+	for fst != -1 && len(subtext) > 0 {
+		lst := bytes.Index(subtext[fst:], []byte("}"))
 		if lst != -1 {
-			envVars[subtext[fst+2:(fst+lst)]] = true
+			envVars[string(subtext[fst+2:(fst+lst)])] = true
 		}
 		subtext = subtext[(fst + lst):]
+		fst = bytes.Index(subtext, []byte("${"))
 	}
 	out := make([]string, len(envVars))
 	i := 0

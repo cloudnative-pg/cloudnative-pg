@@ -18,8 +18,6 @@ package utils
 
 import (
 	"errors"
-	"io/ioutil"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -27,13 +25,10 @@ import (
 
 var _ = DescribeTable("Envsubst test",
 	func(text string, vars map[string]string, expectedString string, expectedErr error) {
-		reader := strings.NewReader(text)
-		out, err := Envsubst(vars, reader)
+		out, err := Envsubst(vars, []byte(text))
 		if expectedErr == nil {
 			Expect(err).ShouldNot(HaveOccurred())
-			outstr, err := ioutil.ReadAll(out)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(string(outstr)).To(Equal(expectedString))
+			Expect(string(out)).To(Equal(expectedString))
 		} else {
 			Expect(errors.Is(err, expectedErr)).To(BeTrue())
 		}
@@ -46,4 +41,12 @@ var _ = DescribeTable("Envsubst test",
 		map[string]string{"foo": "baz", "bar": "quux"}, "substituting baz in quux", nil),
 	Entry("errors out on missing var", "not substituting ${foobar} in bar",
 		map[string]string{"foo": "foo"}, "not substituting ${foobar} in bar", ErrEnvVarNotFound),
+	Entry("can do multi-line subst",
+		`storage:\n
+		storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+		size: 1Gi`,
+		map[string]string{"E2E_DEFAULT_STORAGE_CLASS": "standard"},
+		`storage:\n
+		storageClass: standard
+		size: 1Gi`, nil),
 )

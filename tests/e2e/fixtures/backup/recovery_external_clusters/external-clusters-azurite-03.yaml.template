@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: external-cluster-minio-replica
+  name: external-cluster-azurite
 spec:
   instances: 2
 
@@ -23,29 +23,39 @@ spec:
 
   # Persistent storage configuration
   storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi
 
   bootstrap:
     recovery:
+      database: appdb
+      owner: appuser
+      secret:
+        name: postgresql-user-supplied-app
       # cluster name in source cluster
-      source: source-cluster-minio
-
-  replica:
-    enabled: true
-    source: source-cluster-minio
+      source: pg-backup-azurite
 
   externalClusters:
-    - name: source-cluster-minio
+    - name: pg-backup-azurite
       barmanObjectStore:
-        destinationPath: s3://cluster-backups/
-        endpointURL: https://minio-service:9000
+        destinationPath: https://azurite:10000/storageaccountname/pg-backup-azurite
         endpointCA:
           key: ca.crt
-          name: minio-server-ca-secret
-        s3Credentials:
-          accessKeyId:
-            name: backup-storage-creds
-            key: ID
-          secretAccessKey:
-            name: backup-storage-creds
-            key: KEY
+          name: azurite-ca-secret
+        azureCredentials:
+          connectionString:
+            name: azurite
+            key: AZURE_CONNECTION_STRING
+        wal:
+          compression: gzip
+---
+apiVersion: v1
+data:
+  username: YXBwdXNlcg==
+  password: NGxzMDU0ZjM=
+kind: Secret
+metadata:
+  name: postgresql-user-supplied-app
+  labels:
+    cnpg.io/reload: ""
+type: kubernetes.io/basic-auth

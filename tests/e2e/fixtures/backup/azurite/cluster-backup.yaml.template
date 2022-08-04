@@ -7,6 +7,7 @@ spec:
 
   # Persistent storage configuration
   storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi
 
   # Backup properties
