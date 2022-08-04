@@ -127,7 +127,6 @@ ImportSource
 InfoSec
 Innocenti
 InstanceID
-InstancePVC
 InstanceReportedState
 Istio
 JSON

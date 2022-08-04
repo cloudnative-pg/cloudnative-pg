@@ -205,17 +205,9 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
 			Namespace: cluster.Namespace,
-			Labels: map[string]string{
-				utils.InstanceLabelName: generateInstanceName(cluster, nodeSerial),
-			},
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						utils.InstanceLabelName: generateInstanceName(cluster, nodeSerial),
-					},
-				},
 				Spec: corev1.PodSpec{
 					Hostname:  jobName,
 					Subdomain: cluster.GetServiceAnyName(),

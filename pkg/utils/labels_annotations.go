@@ -32,9 +32,6 @@ const (
 	// JobRoleLabelName is the name of the label containing the purpose of the executed job
 	JobRoleLabelName = "cnpg.io/jobRole"
 
-	// InstanceLabelName is the name of instance which the resourcebelongs to
-	InstanceLabelName = "cnpg.io/instanceName"
-
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
 	OperatorVersionAnnotationName = "cnpg.io/operatorVersion"

@@ -301,9 +301,8 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				ClusterLabelName:        cluster.Name,
-				utils.ClusterLabelName:  cluster.Name,
-				utils.InstanceLabelName: podName,
+				ClusterLabelName:       cluster.Name,
+				utils.ClusterLabelName: cluster.Name,
 			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),

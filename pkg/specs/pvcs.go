@@ -30,7 +30,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -79,9 +78,6 @@ func CreatePVC(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
 			Namespace: cluster.Namespace,
-			Labels: map[string]string{
-				utils.InstanceLabelName: generateInstanceName(cluster, nodeSerial),
-			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
 				PVCStatusAnnotationName:     PVCStatusInitializing,
