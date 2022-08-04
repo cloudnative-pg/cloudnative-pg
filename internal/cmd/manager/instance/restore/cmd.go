@@ -32,7 +32,6 @@ func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
 	var pgData string
-	// TODO: add support
 	var pgWal string
 
 	cmd := &cobra.Command{
