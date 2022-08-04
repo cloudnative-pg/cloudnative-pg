@@ -2238,7 +2238,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 
 // CreateResourceFromFile creates the Kubernetes objects defined in a YAML sample file
 func CreateResourceFromFile(namespace, sampleFilePath string) {
-	objects, err := testsUtils.CreateObjectsFromYAML(sampleFilePath, namespace)
+	objects, err := testsUtils.ParseObjectsFromYAML(sampleFilePath, namespace)
 	Expect(err).ToNot(HaveOccurred())
 	for _, obj := range objects {
 		if cluster, ok := obj.(*apiv1.Cluster); ok {
