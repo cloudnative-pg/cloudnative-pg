@@ -273,7 +273,6 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateSuperuserSecret,
 		r.validateCerts,
 		r.validateBootstrapMethod,
-		r.validateStorageConfiguration,
 		r.validateImageName,
 		r.validateImagePullPolicy,
 		r.validateRecoveryTarget,
@@ -727,22 +726,6 @@ func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
 	return result
 }
 
-// validateStorageConfiguration validates the size format it's correct
-func (r *Cluster) validateStorageConfiguration() field.ErrorList {
-	var result field.ErrorList
-
-	if _, err := resource.ParseQuantity(r.Spec.StorageConfiguration.Size); err != nil {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "storage", "size"),
-				r.Spec.StorageConfiguration.Size,
-				"Size value isn't valid"))
-	}
-
-	return result
-}
-
 // validateImageName validates the image name ensuring we aren't
 // using the "latest" tag
 func (r *Cluster) validateImageName() field.ErrorList {
@@ -1089,7 +1072,7 @@ func (r *Cluster) validateStorageSize() field.ErrorList {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "storage", "size"),
 			r.Spec.StorageConfiguration.Size,
-			err.Error()))
+			"Size value isn't valid"))
 	}
 
 	return result
