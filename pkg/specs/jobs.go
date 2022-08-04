@@ -69,9 +69,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 			"--app-user", cluster.Spec.Bootstrap.InitDB.Owner)
 	}
 
-	if cluster.ShouldCreateWalArchiveVolume() {
-		initCommand = append(initCommand, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
-	}
+	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
 		return createPrimaryJob(cluster, nodeSerial, "import", initCommand)
@@ -129,9 +127,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 		"restore",
 	}
 
-	if cluster.ShouldCreateWalArchiveVolume() {
-		initCommand = append(initCommand, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
-	}
+	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	job := createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
 
@@ -172,9 +168,7 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *bat
 		"pgbasebackup",
 	}
 
-	if cluster.ShouldCreateWalArchiveVolume() {
-		initCommand = append(initCommand, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
-	}
+	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	return createPrimaryJob(cluster, nodeSerial, "pgbasebackup", initCommand)
 }
@@ -188,11 +182,19 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 		"--parent-node", cluster.GetServiceReadWriteName(),
 	}
 
-	if cluster.ShouldCreateWalArchiveVolume() {
-		initCommand = append(initCommand, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
-	}
+	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	return createPrimaryJob(cluster, nodeSerial, "join", initCommand)
+}
+
+func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
+	var flags []string
+
+	if cluster.ShouldCreateWalArchiveVolume() {
+		flags = append(flags, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
+	}
+
+	return flags
 }
 
 // createPrimaryJob create a job that executes the provided command.
