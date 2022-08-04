@@ -259,16 +259,13 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	newPVCCount := int32(len(resources.pvcs.Items))
 	cluster.Status.PVCCount = newPVCCount
-	pvcClassification, err := specs.DetectPVCs(
+	pvcClassification := specs.DetectPVCs(
 		ctx,
 		cluster,
 		resources.pods.Items,
 		resources.jobs.Items,
 		resources.pvcs.Items,
 	)
-	if err != nil {
-		return err
-	}
 	cluster.Status.DanglingPVC = pvcClassification.Dangling
 	cluster.Status.HealthyPVC = pvcClassification.Healthy
 	cluster.Status.InitializingPVC = pvcClassification.Initializing
@@ -349,6 +346,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	// Set the current hash code of the operator binary inside the status.
 	// This is used by the instance manager to validate if a certain binary is
 	// valid or not
+	var err error
 	cluster.Status.OperatorHash, err = executablehash.Get()
 	if err != nil {
 		return err

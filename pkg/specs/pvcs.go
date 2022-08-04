@@ -125,9 +125,9 @@ func DetectPVCs(
 	podList []corev1.Pod,
 	jobList []batchv1.Job,
 	pvcList []corev1.PersistentVolumeClaim,
-) (result PVCUsageStatus, err error) {
+) (result PVCUsageStatus) {
 	contextLogger := log.FromContext(ctx)
-	var foundInstances []string
+
 pvcLoop:
 	for _, pvc := range pvcList {
 		if pvc.Status.Phase != corev1.ClaimPending &&
@@ -139,18 +139,6 @@ pvcLoop:
 		if pvc.ObjectMeta.DeletionTimestamp != nil {
 			continue
 		}
-
-		// TODO optimize
-		// we save all the instance we found so far
-		instanceName, err := GetInstanceNameFromSerialAnnotation(cluster, pvc.Annotations)
-		if err != nil {
-			return result, err
-		}
-
-		if !slices.Contains(foundInstances, instanceName) {
-			foundInstances = append(foundInstances, instanceName)
-		}
-		// END TODO
 
 		if isResizing(pvc) {
 			result.Resizing = append(result.Resizing, pvc.Name)
@@ -186,37 +174,41 @@ pvcLoop:
 	}
 
 	if !cluster.ShouldCreateWalArchiveVolume() {
-		return result, nil
+		return result
 	}
 
-	// NORMALIZE. TODO: refactor
-	for _, instance := range foundInstances {
-		expected := len(cluster.GetInstancePVCNames(instance))
-		var found []int
+	for _, instance := range getInstancesName(podList) {
+		expectedPVCs := getExpectedInstancePVCNames(cluster, instance)
+		var indexOfFoundPVCs []int
+
 		for idx, pvcName := range result.Healthy {
-			if DoesBelongToInstance(instance, pvcName) {
-				found = append(found, idx)
+			if slices.Contains(expectedPVCs, pvcName) {
+				indexOfFoundPVCs = append(indexOfFoundPVCs, idx)
 			}
 		}
-		contextLogger.Info("detectPVC info", "instance", instance, "found", found, "expected", expected)
-		if expected == len(found) {
+
+		if len(expectedPVCs) == len(indexOfFoundPVCs) {
 			continue
 		}
 
-		if expected > len(found) {
+		if len(expectedPVCs) > len(indexOfFoundPVCs) {
 			// we lost some pvc null them all
-			for _, index := range found {
+			for _, index := range indexOfFoundPVCs {
 				result.Dangling = append(result.Dangling, result.Healthy[index])
 				result.Healthy = removeElementByIndex(result.Healthy, index)
 			}
 		}
 
-		// if len(found) > expected {
-		// something terribly wrong
-		//}
+		if len(indexOfFoundPVCs) > len(expectedPVCs) {
+			contextLogger.Warning("found more PVC than those expected",
+				"instance", instance,
+				"expectedPVCs", expectedPVCs,
+				"foundPVCs", indexOfFoundPVCs,
+			)
+		}
 	}
 
-	return result, nil
+	return result
 }
 
 func removeElementByIndex[T any](slice []T, index int) []T {
@@ -245,25 +237,30 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	return false
 }
 
-// GetInstanceNameFromSerialAnnotation  tries to build an instance name from the ClusterSerialAnnotationName annotation
-func GetInstanceNameFromSerialAnnotation(cluster *apiv1.Cluster, annotations map[string]string) (string, error) {
-	if annotations == nil {
-		return "", fmt.Errorf("no annotations found")
-	}
-	v, ok := annotations[ClusterSerialAnnotationName]
-	if !ok {
-		return "", fmt.Errorf("no serial annotation found")
-	}
-
-	i, err := strconv.Atoi(v)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s-%d", cluster.Name, i), nil
-}
-
 // DoesBelongToInstance returns a boolean indicating if that given resources belongs to an instance
 func DoesBelongToInstance(instanceName, resourceName string) bool {
 	return strings.HasPrefix(resourceName, instanceName)
+}
+
+func getInstancesName(pods []corev1.Pod) []string {
+	var instancesName []string
+	for _, pod := range pods {
+		_, ok := pod.Labels[ClusterRoleLabelName]
+		if ok {
+			instancesName = append(instancesName, pod.Name)
+		}
+	}
+
+	return instancesName
+}
+
+// getExpectedInstancePVCNames gets all the PVC names for a given instance
+func getExpectedInstancePVCNames(cluster *apiv1.Cluster, instanceName string) []string {
+	names := []string{instanceName}
+
+	if cluster.ShouldCreateWalArchiveVolume() {
+		names = append(names, instanceName+cluster.GetWalArchiveVolumeSuffix())
+	}
+
+	return names
 }

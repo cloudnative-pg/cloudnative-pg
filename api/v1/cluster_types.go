@@ -1801,17 +1801,6 @@ func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
 	return recoveryParameters.Owner != "" && recoveryParameters.Database != ""
 }
 
-// GetInstancePVCNames gets all the PVC names for a given instance
-func (cluster *Cluster) GetInstancePVCNames(instanceName string) []string {
-	names := []string{instanceName}
-
-	if cluster.ShouldCreateWalArchiveVolume() {
-		names = append(names, instanceName+cluster.GetWalArchiveVolumeSuffix())
-	}
-
-	return names
-}
-
 // ShouldCreateWalArchiveVolume returns if we should create the wal archive volume
 func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 	return cluster.Spec.WalStorage != nil
