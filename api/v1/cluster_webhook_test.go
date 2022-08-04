@@ -427,34 +427,6 @@ var _ = Describe("ImagePullPolicy validation", func() {
 	})
 })
 
-var _ = Describe("Storage validation", func() {
-	It("complains if the value isn't correct", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				StorageConfiguration: StorageConfiguration{
-					Size: "X",
-				},
-			},
-		}
-
-		result := cluster.validateStorageConfiguration()
-		Expect(len(result)).To(Equal(1))
-	})
-
-	It("doesn't complain if value is correct", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				StorageConfiguration: StorageConfiguration{
-					Size: "1Gi",
-				},
-			},
-		}
-
-		result := cluster.validateStorageConfiguration()
-		Expect(result).To(BeEmpty())
-	})
-})
-
 var _ = Describe("Defaulting webhook", func() {
 	It("should fill the image name if isn't already set", func() {
 		cluster := Cluster{}
