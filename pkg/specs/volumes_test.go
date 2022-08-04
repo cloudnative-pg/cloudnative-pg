@@ -54,13 +54,13 @@ var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs
 		Expect(volumeMounts).To(Equal([]corev1.VolumeMount{
 			{
 				Name:      "0-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/0.sql",
+				MountPath: PostInitApplicationSQLRefsFolder + "/0.sql",
 				SubPath:   "0.sql",
 				ReadOnly:  true,
 			},
 			{
 				Name:      "1-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/1.sql",
+				MountPath: PostInitApplicationSQLRefsFolder + "/1.sql",
 				SubPath:   "1.sql",
 				ReadOnly:  true,
 			},
@@ -119,13 +119,13 @@ var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs
 		Expect(volumeMounts).To(Equal([]corev1.VolumeMount{
 			{
 				Name:      "0-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/0.sql",
+				MountPath: PostInitApplicationSQLRefsFolder + "/0.sql",
 				SubPath:   "0.sql",
 				ReadOnly:  true,
 			},
 			{
 				Name:      "1-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/1.sql",
+				MountPath: PostInitApplicationSQLRefsFolder + "/1.sql",
 				SubPath:   "1.sql",
 				ReadOnly:  true,
 			},
@@ -202,25 +202,25 @@ var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs
 		Expect(volumeMounts).To(Equal([]corev1.VolumeMount{
 			{
 				Name:      "0-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/0.sql",
+				MountPath: PostInitApplicationSQLRefsFolder + "/0.sql",
 				SubPath:   "0.sql",
 				ReadOnly:  true,
 			},
 			{
 				Name:      "1-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/1.sql",
+				MountPath: PostInitApplicationSQLRefsFolder + "/1.sql",
 				SubPath:   "1.sql",
 				ReadOnly:  true,
 			},
 			{
 				Name:      "2-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/2.sql",
+				MountPath: PostInitApplicationSQLRefsFolder + "/2.sql",
 				SubPath:   "2.sql",
 				ReadOnly:  true,
 			},
 			{
 				Name:      "3-post-init-application-sql",
-				MountPath: "/etc/post-init-application-sql-refs/3.sql",
+				MountPath: PostInitApplicationSQLRefsFolder + "/3.sql",
 				SubPath:   "3.sql",
 				ReadOnly:  true,
 			},

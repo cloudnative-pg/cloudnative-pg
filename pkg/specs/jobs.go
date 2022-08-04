@@ -29,6 +29,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+const (
+	// PostInitApplicationSQLRefsFolder points to the folder of
+	// postInitApplicationSQL files in the primary job with initdb.
+	PostInitApplicationSQLRefsFolder = "/etc/post-init-application-sql-refs"
+)
+
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
 func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 	initCommand := []string{
@@ -74,7 +80,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
 		initCommand = append(initCommand,
-			"--post-init-application-sql-refs-folder", "/etc/post-init-application-sql-refs")
+			"--post-init-application-sql-refs-folder", PostInitApplicationSQLRefsFolder)
 	}
 
 	return createPrimaryJob(cluster, nodeSerial, "initdb", initCommand)
