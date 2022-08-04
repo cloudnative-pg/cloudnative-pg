@@ -152,7 +152,7 @@ the `psql` command to connect to this service:
 
 ```shell
 kubectl exec -it cert-test -- bash -c "psql
-'sslkey=/etc/secrets/app/tls.key sslcert=/etc/secrets/appuser/tls.crt
+'sslkey=/etc/secrets/app/tls.key sslcert=/etc/secrets/app/tls.crt
 sslrootcert=/etc/secrets/ca/ca.crt host=cluster-example-rw.default.svc dbname=app
 user=app sslmode=verify-full' -c 'select version();'"
 ```

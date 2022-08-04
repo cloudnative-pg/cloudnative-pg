@@ -1067,13 +1067,13 @@ const (
 
 // BarmanCredentials an object containing the potential credentials for each cloud provider
 type BarmanCredentials struct {
-	// The credentials to use to upload data to S3
+	// The credentials to use to upload data to Google Cloud Storage
 	Google *GoogleCredentials `json:"googleCredentials,omitempty"`
 
-	// The credentials to use to upload data to Azure Blob Storage
+	// The credentials to use to upload data to S3
 	AWS *S3Credentials `json:"s3Credentials,omitempty"`
 
-	// The credentials to use to upload data to Google Cloud Storage
+	// The credentials to use to upload data to Azure Blob Storage
 	Azure *AzureCredentials `json:"azureCredentials,omitempty"`
 }
 
