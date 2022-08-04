@@ -26,7 +26,6 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
-	"strings"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -105,19 +104,6 @@ func (resources *managedResources) getPVC(name string) *corev1.PersistentVolumeC
 	}
 
 	return nil
-}
-
-// Retrieve a PVC by name
-func (resources *managedResources) getInstancesPVC(name string) []corev1.PersistentVolumeClaim {
-	var pvcs []corev1.PersistentVolumeClaim
-
-	for _, pvc := range resources.pvcs.Items {
-		if strings.HasPrefix(pvc.Name, name) {
-			pvcs = append(pvcs, pvc)
-		}
-	}
-
-	return pvcs
 }
 
 // An InstanceStatusError reports an unsuccessful attempt to retrieve an instance status
@@ -273,7 +259,16 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	newPVCCount := int32(len(resources.pvcs.Items))
 	cluster.Status.PVCCount = newPVCCount
-	pvcClassification := specs.DetectPVCs(ctx, *cluster, resources.pods.Items, resources.jobs.Items, resources.pvcs.Items)
+	pvcClassification, err := specs.DetectPVCs(
+		ctx,
+		cluster,
+		resources.pods.Items,
+		resources.jobs.Items,
+		resources.pvcs.Items,
+	)
+	if err != nil {
+		return err
+	}
 	cluster.Status.DanglingPVC = pvcClassification.Dangling
 	cluster.Status.HealthyPVC = pvcClassification.Healthy
 	cluster.Status.InitializingPVC = pvcClassification.Initializing
@@ -354,7 +349,6 @@ func (r *ClusterReconciler) updateResourceStatus(
 	// Set the current hash code of the operator binary inside the status.
 	// This is used by the instance manager to validate if a certain binary is
 	// valid or not
-	var err error
 	cluster.Status.OperatorHash, err = executablehash.Get()
 	if err != nil {
 		return err

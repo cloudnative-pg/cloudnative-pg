@@ -2597,13 +2597,7 @@ spec:
                 description: List of all the PVCs created by this cluster and still
                   available which are not attached to a Pod
                 items:
-                  description: InstancePVC contains the pvcName and the instanceName
-                  properties:
-                    instanceName:
-                      type: string
-                    pvcName:
-                      type: string
-                  type: object
+                  type: string
                 type: array
               firstRecoverabilityPoint:
                 description: The first recoverability point, stored as a date in RFC3339
@@ -2612,25 +2606,13 @@ spec:
               healthyPVC:
                 description: List of all the PVCs not dangling nor initializing
                 items:
-                  description: InstancePVC contains the pvcName and the instanceName
-                  properties:
-                    instanceName:
-                      type: string
-                    pvcName:
-                      type: string
-                  type: object
+                  type: string
                 type: array
               initializingPVC:
                 description: List of all the PVCs that are being initialized by this
                   cluster
                 items:
-                  description: InstancePVC contains the pvcName and the instanceName
-                  properties:
-                    instanceName:
-                      type: string
-                    pvcName:
-                      type: string
-                  type: object
+                  type: string
                 type: array
               instances:
                 description: Total number of instances in the cluster
@@ -2704,13 +2686,7 @@ spec:
               resizingPVC:
                 description: List of all the PVCs that have ResizingPVC condition.
                 items:
-                  description: InstancePVC contains the pvcName and the instanceName
-                  properties:
-                    instanceName:
-                      type: string
-                    pvcName:
-                      type: string
-                  type: object
+                  type: string
                 type: array
               secretsResourceVersion:
                 description: The list of resource versions of the secrets managed

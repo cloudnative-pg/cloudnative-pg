@@ -662,19 +662,21 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 	contextLogger := log.FromContext(ctx)
 
 	// Make sure that all healthy PVCs are marked as ready
-	for _, instancePVC := range cluster.Status.HealthyPVC {
-		for _, pvc := range resources.getInstancesPVC(instancePVC.PvcName) {
-			pvc := pvc
-			if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
-				continue
-			}
+	for _, pvcName := range cluster.Status.HealthyPVC {
+		pvc := resources.getPVC(pvcName)
+		if pvc == nil {
+			return fmt.Errorf("pvc not found")
+		}
 
-			contextLogger.Info("PVC is already attached to the pod, marking it as ready",
-				"pvc", pvc.Name)
-			if err := r.setPVCStatusReady(ctx, &pvc); err != nil {
-				contextLogger.Error(err, "can't update PVC annotation as ready")
-				return err
-			}
+		if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
+			continue
+		}
+
+		contextLogger.Info("PVC is already attached to the pod, marking it as ready",
+			"pvc", pvc.Name)
+		if err := r.setPVCStatusReady(ctx, pvc); err != nil {
+			contextLogger.Error(err, "can't update PVC annotation as ready")
+			return err
 		}
 	}
 
@@ -1079,13 +1081,12 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 		}
 
 		// finding the PVC having the same name as pod
-		for _, pvc := range resources.getInstancesPVC(pvcName) {
-			pvc := pvc
-			roleName := job.Labels[utils.JobRoleLabelName]
-			contextLogger.Info("job has been finished, setting PVC as ready", "pod", pvcName, "role", roleName)
-			if err := r.setPVCStatusReady(ctx, &pvc); err != nil {
-				contextLogger.Error(err, "unable to annotate PVC as ready")
-			}
+		// TODO: we need to do a null check
+		pvc := resources.getPVC(pvcName)
+		roleName := job.Labels[utils.JobRoleLabelName]
+		contextLogger.Info("job has been finished, setting PVC as ready", "pod", pvcName, "role", roleName)
+		if err := r.setPVCStatusReady(ctx, pvc); err != nil {
+			contextLogger.Error(err, "unable to annotate PVC as ready")
 		}
 	}
 }

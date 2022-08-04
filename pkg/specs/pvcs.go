@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -51,18 +52,18 @@ var ErrorInvalidSize = fmt.Errorf("invalid storage size")
 // PVCUsageStatus is the status of the PVC we generated
 type PVCUsageStatus struct {
 	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
-	Initializing []apiv1.InstancePVC
+	Initializing []string
 
 	// List of PVCs with Resizing condition. Requires a pod restart.
 	//
 	// INFO: https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/
-	Resizing []apiv1.InstancePVC
+	Resizing []string
 
 	// List of PVCs that are dangling (they don't have a corresponding Job nor a corresponding Pod)
-	Dangling []apiv1.InstancePVC
+	Dangling []string
 
 	// List of PVCs that are used (they have a corresponding Pod)
-	Healthy []apiv1.InstancePVC
+	Healthy []string
 }
 
 // CreatePVC create spec of a PVC, given its name and the storage configuration
@@ -124,11 +125,11 @@ func CreatePVC(
 // nolint: gocognit
 func DetectPVCs(
 	ctx context.Context,
-	cluster apiv1.Cluster,
+	cluster *apiv1.Cluster,
 	podList []corev1.Pod,
 	jobList []batchv1.Job,
 	pvcList []corev1.PersistentVolumeClaim,
-) (result PVCUsageStatus) {
+) (result PVCUsageStatus, err error) {
 	contextLogger := log.FromContext(ctx)
 	var foundInstances []string
 pvcLoop:
@@ -145,19 +146,18 @@ pvcLoop:
 
 		// TODO optimize
 		// we save all the instance we found so far
-		instanceName := pvc.Labels[utils.InstanceLabelName]
+		instanceName, err := GetInstanceNameFromSerialAnnotation(cluster, pvc.Annotations)
+		if err != nil {
+			return result, err
+		}
+
 		if !slices.Contains(foundInstances, instanceName) {
 			foundInstances = append(foundInstances, instanceName)
 		}
 		// END TODO
 
-		instancePVC := apiv1.InstancePVC{
-			InstanceName: instanceName,
-			PvcName:      pvc.Name,
-		}
-
 		if isResizing(pvc) {
-			result.Resizing = append(result.Resizing, instancePVC)
+			result.Resizing = append(result.Resizing, pvc.Name)
 		}
 
 		// Find a Pod corresponding to this PVC
@@ -165,7 +165,7 @@ pvcLoop:
 			if IsWorkingOnPVC(podList[idx].Spec, pvc.Name) {
 				// We found a Pod using this PVC so this
 				// PVC is not dangling
-				result.Healthy = append(result.Healthy, instancePVC)
+				result.Healthy = append(result.Healthy, pvc.Name)
 				continue pvcLoop
 			}
 		}
@@ -174,7 +174,7 @@ pvcLoop:
 			if IsWorkingOnPVC(jobList[idx].Spec.Template.Spec, pvc.Name) {
 				// We have found a Job corresponding to this PVC, so we
 				// are initializing it or the initialization is just completed
-				result.Initializing = append(result.Initializing, instancePVC)
+				result.Initializing = append(result.Initializing, pvc.Name)
 				continue pvcLoop
 			}
 		}
@@ -186,19 +186,19 @@ pvcLoop:
 		}
 
 		// This PVC has not a Job nor a Pod using it, it's dangling
-		result.Dangling = append(result.Dangling, instancePVC)
+		result.Dangling = append(result.Dangling, pvc.Name)
 	}
 
 	if !cluster.ShouldCreateWalArchiveVolume() {
-		return result
+		return result, nil
 	}
 
 	// NORMALIZE. TODO: refactor
 	for _, instance := range foundInstances {
 		expected := len(cluster.GetInstancePVCNames(instance))
 		var found []int
-		for idx, pvc := range result.Healthy {
-			if pvc.InstanceName == instance {
+		for idx, pvcName := range result.Healthy {
+			if DoesBelongToInstance(instance, pvcName) {
 				found = append(found, idx)
 			}
 		}
@@ -220,7 +220,7 @@ pvcLoop:
 		//}
 	}
 
-	return result
+	return result, nil
 }
 
 func removeElementByIndex[T any](slice []T, index int) []T {
@@ -247,4 +247,27 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	}
 
 	return false
+}
+
+// GetInstanceNameFromSerialAnnotation  tries to build an instance name from the ClusterSerialAnnotationName annotation
+func GetInstanceNameFromSerialAnnotation(cluster *apiv1.Cluster, annotations map[string]string) (string, error) {
+	if annotations == nil {
+		return "", fmt.Errorf("no annotations found")
+	}
+	v, ok := annotations[ClusterSerialAnnotationName]
+	if !ok {
+		return "", fmt.Errorf("no serial annotation found")
+	}
+
+	i, err := strconv.Atoi(v)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s-%d", cluster.Name, i), nil
+}
+
+// DoesBelongToInstance returns a boolean indicating if that given resources belongs to an instance
+func DoesBelongToInstance(instanceName, resourceName string) bool {
+	return strings.HasPrefix(resourceName, instanceName)
 }

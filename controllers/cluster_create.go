@@ -1162,9 +1162,9 @@ func (r *ClusterReconciler) reconcilePVCs(
 	pod := specs.PodWithExistingStorage(*cluster, nodeSerial)
 
 	if configuration.Current.EnableAzurePVCUpdates {
-		for _, resizingPVC := range cluster.Status.ResizingPVC {
+		for _, pvcName := range cluster.Status.ResizingPVC {
 			// This code works on the assumption that the PVC have the same name as the pod using it.
-			if resizingPVC.PvcName == pvc.Name {
+			if pvcName == pvc.Name {
 				contextLogger.Info("PVC is in resizing status, retrying in 5 seconds", "pod", pod.Name)
 				return ctrl.Result{RequeueAfter: 5 * time.Second}, ErrNextLoop
 			}
@@ -1212,7 +1212,7 @@ func (r *ClusterReconciler) reconcilePVCs(
 // to the cluster, giving precedence to the target primary if existing in the set. If the target primary is fine,
 // let's start using the PVC we have initialized. After that we use the PVC that are initializing or dangling
 func electPvcToReattach(cluster *apiv1.Cluster) string {
-	pvcs := make([]apiv1.InstancePVC, 0, len(cluster.Status.InitializingPVC)+len(cluster.Status.DanglingPVC))
+	pvcs := make([]string, 0, len(cluster.Status.InitializingPVC)+len(cluster.Status.DanglingPVC))
 	pvcs = append(pvcs, cluster.Status.InitializingPVC...)
 	pvcs = append(pvcs, cluster.Status.DanglingPVC...)
 	if len(pvcs) == 0 {
@@ -1220,20 +1220,20 @@ func electPvcToReattach(cluster *apiv1.Cluster) string {
 	}
 
 	for _, pvc := range pvcs {
-		if pvc.InstanceName == cluster.Status.TargetPrimary {
-			return pvc.PvcName
+		if specs.DoesBelongToInstance(cluster.Status.TargetPrimary, pvc) {
+			return pvc
 		}
 	}
 
-	return pvcs[0].PvcName
+	return pvcs[0]
 }
 
 // removeDanglingPVCs will remove dangling PVCs
 func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *apiv1.Cluster) error {
-	for _, instancePVC := range cluster.Status.DanglingPVC {
+	for _, pvcName := range cluster.Status.DanglingPVC {
 		var pvc corev1.PersistentVolumeClaim
 
-		err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: instancePVC.PvcName}, &pvc)
+		err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: pvcName}, &pvc)
 		if err != nil {
 			// Ignore if NotFound, otherwise report the error
 			if apierrs.IsNotFound(err) {

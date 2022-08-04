@@ -321,12 +321,6 @@ type Topology struct {
 	Instances map[PodName]PodTopologyLabels `json:"instances,omitempty"`
 }
 
-// InstancePVC contains the pvcName and the instanceName
-type InstancePVC struct {
-	InstanceName string `json:"instanceName,omitempty"`
-	PvcName      string `json:"pvcName,omitempty"`
-}
-
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// Total number of instances in the cluster
@@ -365,16 +359,16 @@ type ClusterStatus struct {
 
 	// List of all the PVCs created by this cluster and still available
 	// which are not attached to a Pod
-	DanglingPVC []InstancePVC `json:"danglingPVC,omitempty"`
+	DanglingPVC []string `json:"danglingPVC,omitempty"`
 
 	// List of all the PVCs that have ResizingPVC condition.
-	ResizingPVC []InstancePVC `json:"resizingPVC,omitempty"`
+	ResizingPVC []string `json:"resizingPVC,omitempty"`
 
 	// List of all the PVCs that are being initialized by this cluster
-	InitializingPVC []InstancePVC `json:"initializingPVC,omitempty"`
+	InitializingPVC []string `json:"initializingPVC,omitempty"`
 
 	// List of all the PVCs not dangling nor initializing
-	HealthyPVC []InstancePVC `json:"healthyPVC,omitempty"`
+	HealthyPVC []string `json:"healthyPVC,omitempty"`
 
 	// Current write pod
 	WriteService string `json:"writeService,omitempty"`
