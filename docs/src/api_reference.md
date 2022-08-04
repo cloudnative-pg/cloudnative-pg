@@ -204,9 +204,9 @@ BarmanCredentials an object containing the potential credentials for each cloud 
 
 Name              | Description                                                   | Type                                    
 ----------------- | ------------------------------------------------------------- | ----------------------------------------
-`googleCredentials` | The credentials to use to upload data to S3                   | [*GoogleCredentials](#GoogleCredentials)
-`s3Credentials    ` | The credentials to use to upload data to Azure Blob Storage   | [*S3Credentials](#S3Credentials)        
-`azureCredentials ` | The credentials to use to upload data to Google Cloud Storage | [*AzureCredentials](#AzureCredentials)  
+`googleCredentials` | The credentials to use to upload data to Google Cloud Storage | [*GoogleCredentials](#GoogleCredentials)
+`s3Credentials    ` | The credentials to use to upload data to S3                   | [*S3Credentials](#S3Credentials)        
+`azureCredentials ` | The credentials to use to upload data to Azure Blob Storage   | [*AzureCredentials](#AzureCredentials)  
 
 <a id='BarmanObjectStoreConfiguration'></a>
 
