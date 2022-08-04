@@ -1141,7 +1141,9 @@ func (r *ClusterReconciler) reconcilePVCs(
 	pvc := resources.getPVC(pvcToReattach)
 	if pvc == nil {
 		return ctrl.Result{}, fmt.Errorf(
-			"a pvc to reattach was nominated but it could not be found from the pvc list")
+			"the pvc: %s was nominated to be reattached but it could not be found from the pvc list",
+			pvcToReattach,
+		)
 	}
 
 	// This should not happen. However, we put this guard here

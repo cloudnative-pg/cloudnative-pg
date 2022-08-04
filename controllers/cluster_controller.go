@@ -667,7 +667,10 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 	for _, pvcName := range cluster.Status.HealthyPVC {
 		pvc := resources.getPVC(pvcName)
 		if pvc == nil {
-			return fmt.Errorf("pvc not found")
+			return fmt.Errorf(
+				"could not find the pvc: %s, from the list of managed pvc",
+				pvcName,
+			)
 		}
 
 		if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
