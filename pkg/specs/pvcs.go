@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -163,18 +162,16 @@ pvcLoop:
 
 		// Find a Pod corresponding to this PVC
 		for idx := range podList {
-			for _, volume := range podList[idx].Spec.Volumes {
-				if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == instancePVC.PvcName {
-					// We found a Pod using this PVC so this
-					// PVC is not dangling
-					result.Healthy = append(result.Healthy, instancePVC)
-					continue pvcLoop
-				}
+			if IsWorkingOnPVC(podList[idx].Spec, pvc.Name) {
+				// We found a Pod using this PVC so this
+				// PVC is not dangling
+				result.Healthy = append(result.Healthy, instancePVC)
+				continue pvcLoop
 			}
 		}
 
 		for idx := range jobList {
-			if IsJobOperatingOnPVC(jobList[idx], pvc) {
+			if IsWorkingOnPVC(jobList[idx].Spec.Template.Spec, pvc.Name) {
 				// We have found a Job corresponding to this PVC, so we
 				// are initializing it or the initialization is just completed
 				result.Initializing = append(result.Initializing, instancePVC)
@@ -230,9 +227,14 @@ func removeElementByIndex[T any](slice []T, index int) []T {
 	return append(slice[:index], slice[index+1:]...)
 }
 
-// IsJobOperatingOnPVC checks if a Job is initializing the provided PVC
-func IsJobOperatingOnPVC(job batchv1.Job, pvc corev1.PersistentVolumeClaim) bool {
-	return strings.HasPrefix(job.Name, pvc.Name+"-")
+// IsWorkingOnPVC checks if the given pod spec is working on the pvc
+func IsWorkingOnPVC(podSpec corev1.PodSpec, pvcName string) bool {
+	for _, volume := range podSpec.Volumes {
+		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvcName {
+			return true
+		}
+	}
+	return false
 }
 
 // isResizing returns true if PersistentVolumeClaimResizing condition is present

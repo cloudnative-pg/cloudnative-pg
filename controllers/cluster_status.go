@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -104,6 +105,19 @@ func (resources *managedResources) getPVC(name string) *corev1.PersistentVolumeC
 	}
 
 	return nil
+}
+
+// Retrieve a PVC by name
+func (resources *managedResources) getInstancesPVC(name string) []corev1.PersistentVolumeClaim {
+	var pvcs []corev1.PersistentVolumeClaim
+
+	for _, pvc := range resources.pvcs.Items {
+		if strings.HasPrefix(pvc.Name, name) {
+			pvcs = append(pvcs, pvc)
+		}
+	}
+
+	return pvcs
 }
 
 // An InstanceStatusError reports an unsuccessful attempt to retrieve an instance status

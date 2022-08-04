@@ -663,21 +663,18 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 
 	// Make sure that all healthy PVCs are marked as ready
 	for _, instancePVC := range cluster.Status.HealthyPVC {
-		pvc := resources.getPVC(instancePVC.PvcName)
-		if pvc == nil {
-			contextLogger.Warning("unable to find pvc to annotate it as ready", "pvc", pvc.Name)
-			continue
-		}
+		for _, pvc := range resources.getInstancesPVC(instancePVC.PvcName) {
+			pvc := pvc
+			if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
+				continue
+			}
 
-		if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
-			continue
-		}
-
-		contextLogger.Info("PVC is already attached to the pod, marking it as ready",
-			"pvc", pvc.Name)
-		if err := r.setPVCStatusReady(ctx, pvc); err != nil {
-			contextLogger.Error(err, "can't update PVC annotation as ready")
-			return err
+			contextLogger.Info("PVC is already attached to the pod, marking it as ready",
+				"pvc", pvc.Name)
+			if err := r.setPVCStatusReady(ctx, &pvc); err != nil {
+				contextLogger.Error(err, "can't update PVC annotation as ready")
+				return err
+			}
 		}
 	}
 
@@ -1071,23 +1068,24 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 	for _, job := range completeJobs {
 		var pvcName string
 		for _, pvc := range resources.pvcs.Items {
-			if specs.IsJobOperatingOnPVC(job, pvc) {
+			if specs.IsWorkingOnPVC(job.Spec.Template.Spec, pvc.Name) {
 				pvcName = pvc.Name
 				break
 			}
 		}
+
 		if pvcName == "" {
 			continue
 		}
 
 		// finding the PVC having the same name as pod
-		pvc := resources.getPVC(pvcName)
-
-		roleName := job.Labels[utils.JobRoleLabelName]
-		contextLogger.Info("job has been finished, setting PVC as ready", "pod", pvcName, "role", roleName)
-		err := r.setPVCStatusReady(ctx, pvc)
-		if err != nil {
-			contextLogger.Error(err, "unable to annotate PVC as ready")
+		for _, pvc := range resources.getInstancesPVC(pvcName) {
+			pvc := pvc
+			roleName := job.Labels[utils.JobRoleLabelName]
+			contextLogger.Info("job has been finished, setting PVC as ready", "pod", pvcName, "role", roleName)
+			if err := r.setPVCStatusReady(ctx, &pvc); err != nil {
+				contextLogger.Error(err, "unable to annotate PVC as ready")
+			}
 		}
 	}
 }
