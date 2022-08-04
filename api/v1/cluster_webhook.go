@@ -275,14 +275,12 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateCerts,
 		r.validateBootstrapMethod,
 		r.validateStorageConfiguration,
-		r.validateWalStorageConfiguration,
 		r.validateImageName,
 		r.validateImagePullPolicy,
 		r.validateRecoveryTarget,
 		r.validatePrimaryUpdateStrategy,
 		r.validateMinSyncReplicas,
 		r.validateMaxSyncReplicas,
-		r.validateStorageSize,
 		r.validateWalStorageSize,
 		r.validateName,
 		r.validateBootstrapPgBaseBackupSource,
@@ -747,23 +745,6 @@ func (r *Cluster) validateStorageConfiguration() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) validateWalStorageConfiguration() field.ErrorList {
-	var result field.ErrorList
-
-	if r.ShouldCreateWalArchiveVolume() {
-		if _, err := resource.ParseQuantity(r.Spec.WalStorage.Size); err != nil {
-			result = append(
-				result,
-				field.Invalid(
-					field.NewPath("spec", "walStorage", "size"),
-					r.Spec.WalStorage.Size,
-					"Size value isn't valid"))
-		}
-	}
-
-	return result
-}
-
 // validateImageName validates the image name ensuring we aren't
 // using the "latest" tag
 func (r *Cluster) validateImageName() field.ErrorList {
@@ -1101,13 +1082,6 @@ func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
 	return result
 }
 
-// Validate if the storage size is a parsable quantity
-func (r *Cluster) validateStorageSize() field.ErrorList {
-	var result field.ErrorList
-
-	return append(result, validateStorageConfigurationSize("storage", r.Spec.StorageConfiguration)...)
-}
-
 func (r *Cluster) validateWalStorageSize() field.ErrorList {
 	var result field.ErrorList
 
@@ -1125,7 +1099,7 @@ func validateStorageConfigurationSize(structPath string, storageConfiguration St
 		result = append(result, field.Invalid(
 			field.NewPath("spec", structPath, "size"),
 			storageConfiguration.Size,
-			err.Error()))
+			"Size value isn't valid"))
 	}
 
 	return result

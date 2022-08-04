@@ -309,9 +309,6 @@ func (topologyLabels PodTopologyLabels) matchesTopology(instanceTopology PodTopo
 // PodName is the name of a Pod
 type PodName string
 
-// InstanceName is the name of the instance
-type InstanceName string
-
 // Topology contains the cluster topology
 type Topology struct {
 	// SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors
