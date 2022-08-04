@@ -160,7 +160,7 @@ shellcheck: ## Shellcheck for the hack directory.
 	}
 
 spellcheck: ## Runs the spellcheck on the project.
-	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:0.23.0
+	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:0.25.0
 
 woke: ## Runs the woke checks on project.
 	docker run --rm -v $(PWD):/src -w /src getwoke/woke:0.18.1 woke -c .woke.yaml
