@@ -15,6 +15,8 @@ PostgreSQL can face on a Kubernetes cluster during its lifetime.
 ## Storage space usage
 
 The operator will instantiate one PVC for every PostgreSQL instance to store the `PGDATA` content.
+A second PVC dedicated to the WAL storage will be provisioned in case `.spec.walStorage` is
+specified during cluster initialization.
 
 Such storage space is set for reuse in two cases:
 
@@ -29,11 +31,19 @@ following command:
 kubectl delete -n [namespace] pvc/[cluster-name]-[serial] pod/[cluster-name]-[serial]
 ```
 
+!!! Note
+    In case you have instanciated a dedicated WAL volume it will also have to be deleted during this process.
+
+```sh
+kubectl delete -n [namespace] pvc/[cluster-name]-[serial] pvc/[cluster-name]-[serial]-wal pod/[cluster-name]-[serial]
+```
+
 For example:
 
 ```sh
-$ kubectl delete -n default pvc/cluster-example-1 pod/cluster-example-1
+$ kubectl delete -n default pvc/cluster-example-1 pvc/cluster-example-1-wal pod/cluster-example-1
 persistentvolumeclaim "cluster-example-1" deleted
+persistentvolumeclaim "cluster-example-1-wal" deleted
 pod "cluster-example-1" deleted
 ```
 

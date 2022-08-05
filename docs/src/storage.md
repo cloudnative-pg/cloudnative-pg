@@ -318,6 +318,17 @@ As an example, to recreate the storage for `cluster-example-3` you can:
 $ kubectl delete pvc/cluster-example-3 pod/cluster-example-3
 ```
 
+!!! Important
+    In case you have instanciated a dedicated WAL volume, both PCVs will have to be deleted during this process.
+    Additionally, the same procedure applies in case you want to regenerate the WAL volume PVC, which can be done
+    by disabling `resizeInUseVolumes` also for the `.spec.walStorage` section.
+
+For example (in case a PVC dedicated to WAL storage is present):
+
+```
+$ kubectl delete pvc/cluster-example-3 pvc/cluster-example-3-wal pod/cluster-example-3
+```
+
 Having done that, the operator will orchestrate the creation of another replica with a
 resized PVC:
 
