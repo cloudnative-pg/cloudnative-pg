@@ -283,7 +283,7 @@ func generateFakePVC(c client.Client, cluster *apiv1.Cluster) []corev1.Persisten
 	for idx < cluster.Spec.Instances {
 		idx++
 
-		pvc, err := specs.CreatePVC(cluster.Spec.StorageConfiguration, cluster.Name, cluster.Namespace, idx)
+		pvc, err := specs.CreatePVC(cluster, cluster.Spec.StorageConfiguration, idx)
 		Expect(err).To(BeNil())
 		SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
 
