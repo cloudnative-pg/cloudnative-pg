@@ -903,6 +903,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		"",
 		cluster.Spec.StorageConfiguration,
 		nodeSerial,
+		utils.PVCRolePgData,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
@@ -914,6 +915,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			cluster.GetWalArchiveVolumeSuffix(),
 			*cluster.Spec.WalStorage,
 			nodeSerial,
+			utils.PVCRolePgWal,
 		); err != nil {
 			return ctrl.Result{RequeueAfter: time.Minute}, err
 		}
@@ -1080,6 +1082,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		"",
 		cluster.Spec.StorageConfiguration,
 		nodeSerial,
+		utils.PVCRolePgData,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
@@ -1091,6 +1094,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 			cluster.GetWalArchiveVolumeSuffix(),
 			*cluster.Spec.WalStorage,
 			nodeSerial,
+			utils.PVCRolePgWal,
 		); err != nil {
 			return ctrl.Result{RequeueAfter: time.Minute}, err
 		}
@@ -1263,10 +1267,11 @@ func (r *ClusterReconciler) createPVC(
 	suffix string,
 	storageConfiguration apiv1.StorageConfiguration,
 	nodeSerial int,
+	role utils.PVCRole,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvc, err := specs.CreatePVC(storageConfiguration, *cluster, suffix, nodeSerial)
+	pvc, err := specs.CreatePVC(storageConfiguration, *cluster, suffix, nodeSerial, role)
 	if err != nil {
 		if err == specs.ErrorInvalidSize {
 			// This error should have been caught by the validating

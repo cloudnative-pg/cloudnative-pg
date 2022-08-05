@@ -32,6 +32,9 @@ const (
 	// JobRoleLabelName is the name of the label containing the purpose of the executed job
 	JobRoleLabelName = "cnpg.io/jobRole"
 
+	// PvcRoleLabelName is the name of the label containing the purpose of the pvc
+	PvcRoleLabelName = "cnpg.io/pvcRole"
+
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
 	OperatorVersionAnnotationName = "cnpg.io/operatorVersion"
@@ -46,6 +49,16 @@ const (
 
 	// ReconciliationDisabledValue it the value that stops the reconciliation loop
 	ReconciliationDisabledValue = "disabled"
+)
+
+// PVCRole describes the role of a PVC
+type PVCRole string
+
+const (
+	// PVCRolePgData is a PVC used for storing PG_DATA
+	PVCRolePgData PVCRole = "PG_DATA"
+	// PVCRolePgWal is a PVC used for storing PG_WAL
+	PVCRolePgWal PVCRole = "PG_WAL"
 )
 
 // LabelClusterName labels the object with the cluster name

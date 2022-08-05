@@ -29,6 +29,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -70,6 +71,7 @@ func CreatePVC(
 	cluster apiv1.Cluster,
 	suffix string,
 	nodeSerial int,
+	role utils.PVCRole,
 ) (*corev1.PersistentVolumeClaim, error) {
 	pvcName := fmt.Sprintf("%s-%v%s", cluster.Name, nodeSerial, suffix)
 
@@ -77,6 +79,9 @@ func CreatePVC(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.PvcRoleLabelName: string(role),
+			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
 				PVCStatusAnnotationName:     PVCStatusInitializing,
