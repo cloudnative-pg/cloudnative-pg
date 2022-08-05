@@ -106,7 +106,7 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      fmt.Sprintf("%0*d-post-init-application-sql", digitsCount, i),
-			MountPath: fmt.Sprintf("%s/%0*d.sql", PostInitApplicationSQLRefsFolder, digitsCount, i),
+			MountPath: fmt.Sprintf("%s/%0*d.sql", postInitApplicationSQLRefsFolder, digitsCount, i),
 			SubPath:   fmt.Sprintf("%0*d.sql", digitsCount, i),
 			ReadOnly:  true,
 		})
@@ -132,7 +132,7 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      fmt.Sprintf("%0*d-post-init-application-sql", digitsCount, i+len(refs.SecretRefs)),
-			MountPath: fmt.Sprintf("%s/%0*d.sql", PostInitApplicationSQLRefsFolder, digitsCount, i+len(refs.SecretRefs)),
+			MountPath: fmt.Sprintf("%s/%0*d.sql", postInitApplicationSQLRefsFolder, digitsCount, i+len(refs.SecretRefs)),
 			SubPath:   fmt.Sprintf("%0*d.sql", digitsCount, i+len(refs.SecretRefs)),
 			ReadOnly:  true,
 		})

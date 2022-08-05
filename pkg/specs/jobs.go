@@ -30,9 +30,9 @@ import (
 )
 
 const (
-	// PostInitApplicationSQLRefsFolder points to the folder of
+	// postInitApplicationSQLRefsFolder points to the folder of
 	// postInitApplicationSQL files in the primary job with initdb.
-	PostInitApplicationSQLRefsFolder = "/etc/post-init-application-sql-refs"
+	postInitApplicationSQLRefsFolder = "/etc/post-init-application-sql"
 )
 
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
@@ -80,7 +80,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
 		initCommand = append(initCommand,
-			"--post-init-application-sql-refs-folder", PostInitApplicationSQLRefsFolder)
+			"--post-init-application-sql-refs-folder", postInitApplicationSQLRefsFolder)
 	}
 
 	return createPrimaryJob(cluster, nodeSerial, "initdb", initCommand)

@@ -162,6 +162,6 @@ var _ = Describe("Job created via InitDB", func() {
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitTemplateSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitApplicationSql"))
-		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement(PostInitApplicationSQLRefsFolder))
+		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement(postInitApplicationSQLRefsFolder))
 	})
 })
