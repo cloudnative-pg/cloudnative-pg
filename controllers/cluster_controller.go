@@ -1075,7 +1075,7 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 	for _, job := range completeJobs {
 		for _, pvc := range resources.pvcs.Items {
 			pvc := pvc
-			if !specs.IsWorkingOnPVC(job.Spec.Template.Spec, pvc.Name) {
+			if !specs.IsPodSpecUsingPVC(job.Spec.Template.Spec, pvc.Name) {
 				continue
 			}
 

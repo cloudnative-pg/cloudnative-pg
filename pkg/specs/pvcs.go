@@ -146,7 +146,7 @@ pvcLoop:
 
 		// Find a Pod corresponding to this PVC
 		for idx := range podList {
-			if IsWorkingOnPVC(podList[idx].Spec, pvc.Name) {
+			if IsPodSpecUsingPVC(podList[idx].Spec, pvc.Name) {
 				// We found a Pod using this PVC so this
 				// PVC is not dangling
 				result.Healthy = append(result.Healthy, pvc.Name)
@@ -155,7 +155,7 @@ pvcLoop:
 		}
 
 		for idx := range jobList {
-			if IsWorkingOnPVC(jobList[idx].Spec.Template.Spec, pvc.Name) {
+			if IsPodSpecUsingPVC(jobList[idx].Spec.Template.Spec, pvc.Name) {
 				// We have found a Job corresponding to this PVC, so we
 				// are initializing it or the initialization is just completed
 				result.Initializing = append(result.Initializing, pvc.Name)
@@ -214,8 +214,8 @@ func removeElementByIndex[T any](slice []T, index int) []T {
 	return append(slice[:index], slice[index+1:]...)
 }
 
-// IsWorkingOnPVC checks if the given pod spec is working on the pvc
-func IsWorkingOnPVC(podSpec corev1.PodSpec, pvcName string) bool {
+// IsPodSpecUsingPVC checks if the given pod spec is using the pvc
+func IsPodSpecUsingPVC(podSpec corev1.PodSpec, pvcName string) bool {
 	for _, volume := range podSpec.Volumes {
 		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvcName {
 			return true
