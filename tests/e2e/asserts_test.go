@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,8 +41,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
-
-	"github.com/thoas/go-funk"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
