@@ -2285,7 +2285,7 @@ func AssertBackupConditionInClusterStatus(namespace, clusterName string) {
 	})
 }
 
-func AssertClusterConditionIsReadyOrNot(
+func AssertClusterReadinessStatusIsReached(
 	namespace,
 	clusterName string,
 	conditionStatus apiv1.ConditionStatus,

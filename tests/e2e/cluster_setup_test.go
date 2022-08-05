@@ -131,7 +131,7 @@ var _ = Describe("Cluster setup", func() {
 		})
 	})
 
-	It("cluster conditions should work", func() {
+	It("tests cluster readiness conditions work", func() {
 		namespace = "cluster-conditions"
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
@@ -154,24 +154,23 @@ var _ = Describe("Cluster setup", func() {
 			CreateResourceFromFile(namespace, sampleFile)
 		})
 
-		By("verifying cluster conditions is ready", func() {
-			AssertClusterConditionIsReadyOrNot(namespace, clusterName, apiv1.ConditionTrue, 600, env)
+		By("verifying cluster reaches ready condition", func() {
+			AssertClusterReadinessStatusIsReached(namespace, clusterName, apiv1.ConditionTrue, 600, env)
 		})
 
-		// Add more replicas to the cluster and verify that while scaling up the cluster then conditions working
-		// as expected
+		// scale up the cluster to verify if the cluster remains in Ready
 		By("scaling up the cluster size", func() {
 			err := env.ScaleClusterSize(namespace, clusterName, 5)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		By("verify cluster condition is not ready just after scale up the cluster", func() {
+		By("verifying cluster readiness condition is false just after scale-up", func() {
 			// Just after scale up the cluster, the condition status set to be `False` and cluster is not ready state.
-			AssertClusterConditionIsReadyOrNot(namespace, clusterName, apiv1.ConditionFalse, 180, env)
+			AssertClusterReadinessStatusIsReached(namespace, clusterName, apiv1.ConditionFalse, 180, env)
 		})
 
-		By("verify cluster condition is ready after scale up cluster", func() {
-			AssertClusterConditionIsReadyOrNot(namespace, clusterName, apiv1.ConditionTrue, 180, env)
+		By("verifying cluster reaches ready condition after additional waiting", func() {
+			AssertClusterReadinessStatusIsReached(namespace, clusterName, apiv1.ConditionTrue, 180, env)
 		})
 	})
 })

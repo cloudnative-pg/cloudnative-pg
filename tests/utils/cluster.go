@@ -243,7 +243,7 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 	return &corev1.Pod{}, err
 }
 
-// ScaleClusterSize is scale cluster as given require size
+// ScaleClusterSize scales a cluster to the requested size
 func (env TestingEnvironment) ScaleClusterSize(namespace, clusterName string, newClusterSize int) error {
 	cluster, err := env.GetCluster(namespace, clusterName)
 	if err != nil {

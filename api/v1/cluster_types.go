@@ -427,14 +427,17 @@ type InstanceReportedState struct {
 	TimeLineID int `json:"timeLineID,omitempty"`
 }
 
+// ClusterConditionType defines types of cluster conditions
+type ClusterConditionType string
+
 // These are valid conditions of a Cluster, some of the conditions could be owned by
 // Instance Manager and some of them could be owned by reconciler.
 const (
-	// ConditionContinuousArchiving this condition archiving :owned by InstanceManager.
+	// ConditionContinuousArchiving represents whether WAL archiving is working
 	ConditionContinuousArchiving ClusterConditionType = "ContinuousArchiving"
-	// ConditionBackup this condition looking backup status :owned by InstanceManager.
+	// ConditionBackup represents the last backup's status
 	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
-	// ConditionClusterReady this condition looking for cluster is to be ready
+	// ConditionClusterReady represents whether a cluster is Ready
 	ConditionClusterReady ClusterConditionType = "Ready"
 )
 
@@ -476,15 +479,12 @@ const (
 	// the WAL archiving is not working correctly
 	ConditionReasonContinuousArchivingFailing ConditionReason = "ContinuousArchivingFailing"
 
-	// ClusterReady means that the condition changed because the cluster to be ready and working properly
+	// ClusterReady means that the condition changed because the cluster is ready and working properly
 	ClusterReady ConditionReason = "ClusterIsReady"
 
 	// ClusterIsNotReady means that the condition changed because the cluster is not ready
 	ClusterIsNotReady ConditionReason = "ClusterIsNotReady"
 )
-
-// ClusterConditionType is of string type
-type ClusterConditionType string
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
 type EmbeddedObjectMetadata struct {
