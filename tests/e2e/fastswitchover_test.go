@@ -39,7 +39,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 		namespace   = "primary-switchover-time"
 		sampleFile  = fixturesDir + "/fastswitchover/cluster-fast-switchover.yaml"
 		webTestFile = fixturesDir + "/fastswitchover/webtest.yaml"
-		webTestJob  = fixturesDir + "/fastswitchover/hey-job-webtest.yaml"
+		webTestJob  = fixturesDir + "/fastswitchover/apache-benchmark-webtest.yaml"
 		clusterName = "cluster-fast-switchover"
 		level       = tests.Highest
 	)
