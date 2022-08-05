@@ -32,7 +32,7 @@ kubectl delete -n [namespace] pvc/[cluster-name]-[serial] pod/[cluster-name]-[se
 ```
 
 !!! Note
-    In case you have instanciated a dedicated WAL volume it will also have to be deleted during this process.
+    In case you have instantiated a dedicated WAL volume it will also have to be deleted during this process.
 
 ```sh
 kubectl delete -n [namespace] pvc/[cluster-name]-[serial] pvc/[cluster-name]-[serial]-wal pod/[cluster-name]-[serial]

@@ -360,7 +360,7 @@ $ kubectl delete pvc/cluster-example-3 pod/cluster-example-3
 ```
 
 !!! Important
-    In case you have instanciated a dedicated WAL volume, both PCVs will have to be deleted during this process.
+    In case you have instantiated a dedicated WAL volume, both PCVs will have to be deleted during this process.
     Additionally, the same procedure applies in case you want to regenerate the WAL volume PVC, which can be done
     by disabling `resizeInUseVolumes` also for the `.spec.walStorage` section.
 
