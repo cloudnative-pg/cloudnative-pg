@@ -190,7 +190,7 @@ type ClusterSpec struct {
 	// +optional
 	StorageConfiguration StorageConfiguration `json:"storage,omitempty"`
 
-	// Configuration of the wal storage
+	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
 	WalStorage *StorageConfiguration `json:"walStorage,omitempty"`
 
 	// The time in seconds that is allowed for a PostgreSQL instance to

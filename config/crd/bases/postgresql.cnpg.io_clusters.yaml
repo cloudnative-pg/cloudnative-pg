@@ -2248,7 +2248,8 @@ spec:
                 format: int32
                 type: integer
               walStorage:
-                description: Configuration of the wal storage
+                description: Configuration of the storage for PostgreSQL WAL (Write-Ahead
+                  Log)
                 properties:
                   pvcTemplate:
                     description: Template to be used to generate the Persistent Volume

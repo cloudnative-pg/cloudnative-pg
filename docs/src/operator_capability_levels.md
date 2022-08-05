@@ -91,6 +91,9 @@ workload requirements, based on what the underlying Kubernetes environment
 can offer. This implies choosing a particular storage class in
 a public cloud environment or fine-tuning the generated PVC through a
 PVC template in the CR's `storage` parameter.
+For better performance and finer control, you can also decide to host your
+cluster's Write-Ahead Log (WAL, also known as `pg_wal`) on a separate volume,
+preferably on different storage.
 The [`cnp-bench`](https://github.com/EnterpriseDB/cnp-bench) open source
 project can be used to benchmark both the storage and the database prior to
 production.
