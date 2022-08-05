@@ -182,9 +182,9 @@ func (i *PostgresLifecycle) handleInstanceCommandRequests(
 		}
 		return false, err
 	case postgres.RestartSmartFast:
-		return true, tryShuttingDownSmartFast(i.instance.MaxSwitchoverDelay, i.instance)
+		return true, tryShuttingDownSmartFast(i.instance.MaxStopDelay, i.instance)
 	case postgres.ShutDownFastImmediate:
-		if err := tryShuttingDownFastImmediate(i.instance.MaxStopDelay, i.instance); err != nil {
+		if err := tryShuttingDownFastImmediate(i.instance.MaxSwitchoverDelay, i.instance); err != nil {
 			log.Error(err, "error shutting down instance, proceeding")
 		}
 		return false, nil
