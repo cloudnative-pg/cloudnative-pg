@@ -1266,7 +1266,7 @@ func (r *ClusterReconciler) createPVC(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvcSpec, err := specs.CreatePVC(storageConfiguration, *cluster, suffix, nodeSerial)
+	pvc, err := specs.CreatePVC(storageConfiguration, *cluster, suffix, nodeSerial)
 	if err != nil {
 		if err == specs.ErrorInvalidSize {
 			// This error should have been caught by the validating
@@ -1280,12 +1280,14 @@ func (r *ClusterReconciler) createPVC(
 		return fmt.Errorf("unable to create a PVC spec for node with serial %v: %w", nodeSerial, err)
 	}
 
-	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, cluster)
+	SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
 
-	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-		return fmt.Errorf("unable to create a PVC for this node (nodeSerial: %d): %w",
+	if err = r.Create(ctx, pvc); err != nil && !apierrs.IsAlreadyExists(err) {
+		return fmt.Errorf("unable to create a PVC: %s for this node (nodeSerial: %d): %w",
+			pvc.Name,
 			nodeSerial,
-			err)
+			err,
+		)
 	}
 
 	return nil
