@@ -29,7 +29,9 @@ spec:
     spec:
       serviceAccountName: manager
       securityContext:
-        runAsUser: 1001
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - command:
         - /manager
@@ -77,8 +79,13 @@ spec:
           - mountPath: /run/secrets/cnpg.io/webhook
             name: webhook-certificates
         securityContext:
+          runAsUser: 10001
+          runAsGroup: 10001
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - "ALL"
       volumes:
         - name: scratch-data
           emptyDir: {}
