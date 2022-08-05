@@ -17,12 +17,12 @@ limitations under the License.
 package specs
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs", func() {
