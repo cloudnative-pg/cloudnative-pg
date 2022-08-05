@@ -177,8 +177,8 @@ pvcLoop:
 		return result
 	}
 
-	for _, instance := range getInstancesName(podList) {
-		expectedPVCs := getExpectedInstancePVCNames(cluster, instance)
+	for _, instance := range getInstancesPods(podList) {
+		expectedPVCs := getExpectedInstancePVCNames(cluster, instance.Name)
 		var indexOfFoundPVCs []int
 
 		for idx, pvcName := range result.Healthy {
@@ -241,12 +241,13 @@ func DoesBelongToInstance(instanceName, resourceName string) bool {
 	return strings.HasPrefix(resourceName, instanceName)
 }
 
-func getInstancesName(pods []corev1.Pod) []string {
-	var instancesName []string
+// getInstancesPods filters a list of pods and returns only the CNPG instances pods
+func getInstancesPods(pods []corev1.Pod) []corev1.Pod {
+	var instancesName []corev1.Pod
 	for _, pod := range pods {
 		_, ok := pod.Labels[ClusterRoleLabelName]
 		if ok {
-			instancesName = append(instancesName, pod.Name)
+			instancesName = append(instancesName, pod)
 		}
 	}
 
