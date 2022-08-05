@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -236,9 +235,10 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	return false
 }
 
-// DoesBelongToInstance returns a boolean indicating if that given resources belongs to an instance
-func DoesBelongToInstance(instanceName, resourceName string) bool {
-	return strings.HasPrefix(resourceName, instanceName)
+// DoesPVCBelongToInstance returns a boolean indicating if that given PVC belongs to an instance
+func DoesPVCBelongToInstance(cluster *apiv1.Cluster, instanceName, resourceName string) bool {
+	expectedInstancePVCs := getExpectedInstancePVCNames(cluster, instanceName)
+	return slices.Contains(expectedInstancePVCs, resourceName)
 }
 
 // getInstancesPods filters a list of pods and returns only the CNPG instances pods

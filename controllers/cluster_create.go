@@ -1222,7 +1222,7 @@ func electPvcToReattach(cluster *apiv1.Cluster) string {
 	}
 
 	for _, pvc := range pvcs {
-		if specs.DoesBelongToInstance(cluster.Status.TargetPrimary, pvc) {
+		if specs.DoesPVCBelongToInstance(cluster, cluster.Status.TargetPrimary, pvc) {
 			return pvc
 		}
 	}
