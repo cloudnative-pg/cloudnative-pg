@@ -109,6 +109,10 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
+	if _, err := info.restoreCustomWalDir(ctx); err != nil {
+		return err
+	}
+
 	if err := info.WriteInitialPostgresqlConf(cluster); err != nil {
 		return err
 	}
@@ -138,6 +142,42 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	}
 
 	return info.ConfigureInstanceAfterRestore(env)
+}
+
+// restoreCustomWalDir moves the current pg_wal data to the specified custom wal dir and applies the symlink
+// returns indicating if any changes were made and any error encountered in the process
+func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
+	if info.PgWal == "" {
+		return false, nil
+	}
+
+	contextLogger := log.FromContext(ctx)
+	pgDataWal := path.Join(info.PgData, "pg_wal")
+
+	// if the link is already present we have nothing to do.
+	if linkInfo, _ := os.Readlink(pgDataWal); linkInfo == info.PgWal {
+		contextLogger.Info("symlink to the WAL volume already present, skipping the custom wal dir restore")
+		return false, nil
+	}
+
+	if err := fileutils.EnsureDirectoryExist(info.PgWal); err != nil {
+		return false, err
+	}
+
+	contextLogger.Info("restoring WAL volume symlink and transferring data")
+	if err := fileutils.EnsureDirectoryExist(pgDataWal); err != nil {
+		return false, err
+	}
+
+	if err := fileutils.MoveDirectoryContent(pgDataWal, info.PgWal); err != nil {
+		return false, err
+	}
+
+	if err := fileutils.RemoveFile(pgDataWal); err != nil {
+		return false, err
+	}
+
+	return true, os.Symlink(info.PgWal, pgDataWal)
 }
 
 // restoreDataDir restores PGDATA from an existing backup

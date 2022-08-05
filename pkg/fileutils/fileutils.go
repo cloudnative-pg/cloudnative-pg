@@ -321,6 +321,34 @@ func GetDirectoryContent(dir string) (files []string, err error) {
 	return
 }
 
+// MoveDirectoryContent moves a directory from a source path to its destination by copying
+// the source files to the destination  once this is done it deletes the files from the original location.
+func MoveDirectoryContent(sourceDirectory, destinationDirectory string) error {
+	var err error
+
+	// if something fails we remove any copied files if they exist
+	defer func() {
+		if err != nil {
+			_ = RemoveFile(destinationDirectory)
+		}
+	}()
+
+	names, err := GetDirectoryContent(sourceDirectory)
+	if err != nil {
+		return err
+	}
+	// we first copy the files without deleting them, this is to avoid incosistent states
+	for _, name := range names {
+		if err = CopyFile(filepath.Join(sourceDirectory, name), filepath.Join(destinationDirectory, name)); err != nil {
+			return err
+		}
+	}
+
+	// we finish by removing the original folder content.
+	// we don't assign it to the err variable to avoid triggering defer cleanup logic in case of errors
+	return RemoveDirectoryContent(sourceDirectory)
+}
+
 // GetFileSize returns the size of a file or an error
 func GetFileSize(fileName string) (int64, error) {
 	stat, err := os.Stat(fileName)
