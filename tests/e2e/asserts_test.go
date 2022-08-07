@@ -2280,9 +2280,15 @@ func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 	yaml := data
 
 	if filepath.Ext(cleanPath) == ".template" {
+		prerollImg := os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
+		if prerollImg == "" {
+			prerollImg = os.Getenv("POSTGRES_IMG")
+		}
 		envVars := map[string]string{
-			"E2E_DEFAULT_STORAGE_CLASS": os.Getenv("E2E_DEFAULT_STORAGE_CLASS"),
-			"AZURE_STORAGE_ACCOUNT":     os.Getenv("AZURE_STORAGE_ACCOUNT"),
+			"E2E_DEFAULT_STORAGE_CLASS":  os.Getenv("E2E_DEFAULT_STORAGE_CLASS"),
+			"AZURE_STORAGE_ACCOUNT":      os.Getenv("AZURE_STORAGE_ACCOUNT"),
+			"POSTGRES_IMG":               os.Getenv("POSTGRES_IMG"),
+			"E2E_PRE_ROLLING_UPDATE_IMG": prerollImg,
 		}
 		yaml, err = testsUtils.Envsubst(envVars, data)
 		if err != nil {
