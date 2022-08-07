@@ -1,9 +1,15 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-auto-generated
+  name: cluster-tolerations
 spec:
   instances: 3
+
+  affinity:
+      tolerations:
+        - key: "test-tolerations"
+          operator: "Exists"
+          effect: "NoSchedule"
 
   postgresql:
     parameters:
@@ -17,7 +23,9 @@ spec:
 
   bootstrap:
     initdb:
-      database: appdb
+      database: app
       owner: appuser
+
   storage:
     size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

@@ -1,9 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-pgbouncer
+  name: cluster-pg-data-corruption
 spec:
-  instances: 2
+  instances: 3
 
   postgresql:
     parameters:
@@ -22,4 +22,5 @@ spec:
 
   # Persistent storage configuration
   storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi

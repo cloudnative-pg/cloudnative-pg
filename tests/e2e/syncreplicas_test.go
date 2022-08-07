@@ -55,7 +55,7 @@ var _ = Describe("Synchronous Replicas", func() {
 	It("can manage sync replicas", func() {
 		namespace = "sync-replicas-e2e"
 		clusterName = "cluster-syncreplicas"
-		const sampleFile = fixturesDir + "/sync_replicas/cluster-syncreplicas.yaml"
+		const sampleFile = fixturesDir + "/sync_replicas/cluster-syncreplicas.yaml.template"
 
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
@@ -171,7 +171,7 @@ var _ = Describe("Synchronous Replicas", func() {
 	It("will not prevent a cluster with pg_stat_statements from being created", func() {
 		namespace = "sync-replicas-statstatements"
 		clusterName = "cluster-pgstatstatements"
-		const sampleFile = fixturesDir + "/sync_replicas/cluster-pgstatstatements.yaml"
+		const sampleFile = fixturesDir + "/sync_replicas/cluster-pgstatstatements.yaml.template"
 
 		// Are extensions a problem with synchronous replication? No, absolutely not,
 		// but to install pg_stat_statements you need to create the relative extension

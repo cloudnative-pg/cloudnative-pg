@@ -5,7 +5,7 @@ metadata:
   name: cluster2
 spec:
   instances: 3
-  imageName: "${POSTGRES_IMG}"
+  imageName: ""
   description: "Example of cluster"
   startDelay: 300
   stopDelay: 300
@@ -68,4 +68,3 @@ spec:
 
   storage:
     size: 1Gi
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

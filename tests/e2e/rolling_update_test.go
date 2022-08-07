@@ -293,7 +293,7 @@ var _ = Describe("Rolling updates", func() {
 
 	Context("Three Instances", func() {
 		const namespace = "cluster-rolling-e2e-three-instances"
-		const sampleFile = fixturesDir + "/rolling_updates/cluster-three-instances.yaml"
+		const sampleFile = fixturesDir + "/rolling_updates/cluster-three-instances.yaml.template"
 		const clusterName = "postgresql-three-instances"
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
@@ -318,7 +318,7 @@ var _ = Describe("Rolling updates", func() {
 
 	Context("Single Instance", func() {
 		const namespace = "cluster-rolling-e2e-single-instance"
-		const sampleFile = fixturesDir + "/rolling_updates/cluster-single-instance.yaml"
+		const sampleFile = fixturesDir + "/rolling_updates/cluster-single-instance.yaml.template"
 		const clusterName = "postgresql-single-instance"
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
@@ -342,7 +342,7 @@ var _ = Describe("Rolling updates", func() {
 	})
 
 	Context("primaryUpdateMethod set to restart", func() {
-		const sampleFile = fixturesDir + "/rolling_updates/cluster-using-primary-update-method.yaml"
+		const sampleFile = fixturesDir + "/rolling_updates/cluster-using-primary-update-method.yaml.template"
 		var namespace, clusterName string
 
 		JustAfterEach(func() {

@@ -1,14 +1,12 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-restore
+  name: cluster-syncreplicas
 spec:
   instances: 3
-  imageName: "${POSTGRES_IMG}"
 
-  storage:
-    size: 1Gi
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+  minSyncReplicas: 1
+  maxSyncReplicas: 2
 
   postgresql:
     parameters:
@@ -20,12 +18,6 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
 
-  bootstrap:
-    recovery:
-      backup:
-        name: cluster-backup
-      recoveryTarget:
-        targetTLI: "1"
-
-  superuserSecret:
-    name: cluster-superuser
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1G

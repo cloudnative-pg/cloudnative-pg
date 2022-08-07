@@ -1,13 +1,13 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-single-instance
+  name: pgbouncer-separate-client-server-ca
 spec:
-  imageName: ${E2E_PRE_ROLLING_UPDATE_IMG}
-  instances: 1
+  instances: 2
 
   postgresql:
     parameters:
+      work_mem: "8MB"
       log_checkpoints: "on"
       log_lock_waits: "on"
       log_min_duration_statement: '1000'
@@ -16,12 +16,11 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
 
-  # Example of rolling update strategy:
-  # - unsupervised: automated update of the primary once all
-  #                 replicas have been upgraded (default)
-  # - supervised: requires manual supervision to perform
-  #               the switchover of the primary
-  primaryUpdateStrategy: unsupervised
+  certificates:
+    serverCASecret: my-postgresql-server-ca
+    serverTLSSecret: my-postgresql-server
+    clientCASecret: my-postgresql-client-ca
+    replicationTLSSecret: my-postgresql-client
 
   bootstrap:
     initdb:

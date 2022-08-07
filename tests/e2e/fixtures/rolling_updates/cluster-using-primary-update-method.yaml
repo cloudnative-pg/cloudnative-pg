@@ -1,10 +1,10 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-single-instance
+  name: postgresql-three-instances
 spec:
-  imageName: ${E2E_PRE_ROLLING_UPDATE_IMG}
-  instances: 1
+  imageName: 
+  instances: 3
 
   postgresql:
     parameters:
@@ -22,6 +22,7 @@ spec:
   # - supervised: requires manual supervision to perform
   #               the switchover of the primary
   primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: restart
 
   bootstrap:
     initdb:
@@ -30,5 +31,4 @@ spec:
 
   # Persistent storage configuration
   storage:
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi

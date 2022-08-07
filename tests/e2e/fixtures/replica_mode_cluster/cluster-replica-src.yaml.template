@@ -1,9 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: storage-expansion
+  name: cluster-replica-src
 spec:
-  instances: 3
+  instances: 1
 
   postgresql:
     parameters:
@@ -14,12 +14,15 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
+    pg_hba:
+      - host replication postgres all md5
+      - hostssl app streaming_replica all cert
 
   bootstrap:
     initdb:
-      database: app
-      owner: appuser
+      database: appSrc
+      owner: userSrc
 
   storage:
     size: 1Gi
-
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

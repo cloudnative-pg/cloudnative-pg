@@ -201,7 +201,7 @@ var _ = Describe("Metrics", func() {
 		const (
 			replicaModeClusterDir    = "/replica_mode_cluster/"
 			replicaClusterSampleFile = fixturesDir + "/metrics/cluster-replica-tls-with-metrics.yaml.template"
-			srcClusterSampleFile     = fixturesDir + replicaModeClusterDir + "cluster-replica-src.yaml"
+			srcClusterSampleFile     = fixturesDir + replicaModeClusterDir + "cluster-replica-src.yaml.template"
 			configMapFIle            = fixturesDir + "/metrics/custom-queries-for-replica-cluster.yaml"
 			checkQuery               = "SELECT count(*) FROM test_replica"
 		)
