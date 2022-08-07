@@ -76,7 +76,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive), func() 
 	Context("Maintenance on, reuse pvc on", func() {
 		// Initialize empty global namespace variable
 		var namespace string
-		const sampleFile = fixturesDir + "/drain-node/cluster-drain-node.yaml"
+		const sampleFile = fixturesDir + "/drain-node/cluster-drain-node.yaml.template"
 		const clusterName = "cluster-drain-node"
 
 		JustAfterEach(func() {

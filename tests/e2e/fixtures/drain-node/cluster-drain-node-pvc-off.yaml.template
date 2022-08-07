@@ -1,18 +1,18 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: objectmeta-inheritance
+  name: cluster-drain-node
 spec:
-  inheritedMetadata:
-    annotations:
-      categories: DatabaseApplication
-      example.com/qa: qa
-      example.com/prod: prod
-    labels:
-      environment: qaEnv
-      example.com/qa: qa
-      example.com/prod: prod
-  instances: 1
+  instances: 3
+
+  affinity:
+      nodeSelector:
+        drain: 'drain'
+
+  nodeMaintenanceWindow:
+      reusePVC: off
+      inProgress: on
+
   postgresql:
     parameters:
       log_checkpoints: "on"
@@ -22,9 +22,12 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
+
   bootstrap:
     initdb:
       database: app
       owner: appuser
+
   storage:
     size: 1Gi
+  storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

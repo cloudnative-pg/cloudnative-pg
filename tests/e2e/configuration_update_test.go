@@ -42,7 +42,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 	const (
 		clusterName          = "postgresql-storage-class"
 		namespace            = "cluster-update-config-e2e"
-		sampleFile           = fixturesDir + "/base/cluster-storage-class.yaml"
+		sampleFile           = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		level                = tests.High
 		autoVacuumMaxWorkers = 4
 		timeout              = 60
@@ -407,7 +407,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", func() {
 
 	Context("primaryUpdateMethod value set to restart", Ordered, func() {
 		clusterFileWithPrimaryUpdateRestart := fixturesDir +
-			"/config_update/primary_update_method/primary-update-restart.yaml"
+			"/config_update/primary_update_method/primary-update-restart.yaml.template"
 		var namespace, clusterName string
 		var sourceClusterNamespacedName *types.NamespacedName
 

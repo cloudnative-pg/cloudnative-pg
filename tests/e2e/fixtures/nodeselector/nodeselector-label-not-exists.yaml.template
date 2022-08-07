@@ -1,17 +1,14 @@
+# Example of PostgreSQL cluster using a node selector
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-drain-node
+  name: postgresql-nodeselector
 spec:
   instances: 3
 
   affinity:
-      nodeSelector:
-        drain: 'drain'
-
-  nodeMaintenanceWindow:
-      reusePVC: off
-      inProgress: on
+    nodeSelector:
+      nodeselectortest: notexists
 
   postgresql:
     parameters:
@@ -23,10 +20,7 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
 
-  bootstrap:
-    initdb:
-      database: app
-      owner: appuser
-
+  # Persistent storage configuration
   storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi

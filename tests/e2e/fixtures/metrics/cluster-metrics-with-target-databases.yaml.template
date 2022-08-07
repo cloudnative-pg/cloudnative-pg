@@ -1,9 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: disable-default-monitoring-metrics
+  name: metrics-target-databases
 spec:
-  instances: 1
+  instances: 3
 
   postgresql:
     parameters:
@@ -28,8 +28,15 @@ spec:
       owner: app
 
   monitoring:
-    disableDefaultQueries: true
+    customQueriesConfigMap:
+      - name: monitoring-01
+        key: additional-queries
+    customQueriesSecret:
+      - name: monitoring-01
+        key: additional-queries
+
 
   # Persistent storage configuration
   storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi

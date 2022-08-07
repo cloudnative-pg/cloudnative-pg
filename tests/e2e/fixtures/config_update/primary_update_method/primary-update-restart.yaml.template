@@ -1,14 +1,14 @@
-# Example of PostgreSQL cluster using ssl enabled
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: p-locale
+  name: primary-update-restart
 spec:
   instances: 3
 
   postgresql:
     parameters:
       work_mem: "8MB"
+      max_connections: "105"
       log_checkpoints: "on"
       log_lock_waits: "on"
       log_min_duration_statement: '1000'
@@ -16,17 +16,21 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
-    pg_hba:
-      - hostssl all all all cert
+
+  # Example of rolling update strategy:
+  # - unsupervised: automated update of the primary once all
+  #                 replicas have been upgraded (default)
+  # - supervised: requires manual supervision to perform
+  #               the switchover of the primary
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: restart
 
   bootstrap:
     initdb:
       database: app
       owner: app
-      options:
-      - "--locale"
-      - "en_US.utf8"
 
   # Persistent storage configuration
   storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi

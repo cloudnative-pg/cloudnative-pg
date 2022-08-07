@@ -1,20 +1,13 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-drain-node
+  name: postgresql-client-server-cert
 spec:
   instances: 3
 
-  affinity:
-      nodeSelector:
-        drain: 'drain'
-
-  nodeMaintenanceWindow:
-      reusePVC: on
-      inProgress: on
-
   postgresql:
     parameters:
+      work_mem: "8MB"
       log_checkpoints: "on"
       log_lock_waits: "on"
       log_min_duration_statement: '1000'
@@ -22,11 +15,21 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
+    pg_hba:
+      - hostssl all all all cert
+
+  certificates:
+    serverCASecret: my-postgresql-server-ca
+    serverTLSSecret: my-postgresql-server
+    clientCASecret: my-postgresql-client-ca
+    replicationTLSSecret: my-postgresql-client
 
   bootstrap:
     initdb:
       database: app
-      owner: appuser
+      owner: app
 
+  # Persistent storage configuration
   storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi

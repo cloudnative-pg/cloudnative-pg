@@ -70,7 +70,7 @@ var _ = Describe("Certificates", func() {
 
 	Context("Operator managed mode", Ordered, func() {
 		const (
-			sampleFile = fixturesCertificatesDir + "/cluster-ssl-enabled.yaml"
+			sampleFile = fixturesCertificatesDir + "/cluster-ssl-enabled.yaml.template"
 		)
 
 		cleanClusterCertification := func() {
@@ -254,7 +254,7 @@ var _ = Describe("Certificates", func() {
 	})
 
 	Context("User supplied server certificate mode", func() {
-		const sampleFile = fixturesCertificatesDir + "/cluster-user-supplied-certificates.yaml"
+		const sampleFile = fixturesCertificatesDir + "/cluster-user-supplied-certificates.yaml.template"
 
 		BeforeEach(func() {
 			namespace = "server-certificates-e2e"
@@ -303,7 +303,7 @@ var _ = Describe("Certificates", func() {
 	})
 
 	Context("User supplied client certificate mode", func() {
-		const sampleFile = fixturesCertificatesDir + "/cluster-user-supplied-client-certificates.yaml"
+		const sampleFile = fixturesCertificatesDir + "/cluster-user-supplied-client-certificates.yaml.template"
 
 		BeforeEach(func() {
 			namespace = "client-certificates-e2e"
@@ -338,7 +338,7 @@ var _ = Describe("Certificates", func() {
 	})
 
 	Context("User supplied both client and server certificate mode", func() {
-		const sampleFile = fixturesCertificatesDir + "/cluster-user-supplied-client-server-certificates.yaml"
+		const sampleFile = fixturesCertificatesDir + "/cluster-user-supplied-client-server-certificates.yaml.template"
 
 		BeforeEach(func() {
 			namespace = "client-server-certificates-e2e"

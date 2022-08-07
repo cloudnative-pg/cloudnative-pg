@@ -45,7 +45,7 @@ import (
 var _ = Describe("Imports with Microservice Approach", Label(tests.LabelBackupRestore), func() {
 	const (
 		level            = tests.Medium
-		sourceSampleFile = fixturesDir + "/cluster_microservice/cluster-base.yaml"
+		sourceSampleFile = fixturesDir + "/cluster_microservice/cluster-base.yaml.template"
 		tableName        = "to_import"
 	)
 

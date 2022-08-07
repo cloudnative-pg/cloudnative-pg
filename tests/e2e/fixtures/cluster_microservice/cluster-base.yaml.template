@@ -1,11 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  annotations:
-    env: "test"
-  name: postgresql-storage-class
+  name: cluster-microservice
 spec:
-  instances: 3
+  instances: 2
 
   postgresql:
     parameters:
@@ -31,4 +29,5 @@ spec:
 
   # Persistent storage configuration
   storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi

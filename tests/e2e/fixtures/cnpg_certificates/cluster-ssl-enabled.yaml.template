@@ -2,7 +2,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-server-cert
+  name: postgresql-cert
 spec:
   instances: 3
 
@@ -20,8 +20,10 @@ spec:
       - hostssl all all all cert
 
   certificates:
-    serverCASecret: my-postgresql-server-ca
-    serverTLSSecret: my-postgresql-server
+    serverCASecret: ""
+    serverTLSSecret: ""
+    clientCASecret: ""
+    replicationTLSSecret: ""
 
   bootstrap:
     initdb:
@@ -30,4 +32,5 @@ spec:
 
   # Persistent storage configuration
   storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi

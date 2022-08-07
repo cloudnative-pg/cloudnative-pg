@@ -32,3 +32,4 @@ spec:
   # Require 1Gi of space
   storage:
     size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

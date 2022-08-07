@@ -1,7 +1,8 @@
+# Example of PostgreSQL cluster
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: metrics-target-databases
+  name: cluster-fast-switchover
 spec:
   instances: 3
 
@@ -14,6 +15,11 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
+      wal_receiver_timeout: '2s'
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
 
   # Example of rolling update strategy:
   # - unsupervised: automated update of the primary once all
@@ -22,20 +28,7 @@ spec:
   #               the switchover of the primary
   primaryUpdateStrategy: unsupervised
 
-  bootstrap:
-    initdb:
-      database: app
-      owner: app
-
-  monitoring:
-    customQueriesConfigMap:
-      - name: monitoring-01
-        key: additional-queries
-    customQueriesSecret:
-      - name: monitoring-01
-        key: additional-queries
-
-
-  # Persistent storage configuration
+  # Require 1Gi of space
   storage:
     size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

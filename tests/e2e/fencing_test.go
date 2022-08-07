@@ -37,7 +37,7 @@ import (
 
 var _ = Describe("Fencing", func() {
 	const (
-		sampleFile = fixturesDir + "/base/cluster-storage-class.yaml"
+		sampleFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		level      = tests.Medium
 	)
 	BeforeEach(func() {

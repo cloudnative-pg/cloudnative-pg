@@ -1,14 +1,9 @@
-# Example of PostgreSQL cluster using a node selector
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-nodeselector
+  name: operator-unavailable
 spec:
   instances: 3
-
-  affinity:
-    nodeSelector:
-      nodeselectortest: notexists
 
   postgresql:
     parameters:
@@ -20,6 +15,11 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
 
-  # Persistent storage configuration
+  bootstrap:
+    initdb:
+      database: app
+      owner: appuser
+
   storage:
     size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

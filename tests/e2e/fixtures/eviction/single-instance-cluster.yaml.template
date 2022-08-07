@@ -12,6 +12,7 @@ spec:
 
   storage:
     size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
 
   resources:
     requests:

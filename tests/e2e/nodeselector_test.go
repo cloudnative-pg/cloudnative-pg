@@ -41,7 +41,7 @@ var _ = Describe("nodeSelector", func() {
 
 	Context("The label doesn't exist", func() {
 		const namespace = "nodeselector-e2e-missing-label"
-		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-not-exists.yaml"
+		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-not-exists.yaml.template"
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
@@ -105,7 +105,7 @@ var _ = Describe("nodeSelector", func() {
 
 	Context("The label exists", func() {
 		const namespace = "nodeselector-e2e-existing-label"
-		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-exists.yaml"
+		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-exists.yaml.template"
 		const clusterName = "postgresql-nodeselector"
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
