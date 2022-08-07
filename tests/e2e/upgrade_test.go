@@ -157,7 +157,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// the `apply` command
 
 			Eventually(func() error {
-				_, _, err := testsUtils.RunUnchecked("kubectl apply -n " + upgradeNamespace + " -f " + updateConfFile)
+				err := OnlyCreateResourcesFromFile(upgradeNamespace, updateConfFile)
 				return err
 			}, 60).ShouldNot(HaveOccurred())
 

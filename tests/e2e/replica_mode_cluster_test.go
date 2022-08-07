@@ -35,7 +35,7 @@ var _ = Describe("Replica Mode", func() {
 	const (
 		replicaModeClusterDir = "/replica_mode_cluster/"
 		srcClusterName        = "cluster-replica-src"
-		srcClusterSample      = fixturesDir + replicaModeClusterDir + srcClusterName + ".yaml"
+		srcClusterSample      = fixturesDir + replicaModeClusterDir + srcClusterName + ".yaml.template"
 		checkQuery            = "SELECT count(*) FROM test_replica"
 		level                 = tests.Medium
 	)
