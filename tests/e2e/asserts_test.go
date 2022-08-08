@@ -2238,10 +2238,10 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 	})
 }
 
-// OnlyCreateResourcesFromFile creates the Kubernetes objects defined in a YAML sample file
-// and does no further verification
-func OnlyCreateResourcesFromFile(namespace, sampleFilePath string) error {
-	wrapErr := func(err error) error { return fmt.Errorf("on OnlyCreateResourcesFromFile: %w", err) }
+// CreateResourcesFromFileWithError creates the Kubernetes objects defined in the
+// YAML sample file and returns any errors
+func CreateResourcesFromFileWithError(namespace, sampleFilePath string) error {
+	wrapErr := func(err error) error { return fmt.Errorf("on CreateResourcesFromFileWithError: %w", err) }
 	yaml, err := GetYAMLContent(sampleFilePath)
 	if err != nil {
 		return wrapErr(err)
@@ -2262,8 +2262,9 @@ func OnlyCreateResourcesFromFile(namespace, sampleFilePath string) error {
 
 // CreateResourceFromFile creates the Kubernetes objects defined in a YAML sample file
 func CreateResourceFromFile(namespace, sampleFilePath string) {
-	err := OnlyCreateResourcesFromFile(namespace, sampleFilePath)
-	Expect(err).ShouldNot(HaveOccurred())
+	Eventually(func() error {
+		return CreateResourcesFromFileWithError(namespace, sampleFilePath)
+	}, RetryTimeout, PollingTime).Should(BeNil())
 }
 
 // GetYAMLContent opens a .yaml of .template file and returns its content
@@ -2280,15 +2281,15 @@ func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 	yaml := data
 
 	if filepath.Ext(cleanPath) == ".template" {
-		prerollImg := os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
-		if prerollImg == "" {
-			prerollImg = os.Getenv("POSTGRES_IMG")
+		preRollingUpdateImg := os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
+		if preRollingUpdateImg == "" {
+			preRollingUpdateImg = os.Getenv("POSTGRES_IMG")
 		}
 		envVars := map[string]string{
 			"E2E_DEFAULT_STORAGE_CLASS":  os.Getenv("E2E_DEFAULT_STORAGE_CLASS"),
 			"AZURE_STORAGE_ACCOUNT":      os.Getenv("AZURE_STORAGE_ACCOUNT"),
 			"POSTGRES_IMG":               os.Getenv("POSTGRES_IMG"),
-			"E2E_PRE_ROLLING_UPDATE_IMG": prerollImg,
+			"E2E_PRE_ROLLING_UPDATE_IMG": preRollingUpdateImg,
 		}
 		yaml, err = testsUtils.Envsubst(envVars, data)
 		if err != nil {

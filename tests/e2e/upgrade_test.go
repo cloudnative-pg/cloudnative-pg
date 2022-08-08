@@ -68,14 +68,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		pgSecrets = fixturesDir + "/upgrade/pgsecrets.yaml" //nolint:gosec
 
 		// This is a cluster of the previous version, created before the operator upgrade
-		clusterName1   = "cluster1"
-		sampleFile     = fixturesDir + "/upgrade/cluster1.yaml.template"
-		updateConfFile = fixturesDir + "/upgrade/conf-update.yaml.template"
+		clusterName1 = "cluster1"
+		sampleFile   = fixturesDir + "/upgrade/cluster1.yaml.template"
 
 		// This is a cluster of the previous version, created after the operator upgrade
-		clusterName2    = "cluster2"
-		sampleFile2     = fixturesDir + "/upgrade/cluster2.yaml.template"
-		updateConfFile2 = fixturesDir + "/upgrade/conf-update2.yaml.template"
+		clusterName2 = "cluster2"
+		sampleFile2  = fixturesDir + "/upgrade/cluster2.yaml.template"
 
 		backupName          = "cluster-backup"
 		backupFile          = fixturesDir + "/upgrade/backup1.yaml"
@@ -137,7 +135,18 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 	}
 
-	AssertConfUpgrade := func(clusterName string, updateConfFile string) {
+	applyConfUpgrade := func(cluster *apiv1.Cluster) error {
+		// changes some parameters in the Postgres configuration, and the `pg_hba` entries
+		oldCluster := cluster.DeepCopy()
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "128MB"
+		cluster.Spec.PostgresConfiguration.Parameters["work_mem"] = "8MB"
+		cluster.Spec.PostgresConfiguration.Parameters["max_replication_slots"] = "16"
+		cluster.Spec.PostgresConfiguration.Parameters["maintenance_work_mem"] = "256MB"
+		cluster.Spec.PostgresConfiguration.PgHBA[0] = "host all all all trust"
+		return env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(oldCluster))
+	}
+
+	AssertConfUpgrade := func(clusterName string) {
 		By("checking basic functionality performing a configuration upgrade on the cluster", func() {
 			podList, err := env.GetClusterPodList(upgradeNamespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -157,7 +166,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// the `apply` command
 
 			Eventually(func() error {
-				err := OnlyCreateResourcesFromFile(upgradeNamespace, updateConfFile)
+				err := applyConfUpgrade(cluster)
 				return err
 			}, 60).ShouldNot(HaveOccurred())
 
@@ -179,7 +188,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 						"psql", "-U", "postgres", "-tAc", "show maintenance_work_mem")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
 					return value, err, atoiErr
-				}, timeout).Should(BeEquivalentTo(128),
+				}, timeout).Should(BeEquivalentTo(256),
 					"Pod %v should have updated its config", pod.Name)
 			}
 			// Check that a switchover happened
@@ -502,14 +511,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 		AssertClusterIsReady(upgradeNamespace, clusterName1, 300, env)
 
-		AssertConfUpgrade(clusterName1, updateConfFile)
+		AssertConfUpgrade(clusterName1)
 
 		By("installing a second Cluster on the upgraded operator", func() {
 			CreateResourceFromFile(upgradeNamespace, sampleFile2)
 			AssertClusterIsReady(upgradeNamespace, clusterName2, 600, env)
 		})
 
-		AssertConfUpgrade(clusterName2, updateConfFile2)
+		AssertConfUpgrade(clusterName2)
 
 		// We verify that the backup taken before the upgrade is usable to
 		// create a v1 cluster

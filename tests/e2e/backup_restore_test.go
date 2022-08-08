@@ -1093,7 +1093,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 
 		It("restore a cluster with same backup destination path as source and it fails", func() {
 			// Restoring cluster with same destination path.
-			err := OnlyCreateResourcesFromFile(namespace, clusterRestoreSampleFile)
+			err := CreateResourcesFromFileWithError(namespace, clusterRestoreSampleFile)
 			Expect(err).To(HaveOccurred())
 			Expect(strings.Contains(err.Error(), "Cannot be equal to the ExternalCluster"))
 		})
@@ -1119,7 +1119,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 
 			// Restoring cluster from second backup
 			By("restoring the cluster from the second backup", func() {
-				err = OnlyCreateResourcesFromFile(namespace, clusterRestoreSampleFile3)
+				err = CreateResourcesFromFileWithError(namespace, clusterRestoreSampleFile3)
 				Expect(err).ShouldNot(HaveOccurred())
 			})
 
@@ -1161,7 +1161,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 				AssertStorageCredentialsAreCreated(namespace2, "backup-storage-creds", "minio", "minio123")
 			})
 
-			err = OnlyCreateResourcesFromFile(namespace2, clusterRestoreSampleFile4)
+			err = CreateResourcesFromFileWithError(namespace2, clusterRestoreSampleFile4)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			// Verifying the cluster creation errors since it will fail
