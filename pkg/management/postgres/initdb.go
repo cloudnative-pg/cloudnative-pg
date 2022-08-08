@@ -259,6 +259,8 @@ func (info InitInfo) executePostInitApplicationSQLRefs(sqlUser *sql.DB) error {
 			info.PostInitApplicationSQLRefsFolder, err)
 	}
 
+	// Sorting ensures that we execute the files in the correct order.
+	// We generate the file names by appending a prefix with the number of execution during the volume generation.
 	sort.Strings(files)
 
 	for _, file := range files {
