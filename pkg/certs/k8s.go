@@ -410,10 +410,8 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoMutatingWebhook(
 	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-
 		config, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
 			ctx, pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
-
 		if err != nil {
 			return err
 		}
