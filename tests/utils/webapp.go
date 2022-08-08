@@ -53,7 +53,7 @@ func DefaultWebapp(namespace string, name string, rootCASecretName string, tlsSe
 			Containers: []corev1.Container{
 				{
 					Name:  name,
-					Image: "quay.io/leonardoce/webtest:1.3.0",
+					Image: "ghcr.io/cloudnative-pg/webtest:1.6.0",
 					Ports: []corev1.ContainerPort{
 						{
 							ContainerPort: 8080,
