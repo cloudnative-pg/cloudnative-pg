@@ -400,6 +400,16 @@ event to occur instead of relying on the overall cluster health state. Available
 - ContinuousArchiving
 - Ready
 
+`LastBackupSucceeded` is reporting the status of the latest backup. If set to `True` the
+last backup has been taken correctly, it is set to `False` otherwise.
+
+`ContinuousArchiving` is reporting the status of the WAL archiving. If set to `True` the
+last WAL archival process has been terminated correctly, it is set to `False` otherwise.
+
+`Ready` is `True` when the cluster has the number of instances specified by the user
+and the primary instance is ready. This condition can be used in scripts to wait for
+the cluster to be created.
+
 ### How to wait for a particular condition
 
 - Backup:
