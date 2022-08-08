@@ -29,7 +29,7 @@
 ## limitations under the License.
 ##
 
-#set -o errexit -o nounset -o pipefail
+set -o errexit -o nounset -o pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "${REPO_ROOT}"
@@ -72,15 +72,14 @@ require_clean_work_tree () {
 
 _output_intermediate_csv () {
     BRANCH=$1
-    IFS=$'\n'
-    for r in $(grep -e "\[$BRANCH[0-9~]*\]" $WORKDIR/show-branch.txt)
+    while read -r r
     do
-        ID=$(echo $r | cut -f 2 -d '[' | cut -f 1 -d ']')
-        MSG=$(echo $r | cut -f 2 -d ']')
+        ID=$(echo "$r" | cut -f 2 -d '[' | cut -f 1 -d ']')
+        MSG=$(echo "$r" | cut -f 2 -d ']')
 
         # Skip lines that don't end with ')'
         if [[ $MSG =~ \)$ ]]; then
-            PR=$(echo $r | rev | cut -f 1 -d '(' | rev | cut -f 1 -d ')' | cut -f 2 -d '#')
+            PR=$(echo "$r" | rev | cut -f 1 -d '(' | rev | cut -f 1 -d ')' | cut -f 2 -d '#')
             # Check PR is a number
             if ! [[ "$PR" -eq "$PR" ]] 2> /dev/null; then
                PR='-'
@@ -88,8 +87,8 @@ _output_intermediate_csv () {
         else
           PR='-'
         fi
-        echo "$PR|$ID|${MSG## }"
-    done
+        echo "${PR}|${ID}|${MSG## }"
+    done < <(grep -e "\[${BRANCH}[0-9~]*\]" "$WORKDIR/show-branch.txt")
 }
 
 # Require to be in a release branch
@@ -105,43 +104,42 @@ else
 fi
 
 WORKDIR=$(mktemp -d -t cnpg-XXXX)
-trap "rm -rf $WORKDIR" EXIT
-IFS=$'\n'
+trap 'rm -rf "$WORKDIR"' EXIT
 
-git show-branch --current main > $WORKDIR/show-branch.txt
-_output_intermediate_csv main | sort -nu > $WORKDIR/main.csv
-_output_intermediate_csv $branch | sort -nu > $WORKDIR/$branch.csv
+git show-branch --current main > "$WORKDIR/show-branch.txt"
+_output_intermediate_csv main | sort -nu > "$WORKDIR/main.csv"
+_output_intermediate_csv "$branch" | sort -nu > "$WORKDIR/$branch.csv"
 
 # Prepare intermediate files
-cut -f 1 -d '|' $WORKDIR/main.csv > $WORKDIR/main-PR.txt
-cut -f 1 -d '|' $WORKDIR/$branch.csv > $WORKDIR/$branch-PR.txt
-grep '^-|' $WORKDIR/main.csv | cut -f 3 -d '|' | sort -u > $WORKDIR/main-noPR.txt
-grep '^-|' $WORKDIR/$branch.csv | cut -f 3 -d '|' | sort -u > $WORKDIR/$branch-noPR.txt
-diff -B $WORKDIR/main-noPR.txt $WORKDIR/$branch-noPR.txt > $WORKDIR/manual-verification.txt
+cut -f 1 -d '|' "$WORKDIR/main.csv" > "$WORKDIR/main-PR.txt"
+cut -f 1 -d '|' "$WORKDIR/$branch.csv" > "$WORKDIR/$branch-PR.txt"
+grep '^-|' "$WORKDIR/main.csv" | cut -f 3 -d '|' | sort -u > "$WORKDIR/main-noPR.txt"
+grep '^-|' "$WORKDIR/$branch.csv" | cut -f 3 -d '|' | sort -u > "$WORKDIR/$branch-noPR.txt"
+diff -B "$WORKDIR/main-noPR.txt" "$WORKDIR/$branch-noPR.txt" > "$WORKDIR/manual-verification.txt"
 
 # What's missing in the release
 echo -e "\n## PRs that are missing in $branch but are in main\n"
 i=0
-for pr in $(diff -B $WORKDIR/main-PR.txt $WORKDIR/$branch-PR.txt | grep '^<' | cut -f 2 -d ' ')
+while read -r pr
 do
     ((i=i+1))
-    MSG=$(grep "^$pr|" $WORKDIR/main.csv | cut -f 3 -d '|')
+    MSG=$(grep "^$pr|" "$WORKDIR/main.csv" | cut -f 3 -d '|')
     echo "$i. [$MSG](https://github.com/cloudnative-pg/cloudnative-pg/pull/$pr)"
-done
+done < <(diff -B "$WORKDIR/main-PR.txt" "$WORKDIR/$branch-PR.txt" | grep '^<' | cut -f 2 -d ' ')
 
 # What's in the release and not in main
 echo -e "\n## PRs that are in $branch but not in main\n"
 i=0
-for pr in $(diff -B $WORKDIR/main-PR.txt $WORKDIR/$branch-PR.txt | grep '^>' | cut -f 2 -d ' ')
+while read -r pr
 do
     ((i=i+1))
-    MSG=$(grep "^$pr|" $WORKDIR/$branch.csv | cut -f 3 -d '|')
+    MSG=$(grep "^$pr|" "$WORKDIR/$branch.csv" | cut -f 3 -d '|')
     echo "$i. [$MSG](https://github.com/cloudnative-pg/cloudnative-pg/pull/$pr)"
-done
+done < <(diff -B "$WORKDIR/main-PR.txt" "$WORKDIR/$branch-PR.txt" | grep '^>' | cut -f 2 -d ' ')
 
 # Verify commits without a PR
-if [ -s $WORKDIR/manual-verification.txt ]
+if [ -s "$WORKDIR/manual-verification.txt" ]
 then
     echo -e "\n## Commits without a PR - please check\n"
-    cat $WORKDIR/manual-verification.txt
+    cat "$WORKDIR/manual-verification.txt"
 fi
