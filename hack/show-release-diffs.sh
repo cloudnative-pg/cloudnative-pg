@@ -88,7 +88,7 @@ _output_intermediate_csv () {
           PR='-'
         fi
         echo "${PR}|${ID}|${MSG## }"
-    done < <(grep -e "\[${BRANCH}[0-9~]*\]" "$WORKDIR/show-branch.txt")
+    done < <(grep -e "\[${BRANCH}[0-9~^]*\]" "$WORKDIR/show-branch.txt")
 }
 
 # Require to be in a release branch
