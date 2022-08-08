@@ -420,9 +420,16 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoMutatingWebhook(
 			return nil
 		}
 
+		oldConfig := config.DeepCopy()
+
 		for idx := range config.Webhooks {
 			config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
 		}
+
+		if reflect.DeepEqual(oldConfig.Webhooks, config.Webhooks) {
+			return nil
+		}
+
 		_, err = client.AdmissionregistrationV1().
 			MutatingWebhookConfigurations().
 			Update(ctx, config, metav1.UpdateOptions{})
@@ -446,8 +453,14 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoValidatingWebhook(
 			return nil
 		}
 
+		oldConfig := config.DeepCopy()
+
 		for idx := range config.Webhooks {
 			config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
+		}
+
+		if reflect.DeepEqual(oldConfig.Webhooks, config.Webhooks) {
+			return nil
 		}
 
 		_, err = client.AdmissionregistrationV1().
