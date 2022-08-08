@@ -409,20 +409,27 @@ func ensureMountedSecretsAreInSync(secret *v1.Secret, certDir string) error {
 func (pki PublicKeyInfrastructure) injectPublicKeyIntoMutatingWebhook(
 	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret,
 ) error {
-	config, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
-		ctx, pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
-	if err != nil {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+
+		config, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(
+			ctx, pki.MutatingWebhookConfigurationName, metav1.GetOptions{})
+
+		if err != nil {
+			return err
+		}
+
+		if len(config.Webhooks) == 0 {
+			return nil
+		}
+
+		for idx := range config.Webhooks {
+			config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
+		}
+		_, err = client.AdmissionregistrationV1().
+			MutatingWebhookConfigurations().
+			Update(ctx, config, metav1.UpdateOptions{})
 		return err
-	}
-
-	for idx := range config.Webhooks {
-		config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
-	}
-
-	_, err = client.AdmissionregistrationV1().
-		MutatingWebhookConfigurations().
-		Update(ctx, config, metav1.UpdateOptions{})
-	return err
+	})
 }
 
 // injectPublicKeyIntoValidatingWebhook inject the TLS public key into the admitted
@@ -430,20 +437,26 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoMutatingWebhook(
 func (pki PublicKeyInfrastructure) injectPublicKeyIntoValidatingWebhook(
 	ctx context.Context, client kubernetes.Interface, tlsSecret *v1.Secret,
 ) error {
-	config, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
-		ctx, pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
-	if err != nil {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		config, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(
+			ctx, pki.ValidatingWebhookConfigurationName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if len(config.Webhooks) == 0 {
+			return nil
+		}
+
+		for idx := range config.Webhooks {
+			config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
+		}
+
+		_, err = client.AdmissionregistrationV1().
+			ValidatingWebhookConfigurations().
+			Update(ctx, config, metav1.UpdateOptions{})
 		return err
-	}
-
-	for idx := range config.Webhooks {
-		config.Webhooks[idx].ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
-	}
-
-	_, err = client.AdmissionregistrationV1().
-		ValidatingWebhookConfigurations().
-		Update(ctx, config, metav1.UpdateOptions{})
-	return err
+	})
 }
 
 // injectPublicKeyIntoCRD inject the TLS public key into the admitted
