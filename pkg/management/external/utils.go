@@ -29,8 +29,20 @@ import (
 const (
 	// externalSecretsPath is the path where the cryptographic material
 	// needed to connect to an external cluster will be dumped
-	externalSecretsPath = "/controller/external" // #nosec
+	defaultExternalSecretsPath = "/controller/external" // #nosec
 )
+
+// CustomExternalSecretPath is the custom path where the cryptographic material
+// needed to connect to an external cluster will be dumped
+var CustomExternalSecretPath string
+
+func getSecretPath() string {
+	if CustomExternalSecretPath != "" {
+		return CustomExternalSecretPath
+	}
+
+	return defaultExternalSecretsPath
+}
 
 // ReadSecretKeyRef dumps a certain secret to a file inside a temporary folder
 // using 0600 as permission bits
@@ -74,7 +86,7 @@ func DumpSecretKeyRefToFile(
 		return "", fmt.Errorf("missing key %v in secret %v", selector.Key, selector.Name)
 	}
 
-	directory := path.Join(externalSecretsPath, serverName)
+	directory := path.Join(getSecretPath(), serverName)
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return "", err
 	}
@@ -106,7 +118,7 @@ func CreatePgPassFile(serverName, password string) (string, error) {
 		"*", // username
 		password)
 
-	directory := path.Join(externalSecretsPath, serverName)
+	directory := path.Join(getSecretPath(), serverName)
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return "", err
 	}
