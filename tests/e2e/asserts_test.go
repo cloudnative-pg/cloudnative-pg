@@ -985,7 +985,7 @@ func AssertFastFailOver(
 	})
 
 	By("starting load", func() {
-		// We set up hey and webtest. Hey, a load generator,
+		// We set up Apache Benchmark and webtest. Apache Benchmark, a load generator,
 		// continuously calls the webtest api to execute inserts
 		// on the postgres primary. We make sure that the first
 		// records appear on the database before moving to the next

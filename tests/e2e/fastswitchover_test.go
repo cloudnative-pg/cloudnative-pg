@@ -39,7 +39,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 		namespace   = "primary-switchover-time"
 		sampleFile  = fixturesDir + "/fastswitchover/cluster-fast-switchover.yaml"
 		webTestFile = fixturesDir + "/fastswitchover/webtest.yaml"
-		webTestJob  = fixturesDir + "/fastswitchover/hey-job-webtest.yaml"
+		webTestJob  = fixturesDir + "/fastswitchover/apache-benchmark-webtest.yaml"
 		clusterName = "cluster-fast-switchover"
 		level       = tests.Highest
 	)
@@ -141,7 +141,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 			Expect(err).ToNot(HaveOccurred())
 		})
 		By("starting load", func() {
-			// We set up hey and webtest. Hey, a load generator,
+			// We set up Apache Benchmark and webtest. Apache Benchmark, a load generator,
 			// continuously calls the webtest api to execute inserts
 			// on the postgres primary. We make sure that the first
 			// records appear on the database before moving to the next
