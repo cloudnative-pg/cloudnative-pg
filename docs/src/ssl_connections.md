@@ -83,7 +83,7 @@ spec:
         app: webtest
     spec:
       containers:
-        - image: quay.io/leonardoce/webtest:1.3.0
+        - image: ghcr.io/cloudnative-pg/webtest:1.6.0
           name: cert-test
           volumeMounts:
             - name: secret-volume-root-ca
