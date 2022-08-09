@@ -951,3 +951,21 @@ This will open up two main use cases:
 - replication over different Kubernetes clusters in CloudNativePG
 - *0 cutover time* migrations to CloudNativePG with the `pg_basebackup`
   bootstrap method
+
+## About `sslmode` in `externalCluster`
+
+We recommend that you explicitly specify `sslmode` in the
+`externalClusters.connectionParameters` section when connecting to the source
+PostgreSQL server, always.
+
+!!! Important
+    Please make sure you go through the available options from the
+    ["SSL support page of the PostgreSQL documentation"](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-SSLMODE-STATEMENTS).
+
+If you don't specify `sslmode` in `connectionParameters`, the following
+approach will be applied by the operator:
+
+- if either `sslCert` or `sslKey` is present, `sslmode` is set to `required`
+- if only `sslRootCert` is defined, `sslmode` is set to `verify-ca`
+- otherwise, `sslmode` is explicitly set to `disabled`
+
