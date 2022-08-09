@@ -485,10 +485,11 @@ func (r *ClusterReconciler) updateClusterLabelsOnPVCs(
 		patch := client.MergeFrom(pvc.DeepCopy())
 		utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 
-		contextLogger.Info("Updating cluster labels on pvc", "pvc", pvc.Name)
+		contextLogger.Debug("Updating cluster labels on pvc", "pvc", pvc.Name)
 		if err := r.Patch(ctx, pvc, patch); err != nil {
 			return err
 		}
+		contextLogger.Info("Updated cluster label on pvc", "pvc", pvc.Name)
 	}
 
 	return nil

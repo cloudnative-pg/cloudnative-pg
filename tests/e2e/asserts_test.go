@@ -985,7 +985,7 @@ func AssertFastFailOver(
 	})
 
 	By("starting load", func() {
-		// We set up hey and webtest. Hey, a load generator,
+		// We set up Apache Benchmark and webtest. Apache Benchmark, a load generator,
 		// continuously calls the webtest api to execute inserts
 		// on the postgres primary. We make sure that the first
 		// records appear on the database before moving to the next
@@ -2282,5 +2282,24 @@ func AssertBackupConditionInClusterStatus(namespace, clusterName string) {
 			}
 			return string(getBackupCondition.Status), nil
 		}, 300, 5).Should(BeEquivalentTo("True"))
+	})
+}
+
+func AssertClusterReadinessStatusIsReached(
+	namespace,
+	clusterName string,
+	conditionStatus apiv1.ConditionStatus,
+	timeout int,
+	env *testsUtils.TestingEnvironment,
+) {
+	By(fmt.Sprintf("waiting for cluster condition status in cluster '%v'", clusterName), func() {
+		Eventually(func() (string, error) {
+			clusterCondition, err := testsUtils.GetConditionsInClusterStatus(
+				namespace, clusterName, env, apiv1.ConditionClusterReady)
+			if err != nil {
+				return "", err
+			}
+			return string(clusterCondition.Status), nil
+		}, timeout, 2).Should(BeEquivalentTo(conditionStatus))
 	})
 }

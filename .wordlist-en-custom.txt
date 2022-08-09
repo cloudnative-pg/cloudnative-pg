@@ -55,6 +55,7 @@ CloudNativePG's
 ClusterCondition
 ClusterConditionType
 ClusterIP
+ClusterIsNotReady
 ClusterList
 ClusterRole
 ClusterRole's
@@ -71,6 +72,7 @@ ConfigMapRefs
 ConfigMapResourceVersion
 ConfigMaps
 ContinuousArchiving
+ContinuousArchivingFailing
 Coverity
 Cron
 CronJobs
@@ -142,6 +144,8 @@ LDAPScheme
 LPV
 LSN
 LTS
+LastBackupFailed
+LastBackupSucceeded
 Lifecycle
 Linode
 ListMeta

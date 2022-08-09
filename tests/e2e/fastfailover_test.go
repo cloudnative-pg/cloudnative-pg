@@ -31,7 +31,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 		sampleFileSyncReplicas = fixturesDir + "/fastfailover/cluster-syncreplicas-fast-failover.yaml"
 		webTestFile            = fixturesDir + "/fastfailover/webtest.yaml"
 		webTestSyncReplicas    = fixturesDir + "/fastfailover/webtest-syncreplicas.yaml"
-		webTestJob             = fixturesDir + "/fastfailover/hey-job-webtest.yaml"
+		webTestJob             = fixturesDir + "/fastfailover/apache-benchmark-webtest.yaml"
 		level                  = tests.Highest
 	)
 	var (
