@@ -61,4 +61,9 @@ Replica cluster via backup
 : [`cluster-example-replica-from-backup-simple.yaml`](samples/cluster-example-replica-from-backup-simple.yaml):
    a replica cluster following a cluster with backup configured.
 
+Bootstrap cluster with SQL files
+: [`cluster-example-initdb-sql-refs.yaml`](samples/cluster-example-initdb-sql-refs.yaml):
+   a cluster example that will execute a set of queries defined in a Secret and a ConfigMap right after the database is created.
+
+
 For a list of available options, please refer to the ["API Reference" page](api_reference.md).

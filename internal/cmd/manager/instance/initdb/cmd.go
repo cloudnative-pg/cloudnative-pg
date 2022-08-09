@@ -41,6 +41,7 @@ func NewCmd() *cobra.Command {
 	var postInitSQLStr string
 	var postInitApplicationSQLStr string
 	var postInitTemplateSQLStr string
+	var postInitApplicationSQLRefsFolder string
 
 	cmd := &cobra.Command{
 		Use: "init [options]",
@@ -83,6 +84,9 @@ func NewCmd() *cobra.Command {
 				PostInitSQL:            postInitSQL,
 				PostInitApplicationSQL: postInitApplicationSQL,
 				PostInitTemplateSQL:    postInitTemplateSQL,
+				// if the value to postInitApplicationSQLRefsFolder is empty,
+				// bootstrap will do nothing for post init application SQL refs.
+				PostInitApplicationSQLRefsFolder: postInitApplicationSQLRefsFolder,
 			}
 
 			return initSubCommand(ctx, info)
@@ -109,6 +113,9 @@ func NewCmd() *cobra.Command {
 		"executed inside application database right after the database is created")
 	cmd.Flags().StringVar(&postInitTemplateSQLStr, "post-init-template-sql", "", "The list of SQL queries to be "+
 		"executed inside template1 database to configure the new instance")
+	cmd.Flags().StringVar(&postInitApplicationSQLRefsFolder, "post-init-application-sql-refs-folder",
+		"", "The folder contains a set of SQL files to be executed in alphabetical order "+
+			"against the application database immediately after its creationd")
 
 	return cmd
 }

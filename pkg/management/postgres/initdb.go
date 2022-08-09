@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sort"
 
 	"github.com/lib/pq"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
@@ -83,6 +84,10 @@ type InitInfo struct {
 
 	// Whether it is a temporary instance that will never contain real data.
 	Temporary bool
+
+	// PostInitApplicationSQLRefsFolder is the folder which contains a bunch
+	// of SQL files to be executed just after having configured a new instance
+	PostInitApplicationSQLRefsFolder string
 }
 
 // VerifyPGData verifies if the passed configuration is OK, otherwise it returns an error
@@ -230,6 +235,43 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	log.Info("executing Application instructions")
 	if err = info.executeQueries(appDB, info.PostInitApplicationSQL); err != nil {
 		return fmt.Errorf("could not execute init Application queries: %w", err)
+	}
+
+	if err = info.executePostInitApplicationSQLRefs(appDB); err != nil {
+		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
+	}
+
+	return nil
+}
+
+func (info InitInfo) executePostInitApplicationSQLRefs(sqlUser *sql.DB) error {
+	if info.PostInitApplicationSQLRefsFolder == "" {
+		return nil
+	}
+
+	if err := fileutils.EnsureDirectoryExist(info.PostInitApplicationSQLRefsFolder); err != nil {
+		return fmt.Errorf("could not find directory: %s, err: %w", info.PostInitApplicationSQLRefsFolder, err)
+	}
+
+	files, err := fileutils.GetDirectoryContent(info.PostInitApplicationSQLRefsFolder)
+	if err != nil {
+		return fmt.Errorf("could not get directory content from: %s, err: %w",
+			info.PostInitApplicationSQLRefsFolder, err)
+	}
+
+	// Sorting ensures that we execute the files in the correct order.
+	// We generate the file names by appending a prefix with the number of execution during the volume generation.
+	sort.Strings(files)
+
+	for _, file := range files {
+		sql, ioErr := fileutils.ReadFile(path.Join(info.PostInitApplicationSQLRefsFolder, file))
+		if ioErr != nil {
+			return fmt.Errorf("could not read file: %s, err; %w", file, err)
+		}
+
+		if err = info.executeQueries(sqlUser, []string{string(sql)}); err != nil {
+			return fmt.Errorf("could not execute queries: %w", err)
+		}
 	}
 
 	return nil

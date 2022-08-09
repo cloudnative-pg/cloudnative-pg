@@ -402,6 +402,30 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 				"WAL segment size must be a power of 2"))
 	}
 
+	if initDBOptions.PostInitApplicationSQLRefs != nil {
+		for _, item := range initDBOptions.PostInitApplicationSQLRefs.SecretRefs {
+			if item.Name == "" || item.Key == "" {
+				result = append(
+					result,
+					field.Invalid(
+						field.NewPath("spec", "bootstrap", "initdb", "postInitApplicationSQLRefs", "secretRefs"),
+						item,
+						"key and name must be specified"))
+			}
+		}
+
+		for _, item := range initDBOptions.PostInitApplicationSQLRefs.ConfigMapRefs {
+			if item.Name == "" || item.Key == "" {
+				result = append(
+					result,
+					field.Invalid(
+						field.NewPath("spec", "bootstrap", "initdb", "postInitApplicationSQLRefs", "configMapRefs"),
+						item,
+						"key and name must be specified"))
+			}
+		}
+	}
+
 	return result
 }
 

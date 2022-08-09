@@ -1,2 +1,4 @@
 cluster-postinit-sql.yaml
 cluster-custom-locale.yaml
+cluster_post_init_configmap.yaml
+cluster_post_init_secret.yaml

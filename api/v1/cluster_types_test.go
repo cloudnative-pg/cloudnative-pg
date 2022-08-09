@@ -158,6 +158,89 @@ var _ = Describe("Bootstrap via initdb", func() {
 		Expect(cluster.GetApplicationDatabaseName()).To(Equal("appDB"))
 	})
 
+	It("will run post application sql refs if specified for secrets", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "appDB",
+						Owner:    "appOwner",
+						Secret: &LocalObjectReference{
+							Name: "appSecret",
+						},
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							SecretRefs: []SecretKeySelector{
+								{
+									Key: "secretKey",
+									LocalObjectReference: LocalObjectReference{
+										Name: "secretName",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(cluster.ShouldInitDBRunPostInitApplicationSQLRefs()).To(BeTrue())
+	})
+
+	It("will run post application sql refs if specified for configmaps", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "appDB",
+						Owner:    "appOwner",
+						Secret: &LocalObjectReference{
+							Name: "appSecret",
+						},
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							ConfigMapRefs: []ConfigMapKeySelector{
+								{
+									Key: "configMapKey",
+									LocalObjectReference: LocalObjectReference{
+										Name: "configMapName",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Expect(cluster.ShouldInitDBRunPostInitApplicationSQLRefs()).To(BeTrue())
+	})
+
+	It("will not run post application sql refs if not specified", func() {
+		cluster := Cluster{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "clusterName",
+			},
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "appDB",
+						Owner:    "appOwner",
+						Secret: &LocalObjectReference{
+							Name: "appSecret",
+						},
+					},
+				},
+			},
+		}
+
+		Expect(cluster.ShouldInitDBRunPostInitApplicationSQLRefs()).To(BeFalse())
+	})
+
 	It("will not create an application database if not requested", func() {
 		cluster := Cluster{
 			ObjectMeta: v1.ObjectMeta{

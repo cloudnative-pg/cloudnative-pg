@@ -1,28 +1,32 @@
-# Example of PostgreSQL cluster using ssl enabled
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: post-init-sql-configmap
+data:
+  configmap.sql: |
+    create table configmaps (i integer);
+    insert into configmaps (select generate_series(1,10000));
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: post-init-sql-secret
+stringData:
+  secret.sql: |
+    create table secrets (i integer);
+    insert into secrets (select generate_series(1,10000));
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: p-postinit-sql
+  name: cluster-example-initdb
 spec:
   instances: 3
 
-  postgresql:
-    parameters:
-      work_mem: "8MB"
-      log_checkpoints: "on"
-      log_lock_waits: "on"
-      log_min_duration_statement: '1000'
-      log_statement: 'ddl'
-      log_temp_files: '1024'
-      log_autovacuum_min_duration: '1s'
-      log_replication_commands: 'on'
-    pg_hba:
-      - hostssl all all all cert
-
   bootstrap:
     initdb:
-      database: app
-      owner: app
+      database: appdb
+      owner: appuser
       postInitSQL:
         - create table numbers (i integer)
         - insert into numbers (select generate_series(1,10000))
@@ -39,7 +43,5 @@ spec:
         - name: post-init-sql-secret
           key: secret.sql
 
-  # Persistent storage configuration
   storage:
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi
