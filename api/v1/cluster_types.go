@@ -800,6 +800,13 @@ type BootstrapInitDB struct {
 	// Bootstraps the new cluster by importing data from an existing PostgreSQL
 	// instance using logical backup (`pg_dump` and `pg_restore`)
 	Import *Import `json:"import,omitempty"`
+
+	// PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
+	// contain SQL files, the general implementation order to these references is
+	// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
+	// the implementation order is same as the order of each array
+	// (by default empty)
+	PostInitApplicationSQLRefs *PostInitApplicationSQLRefs `json:"postInitApplicationSQLRefs,omitempty"`
 }
 
 // SnapshotType is a type of allowed import
@@ -838,6 +845,18 @@ type Import struct {
 type ImportSource struct {
 	// The name of the externalCluster used for import
 	ExternalCluster string `json:"externalCluster"`
+}
+
+// PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
+// contain SQL files, the general implementation order to these references is
+// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
+// the implementation order is same as the order of each array
+type PostInitApplicationSQLRefs struct {
+	// SecretRefs holds a list of references to Secrets
+	SecretRefs []SecretKeySelector `json:"secretRefs,omitempty"`
+
+	// ConfigMapRefs holds a list of references to ConfigMaps
+	ConfigMapRefs []ConfigMapKeySelector `json:"configMapRefs,omitempty"`
 }
 
 // BootstrapRecovery contains the configuration required to restore
@@ -1747,6 +1766,26 @@ func (cluster *Cluster) ShouldCreateApplicationDatabase() bool {
 	return cluster.ShouldInitDBCreateApplicationDatabase() ||
 		cluster.ShouldRecoveryCreateApplicationDatabase() ||
 		cluster.ShouldPgBaseBackupCreateApplicationDatabase()
+}
+
+// ShouldInitDBRunPostInitApplicationSQLRefs returns true if for this cluster,
+// during the bootstrap phase using initDB, we need to run post application
+// SQL files from provided references.
+func (cluster *Cluster) ShouldInitDBRunPostInitApplicationSQLRefs() bool {
+	if cluster.Spec.Bootstrap == nil {
+		return false
+	}
+
+	if cluster.Spec.Bootstrap.InitDB == nil {
+		return false
+	}
+
+	if cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs == nil {
+		return false
+	}
+
+	return (len(cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs.ConfigMapRefs) != 0 ||
+		len(cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs.SecretRefs) != 0)
 }
 
 // ShouldInitDBCreateApplicationDatabase returns true if the application database needs to be created during initdb
