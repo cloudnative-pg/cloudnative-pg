@@ -71,8 +71,16 @@ def track_time_taken(test_results, min_durations, max_durations, slowest_branche
     if (test_results["start_time"] == "0001-01-01T00:00:00Z" or
         test_results["start_time"] == "0001-01-01T00:00:00Z"):
         return
-    start_time = datetime.fromisoformat(test_results["start_time"])
-    end_time = datetime.fromisoformat(test_results["end_time"])
+    # chop of the nanoseconds part, which is too much for Python `fromisoformat`
+    start_frags = test_results["start_time"].split(".")
+    if len(start_frags) != 2:
+        return
+    end_frags = test_results["end_time"].split(".")
+    if len(end_frags) != 2:
+        return
+
+    start_time = datetime.fromisoformat(start_frags[0])
+    end_time = datetime.fromisoformat(end_frags[0])
     duration = end_time - start_time
     matrix_id = test_results["matrix_id"]
     if name not in max_durations:
