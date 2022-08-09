@@ -7,12 +7,18 @@
 ## viceversa. It should be used to help maintainers spot any
 ## missed commit to be backported, while waiting for an automate
 ## procedure that issues PRs on all supported release branches.
+## It also enables to compare the current branch with another
+## one, by passing an optional parameter.
 ##
-## You need to run this script from the release branch. For example
+## You need to run this script from the release branch.
+## The following example compares 1.16 branch with main:
 ##
 ##     git checkout release-1.16
 ##     ./hack/show-release-diffs.sh
 ##
+## This example compares the current branch with 1.15:
+##
+##     ./hack/show-release-diffs.sh release-1.15
 ##
 ## Copyright The CloudNativePG Contributors
 ##
@@ -34,10 +40,14 @@ set -o errexit -o nounset -o pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "${REPO_ROOT}"
 
-if [ "$#" -ne 0 ]; then
-    echo "Usage: hack/show-release-diffs.sh"
+if [ "$#" -gt 2 ]; then
+    echo "Usage: hack/show-release-diffs.sh [branch]"
+    echo ""
+    echo "- [branch]: branch to compare with (default main)"
     exit 1
 fi
+
+MAIN_BRANCH=${1:-main}
 
 # Verify we are working on a clean directory
 require_clean_work_tree () {
@@ -97,45 +107,45 @@ require_clean_work_tree "release"
 # Verify that you are in a release branch
 if branch=$(git symbolic-ref --short -q HEAD) && [[ "$branch" == release-* ]]
 then
-    echo "# Checking ${branch} vs main"
+    echo "# Checking ${branch} vs ${MAIN_BRANCH}"
 else
-    echo >&2 "You must be on a 'release-*' branch ($branch) to run differences with main"
+    echo >&2 "You must be on a 'release-*' branch ($branch) to run differences with ${MAIN_BRANCH}"
     exit 1
 fi
 
 WORKDIR=$(mktemp -d -t cnpg-XXXX)
 trap 'rm -rf "$WORKDIR"' EXIT
 
-git show-branch --current main > "$WORKDIR/show-branch.txt"
-_output_intermediate_csv main | sort -nu > "$WORKDIR/main.csv"
+git show-branch --current ${MAIN_BRANCH} > "$WORKDIR/show-branch.txt"
+_output_intermediate_csv ${MAIN_BRANCH} | sort -nu > "$WORKDIR/${MAIN_BRANCH}.csv"
 _output_intermediate_csv "$branch" | sort -nu > "$WORKDIR/$branch.csv"
 
 # Prepare intermediate files
-cut -f 1 -d '|' "$WORKDIR/main.csv" > "$WORKDIR/main-PR.txt"
+cut -f 1 -d '|' "$WORKDIR/${MAIN_BRANCH}.csv" > "$WORKDIR/${MAIN_BRANCH}-PR.txt"
 cut -f 1 -d '|' "$WORKDIR/$branch.csv" > "$WORKDIR/$branch-PR.txt"
-grep '^-|' "$WORKDIR/main.csv" | cut -f 3 -d '|' | sort -u > "$WORKDIR/main-noPR.txt"
+grep '^-|' "$WORKDIR/${MAIN_BRANCH}.csv" | cut -f 3 -d '|' | sort -u > "$WORKDIR/${MAIN_BRANCH}-noPR.txt"
 grep '^-|' "$WORKDIR/$branch.csv" | cut -f 3 -d '|' | sort -u > "$WORKDIR/$branch-noPR.txt"
-diff -B "$WORKDIR/main-noPR.txt" "$WORKDIR/$branch-noPR.txt" > "$WORKDIR/manual-verification.txt"
+diff -B "$WORKDIR/${MAIN_BRANCH}-noPR.txt" "$WORKDIR/$branch-noPR.txt" > "$WORKDIR/manual-verification.txt"
 
 # What's missing in the release
-echo -e "\n## PRs that are missing in $branch but are in main\n"
+echo -e "\n## PRs that are missing in $branch but are in ${MAIN_BRANCH}\n"
 i=0
 while read -r pr
 do
     ((i=i+1))
-    MSG=$(grep "^$pr|" "$WORKDIR/main.csv" | cut -f 3 -d '|')
+    MSG=$(grep "^$pr|" "$WORKDIR/${MAIN_BRANCH}.csv" | cut -f 3 -d '|')
     echo "$i. [$MSG](https://github.com/cloudnative-pg/cloudnative-pg/pull/$pr)"
-done < <(diff -B "$WORKDIR/main-PR.txt" "$WORKDIR/$branch-PR.txt" | grep '^<' | cut -f 2 -d ' ')
+done < <(diff -B "$WORKDIR/${MAIN_BRANCH}-PR.txt" "$WORKDIR/$branch-PR.txt" | grep '^<' | cut -f 2 -d ' ')
 
-# What's in the release and not in main
-echo -e "\n## PRs that are in $branch but not in main\n"
+# What's in the release and not in ${MAIN_BRANCH}
+echo -e "\n## PRs that are in $branch but not in ${MAIN_BRANCH}\n"
 i=0
 while read -r pr
 do
     ((i=i+1))
     MSG=$(grep "^$pr|" "$WORKDIR/$branch.csv" | cut -f 3 -d '|')
     echo "$i. [$MSG](https://github.com/cloudnative-pg/cloudnative-pg/pull/$pr)"
-done < <(diff -B "$WORKDIR/main-PR.txt" "$WORKDIR/$branch-PR.txt" | grep '^>' | cut -f 2 -d ' ')
+done < <(diff -B "$WORKDIR/${MAIN_BRANCH}-PR.txt" "$WORKDIR/$branch-PR.txt" | grep '^>' | cut -f 2 -d ' ')
 
 # Verify commits without a PR
 if [ -s "$WORKDIR/manual-verification.txt" ]
