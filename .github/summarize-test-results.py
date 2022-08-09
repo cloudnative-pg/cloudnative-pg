@@ -52,7 +52,7 @@ a summary in Markdown, which can then be rendered in GitHub using
 import argparse
 import json
 import os
-
+from datetime import datetime
 
 def is_failed(e2e_test):
     """checks if the test failed. In ginkgo, the passing states are well defined
@@ -63,6 +63,30 @@ def is_failed(e2e_test):
         and e2e_test["state"] != "skipped"
         and e2e_test["state"] != "ignoreFailed"
     )
+
+def track_time_taken(test_results, min_durations, max_durations, slowest_branches):
+    """computes the running shortest and longest duration of running each kind of test
+    """
+    name = test_results["name"]
+    if (test_results["start_time"] == "0001-01-01T00:00:00Z" or
+        test_results["start_time"] == "0001-01-01T00:00:00Z"):
+        return
+    start_time = datetime.fromisoformat(test_results["start_time"])
+    end_time = datetime.fromisoformat(test_results["end_time"])
+    duration = end_time - start_time
+    matrix_id = test_results["matrix_id"]
+    if name not in max_durations:
+        max_durations[name] = duration
+    if name not in min_durations:
+        min_durations[name] = duration
+    if name not in slowest_branches:
+        slowest_branches[name] = matrix_id
+
+    if duration > max_durations[name]:
+        max_durations[name] = duration
+        slowest_branches[name] = matrix_id
+    if duration < min_durations[name]:
+        min_durations[name] = duration
 
 def count_bucketized_stats(test_results, total_bucketized, failed_bucketized, field_id):
     """counts the success/failures onto a bucket. This means there are two
@@ -124,6 +148,10 @@ def compute_test_summary(test_dir):
     total_by_postgres = {}
     failed_by_postgres = {}
 
+    min_durations = {}
+    max_durations = {}
+    slowest_branches = {}
+
     dir_listing = os.listdir(test_dir)
     for f in dir_listing:
         path = os.path.join(test_dir, f)
@@ -159,6 +187,8 @@ def compute_test_summary(test_dir):
             ## bucketing by postgres version
             count_bucketized_stats(test_results, total_by_postgres, failed_by_postgres, "postgres_version")
 
+            track_time_taken(test_results, min_durations, max_durations, slowest_branches)
+
     unique_failed, unique_run = compute_bucketized_summary(unique_test_failed, unique_test_run)
     k8s_failed, k8s_run = compute_bucketized_summary(failed_by_k8s, total_by_k8s)
     postgres_failed, postgres_run = compute_bucketized_summary(failed_by_postgres, total_by_postgres)
@@ -182,6 +212,9 @@ def compute_test_summary(test_dir):
         "failed_by_postgres": failed_by_postgres,
         "postgres_run": postgres_run,
         "postgres_failed": postgres_failed,
+        "max_durations": max_durations,
+        "min_durations": min_durations,
+        "slowest_branches": slowest_branches,
     }
 
 
@@ -248,33 +281,40 @@ def format_by_test(summary, structure):
         )
     print()
 
+def format_duration(d):
+    "pretty-print duration"
+    return "{minutes} min {seconds} sec".format(
+            minutes = d.seconds // 60,
+            seconds = d.seconds % 60,
+        )
 
-def format_test_summary(summary):
-    """creates a Markdown document with several tables rendering test results.
-    Outputs to stdout like a good 12-factor-app citizen
+def format_durations_table(min_durations, max_durations, slowest_branches, structure):
+    """print the table of durations per test
     """
-
-    print(
-        "Note that there are several tables below: overview, bucketed "
-        + "by test, bucketed by matrix branch, kubernetes, postgres…"
+    print("## " + structure["title"])
+    print()
+    print("|" + " | ".join(structure["header"]) + "|")
+    print("|" + "|".join(["---"] * len(structure["header"])) + "|")
+    sorted_by_longest = dict(
+        sorted(
+            max_durations.items(), key=lambda item: item[1], reverse=True
+        )
     )
+
+    for bucket in sorted_by_longest:
+        print(
+            "| {longest} | {shortest} | {branch} | {name} |".format(
+                name=bucket,
+                longest=format_duration(max_durations[bucket]),
+                shortest=format_duration(min_durations[bucket]),
+                branch=slowest_branches[bucket]
+            )
+        )
     print()
 
-    overview_section = {
-        "title": "Overview",
-        "header": ["failed", "out of", ""],
-        "rows": [["test combinations", "total_failed", "total_run"],
-                ["unique tests", "unique_failed", "unique_run"],
-                ["k8s versions", "k8s_failed", "k8s_run"],
-                ["postgres versions", "postgres_failed", "postgres_run"]],
-    }
-
-    format_overview(summary, overview_section)
-
-    if summary["total_failed"] == 0:
-        print("No failures, no more stats shown. It's not easy being green.")
-        return
-
+def format_test_failures(summary):
+    """creates the part of the test report that drills into the failures
+    """
     by_test_section = {
         "title": "Failures by test",
         "header": ["failed runs", "total runs", "failed K8s", "failed PG", "test"],
@@ -302,6 +342,43 @@ def format_test_summary(summary):
     }
 
     format_bucket_table(summary["failed_by_postgres"], summary["total_by_postgres"], by_postgres_section)
+
+def format_test_summary(summary):
+    """creates a Markdown document with several tables rendering test results.
+    Outputs to stdout like a good 12-factor-app citizen
+    """
+
+    print(
+        """Note that there are several tables below: overview, bucketed
+by test, bucketed by matrix branch, kubernetes, postgres…
+
+* [timing table](#Test-times)
+"""
+    )
+    print()
+
+    overview_section = {
+        "title": "Overview",
+        "header": ["failed", "out of", ""],
+        "rows": [["test combinations", "total_failed", "total_run"],
+                ["unique tests", "unique_failed", "unique_run"],
+                ["k8s versions", "k8s_failed", "k8s_run"],
+                ["postgres versions", "postgres_failed", "postgres_run"]],
+    }
+
+    format_overview(summary, overview_section)
+
+    if summary["total_failed"] == 0:
+        print("No failures, no failure stats shown. It's not easy being green.")
+    else:
+        format_test_failures(summary)
+
+    timing_section = {
+        "title": "Test times",
+        "header": ["longest taken", "shortest taken", "slowest branch", "test"],
+    }
+
+    format_durations_table(summary["min_durations"], summary["max_durations"], summary["slowest_branches"], timing_section)
 
 
 if __name__ == "__main__":
