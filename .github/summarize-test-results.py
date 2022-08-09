@@ -64,6 +64,31 @@ def is_failed(e2e_test):
         and e2e_test["state"] != "ignoreFailed"
     )
 
+def count_bucketized_stats(test_results, total_bucketized, failed_bucketized, field_id):
+    """counts the success/failures onto a bucket. This means there are two
+    dictionaries: one for `total` tests, one for `failed` tests.
+    """
+    bucket_id = test_results[field_id]
+    if bucket_id not in total_bucketized:
+        total_bucketized[bucket_id] = 0
+    total_bucketized[bucket_id] = 1 + total_bucketized[bucket_id]
+    if is_failed(test_results):
+        if bucket_id not in failed_bucketized:
+            failed_bucketized[bucket_id] = 0
+        failed_bucketized[bucket_id] = 1 + failed_bucketized[bucket_id]
+
+def compute_bucketized_summary(failed_bucketized, total_bucketized):
+    """counts the number of buckets with failures and the total number of buckets
+
+    returns (num-failed-buckets, total-failed-buckets)
+    """
+    failed_buckets_count = 0
+    total_buckets_count = 0
+    for name in total_bucketized:
+        failed_buckets_count = 1 + failed_buckets_count
+    for name in failed_bucketized:
+        total_buckets_count = 1 + total_buckets_count
+    return failed_buckets_count, total_buckets_count
 
 def compute_test_summary(test_dir):
     """iterate over the JSON artifact files in `test_dir`, and
@@ -94,19 +119,24 @@ def compute_test_summary(test_dir):
     failed_pg_by_test = {}
     total_by_matrix = {}
     failed_by_matrix = {}
+    total_by_k8s = {}
+    failed_by_k8s = {}
+    total_by_postgres = {}
+    failed_by_postgres = {}
 
     dir_listing = os.listdir(test_dir)
     for f in dir_listing:
         path = os.path.join(test_dir, f)
         with open(path) as json_file:
             test_results = json.load(json_file)
+
+            ## bucketing by test name
             name = test_results["name"]
             if name not in total_by_test:
                 total_by_test[name] = 0
             unique_test_run[name] = True
             total_runs = 1 + total_runs
             total_by_test[name] = 1 + total_by_test[name]
-
             if is_failed(test_results):
                 if name not in fails_by_test:
                     fails_by_test[name] = 0
@@ -114,29 +144,24 @@ def compute_test_summary(test_dir):
                     failed_k8s_by_test[name] = []
                 if name not in failed_pg_by_test:
                     failed_pg_by_test[name] = []
-
                 unique_test_failed[name] = True
                 fails_by_test[name] = 1 + fails_by_test[name]
                 total_fails = 1 + total_fails
                 failed_k8s_by_test[name].append(test_results["k8s_version"])
                 failed_pg_by_test[name].append(test_results["postgres_version"])
 
-            matrix = test_results["matrix_id"]
-            if matrix not in total_by_matrix:
-                total_by_matrix[matrix] = 0
+            ## bucketing by matrix ID
+            count_bucketized_stats(test_results, total_by_matrix, failed_by_matrix, "matrix_id")
 
-            total_by_matrix[matrix] = 1 + total_by_matrix[matrix]
-            if is_failed(test_results):
-                if matrix not in failed_by_matrix:
-                    failed_by_matrix[matrix] = 0
-                failed_by_matrix[matrix] = 1 + failed_by_matrix[matrix]
+            ## bucketing by k8s version
+            count_bucketized_stats(test_results, total_by_k8s, failed_by_k8s, "k8s_version")
 
-    unique_failed = 0
-    unique_run = 0
-    for name in unique_test_failed:
-        unique_failed = 1 + unique_failed
-    for name in unique_test_run:
-        unique_run = 1 + unique_run
+            ## bucketing by postgres version
+            count_bucketized_stats(test_results, total_by_postgres, failed_by_postgres, "postgres_version")
+
+    unique_failed, unique_run = compute_bucketized_summary(unique_test_failed, unique_test_run)
+    k8s_failed, k8s_run = compute_bucketized_summary(failed_by_k8s, total_by_k8s)
+    postgres_failed, postgres_run = compute_bucketized_summary(failed_by_postgres, total_by_postgres)
 
     return {
         "total_run": total_runs,
@@ -149,6 +174,14 @@ def compute_test_summary(test_dir):
         "total_by_matrix": total_by_matrix,
         "failed_k8s_by_test": failed_k8s_by_test,
         "failed_pg_by_test": failed_pg_by_test,
+        "total_by_k8s": total_by_k8s,
+        "failed_by_k8s": failed_by_k8s,
+        "k8s_run": k8s_run,
+        "k8s_failed": k8s_failed,
+        "total_by_postgres": total_by_postgres,
+        "failed_by_postgres": failed_by_postgres,
+        "postgres_run": postgres_run,
+        "postgres_failed": postgres_failed,
     }
 
 
@@ -158,24 +191,17 @@ def format_overview(summary, structure):
     print()
     print("|" + " | ".join(structure["header"]) + "|")
     print("|" + "|".join(["---"] * len(structure["header"])) + "|")
-    print(
-        "| {failed} | {total} | {name} |".format(
-            name=structure["row1"][0],
-            failed=summary[structure["row1"][1]],
-            total=summary[structure["row1"][2]],
+    for row in structure["rows"]:
+        print(
+            "| {failed} | {total} | {name} |".format(
+                name=row[0],
+                failed=summary[row[1]],
+                total=summary[row[2]],
+            )
         )
-    )
-    print(
-        "| {failed} | {total} | {name} |".format(
-            name=structure["row2"][0],
-            failed=summary[structure["row2"][1]],
-            total=summary[structure["row2"][2]],
-        )
-    )
     print()
 
-
-def format_by_matrix(summary, structure):
+def format_bucket_table(failed_buckets, all_buckets, structure):
     """print metrics bucketed by matrix branch"""
     print("## " + structure["title"])
     print()
@@ -183,7 +209,7 @@ def format_by_matrix(summary, structure):
     print("|" + "|".join(["---"] * len(structure["header"])) + "|")
     sorted_by_fail = dict(
         sorted(
-            summary["failed_by_matrix"].items(), key=lambda item: item[1], reverse=True
+            failed_buckets.items(), key=lambda item: item[1], reverse=True
         )
     )
 
@@ -191,8 +217,8 @@ def format_by_matrix(summary, structure):
         print(
             "| {failed} | {total} | {name} |".format(
                 name=bucket,
-                failed=summary["failed_by_matrix"][bucket],
-                total=summary["total_by_matrix"][bucket],
+                failed=failed_buckets[bucket],
+                total=all_buckets[bucket],
             )
         )
     print()
@@ -229,16 +255,18 @@ def format_test_summary(summary):
     """
 
     print(
-        "Note that there are three tables below: overview, bucketed "
-        + "by test, bucketed by matrix branch."
+        "Note that there are several tables below: overview, bucketed "
+        + "by test, bucketed by matrix branch, kubernetes, postgres…"
     )
     print()
 
     overview_section = {
         "title": "Overview",
-        "header": ["failed", "total", ""],
-        "row1": ["test combinations", "total_failed", "total_run"],
-        "row2": ["unique tests", "unique_failed", "unique_run"],
+        "header": ["failed", "out of", ""],
+        "rows": [["test combinations", "total_failed", "total_run"],
+                ["unique tests", "unique_failed", "unique_run"],
+                ["k8s versions", "k8s_failed", "k8s_run"],
+                ["postgres versions", "postgres_failed", "postgres_run"]],
     }
 
     format_overview(summary, overview_section)
@@ -249,17 +277,31 @@ def format_test_summary(summary):
 
     by_test_section = {
         "title": "Failures by test",
-        "header": ["failed", "total", "failed K8s", "failed PG", "test"],
+        "header": ["failed runs", "total runs", "failed K8s", "failed PG", "test"],
     }
 
     format_by_test(summary, by_test_section)
 
     by_matrix_section = {
         "title": "Failures by matrix branch",
-        "header": ["failed", "total", "matrix branch"],
+        "header": ["failed tests", "total tests", "matrix branch"],
     }
 
-    format_by_matrix(summary, by_matrix_section)
+    format_bucket_table(summary["failed_by_matrix"], summary["total_by_matrix"], by_matrix_section)
+
+    by_k8s_section = {
+        "title": "Failures by kubernetes version",
+        "header": ["failed tests", "total tests", "kubernetes version"],
+    }
+
+    format_bucket_table(summary["failed_by_k8s"], summary["total_by_k8s"], by_k8s_section)
+
+    by_postgres_section = {
+        "title": "Failures by postgres version",
+        "header": ["failed tests", "total tests", "postgres version"],
+    }
+
+    format_bucket_table(summary["failed_by_postgres"], summary["total_by_postgres"], by_postgres_section)
 
 
 if __name__ == "__main__":
