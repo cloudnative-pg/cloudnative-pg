@@ -6,15 +6,13 @@ spec:
   template:
     spec:
       containers:
-      - name: hey
-        image: ricoli/hey
+      - name: apache-benchmark
+        image: httpd
         command:
-         - "/go/bin/hey"
-         - "-z"
-         - "2m"
+         - "/usr/local/apache2/bin/ab"
+         - "-t"
+         - "120"
          - "-c"
          - "5"
-         - "-m"
-         - "GET"
          - "http://webtest:8080/tx"
       restartPolicy: Never
