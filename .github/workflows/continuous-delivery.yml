@@ -7,17 +7,14 @@ on:
   # A push from any branch
   push:
     branches:
-      - '**'
-  # A pull request is 'opened', 'synchronize', or 'reopened'
-  pull_request:
-  # A pull request from a fork repository which is labelled
+      - 'main'
   pull_request_target:
     types: [labeled]
   # Manually or triggered by another workflow
   workflow_dispatch:
     inputs:
       depth:
-        description: 'Depth (push, pull_request, main, schedule)'
+        description: 'Depth (push, pull_request_target, main, schedule)'
         required: true
         default: 'main'
       test_level:
@@ -57,7 +54,7 @@ jobs:
           concurrent_skipping: 'same_content'
           skip_after_successful_duplicate: 'true'
           paths_ignore: '["README.md", "docs/**"]'
-          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
+          do_not_skip: '["pull_request_target", "workflow_dispatch", "schedule"]'
 
   # Classify codebase changes along 5 different dimensions based on the files
   # changed in the commit/PR, and create 5 different filters which are used in
@@ -179,7 +176,8 @@ jobs:
            github.event_name == 'pull_request_target' &&
            github.event.action == 'labeled' &&
            contains(github.event.pull_request.labels.*.name, 'ready to test :elephant:')
-        )
+        ) ||
+        github.head_ref == 'main'
       )
     runs-on: ubuntu-20.04
     strategy:
@@ -477,7 +475,6 @@ jobs:
         startsWith(github.ref_name, 'release-') ||
         startsWith(github.head_ref, 'dependabot/') ||
         startsWith(github.ref_name, 'dependabot/') ||
-        (github.event_name == 'pull_request' && github.event.action == 'opened') ||
         (github.event_name == 'pull_request_target' &&  github.event.action == 'labeled')
        )
     runs-on: ubuntu-20.04
@@ -517,7 +514,7 @@ jobs:
         id: evaluate-test-level
         run: |
           declare -A events
-          events=([push]=0 [pull_request]=2 [main]=3 [schedule]=4 [pull_request_target]=3)
+          events=([push]=0 [pull_request_target]=2 [main]=3 [schedule]=4)
           test_level_from_input="${{ github.event.inputs.test_level }}"
           if [ -n "${test_level_from_input}" ]
           then
