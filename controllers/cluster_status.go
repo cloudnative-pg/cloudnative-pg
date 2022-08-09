@@ -31,6 +31,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -729,10 +730,32 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	phase string,
 	reason string,
 ) error {
-	existingClusterStatus := cluster.Status
+	// we ensure that the cluster conditions aren't nil before operating
+	if cluster.Status.Conditions == nil {
+		cluster.Status.Conditions = []metav1.Condition{}
+	}
 
+	existingClusterStatus := cluster.Status
 	cluster.Status.Phase = phase
 	cluster.Status.PhaseReason = reason
+
+	condition := metav1.Condition{
+		Type:    string(apiv1.ConditionClusterReady),
+		Status:  metav1.ConditionFalse,
+		Reason:  string(apiv1.ClusterIsNotReady),
+		Message: "Cluster Is Not Ready",
+	}
+
+	if cluster.Status.Phase == apiv1.PhaseHealthy {
+		condition = metav1.Condition{
+			Type:    string(apiv1.ConditionClusterReady),
+			Status:  metav1.ConditionTrue,
+			Reason:  string(apiv1.ClusterReady),
+			Message: "Cluster is Ready",
+		}
+	}
+
+	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		if err := r.Status().Update(ctx, cluster); err != nil {
