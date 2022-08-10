@@ -67,7 +67,6 @@ type PVCUsageStatus struct {
 
 // CreatePVC create spec of a PVC, given its name and the storage configuration
 func CreatePVC(
-	cluster *apiv1.Cluster,
 	storageConfiguration apiv1.StorageConfiguration,
 	cluster apiv1.Cluster,
 	suffix string,
