@@ -71,7 +71,7 @@ def track_time_taken(test_results, min_durations, max_durations, slowest_branche
     if (test_results["start_time"] == "0001-01-01T00:00:00Z" or
         test_results["start_time"] == "0001-01-01T00:00:00Z"):
         return
-    # chop of the nanoseconds part, which is too much for Python `fromisoformat`
+    # chop off the nanoseconds part, which is too much for Python `fromisoformat`
     start_frags = test_results["start_time"].split(".")
     if len(start_frags) != 2:
         return
@@ -117,9 +117,9 @@ def compute_bucketized_summary(failed_bucketized, total_bucketized):
     failed_buckets_count = 0
     total_buckets_count = 0
     for name in total_bucketized:
-        failed_buckets_count = 1 + failed_buckets_count
-    for name in failed_bucketized:
         total_buckets_count = 1 + total_buckets_count
+    for name in failed_bucketized:
+        failed_buckets_count = 1 + failed_buckets_count
     return failed_buckets_count, total_buckets_count
 
 def compute_test_summary(test_dir):
@@ -299,7 +299,7 @@ def format_duration(d):
 def format_durations_table(min_durations, max_durations, slowest_branches, structure):
     """print the table of durations per test
     """
-    print("## " + structure["title"])
+    print("<h2><a name=timing>" + structure["title"] + "</a></h2>")
     print()
     print("|" + " | ".join(structure["header"]) + "|")
     print("|" + "|".join(["---"] * len(structure["header"])) + "|")
@@ -360,7 +360,7 @@ def format_test_summary(summary):
         """Note that there are several tables below: overview, bucketed
 by test, bucketed by matrix branch, kubernetes, postgres…
 
-* [timing table](#Test-times)
+* [timing table](#timing)
 """
     )
     print()
