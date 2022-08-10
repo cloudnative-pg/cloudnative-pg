@@ -33,7 +33,8 @@ const (
 )
 
 // CustomExternalSecretsPath is the custom path where the cryptographic material
-// needed to connect to an external cluster will be dumped
+// needed to connect to an external cluster will be dumped.
+// This will be used by the unit tests.
 var CustomExternalSecretsPath string
 
 func getExternalSecretsPath() string {
