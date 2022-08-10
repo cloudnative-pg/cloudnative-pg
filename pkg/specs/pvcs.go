@@ -192,22 +192,18 @@ pvcLoop:
 		}
 
 		switch {
-		case len(expectedPVCs) == len(indexOfFoundPVCs):
-			continue
 		case len(expectedPVCs) > len(indexOfFoundPVCs):
 			// we lost some pvc null them all
 			for _, index := range indexOfFoundPVCs {
 				result.Dangling = append(result.Dangling, result.Healthy[index])
 				result.Healthy = removeElementByIndex(result.Healthy, index)
 			}
-			continue
 		case len(indexOfFoundPVCs) > len(expectedPVCs):
 			contextLogger.Warning("found more PVC than those expected",
 				"instance", instance,
 				"expectedPVCs", expectedPVCs,
 				"foundPVCs", indexOfFoundPVCs,
 			)
-			continue
 		}
 	}
 

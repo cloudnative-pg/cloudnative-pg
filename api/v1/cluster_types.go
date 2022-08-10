@@ -1798,7 +1798,7 @@ func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
 	return recoveryParameters.Owner != "" && recoveryParameters.Database != ""
 }
 
-// ShouldCreateWalArchiveVolume returns if we should create the wal archive volume
+// ShouldCreateWalArchiveVolume returns whether we should create the wal archive volume
 func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 	return cluster.Spec.WalStorage != nil
 }

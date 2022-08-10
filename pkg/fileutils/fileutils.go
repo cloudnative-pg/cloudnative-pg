@@ -322,7 +322,7 @@ func GetDirectoryContent(dir string) (files []string, err error) {
 }
 
 // MoveDirectoryContent moves a directory from a source path to its destination by copying
-// the source files to the destination  once this is done it deletes the files from the original location.
+// the source files to the destination. Once this is done it deletes the files from the original location.
 func MoveDirectoryContent(sourceDirectory, destinationDirectory string) error {
 	var err error
 
