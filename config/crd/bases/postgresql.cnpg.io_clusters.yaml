@@ -752,8 +752,8 @@ spec:
                     description: The configuration for the barman-cloud tool suite
                     properties:
                       azureCredentials:
-                        description: The credentials to use to upload data to Google
-                          Cloud Storage
+                        description: The credentials to use to upload data to Azure
+                          Blob Storage
                         properties:
                           connectionString:
                             description: The connection string to be used
@@ -880,7 +880,8 @@ spec:
                           overriding the automatic endpoint discovery
                         type: string
                       googleCredentials:
-                        description: The credentials to use to upload data to S3
+                        description: The credentials to use to upload data to Google
+                          Cloud Storage
                         properties:
                           applicationCredentials:
                             description: The secret containing the Google Cloud Storage
@@ -908,8 +909,7 @@ spec:
                           will be passed to the Barman --history-tags option.
                         type: object
                       s3Credentials:
-                        description: The credentials to use to upload data to Azure
-                          Blob Storage
+                        description: The credentials to use to upload data to S3
                         properties:
                           accessKeyId:
                             description: The reference to the access key id
@@ -1117,6 +1117,51 @@ spec:
                         items:
                           type: string
                         type: array
+                      postInitApplicationSQLRefs:
+                        description: PostInitApplicationSQLRefs points references
+                          to ConfigMaps or Secrets which contain SQL files, the general
+                          implementation order to these references is from all Secrets
+                          to all ConfigMaps, and inside Secrets or ConfigMaps, the
+                          implementation order is same as the order of each array
+                          (by default empty)
+                        properties:
+                          configMapRefs:
+                            description: ConfigMapRefs holds a list of references
+                              to ConfigMaps
+                            items:
+                              description: ConfigMapKeySelector contains enough information
+                                to let you locate the key of a ConfigMap
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            type: array
+                          secretRefs:
+                            description: SecretRefs holds a list of references to
+                              Secrets
+                            items:
+                              description: SecretKeySelector contains enough information
+                                to let you locate the key of a Secret
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            type: array
+                        type: object
                       postInitSQL:
                         description: List of SQL queries to be executed as a superuser
                           immediately after the cluster has been created - to be used
@@ -1347,8 +1392,8 @@ spec:
                       description: The configuration for the barman-cloud tool suite
                       properties:
                         azureCredentials:
-                          description: The credentials to use to upload data to Google
-                            Cloud Storage
+                          description: The credentials to use to upload data to Azure
+                            Blob Storage
                           properties:
                             connectionString:
                               description: The connection string to be used
@@ -1475,7 +1520,8 @@ spec:
                             overriding the automatic endpoint discovery
                           type: string
                         googleCredentials:
-                          description: The credentials to use to upload data to S3
+                          description: The credentials to use to upload data to Google
+                            Cloud Storage
                           properties:
                             applicationCredentials:
                               description: The secret containing the Google Cloud
@@ -1503,8 +1549,7 @@ spec:
                             will be passed to the Barman --history-tags option.
                           type: object
                         s3Credentials:
-                          description: The credentials to use to upload data to Azure
-                            Blob Storage
+                          description: The credentials to use to upload data to S3
                           properties:
                             accessKeyId:
                               description: The reference to the access key id

@@ -274,7 +274,6 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateSuperuserSecret,
 		r.validateCerts,
 		r.validateBootstrapMethod,
-		r.validateStorageConfiguration,
 		r.validateImageName,
 		r.validateImagePullPolicy,
 		r.validateRecoveryTarget,
@@ -403,6 +402,30 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 				field.NewPath("spec", "bootstrap", "initdb", "walSegmentSize"),
 				initDBOptions.WalSegmentSize,
 				"WAL segment size must be a power of 2"))
+	}
+
+	if initDBOptions.PostInitApplicationSQLRefs != nil {
+		for _, item := range initDBOptions.PostInitApplicationSQLRefs.SecretRefs {
+			if item.Name == "" || item.Key == "" {
+				result = append(
+					result,
+					field.Invalid(
+						field.NewPath("spec", "bootstrap", "initdb", "postInitApplicationSQLRefs", "secretRefs"),
+						item,
+						"key and name must be specified"))
+			}
+		}
+
+		for _, item := range initDBOptions.PostInitApplicationSQLRefs.ConfigMapRefs {
+			if item.Name == "" || item.Key == "" {
+				result = append(
+					result,
+					field.Invalid(
+						field.NewPath("spec", "bootstrap", "initdb", "postInitApplicationSQLRefs", "configMapRefs"),
+						item,
+						"key and name must be specified"))
+			}
+		}
 	}
 
 	return result
@@ -724,22 +747,6 @@ func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
 				field.NewPath("spec", "bootstrap", "recovery", "source"),
 				r.Spec.Bootstrap.Recovery.Source,
 				fmt.Sprintf("External cluster %v not found", r.Spec.Bootstrap.Recovery.Source)))
-	}
-
-	return result
-}
-
-// validateStorageConfiguration validates the size format it's correct
-func (r *Cluster) validateStorageConfiguration() field.ErrorList {
-	var result field.ErrorList
-
-	if _, err := resource.ParseQuantity(r.Spec.StorageConfiguration.Size); err != nil {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "storage", "size"),
-				r.Spec.StorageConfiguration.Size,
-				"Size value isn't valid"))
 	}
 
 	return result

@@ -30,6 +30,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+const (
+	// postInitApplicationSQLRefsFolder points to the folder of
+	// postInitApplicationSQL files in the primary job with initdb.
+	postInitApplicationSQLRefsFolder = "/etc/post-init-application-sql"
+)
+
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
 func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 	initCommand := []string{
@@ -74,6 +80,12 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
 		return createPrimaryJob(cluster, nodeSerial, "import", initCommand)
 	}
+
+	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
+		initCommand = append(initCommand,
+			"--post-init-application-sql-refs-folder", postInitApplicationSQLRefsFolder)
+	}
+
 	return createPrimaryJob(cluster, nodeSerial, "initdb", initCommand)
 }
 
@@ -207,9 +219,19 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
 			Namespace: cluster.Namespace,
+			Labels: map[string]string{
+				utils.InstanceLabelName: podName,
+				utils.ClusterLabelName:  cluster.Name,
+			},
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						utils.InstanceLabelName: podName,
+						utils.ClusterLabelName:  cluster.Name,
+					},
+				},
 				Spec: corev1.PodSpec{
 					Hostname:  jobName,
 					Subdomain: cluster.GetServiceAnyName(),
@@ -245,6 +267,15 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 	if utils.IsAnnotationAppArmorPresent(cluster.Annotations) {
 		utils.AnnotateAppArmor(&job.ObjectMeta, cluster.Annotations)
+	}
+
+	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
+		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
+			cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs,
+		)
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
 	}
 
 	return job

@@ -45,6 +45,9 @@ var _ = Describe("InitDB settings", func() {
 		const (
 			clusterName        = "p-postinit-sql"
 			postInitSQLCluster = fixturesCertificatesDir + "/cluster-postinit-sql.yaml"
+
+			postInitSQLSecretRef    = fixturesCertificatesDir + "/cluster_post_init_secret.yaml"
+			postInitSQLConfigMapRef = fixturesCertificatesDir + "/cluster_post_init_configmap.yaml"
 		)
 
 		var namespace string
@@ -62,6 +65,10 @@ var _ = Describe("InitDB settings", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace = "initdb-postqueries"
 			err := env.CreateNamespace(namespace)
+
+			CreateResourceFromFile(namespace, postInitSQLSecretRef)
+			CreateResourceFromFile(namespace, postInitSQLConfigMapRef)
+
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
 
@@ -78,6 +85,24 @@ var _ = Describe("InitDB settings", func() {
 			})
 			By("querying the App database tables via psql", func() {
 				cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM application_numbers'"
+				_, _, err := utils.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primaryDst,
+					cmd))
+				Expect(err).ToNot(HaveOccurred())
+			})
+			By("querying the App database tables defined by secretRefs", func() {
+				cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM secrets'"
+				_, _, err := utils.Run(fmt.Sprintf(
+					"kubectl exec -n %v %v -- %v",
+					namespace,
+					primaryDst,
+					cmd))
+				Expect(err).ToNot(HaveOccurred())
+			})
+			By("querying the App database tables defined by configMapRefs", func() {
+				cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM configmaps'"
 				_, _, err := utils.Run(fmt.Sprintf(
 					"kubectl exec -n %v %v -- %v",
 					namespace,

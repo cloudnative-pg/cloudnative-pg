@@ -35,6 +35,9 @@ const (
 	// PvcRoleLabelName is the name of the label containing the purpose of the pvc
 	PvcRoleLabelName = "cnpg.io/pvcRole"
 
+	// InstanceLabelName is the name of the label containing the instance name
+	InstanceLabelName = "cnpg.io/instanceName"
+
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object
 	OperatorVersionAnnotationName = "cnpg.io/operatorVersion"

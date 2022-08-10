@@ -279,6 +279,136 @@ var _ = Describe("initdb options validation", func() {
 		Expect(result).To(BeEmpty())
 	})
 
+	It("complain if key is missing in the secretRefs", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							SecretRefs: []SecretKeySelector{
+								{
+									LocalObjectReference: LocalObjectReference{Name: "secret1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateInitDB()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("complain if name is missing in the secretRefs", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							SecretRefs: []SecretKeySelector{
+								{
+									Key: "key",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateInitDB()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("complain if key is missing in the configMapRefs", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							ConfigMapRefs: []ConfigMapKeySelector{
+								{
+									LocalObjectReference: LocalObjectReference{Name: "configmap1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateInitDB()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("complain if name is missing in the configMapRefs", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							ConfigMapRefs: []ConfigMapKeySelector{
+								{
+									Key: "key",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateInitDB()
+		Expect(len(result)).To(Equal(1))
+	})
+
+	It("doesn't complain if configmapRefs and secretRefs are valid", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{
+						Database: "app",
+						Owner:    "app",
+						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+							ConfigMapRefs: []ConfigMapKeySelector{
+								{
+									LocalObjectReference: LocalObjectReference{Name: "configmap1"},
+									Key:                  "key",
+								},
+								{
+									LocalObjectReference: LocalObjectReference{Name: "configmap2"},
+									Key:                  "key",
+								},
+							},
+							SecretRefs: []SecretKeySelector{
+								{
+									LocalObjectReference: LocalObjectReference{Name: "secret1"},
+									Key:                  "key",
+								},
+								{
+									LocalObjectReference: LocalObjectReference{Name: "secret2"},
+									Key:                  "key",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result := cluster.validateInitDB()
+		Expect(result).To(BeEmpty())
+	})
+
 	It("doesn't complain if superuser secret it's empty", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{},
@@ -424,34 +554,6 @@ var _ = Describe("ImagePullPolicy validation", func() {
 
 		result := cluster.validateImagePullPolicy()
 		Expect(len(result)).To(Equal(0))
-	})
-})
-
-var _ = Describe("Storage validation", func() {
-	It("complains if the value isn't correct", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				StorageConfiguration: StorageConfiguration{
-					Size: "X",
-				},
-			},
-		}
-
-		result := cluster.validateStorageConfiguration()
-		Expect(len(result)).To(Equal(1))
-	})
-
-	It("doesn't complain if value is correct", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				StorageConfiguration: StorageConfiguration{
-					Size: "1Gi",
-				},
-			},
-		}
-
-		result := cluster.validateStorageConfiguration()
-		Expect(result).To(BeEmpty())
 	})
 })
 

@@ -430,13 +430,18 @@ type InstanceReportedState struct {
 	TimeLineID int `json:"timeLineID,omitempty"`
 }
 
+// ClusterConditionType defines types of cluster conditions
+type ClusterConditionType string
+
 // These are valid conditions of a Cluster, some of the conditions could be owned by
 // Instance Manager and some of them could be owned by reconciler.
 const (
-	// ConditionContinuousArchiving this condition archiving :owned by InstanceManager.
+	// ConditionContinuousArchiving represents whether WAL archiving is working
 	ConditionContinuousArchiving ClusterConditionType = "ContinuousArchiving"
-	// ConditionBackup this condition looking backup status :owned by InstanceManager.
+	// ConditionBackup represents the last backup's status
 	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
+	// ConditionClusterReady represents whether a cluster is Ready
+	ConditionClusterReady ClusterConditionType = "Ready"
 )
 
 // ConditionStatus defines conditions of resources
@@ -476,10 +481,13 @@ const (
 	// ConditionReasonContinuousArchivingFailing means that the condition has changed because
 	// the WAL archiving is not working correctly
 	ConditionReasonContinuousArchivingFailing ConditionReason = "ContinuousArchivingFailing"
-)
 
-// ClusterConditionType is of string type
-type ClusterConditionType string
+	// ClusterReady means that the condition changed because the cluster is ready and working properly
+	ClusterReady ConditionReason = "ClusterIsReady"
+
+	// ClusterIsNotReady means that the condition changed because the cluster is not ready
+	ClusterIsNotReady ConditionReason = "ClusterIsNotReady"
+)
 
 // EmbeddedObjectMetadata contains metadata to be inherited by all resources related to a Cluster
 type EmbeddedObjectMetadata struct {
@@ -795,6 +803,13 @@ type BootstrapInitDB struct {
 	// Bootstraps the new cluster by importing data from an existing PostgreSQL
 	// instance using logical backup (`pg_dump` and `pg_restore`)
 	Import *Import `json:"import,omitempty"`
+
+	// PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
+	// contain SQL files, the general implementation order to these references is
+	// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
+	// the implementation order is same as the order of each array
+	// (by default empty)
+	PostInitApplicationSQLRefs *PostInitApplicationSQLRefs `json:"postInitApplicationSQLRefs,omitempty"`
 }
 
 // SnapshotType is a type of allowed import
@@ -833,6 +848,18 @@ type Import struct {
 type ImportSource struct {
 	// The name of the externalCluster used for import
 	ExternalCluster string `json:"externalCluster"`
+}
+
+// PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
+// contain SQL files, the general implementation order to these references is
+// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
+// the implementation order is same as the order of each array
+type PostInitApplicationSQLRefs struct {
+	// SecretRefs holds a list of references to Secrets
+	SecretRefs []SecretKeySelector `json:"secretRefs,omitempty"`
+
+	// ConfigMapRefs holds a list of references to ConfigMaps
+	ConfigMapRefs []ConfigMapKeySelector `json:"configMapRefs,omitempty"`
 }
 
 // BootstrapRecovery contains the configuration required to restore
@@ -1062,13 +1089,13 @@ const (
 
 // BarmanCredentials an object containing the potential credentials for each cloud provider
 type BarmanCredentials struct {
-	// The credentials to use to upload data to S3
+	// The credentials to use to upload data to Google Cloud Storage
 	Google *GoogleCredentials `json:"googleCredentials,omitempty"`
 
-	// The credentials to use to upload data to Azure Blob Storage
+	// The credentials to use to upload data to S3
 	AWS *S3Credentials `json:"s3Credentials,omitempty"`
 
-	// The credentials to use to upload data to Google Cloud Storage
+	// The credentials to use to upload data to Azure Blob Storage
 	Azure *AzureCredentials `json:"azureCredentials,omitempty"`
 }
 
@@ -1742,6 +1769,26 @@ func (cluster *Cluster) ShouldCreateApplicationDatabase() bool {
 	return cluster.ShouldInitDBCreateApplicationDatabase() ||
 		cluster.ShouldRecoveryCreateApplicationDatabase() ||
 		cluster.ShouldPgBaseBackupCreateApplicationDatabase()
+}
+
+// ShouldInitDBRunPostInitApplicationSQLRefs returns true if for this cluster,
+// during the bootstrap phase using initDB, we need to run post application
+// SQL files from provided references.
+func (cluster *Cluster) ShouldInitDBRunPostInitApplicationSQLRefs() bool {
+	if cluster.Spec.Bootstrap == nil {
+		return false
+	}
+
+	if cluster.Spec.Bootstrap.InitDB == nil {
+		return false
+	}
+
+	if cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs == nil {
+		return false
+	}
+
+	return (len(cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs.ConfigMapRefs) != 0 ||
+		len(cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs.SecretRefs) != 0)
 }
 
 // ShouldInitDBCreateApplicationDatabase returns true if the application database needs to be created during initdb
