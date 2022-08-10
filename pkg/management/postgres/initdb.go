@@ -341,14 +341,14 @@ func getConnectionPoolerForExternalCluster(
 		return nil, fmt.Errorf("missing external cluster")
 	}
 
-	tmp := externalCluster.DeepCopy()
-	delete(tmp.ConnectionParameters, "dbname")
+	modifiedExternalCluster := externalCluster.DeepCopy()
+	delete(modifiedExternalCluster.ConnectionParameters, "dbname")
 
 	sourceDBConnectionString, pgpass, err := external.ConfigureConnectionToServer(
 		ctx,
 		client,
 		namespaceOfNewCluster,
-		&externalCluster,
+		modifiedExternalCluster,
 	)
 	if err != nil {
 		return nil, err
