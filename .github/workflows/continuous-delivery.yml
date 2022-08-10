@@ -396,7 +396,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v3.1.0
+        uses: docker/build-push-action@v3.1.1
         with:
           platforms: ${{ steps.docker-platforms.outputs.platforms }}
           context: .
