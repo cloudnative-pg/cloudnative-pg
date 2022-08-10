@@ -485,6 +485,7 @@ executables
 extensibility
 externalCluster
 externalClusters
+externalclusters
 facto
 failover
 failovers
