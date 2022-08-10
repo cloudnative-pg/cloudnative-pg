@@ -81,5 +81,17 @@ func ConfigureConnectionToServer(
 		}
 	}
 
+	switch {
+	// we respect the user passed parameters
+	case connectionParameters["sslmode"] != "":
+	// we assume that if just one of this was passed the user intended to do a sslmode require connection.
+	case server.SSLCert != nil || server.SSLKey != nil:
+		connectionParameters["sslmode"] = "require"
+	case server.SSLRootCert != nil:
+		connectionParameters["sslmode"] = "verify-ca"
+	default:
+		connectionParameters["sslmode"] = "disable"
+	}
+
 	return configfile.CreateConnectionString(connectionParameters), pgpassfile, nil
 }

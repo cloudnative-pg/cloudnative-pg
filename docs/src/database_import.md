@@ -65,6 +65,7 @@ latter by the `monolith` type.
     [PostgreSQL documentation on "SQL Dump"](https://www.postgresql.org/docs/current/app-pgdump.html)
     for further information.
 
+
 ## The `microservice` type
 
 With the microservice approach, you can specify a single database you want to
@@ -139,7 +140,8 @@ spec:
 There are a few things you need to be aware of when using the `microservice` type:
 
 - It requires an `externalCluster` that points to an existing PostgreSQL
-  instance containing the data to import
+  instance containing the data to import (for more information, please refer to
+  ["The `externalClusters` section"](bootstrap.md#the-externalclusters-section))
 - Traffic must be allowed between the Kubernetes cluster and the
   `externalCluster` during the operation
 - Connection to the source database must be granted with the specified user
@@ -213,7 +215,8 @@ spec:
 There are a few things you need to be aware of when using the `monolith` type:
 
 - It requires an `externalCluster` that points to an existing PostgreSQL
-  instance containing the data to import
+  instance containing the data to import (for more information, please refer to
+  ["The `externalClusters` section"](bootstrap.md#the-externalclusters-section))
 - Traffic must be allowed between the Kubernetes cluster and the
   `externalCluster` during the operation
 - Connection to the source database must be granted with the specified user
@@ -237,3 +240,4 @@ There are a few things you need to be aware of when using the `monolith` type:
 - After the clone procedure is done, `ANALYZE VERBOSE` is executed for every
   database.
 - `postImportApplicationSQL` field is not supported
+
