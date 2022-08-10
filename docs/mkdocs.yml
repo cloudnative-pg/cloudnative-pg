@@ -41,6 +41,7 @@ nav:
   - failover.md
   - troubleshooting.md
   - fencing.md
+  - postgis.md
   - e2e.md
   - container_images.md
   - operator_capability_levels.md

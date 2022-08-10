@@ -192,6 +192,12 @@ are properly reloaded or restarted, depending on the configuration option.
 *Current limitation:* changes with `ALTER SYSTEM` are not detected, meaning
 that the cluster state is not enforced.
 
+### PostGIS clusters
+
+CloudNativePG supports the installation of clusters with the [PostGIS](postgis.md)
+open source extension for geographical databases, one of the most popular
+extensions for PostgreSQL.
+
 ### Basic LDAP authentication for PostgreSQL
 
 The operator allows you to configure LDAP authentication for your PostgreSQL
