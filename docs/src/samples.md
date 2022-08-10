@@ -43,7 +43,7 @@ Full example
 
 PostGIS example
 : [`postgis-example.yaml`](samples/postgis-example.yaml):
-   an example of "PostGIS cluster" (see the [PostGIS section](postgis.md) for details.
+   an example of "PostGIS cluster" (see the [PostGIS section](postgis.md) for details.)
 
 Replica cluster via streaming
 :   **Prerequisites**: [`cluster-example.yaml`](samples/cluster-example.yaml)
