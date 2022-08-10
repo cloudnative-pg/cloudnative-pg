@@ -134,17 +134,17 @@ spec:
 
 ## Volume for WAL
 
-By default, PostgreSQL stores all its data in the so called `PGDATA`.
-One of the core directories inside `PGDATA` is called `pg_wal` (historically
+By default, PostgreSQL stores all its data in the so-called `PGDATA` (a directory).
+One of the core directories inside `PGDATA` is `pg_wal` (historically
 known as `pg_xlog` in PostgreSQL), which contains the log of transactional
 changes occurred in the database, in the form of segment files.
 
 !!! Info
-    Normally, each segment is 16 MB in size, but the size is can be changed
-    at cluster initialization time through the `walSegmentSize` option, as
+    Normally, each segment is 16 MB in size, but the size can be configured
+    through the `walSegmentSize` option, applied at cluster initialization time, as
     described in ["Bootstrap an empty cluster"](bootstrap.md#bootstrap-an-empty-cluster-initdb).
 
-While in most of the cases having `pg_wal` on the same volume where `PGDATA`
+While in most cases, having `pg_wal` on the same volume where `PGDATA`
 resides is fine, there are a few benefits from having WALs stored in a separate
 volume:
 
@@ -360,7 +360,7 @@ $ kubectl delete pvc/cluster-example-3 pod/cluster-example-3
 ```
 
 !!! Important
-    In case you have instantiated a dedicated WAL volume, both PCVs will have to be deleted during this process.
+    In case you have created a dedicated WAL volume, both PVCs will have to be deleted during this process.
     Additionally, the same procedure applies in case you want to regenerate the WAL volume PVC, which can be done
     by disabling `resizeInUseVolumes` also for the `.spec.walStorage` section.
 
