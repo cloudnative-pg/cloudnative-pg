@@ -139,7 +139,8 @@ spec:
 There are a few things you need to be aware of when using the `microservice` type:
 
 - It requires an `externalCluster` that points to an existing PostgreSQL
-  instance containing the data to import
+  instance containing the data to import (for more information, please refer to
+  ["The `externalClusters` section"](bootstrap.md#the-externalclusters-section))
 - Traffic must be allowed between the Kubernetes cluster and the
   `externalCluster` during the operation
 - Connection to the source database must be granted with the specified user
@@ -205,6 +206,7 @@ spec:
         host: pg96.local
         user: postgres
         dbname: postgres
+        sslmode: require
       password:
         name: cluster-pg96-superuser
         key: password
@@ -213,9 +215,12 @@ spec:
 There are a few things you need to be aware of when using the `monolith` type:
 
 - It requires an `externalCluster` that points to an existing PostgreSQL
-  instance containing the data to import
+  instance containing the data to import (for more information, please refer to
+  ["The `externalClusters` section"](bootstrap.md#the-externalclusters-section))
 - Traffic must be allowed between the Kubernetes cluster and the
   `externalCluster` during the operation
+- You need to specify `sslmode: disable` in the `connectionParameters` section
+  if you need to connect to a PostgreSQL instance without SSL
 - Connection to the source database must be granted with the specified user
   that needs to run `pg_dump` and retrieve roles information (*superuser* is
   OK)
