@@ -24,7 +24,7 @@ is like any other PostgreSQL cluster. The only differences are:
 - the presence in the system of PostGIS and related libraries
 - the presence in the database(s) of the PostGIS extension
 
-Being CloudNativePG founded on Immutable Application Containers, the only way
+Since CloudNativePG is based on Immutable Application Containers, the only way
 to provision PostGIS is to add it to the container image that you use for the
 operand. The ["Container Image Requirements" section](container_images.md) provides
 detailed instructions on how this is achieved. More simply, you can just use
@@ -35,7 +35,7 @@ do this in two ways:
 
 - install it in the application database, which is the main and supposedly only
   database you host in the cluster according to the microservice architecture, or
-- install it in the `template1` database so to make it available for all the
+- install it in the `template1` database so as to make it available for all the
   databases you end up creating in the cluster, in case you adopt the monolith
   architecture where the instance is shared by multiple databases
 
@@ -57,8 +57,8 @@ provides some guidance on how the creation of a PostGIS cluster can be done.
 
 !!! Warning
     Please consider that, although convention over configuration applies in
-    CloudNativePG, you should spend time configuring your system for production
-    and tune it. Also the `imageName` in the example below deliberately points
+    CloudNativePG, you should spend time configuring and tuning your system for
+    production. Also the `imageName` in the example below deliberately points
     to the latest available image for PostgreSQL 14 - you should use a specific
     image name or, preferably, the SHA256 digest for true immutability.
 
@@ -95,10 +95,10 @@ both the template database and the application database, ready for use.
 
 You can easily verify the available version of PostGIS that is in the
 container, by connecting to the `app` database (you might obtain different
-values from this document):
+values from the ones in this document):
 
 ```console
-$ k exec -ti postgis-example-1 -- psql app
+$ kubectl exec -ti postgis-example-1 -- psql app
 Defaulted container "postgres" out of: postgres, bootstrap-controller (init)
 psql (14.4 (Debian 14.4-1.pgdg110+1))
 Type "help" for help.
@@ -143,5 +143,5 @@ app=# SELECT postgis_full_version();
                                                                             postgis_full_version
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  POSTGIS="3.2.2 628da50" [EXTENSION] PGSQL="140" GEOS="3.9.0-CAPI-1.16.2" PROJ="7.2.1" LIBXML="2.9.10" LIBJSON="0.15" LIBPROTOBUF="1.3.3" WAGYU="0.5.0 (Internal)" TOPOLOGY
-(5 rows)
+(1 row)
 ```

@@ -211,7 +211,7 @@ for all databases part of the operation and, if requested, for roles.
 
 CloudNativePG supports the installation of clusters with the [PostGIS](postgis.md)
 open source extension for geographical databases, one of the most popular
-for PostgreSQL.
+extensions for PostgreSQL.
 
 ### Basic LDAP authentication for PostgreSQL
 

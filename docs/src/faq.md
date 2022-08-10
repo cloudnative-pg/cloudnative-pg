@@ -357,7 +357,7 @@ spec:
 The time zone can be verified with:
 
 ``` console
-$ k exec -ti pg-italy-1 -c postgres -- psql -x -c "SHOW timezone"
+$ kubectl exec -ti pg-italy-1 -c postgres -- psql -x -c "SHOW timezone"
 -[ RECORD 1 ]---------
 TimeZone | Europe/Rome
 ```
