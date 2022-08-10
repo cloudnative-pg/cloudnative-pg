@@ -104,7 +104,7 @@ ssl = 'on'
 ssl_ca_file = '/controller/certificates/client-ca.crt'
 ssl_cert_file = '/controller/certificates/server.crt'
 ssl_key_file = '/controller/certificates/server.key'
-unix_socket_directories = '/var/run/postgresql'
+unix_socket_directories = '/controller/run'
 wal_level = 'logical'
 wal_log_hints = 'on'
 ```
