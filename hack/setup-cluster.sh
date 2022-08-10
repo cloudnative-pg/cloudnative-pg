@@ -43,6 +43,14 @@ trap 'rm -fr ${TEMP_DIR}' EXIT
 registry_volume=registry_dev_data
 registry_name=registry.dev
 
+# Helper images
+POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
+POSTGRES_UPDATE_IMG=${POSTGRES_UPDATE_IMG:-${POSTGRES_IMG%.*}}
+PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/specs/pgbouncer/deployments.go" | cut -f 2 -d \")}
+MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/minio.go"  | cut -f 2 -d \")}
+APACHE_IMG=${APACHE_IMG:-"httpd"}
+HELPER_IMGS=($POSTGRES_IMG $POSTGRES_UPDATE_IMG $PGBOUNCER_IMG $MINIO_IMG $APACHE_IMG)
+
 # Colors (only if using a terminal)
 bright=
 reset=
@@ -460,6 +468,15 @@ load() {
   load_image "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
 
   echo "${bright}Done loading new operator image on cluster ${CLUSTER_NAME}${reset}"
+
+  echo "${bright}Loading helper images for tests on cluster ${CLUSTER_NAME}${reset}"
+
+  for IMG in ${HELPER_IMGS[@]}; do
+    docker pull "${IMG}"
+    "load_image_${ENGINE}" "${CLUSTER_NAME}" "${IMG}"
+  done
+
+  echo "${bright}Done loading helper images on cluster ${CLUSTER_NAME}${reset}"
 }
 
 deploy() {
