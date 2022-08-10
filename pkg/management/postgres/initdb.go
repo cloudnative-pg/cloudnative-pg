@@ -254,3 +254,39 @@ func (info InitInfo) Bootstrap() error {
 		return nil
 	})
 }
+
+func getConnectionPoolerForExternalCluster(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	client ctrl.Client,
+	namespaceOfNewCluster string,
+) (*pool.ConnectionPool, error) {
+	externalCluster, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.InitDB.Import.Source.ExternalCluster)
+	if !ok {
+		return nil, fmt.Errorf("missing external cluster")
+	}
+
+	modifiedExternalCluster := externalCluster.DeepCopy()
+	delete(modifiedExternalCluster.ConnectionParameters, "dbname")
+
+	sourceDBConnectionString, pgpass, err := external.ConfigureConnectionToServer(
+		ctx,
+		client,
+		namespaceOfNewCluster,
+		modifiedExternalCluster,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unfortunately lib/pq doesn't support the passfile
+	// connection option so we must rely on an environment
+	// variable.
+	if pgpass != "" {
+		if err = os.Setenv("PGPASSFILE", pgpass); err != nil {
+			return nil, err
+		}
+	}
+
+	return pool.NewConnectionPool(sourceDBConnectionString), nil
+}
