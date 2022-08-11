@@ -116,8 +116,8 @@ fi
 WORKDIR=$(mktemp -d -t cnpg-XXXX)
 trap 'rm -rf "$WORKDIR"' EXIT
 
-git show-branch --current ${MAIN_BRANCH} > "$WORKDIR/show-branch.txt"
-_output_intermediate_csv ${MAIN_BRANCH} | sort -nu > "$WORKDIR/${MAIN_BRANCH}.csv"
+git show-branch --current "${MAIN_BRANCH}" > "$WORKDIR/show-branch.txt"
+_output_intermediate_csv "${MAIN_BRANCH}" | sort -nu > "$WORKDIR/${MAIN_BRANCH}.csv"
 _output_intermediate_csv "$branch" | sort -nu > "$WORKDIR/$branch.csv"
 
 # Prepare intermediate files
