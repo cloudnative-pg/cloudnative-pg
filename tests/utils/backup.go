@@ -39,7 +39,7 @@ func ExecuteBackup(namespace string, backupFile string, env *TestingEnvironment)
 			return err
 		}
 		return nil
-	}, RetryTimeout, PollingTime).Should(BeNil())
+	}, RetryTimeoutClient, PollingTime).Should(BeNil())
 
 	// After a while the Backup should be completed
 	timeout := 180
