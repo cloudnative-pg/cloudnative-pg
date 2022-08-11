@@ -264,7 +264,9 @@ def format_bucket_table(buckets, structure):
         "header": ["failed tests", "total tests", "platform"],
     }
     """
-    print("## " + structure["title"])
+    print("<h2><a name={anchor}>{title}</a></h2>".format(
+        title=structure["title"],
+        anchor=structure["anchor"]))
     print()
     print("|" + " | ".join(structure["header"]) + "|")
     print("|" + "|".join(["---"] * len(structure["header"])) + "|")
@@ -287,7 +289,9 @@ def format_bucket_table(buckets, structure):
 def format_by_test(summary, structure):
     """print metrics bucketed by test class
     """
-    print("## " + structure["title"])
+    print("<h2><a name={anchor}>{title}</a></h2>".format(
+        title=structure["title"],
+        anchor=structure["anchor"]))
     print()
     print("|" + " | ".join(structure["header"]) + "|")
     print("|" + "|".join(["---"] * len(structure["header"])) + "|")
@@ -319,7 +323,9 @@ def format_duration(d):
 def format_durations_table(test_times, structure):
     """print the table of durations per test
     """
-    print("<h2><a name=timing>" + structure["title"] + "</a></h2>")
+    print("<h2><a name={anchor}>{title}</a></h2>".format(
+        title=structure["title"],
+        anchor=structure["anchor"]))
     print()
     print("|" + " | ".join(structure["header"]) + "|")
     print("|" + "|".join(["---"] * len(structure["header"])) + "|")
@@ -345,6 +351,7 @@ def format_test_failures(summary):
     """
     by_test_section = {
         "title": "Failures by test",
+        "anchor": "by_test",
         "header": ["failed runs", "total runs", "failed K8s", "failed PG", "test"],
     }
 
@@ -352,6 +359,7 @@ def format_test_failures(summary):
 
     by_matrix_section = {
         "title": "Failures by matrix branch",
+        "anchor": "by_matrix",
         "header": ["failed tests", "total tests", "matrix branch"],
     }
 
@@ -359,6 +367,7 @@ def format_test_failures(summary):
 
     by_k8s_section = {
         "title": "Failures by kubernetes version",
+        "anchor": "by_k8s",
         "header": ["failed tests", "total tests", "kubernetes version"],
     }
 
@@ -366,6 +375,7 @@ def format_test_failures(summary):
 
     by_postgres_section = {
         "title": "Failures by postgres version",
+        "anchor": "by_postgres",
         "header": ["failed tests", "total tests", "postgres version"],
     }
 
@@ -373,6 +383,7 @@ def format_test_failures(summary):
 
     by_platform_section = {
         "title": "Failures by platform",
+        "anchor": "by_platform",
         "header": ["failed tests", "total tests", "platform"],
     }
 
@@ -387,7 +398,8 @@ def format_test_summary(summary):
         """Note that there are several tables below: overview, bucketed
 by test, bucketed by matrix branch, kubernetes, postgres…
 
-* [timing table](#user-content-timing)
+Index: [timing table](#user-content-timing) | [by test](#user-content-by_test) |
+  [by k8s](#user-content-by_k8s) | [by postgres](#user-content-by_pg) |  [by platform](#user-content-by_platform)
 """
     )
     print()
@@ -410,6 +422,7 @@ by test, bucketed by matrix branch, kubernetes, postgres…
 
     timing_section = {
         "title": "Test times",
+        "anchor": "timing",
         "header": ["longest taken", "shortest taken", "slowest branch", "test"],
     }
 
