@@ -360,7 +360,7 @@ def format_test_summary(summary):
         """Note that there are several tables below: overview, bucketed
 by test, bucketed by matrix branch, kubernetes, postgres…
 
-* [timing table](#timing)
+* [timing table](#user-content-timing)
 """
     )
     print()
