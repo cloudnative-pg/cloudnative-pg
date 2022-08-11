@@ -191,8 +191,7 @@ func IsJobOperatingOnPVC(job batchv1.Job, pvc corev1.PersistentVolumeClaim) bool
 // isResizing returns true if PersistentVolumeClaimResizing condition is present
 func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	for _, condition := range pvc.Status.Conditions {
-		if condition.Type == corev1.PersistentVolumeClaimResizing ||
-			condition.Type == corev1.PersistentVolumeClaimFileSystemResizePending {
+		if condition.Type == corev1.PersistentVolumeClaimResizing {
 			return true
 		}
 	}
