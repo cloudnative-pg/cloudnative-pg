@@ -64,7 +64,7 @@ def is_failed(e2e_test):
         and e2e_test["state"] != "ignoreFailed"
     )
 
-def track_time_taken(test_results, min_durations, max_durations, slowest_branches):
+def track_time_taken(test_results, test_times):
     """computes the running shortest and longest duration of running each kind of test
     """
     name = test_results["name"]
@@ -83,42 +83,42 @@ def track_time_taken(test_results, min_durations, max_durations, slowest_branche
     end_time = datetime.fromisoformat(end_frags[0])
     duration = end_time - start_time
     matrix_id = test_results["matrix_id"]
-    if name not in max_durations:
-        max_durations[name] = duration
-    if name not in min_durations:
-        min_durations[name] = duration
-    if name not in slowest_branches:
-        slowest_branches[name] = matrix_id
+    if name not in test_times["max"]:
+        test_times["max"][name] = duration
+    if name not in test_times["min"]:
+        test_times["min"][name] = duration
+    if name not in test_times["slowest_branch"]:
+        test_times["slowest_branch"][name] = matrix_id
 
-    if duration > max_durations[name]:
-        max_durations[name] = duration
-        slowest_branches[name] = matrix_id
-    if duration < min_durations[name]:
-        min_durations[name] = duration
+    if duration > test_times["max"][name]:
+        test_times["max"][name] = duration
+        test_times["slowest_branch"][name] = matrix_id
+    if duration < test_times["min"][name]:
+        test_times["min"][name] = duration
 
-def count_bucketized_stats(test_results, total_bucketized, failed_bucketized, field_id):
+def count_bucketized_stats(test_results, parameter_buckets, field_id):
     """counts the success/failures onto a bucket. This means there are two
     dictionaries: one for `total` tests, one for `failed` tests.
     """
     bucket_id = test_results[field_id]
-    if bucket_id not in total_bucketized:
-        total_bucketized[bucket_id] = 0
-    total_bucketized[bucket_id] = 1 + total_bucketized[bucket_id]
+    if bucket_id not in parameter_buckets["total"]:
+        parameter_buckets["total"][bucket_id] = 0
+    parameter_buckets["total"][bucket_id] = 1 + parameter_buckets["total"][bucket_id]
     if is_failed(test_results):
-        if bucket_id not in failed_bucketized:
-            failed_bucketized[bucket_id] = 0
-        failed_bucketized[bucket_id] = 1 + failed_bucketized[bucket_id]
+        if bucket_id not in parameter_buckets["failed"]:
+            parameter_buckets["failed"][bucket_id] = 0
+        parameter_buckets["failed"][bucket_id] = 1 + parameter_buckets["failed"][bucket_id]
 
-def compute_bucketized_summary(failed_bucketized, total_bucketized):
+def compute_bucketized_summary(parameter_buckets):
     """counts the number of buckets with failures and the total number of buckets
 
     returns (num-failed-buckets, total-failed-buckets)
     """
     failed_buckets_count = 0
     total_buckets_count = 0
-    for name in total_bucketized:
+    for name in parameter_buckets["total"]:
         total_buckets_count = 1 + total_buckets_count
-    for name in failed_bucketized:
+    for name in parameter_buckets["failed"]:
         failed_buckets_count = 1 + failed_buckets_count
     return failed_buckets_count, total_buckets_count
 
@@ -143,22 +143,36 @@ def compute_test_summary(test_dir):
     """
     total_runs = 0
     total_fails = 0
-    unique_test_run = {}
-    unique_test_failed = {}
+    unique_test = {
+        "total": {},
+        "failed": {}                
+    }
     total_by_test = {}
     fails_by_test = {}
     failed_k8s_by_test = {}
     failed_pg_by_test = {}
-    total_by_matrix = {}
-    failed_by_matrix = {}
-    total_by_k8s = {}
-    failed_by_k8s = {}
-    total_by_postgres = {}
-    failed_by_postgres = {}
+    by_matrix = {
+        "total": {},
+        "failed": {}        
+    }
+    by_k8s = {
+        "total": {},
+        "failed": {}        
+    }
+    by_postgres = {
+        "total": {},
+        "failed": {}
+    }
+    by_platform = {
+        "total": {},
+        "failed": {}
+    }
 
-    min_durations = {}
-    max_durations = {}
-    slowest_branches = {}
+    test_dutrations = {
+        "max": {},
+        "min": {},
+        "slowest_branch": {}
+    }
 
     dir_listing = os.listdir(test_dir)
     for f in dir_listing:
@@ -170,7 +184,7 @@ def compute_test_summary(test_dir):
             name = test_results["name"]
             if name not in total_by_test:
                 total_by_test[name] = 0
-            unique_test_run[name] = True
+            unique_test["total"][name] = True
             total_runs = 1 + total_runs
             total_by_test[name] = 1 + total_by_test[name]
             if is_failed(test_results):
@@ -180,26 +194,29 @@ def compute_test_summary(test_dir):
                     failed_k8s_by_test[name] = []
                 if name not in failed_pg_by_test:
                     failed_pg_by_test[name] = []
-                unique_test_failed[name] = True
+                unique_test["failed"][name] = True
                 fails_by_test[name] = 1 + fails_by_test[name]
                 total_fails = 1 + total_fails
                 failed_k8s_by_test[name].append(test_results["k8s_version"])
                 failed_pg_by_test[name].append(test_results["postgres_version"])
 
             ## bucketing by matrix ID
-            count_bucketized_stats(test_results, total_by_matrix, failed_by_matrix, "matrix_id")
+            count_bucketized_stats(test_results, by_matrix, "matrix_id")
 
             ## bucketing by k8s version
-            count_bucketized_stats(test_results, total_by_k8s, failed_by_k8s, "k8s_version")
+            count_bucketized_stats(test_results, by_k8s, "k8s_version")
 
             ## bucketing by postgres version
-            count_bucketized_stats(test_results, total_by_postgres, failed_by_postgres, "postgres_version")
+            count_bucketized_stats(test_results, by_postgres, "postgres_version")
 
-            track_time_taken(test_results, min_durations, max_durations, slowest_branches)
+            ## bucketing by platform
+            count_bucketized_stats(test_results, by_platform, "platform")
 
-    unique_failed, unique_run = compute_bucketized_summary(unique_test_failed, unique_test_run)
-    k8s_failed, k8s_run = compute_bucketized_summary(failed_by_k8s, total_by_k8s)
-    postgres_failed, postgres_run = compute_bucketized_summary(failed_by_postgres, total_by_postgres)
+            track_time_taken(test_results, test_dutrations)
+
+    unique_failed, unique_run = compute_bucketized_summary(unique_test)
+    k8s_failed, k8s_run = compute_bucketized_summary(by_k8s)
+    postgres_failed, postgres_run = compute_bucketized_summary(by_postgres)
 
     return {
         "total_run": total_runs,
@@ -208,21 +225,17 @@ def compute_test_summary(test_dir):
         "unique_failed": unique_failed,
         "failed_by_test": fails_by_test,
         "total_by_test": total_by_test,
-        "failed_by_matrix": failed_by_matrix,
-        "total_by_matrix": total_by_matrix,
+        "by_matrix": by_matrix,
         "failed_k8s_by_test": failed_k8s_by_test,
         "failed_pg_by_test": failed_pg_by_test,
-        "total_by_k8s": total_by_k8s,
-        "failed_by_k8s": failed_by_k8s,
+        "by_k8s": by_k8s,
         "k8s_run": k8s_run,
         "k8s_failed": k8s_failed,
-        "total_by_postgres": total_by_postgres,
-        "failed_by_postgres": failed_by_postgres,
+        "by_postgres": by_postgres,
         "postgres_run": postgres_run,
         "postgres_failed": postgres_failed,
-        "max_durations": max_durations,
-        "min_durations": min_durations,
-        "slowest_branches": slowest_branches,
+        "test_durations": test_dutrations,
+        "by_platform": by_platform,
     }
 
 
@@ -242,15 +255,22 @@ def format_overview(summary, structure):
         )
     print()
 
-def format_bucket_table(failed_buckets, all_buckets, structure):
-    """print metrics bucketed by matrix branch"""
+def format_bucket_table(buckets, structure):
+    """print table with bucketed metrics, sorted by decreasing amount of faiulres.
+
+    The structure argument contains the layout directives. E.g.
+    {
+        "title": "Failures by platform",
+        "header": ["failed tests", "total tests", "platform"],
+    }
+    """
     print("## " + structure["title"])
     print()
     print("|" + " | ".join(structure["header"]) + "|")
     print("|" + "|".join(["---"] * len(structure["header"])) + "|")
     sorted_by_fail = dict(
         sorted(
-            failed_buckets.items(), key=lambda item: item[1], reverse=True
+            buckets["failed"].items(), key=lambda item: item[1], reverse=True
         )
     )
 
@@ -258,15 +278,15 @@ def format_bucket_table(failed_buckets, all_buckets, structure):
         print(
             "| {failed} | {total} | {name} |".format(
                 name=bucket,
-                failed=failed_buckets[bucket],
-                total=all_buckets[bucket],
+                failed=buckets["failed"][bucket],
+                total=buckets["total"][bucket],
             )
         )
     print()
 
-
 def format_by_test(summary, structure):
-    """print metrics bucketed by test class"""
+    """print metrics bucketed by test class
+    """
     print("## " + structure["title"])
     print()
     print("|" + " | ".join(structure["header"]) + "|")
@@ -296,7 +316,7 @@ def format_duration(d):
             seconds = d.seconds % 60,
         )
 
-def format_durations_table(min_durations, max_durations, slowest_branches, structure):
+def format_durations_table(test_times, structure):
     """print the table of durations per test
     """
     print("<h2><a name=timing>" + structure["title"] + "</a></h2>")
@@ -305,7 +325,7 @@ def format_durations_table(min_durations, max_durations, slowest_branches, struc
     print("|" + "|".join(["---"] * len(structure["header"])) + "|")
     sorted_by_longest = dict(
         sorted(
-            max_durations.items(), key=lambda item: item[1], reverse=True
+            test_times["max"].items(), key=lambda item: item[1], reverse=True
         )
     )
 
@@ -313,9 +333,9 @@ def format_durations_table(min_durations, max_durations, slowest_branches, struc
         print(
             "| {longest} | {shortest} | {branch} | {name} |".format(
                 name=bucket,
-                longest=format_duration(max_durations[bucket]),
-                shortest=format_duration(min_durations[bucket]),
-                branch=slowest_branches[bucket]
+                longest=format_duration(test_times["max"][bucket]),
+                shortest=format_duration(test_times["min"][bucket]),
+                branch=test_times["slowest_branch"][bucket]
             )
         )
     print()
@@ -335,21 +355,28 @@ def format_test_failures(summary):
         "header": ["failed tests", "total tests", "matrix branch"],
     }
 
-    format_bucket_table(summary["failed_by_matrix"], summary["total_by_matrix"], by_matrix_section)
+    format_bucket_table(summary["by_matrix"], by_matrix_section)
 
     by_k8s_section = {
         "title": "Failures by kubernetes version",
         "header": ["failed tests", "total tests", "kubernetes version"],
     }
 
-    format_bucket_table(summary["failed_by_k8s"], summary["total_by_k8s"], by_k8s_section)
+    format_bucket_table(summary["by_k8s"], by_k8s_section)
 
     by_postgres_section = {
         "title": "Failures by postgres version",
         "header": ["failed tests", "total tests", "postgres version"],
     }
 
-    format_bucket_table(summary["failed_by_postgres"], summary["total_by_postgres"], by_postgres_section)
+    format_bucket_table(summary["by_postgres"], by_postgres_section)
+
+    by_platform_section = {
+        "title": "Failures by platform",
+        "header": ["failed tests", "total tests", "platform"],
+    }
+
+    format_bucket_table(summary["by_platform"], by_platform_section)
 
 def format_test_summary(summary):
     """creates a Markdown document with several tables rendering test results.
@@ -386,7 +413,7 @@ by test, bucketed by matrix branch, kubernetes, postgres…
         "header": ["longest taken", "shortest taken", "slowest branch", "test"],
     }
 
-    format_durations_table(summary["min_durations"], summary["max_durations"], summary["slowest_branches"], timing_section)
+    format_durations_table(summary["test_durations"], timing_section)
 
 
 if __name__ == "__main__":
