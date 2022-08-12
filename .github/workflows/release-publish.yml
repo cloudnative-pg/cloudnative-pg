@@ -26,7 +26,7 @@ jobs:
         name: Get tag
         run: |
           tag="${GITHUB_REF#refs/tags/v}"
-          version="{$tag#v}"
+          version="${tag#v}"
           file=$(echo ${version} | awk -F '[.]' '{print "release_notes/v"$1"."$2".md"}')
           echo "TAG=${tag}" >> $GITHUB_ENV
           echo "VERSION=${version}" >> $GITHUB_ENV
