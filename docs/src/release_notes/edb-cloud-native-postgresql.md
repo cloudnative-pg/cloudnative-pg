@@ -254,7 +254,7 @@ Features:
   instance manager, which removes the need to perform a rolling update of the
   entire cluster following an update of the operator. By default this option is
   disabled (please refer to the
-  [documentation for more detailed information](installation_upgrade.md#in-place-updates-of-the-instance-manager))
+  [documentation for more detailed information](../installation_upgrade.md#in-place-updates-of-the-instance-manager))
 - Limit the list of options that can be customized in the `initdb` bootstrap
   method to `dataChecksums`, `encoding`,  `localeCollate`, `localeCType`,
   `walSegmentSize`. This makes the `options` array obsolete and planned to be
