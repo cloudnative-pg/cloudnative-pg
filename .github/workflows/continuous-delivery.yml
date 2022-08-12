@@ -339,7 +339,7 @@ jobs:
           commit_short=$(git rev-parse --short "${commit_sha}")
           
           # extract branch name
-          if [ ${{ github.event_name }} != 'pull_request' ]
+          if [ ${{ github.event_name }} != 'pull_request' ] && [ ${{ github.event_name }} != 'pull_request_target' ]
           then
             echo "::set-output name=branch_name::${GITHUB_REF#refs/heads/}"
           else

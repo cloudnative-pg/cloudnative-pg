@@ -34,7 +34,7 @@ var _ = Describe("Release tag extraction", func() {
 })
 
 var _ = Describe("Most recent tag", func() {
-	It("properly works with release tag", func() {
+	It("properly works with release branch", func() {
 		wd, err := os.Getwd()
 		Expect(err).To(BeNil())
 		releasesDir := filepath.Join(filepath.Dir(filepath.Dir(wd)), "releases")
@@ -43,16 +43,20 @@ var _ = Describe("Most recent tag", func() {
 		if len(versionList) < 2 {
 			Skip("because we need two or more releases")
 		}
+		err = os.Setenv("BRANCH_NAME", "release/v"+versions.Version)
+		Expect(err).To(BeNil())
 		tag, err := GetMostRecentReleaseTag(releasesDir)
 		Expect(tag).To(Not(BeEmpty()))
 		Expect(tag).ToNot(BeEquivalentTo(versions.Version))
 		Expect(err).To(BeNil())
 	})
 
-	It("properly works with dev tag", func() {
+	It("properly works with dev branch", func() {
 		wd, err := os.Getwd()
 		Expect(err).To(BeNil())
 		releasesDir := filepath.Join(filepath.Dir(filepath.Dir(wd)), "releases")
+		err = os.Setenv("BRANCH_NAME", "dev/"+versions.Version)
+		Expect(err).To(BeNil())
 		tag, err := GetMostRecentReleaseTag(releasesDir)
 		Expect(tag).To(Not(BeEmpty()))
 		Expect(tag).To(BeEquivalentTo(versions.Version))
