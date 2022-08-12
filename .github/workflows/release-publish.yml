@@ -85,6 +85,12 @@ jobs:
           images="${images},ghcr.io/cloudnative-pg/cloudnative-pg-testing"
           commit_sha=${{ github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
+          skip_krew="false"
+          latest_release_branch=$(git branch -l 'release-*' | sort -r | head -n1 | sed -e 's/^.*\(release-.*\)/\1/')
+          current_release_branch=$(git branch --show-current | head -n1 | sed -e 's/^.*\(release-.*\)/\1/')
+          if [[ "$latest_release_branch" != "$current_release_branch" ]]; then
+            skip_krew="true"
+          fi
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
@@ -92,6 +98,7 @@ jobs:
           echo "::set-output name=date::${commit_date}"
           echo "::set-output name=version::${commit_version}"
           echo "::set-output name=commit::${commit_short}"
+          echo "::set-output name=skip_krew::${skip_krew}"
       -
         name: Import GPG key
         id: import_gpg
@@ -119,6 +126,7 @@ jobs:
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
       -
         name: Publish Krew
+        if: ${{ steps.build-meta.outputs.skip_krew == 'false' }}
         uses: rajatjindal/krew-release-bot@v0.0.43
         with:
           krew_template_file: dist/cnpg.yaml
