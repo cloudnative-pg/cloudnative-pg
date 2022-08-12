@@ -300,7 +300,8 @@ jobs:
       packages: write
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
-      cnpg_version: ${{ steps.build-meta.outputs.cnpg_version }}
+      branch_name: ${{ steps.build-meta.outputs.branch_name }}
+
     steps:
       -
         name: Checkout
@@ -336,14 +337,21 @@ jobs:
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
-          git_version_tag=$(git describe --tags --match 'v*')
+          
+          # extract branch name
+          if [ ${{ github.event_name }} != 'pull_request' ] && [ ${{ github.event_name }} != 'pull_request_target' ]
+          then
+            echo "::set-output name=branch_name::${GITHUB_REF#refs/heads/}"
+          else
+            echo "::set-output name=branch_name::${GITHUB_HEAD_REF}"
+          fi
+
           echo "::set-output name=images::${images}"
           echo "::set-output name=tags::${tags}"
           echo "::set-output name=labels::${labels}"
           echo "::set-output name=date::${commit_date}"
           echo "::set-output name=version::${commit_version}"
           echo "::set-output name=commit::${commit_short}"
-          echo "::set-output name=cnpg_version::${git_version_tag}"
       -
         name: Set GoReleaser environment
         run: |
@@ -506,7 +514,7 @@ jobs:
       MATRIX: ${{ matrix.id }}
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
-      CNPG_VERSION: ${{ needs.buildx.outputs.cnpg_version }}
+      BRANCH_NAME:  ${{ needs.buildx.outputs.branch_name }}
 
       DOCKER_SERVER: ghcr.io
       DOCKER_USERNAME: ${{ github.actor }}
