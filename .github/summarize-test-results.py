@@ -164,7 +164,7 @@ def compute_test_summary(test_dir):
         "by_k8s": by_k8s,
         "by_platform": by_platform,
         "by_postgres": by_postgres,
-        "test_durations": test_dutrations,
+        "test_durations": test_durations,
     }
     """
     total_runs = 0
@@ -192,7 +192,7 @@ def compute_test_summary(test_dir):
         "failed": {}
     }
 
-    test_dutrations = {
+    test_durations = {
         "max": {},
         "min": {},
         "slowest_branch": {}
@@ -223,7 +223,7 @@ def compute_test_summary(test_dir):
             ## bucketing by platform
             count_bucketized_stats(test_results, by_platform, "platform")
 
-            track_time_taken(test_results, test_dutrations)
+            track_time_taken(test_results, test_durations)
 
 
 
@@ -235,7 +235,7 @@ def compute_test_summary(test_dir):
         "by_k8s": by_k8s,
         "by_platform": by_platform,
         "by_postgres": by_postgres,
-        "test_durations": test_dutrations,
+        "test_durations": test_durations,
     }
 
 def compile_overview(summary):
@@ -262,7 +262,7 @@ def compile_overview(summary):
     }
 
 def format_overview(summary, structure):
-    """print unbucketed test metrics"""
+    """print general test metrics"""
     print("## " + structure["title"])
     print()
     print("|" + " | ".join(structure["header"]) + "|")
@@ -278,7 +278,7 @@ def format_overview(summary, structure):
     print()
 
 def format_bucket_table(buckets, structure):
-    """print table with bucketed metrics, sorted by decreasing amount of faiulres.
+    """print table with bucketed metrics, sorted by decreasing amount of failures.
 
     The structure argument contains the layout directives. E.g.
     {
@@ -417,27 +417,29 @@ def format_test_summary(summary):
     """
 
     print(
-        """Note that there are several tables below: overview, bucketed
-by several parameters, timings.
-""")
+        "Note that there are several tables below: overview, bucketed " +
+        "by several parameters, timings.")
+    print()
     if summary["total_failed"] != 0:
         print(
-            """Index: [timing table](#user-content-timing) | [by test](#user-content-by_test) |
- [by k8s](#user-content-by_k8s) | [by postgres](#user-content-by_postgres) |
- [by platform](#user-content-by_platform)
-""")
+            "**Index**: [timing table](#user-content-timing) | [by test](#user-content-by_test) | " +
+            "[by k8s](#user-content-by_k8s) | [by postgres](#user-content-by_postgres) | " +
+            "[by platform](#user-content-by_platform)")
+        print()
 
     overview = compile_overview(summary)
 
     overview_section = {
         "title": "Overview",
         "header": ["failed", "out of", ""],
-        "rows": [["test combinations", "total_failed", "total_run"],
-                ["unique tests", "unique_failed", "unique_run"],
-                ["matrix branches", "matrix_failed", "matrix_run"],
-                ["k8s versions", "k8s_failed", "k8s_run"],
-                ["postgres versions", "postgres_failed", "postgres_run"],
-                ["platforms", "platform_failed", "platform_run"]],
+        "rows": [
+            ["test combinations", "total_failed", "total_run"],
+            ["unique tests", "unique_failed", "unique_run"],
+            ["matrix branches", "matrix_failed", "matrix_run"],
+            ["k8s versions", "k8s_failed", "k8s_run"],
+            ["postgres versions", "postgres_failed", "postgres_run"],
+            ["platforms", "platform_failed", "platform_run"]
+        ],
     }
 
     format_overview(overview, overview_section)

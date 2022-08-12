@@ -80,7 +80,7 @@ var _ = Describe("InitDB settings", func() {
 					namespace,
 					primaryDst,
 					cmd))
-				Expect(err).To(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 			})
 			By("querying the App database tables via psql", func() {
 				cmd := "psql -U postgres app -tAc 'SELECT count(*) FROM application_numbers'"
