@@ -15,9 +15,11 @@
 #
 
 import re
+import pprint
 import urllib.request
 import json
 from packaging import version
+from subprocess import check_output
 
 min_supported_major = 10
 
@@ -26,20 +28,14 @@ pg_version_re = re.compile(r"^(\d+)(?:\.\d+|beta\d+|rc\d+|alpha\d+)(-\d+)?$")
 pg_versions_file = ".github/pg_versions.json"
 
 
-def get_token(repo_name):
-    token_url = "https://ghcr.io/token?scope=repository:{}:pull".format(repo_name)
-    req = urllib.request.Request(token_url)
-    data = urllib.request.urlopen(req).read()
-    token_json = json.loads(data.decode("utf-8"))
-    return token_json["token"]
-
-
 def get_json(repo_name):
-    token = get_token(repo_name)
-    repo_url = "https://ghcr.io/v2/{}/tags/list".format(repo_name)
-    req = urllib.request.Request(repo_url)
-    req.add_header("Authorization", "Bearer {}".format(token))
-    data = urllib.request.urlopen(req).read()
+    data = check_output([
+        "docker",
+        "run",
+        "--rm",
+        "quay.io/skopeo/stable",
+        "list-tags",
+        "docker://ghcr.io/{}".format(pg_repo_name)])
     repo_json = json.loads(data.decode("utf-8"))
     return repo_json
 
@@ -50,8 +46,7 @@ def is_pre_release(v):
 
 def write_json(repo_url, version_re, output_file):
     repo_json = get_json(repo_url)
-
-    tags = repo_json["tags"]
+    tags = repo_json["Tags"]
 
     # Filter out all the tags which do not match the version regexp
     tags = [item for item in tags if version_re.search(item)]
