@@ -43,8 +43,6 @@ var _ = Describe("Most recent tag", func() {
 		if len(versionList) < 2 {
 			Skip("because we need two or more releases")
 		}
-		err = os.Setenv("CNPG_VERSION", versions.Version)
-		Expect(err).To(BeNil())
 		tag, err := GetMostRecentReleaseTag(releasesDir)
 		Expect(tag).To(Not(BeEmpty()))
 		Expect(tag).ToNot(BeEquivalentTo(versions.Version))
@@ -55,24 +53,9 @@ var _ = Describe("Most recent tag", func() {
 		wd, err := os.Getwd()
 		Expect(err).To(BeNil())
 		releasesDir := filepath.Join(filepath.Dir(filepath.Dir(wd)), "releases")
-		err = os.Setenv("CNPG_VERSION", versions.Version+"-test")
-		Expect(err).To(BeNil())
 		tag, err := GetMostRecentReleaseTag(releasesDir)
 		Expect(tag).To(Not(BeEmpty()))
 		Expect(tag).To(BeEquivalentTo(versions.Version))
 		Expect(err).To(BeNil())
-	})
-})
-
-var _ = Describe("Dev tag version check", func() {
-	It("returns true when CNPG_VERSION contains a dev tag", func() {
-		err := os.Setenv("CNPG_VERSION", "100.9.1-test")
-		Expect(err).To(BeNil())
-		Expect(isDevTagVersion()).To(BeTrue())
-	})
-	It("returns false when CNPG_VERSION contains a release tag", func() {
-		err := os.Setenv("CNPG_VERSION", "100.9.1")
-		Expect(err).To(BeNil())
-		Expect(isDevTagVersion()).To(BeFalse())
 	})
 })

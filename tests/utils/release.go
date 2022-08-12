@@ -42,13 +42,15 @@ func GetMostRecentReleaseTag(releasesPath string) (string, error) {
 		return "", errors.New("could not find releases")
 	}
 
-	if len(versions) == 1 || isDevTagVersion() {
-		return versions[0].String(), nil
+	// if we're running on a release branch, we should get the previous version (if it
+	// has) to test upgrades from it
+	if len(versions) > 1 && isReleasePullRequestBranch() {
+		return versions[1].String(), nil
 	}
 
-	// if we're running on a release branch, we should get the previous version
-	// to test upgrades from it
-	return versions[1].String(), nil
+	// otherwise, we take for granted it's on a dev branch (or just one release available),
+	// so just return the latest release tag
+	return versions[0].String(), nil
 }
 
 // GetAvailableReleases retrieves all the available releases from
@@ -74,18 +76,16 @@ func GetAvailableReleases(releasesPath string) ([]*semver.Version, error) {
 	return versions, nil
 }
 
-func isDevTagVersion() bool {
-	currentTagVersion := os.Getenv("CNPG_VERSION")
-	if currentTagVersion == "" {
-		currentTagVersionBytes, err := exec.Command("git", "describe", "--tags", "--match", "v*").Output()
+func isReleasePullRequestBranch() bool {
+	branchName := os.Getenv("BRANCH_NAME")
+	if branchName == "" {
+		branchNameBytes, err := exec.Command("git", "branch", "--show-current").Output()
 		if err != nil {
-			return false
+			return true
 		}
-		currentTagVersion = string(currentTagVersionBytes)
+		branchName = string(branchNameBytes)
 	}
-
-	fragments := strings.Split(currentTagVersion, "-")
-	return len(fragments) > 1
+	return strings.HasPrefix(branchName, "release/v")
 }
 
 func extractTag(releaseFile string) string {
