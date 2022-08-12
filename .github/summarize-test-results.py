@@ -64,6 +64,15 @@ def is_failed(e2e_test):
         and e2e_test["state"] != "ignoreFailed"
     )
 
+def combine_postgres_data(test_entry):
+    """combines Postgres kind and version of the test artifact to
+    a single field called `pg_version`
+    """
+    test_entry["pg_version"] = "{pgkind}-{pgversion}".format(
+        pgkind = test_entry["postgres_kind"],
+        pgversion =  test_entry["postgres_version"])
+    return test_entry
+
 def track_time_taken(test_results, test_times):
     """computes the running shortest and longest duration of running each kind of test
     """
@@ -95,6 +104,25 @@ def track_time_taken(test_results, test_times):
         test_times["slowest_branch"][name] = matrix_id
     if duration < test_times["min"][name]:
         test_times["min"][name] = duration
+
+def count_bucketed_by_test(test_results, by_test):
+    """counts the successes, failures, failing versions of kubernetes,
+    failing versions of postgres, bucketed by test name.
+    """
+    name = test_results["name"]
+    if name not in by_test["total"]:
+        by_test["total"][name] = 0
+    by_test["total"][name] = 1 + by_test["total"][name]
+    if is_failed(test_results):
+        if name not in by_test["failed"]:
+            by_test["failed"][name] = 0
+        if name not in by_test["k8s_versions_failed"]:
+            by_test["k8s_versions_failed"][name] = {}
+        if name not in by_test["pg_versions_failed"]:
+            by_test["pg_versions_failed"][name] = {}
+        by_test["failed"][name] = 1 + by_test["failed"][name]
+        by_test["k8s_versions_failed"][name][test_results["k8s_version"]] = True
+        by_test["pg_versions_failed"][name][test_results["pg_version"]] = True
 
 def count_bucketized_stats(test_results, parameter_buckets, field_id):
     """counts the success/failures onto a bucket. This means there are two
@@ -141,10 +169,6 @@ def compute_test_summary(test_dir):
     """
     total_runs = 0
     total_fails = 0
-    unique_test = {
-        "total": {},
-        "failed": {}                
-    }
     by_test = {
         "total": {},
         "failed": {},
@@ -153,11 +177,11 @@ def compute_test_summary(test_dir):
     }
     by_matrix = {
         "total": {},
-        "failed": {}        
+        "failed": {}
     }
     by_k8s = {
         "total": {},
-        "failed": {}        
+        "failed": {}
     }
     by_postgres = {
         "total": {},
@@ -178,27 +202,14 @@ def compute_test_summary(test_dir):
     for f in dir_listing:
         path = os.path.join(test_dir, f)
         with open(path) as json_file:
-            test_results = json.load(json_file)
+            test_results = combine_postgres_data(json.load(json_file))
+
+            total_runs = 1 + total_runs
+            if is_failed(test_results):
+                total_fails = 1 + total_fails
 
             ## bucketing by test name
-            name = test_results["name"]
-            if name not in by_test["total"]:
-                by_test["total"][name] = 0
-            unique_test["total"][name] = True
-            total_runs = 1 + total_runs
-            by_test["total"][name] = 1 + by_test["total"][name]
-            if is_failed(test_results):
-                if name not in by_test["failed"]:
-                    by_test["failed"][name] = 0
-                if name not in by_test["k8s_versions_failed"]:
-                    by_test["k8s_versions_failed"][name] = {}
-                if name not in by_test["pg_versions_failed"]:
-                    by_test["pg_versions_failed"][name] = {}
-                unique_test["failed"][name] = True
-                by_test["failed"][name] = 1 + by_test["failed"][name]
-                total_fails = 1 + total_fails
-                by_test["k8s_versions_failed"][name][test_results["k8s_version"]] = True
-                by_test["pg_versions_failed"][name][test_results["postgres_version"]] = True
+            count_bucketed_by_test(test_results, by_test)
 
             ## bucketing by matrix ID
             count_bucketized_stats(test_results, by_matrix, "matrix_id")
@@ -207,7 +218,7 @@ def compute_test_summary(test_dir):
             count_bucketized_stats(test_results, by_k8s, "k8s_version")
 
             ## bucketing by postgres version
-            count_bucketized_stats(test_results, by_postgres, "postgres_version")
+            count_bucketized_stats(test_results, by_postgres, "pg_version")
 
             ## bucketing by platform
             count_bucketized_stats(test_results, by_platform, "platform")
@@ -412,7 +423,8 @@ by several parameters, timings.
     if summary["total_failed"] != 0:
         print(
             """Index: [timing table](#user-content-timing) | [by test](#user-content-by_test) |
-  [by k8s](#user-content-by_k8s) | [by postgres](#user-content-by_postgres) |  [by platform](#user-content-by_platform)
+ [by k8s](#user-content-by_k8s) | [by postgres](#user-content-by_postgres) |
+ [by platform](#user-content-by_platform)
 """)
 
     overview = compile_overview(summary)
