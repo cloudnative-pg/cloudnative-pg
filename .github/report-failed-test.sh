@@ -88,7 +88,7 @@ function failure_summary {
       echo "-----"
     done < <(jq -c -f "${filter_file}" $ff)
   done
-  printf "${highlight_color}%d ${summary}\n\n" ${cnt}
+  printf "${highlight_color}%d ${summary}\n\n" "${cnt}"
   echo "------------------------------"
   echo
 }
