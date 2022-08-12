@@ -568,7 +568,7 @@ Name           | Description                                                    
 `server        ` | LDAP hostname or IP address                                     | string                                    
 `port          ` | LDAP server port                                                | int                                       
 `scheme        ` | LDAP schema to be used, possible options are `ldap` and `ldaps` | LDAPScheme                                
-`tls           ` | Set to true to enable LDAP over TLS. false is default           | bool                                      
+`tls           ` | Set to `true` to enable LDAP over TLS. `false` is default       | bool                                      
 `bindAsAuth    ` | Bind as authentication configuration                            | [*LDAPBindAsAuth](#LDAPBindAsAuth)        
 `bindSearchAuth` | Bind+Search authentication configuration                        | [*LDAPBindSearchAuth](#LDAPBindSearchAuth)
 
