@@ -151,7 +151,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 lint: ## Run the linter.
-	golangci-lint run
+	golangci-lint run --timeout 10m0s
 
 shellcheck: ## Shellcheck for the hack directory.
 	@{ \
