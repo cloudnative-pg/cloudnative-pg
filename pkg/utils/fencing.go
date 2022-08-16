@@ -21,9 +21,9 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 
 var (
