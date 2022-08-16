@@ -32,7 +32,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Cluster setup", func() {
+var _ = FDescribe("Cluster setup", func() {
 	const (
 		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml"
 		clusterName = "postgresql-storage-class"
