@@ -132,7 +132,7 @@ var _ = Describe("Cluster setup", func() {
 	})
 
 	It("tests cluster readiness conditions work", func() {
-		namespace = "cluster-conditions"
+		const namespace = "cluster-conditions"
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 
