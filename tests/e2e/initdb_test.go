@@ -43,8 +43,8 @@ var _ = Describe("InitDB settings", func() {
 
 	Context("initdb custom post-init SQL scripts", func() {
 		const (
-			clusterName        = "p-postinit-sql"
-		    postInitSQLCluster = fixturesCertificatesDir + "/cluster-postinit-sql.yaml.template"
+			clusterName             = "p-postinit-sql"
+			postInitSQLCluster      = fixturesCertificatesDir + "/cluster-postinit-sql.yaml.template"
 			postInitSQLSecretRef    = fixturesCertificatesDir + "/cluster_post_init_secret.yaml"
 			postInitSQLConfigMapRef = fixturesCertificatesDir + "/cluster_post_init_configmap.yaml"
 		)

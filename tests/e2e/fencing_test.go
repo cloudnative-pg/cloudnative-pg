@@ -112,7 +112,6 @@ var _ = Describe("Fencing", func() {
 		By("checking the cluster has the expected annotation set", func() {
 			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(cluster.Annotations).NotTo(BeNil())
 			if len(content) == 0 {
 				Expect(cluster.Annotations).To(Or(Not(HaveKey(utils.FencedInstanceAnnotation)),
 					HaveKeyWithValue(utils.FencedInstanceAnnotation, "")))
@@ -133,7 +132,7 @@ var _ = Describe("Fencing", func() {
 				Expect(err).ToNot(HaveOccurred())
 				beforeFencingPodName = primaryPod.GetName()
 				Expect(testUtils.FencingOn(env, beforeFencingPodName,
-					namespace, clusterName, fencingMethod)).ToNot(HaveOccurred())
+					namespace, clusterName, fencingMethod)).Should(Succeed())
 			})
 			By("check the instance is not ready, but kept as primary instance", func() {
 				checkInstanceStatusReadyOrNot(beforeFencingPodName, namespace, false)

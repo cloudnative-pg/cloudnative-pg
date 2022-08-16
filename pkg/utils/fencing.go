@@ -22,6 +22,8 @@ import (
 	"sort"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -70,9 +72,9 @@ func GetFencedInstances(annotations map[string]string) (*stringset.Data, error) 
 }
 
 // SetFencedInstances sets the list of fenced servers inside the annotations
-func SetFencedInstances(annotations map[string]string, data *stringset.Data) error {
+func SetFencedInstances(object *metav1.ObjectMeta, data *stringset.Data) error {
 	if data.Len() == 0 {
-		delete(annotations, FencedInstanceAnnotation)
+		delete(object.Annotations, FencedInstanceAnnotation)
 		return nil
 	}
 
@@ -83,15 +85,18 @@ func SetFencedInstances(annotations map[string]string, data *stringset.Data) err
 	if err != nil {
 		return err
 	}
-	annotations[FencedInstanceAnnotation] = string(annotationValue)
+	if object.Annotations == nil {
+		object.Annotations = make(map[string]string)
+	}
+	object.Annotations[FencedInstanceAnnotation] = string(annotationValue)
 
 	return nil
 }
 
 // AddFencedInstance adds the given server name to the FencedInstanceAnnotation annotation
 // returns an error if the instance was already fenced
-func AddFencedInstance(serverName string, annotations map[string]string) error {
-	fencedInstances, err := GetFencedInstances(annotations)
+func AddFencedInstance(serverName string, object *metav1.ObjectMeta) error {
+	fencedInstances, err := GetFencedInstances(object.Annotations)
 	if err != nil {
 		return err
 	}
@@ -109,7 +114,7 @@ func AddFencedInstance(serverName string, annotations map[string]string) error {
 		fencedInstances.Put(serverName)
 	}
 
-	if err := SetFencedInstances(annotations, fencedInstances); err != nil {
+	if err := SetFencedInstances(object, fencedInstances); err != nil {
 		return err
 	}
 
@@ -118,12 +123,12 @@ func AddFencedInstance(serverName string, annotations map[string]string) error {
 
 // RemoveFencedInstance removes the given server name from the FencedInstanceAnnotation annotation
 // returns an error if the instance was already unfenced
-func RemoveFencedInstance(serverName string, annotations map[string]string) error {
+func RemoveFencedInstance(serverName string, object *metav1.ObjectMeta) error {
 	if serverName == FenceAllServers {
-		return SetFencedInstances(annotations, stringset.New())
+		return SetFencedInstances(object, stringset.New())
 	}
 
-	fencedInstances, err := GetFencedInstances(annotations)
+	fencedInstances, err := GetFencedInstances(object.Annotations)
 	if err != nil {
 		return err
 	}
@@ -137,5 +142,5 @@ func RemoveFencedInstance(serverName string, annotations map[string]string) erro
 	}
 
 	fencedInstances.Delete(serverName)
-	return SetFencedInstances(annotations, fencedInstances)
+	return SetFencedInstances(object, fencedInstances)
 }
