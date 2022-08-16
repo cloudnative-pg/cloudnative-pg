@@ -1,8 +1,6 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  annotations:
-    env: "test"
   name: postgresql-storage-class
 spec:
   instances: 3

@@ -174,7 +174,9 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 }
 
 // AssertCreateCluster creates the cluster and verifies that the ready pods
-// correspond to the number of Instances in the cluster spec
+// correspond to the number of Instances in the cluster spec.
+// Important: this is not equivalent to "kubectl apply", and is not able
+// to apply a patch to an existing object.
 func AssertCreateCluster(namespace string, clusterName string, sampleFile string, env *testsUtils.TestingEnvironment) {
 	By(fmt.Sprintf("having a %v namespace", namespace), func() {
 		// Creating a namespace should be quick
