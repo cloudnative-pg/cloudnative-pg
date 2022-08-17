@@ -657,7 +657,7 @@ type LDAPConfig struct {
 	// +kubebuilder:validation:Enum=ldap;ldaps
 	Scheme LDAPScheme `json:"scheme,omitempty"`
 
-	// Set to 1 to enable LDAP over TLS
+	// Set to 'true' to enable LDAP over TLS. 'false' is default
 	TLS bool `json:"tls,omitempty"`
 
 	// Bind as authentication configuration
