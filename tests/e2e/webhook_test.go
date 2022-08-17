@@ -39,7 +39,7 @@ affected.
 var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive), Ordered, func() {
 	// Define some constants to be used in the test
 	const (
-		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml"
+		sampleFile        = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		operatorNamespace = "cnpg-system"
 		level             = tests.Highest
 		mutatingWebhook   = "mcluster.kb.io"

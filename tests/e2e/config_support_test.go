@@ -33,7 +33,7 @@ import (
 // the upgrades (especially in OLM installation like OpenShift).
 var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive), func() {
 	const (
-		clusterWithInheritedLabelsFile = fixturesDir + "/configmap-support/config-support.yaml"
+		clusterWithInheritedLabelsFile = fixturesDir + "/configmap-support/config-support.yaml.template"
 		configMapFile                  = fixturesDir + "/configmap-support/configmap.yaml"
 		secretFile                     = fixturesDir + "/configmap-support/secret.yaml"
 		configName                     = "cnpg-controller-manager-config"

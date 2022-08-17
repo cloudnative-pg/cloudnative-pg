@@ -32,7 +32,7 @@ import (
 
 var _ = Describe("PGBouncer Types", Ordered, func() {
 	const (
-		sampleFile                    = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml"
+		sampleFile                    = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml.template"
 		poolerCertificateRWSampleFile = fixturesDir + "/pgbouncer/pgbouncer_types/pgbouncer-pooler-rw.yaml"
 		poolerCertificateROSampleFile = fixturesDir + "/pgbouncer/pgbouncer_types/pgbouncer-pooler-ro.yaml"
 		level                         = tests.Low

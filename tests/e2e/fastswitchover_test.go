@@ -37,7 +37,7 @@ import (
 var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func() {
 	const (
 		namespace   = "primary-switchover-time"
-		sampleFile  = fixturesDir + "/fastswitchover/cluster-fast-switchover.yaml"
+		sampleFile  = fixturesDir + "/fastswitchover/cluster-fast-switchover.yaml.template"
 		webTestFile = fixturesDir + "/fastswitchover/webtest.yaml"
 		webTestJob  = fixturesDir + "/fastswitchover/apache-benchmark-webtest.yaml"
 		clusterName = "cluster-fast-switchover"

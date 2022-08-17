@@ -84,7 +84,8 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// own namespace, they can share the configuration file
 
 		const (
-			clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-with-wal-max-parallel.yaml"
+			clusterWithMinioSampleFile = fixturesDir +
+				"/backup/minio/cluster-with-backup-minio-with-wal-max-parallel.yaml.template"
 		)
 
 		namespace = "pg-backup-minio-wal-max-parallel"

@@ -33,7 +33,7 @@ import (
 var _ = Describe("Cluster setup", func() {
 	const (
 		namespace   = "cluster-storageclass-e2e"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml"
+		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		clusterName = "postgresql-storage-class"
 		level       = tests.Highest
 	)
