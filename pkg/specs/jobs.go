@@ -18,6 +18,7 @@ package specs
 
 import (
 	"fmt"
+	"path"
 
 	"github.com/kballard/go-shellquote"
 	batchv1 "k8s.io/api/batch/v1"
@@ -73,6 +74,8 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 			"--app-db-name", cluster.Spec.Bootstrap.InitDB.Database,
 			"--app-user", cluster.Spec.Bootstrap.InitDB.Owner)
 	}
+
+	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
 		return createPrimaryJob(cluster, nodeSerial, "import", initCommand)
@@ -136,6 +139,8 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 		"restore",
 	}
 
+	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
+
 	job := createPrimaryJob(cluster, nodeSerial, "full-recovery", initCommand)
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
@@ -175,6 +180,8 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *bat
 		"pgbasebackup",
 	}
 
+	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
+
 	return createPrimaryJob(cluster, nodeSerial, "pgbasebackup", initCommand)
 }
 
@@ -187,7 +194,19 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 		"--parent-node", cluster.GetServiceReadWriteName(),
 	}
 
+	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
+
 	return createPrimaryJob(cluster, nodeSerial, "join", initCommand)
+}
+
+func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
+	var flags []string
+
+	if cluster.ShouldCreateWalArchiveVolume() {
+		flags = append(flags, "--pg-wal", path.Join(pgWalVolumePath, "/pg_wal"))
+	}
+
+	return flags
 }
 
 // createPrimaryJob create a job that executes the provided command.

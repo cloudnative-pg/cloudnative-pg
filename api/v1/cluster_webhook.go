@@ -19,6 +19,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -279,7 +280,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validatePrimaryUpdateStrategy,
 		r.validateMinSyncReplicas,
 		r.validateMaxSyncReplicas,
-		r.validateStorageSize,
+		r.validateWalStorageSize,
 		r.validateName,
 		r.validateBootstrapPgBaseBackupSource,
 		r.validateBootstrapRecoverySource,
@@ -333,6 +334,7 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 	allErrs = append(allErrs, r.validateImageChange(old.Spec.ImageName)...)
 	allErrs = append(allErrs, r.validateConfigurationChange(old)...)
 	allErrs = append(allErrs, r.validateStorageChange(old)...)
+	allErrs = append(allErrs, r.validateWalStorageChange(old)...)
 	allErrs = append(allErrs, r.validateReplicaModeChange(old)...)
 	allErrs = append(allErrs, r.validateUnixPermissionIdentifierChange(old)...)
 	return allErrs
@@ -1087,15 +1089,23 @@ func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
 	return result
 }
 
-// Validate if the storage size is a parsable quantity
-func (r *Cluster) validateStorageSize() field.ErrorList {
+func (r *Cluster) validateWalStorageSize() field.ErrorList {
 	var result field.ErrorList
 
-	_, err := resource.ParseQuantity(r.Spec.StorageConfiguration.Size)
-	if err != nil {
+	if r.ShouldCreateWalArchiveVolume() {
+		result = append(result, validateStorageConfigurationSize("walStorage", *r.Spec.WalStorage)...)
+	}
+
+	return result
+}
+
+func validateStorageConfigurationSize(structPath string, storageConfiguration StorageConfiguration) field.ErrorList {
+	var result field.ErrorList
+
+	if _, err := resource.ParseQuantity(storageConfiguration.Size); err != nil {
 		result = append(result, field.Invalid(
-			field.NewPath("spec", "storage", "size"),
-			r.Spec.StorageConfiguration.Size,
+			field.NewPath("spec", structPath, "size"),
+			storageConfiguration.Size,
 			"Size value isn't valid"))
 	}
 
@@ -1106,27 +1116,60 @@ func (r *Cluster) validateStorageSize() field.ErrorList {
 func (r *Cluster) validateStorageChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
 
-	oldSize, err := resource.ParseQuantity(old.Spec.StorageConfiguration.Size)
+	return append(
+		result,
+		validateStorageConfigurationChange(
+			"storage",
+			old.Spec.StorageConfiguration,
+			r.Spec.StorageConfiguration,
+		)...,
+	)
+}
+
+func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
+	var result field.ErrorList
+
+	if !reflect.DeepEqual(old.Spec.WalStorage, r.Spec.WalStorage) {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "walStorage"),
+			r.Spec.WalStorage,
+			"cannot change walStorage parameter after initialization"),
+		)
+	}
+
+	return result
+}
+
+// validateStorageConfigurationChange generates an error list by comparing two StorageConfiguration
+func validateStorageConfigurationChange(
+	structPath string,
+	oldStorage StorageConfiguration,
+	newStorage StorageConfiguration,
+) field.ErrorList {
+	var result field.ErrorList
+
+	oldSize, err := resource.ParseQuantity(oldStorage.Size)
 	if err != nil {
 		// Can't read the old size, so can't tell if the new size is greater
 		// or less
 		return result
 	}
 
-	result = append(result, r.validateStorageSize()...)
+	result = append(result, validateStorageConfigurationSize(structPath, newStorage)...)
 	if len(result) != 0 {
 		return result
 	}
-	newSize, _ := resource.ParseQuantity(r.Spec.StorageConfiguration.Size)
+
+	newSize, _ := resource.ParseQuantity(newStorage.Size)
 
 	if oldSize.AsDec().Cmp(newSize.AsDec()) == 1 {
 		result = append(result, field.Invalid(
-			field.NewPath("spec", "storage", "size"),
-			r.Spec.StorageConfiguration.Size,
+			field.NewPath("spec", structPath, "size"),
+			newStorage.Size,
 			fmt.Sprintf(
 				"can't shrink existing storage from %v to %v",
-				old.Spec.StorageConfiguration.Size,
-				r.Spec.StorageConfiguration.Size)))
+				oldStorage.Size,
+				newStorage.Size)))
 	}
 
 	return result

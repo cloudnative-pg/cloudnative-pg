@@ -35,6 +35,7 @@ import (
 // NewCmd creates the new "join" command
 func NewCmd() *cobra.Command {
 	var pgData string
+	var pgWal string
 	var parentNode string
 	var podName string
 	var clusterName string
@@ -55,6 +56,7 @@ func NewCmd() *cobra.Command {
 
 			info := postgres.InitInfo{
 				PgData:     pgData,
+				PgWal:      pgWal,
 				ParentNode: parentNode,
 				PodName:    podName,
 			}
@@ -64,6 +66,7 @@ func NewCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
+	cmd.Flags().StringVar(&pgWal, "pg-wal", "", "the PGWAL to be created")
 	cmd.Flags().StringVar(&parentNode, "parent-node", "", "The origin node")
 	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of this pod, to "+
 		"be checked against the cluster state")

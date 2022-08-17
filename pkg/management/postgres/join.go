@@ -27,7 +27,7 @@ import (
 
 // ClonePgData clones an existing server, given its connection string,
 // to a certain data directory
-func ClonePgData(connectionString, targetPgData string) error {
+func ClonePgData(connectionString, targetPgData, walDir string) error {
 	// To initiate streaming replication, the frontend sends the replication parameter
 	// in the startup message. A Boolean value of true (or on, yes, 1) tells the backend
 	// to go into physical replication walsender mode, wherein a small set of replication
@@ -55,6 +55,11 @@ func ClonePgData(connectionString, targetPgData string) error {
 		"-w",
 		"-d", connectionString,
 	}
+
+	if walDir != "" {
+		options = append(options, "--waldir", walDir)
+	}
+
 	pgBaseBackupCmd := exec.Command(pgBaseBackupName, options...) // #nosec
 	err = execlog.RunStreaming(pgBaseBackupCmd, pgBaseBackupName)
 	if err != nil {
@@ -68,7 +73,7 @@ func ClonePgData(connectionString, targetPgData string) error {
 func (info InitInfo) Join() error {
 	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
 
-	err := ClonePgData(primaryConnInfo, info.PgData)
+	err := ClonePgData(primaryConnInfo, info.PgData, info.PgWal)
 	if err != nil {
 		return err
 	}
