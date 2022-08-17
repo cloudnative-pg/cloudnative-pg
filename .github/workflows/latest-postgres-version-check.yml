@@ -1,3 +1,6 @@
+# This workflow schedules daily jobs (00:30:00 UTC) to check the latest postgres versions from
+# `cloudnative-pg/postgresql` ... if there's a latest postgres version detected, then a PR will be created for proposing
+# to update the `DefaultImageName` in code and version references in docs.
 name: latest-postgres-version-check
 
 on:

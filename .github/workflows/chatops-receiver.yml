@@ -1,3 +1,6 @@
+# This workflow listens repository_dispatch events of type `test-command` which is triggered by `/test` issued in
+# a PR comment. Once received, it triggers a `workflow_dispatch` event on `continuous-delivery` workflow, so to run the
+# E2E test per the PR, and turn in the link of the E2E test to the comment.
 name: slash-command-receiver
 
 on:

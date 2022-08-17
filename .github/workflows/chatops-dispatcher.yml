@@ -1,3 +1,9 @@
+# This workflow listens comment creation events, and if the comment is from a PR AND
+#     if the comment starts with "/test", it will issue `test` command to be listened by `chatops-receiver` so that
+#         then trigger `continuous-delivery` workflow to run a full-scale E2E test
+#     if the comment starts with "/ok-to-merge", it will label the PR with "ok to merge :ok_hand:"
+#     if the comment starts with "/ready-to-test", it will label the PR with "ready to test :elephant:" if the label
+#         does not already exist or remove the label "ready to test :elephant:" if it already exists.
 name: slash-command-dispatcher
 
 on:

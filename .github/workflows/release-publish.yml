@@ -1,5 +1,5 @@
-# When a release tag is pushed, create and publish operator images on Quay and
-# Docker. Then generate a release on GitHub.
+# When a release tag is pushed, create and publish operator images on GitHub Registry.
+# Then generate a release on GitHub.
 name: release-publish
 
 on:
