@@ -69,11 +69,13 @@ type PVCUsageStatus struct {
 func CreatePVC(
 	storageConfiguration apiv1.StorageConfiguration,
 	cluster apiv1.Cluster,
-	suffix string,
 	nodeSerial int,
 	role utils.PVCRole,
 ) (*corev1.PersistentVolumeClaim, error) {
-	pvcName := fmt.Sprintf("%s-%v%s", cluster.Name, nodeSerial, suffix)
+	pvcName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	if role == utils.PVCRolePgWal {
+		pvcName += cluster.GetWalArchiveVolumeSuffix()
+	}
 
 	result := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{

@@ -900,7 +900,6 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	if err := r.createPVC(
 		ctx,
 		cluster,
-		"",
 		cluster.Spec.StorageConfiguration,
 		nodeSerial,
 		utils.PVCRolePgData,
@@ -912,7 +911,6 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		if err := r.createPVC(
 			ctx,
 			cluster,
-			cluster.GetWalArchiveVolumeSuffix(),
 			*cluster.Spec.WalStorage,
 			nodeSerial,
 			utils.PVCRolePgWal,
@@ -1079,7 +1077,6 @@ func (r *ClusterReconciler) joinReplicaInstance(
 	if err := r.createPVC(
 		ctx,
 		cluster,
-		"",
 		cluster.Spec.StorageConfiguration,
 		nodeSerial,
 		utils.PVCRolePgData,
@@ -1091,7 +1088,6 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		if err := r.createPVC(
 			ctx,
 			cluster,
-			cluster.GetWalArchiveVolumeSuffix(),
 			*cluster.Spec.WalStorage,
 			nodeSerial,
 			utils.PVCRolePgWal,
@@ -1264,19 +1260,18 @@ func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *api
 func (r *ClusterReconciler) createPVC(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	suffix string,
 	storageConfiguration apiv1.StorageConfiguration,
 	nodeSerial int,
 	role utils.PVCRole,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvc, err := specs.CreatePVC(storageConfiguration, *cluster, suffix, nodeSerial, role)
+	pvc, err := specs.CreatePVC(storageConfiguration, *cluster, nodeSerial, role)
 	if err != nil {
 		if err == specs.ErrorInvalidSize {
 			// This error should have been caught by the validating
 			// webhook, but since we are here the user must have disabled server-side
-			// validation and we must react.
+			// validation, and we must react.
 			contextLogger.Info("The size specified for the cluster is not valid",
 				"size",
 				storageConfiguration.Size)

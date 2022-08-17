@@ -325,15 +325,16 @@ func GetDirectoryContent(dir string) (files []string, err error) {
 // the source files to the destination. Once this is done it deletes the files from the original location.
 func MoveDirectoryContent(sourceDirectory, destinationDirectory string) error {
 	var err error
+	var names []string
 
 	// if something fails we remove any copied files if they exist
 	defer func() {
 		if err != nil {
-			_ = RemoveFile(destinationDirectory)
+			_ = RemoveDirectoryContent(destinationDirectory)
 		}
 	}()
 
-	names, err := GetDirectoryContent(sourceDirectory)
+	names, err = GetDirectoryContent(sourceDirectory)
 	if err != nil {
 		return err
 	}
