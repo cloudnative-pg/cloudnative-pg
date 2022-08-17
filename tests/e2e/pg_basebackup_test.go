@@ -30,9 +30,9 @@ import (
 var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 	const (
 		namespace      = "cluster-pg-basebackup-basic-auth"
-		srcCluster     = fixturesDir + "/pg_basebackup/cluster-src.yaml"
+		srcCluster     = fixturesDir + "/pg_basebackup/cluster-src.yaml.template"
 		srcClusterName = "pg-basebackup-src"
-		dstCluster     = fixturesDir + "/pg_basebackup/cluster-dst-basic-auth.yaml"
+		dstCluster     = fixturesDir + "/pg_basebackup/cluster-dst-basic-auth.yaml.template"
 		dstClusterName = "pg-basebackup-dst-basic-auth"
 		checkQuery     = "psql -U postgres app -tAc 'SELECT count(*) FROM to_bootstrap'"
 		level          = tests.High
@@ -106,10 +106,10 @@ var _ = Describe("Bootstrap with pg_basebackup using basic auth", func() {
 var _ = Describe("Bootstrap with pg_basebackup using TLS auth", func() {
 	const namespace = "cluster-pg-basebackup-tls-auth"
 
-	const srcCluster = fixturesDir + "/pg_basebackup/cluster-src.yaml"
+	const srcCluster = fixturesDir + "/pg_basebackup/cluster-src.yaml.template"
 	const srcClusterName = "pg-basebackup-src"
 
-	const dstCluster = fixturesDir + "/pg_basebackup/cluster-dst-tls.yaml"
+	const dstCluster = fixturesDir + "/pg_basebackup/cluster-dst-tls.yaml.template"
 	const dstClusterName = "pg-basebackup-dst-tls-auth"
 
 	const checkQuery = "psql -U postgres app -tAc 'SELECT count(*) FROM to_bootstrap'"

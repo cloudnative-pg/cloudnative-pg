@@ -35,7 +35,7 @@ var _ = Describe("Replica Mode", func() {
 	const (
 		replicaModeClusterDir = "/replica_mode_cluster/"
 		srcClusterName        = "cluster-replica-src"
-		srcClusterSample      = fixturesDir + replicaModeClusterDir + srcClusterName + ".yaml"
+		srcClusterSample      = fixturesDir + replicaModeClusterDir + srcClusterName + ".yaml.template"
 		checkQuery            = "SELECT count(*) FROM test_replica"
 		level                 = tests.Medium
 	)
@@ -65,7 +65,7 @@ var _ = Describe("Replica Mode", func() {
 	})
 
 	Context("can bootstrap a replica cluster using TLS auth", func() {
-		const replicaClusterSampleTLS = fixturesDir + replicaModeClusterDir + "cluster-replica-tls.yaml"
+		const replicaClusterSampleTLS = fixturesDir + replicaModeClusterDir + "cluster-replica-tls.yaml.template"
 
 		It("should work", func() {
 			replicaNamespace = "replica-mode-tls-auth"
@@ -78,7 +78,7 @@ var _ = Describe("Replica Mode", func() {
 	})
 
 	Context("can bootstrap a replica cluster using basic auth", func() {
-		const replicaClusterSampleBasicAuth = fixturesDir + replicaModeClusterDir + "cluster-replica-basicauth.yaml"
+		const replicaClusterSampleBasicAuth = fixturesDir + replicaModeClusterDir + "cluster-replica-basicauth.yaml.template"
 
 		var primaryReplicaCluster *corev1.Pod
 		var err error
@@ -137,7 +137,8 @@ var _ = Describe("Replica Mode", func() {
 
 	Context("archive mode set to 'always' on designated primary", func() {
 		It("verify replica cluster can archive WALs from the designated primary", func() {
-			const replicaClusterSample = fixturesDir + replicaModeClusterDir + "cluster-replica-archive-mode-always.yaml"
+			const replicaClusterSample = fixturesDir + replicaModeClusterDir +
+				"cluster-replica-archive-mode-always.yaml.template"
 
 			replicaNamespace = "replica-mode-archive"
 			err := env.CreateNamespace(replicaNamespace)

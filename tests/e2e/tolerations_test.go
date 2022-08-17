@@ -32,7 +32,7 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive), f
 	var taintedNodes []string
 	namespace := "test-tolerations"
 	const (
-		sampleFile    = fixturesDir + "/tolerations/cluster-tolerations.yaml"
+		sampleFile    = fixturesDir + "/tolerations/cluster-tolerations.yaml.template"
 		clusterName   = "cluster-tolerations"
 		tolerationKey = "test-tolerations"
 		level         = tests.Lowest

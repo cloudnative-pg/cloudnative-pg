@@ -25,7 +25,7 @@ import (
 
 var _ = Describe("PGBouncer Connections", func() {
 	const (
-		sampleFile                    = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml"
+		sampleFile                    = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml.template"
 		poolerBasicAuthRWSampleFile   = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-rw.yaml"
 		poolerCertificateRWSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-tls-rw.yaml"
 		poolerBasicAuthROSampleFile   = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-ro.yaml"
@@ -143,7 +143,7 @@ var _ = Describe("PGBouncer Connections", func() {
 		It("can connect to Postgres via pgbouncer using different client and server CA", func() {
 			const (
 				folderPath                    = fixturesDir + "/pgbouncer/pgbouncer_separate_client_server_ca/"
-				sampleFileWithCertificate     = folderPath + "cluster-user-supplied-client-server-certificates.yaml"
+				sampleFileWithCertificate     = folderPath + "cluster-user-supplied-client-server-certificates.yaml.template"
 				poolerCertificateROSampleFile = folderPath + "pgbouncer-pooler-tls-ro.yaml"
 				poolerCertificateRWSampleFile = folderPath + "pgbouncer-pooler-tls-rw.yaml"
 				caSecName                     = "my-postgresql-server-ca"

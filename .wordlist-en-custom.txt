@@ -108,6 +108,7 @@ GC
 GCE
 GCS
 GID
+GIS
 GKE
 GPL
 GUC
@@ -478,6 +479,7 @@ dod
 domainbetakubernetesiozone
 downtimes
 dvcmQ
+dx
 ecdsa
 edb
 eks
@@ -491,9 +493,11 @@ executables
 extensibility
 externalCluster
 externalClusters
+externalclusters
 facto
 failover
 failovers
+faq
 fastpath
 fb
 fd
@@ -502,11 +506,13 @@ filesystem
 findstr
 fio
 freddie
+fuzzystrmatch
 gc
 gcc
 gce
 gcs
 gcsCredentials
+geocoder
 ghcr
 github
 gkeEnvironment
@@ -668,6 +674,7 @@ pdf
 persistentvolumeclaim
 persistentvolumeclaims
 pgBouncer
+pgSQL
 pgaudit
 pgbarman
 pgbasebackup
@@ -679,6 +686,7 @@ pgstatstatements
 phaseReason
 pid
 pitr
+plpgsql
 pluggable
 png
 podAffinityTerm
@@ -698,6 +706,8 @@ posix
 postImportApplicationSQL
 postInitApplicationSQLRefs
 postInitSQL
+postInitTemplateSQL
+postgis
 postgres
 postgresGID
 postgresImageName

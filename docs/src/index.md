@@ -47,6 +47,8 @@ The PostgreSQL operand container images are available for all the
 on multiple architectures, directly from the
 [`postgres-containers` project's GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
 
+Additionally, the Community provides images for the [PostGIS extension](postgis.md).
+
 !!! Warning
     CloudNativePG requires that all nodes in a Kubernetes cluster have the
     same CPU architecture, thus a hybrid CPU architecture Kubernetes cluster is not

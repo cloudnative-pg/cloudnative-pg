@@ -1,3 +1,0 @@
-cluster-with-backup-minio.yaml
-cluster-with-backup-minio-with-wal-max-parallel.yaml
-cluster-with-backup-minio-custom-servername.yaml

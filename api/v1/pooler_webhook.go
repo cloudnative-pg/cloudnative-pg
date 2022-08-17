@@ -65,6 +65,11 @@ var (
 		"server_reset_query_always",
 		"server_round_robin",
 		"stats_period",
+		"tcp_keepalive",
+		"tcp_keepcnt",
+		"tcp_keepidle",
+		"tcp_keepintvl",
+		"tcp_user_timeout",
 		"verbose",
 	})
 )

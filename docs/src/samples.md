@@ -41,6 +41,10 @@ Full example
 : [`cluster-example-full.yaml`](samples/cluster-example-full.yaml):
    a cluster that sets most of the available options.
 
+PostGIS example
+: [`postgis-example.yaml`](samples/postgis-example.yaml):
+   an example of "PostGIS cluster" (see the [PostGIS section](postgis.md) for details.)
+
 Replica cluster via streaming
 :   **Prerequisites**: [`cluster-example.yaml`](samples/cluster-example.yaml)
     applied and Healthy

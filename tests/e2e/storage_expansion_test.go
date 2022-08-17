@@ -31,7 +31,7 @@ import (
 // with different storage providers in different k8s environments
 var _ = Describe("Verify storage", func() {
 	const (
-		sampleFile  = fixturesDir + "/storage_expansion/cluster-storage-expansion.yaml"
+		sampleFile  = fixturesDir + "/storage_expansion/cluster-storage-expansion.yaml.template"
 		clusterName = "storage-expansion"
 		level       = tests.Lowest
 	)

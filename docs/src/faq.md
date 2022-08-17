@@ -262,7 +262,7 @@ major version of Postgres is version 14, which ships out of the box:
 -   declarative partitioning for horizontal table partitioning, which is
     a very well-known technique in the database area to improve vertical
     scalability on a single instance
--   extensibility, with extensions like PostGIS for geographical
+-   extensibility, with extensions like [PostGIS](postgis.md) for geographical
     databases
 -   parallel queries for vertical scalability
 -   JSON support, unleashing the multi-model hybrid database for both
@@ -357,7 +357,7 @@ spec:
 The time zone can be verified with:
 
 ``` console
-$ k exec -ti pg-italy-1 -c postgres -- psql -x -c "SHOW timezone"
+$ kubectl exec -ti pg-italy-1 -c postgres -- psql -x -c "SHOW timezone"
 -[ RECORD 1 ]---------
 TimeZone | Europe/Rome
 ```

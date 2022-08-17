@@ -210,6 +210,12 @@ connection. Import is from any supported version of Postgres and relies on
 `pg_dump` and `pg_restore` to be executed from the new cluster primary
 for all databases part of the operation and, if requested, for roles.
 
+### PostGIS clusters
+
+CloudNativePG supports the installation of clusters with the [PostGIS](postgis.md)
+open source extension for geographical databases, one of the most popular
+extensions for PostgreSQL.
+
 ### Basic LDAP authentication for PostgreSQL
 
 The operator allows you to configure LDAP authentication for your PostgreSQL

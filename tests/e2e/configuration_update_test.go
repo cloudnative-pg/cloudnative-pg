@@ -23,7 +23,9 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -40,7 +42,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 	const (
 		clusterName          = "postgresql-storage-class"
 		namespace            = "cluster-update-config-e2e"
-		sampleFile           = fixturesDir + "/base/cluster-storage-class.yaml"
+		sampleFile           = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		level                = tests.High
 		autoVacuumMaxWorkers = 4
 		timeout              = 60
@@ -50,14 +52,49 @@ var _ = Describe("Configuration update", Ordered, func() {
 		Name:      clusterName,
 	}
 	commandTimeout := time.Second * 2
+	postgresParams := map[string]string{
+		"work_mem":                    "8MB",
+		"max_connections":             "110",
+		"log_checkpoints":             "on",
+		"log_lock_waits":              "on",
+		"log_min_duration_statement":  "1000",
+		"log_statement":               "ddl",
+		"log_temp_files":              "1024",
+		"log_autovacuum_min_duration": "1s",
+		"log_replication_commands":    "on",
+	}
+	updateClusterPostgresParams := func(paramsMap map[string]string) {
+		cluster := apiv1.Cluster{}
+		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			err := utils.GetObject(env, namespacedName, &cluster)
+			Expect(err).ToNot(HaveOccurred())
+			cluster.Spec.PostgresConfiguration.Parameters = paramsMap
+			return env.Client.Update(env.Ctx, &cluster)
+		})
+		Expect(err).ToNot(HaveOccurred())
+	}
 
-	checkErrorOutFixedAndBlockedConfigurationParameter := func(sampleFile string) {
+	updateClusterPostgresPgHBA := func() {
+		cluster := apiv1.Cluster{}
+		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			err := utils.GetObject(env, namespacedName, &cluster)
+			Expect(err).ToNot(HaveOccurred())
+			cluster.Spec.PostgresConfiguration.PgHBA = []string{"host all all all trust"}
+			return env.Client.Update(env.Ctx, &cluster)
+		})
+		Expect(err).ToNot(HaveOccurred())
+	}
+
+	checkErrorOutFixedAndBlockedConfigurationParameter := func(params map[string]string) {
 		// Update the configuration
-		Eventually(func() error {
-			_, _, err := utils.RunUnchecked("kubectl apply -n " + namespace + " -f " + sampleFile)
-			return err
-			// Expecting an error when a blockedConfigurationParameter is modified
-		}, RetryTimeout, PollingTime).ShouldNot(BeNil())
+		cluster := apiv1.Cluster{}
+		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			err := utils.GetObject(env, namespacedName, &cluster)
+			Expect(err).NotTo(HaveOccurred())
+			cluster.Spec.PostgresConfiguration.Parameters = params
+			return env.Client.Update(env.Ctx, &cluster)
+		})
+		Expect(apierrors.IsInvalid(err)).To(BeTrue())
 
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -102,14 +139,12 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 	It("01. reloading Pg when a parameter requiring reload is modified", func() {
 		// max_connection increase to 110
-		reloadSampleFile := fixturesDir + "/config_update/01-reload.yaml"
-
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("apply configuration update", func() {
 			// Update the configuration
-			CreateResourceFromFile(namespace, reloadSampleFile)
+			updateClusterPostgresParams(postgresParams)
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, 300)
 		})
 
@@ -128,7 +163,6 @@ var _ = Describe("Configuration update", Ordered, func() {
 	})
 
 	It("02. reloading Pg when pg_hba rules are modified", func() {
-		pgHbaReloadSampleFile := fixturesDir + "/config_update/02-pg_hba_reload.yaml"
 		endpointName := clusterName + "-rw"
 
 		// Connection should fail now because we are not supplying a password
@@ -150,7 +184,7 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 		By("apply configuration update", func() {
 			// Update the configuration
-			CreateResourceFromFile(namespace, pgHbaReloadSampleFile)
+			updateClusterPostgresPgHBA()
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, 300)
 		})
 
@@ -177,7 +211,6 @@ var _ = Describe("Configuration update", Ordered, func() {
 	})
 	// nolint:dupl
 	It("03. restarting and switching Pg when a parameter requiring restart is modified", func() {
-		restartRequiredSampleFile := fixturesDir + "/config_update/03-restart.yaml"
 		timeout := 300
 
 		podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -190,7 +223,8 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 		By("apply configuration update", func() {
 			// Update the configuration
-			CreateResourceFromFile(namespace, restartRequiredSampleFile)
+			postgresParams["shared_buffers"] = "256MB"
+			updateClusterPostgresParams(postgresParams)
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 		})
 
@@ -217,7 +251,6 @@ var _ = Describe("Configuration update", Ordered, func() {
 	})
 
 	It("04. restarting and switching Pg when mixed parameters are modified", func() {
-		mixParamsSampleFile := fixturesDir + "/config_update/04-mixed-params.yaml"
 		timeout := 300
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -229,7 +262,9 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 		By("apply configuration update", func() {
 			// Update the configuration
-			CreateResourceFromFile(namespace, mixParamsSampleFile)
+			postgresParams["max_replication_slots"] = "16"
+			postgresParams["maintenance_work_mem"] = "128MB"
+			updateClusterPostgresParams(postgresParams)
 			AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 		})
 
@@ -263,13 +298,14 @@ var _ = Describe("Configuration update", Ordered, func() {
 	})
 
 	It("05. error out when a fixedConfigurationParameter is modified", func() {
-		fixedParamsSampleFile := fixturesDir + "/config_update/05-fixed-params.yaml"
-		checkErrorOutFixedAndBlockedConfigurationParameter(fixedParamsSampleFile)
+		postgresParams["cluster_name"] = "Setting this parameter is not allowed"
+		checkErrorOutFixedAndBlockedConfigurationParameter(postgresParams)
 	})
 
 	It("06. error out when a blockedConfigurationParameter is modified", func() {
-		blockedParamsSampleFile := fixturesDir + "/config_update/06-blocked-params.yaml"
-		checkErrorOutFixedAndBlockedConfigurationParameter(blockedParamsSampleFile)
+		delete(postgresParams, "cluster_name")
+		postgresParams["port"] = "5433"
+		checkErrorOutFixedAndBlockedConfigurationParameter(postgresParams)
 	})
 
 	// nolint:dupl
@@ -277,7 +313,6 @@ var _ = Describe("Configuration update", Ordered, func() {
 		"to restart first the primary instance is decreased",
 		func() {
 			// max_connection decrease to 105
-			restartOnDescreaseSampleFile := fixturesDir + "/config_update/07-restart-decrease.yaml"
 			timeout := 300
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -289,7 +324,9 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 			By("apply configuration update", func() {
 				// Update the configuration
-				CreateResourceFromFile(namespace, restartOnDescreaseSampleFile)
+				delete(postgresParams, "port")
+				postgresParams["max_connections"] = "105"
+				updateClusterPostgresParams(postgresParams)
 				AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 			})
 
@@ -319,8 +356,6 @@ var _ = Describe("Configuration update", Ordered, func() {
 	It("08. restarting and not switching Pg when a hot standby sensible parameter requiring "+
 		"to restart first the primary instance is decreased, resetting to the default value",
 		func() {
-			// max_connection is removed (decrease to default)
-			restartOnDecreaseSampleFile := fixturesDir + "/config_update/08-restart-decrease-removing.yaml"
 			timeout := 300
 
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -333,7 +368,8 @@ var _ = Describe("Configuration update", Ordered, func() {
 
 			By("apply configuration update", func() {
 				// Update the configuration
-				CreateResourceFromFile(namespace, restartOnDecreaseSampleFile)
+				delete(postgresParams, "max_connections")
+				updateClusterPostgresParams(postgresParams)
 				AssertPostgresNoPendingRestart(namespace, clusterName, commandTimeout, timeout)
 			})
 
@@ -371,7 +407,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", func() {
 
 	Context("primaryUpdateMethod value set to restart", Ordered, func() {
 		clusterFileWithPrimaryUpdateRestart := fixturesDir +
-			"/config_update/primary_update_method/primary-update-restart.yaml"
+			"/config_update/primary_update_method/primary-update-restart.yaml.template"
 		var namespace, clusterName string
 		var sourceClusterNamespacedName *types.NamespacedName
 
