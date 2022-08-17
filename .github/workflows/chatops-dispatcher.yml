@@ -1,3 +1,15 @@
+# This workflow listens comment creation events. When the comment is issued from a PR AND the content of the comment
+# starts with certain prefixes, it will be handled by `chatops-dispatcher` job.
+#
+# 1. If the comment starts with "/test", the job will dispatch a `repository_dispatch` event of type
+#    `test-command` to this repo, and the event will then be received by the `chatops-receiver` workflow (of this repo)
+#    so that triggers a large-scale E2E test per the PR.
+#
+# 2. If the comment starts with "/ok-to-merge", it will label the PR with "ok to merge :ok_hand:"
+#
+# 3. If the comment starts with "/ready-to-test", it will label the PR with "ready to test :elephant:" if the label
+#    does not already exist or remove the label "ready to test :elephant:" if it already exists.
+
 name: slash-command-dispatcher
 
 on:

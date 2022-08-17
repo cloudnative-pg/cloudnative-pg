@@ -1,9 +1,13 @@
+# Keep all the dependencies updated with daily check
+# See to https://github.blog/2020-06-01-keep-all-your-packages-up-to-date-with-dependabot/
 version: 2
 updates:
+  # check for Go dependencies
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "daily"
+  # check for GitHub action dependencies
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

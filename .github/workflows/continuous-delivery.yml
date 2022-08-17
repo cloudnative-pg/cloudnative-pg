@@ -1,12 +1,17 @@
 name: continuous-delivery
-
+# This workflow will be triggered under following circumstances
 on:
+  # This workflow will be triggered for a commit (push) to any branches
   push:
     branches:
       - '**'
+  # ... triggered when a pull request is `opened`, `synchronize`, or `reopened`
   pull_request:
+  # ... triggered once a pull request from a forked repo is labelled
   pull_request_target:
     types: [labeled]
+
+  # could be manually triggered
   workflow_dispatch:
     inputs:
       depth:
@@ -16,9 +21,12 @@ on:
       test_level:
         description: 'Test level (0-4)'
         required: false
+
+  # would be scheduled to run on `main` branch at 01:00:00 (UTC) every day
   schedule:
     - cron:  '0 1 * * *'
 
+# set up env variables to be used across all the jobs
 env:
   GOLANG_VERSION: "1.18.x"
   GOLANGCI_LINT_VERSION: "v1.47"
@@ -27,12 +35,21 @@ env:
   ROOK_VERSION: "v1.6.8"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
 
+# default setting for `step`s
 defaults:
   run:
+    # default failure handling setting for shell under `run` step
     shell: 'bash -Eeuo pipefail -x {0}'
 
 jobs:
-
+  # This workflow could be triggered under different cases with the `same` codebase ... hence skip the duplicated ones
+  # except when:
+  #   1. it's on `main` branch
+  #   2. it's triggered by events defined in `do_not_skip`, aka:
+  #      a. pull request [`opened`, `synchronize`, `reopened`]
+  #      b. manually triggered
+  #      c. scheduled
+  #  Note: by `same` codebase, we exclude files under paths specified in `paths_ignore`
   duplicate_runs:
     runs-on: ubuntu-20.04
     name: Skip duplicate runs
@@ -47,6 +64,9 @@ jobs:
           paths_ignore: '["README.md", "docs/**"]'
           do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
 
+  # Here we sort codebase changes into 5 different categories based on the files changed in the commit/PR, and name
+  # them as 5 different filters which are used along with other conditions in the follow-up jobs to decide whether the
+  # job will be skipped.
   change-triage:
     name: Check changed files
     needs: duplicate_runs
@@ -101,7 +121,7 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
-    # Run Go linter if Go code have changed
+    # Run Go linter only if Go code have changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.go-code-changed == 'true'
@@ -129,7 +149,7 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
-    # Run shellcheck linter if shell code have changed
+    # Run shellcheck linter only if shell code have changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.shell-script-changed == 'true'
@@ -148,7 +168,10 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
-    # Run unit tests if anything but docs, e2e tests and shell scripts have changed
+    # Run unit tests only when all the following conditions are satisfied:
+    #   1. If anything but docs, e2e tests and shell scripts have changed
+    #   2. When the slash command (`/test` or `/test-cnp`) is issued in the PR comment
+    #      or the PR (which triggers this workflow) is labeled with `ready to test :elephant:`
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
@@ -166,6 +189,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
+        # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
         k8s-version:
           - 1.19.x
           - 1.20.x
@@ -185,6 +209,8 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
+        # Cache Go modules on GitHub runners to be reused across jobs
+        # See to: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows
         name: Cache Go modules
         uses: actions/cache@v3
         with:
@@ -283,8 +309,10 @@ jobs:
       - crd
       - duplicate_runs
       - change-triage
-    # Build containers if anything but docs have changed,
-    # or it is a scheduled execution
+    # Build containers:
+    #   (if anything but docs have changed, or it is a scheduled execution)
+    #   AND
+    #   all its precedent jobs are whether `success`ful or `skipped`
     # See https://github.com/actions/runner/issues/491#issuecomment-850884422
     if: |
       (
@@ -309,6 +337,9 @@ jobs:
       packages: write
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
+      # `branch_name` will be used later in `isReleasePullRequestBranch` to decide which image tag is to be used in the
+      # follow-up E2E test `upgrade_test.go` according to whether the workflow is triggered regard to a release pull
+      # request branch.
       branch_name: ${{ steps.build-meta.outputs.branch_name }}
 
     steps:
@@ -347,7 +378,9 @@ jobs:
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
           
-          # extract branch name
+          # Extract branch name and expose it to branch_name, which will be used later to decide which image tag is
+          # taken in the `upgrade_test.go` E2E test based on whether the workflow is running regards to a release pull
+          # request branch.
           if [ ${{ github.event_name }} != 'pull_request' ] && [ ${{ github.event_name }} != 'pull_request_target' ]
           then
             echo "::set-output name=branch_name::${GITHUB_REF#refs/heads/}"
@@ -439,6 +472,24 @@ jobs:
     needs:
       - buildx
       - duplicate_runs
+    # The job is triggered only if:
+    #   1. `duplicated_runs` tells this workflow run should not skipped
+    #      AND
+    #   2. the precedent job `buildx` is `success`ful
+    #      AND
+    #   3. the workflow run is:
+    #      3.1. manually triggered
+    #           OR
+    #      3.2. triggered on:
+    #           a. `main` branch
+    #               OR
+    #           b. `release-*` branch
+    #               OR
+    #           c. `dependabot/*` branch
+    #           OR
+    #       3.3. when a PR is `opened`
+    #           OR
+    #       3.4. when a PR from a forked repo is `labeled`
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       always() &&
@@ -464,6 +515,11 @@ jobs:
         uses: actions/checkout@v3
       -
         id: generate-jobs
+        # Generate jobs to perform different `depth` of E2E test according to `depth` specified when manually triggering
+        # the workflow run or which types of GitHub event that trigger the workflow run.
+        #
+        # Note: `depth` decides how many versions of `postgres` and `kubernetes` the E2E test is going to be performed
+        #       upon.
         name: Generate Jobs
         shell: bash
         run: |
@@ -471,6 +527,11 @@ jobs:
             -m '${{ github.event.inputs.depth || github.event_name }}'
 
   evaluate-test-level:
+    # To evaluate the test level of the E2E test is going to be performed, which means how many test cases in the whole
+    # test suits are going to be covered.
+    #
+    # Note: the test level is whether specified as `test_level` when manually triggering the workflow run OR
+    #       is inferred from the type of event that triggers this workflow run. --> see to: step `evaluate-test-level`
     name: Evaluate test level
     needs:
       - generate-jobs
@@ -517,11 +578,13 @@ jobs:
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
     runs-on: ubuntu-20.04
     env:
+      # `TEST_DEPTH` decides how many test cases in the whole test suits the E2E test is going to cover
       TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
       MATRIX: ${{ matrix.id }}
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
+      # The starting version of operator used in rolling upgrade to upgrade from
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       BRANCH_NAME:  ${{ needs.buildx.outputs.branch_name }}
 
@@ -568,6 +631,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       -
+        # `Retry` preparing the E2E test ENV
         name: Prepare the environment
         uses: nick-fields/retry@v2
         with:
@@ -585,13 +649,17 @@ jobs:
         run:
           make e2e-test-kind
       -
+        # Summarize the failed E2E test cases if there's any
         name: Report failed E2E tests
         if: failure()
         run: |
           set +x
           chmod +x .github/report-failed-test.sh
           ./.github/report-failed-test.sh
-      - name: Create individual artifact for each E2E test
+      -
+        # Create individual artifact for each E2E test which will be used to generate E2E test summary in the follow-up
+        # job `summarize-e2e-tests`
+        name: Create individual artifact for each E2E test
         if: always()
         run: |
           set +x
@@ -631,6 +699,7 @@ jobs:
           rm tests/e2e/out/report.json
 
       -
+        # Archive logs for failed test cases if there's any
         name: Archive Kind logs
         if: failure()
         uses: actions/upload-artifact@v3
@@ -649,8 +718,9 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # Summarize E2E tests results ... the summary is appended in the `summary` view of the workflow run
   summarize-e2e-tests:
-    name: E2E test suite # GH Actions will append "summary"
+    name: E2E test suite
     needs:
       - duplicate_runs
       - evaluate-test-level
@@ -675,6 +745,12 @@ jobs:
         run: |
           python .github/summarize-test-results.py --dir test-artifacts >> $GITHUB_STEP_SUMMARY
 
+  # For a workflow run per a PR, when the precedent E2E test is successfully completed AND
+  #     it's triggered by `workflow_dispatch` (the slash command will create that type of event) AND
+  #     the E2E test have an adequate coverage (`depth` is either equal to `main` or `schedule` AND `testLevel` greater
+  #     than 4)
+  # then the PR will be labeled with `ok-to-merge`, which means the PR can be merged hereafter.
+  # Also see to `require-labels.yml`
   ok-to-merge:
     name: Label the PR as "ok to merge"
     needs:
@@ -714,6 +790,7 @@ jobs:
           number: ${{ steps.get_pr_number_and_labels.outputs.pr_number }}
           labels: "ok to merge :ok_hand:"
 
+  # Remove the `ok-to-merge` label if the precedent E2E test is failed
   unlabel-ok-to-merge:
     name: Remove the "ok to merge" label from the PR
     needs:
