@@ -85,7 +85,7 @@ test: generate fmt vet manifests ## Run tests.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
 	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest ;\
 	source <(setup-envtest use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
-	go test ./api/... ./cmd/... ./controllers/... ./internal/... ./pkg/... ./tests/utils -coverprofile cover.out
+	go test -coverpkg=./... --count=1 -coverprofile=cover.out ./api/... ./cmd/... ./controllers/... ./internal/... ./pkg/... ./tests/utils ;
 
 e2e-test-kind: ## Run e2e tests locally using kind.
 	hack/e2e/run-e2e-kind.sh
