@@ -39,7 +39,7 @@ import (
 var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive), func() {
 	const (
 		clusterName = "operator-unavailable"
-		sampleFile  = fixturesDir + "/operator-unavailable/operator-unavailable.yaml"
+		sampleFile  = fixturesDir + "/operator-unavailable/operator-unavailable.yaml.template"
 		level       = tests.Medium
 	)
 

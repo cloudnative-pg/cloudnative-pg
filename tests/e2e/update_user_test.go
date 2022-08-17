@@ -225,7 +225,7 @@ var _ = Describe("Disabling superuser password", func() {
 
 var _ = Describe("Creating a cluster without superuser password", func() {
 	const namespace = "no-postgres-pwd"
-	const sampleFile = fixturesDir + "/secrets/cluster-no-postgres-pwd.yaml"
+	const sampleFile = fixturesDir + "/secrets/cluster-no-postgres-pwd.yaml.template"
 	const clusterName = "cluster-no-postgres-pwd"
 
 	JustAfterEach(func() {

@@ -1,8 +1,0 @@
-01-reload.yaml
-02-pg_hba_reload.yaml
-03-restart.yaml
-04-mixed-params.yaml
-05-fixed-params.yaml
-06-blocked-params.yaml
-07-restart-decrease.yaml
-08-restart-decrease-removing.yaml

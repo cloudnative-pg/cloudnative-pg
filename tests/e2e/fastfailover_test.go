@@ -27,8 +27,8 @@ import (
 
 var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() {
 	const (
-		sampleFile             = fixturesDir + "/fastfailover/cluster-fast-failover.yaml"
-		sampleFileSyncReplicas = fixturesDir + "/fastfailover/cluster-syncreplicas-fast-failover.yaml"
+		sampleFile             = fixturesDir + "/fastfailover/cluster-fast-failover.yaml.template"
+		sampleFileSyncReplicas = fixturesDir + "/fastfailover/cluster-syncreplicas-fast-failover.yaml.template"
 		webTestFile            = fixturesDir + "/fastfailover/webtest.yaml"
 		webTestSyncReplicas    = fixturesDir + "/fastfailover/webtest-syncreplicas.yaml"
 		webTestJob             = fixturesDir + "/fastfailover/apache-benchmark-webtest.yaml"

@@ -33,7 +33,7 @@ import (
 var _ = Describe("Operator High Availability", Serial, Label(tests.LabelDisruptive, tests.LabelNoOpenshift), func() {
 	const (
 		namespace   = "operator-ha-e2e"
-		sampleFile  = fixturesDir + "/operator-ha/operator-ha.yaml"
+		sampleFile  = fixturesDir + "/operator-ha/operator-ha.yaml.template"
 		clusterName = "operator-ha"
 		level       = tests.Lowest
 	)
