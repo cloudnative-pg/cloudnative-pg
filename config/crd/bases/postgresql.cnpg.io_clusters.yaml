@@ -1795,7 +1795,8 @@ spec:
                         description: LDAP hostname or IP address
                         type: string
                       tls:
-                        description: Set to 1 to enable LDAP over TLS
+                        description: Set to 'true' to enable LDAP over TLS. 'false'
+                          is default
                         type: boolean
                     type: object
                   parameters:
