@@ -59,7 +59,7 @@ var _ = Describe("JSON log output", func() {
 	It("correctly produces logs in JSON format", func() {
 		namespace = "json-logs-e2e"
 		clusterName = "postgresql-json-logs"
-		const sampleFile = fixturesDir + "/json_logs/cluster-json-logs.yaml"
+		const sampleFile = fixturesDir + "/json_logs/cluster-json-logs.yaml.template"
 		// Create a cluster in a namespace we'll delete after the test
 		namespaceErr := env.CreateNamespace(namespace)
 		Expect(namespaceErr).ToNot(HaveOccurred())

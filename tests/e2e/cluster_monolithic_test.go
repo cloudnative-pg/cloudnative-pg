@@ -45,7 +45,7 @@ import (
 var _ = Describe("Imports with Monolithic Approach", func() {
 	const (
 		level             = tests.Medium
-		sourceClusterFile = fixturesDir + "/base/cluster-storage-class.yaml"
+		sourceClusterFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		targetClusterName = "cluster-target"
 		tableName         = "to_import"
 		databaseSuperUser = "testuserone" // one of the DB users should be a superuser

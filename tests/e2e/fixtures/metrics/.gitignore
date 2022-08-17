@@ -1,5 +1,0 @@
-cluster-metrics.yaml
-cluster-metrics-with-target-databases.yaml
-cluster-disable-default-metrics.yaml
-cluster-default-metrics.yaml
-cluster-replica-tls-with-metrics.yaml

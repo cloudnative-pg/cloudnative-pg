@@ -27,7 +27,7 @@ import (
 var _ = Describe("Cluster objectmeta", func() {
 	const (
 		level                 = tests.Low
-		clusterWithObjectMeta = fixturesDir + "/cluster_objectmeta/cluster-level-objectMeta.yaml"
+		clusterWithObjectMeta = fixturesDir + "/cluster_objectmeta/cluster-level-objectMeta.yaml.template"
 		namespace             = "objectmeta-inheritance"
 	)
 

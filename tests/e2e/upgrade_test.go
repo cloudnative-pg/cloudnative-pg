@@ -68,18 +68,16 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		pgSecrets = fixturesDir + "/upgrade/pgsecrets.yaml" //nolint:gosec
 
 		// This is a cluster of the previous version, created before the operator upgrade
-		clusterName1   = "cluster1"
-		sampleFile     = fixturesDir + "/upgrade/cluster1.yaml"
-		updateConfFile = fixturesDir + "/upgrade/conf-update.yaml"
+		clusterName1 = "cluster1"
+		sampleFile   = fixturesDir + "/upgrade/cluster1.yaml.template"
 
 		// This is a cluster of the previous version, created after the operator upgrade
-		clusterName2    = "cluster2"
-		sampleFile2     = fixturesDir + "/upgrade/cluster2.yaml"
-		updateConfFile2 = fixturesDir + "/upgrade/conf-update2.yaml"
+		clusterName2 = "cluster2"
+		sampleFile2  = fixturesDir + "/upgrade/cluster2.yaml.template"
 
 		backupName          = "cluster-backup"
 		backupFile          = fixturesDir + "/upgrade/backup1.yaml"
-		restoreFile         = fixturesDir + "/upgrade/cluster-restore.yaml"
+		restoreFile         = fixturesDir + "/upgrade/cluster-restore.yaml.template"
 		scheduledBackupFile = fixturesDir + "/upgrade/scheduled-backup.yaml"
 		countBackupsScript  = "sh -c 'mc find minio --name data.tar.gz | wc -l'"
 		level               = tests.Lowest
@@ -137,7 +135,18 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 	}
 
-	AssertConfUpgrade := func(clusterName string, updateConfFile string) {
+	applyConfUpgrade := func(cluster *apiv1.Cluster) error {
+		// changes some parameters in the Postgres configuration, and the `pg_hba` entries
+		oldCluster := cluster.DeepCopy()
+		cluster.Spec.PostgresConfiguration.Parameters["shared_buffers"] = "128MB"
+		cluster.Spec.PostgresConfiguration.Parameters["work_mem"] = "8MB"
+		cluster.Spec.PostgresConfiguration.Parameters["max_replication_slots"] = "16"
+		cluster.Spec.PostgresConfiguration.Parameters["maintenance_work_mem"] = "256MB"
+		cluster.Spec.PostgresConfiguration.PgHBA[0] = "host all all all trust"
+		return env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(oldCluster))
+	}
+
+	AssertConfUpgrade := func(clusterName string) {
 		By("checking basic functionality performing a configuration upgrade on the cluster", func() {
 			podList, err := env.GetClusterPodList(upgradeNamespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -157,7 +166,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// the `apply` command
 
 			Eventually(func() error {
-				_, _, err := testsUtils.RunUnchecked("kubectl apply -n " + upgradeNamespace + " -f " + updateConfFile)
+				err := applyConfUpgrade(cluster)
 				return err
 			}, 60).ShouldNot(HaveOccurred())
 
@@ -179,7 +188,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 						"psql", "-U", "postgres", "-tAc", "show maintenance_work_mem")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
 					return value, err, atoiErr
-				}, timeout).Should(BeEquivalentTo(128),
+				}, timeout).Should(BeEquivalentTo(256),
 					"Pod %v should have updated its config", pod.Name)
 			}
 			// Check that a switchover happened
@@ -304,15 +313,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// in parallel and check for it to be up later.
 		By(fmt.Sprintf("creating a Cluster in the '%v' upgradeNamespace",
 			upgradeNamespace), func() {
-			Eventually(func() error {
-				_, stderr, err := testsUtils.Run(
-					"kubectl create -n " + upgradeNamespace + " -f " + sampleFile)
-				if err != nil {
-					GinkgoWriter.Printf("stderr: %s\n", stderr)
-					return err
-				}
-				return nil
-			}, 120).ShouldNot(HaveOccurred())
+			CreateResourceFromFile(upgradeNamespace, sampleFile)
 		})
 
 		By("setting up minio", func() {
@@ -510,22 +511,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 		AssertClusterIsReady(upgradeNamespace, clusterName1, 300, env)
 
-		AssertConfUpgrade(clusterName1, updateConfFile)
+		AssertConfUpgrade(clusterName1)
 
 		By("installing a second Cluster on the upgraded operator", func() {
-			Eventually(func() error {
-				_, _, err := testsUtils.Run(
-					"kubectl create -n " + upgradeNamespace + " -f " + sampleFile2)
-				if err != nil {
-					return err
-				}
-				return nil
-			}, 60, 5).Should(BeNil())
-
+			CreateResourceFromFile(upgradeNamespace, sampleFile2)
 			AssertClusterIsReady(upgradeNamespace, clusterName2, 600, env)
 		})
 
-		AssertConfUpgrade(clusterName2, updateConfFile2)
+		AssertConfUpgrade(clusterName2)
 
 		// We verify that the backup taken before the upgrade is usable to
 		// create a v1 cluster

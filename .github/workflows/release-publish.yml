@@ -87,7 +87,7 @@ jobs:
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
           skip_krew="false"
           latest_release_branch=$(git branch -rl '*/release-*' | sort -r | head -n1 | sed -e 's/^.*\(release-.*\)/\1/')
-          current_release_branch=$(echo "${{ env.TAG }}" | sed -e 's/v\([0-9]\+.[0-9]\+\).*/release-\1/')
+          current_release_branch=$(echo "${{ env.TAG }}" | sed -e 's/\([0-9]\+.[0-9]\+\).*/release-\1/')
           if [[ "$latest_release_branch" != "$current_release_branch" ]]; then
             skip_krew="true"
           fi

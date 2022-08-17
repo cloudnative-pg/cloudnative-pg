@@ -1,7 +1,2 @@
-cluster-restore.yaml
-cluster1.yaml
-cluster2.yaml
-conf-update.yaml
-conf-update2.yaml
 current-manifest.yaml
 minio-pvc.yaml

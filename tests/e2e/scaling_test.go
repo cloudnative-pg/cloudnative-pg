@@ -29,7 +29,7 @@ import (
 var _ = Describe("Cluster scale up and down", func() {
 	const (
 		namespace   = "cluster-scale-e2e-storage-class"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml"
+		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		clusterName = "postgresql-storage-class"
 		level       = tests.Lowest
 	)
