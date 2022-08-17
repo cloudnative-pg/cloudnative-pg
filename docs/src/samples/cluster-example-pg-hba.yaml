@@ -8,10 +8,5 @@ spec:
     pg_hba:
       - hostssl app all all cert
 
-  bootstrap:
-    initdb:
-      database: app
-      owner: app
-
   storage:
     size: 1Gi
