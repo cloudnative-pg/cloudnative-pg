@@ -190,6 +190,9 @@ type ClusterSpec struct {
 	// +optional
 	StorageConfiguration StorageConfiguration `json:"storage,omitempty"`
 
+	// Configuration of the storage for PostgreSQL WAL (Write-Ahead Log)
+	WalStorage *StorageConfiguration `json:"walStorage,omitempty"`
+
 	// The time in seconds that is allowed for a PostgreSQL instance to
 	// successfully start up (default 30)
 	// +kubebuilder:default:=30
@@ -1840,6 +1843,16 @@ func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
 
 	recoveryParameters := cluster.Spec.Bootstrap.Recovery
 	return recoveryParameters.Owner != "" && recoveryParameters.Database != ""
+}
+
+// ShouldCreateWalArchiveVolume returns whether we should create the wal archive volume
+func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
+	return cluster.Spec.WalStorage != nil
+}
+
+// GetWalArchiveVolumeSuffix gets the wal archive volume name suffix
+func (cluster *Cluster) GetWalArchiveVolumeSuffix() string {
+	return "-wal"
 }
 
 // GetPostgresUID returns the UID that is being used for the "postgres"

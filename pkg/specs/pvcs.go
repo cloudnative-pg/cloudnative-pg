@@ -17,16 +17,18 @@ limitations under the License.
 package specs
 
 import (
+	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -65,19 +67,22 @@ type PVCUsageStatus struct {
 
 // CreatePVC create spec of a PVC, given its name and the storage configuration
 func CreatePVC(
-	cluster *apiv1.Cluster,
 	storageConfiguration apiv1.StorageConfiguration,
+	cluster apiv1.Cluster,
 	nodeSerial int,
+	role utils.PVCRole,
 ) (*corev1.PersistentVolumeClaim, error) {
 	pvcName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	if role == utils.PVCRolePgWal {
+		pvcName += cluster.GetWalArchiveVolumeSuffix()
+	}
 
 	result := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				utils.InstanceLabelName: pvcName,
-				utils.ClusterLabelName:  cluster.Name,
+				utils.PvcRoleLabelName: string(role),
 			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
@@ -119,11 +124,17 @@ func CreatePVC(
 
 // DetectPVCs fill the list with the PVCs which are dangling, given that
 // PVC are usually named after Pods
+// nolint: gocognit
 func DetectPVCs(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
 	podList []corev1.Pod,
 	jobList []batchv1.Job,
 	pvcList []corev1.PersistentVolumeClaim,
 ) (result PVCUsageStatus) {
+	contextLogger := log.FromContext(ctx)
+
+pvcLoop:
 	for _, pvc := range pvcList {
 		if pvc.Status.Phase != corev1.ClaimPending &&
 			pvc.Status.Phase != corev1.ClaimBound {
@@ -140,34 +151,22 @@ func DetectPVCs(
 		}
 
 		// Find a Pod corresponding to this PVC
-		podFound := false
 		for idx := range podList {
-			if podList[idx].Name == pvc.Name {
-				podFound = true
-				break
+			if IsPodSpecUsingPVC(podList[idx].Spec, pvc.Name) {
+				// We found a Pod using this PVC so this
+				// PVC is not dangling
+				result.Healthy = append(result.Healthy, pvc.Name)
+				continue pvcLoop
 			}
 		}
 
-		if podFound {
-			// We found a Pod using this PVC so this
-			// PVC is not dangling
-			result.Healthy = append(result.Healthy, pvc.Name)
-			continue
-		}
-
-		jobFound := false
 		for idx := range jobList {
-			if IsJobOperatingOnPVC(jobList[idx], pvc) {
-				jobFound = true
-				break
+			if IsPodSpecUsingPVC(jobList[idx].Spec.Template.Spec, pvc.Name) {
+				// We have found a Job corresponding to this PVC, so we
+				// are initializing it or the initialization is just completed
+				result.Initializing = append(result.Initializing, pvc.Name)
+				continue pvcLoop
 			}
-		}
-
-		if jobFound {
-			// We have found a Job corresponding to this PVC, so we
-			// are initializing it or the initialization is just completed
-			result.Initializing = append(result.Initializing, pvc.Name)
-			continue
 		}
 
 		if pvc.Annotations[PVCStatusAnnotationName] != PVCStatusReady {
@@ -180,12 +179,51 @@ func DetectPVCs(
 		result.Dangling = append(result.Dangling, pvc.Name)
 	}
 
+	if !cluster.ShouldCreateWalArchiveVolume() {
+		return result
+	}
+
+	for _, instance := range getInstancesPods(podList) {
+		expectedPVCs := getExpectedInstancePVCNames(cluster, instance.Name)
+		var indexOfFoundPVCs []int
+
+		for idx, pvcName := range result.Healthy {
+			if slices.Contains(expectedPVCs, pvcName) {
+				indexOfFoundPVCs = append(indexOfFoundPVCs, idx)
+			}
+		}
+
+		switch {
+		case len(expectedPVCs) > len(indexOfFoundPVCs):
+			// we lost some pvc null them all
+			for _, index := range indexOfFoundPVCs {
+				result.Dangling = append(result.Dangling, result.Healthy[index])
+				result.Healthy = removeElementByIndex(result.Healthy, index)
+			}
+		case len(indexOfFoundPVCs) > len(expectedPVCs):
+			contextLogger.Warning("found more PVC than those expected",
+				"instance", instance,
+				"expectedPVCs", expectedPVCs,
+				"foundPVCs", indexOfFoundPVCs,
+			)
+		}
+	}
+
 	return result
 }
 
-// IsJobOperatingOnPVC checks if a Job is initializing the provided PVC
-func IsJobOperatingOnPVC(job batchv1.Job, pvc corev1.PersistentVolumeClaim) bool {
-	return strings.HasPrefix(job.Name, pvc.Name+"-")
+func removeElementByIndex[T any](slice []T, index int) []T {
+	return append(slice[:index], slice[index+1:]...)
+}
+
+// IsPodSpecUsingPVC checks if the given pod spec is using the pvc
+func IsPodSpecUsingPVC(podSpec corev1.PodSpec, pvcName string) bool {
+	for _, volume := range podSpec.Volumes {
+		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvcName {
+			return true
+		}
+	}
+	return false
 }
 
 // isResizing returns true if PersistentVolumeClaimResizing condition is present
@@ -197,4 +235,34 @@ func isResizing(pvc corev1.PersistentVolumeClaim) bool {
 	}
 
 	return false
+}
+
+// DoesPVCBelongToInstance returns a boolean indicating if that given PVC belongs to an instance
+func DoesPVCBelongToInstance(cluster *apiv1.Cluster, instanceName, resourceName string) bool {
+	expectedInstancePVCs := getExpectedInstancePVCNames(cluster, instanceName)
+	return slices.Contains(expectedInstancePVCs, resourceName)
+}
+
+// getInstancesPods filters a list of pods and returns only the CNPG instances pods
+func getInstancesPods(pods []corev1.Pod) []corev1.Pod {
+	var instancesName []corev1.Pod
+	for _, pod := range pods {
+		_, ok := pod.Labels[ClusterRoleLabelName]
+		if ok {
+			instancesName = append(instancesName, pod)
+		}
+	}
+
+	return instancesName
+}
+
+// getExpectedInstancePVCNames gets all the PVC names for a given instance
+func getExpectedInstancePVCNames(cluster *apiv1.Cluster, instanceName string) []string {
+	names := []string{instanceName}
+
+	if cluster.ShouldCreateWalArchiveVolume() {
+		names = append(names, instanceName+cluster.GetWalArchiveVolumeSuffix())
+	}
+
+	return names
 }

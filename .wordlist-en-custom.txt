@@ -550,6 +550,7 @@ initDB
 initdb
 initialise
 initializingPVC
+instanceName
 instancesStatus
 inuse
 io
@@ -728,6 +729,7 @@ psql
 pv
 pvc
 pvcCount
+pvcName
 pvcTemplate
 quantile
 queryable
@@ -880,6 +882,7 @@ volumeMode
 volumeMounts
 wal
 walSegmentSize
+walStorage
 walbackupconfiguration
 walkthrough
 walsender
