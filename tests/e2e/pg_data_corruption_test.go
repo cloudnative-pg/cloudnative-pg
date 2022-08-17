@@ -70,7 +70,7 @@ var _ = Describe("PGDATA Corruption", func() {
 			oldPrimaryPodInfo, err = env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			oldPrimaryPodName = oldPrimaryPodInfo.GetName()
-			// Get the UID of the pod
+			// Get the PVC related to the pod
 			pvcName := oldPrimaryPodInfo.Spec.Volumes[0].PersistentVolumeClaim.ClaimName
 			pvc := &corev1.PersistentVolumeClaim{}
 			namespacedPVCName := types.NamespacedName{
@@ -122,9 +122,21 @@ var _ = Describe("PGDATA Corruption", func() {
 			}, 120).Should(BeNumerically(">", 0))
 		})
 		By("removing old primary pod and attached pvc", func() {
-			// removing old primary pod attached pvc
-			_, _, err = testsUtils.Run(fmt.Sprintf("kubectl delete pvc  %v -n %v --wait=false", oldPrimaryPVCName, namespace))
+			// Check if walStorage is enabled
+			walStorageEnabled, err := testsUtils.IsWalStorageEnabled(namespace, clusterName, env)
 			Expect(err).ToNot(HaveOccurred())
+
+			// removing old primary pod attached pvc
+			_, _, err = testsUtils.Run(
+				fmt.Sprintf("kubectl delete pvc %v -n %v --wait=false", oldPrimaryPVCName, namespace))
+			Expect(err).ToNot(HaveOccurred())
+
+			// removing WalStorage PVC if needed
+			if walStorageEnabled {
+				_, _, err = testsUtils.Run(
+					fmt.Sprintf("kubectl delete pvc %v-wal -n %v --wait=false", oldPrimaryPVCName, namespace))
+				Expect(err).ToNot(HaveOccurred())
+			}
 
 			zero := int64(0)
 			forceDelete := &client.DeleteOptions{

@@ -17,7 +17,9 @@ limitations under the License.
 package utils
 
 import (
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -26,4 +28,18 @@ func GetStorageAllowExpansion(defaultStorageClass string, env *TestingEnvironmen
 	storageClass := &storagev1.StorageClass{}
 	err := GetObject(env, client.ObjectKey{Name: defaultStorageClass}, storageClass)
 	return storageClass.AllowVolumeExpansion, err
+}
+
+// IsWalStorageEnabled returns true if 'WalStorage' is being used
+func IsWalStorageEnabled(namespace, clusterName string, env *TestingEnvironment) (bool, error) {
+	namespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      clusterName,
+	}
+	cluster := &apiv1.Cluster{}
+	err := env.Client.Get(env.Ctx, namespacedName, cluster)
+	if cluster.Spec.WalStorage == nil {
+		return false, err
+	}
+	return true, err
 }
