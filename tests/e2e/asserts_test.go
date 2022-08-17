@@ -19,6 +19,8 @@ package e2e
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -171,8 +173,10 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 	})
 }
 
-// AssertCreateCluster tests that the pods that should have been created by the sample
-// exist and are in ready state
+// AssertCreateCluster creates the cluster and verifies that the ready pods
+// correspond to the number of Instances in the cluster spec.
+// Important: this is not equivalent to "kubectl apply", and is not able
+// to apply a patch to an existing object.
 func AssertCreateCluster(namespace string, clusterName string, sampleFile string, env *testsUtils.TestingEnvironment) {
 	By(fmt.Sprintf("having a %v namespace", namespace), func() {
 		// Creating a namespace should be quick
@@ -197,7 +201,7 @@ func AssertCreateCluster(namespace string, clusterName string, sampleFile string
 }
 
 func AssertClusterIsReady(namespace string, clusterName string, timeout int, env *testsUtils.TestingEnvironment) {
-	By("having a Cluster with each instance in status ready", func() {
+	By(fmt.Sprintf("having a Cluster %s with each instance in status ready", clusterName), func() {
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      clusterName,
@@ -221,7 +225,9 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 				err = env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.Phase, err
 			}
-			return "", nil
+			return fmt.Sprintf("spec Instances: %d, ready pods: %d",
+				cluster.Spec.Instances,
+				utils.CountReadyPods(podList.Items)), nil
 		}, timeout, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy))
 	})
 }
@@ -2234,14 +2240,86 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 	})
 }
 
+// CreateResourcesFromFileWithError creates the Kubernetes objects defined in the
+// YAML sample file and returns any errors
+func CreateResourcesFromFileWithError(namespace, sampleFilePath string) error {
+	wrapErr := func(err error) error { return fmt.Errorf("on CreateResourcesFromFileWithError: %w", err) }
+	yaml, err := GetYAMLContent(sampleFilePath)
+	if err != nil {
+		return wrapErr(err)
+	}
+
+	objects, err := testsUtils.ParseObjectsFromYAML(yaml, namespace)
+	if err != nil {
+		return wrapErr(err)
+	}
+	for _, obj := range objects {
+		err := testsUtils.CreateObject(env, obj)
+		if err != nil {
+			return wrapErr(err)
+		}
+	}
+	return nil
+}
+
+// CreateResourceFromFile creates the Kubernetes objects defined in a YAML sample file
 func CreateResourceFromFile(namespace, sampleFilePath string) {
 	Eventually(func() error {
-		_, _, err := testsUtils.RunUnchecked("kubectl apply -n " + namespace + " -f " + sampleFilePath)
-		if err != nil {
-			return err
-		}
-		return nil
+		return CreateResourcesFromFileWithError(namespace, sampleFilePath)
 	}, RetryTimeout, PollingTime).Should(BeNil())
+}
+
+// GetYAMLContent opens a .yaml of .template file and returns its content
+//
+// In the case of a .template file, it performs the substitution of the embedded
+// SHELL-FORMAT variables
+func GetYAMLContent(sampleFilePath string) ([]byte, error) {
+	wrapErr := func(err error) error { return fmt.Errorf("in GetYAMLContent: %w", err) }
+	cleanPath := filepath.Clean(sampleFilePath)
+	data, err := ioutil.ReadFile(cleanPath)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	yaml := data
+
+	if filepath.Ext(cleanPath) == ".template" {
+		preRollingUpdateImg := os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
+		if preRollingUpdateImg == "" {
+			preRollingUpdateImg = os.Getenv("POSTGRES_IMG")
+		}
+		envVars := map[string]string{
+			"E2E_DEFAULT_STORAGE_CLASS":  os.Getenv("E2E_DEFAULT_STORAGE_CLASS"),
+			"AZURE_STORAGE_ACCOUNT":      os.Getenv("AZURE_STORAGE_ACCOUNT"),
+			"POSTGRES_IMG":               os.Getenv("POSTGRES_IMG"),
+			"E2E_PRE_ROLLING_UPDATE_IMG": preRollingUpdateImg,
+		}
+		yaml, err = testsUtils.Envsubst(envVars, data)
+		if err != nil {
+			return nil, wrapErr(err)
+		}
+	}
+	return yaml, nil
+}
+
+// DeleteResourcesFromFile deletes the Kubernetes objects described in the file
+func DeleteResourcesFromFile(namespace, sampleFilePath string) error {
+	wrapErr := func(err error) error { return fmt.Errorf("in DeleteResourcesFromFile: %w", err) }
+	yaml, err := GetYAMLContent(sampleFilePath)
+	if err != nil {
+		return wrapErr(err)
+	}
+
+	objects, err := testsUtils.ParseObjectsFromYAML(yaml, namespace)
+	if err != nil {
+		return wrapErr(err)
+	}
+	for _, obj := range objects {
+		err := testsUtils.DeleteObject(env, obj)
+		if err != nil {
+			return wrapErr(err)
+		}
+	}
+	return nil
 }
 
 // Assert in the giving cluster, all the postgres db has no pending restart

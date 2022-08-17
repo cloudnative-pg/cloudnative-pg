@@ -44,7 +44,7 @@ var _ = Describe("InitDB settings", func() {
 	Context("initdb custom post-init SQL scripts", func() {
 		const (
 			clusterName        = "p-postinit-sql"
-			postInitSQLCluster = fixturesCertificatesDir + "/cluster-postinit-sql.yaml"
+			postInitSQLCluster = fixturesCertificatesDir + "/cluster-postinit-sql.yaml.template"
 		)
 
 		var namespace string
@@ -111,7 +111,7 @@ var _ = Describe("InitDB settings", func() {
 	Context("custom default locale", func() {
 		const (
 			clusterName        = "p-locale"
-			postInitSQLCluster = fixturesCertificatesDir + "/cluster-custom-locale.yaml"
+			postInitSQLCluster = fixturesCertificatesDir + "/cluster-custom-locale.yaml.template"
 		)
 
 		var namespace string

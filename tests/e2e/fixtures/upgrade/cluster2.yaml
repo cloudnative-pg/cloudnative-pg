@@ -2,10 +2,10 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster1
+  name: cluster2
 spec:
   instances: 3
-  imageName: "${POSTGRES_IMG}"
+  imageName: ""
   description: "Example of cluster"
   startDelay: 300
   stopDelay: 300
@@ -13,10 +13,7 @@ spec:
 
   postgresql:
     parameters:
-      work_mem: "8MB"
-      shared_buffers: "128MB"
-      max_replication_slots: "16"
-      maintenance_work_mem: "128MB"
+      shared_buffers: 256MB
       log_checkpoints: "on"
       log_lock_waits: "on"
       log_min_duration_statement: '1000'
@@ -25,7 +22,7 @@ spec:
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
     pg_hba:
-      - host all all all trust
+      - host all all 10.244.0.0/16 md5
 
   bootstrap:
     initdb:
@@ -38,7 +35,7 @@ spec:
 
   backup:
     barmanObjectStore:
-      destinationPath: s3://cluster-full-backup/
+      destinationPath: s3://cluster2-full-backup/
       endpointURL: http://minio-service:9000
       s3Credentials:
         accessKeyId:
@@ -71,4 +68,3 @@ spec:
 
   storage:
     size: 1Gi
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

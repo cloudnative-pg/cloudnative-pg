@@ -37,7 +37,7 @@ import (
 var _ = Describe("PGDATA Corruption", func() {
 	const (
 		namespace   = "pg-data-corruption"
-		sampleFile  = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml"
+		sampleFile  = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml.template"
 		clusterName = "cluster-pg-data-corruption"
 		level       = tests.Medium
 	)
