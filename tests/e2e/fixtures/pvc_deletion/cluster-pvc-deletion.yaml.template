@@ -1,10 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgresql-single-instance
+  name: cluster-pvc-deletion
 spec:
-  imageName: 
-  instances: 1
+  instances: 3
 
   postgresql:
     parameters:
@@ -30,4 +29,8 @@ spec:
 
   # Persistent storage configuration
   storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
     size: 1Gi

@@ -34,8 +34,8 @@ import (
 var _ = Describe("PVC Deletion", func() {
 	const (
 		namespace   = "cluster-pvc-deletion"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		clusterName = "postgresql-storage-class"
+		sampleFile  = fixturesDir + "/pvc_deletion/cluster-pvc-deletion.yaml.template"
+		clusterName = "cluster-pvc-deletion"
 		level       = tests.Medium
 	)
 	BeforeEach(func() {
