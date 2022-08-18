@@ -50,9 +50,10 @@ a summary in Markdown, which can then be rendered in GitHub using
 """
 
 import argparse
+from datetime import datetime
 import json
 import os
-from datetime import datetime
+import pathlib
 
 def is_failed(e2e_test):
     """checks if the test failed. In ginkgo, the passing states are well defined
@@ -154,17 +155,17 @@ def compute_test_summary(test_dir):
     """iterate over the JSON artifact files in `test_dir`, and
     bucket them for comprehension.
 
-    Produces a dictionary of dictionaries:
+    Returns a dictionary of dictionaries:
 
     {
         "total_run": 0,
         "total_failed": 0,
-        "by_test": by_test,
-        "by_matrix": by_matrix,
-        "by_k8s": by_k8s,
-        "by_platform": by_platform,
-        "by_postgres": by_postgres,
-        "test_durations": test_durations,
+        "by_test": { … },
+        "by_matrix": { … },
+        "by_k8s": { … },
+        "by_platform": { … },
+        "by_postgres": { … },
+        "test_durations": { … },
     }
     """
     total_runs = 0
@@ -200,6 +201,8 @@ def compute_test_summary(test_dir):
 
     dir_listing = os.listdir(test_dir)
     for f in dir_listing:
+        if pathlib.Path(f).suffix != ".json":
+            continue
         path = os.path.join(test_dir, f)
         with open(path) as json_file:
             test_results = combine_postgres_data(json.load(json_file))
