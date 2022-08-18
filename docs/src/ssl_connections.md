@@ -10,10 +10,10 @@ Authority (CA) to create and sign TLS client certificates. Through the `cnpg` pl
 issue a new TLS client certificate which can be used to authenticate a user instead of using passwords.
 
 Please refer to the following steps to authenticate via TLS/SSL certificates, which assume you have
-installed a cluster using the [cluster-example.yaml](samples/cluster-example.yaml) deployment manifest.
-According to the convention over configuration paradigm, that file automatically creates an `app` database
-which is owned by a user called `app` (you can change this convention through the `initdb` configuration
-in the `bootstrap` section).
+installed a cluster using the [cluster-example-pg-hba.yaml](samples/cluster-example-pg-hba.yaml)
+manifest. According to the convention over configuration paradigm, that file automatically creates an `app`
+database which is owned by a user called `app` (you can change this convention through the `initdb`
+configuration in the `bootstrap` section).
 
 ## Issuing a new certificate
 
