@@ -11,12 +11,13 @@ with the following requirements:
     - `pg_controldata`
     - `pg_basebackup`
 - Barman Cloud executables that must be in the path:
-    - `barman-cloud-wal-archive`
-    - `barman-cloud-wal-restore`
     - `barman-cloud-backup`
-    - `barman-cloud-restore`
+    - `barman-cloud-backup-delete`
     - `barman-cloud-backup-list`
     - `barman-cloud-check-wal-archive`
+    - `barman-cloud-restore`
+    - `barman-cloud-wal-archive`
+    - `barman-cloud-wal-restore`
 - PGAudit extension installed (optional - only if PGAudit is required
   in the deployed clusters)
 - Sensible locale settings
