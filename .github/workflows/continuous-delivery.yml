@@ -200,7 +200,16 @@ jobs:
           ENVTEST_K8S_VERSION: ${{ matrix.k8s-version }}
         run: |
           make test
-
+      -
+        name: Coverage Summary
+        if: matrix.k8s-version == '1.23.x'
+        run: |
+          go tool cover -func=cover.out -o coverage.out
+      -
+        name: Publish unit test summary
+        if: matrix.k8s-version == '1.23.x'
+        run: |
+          echo "Unit test coverage: $(tail -n 1 coverage.out | awk '{print $3}')" >> $GITHUB_STEP_SUMMARY
   apidoc:
     name: Verify API doc is up to date
     needs:
