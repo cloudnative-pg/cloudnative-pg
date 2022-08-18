@@ -69,5 +69,8 @@ Bootstrap cluster with SQL files
 : [`cluster-example-initdb-sql-refs.yaml`](samples/cluster-example-initdb-sql-refs.yaml):
    a cluster example that will execute a set of queries defined in a Secret and a ConfigMap right after the database is created.
 
+Sample cluster with customized `pg_hba` configuration
+: [`cluster-example-pg-hba.yaml`](samples/cluster-example-pg-hba.yaml):
+  a basic cluster that enables user `app` to authenticate using certificates.
 
 For a list of available options, please refer to the ["API Reference" page](api_reference.md).

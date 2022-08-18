@@ -589,7 +589,9 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
-	r.markPVCReadyForCompletedJobs(ctx, resources)
+	if err := r.markPVCReadyForCompletedJobs(ctx, resources); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// Work on the PVCs we currently have
 	pvcNeedingMaintenance := len(cluster.Status.DanglingPVC) + len(cluster.Status.InitializingPVC)
@@ -665,8 +667,10 @@ func (r *ClusterReconciler) ensureHealthyPVCsAnnotation(
 	for _, pvcName := range cluster.Status.HealthyPVC {
 		pvc := resources.getPVC(pvcName)
 		if pvc == nil {
-			contextLogger.Warning("unable to find pvc to annotate it as ready", "pvc", pvc.Name)
-			continue
+			return fmt.Errorf(
+				"could not find the pvc: %s, from the list of managed pvc",
+				pvcName,
+			)
 		}
 
 		if pvc.Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusReady {
@@ -1060,36 +1064,35 @@ func (r *ClusterReconciler) mapNodeToClusters(ctx context.Context) handler.MapFu
 func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 	ctx context.Context,
 	resources *managedResources,
-) {
+) error {
 	contextLogger := log.FromContext(ctx)
 
 	completeJobs := utils.FilterCompleteJobs(resources.jobs.Items)
 	if len(completeJobs) == 0 {
-		return
+		return nil
 	}
 
 	for _, job := range completeJobs {
-		var pvcName string
 		for _, pvc := range resources.pvcs.Items {
-			if specs.IsJobOperatingOnPVC(job, pvc) {
-				pvcName = pvc.Name
-				break
+			pvc := pvc
+			if !specs.IsPodSpecUsingPVC(job.Spec.Template.Spec, pvc.Name) {
+				continue
+			}
+
+			roleName := job.Labels[utils.JobRoleLabelName]
+			contextLogger.Info("job has been finished, setting PVC as ready",
+				"pvcName", pvc.Name,
+				"role", roleName,
+			)
+
+			if err := r.setPVCStatusReady(ctx, &pvc); err != nil {
+				contextLogger.Error(err, "unable to annotate PVC as ready")
+				return err
 			}
 		}
-		if pvcName == "" {
-			continue
-		}
-
-		// finding the PVC having the same name as pod
-		pvc := resources.getPVC(pvcName)
-
-		roleName := job.Labels[utils.JobRoleLabelName]
-		contextLogger.Info("job has been finished, setting PVC as ready", "pod", pvcName, "role", roleName)
-		err := r.setPVCStatusReady(ctx, pvc)
-		if err != nil {
-			contextLogger.Error(err, "unable to annotate PVC as ready")
-		}
 	}
+
+	return nil
 }
 
 // TODO: only required to cleanup custom monitoring queries configmaps from older versions (v1.10 and v1.11)

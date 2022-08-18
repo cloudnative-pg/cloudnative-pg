@@ -25,6 +25,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
+// pgWalVolumePath its the path used by the WAL volume when present
+const pgWalVolumePath = "/var/lib/postgresql/wal"
+
 func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
 		{
@@ -75,6 +78,18 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 				},
 			},
 		)
+	}
+
+	if cluster.ShouldCreateWalArchiveVolume() {
+		result = append(result,
+			corev1.Volume{
+				Name: "pg-wal",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: podName + cluster.GetWalArchiveVolumeSuffix(),
+					},
+				},
+			})
 	}
 
 	return result
@@ -175,6 +190,15 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 			corev1.VolumeMount{
 				Name:      "app-secret",
 				MountPath: "/etc/app-secret",
+			},
+		)
+	}
+
+	if cluster.ShouldCreateWalArchiveVolume() {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      "pg-wal",
+				MountPath: pgWalVolumePath,
 			},
 		)
 	}
