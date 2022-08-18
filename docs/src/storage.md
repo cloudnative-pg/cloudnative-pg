@@ -67,6 +67,10 @@ Briefly, `cnp-bench` is designed to operate at two levels:
 The operator creates a persistent volume claim (PVC) for each PostgreSQL
 instance, with the goal to store the `PGDATA`, and then mounts it into each Pod.
 
+Additionally, it supports the creation of clusters with a separate PVC
+on which to store PostgreSQL Write-Ahead Log (WAL), as explained in the
+["Volume for WAL" section](#volume-for-wal) below.
+
 ## Configuration via a storage class
 
 The easier way to configure the storage for a PostgreSQL class is to just
@@ -127,6 +131,66 @@ spec:
       storageClassName: standard
       volumeMode: Filesystem
 ```
+
+## Volume for WAL
+
+By default, PostgreSQL stores all its data in the so-called `PGDATA` (a directory).
+One of the core directories inside `PGDATA` is `pg_wal` (historically
+known as `pg_xlog` in PostgreSQL), which contains the log of transactional
+changes occurred in the database, in the form of segment files.
+
+!!! Info
+    Normally, each segment is 16 MB in size, but the size can be configured
+    through the `walSegmentSize` option, applied at cluster initialization time, as
+    described in ["Bootstrap an empty cluster"](bootstrap.md#bootstrap-an-empty-cluster-initdb).
+
+While in most cases, having `pg_wal` on the same volume where `PGDATA`
+resides is fine, there are a few benefits from having WALs stored in a separate
+volume:
+
+- **I/O performance**: by storing WAL files on different storage than `PGDATA`,
+  PostgreSQL can exploit parallel I/O for WAL operations (normally
+  sequential writes) and for data files (tables and indexes for example), thus
+  improving vertical scalability
+
+- **more reliability**: by reserving dedicated disk space to WAL files, you
+  can always be sure that exhaustion of space on the `PGDATA` volume will
+  never interfere with WAL writing, ensuring that your PostgreSQL primary
+  is correctly shut down.
+
+- **finer control**: you can define the amount of space dedicated to both
+  `PGDATA` and `pg_wal`, fine tune [WAL
+  configuration](https://www.postgresql.org/docs/current/wal-configuration.html)
+  and checkpoints, even use a different storage class for cost optimization
+
+- **better I/O monitoring**: you can constantly monitor the load and disk usage
+  on both `PGDATA` and `pg_wal`, and set proper alerts that notify you in case,
+  for example, `PGDATA` requires resizing
+
+
+!!! Seealso "Write-Ahead Log (WAL)"
+    Please refer to the ["Reliability and the Write-Ahead Log" page](https://www.postgresql.org/docs/current/wal.html)
+    from the official PostgreSQL documentation for more information.
+
+You can add a separate volume for WAL through the `.spec.walStorage` option,
+which follows the same rules described for the `storage` field and provisions a
+dedicated PVC. For example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: separate-pgwal-volume
+spec:
+  instances: 3
+  storage:
+    size: 1Gi
+  walStorage:
+    size: 1Gi
+```
+
+!!! Important
+    `walStorage` initialization is only supported during cluster creation.
 
 ## Volume expansion
 
@@ -295,6 +359,17 @@ As an example, to recreate the storage for `cluster-example-3` you can:
 $ kubectl delete pvc/cluster-example-3 pod/cluster-example-3
 ```
 
+!!! Important
+    In case you have created a dedicated WAL volume, both PVCs will have to be deleted during this process.
+    Additionally, the same procedure applies in case you want to regenerate the WAL volume PVC, which can be done
+    by disabling `resizeInUseVolumes` also for the `.spec.walStorage` section.
+
+For example (in case a PVC dedicated to WAL storage is present):
+
+```
+$ kubectl delete pvc/cluster-example-3 pvc/cluster-example-3-wal pod/cluster-example-3
+```
+
 Having done that, the operator will orchestrate the creation of another replica with a
 resized PVC:
 
@@ -303,6 +378,6 @@ $ kubectl get pods
 NAME                           READY   STATUS      RESTARTS   AGE
 cluster-example-1              1/1     Running     0          5m58s
 cluster-example-2              1/1     Running     0          5m43s
-cluster-example-4-join-v2bfg   0/1     Completed   0          17s
+cluster-example-4-join-v2      0/1     Completed   0          17s
 cluster-example-4              1/1     Running     0          10s
 ```

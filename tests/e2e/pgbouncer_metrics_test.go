@@ -32,7 +32,7 @@ import (
 
 var _ = Describe("PGBouncer Metrics", func() {
 	const (
-		cnpgCluster                 = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml"
+		cnpgCluster                 = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml.template"
 		poolerBasicAuthRWSampleFile = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-rw.yaml"
 		namespace                   = "pgbouncer-metrics-e2e"
 		level                       = tests.Low

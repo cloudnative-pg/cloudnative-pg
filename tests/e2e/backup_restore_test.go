@@ -38,7 +38,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 	const (
 		level = tests.High
 
-		azuriteBlobSampleFile = fixturesDir + "/backup/azurite/cluster-backup.yaml"
+		azuriteBlobSampleFile = fixturesDir + "/backup/azurite/cluster-backup.yaml.template"
 
 		tableName = "to_restore"
 	)
@@ -64,7 +64,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 		const (
 			backupFile                 = fixturesDir + "/backup/minio/backup-minio.yaml"
-			clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml"
+			clusterWithMinioSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio.yaml.template"
 			customQueriesSampleFile    = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
 			minioCaSecName             = "minio-server-ca-secret"
 			minioTLSSecName            = "minio-server-tls-secret"
@@ -170,7 +170,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				targetDBTwo              = "test1"
 				targetDBSecret           = "secret_test"
 				testTableName            = "test_table"
-				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore.yaml"
+				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore.yaml.template"
 			)
 
 			restoredClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
@@ -234,9 +234,10 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				testTableName            = "test_table"
 				clusterRestoreSampleFile = fixturesDir + "/backup/cluster-from-restore-custom.yaml"
 				// clusterWithMinioCustomSampleFile has metadata.name != backup.barmanObjectStore.serverName
-				clusterWithMinioCustomSampleFile = fixturesDir + "/backup/minio/cluster-with-backup-minio-custom-servername.yaml"
-				backupFileCustom                 = fixturesDir + "/backup/minio/backup-minio-custom-servername.yaml"
-				clusterServerName                = "pg-backup-minio-Custom-Name"
+				clusterWithMinioCustomSampleFile = fixturesDir +
+					"/backup/minio/cluster-with-backup-minio-custom-servername.yaml.template"
+				backupFileCustom  = fixturesDir + "/backup/minio/backup-minio-custom-servername.yaml"
+				clusterServerName = "pg-backup-minio-Custom-Name"
 			)
 
 			customClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioCustomSampleFile)
@@ -365,8 +366,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		// We must be careful here. All the clusters use the same remote storage
 		// and that means that we must use different cluster names otherwise
 		// we risk mixing WALs and backups
-		const azureBlobSampleFile = fixturesDir + "/backup/azure_blob/cluster-with-backup-azure-blob.yaml"
-		const clusterRestoreSampleFile = fixturesDir + "/backup/azure_blob/cluster-from-restore.yaml"
+		const azureBlobSampleFile = fixturesDir + "/backup/azure_blob/cluster-with-backup-azure-blob.yaml.template"
+		const clusterRestoreSampleFile = fixturesDir + "/backup/azure_blob/cluster-from-restore.yaml.template"
 		const scheduledBackupSampleFile = fixturesDir +
 			"/backup/scheduled_backup_immediate/scheduled-backup-immediate-azure-blob.yaml"
 		backupFile := fixturesDir + "/backup/azure_blob/backup-azure-blob.yaml"
@@ -486,7 +487,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		// namespace as the cluster. Since each cluster is installed in its
 		// own namespace, they can share the configuration file
 		const (
-			clusterRestoreSampleFile  = fixturesDir + "/backup/azurite/cluster-from-restore.yaml"
+			clusterRestoreSampleFile  = fixturesDir + "/backup/azurite/cluster-from-restore.yaml.template"
 			scheduledBackupSampleFile = fixturesDir +
 				"/backup/scheduled_backup_suspend/scheduled-backup-suspend-azurite.yaml"
 			scheduledBackupImmediateSampleFile = fixturesDir +
@@ -582,21 +583,21 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.LabelBackupRestore), func() {
 	const (
 		fixturesBackupDir               = fixturesDir + "/backup/recovery_external_clusters/"
-		azuriteBlobSampleFile           = fixturesDir + "/backup/azurite/cluster-backup.yaml"
-		externalClusterFileMinio        = fixturesBackupDir + "external-clusters-minio-03.yaml"
-		externalClusterFileMinioReplica = fixturesBackupDir + "external-clusters-minio-replica-04.yaml"
+		azuriteBlobSampleFile           = fixturesDir + "/backup/azurite/cluster-backup.yaml.template"
+		externalClusterFileMinio        = fixturesBackupDir + "external-clusters-minio-03.yaml.template"
+		externalClusterFileMinioReplica = fixturesBackupDir + "external-clusters-minio-replica-04.yaml.template"
 		sourceTakeFirstBackupFileMinio  = fixturesBackupDir + "backup-minio-02.yaml"
 		sourceTakeSecondBackupFileMinio = fixturesBackupDir + "backup-minio-03.yaml"
 		sourceTakeThirdBackupFileMinio  = fixturesBackupDir + "backup-minio-04.yaml"
-		clusterSourceFileMinio          = fixturesBackupDir + "source-cluster-minio-01.yaml"
+		clusterSourceFileMinio          = fixturesBackupDir + "source-cluster-minio-01.yaml.template"
 		sourceBackupFileAzure           = fixturesBackupDir + "backup-azure-blob-02.yaml"
-		clusterSourceFileAzure          = fixturesBackupDir + "source-cluster-azure-blob-01.yaml"
+		clusterSourceFileAzure          = fixturesBackupDir + "source-cluster-azure-blob-01.yaml.template"
 		externalClusterFileAzure        = fixturesBackupDir + "external-clusters-azure-blob-03.yaml"
 		sourceBackupFileAzurePITR       = fixturesBackupDir + "backup-azure-blob-pitr.yaml"
-		externalClusterFileAzurite      = fixturesBackupDir + "external-clusters-azurite-03.yaml"
+		externalClusterFileAzurite      = fixturesBackupDir + "external-clusters-azurite-03.yaml.template"
 		backupFileAzurite               = fixturesBackupDir + "backup-azurite-02.yaml"
 		tableName                       = "to_restore"
-		clusterSourceFileAzureSAS       = fixturesBackupDir + "cluster-with-backup-azure-blob-sas.yaml"
+		clusterSourceFileAzureSAS       = fixturesBackupDir + "cluster-with-backup-azure-blob-sas.yaml.template"
 		clusterRestoreFileAzureSAS      = fixturesBackupDir + "cluster-from-restore-sas.yaml"
 		sourceBackupFileAzureSAS        = fixturesBackupDir + "backup-azure-blob-sas.yaml"
 		sourceBackupFileAzurePITRSAS    = fixturesBackupDir + "backup-azure-blob-pitr-sas.yaml"
@@ -994,7 +995,7 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 	const (
 		level = tests.High
 
-		clusterSampleFile = fixturesDir + "/backup/backup_restore_safety/cluster-with-backup-minio.yaml"
+		clusterSampleFile = fixturesDir + "/backup/backup_restore_safety/cluster-with-backup-minio.yaml.template"
 	)
 
 	var namespace, clusterName, namespace2 string
@@ -1016,10 +1017,10 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 		// in case user configures the same destination path for more backups
 
 		const (
-			clusterRestoreSampleFile  = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio.yaml"
-			clusterRestoreSampleFile2 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-2.yaml"
-			clusterRestoreSampleFile3 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-3.yaml"
-			clusterRestoreSampleFile4 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-4.yaml"
+			clusterRestoreSampleFile  = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio.yaml.template"
+			clusterRestoreSampleFile2 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-2.yaml.template"
+			clusterRestoreSampleFile3 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-3.yaml.template"
+			clusterRestoreSampleFile4 = fixturesDir + "/backup/backup_restore_safety/external-clusters-minio-4.yaml.template"
 			sourceBackup              = fixturesDir + "/backup/backup_restore_safety/backup-source-cluster.yaml"
 			restoreBackup             = fixturesDir + "/backup/backup_restore_safety/backup-cluster-2.yaml"
 		)
@@ -1092,10 +1093,9 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 
 		It("restore a cluster with same backup destination path as source and it fails", func() {
 			// Restoring cluster with same destination path.
-			_, stderr, err := testUtils.RunUnchecked("kubectl apply -n " + namespace + " -f " + clusterRestoreSampleFile)
+			err := CreateResourcesFromFileWithError(namespace, clusterRestoreSampleFile)
 			Expect(err).To(HaveOccurred())
-			// Asserting if the cluster pods have this error info.
-			Expect(strings.Contains(stderr, "Cannot be equal to the ExternalCluster")).Should(BeTrue())
+			Expect(strings.Contains(err.Error(), "Cannot be equal to the ExternalCluster"))
 		})
 
 		It("restore a cluster with different backup destination and creates another cluster with same path as "+
@@ -1104,18 +1104,24 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 			Expect(err).ToNot(HaveOccurred())
 
 			// Deleting  source cluster since we have backup to restore.
-			_, _, err = testUtils.RunUnchecked("kubectl delete -f " + clusterSampleFile + " -n " + namespace)
-			Expect(err).ToNot(HaveOccurred())
+			By("deleting the original cluster", func() {
+				err = DeleteResourcesFromFile(namespace, clusterSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+			})
 
 			// Restoring cluster form source backup
 			AssertCreateCluster(namespace, restoredClusterName, clusterRestoreSampleFile2, env)
 
 			// Taking backup of restore cluster which will be used to create another cluster further
-			testUtils.ExecuteBackup(namespace, restoreBackup, env)
+			By("taking backup of the restore cluster", func() {
+				testUtils.ExecuteBackup(namespace, restoreBackup, env)
+			})
 
 			// Restoring cluster from second backup
-			_, _, err = testUtils.RunUnchecked("kubectl apply -n " + namespace + " -f " + clusterRestoreSampleFile3)
-			Expect(err).ToNot(HaveOccurred())
+			By("restoring the cluster from the second backup", func() {
+				err = CreateResourcesFromFileWithError(namespace, clusterRestoreSampleFile3)
+				Expect(err).ShouldNot(HaveOccurred())
+			})
 
 			// Verifying the cluster creation errors since it will fail
 			// it must have the error log message for barman cloud.
@@ -1148,14 +1154,15 @@ var _ = Describe("Backup and restore Safety", Label(tests.LabelBackupRestore), f
 
 		It("restore a cluster with different backup destination and creates another cluster with same "+
 			"backup destination as restored cluster and it fails", func() {
-			_, _, err := testUtils.RunUnchecked("kubectl delete -f " + clusterRestoreSampleFile3 + " -n " + namespace)
+			err := DeleteResourcesFromFile(namespace, clusterRestoreSampleFile3)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the credentials for minio", func() {
 				AssertStorageCredentialsAreCreated(namespace2, "backup-storage-creds", "minio", "minio123")
 			})
-			_, _, err = testUtils.RunUnchecked("kubectl apply -n " + namespace2 + " -f " + clusterRestoreSampleFile4)
-			Expect(err).ToNot(HaveOccurred())
+
+			err = CreateResourcesFromFileWithError(namespace2, clusterRestoreSampleFile4)
+			Expect(err).ShouldNot(HaveOccurred())
 
 			// Verifying the cluster creation errors since it will fail
 			// it must have the error log message for barman cloud.

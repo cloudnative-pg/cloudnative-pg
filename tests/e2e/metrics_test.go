@@ -39,8 +39,8 @@ var _ = Describe("Metrics", func() {
 		targetDBTwo                    = "test1"
 		targetDBSecret                 = "secret_test"
 		testTableName                  = "test_table"
-		clusterMetricsFile             = fixturesDir + "/metrics/cluster-metrics.yaml"
-		clusterMetricsDBFile           = fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml"
+		clusterMetricsFile             = fixturesDir + "/metrics/cluster-metrics.yaml.template"
+		clusterMetricsDBFile           = fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml.template"
 		customQueriesSampleFile        = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
 		defaultMonitoringConfigMapName = "cnpg-default-monitoring"
 		level                          = tests.Low
@@ -141,7 +141,7 @@ var _ = Describe("Metrics", func() {
 	})
 
 	It("can gather default metrics details", func() {
-		const clusterWithDefaultMetricsFile = fixturesDir + "/base/cluster-storage-class.yaml"
+		const clusterWithDefaultMetricsFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		namespace = "default-metrics-details"
 		metricsClusterName, err = env.GetResourceNameFromYAML(clusterWithDefaultMetricsFile)
 		Expect(err).ToNot(HaveOccurred())
@@ -175,7 +175,8 @@ var _ = Describe("Metrics", func() {
 
 	It("default set of metrics queries should not be injected into the cluster "+
 		"when disableDefaultQueries field set to be true", func() {
-		const defaultMonitoringQueriesDisableSampleFile = fixturesDir + "/metrics/cluster-disable-default-metrics.yaml"
+		const defaultMonitoringQueriesDisableSampleFile = fixturesDir +
+			"/metrics/cluster-disable-default-metrics.yaml.template"
 		namespace = "disable-default-metrics"
 		metricsClusterName, err = env.GetResourceNameFromYAML(defaultMonitoringQueriesDisableSampleFile)
 		Expect(err).ToNot(HaveOccurred())
@@ -199,8 +200,8 @@ var _ = Describe("Metrics", func() {
 	It("execute custom queries against the application database on replica clusters", func() {
 		const (
 			replicaModeClusterDir    = "/replica_mode_cluster/"
-			replicaClusterSampleFile = fixturesDir + "/metrics/cluster-replica-tls-with-metrics.yaml"
-			srcClusterSampleFile     = fixturesDir + replicaModeClusterDir + "cluster-replica-src.yaml"
+			replicaClusterSampleFile = fixturesDir + "/metrics/cluster-replica-tls-with-metrics.yaml.template"
+			srcClusterSampleFile     = fixturesDir + replicaModeClusterDir + "cluster-replica-src.yaml.template"
 			configMapFIle            = fixturesDir + "/metrics/custom-queries-for-replica-cluster.yaml"
 			checkQuery               = "SELECT count(*) FROM test_replica"
 		)

@@ -55,8 +55,8 @@ import (
 var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 	const (
 		level                    = tests.Low
-		singleInstanceSampleFile = fixturesDir + "/eviction/single-instance-cluster.yaml"
-		multiInstanceSampleFile  = fixturesDir + "/eviction/multi-instance-cluster.yaml"
+		singleInstanceSampleFile = fixturesDir + "/eviction/single-instance-cluster.yaml.template"
+		multiInstanceSampleFile  = fixturesDir + "/eviction/multi-instance-cluster.yaml.template"
 	)
 
 	evictPod := func(podName string, namespace string, env *testsUtils.TestingEnvironment, timeoutSeconds uint) error {

@@ -39,6 +39,13 @@ TEMP_DIR="$(mktemp -d)"
 LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
 trap 'rm -fr ${TEMP_DIR}' EXIT
 
+# Operating System and Architecture
+OS=$(uname | tr '[:upper:]' '[:lower:]')
+case $(uname -m) in
+  x86_64) ARCH="amd64" ;;
+  aarch64) ARCH="arm64" ;;
+esac
+
 # Constants
 registry_volume=registry_dev_data
 registry_name=registry.dev
@@ -80,7 +87,7 @@ install_kind() {
       sed 's/.*"tag_name":"\([^"]\+\)".*/\1/'
   )}
 
-  curl -s -L "https://kind.sigs.k8s.io/dl/${version}/kind-$(uname)-amd64" -o "${binary}"
+  curl -s -L "https://kind.sigs.k8s.io/dl/${version}/kind-${OS}-${ARCH}" -o "${binary}"
   chmod +x "${binary}"
 }
 
@@ -268,11 +275,8 @@ install_kubectl() {
   local bindir=$1
 
   local binary="${bindir}/kubectl"
-  local os
 
-  # Requires 'tr' for Darwin vs darwin issue
-  os=$(uname | tr '[:upper:]' '[:lower:]')
-  curl -sL "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION#v}/bin/${os}/amd64/kubectl" -o "${binary}"
+  curl -sL "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION#v}/bin/${OS}/${ARCH}/kubectl" -o "${binary}"
   chmod +x "${binary}"
 }
 

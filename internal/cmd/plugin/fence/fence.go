@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -56,7 +57,7 @@ func ApplyFenceFunc(
 	clusterName string,
 	namespace string,
 	serverName string,
-	fenceFunc func(string, map[string]string) error,
+	fenceFunc func(string, *metav1.ObjectMeta) error,
 ) error {
 	var cluster apiv1.Cluster
 
@@ -76,10 +77,7 @@ func ApplyFenceFunc(
 	}
 
 	fencedCluster := cluster.DeepCopy()
-	if fencedCluster.Annotations == nil {
-		fencedCluster.Annotations = make(map[string]string)
-	}
-	if err = fenceFunc(serverName, fencedCluster.Annotations); err != nil {
+	if err = fenceFunc(serverName, &fencedCluster.ObjectMeta); err != nil {
 		return err
 	}
 	fencedCluster.ManagedFields = nil

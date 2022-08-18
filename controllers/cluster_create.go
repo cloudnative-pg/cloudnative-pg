@@ -897,24 +897,26 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
-	pvcSpec, err := specs.CreatePVC(cluster, cluster.Spec.StorageConfiguration, nodeSerial)
-	if err != nil {
-		if err == specs.ErrorInvalidSize {
-			// This error should have been caught by the validating
-			// webhook, but since we are here the user must have disabled server-side
-			// validation, and we must react.
-			contextLogger.Info("The size specified for the cluster is not valid",
-				"size",
-				cluster.Spec.StorageConfiguration.Size)
-			return ctrl.Result{RequeueAfter: time.Minute}, nil
-		}
-		return ctrl.Result{}, err
+	if err := r.createPVC(
+		ctx,
+		cluster,
+		cluster.Spec.StorageConfiguration,
+		nodeSerial,
+		utils.PVCRolePgData,
+	); err != nil {
+		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
-	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, cluster)
-	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-		contextLogger.Error(err, "Unable to create a PVC for this node", "nodeSerial", nodeSerial)
-		return ctrl.Result{}, err
+	if cluster.ShouldCreateWalArchiveVolume() {
+		if err := r.createPVC(
+			ctx,
+			cluster,
+			*cluster.Spec.WalStorage,
+			nodeSerial,
+			utils.PVCRolePgWal,
+		); err != nil {
+			return ctrl.Result{RequeueAfter: time.Minute}, err
+		}
 	}
 
 	// We are bootstrapping a cluster and in need to create the first node
@@ -1072,26 +1074,26 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	pvcSpec, err := specs.CreatePVC(cluster, cluster.Spec.StorageConfiguration, nodeSerial)
-	if err != nil {
-		if err == specs.ErrorInvalidSize {
-			// This error should have been caught by the validating
-			// webhook, but since we are here the user must have disabled server-side
-			// validation and we must react.
-			contextLogger.Info("The size specified for the cluster is not valid",
-				"size",
-				cluster.Spec.StorageConfiguration.Size)
-			return ctrl.Result{RequeueAfter: time.Minute}, ErrNextLoop
-		}
-		return ctrl.Result{}, fmt.Errorf("unable to create a PVC spec for node with serial %v: %w", nodeSerial, err)
+	if err := r.createPVC(
+		ctx,
+		cluster,
+		cluster.Spec.StorageConfiguration,
+		nodeSerial,
+		utils.PVCRolePgData,
+	); err != nil {
+		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
 
-	SetClusterOwnerAnnotationsAndLabels(&pvcSpec.ObjectMeta, cluster)
-
-	if err = r.Create(ctx, pvcSpec); err != nil && !apierrs.IsAlreadyExists(err) {
-		return ctrl.Result{}, fmt.Errorf("unable to create a PVC for this node (nodeSerial: %d): %w",
+	if cluster.ShouldCreateWalArchiveVolume() {
+		if err := r.createPVC(
+			ctx,
+			cluster,
+			*cluster.Spec.WalStorage,
 			nodeSerial,
-			err)
+			utils.PVCRolePgWal,
+		); err != nil {
+			return ctrl.Result{RequeueAfter: time.Minute}, err
+		}
 	}
 
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, ErrNextLoop
@@ -1137,6 +1139,12 @@ func (r *ClusterReconciler) reconcilePVCs(
 	}
 
 	pvc := resources.getPVC(pvcToReattach)
+	if pvc == nil {
+		return ctrl.Result{}, fmt.Errorf(
+			"the pvc: %s was nominated to be reattached but it could not be found from the pvc list",
+			pvcToReattach,
+		)
+	}
 
 	// This should not happen. However, we put this guard here
 	// as an assertion to catch unexpected events.
@@ -1156,9 +1164,9 @@ func (r *ClusterReconciler) reconcilePVCs(
 	pod := specs.PodWithExistingStorage(*cluster, nodeSerial)
 
 	if configuration.Current.EnableAzurePVCUpdates {
-		for _, resizingPVC := range cluster.Status.ResizingPVC {
-			// This code works on the assumption that the PVC have the same name as the pod using it.
-			if resizingPVC == pvc.Name {
+		for _, pvcName := range cluster.Status.ResizingPVC {
+			// if the pvc is in resizing state we requeue and wait
+			if pvcName == pvc.Name {
 				contextLogger.Info("PVC is in resizing status, retrying in 5 seconds", "pod", pod.Name)
 				return ctrl.Result{RequeueAfter: 5 * time.Second}, ErrNextLoop
 			}
@@ -1213,9 +1221,9 @@ func electPvcToReattach(cluster *apiv1.Cluster) string {
 		return ""
 	}
 
-	for _, name := range pvcs {
-		if name == cluster.Status.TargetPrimary {
-			return name
+	for _, pvc := range pvcs {
+		if specs.DoesPVCBelongToInstance(cluster, cluster.Status.TargetPrimary, pvc) {
+			return pvc
 		}
 	}
 
@@ -1244,6 +1252,42 @@ func (r *ClusterReconciler) removeDanglingPVCs(ctx context.Context, cluster *api
 			}
 			return fmt.Errorf("removing unneeded PVC %v: %v", pvc.Name, err)
 		}
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) createPVC(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	storageConfiguration apiv1.StorageConfiguration,
+	nodeSerial int,
+	role utils.PVCRole,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	pvc, err := specs.CreatePVC(storageConfiguration, *cluster, nodeSerial, role)
+	if err != nil {
+		if err == specs.ErrorInvalidSize {
+			// This error should have been caught by the validating
+			// webhook, but since we are here the user must have disabled server-side
+			// validation, and we must react.
+			contextLogger.Info("The size specified for the cluster is not valid",
+				"size",
+				storageConfiguration.Size)
+			return ErrNextLoop
+		}
+		return fmt.Errorf("unable to create a PVC spec for node with serial %v: %w", nodeSerial, err)
+	}
+
+	SetClusterOwnerAnnotationsAndLabels(&pvc.ObjectMeta, cluster)
+
+	if err = r.Create(ctx, pvc); err != nil && !apierrs.IsAlreadyExists(err) {
+		return fmt.Errorf("unable to create a PVC: %s for this node (nodeSerial: %d): %w",
+			pvc.Name,
+			nodeSerial,
+			err,
+		)
 	}
 
 	return nil

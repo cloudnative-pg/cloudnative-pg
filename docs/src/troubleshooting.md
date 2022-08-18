@@ -511,5 +511,5 @@ PODNAME=<POD>
 VOLNAME=$(kubectl get pv -o json | \
   jq -r '.items[]|select(.spec.claimRef.name=='\"$PODNAME\"')|.metadata.name')
 
-kubectl delete pod/$PODNAME pvc/$PODNAME pv/$VOLNAME
+kubectl delete pod/$PODNAME pvc/$PODNAME pvc/$PODNAME-wal pv/$VOLNAME
 ```

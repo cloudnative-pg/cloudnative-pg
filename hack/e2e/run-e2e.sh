@@ -42,10 +42,6 @@ notinpath () {
 # Process the e2e templates
 export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 export AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT:-''}
-find "${ROOT_DIR}"/tests/*/fixtures -name "*.template" | \
-while read -r f; do
-  envsubst <"${f}" >"${f%.template}"
-done
 
 # Getting the operator images need a pull secret
 kubectl create namespace cnpg-system
