@@ -38,7 +38,7 @@ import (
 var _ = Describe("Failover", func() {
 	const (
 		namespace   = "failover-e2e"
-		sampleFile  = samplesDir + "/cluster-storage-class.yaml"
+		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		clusterName = "postgresql-storage-class"
 		level       = tests.Medium
 	)
