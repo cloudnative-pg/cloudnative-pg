@@ -102,24 +102,24 @@ var _ = Describe("Sacrificial Pod detection", func() {
 
 	It("detects if the list of Pods is empty", func() {
 		var podList []corev1.Pod
-		Expect(getSacrificialPod(podList)).To(BeNil())
+		Expect(getSacrificialInstance(podList)).To(BeNil())
 	})
 
 	It("detects if we have not a ready Pod", func() {
 		podList := []corev1.Pod{foo, bar}
-		Expect(getSacrificialPod(podList)).To(BeNil())
+		Expect(getSacrificialInstance(podList)).To(BeNil())
 	})
 
 	It("detects it if is the first available", func() {
 		podList := []corev1.Pod{foo, bar, car1, car2}
-		result := getSacrificialPod(podList)
+		result := getSacrificialInstance(podList)
 		Expect(result).ToNot(BeNil())
 		Expect(result.Name).To(Equal("car-2"))
 	})
 
 	It("detects it if is not the first one", func() {
 		podList := []corev1.Pod{car2, foo, bar, car1}
-		result := getSacrificialPod(podList)
+		result := getSacrificialInstance(podList)
 		Expect(result).ToNot(BeNil())
 		Expect(result.Name).To(Equal("car-2"))
 	})

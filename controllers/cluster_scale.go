@@ -53,18 +53,18 @@ func (r *ClusterReconciler) scaleDownCluster(
 	}
 
 	// Is there one pod to be deleted?
-	sacrificialPod := getSacrificialPod(resources.pods.Items)
-	if sacrificialPod == nil {
+	sacrificialInstance := getSacrificialInstance(resources.instances.Items)
+	if sacrificialInstance == nil {
 		contextLogger.Info("There are no instances to be sacrificed. Wait for the next sync loop")
 		return nil
 	}
 
 	r.Recorder.Eventf(cluster, "Normal", "ScaleDown",
-		"Scaling down: removing instance %v", sacrificialPod.Name)
+		"Scaling down: removing instance %v", sacrificialInstance.Name)
 
 	contextLogger.Info("Too many nodes for cluster, deleting an instance",
-		"pod", sacrificialPod.Name)
-	if err := r.Delete(ctx, sacrificialPod); err != nil {
+		"pod", sacrificialInstance.Name)
+	if err := r.Delete(ctx, sacrificialInstance); err != nil {
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
 			return fmt.Errorf("cannot kill the Pod to scale down: %w", err)
@@ -74,8 +74,8 @@ func (r *ClusterReconciler) scaleDownCluster(
 	// Let's drop the PVC too
 	pvc := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      sacrificialPod.Name,
-			Namespace: sacrificialPod.Namespace,
+			Name:      sacrificialInstance.Name,
+			Namespace: sacrificialInstance.Namespace,
 		},
 	}
 
@@ -83,13 +83,13 @@ func (r *ClusterReconciler) scaleDownCluster(
 	if err != nil {
 		// Ignore if NotFound, otherwise report the error
 		if !apierrs.IsNotFound(err) {
-			return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialPod.Name, err)
+			return fmt.Errorf("scaling down node (pvc) %v: %v", sacrificialInstance.Name, err)
 		}
 	}
 
 	// And now also the Job
 	for idx := range resources.jobs.Items {
-		if strings.HasPrefix(resources.jobs.Items[idx].Name, sacrificialPod.Name+"-") {
+		if strings.HasPrefix(resources.jobs.Items[idx].Name, sacrificialInstance.Name+"-") {
 			// This job was working against the PVC of this Pod,
 			// let's remove it
 			foreground := metav1.DeletePropagationForeground
@@ -103,7 +103,7 @@ func (r *ClusterReconciler) scaleDownCluster(
 			if err != nil {
 				// Ignore if NotFound, otherwise report the error
 				if !apierrs.IsNotFound(err) {
-					return fmt.Errorf("scaling down node (job) %v: %v", sacrificialPod.Name, err)
+					return fmt.Errorf("scaling down node (job) %v: %v", sacrificialInstance.Name, err)
 				}
 			}
 		}
