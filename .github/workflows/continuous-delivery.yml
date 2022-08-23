@@ -722,7 +722,8 @@ jobs:
 
       - name: Compute the E2E test summary
         run: |
-          python .github/summarize-test-results.py --dir test-artifacts >> $GITHUB_STEP_SUMMARY
+          python .github/summarize_test_results.py --dir test-artifacts >> $GITHUB_STEP_SUMMARY
+
       - name: Delete the downloaded files
         run: rm -rf test-artifacts
 
