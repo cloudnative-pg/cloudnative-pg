@@ -69,14 +69,15 @@ func CreatePVC(
 	storageConfiguration apiv1.StorageConfiguration,
 	nodeSerial int,
 ) (*corev1.PersistentVolumeClaim, error) {
-	pvcName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	instanceName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	pvcName := instanceName
 
 	result := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pvcName,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				utils.InstanceNameLabelName: pvcName,
+				utils.InstanceNameLabelName: instanceName,
 			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
