@@ -72,7 +72,8 @@ func CreatePVC(
 	nodeSerial int,
 	role utils.PVCRole,
 ) (*corev1.PersistentVolumeClaim, error) {
-	pvcName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	instanceName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	pvcName := instanceName
 	if role == utils.PVCRolePgWal {
 		pvcName += cluster.GetWalArchiveVolumeSuffix()
 	}
@@ -82,7 +83,8 @@ func CreatePVC(
 			Name:      pvcName,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				utils.PvcRoleLabelName: string(role),
+				utils.InstanceLabelName: instanceName,
+				utils.PvcRoleLabelName:  string(role),
 			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),
