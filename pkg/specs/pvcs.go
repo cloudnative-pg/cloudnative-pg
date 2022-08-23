@@ -76,8 +76,7 @@ func CreatePVC(
 			Name:      pvcName,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				utils.InstanceLabelName: pvcName,
-				utils.ClusterLabelName:  cluster.Name,
+				utils.InstanceNameLabelName: pvcName,
 			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),

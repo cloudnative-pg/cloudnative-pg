@@ -154,7 +154,7 @@ var _ = Describe("cluster_status unit tests", func() {
 				Eventually(func() (*managedResources, error) {
 					return crReconciler.getManagedResources(ctx, cluster)
 				}).Should(Satisfy(func(mr *managedResources) bool {
-					return len(mr.pods.Items) == len(pods) &&
+					return len(mr.instances.Items) == len(pods) &&
 						len(mr.jobs.Items) == len(jobs) &&
 						len(mr.pvcs.Items) == len(pvcs)
 				}))

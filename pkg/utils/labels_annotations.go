@@ -32,8 +32,11 @@ const (
 	// JobRoleLabelName is the name of the label containing the purpose of the executed job
 	JobRoleLabelName = "cnpg.io/jobRole"
 
-	// InstanceLabelName is the name of the label containing the instance name
-	InstanceLabelName = "cnpg.io/instanceName"
+	// PvcRoleLabelName is the name of the label containing the purpose of the pvc
+	PvcRoleLabelName = "cnpg.io/pvcRole"
+
+	// InstanceNameLabelName is the name of the label containing the instance name
+	InstanceNameLabelName = "cnpg.io/instanceName"
 
 	// OperatorVersionAnnotationName is the name of the annotation containing
 	// the version of the operator that generated a certain object

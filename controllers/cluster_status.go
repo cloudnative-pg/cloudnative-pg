@@ -61,9 +61,9 @@ var StatusRequestRetry = wait.Backoff{
 // managedResources contains the resources that are created a cluster
 // and need to be managed by the controller
 type managedResources struct {
-	pods corev1.PodList
-	pvcs corev1.PersistentVolumeClaimList
-	jobs batchv1.JobList
+	instances corev1.PodList
+	pvcs      corev1.PersistentVolumeClaimList
+	jobs      batchv1.JobList
 }
 
 // Count the number of jobs that are still running
@@ -74,9 +74,9 @@ func (resources *managedResources) countRunningJobs() int {
 }
 
 // Check if every managed Pod is active and will be schedules
-func (resources *managedResources) allPodsAreActive() bool {
-	for idx := range resources.pods.Items {
-		if !utils.IsPodActive(resources.pods.Items[idx]) {
+func (resources *managedResources) allInstancesAreActive() bool {
+	for idx := range resources.instances.Items {
+		if !utils.IsPodActive(resources.instances.Items[idx]) {
 			return false
 		}
 	}
@@ -84,9 +84,9 @@ func (resources *managedResources) allPodsAreActive() bool {
 }
 
 // Check if at least one Pod is alive (active and not crash-looping)
-func (resources *managedResources) noPodsAreAlive() bool {
-	for idx := range resources.pods.Items {
-		if utils.IsPodAlive(resources.pods.Items[idx]) {
+func (resources *managedResources) noInstanceIsAlive() bool {
+	for idx := range resources.instances.Items {
+		if utils.IsPodAlive(resources.instances.Items[idx]) {
 			return false
 		}
 	}
@@ -120,7 +120,7 @@ func (r *ClusterReconciler) getManagedResources(
 	cluster *apiv1.Cluster,
 ) (*managedResources, error) {
 	// Update the status of this resource
-	childPods, err := r.getManagedPods(ctx, cluster)
+	instances, err := r.getManagedInstances(ctx, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -136,13 +136,13 @@ func (r *ClusterReconciler) getManagedResources(
 	}
 
 	return &managedResources{
-		pods: childPods,
-		pvcs: childPVCs,
-		jobs: childJobs,
+		instances: instances,
+		pvcs:      childPVCs,
+		jobs:      childJobs,
 	}, nil
 }
 
-func (r *ClusterReconciler) getManagedPods(
+func (r *ClusterReconciler) getManagedInstances(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (corev1.PodList, error) {
@@ -237,7 +237,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	newPVCCount := int32(len(resources.pvcs.Items))
 	cluster.Status.PVCCount = newPVCCount
-	pvcClassification := specs.DetectPVCs(resources.pods.Items, resources.jobs.Items, resources.pvcs.Items)
+	pvcClassification := specs.DetectPVCs(resources.instances.Items, resources.jobs.Items, resources.pvcs.Items)
 	cluster.Status.DanglingPVC = pvcClassification.Dangling
 	cluster.Status.HealthyPVC = pvcClassification.Healthy
 	cluster.Status.InitializingPVC = pvcClassification.Initializing
@@ -245,7 +245,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones
-	filteredPods := utils.FilterActivePods(resources.pods.Items)
+	filteredPods := utils.FilterActivePods(resources.instances.Items)
 
 	// Count pods
 	newInstances := len(filteredPods)
@@ -257,7 +257,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.JobCount = newJobs
 
 	// Instances status
-	cluster.Status.InstancesStatus = utils.ListStatusPods(resources.pods.Items)
+	cluster.Status.InstancesStatus = utils.ListStatusPods(resources.instances.Items)
 
 	// Services
 	cluster.Status.WriteService = cluster.GetServiceReadWriteName()
@@ -269,10 +269,10 @@ func (r *ClusterReconciler) updateResourceStatus(
 		cluster.Status.CurrentPrimary != "" {
 		found := false
 		if cluster.Status.ReadyInstances > 0 {
-			for _, pod := range utils.FilterActivePods(resources.pods.Items) {
+			for _, instance := range utils.FilterActivePods(resources.instances.Items) {
 				// If the target primary is not active, it will never be promoted
 				// since is will not be scheduled anymore
-				if pod.Name == cluster.Status.TargetPrimary {
+				if instance.Name == cluster.Status.TargetPrimary {
 					found = true
 					break
 				}
@@ -284,7 +284,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 			// or not present
 			log.FromContext(ctx).Info("Wrong target primary, the chosen one is not active or not present",
 				"targetPrimary", cluster.Status.TargetPrimary,
-				"pods", resources.pods)
+				"instances", resources.instances)
 			cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
 			cluster.Status.TargetPrimaryTimestamp = utils.GetCurrentTimestamp()
 		}
