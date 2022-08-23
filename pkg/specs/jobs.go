@@ -181,7 +181,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 // createPrimaryJob create a job that executes the provided command.
 // The role should describe the purpose of the executed job
 func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCommand []string) *batchv1.Job {
-	podName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	instanceName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
 	jobName := fmt.Sprintf("%s-%v-%s", cluster.Name, nodeSerial, role)
 
 	job := &batchv1.Job{
@@ -189,16 +189,16 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 			Name:      jobName,
 			Namespace: cluster.Namespace,
 			Labels: map[string]string{
-				utils.InstanceLabelName: podName,
-				utils.ClusterLabelName:  cluster.Name,
+				utils.InstanceNameLabelName: instanceName,
+				utils.ClusterLabelName:      cluster.Name,
 			},
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						utils.InstanceLabelName: podName,
-						utils.ClusterLabelName:  cluster.Name,
+						utils.InstanceNameLabelName: instanceName,
+						utils.ClusterLabelName:      cluster.Name,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -212,14 +212,14 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCo
 							Name:            role,
 							Image:           cluster.GetImageName(),
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-							Env:             createEnvVarPostgresContainer(cluster, podName),
+							Env:             createEnvVarPostgresContainer(cluster, instanceName),
 							Command:         initCommand,
 							VolumeMounts:    createPostgresVolumeMounts(cluster),
 							Resources:       cluster.Spec.Resources,
 							SecurityContext: CreateContainerSecurityContext(),
 						},
 					},
-					Volumes:            createPostgresVolumes(cluster, podName),
+					Volumes:            createPostgresVolumes(cluster, instanceName),
 					SecurityContext:    CreatePodSecurityContext(cluster.GetPostgresUID(), cluster.GetPostgresGID()),
 					Affinity:           CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 					Tolerations:        cluster.Spec.Affinity.Tolerations,
