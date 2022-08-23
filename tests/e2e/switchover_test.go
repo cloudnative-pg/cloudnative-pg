@@ -26,7 +26,7 @@ import (
 var _ = Describe("Switchover", func() {
 	const (
 		namespace   = "switchover-e2e"
-		sampleFile  = samplesDir + "/cluster-storage-class.yaml"
+		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		clusterName = "postgresql-storage-class"
 		level       = tests.Medium
 	)

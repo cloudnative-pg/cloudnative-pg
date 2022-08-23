@@ -19,7 +19,6 @@ package e2e
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -2034,7 +2033,7 @@ func CreateResourceFromFile(namespace, sampleFilePath string) {
 func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 	wrapErr := func(err error) error { return fmt.Errorf("in GetYAMLContent: %w", err) }
 	cleanPath := filepath.Clean(sampleFilePath)
-	data, err := ioutil.ReadFile(cleanPath)
+	data, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return nil, wrapErr(err)
 	}
