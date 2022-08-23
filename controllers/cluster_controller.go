@@ -381,7 +381,7 @@ func (r *ClusterReconciler) reconcileResources(
 	contextLogger, ctx := log.SetupLogger(ctx)
 
 	// Update the labels for the -rw service to work correctly
-	if err := r.updateRoleLabelsOnPods(ctx, cluster, resources.pods); err != nil {
+	if err := r.updateRoleLabels(ctx, cluster, resources.pods, resources.pvcs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pods: %w", err)
 	}
 

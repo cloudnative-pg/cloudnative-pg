@@ -495,11 +495,13 @@ func (r *ClusterReconciler) updateClusterLabelsOnPVCs(
 	return nil
 }
 
-// Make sure that only the currentPrimary has the label forward write traffic to him
-func (r *ClusterReconciler) updateRoleLabelsOnPods(
+// updateRoleLabels ensures that the primary POD and its PVC have the correct labels
+// nolint: gocognit
+func (r *ClusterReconciler) updateRoleLabels(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	pods corev1.PodList,
+	pvcs corev1.PersistentVolumeClaimList,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -511,12 +513,13 @@ func (r *ClusterReconciler) updateRoleLabelsOnPods(
 	primaryFound := false
 	for idx := range pods.Items {
 		pod := &pods.Items[idx]
-
 		if !utils.IsPodActive(*pod) {
 			contextLogger.Info("Ignoring not active Pod during label update",
 				"pod", pod.Name, "status", pod.Status)
 			continue
 		}
+
+		instancePVCs := specs.FilterInstancePVCs(pvcs.Items, pod.Spec)
 
 		podRole, hasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
 
@@ -531,6 +534,9 @@ func (r *ClusterReconciler) updateRoleLabelsOnPods(
 				if err := r.Patch(ctx, pod, patch); err != nil {
 					return err
 				}
+				if err := r.updateInstanceRoleOnPVCs(ctx, instancePVCs, specs.ClusterRoleLabelPrimary); err != nil {
+					return err
+				}
 			}
 
 		default:
@@ -541,12 +547,38 @@ func (r *ClusterReconciler) updateRoleLabelsOnPods(
 				if err := r.Patch(ctx, pod, patch); err != nil {
 					return err
 				}
+				if err := r.updateInstanceRoleOnPVCs(ctx, instancePVCs, specs.ClusterRoleLabelReplica); err != nil {
+					return err
+				}
 			}
 		}
 	}
 
 	if !primaryFound {
 		contextLogger.Info("No primary instance found for this cluster")
+	}
+
+	return nil
+}
+
+// updateInstanceRoleOnPVCs updates a set of pvcs with the given clusterRole
+func (r *ClusterReconciler) updateInstanceRoleOnPVCs(
+	ctx context.Context,
+	instancePVCs []corev1.PersistentVolumeClaim,
+	role string,
+) error {
+	for _, pvc := range instancePVCs {
+		pvc := pvc
+		// this is needed, because on older versions pvc.labels could be nil
+		if pvc.Labels == nil {
+			pvc.Labels = map[string]string{}
+		}
+
+		pvcPatch := client.MergeFrom(pvc.DeepCopy())
+		pvc.Labels[specs.ClusterRoleLabelName] = role
+		if err := r.Client.Patch(ctx, &pvc, pvcPatch); err != nil {
+			return fmt.Errorf("error while setting instance role on the pvc %s: %w", pvc.Name, err)
+		}
 	}
 
 	return nil
