@@ -54,6 +54,8 @@ from datetime import datetime
 import json
 import os
 import pathlib
+from prettytable import MARKDOWN
+from prettytable import PrettyTable
 
 
 def is_failed(e2e_test):
@@ -273,17 +275,14 @@ def compile_overview(summary):
 
 def format_overview(summary, structure):
     """print general test metrics"""
-    print("## " + structure["title"])
-    print()
-    print("|" + " | ".join(structure["header"]) + "|")
-    print("|" + "|".join(["---"] * len(structure["header"])) + "|")
+    print("## " + structure["title"] + "\n")
+    table = PrettyTable(align="l")
+    table.field_names = structure["header"]
+    table.set_style(MARKDOWN)
 
     for row in structure["rows"]:
-        name = row[0]
-        failed = summary[row[1]]
-        total = summary[row[2]]
-        print(f"| {failed} | {total} | {name} |")
-    print()
+        table.add_row([row[0], summary[row[1]], summary[row[2]]])
+    print(table)
 
 
 def format_bucket_table(buckets, structure):
@@ -298,10 +297,11 @@ def format_bucket_table(buckets, structure):
     """
     title = structure["title"]
     anchor = structure["anchor"]
-    print(f"<h2><a name={anchor}>{title}</a></h2>")
-    print()
-    print("|" + " | ".join(structure["header"]) + "|")
-    print("|" + "|".join(["---"] * len(structure["header"])) + "|")
+    print(f"\n<h2><a name={anchor}>{title}</a></h2>\n")
+    table = PrettyTable(align="l")
+    table.field_names = structure["header"]
+    table.set_style(MARKDOWN)
+
     sorted_by_fail = dict(
         sorted(
             buckets["failed"].items(), key=lambda item: item[1], reverse=True
@@ -309,21 +309,23 @@ def format_bucket_table(buckets, structure):
     )
 
     for bucket in sorted_by_fail:
-        name = bucket
-        failed = buckets["failed"][bucket]
-        total = buckets["total"][bucket]
-        print(f"| {failed} | {total} | {name} |")
-    print()
+        table.add_row(
+            [bucket, buckets["failed"][bucket], buckets["total"][bucket]]
+        )
+
+    print(table)
 
 
 def format_by_test(summary, structure):
     """print metrics bucketed by test class"""
     title = structure["title"]
     anchor = structure["anchor"]
-    print(f"<h2><a name={anchor}>{title}</a></h2>")
-    print()
-    print("|" + " | ".join(structure["header"]) + "|")
-    print("|" + "|".join(["---"] * len(structure["header"])) + "|")
+    print(f"\n<h2><a name={anchor}>{title}</a></h2>\n")
+
+    table = PrettyTable(align="l")
+    table.field_names = structure["header"]
+    table.set_style(MARKDOWN)
+
     sorted_by_fail = dict(
         sorted(
             summary["by_test"]["failed"].items(),
@@ -333,16 +335,22 @@ def format_by_test(summary, structure):
     )
 
     for bucket in sorted_by_fail:
-        name = bucket
-        failed = summary["by_test"]["failed"][bucket]
-        total = summary["by_test"]["failed"][bucket]
         failed_k8s = ", ".join(
             summary["by_test"]["k8s_versions_failed"][bucket].keys()
         )
         failed_pg = ", ".join(
             summary["by_test"]["pg_versions_failed"][bucket].keys()
         )
-        print(f"| {failed} | {total} | {failed_k8s} | {failed_pg} | {name} |")
+        table.add_row(
+            [
+                summary["by_test"]["failed"][bucket],
+                summary["by_test"]["failed"],
+                failed_k8s,
+                failed_pg,
+                bucket,
+            ]
+        )
+
     print()
 
 
@@ -357,10 +365,12 @@ def format_durations_table(test_times, structure):
     """print the table of durations per test"""
     title = structure["title"]
     anchor = structure["anchor"]
-    print(f"<h2><a name={anchor}>{title}</a></h2>")
-    print()
-    print("|" + " | ".join(structure["header"]) + "|")
-    print("|" + "|".join(["---"] * len(structure["header"])) + "|")
+    print(f"\n<h2><a name={anchor}>{title}</a></h2>\n")
+
+    table = PrettyTable(align="l", max_width=80)
+    table.set_style(MARKDOWN)
+    table.field_names = structure["header"]
+
     sorted_by_longest = dict(
         sorted(
             test_times["max"].items(), key=lambda item: item[1], reverse=True
@@ -372,8 +382,9 @@ def format_durations_table(test_times, structure):
         longest = format_duration(test_times["max"][bucket])
         shortest = format_duration(test_times["min"][bucket])
         branch = test_times["slowest_branch"][bucket]
-        print(f"| {longest} | {shortest} | {branch} | {name} |")
-    print()
+        table.add_row([longest, shortest, branch, name])
+
+    print(table)
 
 
 def format_test_failures(summary):
