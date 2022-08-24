@@ -18,7 +18,6 @@ package postgres
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -36,9 +35,9 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 
 	_ = BeforeEach(func() {
 		var err error
-		pgdata, err = ioutil.TempDir("", "cleanup-stale-pid-file-pgdata-")
+		pgdata, err = os.MkdirTemp("", "cleanup-stale-pid-file-pgdata-")
 		Expect(err).NotTo(HaveOccurred())
-		socketDir, err = ioutil.TempDir("", "cleanup-stale-pid-file-socketdir-")
+		socketDir, err = os.MkdirTemp("", "cleanup-stale-pid-file-socketdir-")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -62,11 +61,11 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 		instance.SocketDirectory = socketDir
 
 		pidFile := filepath.Join(pgdata, PostgresqlPidFile)
-		err := ioutil.WriteFile(pidFile, []byte("1234"), 0o400)
+		err := os.WriteFile(pidFile, []byte("1234"), 0o400)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		lockFile := filepath.Join(socketDir, PostgresqlPidFile)
-		err = ioutil.WriteFile(filepath.Join(socketDir, ".s.PGSQL.5432.lock"), []byte("1234"), 0o400)
+		err = os.WriteFile(filepath.Join(socketDir, ".s.PGSQL.5432.lock"), []byte("1234"), 0o400)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		process, err := instance.CheckForExistingPostmaster(postgresName)
@@ -87,7 +86,7 @@ var _ = Describe("the detection of a postmaster process using the pid file", fun
 		instance := NewInstance()
 		instance.PgData = pgdata
 		instance.SocketDirectory = socketDir
-		err := ioutil.WriteFile(
+		err := os.WriteFile(
 			filepath.Join(pgdata, PostgresqlPidFile),
 			[]byte(fmt.Sprintf("%v", myPid)), 0o400)
 		Expect(err).ShouldNot(HaveOccurred())

@@ -1076,8 +1076,8 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 }
 
 // TODO: only required to cleanup custom monitoring queries configmaps from older versions (v1.10 and v1.11)
-// 		 that could have been copied with the source configmap name instead of the new default one.
-// 		 Should be removed in future releases.
+// that could have been copied with the source configmap name instead of the new default one.
+// Should be removed in future releases.
 func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context, cluster *apiv1.Cluster) {
 	contextLogger := log.FromContext(ctx)
 

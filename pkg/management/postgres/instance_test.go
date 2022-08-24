@@ -18,7 +18,6 @@ package postgres
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -44,7 +43,7 @@ var _ = Describe("Parsing version", func() {
 })
 
 var _ = Describe("testing primary instance methods", Ordered, func() {
-	tempDir, err := ioutil.TempDir("", "primary")
+	tempDir, err := os.MkdirTemp("", "primary")
 	Expect(err).ToNot(HaveOccurred())
 
 	instance := Instance{
@@ -152,7 +151,7 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 })
 
 var _ = Describe("testing replica instance methods", Ordered, func() {
-	tempDir, err := ioutil.TempDir("", "primary")
+	tempDir, err := os.MkdirTemp("", "primary")
 	Expect(err).ToNot(HaveOccurred())
 
 	instance := Instance{

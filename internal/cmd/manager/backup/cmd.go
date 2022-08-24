@@ -19,7 +19,7 @@ package backup
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 
@@ -51,7 +51,7 @@ func NewCmd() *cobra.Command {
 				}
 			}()
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				log.Error(err, "Error while reading backup response body",
 					"backupURL", backupURL,

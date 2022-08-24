@@ -19,7 +19,6 @@ package logpipe
 import (
 	"context"
 	"errors"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -107,7 +106,7 @@ var _ = Describe("CSV file reader", func() {
 		})
 
 		When("correctly handles a record with an invalid number of fields", func() {
-			inputBuffer, err := ioutil.ReadFile("testdata/one_line.csv")
+			inputBuffer, err := os.ReadFile("testdata/one_line.csv")
 			Expect(err).ShouldNot(HaveOccurred())
 			input := strings.TrimRight(string(inputBuffer), " \n")
 

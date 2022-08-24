@@ -34,9 +34,9 @@ var semanticVersionRegex = regexp.MustCompile(`^(\d\.?)+`)
 // GetPostgresVersionFromTag parse a PostgreSQL version string returning
 // a major version ID. Example:
 //
-//     GetPostgresVersionFromTag("9.5.3") == 90503
-//     GetPostgresVersionFromTag("10.2") == 100002
-//     GetPostgresVersionFromTag("15beta1") == 150000
+//	GetPostgresVersionFromTag("9.5.3") == 90503
+//	GetPostgresVersionFromTag("10.2") == 100002
+//	GetPostgresVersionFromTag("15beta1") == 150000
 func GetPostgresVersionFromTag(version string) (int, error) {
 	if !semanticVersionRegex.MatchString(version) {
 		return 0,
@@ -104,8 +104,8 @@ func GetPostgresMajorVersionFromTag(version string) (int, error) {
 // GetPostgresMajorVersion gets only the Major version from a PostgreSQL version string.
 // Example:
 //
-//     GetPostgresMajorVersion("90503") == 90500
-//     GetPostgresMajorVersion("100002") == 100000
+//	GetPostgresMajorVersion("90503") == 90500
+//	GetPostgresMajorVersion("100002") == 100000
 func GetPostgresMajorVersion(parsedVersion int) int {
 	return parsedVersion - parsedVersion%100
 }

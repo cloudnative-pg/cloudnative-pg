@@ -17,7 +17,6 @@ limitations under the License.
 package spool
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 
@@ -34,10 +33,10 @@ var _ = Describe("Spool", func() {
 
 	_ = BeforeEach(func() {
 		var err error
-		tmpDir, err = ioutil.TempDir("", "spool-test-")
+		tmpDir, err = os.MkdirTemp("", "spool-test-")
 		Expect(err).NotTo(HaveOccurred())
 
-		tmpDir2, err = ioutil.TempDir("", "spool-test-tmp-")
+		tmpDir2, err = os.MkdirTemp("", "spool-test-tmp-")
 		Expect(err).NotTo(HaveOccurred())
 
 		spool, err = New(tmpDir)
