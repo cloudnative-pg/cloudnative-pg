@@ -2103,7 +2103,7 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 			return nil
 		}, 60, 5).Should(BeNil())
 	})
-	By("deleting Pod and pPVC", func() {
+	By("deleting Pod and PVCs", func() {
 		// Gathering cluster primary
 		currentPrimary, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())

@@ -18,6 +18,9 @@ spec:
   storage:
     size: 1Gi
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+  walStorage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
 
   bootstrap:
     pg_basebackup:
