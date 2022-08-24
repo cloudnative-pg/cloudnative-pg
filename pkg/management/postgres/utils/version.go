@@ -18,7 +18,7 @@ package utils
 
 import (
 	"database/sql"
-	"io/ioutil"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -53,7 +53,7 @@ func parseVersionNum(versionNum string) (*semver.Version, error) {
 // GetMajorVersion read the PG_VERSION file in the data directory
 // returning the major version of the database
 func GetMajorVersion(pgData string) (int, error) {
-	content, err := ioutil.ReadFile(path.Join(pgData, "PG_VERSION")) // #nosec
+	content, err := os.ReadFile(path.Join(pgData, "PG_VERSION")) // #nosec
 	if err != nil {
 		return 0, err
 	}

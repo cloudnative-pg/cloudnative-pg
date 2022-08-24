@@ -36,9 +36,8 @@ import (
 // We are running as PID 1 in our container and we may receive SIGCHLD for
 // the following reasons:
 //
-// 1 - a child process we manually executed via `exec.Cmd` (i.e. the postmaster)
-//     exited
-// 2 - an postmaster worker process terminated after the postmaster itself
+// 1 - a child process we manually executed via `exec.Cmd` (i.e. the postmaster) exited
+// 2 - a postmaster worker process terminated after the postmaster itself
 //
 // The second condition may seem unlikely but it unfortunately happens everytime
 // the postmaster ends, even if just for the logging collector subprocess.

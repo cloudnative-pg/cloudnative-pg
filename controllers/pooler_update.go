@@ -55,8 +55,9 @@ func (r *PoolerReconciler) updateOwnedObjects(
 	return r.updateService(ctx, pooler, resources)
 }
 
-//nolint:dupl
 // updateDeployment update the deployment or create it when needed
+//
+//nolint:dupl
 func (r *PoolerReconciler) updateDeployment(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
@@ -116,8 +117,9 @@ func (r *PoolerReconciler) updateDeployment(
 	return nil
 }
 
-//nolint:dupl
 // updateService update or create the pgbouncer service as needed
+//
+//nolint:dupl
 func (r *PoolerReconciler) updateService(
 	ctx context.Context,
 	pooler *apiv1.Pooler,
@@ -191,8 +193,8 @@ func (r *PoolerReconciler) updateRBAC(
 // updateServiceAccount update or create the pgbouncer ServiceAccount
 // The goal of this method is to make sure that:
 //
-//   * the ServiceAccount exits
-//   * it contains the ImagePullSecret if required
+//   - the ServiceAccount exits
+//   - it contains the ImagePullSecret if required
 //
 // Any other property of the ServiceAccount is preserved
 func (r *PoolerReconciler) updateServiceAccount(

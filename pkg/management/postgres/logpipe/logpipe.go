@@ -80,6 +80,7 @@ func (p *LogPipe) GetExitedCondition() *concurrency.Executed {
 // from a process logging in CSV to a file and redirecting its content to stdout in JSON format.
 // The goroutine is started just once for a given file.
 // All successive calls, that are referencing the same filename, will just check its existence
+//
 //nolint:dupl
 func (p *LogPipe) Start(ctx context.Context) error {
 	filenameLog := log.FromContext(ctx).WithValues("fileName", p.fileName)

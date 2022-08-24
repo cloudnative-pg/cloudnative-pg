@@ -17,7 +17,6 @@ limitations under the License.
 package fileutils
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -38,11 +37,11 @@ func TestConfigFile(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	var err error
-	tempDir1, err = ioutil.TempDir(os.TempDir(), "fileutils1_")
+	tempDir1, err = os.MkdirTemp(os.TempDir(), "fileutils1_")
 	Expect(err).To(BeNil())
-	tempDir2, err = ioutil.TempDir(os.TempDir(), "fileutils2_")
+	tempDir2, err = os.MkdirTemp(os.TempDir(), "fileutils2_")
 	Expect(err).To(BeNil())
-	tempDir3, err = ioutil.TempDir(os.TempDir(), "fileutils3_")
+	tempDir3, err = os.MkdirTemp(os.TempDir(), "fileutils3_")
 	Expect(err).To(BeNil())
 })
 

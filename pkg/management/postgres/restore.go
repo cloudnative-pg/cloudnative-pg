@@ -21,7 +21,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/exec"
@@ -383,7 +382,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.
 			return fmt.Errorf("cannot write recovery config: %w", err)
 		}
 
-		err = ioutil.WriteFile(
+		err = os.WriteFile(
 			path.Join(info.PgData, "postgresql.auto.conf"),
 			[]byte(""),
 			0o600)
@@ -392,14 +391,14 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.
 		}
 
 		// Create recovery signal file
-		return ioutil.WriteFile(
+		return os.WriteFile(
 			path.Join(info.PgData, "recovery.signal"),
 			[]byte(""),
 			0o600)
 	}
 
 	// We need to generate a recovery.conf
-	return ioutil.WriteFile(
+	return os.WriteFile(
 		path.Join(info.PgData, "recovery.conf"),
 		[]byte(recoveryFileContents),
 		0o600)
@@ -446,7 +445,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 		return err
 	}
 
-	tempDataDir, err := ioutil.TempDir(postgresSpec.RecoveryTemporaryDirectory, "datadir_")
+	tempDataDir, err := os.MkdirTemp(postgresSpec.RecoveryTemporaryDirectory, "datadir_")
 	if err != nil {
 		return fmt.Errorf("while creating a temporary data directory: %w", err)
 	}
