@@ -495,13 +495,11 @@ func (r *ClusterReconciler) updateClusterLabelsOnPVCs(
 	return nil
 }
 
-// updateRoleLabels ensures that the primary POD and its PVC have the correct labels
-// nolint: gocognit
-func (r *ClusterReconciler) updateRoleLabels(
+// Make sure that only the currentPrimary has the label forward write traffic to him
+func (r *ClusterReconciler) updateRoleLabelsOnPods(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	pods corev1.PodList,
-	pvcs corev1.PersistentVolumeClaimList,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -513,13 +511,12 @@ func (r *ClusterReconciler) updateRoleLabels(
 	primaryFound := false
 	for idx := range pods.Items {
 		pod := &pods.Items[idx]
+
 		if !utils.IsPodActive(*pod) {
 			contextLogger.Info("Ignoring not active Pod during label update",
 				"pod", pod.Name, "status", pod.Status)
 			continue
 		}
-
-		instancePVCs := specs.FilterInstancePVCs(pvcs.Items, pod.Spec)
 
 		podRole, hasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
 
@@ -534,9 +531,6 @@ func (r *ClusterReconciler) updateRoleLabels(
 				if err := r.Patch(ctx, pod, patch); err != nil {
 					return err
 				}
-				if err := r.updateInstanceRoleOnPVCs(ctx, instancePVCs, specs.ClusterRoleLabelPrimary); err != nil {
-					return err
-				}
 			}
 
 		default:
@@ -545,9 +539,6 @@ func (r *ClusterReconciler) updateRoleLabels(
 				patch := client.MergeFrom(pod.DeepCopy())
 				pod.Labels[specs.ClusterRoleLabelName] = specs.ClusterRoleLabelReplica
 				if err := r.Patch(ctx, pod, patch); err != nil {
-					return err
-				}
-				if err := r.updateInstanceRoleOnPVCs(ctx, instancePVCs, specs.ClusterRoleLabelReplica); err != nil {
 					return err
 				}
 			}
@@ -561,23 +552,33 @@ func (r *ClusterReconciler) updateRoleLabels(
 	return nil
 }
 
-// updateInstanceRoleOnPVCs updates a set of pvcs with the given clusterRole
-func (r *ClusterReconciler) updateInstanceRoleOnPVCs(
+// updateClusterRoleLabelsOnPVCs ensures that the PVCs have the correct cluster role label set
+func (r *ClusterReconciler) updateClusterRoleLabelsOnPVCs(
 	ctx context.Context,
-	instancePVCs []corev1.PersistentVolumeClaim,
-	role string,
+	pods corev1.PodList,
+	pvcs corev1.PersistentVolumeClaimList,
 ) error {
-	for _, pvc := range instancePVCs {
-		pvc := pvc
-		// this is needed, because on older versions pvc.labels could be nil
-		if pvc.Labels == nil {
-			pvc.Labels = map[string]string{}
+	for _, pod := range pods.Items {
+		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
+		if !podHasRole {
+			continue
 		}
 
-		pvcPatch := client.MergeFrom(pvc.DeepCopy())
-		pvc.Labels[specs.ClusterRoleLabelName] = role
-		if err := r.Client.Patch(ctx, &pvc, pvcPatch); err != nil {
-			return fmt.Errorf("error while setting instance role on the pvc %s: %w", pvc.Name, err)
+		for _, pvc := range specs.FilterInstancePVCs(pvcs.Items, pod.Spec) {
+			pvc := pvc
+			// this is needed, because on older versions pvc.labels could be nil
+			if pvc.Labels == nil {
+				pvc.Labels = map[string]string{}
+			}
+			if pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] == podRole {
+				continue
+			}
+
+			pvcPatch := client.MergeFrom(pvc.DeepCopy())
+			pvc.Labels[specs.ClusterRoleLabelName] = podRole
+			if err := r.Client.Patch(ctx, &pvc, pvcPatch); err != nil {
+				return err
+			}
 		}
 	}
 
