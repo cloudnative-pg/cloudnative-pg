@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"path"
 	"sort"
+	"strings"
 
 	"github.com/lib/pq"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,6 +42,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logicalimport"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
@@ -319,6 +321,11 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 	}
 
 	instance := info.GetInstance()
+
+	if libs := strings.Join(cluster.Spec.PostgresConfiguration.AdditionalLibraries, ","); libs != "" {
+		libsConfig := fmt.Sprintf("%s='%s'", postgres.SharedPreloadLibraries, libs)
+		instance.StartupOptions = append(instance.StartupOptions, libsConfig)
+	}
 
 	majorVersion, err := postgresutils.GetMajorVersion(instance.PgData)
 	if err != nil {
