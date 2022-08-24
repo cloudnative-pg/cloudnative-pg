@@ -18,10 +18,10 @@ limitations under the License.
 Package configparser contains the code required to fill a Go structure
 representing the configuration information from several sources like:
 
-1. a struct containing the default values
-2. a map from string to strings (e.g. the one that can be extracted for a Kubernetes ConfigMap)
-3. an environment source like the system environment variables or a "fake"
-   one suitable for testing.
+ 1. a struct containing the default values
+ 2. a map from string to strings (e.g. the one that can be extracted for a Kubernetes ConfigMap)
+ 3. an environment source like the system environment variables or a "fake"
+    one suitable for testing.
 
 To map the struct fields with the sources, the "env" tag is being
 used like in the following example:

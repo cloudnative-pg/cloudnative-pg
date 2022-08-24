@@ -18,7 +18,6 @@ package certs
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -306,7 +305,7 @@ var _ = Describe("TLS certificates injection", func() {
 
 var _ = Describe("Webhook environment creation", func() {
 	It("should setup the certificates and the webhooks", func() {
-		tempDirName, err := ioutil.TempDir("/tmp", "cert_*")
+		tempDirName, err := os.MkdirTemp("/tmp", "cert_*")
 		Expect(err).To(BeNil())
 		defer func() {
 			err = os.RemoveAll(tempDirName)

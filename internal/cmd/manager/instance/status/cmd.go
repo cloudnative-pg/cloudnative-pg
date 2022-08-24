@@ -19,7 +19,7 @@ package status
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 
@@ -59,7 +59,7 @@ func statusSubCommand() error {
 		}
 	}()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error(err, "Error while reading status response body",
 			"statusURL", statusURL,

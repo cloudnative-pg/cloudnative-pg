@@ -17,7 +17,6 @@ limitations under the License.
 package configfile
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -32,7 +31,7 @@ var _ = Describe("update Postgres configuration files", func() {
 
 	_ = BeforeEach(func() {
 		var err error
-		tmpDir, err = ioutil.TempDir("", "configuration-test-")
+		tmpDir, err = os.MkdirTemp("", "configuration-test-")
 		Expect(err).NotTo(HaveOccurred())
 	})
 

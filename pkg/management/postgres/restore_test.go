@@ -18,7 +18,6 @@ package postgres
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"path"
 
@@ -32,7 +31,7 @@ import (
 )
 
 var _ = Describe("testing restore InitInfo methods", func() {
-	tempDir, err := ioutil.TempDir("", "restore")
+	tempDir, err := os.MkdirTemp("", "restore")
 	Expect(err).ToNot(HaveOccurred())
 
 	pgData := path.Join(tempDir, "postgres", "data", "pgdata")

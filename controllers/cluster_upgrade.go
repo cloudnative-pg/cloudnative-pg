@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	neturl "net/url"
 
@@ -486,7 +485,7 @@ func upgradeInstanceManagerOnPod(ctx context.Context, pod v1.Pod) error {
 	}
 
 	var body []byte
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

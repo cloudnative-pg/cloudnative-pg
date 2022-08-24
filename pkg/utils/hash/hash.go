@@ -21,8 +21,7 @@ limitations under the License.
 // The code in this package is adapted from:
 //
 // https://github.com/kubernetes/kubernetes/blob/master/pkg/util/hash/hash.go   // wokeignore:rule=master
-// https://github.com/kubernetes/kubernetes/blob/ea0764452222146c47ec826977f49d7001b0ea8c/
-//   pkg/controller/controller_utils.go#L1189
+// https://github.com/kubernetes/kubernetes/blob/ea07644/pkg/controller/controller_utils.go#L1189
 package hash
 
 import (

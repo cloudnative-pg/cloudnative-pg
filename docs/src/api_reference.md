@@ -930,9 +930,9 @@ Name               | Description                                                
 
 SyncReplicaElectionConstraints contains the constraints for sync replicas election.
 
-For anti-affinity parameters two instances are considered in the same location if all the labels values match
+For anti-affinity parameters two instances are considered in the same location if all the labels values match.
 
-In future synchronous replica election restriction by name will be supported
+In future synchronous replica election restriction by name will be supported.
 
 Name                   | Description                                                                                                    | Type    
 ---------------------- | -------------------------------------------------------------------------------------------------------------- | --------

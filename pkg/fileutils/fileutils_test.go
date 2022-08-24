@@ -18,7 +18,7 @@ package fileutils
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 
@@ -136,7 +136,7 @@ var _ = Describe("function GetDirectoryContent", func() {
 		for i := 0; i < 10; i++ {
 			testFiles[i] = fmt.Sprintf("test_file_%v", i)
 			file := filepath.Join(tempDir3, testFiles[i])
-			err := ioutil.WriteFile(file, []byte("fake_content"), 0o400)
+			err := os.WriteFile(file, []byte("fake_content"), 0o400)
 			Expect(err).ShouldNot(HaveOccurred())
 		}
 		files, err := GetDirectoryContent(tempDir3)
