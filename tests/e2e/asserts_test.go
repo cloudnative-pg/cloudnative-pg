@@ -2380,3 +2380,44 @@ func AssertClusterReadinessStatusIsReached(
 		}, timeout, 2).Should(BeEquivalentTo(conditionStatus))
 	})
 }
+
+// assertPvcHasLabels verifies if the PVCs of a cluster in a given namespace
+// contains the expected labels, and their values reflect the current status
+// of the related pods.
+func assertPvcHasLabels(
+	namespace,
+	clusterName string,
+) {
+	// Gather the list of PVCs in the current namespace
+	pvcList := &corev1.PersistentVolumeClaimList{}
+	err := env.Client.List(env.Ctx, pvcList, ctrlclient.InNamespace(namespace))
+	Expect(err).ToNot(HaveOccurred())
+
+	// Iterating through PVC list
+	for _, pvc := range pvcList.Items {
+		// Gather the podName related to the current pvc using nodeSerial
+		podName := fmt.Sprintf("%v-%v", clusterName, pvc.Annotations["cnpg.io/nodeSerial"])
+		pod := &corev1.Pod{}
+		podNamespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      podName,
+		}
+		err = env.Client.Get(env.Ctx, podNamespacedName, pod)
+		Expect(err).ToNot(HaveOccurred())
+
+		ExpectedRole := "replica"
+		if specs.IsPodPrimary(*pod) {
+			ExpectedRole = "primary"
+		}
+		ExpectedPvcRole := "PG_DATA"
+		if pvc.Name == podName+"-wal" {
+			ExpectedPvcRole = "PG_WAL"
+		}
+		expectedLabels := map[string]string{
+			"cnpg.io/cluster": clusterName,
+			"cnpg.io/pvcRole": ExpectedPvcRole,
+			"role":            ExpectedRole,
+		}
+		Expect(testsUtils.PvcHasLabels(pvc, expectedLabels)).To(BeTrue())
+	}
+}

@@ -176,6 +176,9 @@ var _ = Describe("PVC Deletion", func() {
 			}
 			err = env.Client.Get(env.Ctx, newNamespacedPVCName, newPvc)
 			Expect(newPvc.GetUID(), err).NotTo(BeEquivalentTo(originalPVCUID))
+
+			// Check the labels of each PVC
+			assertPvcHasLabels(namespace, clusterName)
 		})
 	})
 })

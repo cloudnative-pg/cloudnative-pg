@@ -80,6 +80,7 @@ var _ = Describe("Separate pg_wal volume", func() {
 				err = env.Client.Get(env.Ctx, namespacedPVCName, pvc)
 				Expect(pvc.GetName(), err).To(BeEquivalentTo(pvcName))
 			}
+			assertPvcHasLabels(namespace, clusterName)
 		})
 		By("checking that pg_wal is a symlink to the dedicated volume", func() {
 			for _, pod := range podList.Items {
