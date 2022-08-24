@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -33,8 +34,8 @@ import (
 var _ = Describe("PVC Deletion", func() {
 	const (
 		namespace   = "cluster-pvc-deletion"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		clusterName = "postgresql-storage-class"
+		sampleFile  = fixturesDir + "/pvc_deletion/cluster-pvc-deletion.yaml.template"
+		clusterName = "cluster-pvc-deletion"
 		level       = tests.Medium
 	)
 	BeforeEach(func() {
@@ -82,7 +83,11 @@ var _ = Describe("PVC Deletion", func() {
 			originalPVCUID := pvc.GetUID()
 
 			// Delete the pod
-			_, _, err = testsUtils.Run(fmt.Sprintf("kubectl delete -n %v pod/%v", namespace, podName))
+			zero := int64(0)
+			forceDelete := &ctrlclient.DeleteOptions{
+				GracePeriodSeconds: &zero,
+			}
+			err = env.DeletePod(namespace, podName, forceDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// The pod should be back
@@ -124,9 +129,29 @@ var _ = Describe("PVC Deletion", func() {
 			Expect(err).ToNot(HaveOccurred())
 			originalPVCUID := pvc.GetUID()
 
-			// Delete the PVC and the Pod
-			_, _, err = testsUtils.Run(fmt.Sprintf("kubectl delete -n %v pvc/%v pod/%v", namespace, pvcName, podName))
+			// Check if walStorage is enabled
+			walStorageEnabled, err := testsUtils.IsWalStorageEnabled(namespace, clusterName, env)
 			Expect(err).ToNot(HaveOccurred())
+
+			// Delete the PVC and the Pod
+			_, _, err = testsUtils.Run(
+				fmt.Sprintf("kubectl delete pvc %v -n %v --wait=false", pvcName, namespace))
+			Expect(err).ToNot(HaveOccurred())
+
+			// removing WalStorage PVC if needed
+			if walStorageEnabled {
+				_, _, err = testsUtils.Run(
+					fmt.Sprintf("kubectl delete pvc %v-wal -n %v --wait=false", pvcName, namespace))
+				Expect(err).ToNot(HaveOccurred())
+			}
+			// Deleting primary pod
+			zero := int64(0)
+			forceDelete := &ctrlclient.DeleteOptions{
+				GracePeriodSeconds: &zero,
+			}
+			err = env.DeletePod(namespace, podName, forceDelete)
+			Expect(err).ToNot(HaveOccurred())
+
 			// A new pod should be created
 			timeout := 300
 			newPodName := clusterName + "-4"
