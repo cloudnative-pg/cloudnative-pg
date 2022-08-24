@@ -300,6 +300,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 				ClusterLabelName:            cluster.Name,
 				utils.ClusterLabelName:      cluster.Name,
 				utils.InstanceNameLabelName: podName,
+				utils.PodRoleLabelName:      string(utils.PodRoleInstance),
 			},
 			Annotations: map[string]string{
 				ClusterSerialAnnotationName: strconv.Itoa(nodeSerial),

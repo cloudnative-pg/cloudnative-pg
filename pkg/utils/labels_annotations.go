@@ -35,6 +35,9 @@ const (
 	// PvcRoleLabelName is the name of the label containing the purpose of the pvc
 	PvcRoleLabelName = "cnpg.io/pvcRole"
 
+	// PodRoleLabelName is the name of the label containing the podRole value
+	PodRoleLabelName = "cnpg.io/podRole"
+
 	// InstanceNameLabelName is the name of the label containing the instance name
 	InstanceNameLabelName = "cnpg.io/instanceName"
 
@@ -52,6 +55,14 @@ const (
 
 	// ReconciliationDisabledValue it the value that stops the reconciliation loop
 	ReconciliationDisabledValue = "disabled"
+)
+
+// PodRole describes the Role of a given pod
+type PodRole string
+
+const (
+	// PodRoleInstance the label value indicating an instance
+	PodRoleInstance PodRole = "instance"
 )
 
 // LabelClusterName labels the object with the cluster name
