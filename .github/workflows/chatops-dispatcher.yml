@@ -1,9 +1,19 @@
-# This workflow listens comment creation events. When the comment is issued from a PR AND the content of the comment
-# starts with certain prefixes, it will be handled by `chatops-dispatcher` job.
+# This workflow is triggered by comments creation events in pull request. It is the entry point of slash command
+# support like /test, /ok-to-merge, /ready-to-test.
 #
-# 1. If the comment starts with "/test", the job will dispatch a `repository_dispatch` event of type
-#    `test-command` to this repo, and the event will then be received by the `chatops-receiver` workflow (of this repo)
-#    so that triggers a large-scale E2E test per the PR.
+# 1. If the comment starts with "/test"
+#    It will trigger 'slash-command-receiver' workflow and finally trigger e2e test in specific scope with params,
+#    in format of  '/test test_level=4 depth=main'
+#
+#          test_level: With what level and above, the e2e test will be run. e2e test cases is classified with 5 levels
+#                       0 highest, 1 high, 2 medium, 3 low, 4 lowest.
+#                       all test cases smaller or equals than the test level specified by 'test_level' will be run.
+#          depth:  E2e test cases is grouped by depth too, the value for depths are:
+#                        schedule
+#                        main
+#                        pull_request
+#                        push
+#                   'schedule' contains most test cases coverage,  and 'push' contains less test cases coverage.
 #
 # 2. If the comment starts with "/ok-to-merge", it will label the PR with "ok to merge :ok_hand:"
 #

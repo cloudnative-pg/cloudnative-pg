@@ -1,4 +1,4 @@
-# This workflow is to schedule daily jobs (00:00:00 UTC) to clean up stale `*-testing` images older than the
+# This workflow is scheduled to run daily to clean up stale `*-testing` images older than the
 # `cut-off` periods specified in `snok/container-retention-policy`
 name: clean-testing-package
 
