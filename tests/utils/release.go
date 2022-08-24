@@ -19,7 +19,6 @@ package utils
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"sort"
@@ -56,7 +55,7 @@ func GetMostRecentReleaseTag(releasesPath string) (string, error) {
 // GetAvailableReleases retrieves all the available releases from
 // the list of YAML files in the top-level `releases/` directory.
 func GetAvailableReleases(releasesPath string) ([]*semver.Version, error) {
-	fileInfo, err := ioutil.ReadDir(releasesPath)
+	fileInfo, err := os.ReadDir(releasesPath)
 	if err != nil {
 		return nil, err
 	}

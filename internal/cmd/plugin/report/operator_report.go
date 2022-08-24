@@ -85,12 +85,12 @@ func (or operatorReport) writeToZip(zipper *zip.Writer, format plugin.OutputForm
 
 // operator implements the "report operator" subcommand
 // Produces a zip file containing
-//  - operator deployment
-//  - operator pod definition
-//  - operator configuration Configmap and Secret key (if any)
-//  - events in the operator namespace
-//  - operator's Validating/MutatingWebhookConfiguration and their associated services
-//  - operator pod's logs (if `includeLogs` is true)
+//   - operator deployment
+//   - operator pod definition
+//   - operator configuration Configmap and Secret key (if any)
+//   - events in the operator namespace
+//   - operator's Validating/MutatingWebhookConfiguration and their associated services
+//   - operator pod's logs (if `includeLogs` is true)
 func operator(ctx context.Context, format plugin.OutputFormat,
 	file string, stopRedaction, includeLogs bool, now time.Time,
 ) error {

@@ -70,6 +70,7 @@ type shoudRequeue bool
 
 // Reconcile is the main reconciliation loop for the instance
 // TODO this function needs to be refactor
+//
 //nolint:gocognit
 func (r *InstanceReconciler) Reconcile(
 	ctx context.Context,
@@ -774,16 +775,16 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 // user cannot easily tell if the operation has been done completely.
 // The rationale behind this is:
 //
-// 1. when invoked at the startup of the instance manager, PostgreSQL
-//    is not up. If this raise an error, then PostgreSQL won't
-//    be able to start correctly (TLS certs are missing, i.e.),
-//    making no difference between returning an error or not
+//  1. when invoked at the startup of the instance manager, PostgreSQL
+//     is not up. If this raise an error, then PostgreSQL won't
+//     be able to start correctly (TLS certs are missing, i.e.),
+//     making no difference between returning an error or not
 //
-// 2. when invoked inside the reconciliation loop, if the operation
-//    raise an error, it's pointless to retry. The only way to recover
-//    from such an error is wait for the CNPG operator to refresh the
-//    resource version of the secrets to be used, and in that case a
-//    reconciliation loop will be started again.
+//  2. when invoked inside the reconciliation loop, if the operation
+//     raise an error, it's pointless to retry. The only way to recover
+//     from such an error is wait for the CNPG operator to refresh the
+//     resource version of the secrets to be used, and in that case a
+//     reconciliation loop will be started again.
 func (r *InstanceReconciler) RefreshSecrets(
 	ctx context.Context,
 	cluster *apiv1.Cluster,

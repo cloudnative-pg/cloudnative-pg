@@ -80,9 +80,8 @@ func NewReference(name string) *Reference {
 // GetImageTag gets the image tag from a full image string.
 // Example:
 //
-//     GetImageTag("postgres") == "latest"
-//     GetImageTag("ghcr.io/cloudnative-pg/postgresql:12.3") == "12.3"
-//
+//	GetImageTag("postgres") == "latest"
+//	GetImageTag("ghcr.io/cloudnative-pg/postgresql:12.3") == "12.3"
 func GetImageTag(imageName string) string {
 	ref := NewReference(imageName)
 	return ref.Tag

@@ -56,7 +56,7 @@ func IsPodReady(pod corev1.Pod) bool {
 }
 
 // IsPodActive checks if a pod is active, copied from:
-//nolint:lll // https://github.com/kubernetes/kubernetes/blob/1bd00776b5d78828a065b5c21e7003accc308a06/test/e2e/framework/pod/resource.go#L664
+// https://github.com/kubernetes/kubernetes/blob/1bd0077/test/e2e/framework/pod/resource.go#L664
 func IsPodActive(p corev1.Pod) bool {
 	return corev1.PodSucceeded != p.Status.Phase &&
 		corev1.PodPending != p.Status.Phase &&

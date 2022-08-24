@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -255,7 +254,7 @@ func (env TestingEnvironment) IsIBM() bool {
 
 // GetResourceNamespacedNameFromYAML returns the NamespacedName representing a resource in a YAML file
 func (env TestingEnvironment) GetResourceNamespacedNameFromYAML(path string) (types.NamespacedName, error) {
-	data, err := ioutil.ReadFile(filepath.Clean(path))
+	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return types.NamespacedName{}, err
 	}

@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -130,7 +129,7 @@ func WriteFileAtomic(fileName string, contents []byte, perm os.FileMode) (bool, 
 	}
 	if exist {
 		var previousContents []byte
-		previousContents, err = ioutil.ReadFile(fileName) // #nosec
+		previousContents, err = os.ReadFile(fileName) // #nosec
 		if err != nil {
 			err = fmt.Errorf("while reading previous file contents: %w", err)
 			return false, err
@@ -188,7 +187,7 @@ func ReadFile(fileName string) ([]byte, error) {
 		return nil, nil
 	}
 
-	content, err := ioutil.ReadFile(fileName) // #nosec
+	content, err := os.ReadFile(fileName) // #nosec
 	if err != nil {
 		return nil, err
 	}

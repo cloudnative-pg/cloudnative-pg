@@ -529,7 +529,7 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	return configuration
 }
 
-//  setDefaultConfigurations sets all default configurations into the configuration map
+// setDefaultConfigurations sets all default configurations into the configuration map
 // from the provided info
 func setDefaultConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
 	// start from the global default settings

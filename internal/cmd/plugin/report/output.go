@@ -41,8 +41,8 @@ func reportName(kind string, timestamp time.Time, objName ...string) string {
 type zipFileWriter func(zipper *zip.Writer, dirname string) error
 
 // writerZippedReport writes a zip with the various report parts to file s
-//  - file: the name of the zip file
-//  - folder: the top-level folder created in the zip to contain all sections
+//   - file: the name of the zip file
+//   - folder: the top-level folder created in the zip to contain all sections
 func writeZippedReport(sections []zipFileWriter, file, folder string) (err error) {
 	if exists, _ := fileutils.FileExists(file); exists {
 		return fmt.Errorf("file already exist will not overwrite")

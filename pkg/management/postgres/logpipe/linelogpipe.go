@@ -90,6 +90,7 @@ func NewRawLineLogPipe(fileName, name string) *LineLogPipe {
 // from a process logging raw strings to a file and redirecting its content to stdout in JSON format.
 // The goroutine is started just once for a given file.
 // All successive calls, that are referencing the same filename, will just check its existence
+//
 //nolint:dupl
 func (p *LineLogPipe) Start(ctx context.Context) error {
 	filenameLog := log.FromContext(ctx).WithValues("fileName", p.fileName)
