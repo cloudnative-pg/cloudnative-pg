@@ -53,12 +53,11 @@ import (
 )
 
 const (
-	// RetryTimeoutClient retry time when client api call or kubectl cli request get failed
-	RetryTimeoutClient = 60
-	// RetryTimeoutCommand retry time out when command fails
-	RetryTimeoutCommand = 5
-
-	// PollingTime polling between retry
+	// RetryTimeout retry timeout (in seconds) when a client api call or kubectl cli request get failed
+	RetryTimeout = 60
+	// RetryAttempts maximum number of attempts when it fails in `retry`. Mainly used in `RunUncheckedRetry`
+	RetryAttempts = 5
+	// PollingTime polling interval (in seconds) between retries
 	PollingTime = 5
 )
 
@@ -115,7 +114,7 @@ func (env TestingEnvironment) EventuallyExecCommand(
 			return err
 		}
 		return nil
-	}, RetryTimeoutClient, PollingTime).Should(BeNil())
+	}, RetryTimeout, PollingTime).Should(BeNil())
 	return stdOut, stdErr, err
 }
 

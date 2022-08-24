@@ -65,7 +65,7 @@ func RunUncheckedRetry(command string) (stdout string, stderr string, err error)
 			return nil
 		},
 		retry.Delay(PollingTime*time.Second),
-		retry.Attempts(RetryTimeoutCommand),
+		retry.Attempts(RetryAttempts),
 		retry.DelayType(retry.FixedDelay),
 	)
 	stdout = outBuffer.String()
