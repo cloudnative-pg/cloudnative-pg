@@ -135,15 +135,15 @@ func GetAllAccessibleDatabases(tx *sql.Tx, whereClause string) (databases []stri
 		[]string{"SELECT datname FROM pg_database", whereClause},
 		" WHERE "),
 	)
+	if err != nil {
+		return nil, []error{fmt.Errorf("could not get databases: %w", err)}
+	}
 	defer func() {
 		err = rows.Close()
 		if err != nil {
 			log.Error(err, "while closing rows: %w")
 		}
 	}()
-	if err != nil {
-		return nil, []error{fmt.Errorf("could not get databases: %w", err)}
-	}
 	for rows.Next() {
 		var database string
 		if err := rows.Scan(&database); err != nil {
