@@ -1,3 +1,17 @@
+# This workflow adds support for custom "slash commands" in the CI/CD pipeline.
+# It is triggered by comments made on pull requests.
+#
+# 1. If the comment starts with "/test"
+#    it will trigger a 'slash-command-receiver' workflow, which in turn, will
+#    trigger an execution of the E2E Test Suite.
+#
+# 2. If the comment starts with "/ok-to-merge", it will label the PR with
+#    "ok to merge :ok_hand:"
+#
+# 3. If the comment starts with "/ready-to-test", it will label the PR with
+#    "ready to test :elephant:" if the label was not already applied, or remove
+#    the label if it was there already.
+#
 name: slash-command-dispatcher
 
 on:

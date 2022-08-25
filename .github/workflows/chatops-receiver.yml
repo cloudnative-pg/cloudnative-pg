@@ -1,3 +1,27 @@
+# This workflow implements support for the "/test" slash-command triggered
+# by the chatops-receiver workflow.
+# After receiving the repository_dispatch with the '/test' command, it will
+# trigger the E2E Test Suite execution, and add a PR comment with the test link
+#
+# The "/test" command can take arguments, which will be passed on to the
+# continuous-delivery workflow and will determine how the test suite is executed
+#
+#  Format:  '/test test_level=4 depth=main'
+#
+#          test_level: specifies the maximum level of the tests to run.
+#               E2E tests tagged with that level or lower will be run.
+#               4: highest, 3: high, 2: medium, 1: low, 0: lowest.
+#               I.e. test_level=4 runs all the tests
+#
+#          depth:  controls the "width" of the matrix that will be generated,
+#               i.e. the number of combinations of Kubernetes x Postgres
+#               versions the E2E Test Suite will be executed on.
+#               In order of decreasing completeness:
+#               - schedule
+#               - main
+#               - pull_request
+#               - push
+#
 name: slash-command-receiver
 
 on:
