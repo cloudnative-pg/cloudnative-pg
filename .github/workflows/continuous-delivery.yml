@@ -720,6 +720,10 @@ jobs:
       - name: Display the structure of the artifact folder
         run: ls -R test-artifacts
 
+      - name: Install Summarize dependencies
+        run: |
+          pip install prettytable
+
       - name: Compute the E2E test summary
         run: |
           python .github/summarize_test_results.py --dir test-artifacts >> $GITHUB_STEP_SUMMARY
