@@ -1,12 +1,19 @@
+# This workflow executes the E2E Test Suite for a series of combinations that
+# represent different execution environments
 name: continuous-delivery
-
 on:
+  # Can be triggered by:
+  #
+  # A push from any branch
   push:
     branches:
       - '**'
+  # A pull request is 'opened', 'synchronize', or 'reopened'
   pull_request:
+  # A pull request from a fork repository which is labelled
   pull_request_target:
     types: [labeled]
+  # Manually or triggered by another workflow
   workflow_dispatch:
     inputs:
       depth:
@@ -16,9 +23,11 @@ on:
       test_level:
         description: 'Test level (0-4)'
         required: false
+  # scheduled
   schedule:
     - cron:  '0 1 * * *'
 
+# set up environment variables to be used across all the jobs
 env:
   GOLANG_VERSION: "1.18.x"
   GOLANGCI_LINT_VERSION: "v1.49"
@@ -29,10 +38,13 @@ env:
 
 defaults:
   run:
+    # default failure handling for shell scripts in 'run' steps
     shell: 'bash -Eeuo pipefail -x {0}'
 
 jobs:
-
+  # Detects if we should skip the workflow due to being duplicated. Exceptions:
+  #   1. it's on 'main' branch
+  #   2. it's triggered by events in the 'do_not_skip' list
   duplicate_runs:
     runs-on: ubuntu-20.04
     name: Skip duplicate runs
@@ -47,6 +59,9 @@ jobs:
           paths_ignore: '["README.md", "docs/**"]'
           do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
 
+  # Classify codebase changes along 5 different dimensions based on the files
+  # changed in the commit/PR, and create 5 different filters which are used in
+  # the following jobs to decide whether the step should be skipped.
   change-triage:
     name: Check changed files
     needs: duplicate_runs
@@ -101,7 +116,7 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
-    # Run Go linter if Go code have changed
+    # Run Go linter only if Go code has changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.go-code-changed == 'true'
@@ -129,7 +144,7 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
-    # Run shellcheck linter if shell code have changed
+    # Run shellcheck linter only if shell code has changed
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.shell-script-changed == 'true'
@@ -148,7 +163,10 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
-    # Run unit tests if anything but docs, e2e tests and shell scripts have changed
+    # Run unit tests only if the operator or the Go codebase have changed
+    # AND EITHER
+    # The slash command ('/test' or '/test-cnp') was issued in the PR comment
+    # OR the PR is labeled with 'ready to test :elephant:'
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
@@ -166,6 +184,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
+        # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
         k8s-version:
           - 1.19.x
           - 1.20.x
@@ -185,6 +204,8 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       -
+        # Cache Go modules on GitHub runners to be reused across jobs
+        # See to: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows
         name: Cache Go modules
         uses: actions/cache@v3
         with:
@@ -283,9 +304,10 @@ jobs:
       - crd
       - duplicate_runs
       - change-triage
-    # Build containers if anything but docs have changed,
-    # or it is a scheduled execution
-    # See https://github.com/actions/runner/issues/491#issuecomment-850884422
+    # Build containers:
+    #   if there have been any code changes OR it is a scheduled execution
+    #   AND
+    #   none of the preceding jobs failed
     if: |
       (
         github.event_name == 'schedule' ||
@@ -309,6 +331,7 @@ jobs:
       packages: write
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
+      # 'branch_name' is used in 'GetMostRecentReleaseTag' in the Go code
       branch_name: ${{ steps.build-meta.outputs.branch_name }}
 
     steps:
@@ -439,6 +462,10 @@ jobs:
     needs:
       - buildx
       - duplicate_runs
+    # We try to avoid running the E2E Test Suite in general, to reduce load on
+    # GitHub resources. We should run the tests always: on main and release
+    # branches, when triggered by dependabot, when a PR is first opened, or when
+    # a PR from a forked repo is labeled
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       always() &&
@@ -464,6 +491,8 @@ jobs:
         uses: actions/checkout@v3
       -
         id: generate-jobs
+        # Generates the jobs that will become different matrix branches,
+        # according to the event, or to the "depth" parameter if manually set
         name: Generate Jobs
         shell: bash
         run: |
@@ -471,6 +500,8 @@ jobs:
             -m '${{ github.event.inputs.depth || github.event_name }}'
 
   evaluate-test-level:
+    # Evaluates the level/depth at which to execute an E2E Test Suite run.
+    # E2E Tests with a level higher than this will be skipped.
     name: Evaluate test level
     needs:
       - generate-jobs
@@ -517,11 +548,14 @@ jobs:
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
     runs-on: ubuntu-20.04
     env:
+      # 'TEST_DEPTH' determines which E2E test cases will be run.
+      # i.e. tests that have a level setting higher than TEST_DEPTH are skipped
       TEST_DEPTH: ${{ needs.evaluate-test-level.outputs.testLevel }}
       K8S_VERSION: "${{ matrix.k8s_version }}"
       POSTGRES_VERSION: ${{ matrix.postgres_version }}
       MATRIX: ${{ matrix.id }}
       POSTGRES_IMG: "${{ matrix.postgres_img }}"
+      # The version of operator to upgrade FROM, in the rolling upgrade E2E test
       E2E_PRE_ROLLING_UPDATE_IMG: "${{ matrix.postgres_pre_img }}"
       BRANCH_NAME:  ${{ needs.buildx.outputs.branch_name }}
 
@@ -568,6 +602,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       -
+        # 'Retry' preparing the E2E test ENV
         name: Prepare the environment
         uses: nick-fields/retry@v2
         with:
@@ -585,13 +620,17 @@ jobs:
         run:
           make e2e-test-kind
       -
+        # Summarize the failed E2E test cases if there are any
         name: Report failed E2E tests
         if: failure()
         run: |
           set +x
           chmod +x .github/report-failed-test.sh
           ./.github/report-failed-test.sh
-      - name: Create individual artifact for each E2E test
+      -
+        # Create an individual artifact for each E2E test, which will be used to
+        # generate E2E test summary in the follow-up job 'summarize-e2e-tests'
+        name: Create individual artifact for each E2E test
         if: always()
         run: |
           set +x
@@ -631,6 +670,7 @@ jobs:
           rm tests/e2e/out/report.json
 
       -
+        # Archive logs for failed test cases if there are any
         name: Archive Kind logs
         if: failure()
         uses: actions/upload-artifact@v3
@@ -649,8 +689,9 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # Summarize E2E test results, display in the GitHub 'summary' view
   summarize-e2e-tests:
-    name: E2E test suite # GH Actions will append "summary"
+    name: E2E test suite
     needs:
       - duplicate_runs
       - evaluate-test-level
@@ -675,6 +716,10 @@ jobs:
         run: |
           python .github/summarize-test-results.py --dir test-artifacts >> $GITHUB_STEP_SUMMARY
 
+  # Adds the 'ok-to-merge' label to workflows that have run successfully and
+  # have adequate test and matrix coverage.
+  # This label is a prerequisite to be able to merge a PR.
+  # Also see to 'require-labels.yml'
   ok-to-merge:
     name: Label the PR as "ok to merge"
     needs:
@@ -714,6 +759,7 @@ jobs:
           number: ${{ steps.get_pr_number_and_labels.outputs.pr_number }}
           labels: "ok to merge :ok_hand:"
 
+  # Remove the 'ok-to-merge' label if the E2E tests or previous steps failed
   unlabel-ok-to-merge:
     name: Remove the "ok to merge" label from the PR
     needs:

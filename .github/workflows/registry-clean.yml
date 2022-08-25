@@ -1,3 +1,5 @@
+# This workflow runs daily to clean up the `*-testing` images older than the
+# cut-off period specified in `snok/container-retention-policy`
 name: clean-testing-package
 
 on:
