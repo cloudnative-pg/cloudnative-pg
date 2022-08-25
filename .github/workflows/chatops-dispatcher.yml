@@ -1,25 +1,17 @@
-# This workflow is triggered by comments creation events in pull request. It is the entry point of slash command
-# support like /test, /ok-to-merge, /ready-to-test.
+# This workflow adds support for custom "slash commands" in the CI/CD pipeline.
+# It is triggered by comments made on pull requests.
 #
 # 1. If the comment starts with "/test"
-#    It will trigger 'slash-command-receiver' workflow and finally trigger e2e test in specific scope with params,
-#    in format of  '/test test_level=4 depth=main'
+#    it will trigger a 'slash-command-receiver' workflow, which in turn, will
+#    trigger an execution of the E2E Test Suite.
 #
-#          test_level: With what level and above, the e2e test will be run. e2e test cases is classified with 5 levels
-#                       0 highest, 1 high, 2 medium, 3 low, 4 lowest.
-#                       all test cases smaller or equals than the test level specified by 'test_level' will be run.
-#          depth:  E2e test cases is grouped by depth too, the value for depths are:
-#                        schedule
-#                        main
-#                        pull_request
-#                        push
-#                   'schedule' contains most test cases coverage,  and 'push' contains less test cases coverage.
+# 2. If the comment starts with "/ok-to-merge", it will label the PR with
+#    "ok to merge :ok_hand:"
 #
-# 2. If the comment starts with "/ok-to-merge", it will label the PR with "ok to merge :ok_hand:"
+# 3. If the comment starts with "/ready-to-test", it will label the PR with
+#    "ready to test :elephant:" if the label was not already applied, or remove
+#    the label if it was there already.
 #
-# 3. If the comment starts with "/ready-to-test", it will label the PR with "ready to test :elephant:" if the label
-#    does not already exist or remove the label "ready to test :elephant:" if it already exists.
-
 name: slash-command-dispatcher
 
 on:

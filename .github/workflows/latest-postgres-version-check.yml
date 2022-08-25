@@ -1,5 +1,5 @@
-# This workflow is scheduled to check the latest postgres versions from ·cloudnative-pg/postgresql`, if there have
-# update the default postgres version.
+# Checks the latest postgres image from `ghcr.io/cloudnative-pg/postgresql`,
+# and if there is a new one, updates the codebase with it
 
 name: latest-postgres-version-check
 
