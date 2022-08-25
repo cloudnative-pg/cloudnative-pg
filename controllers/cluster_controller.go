@@ -385,7 +385,7 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pods: %w", err)
 	}
 
-	if err := r.updateClusterRoleLabelsOnPVCs(ctx, resources.pods, resources.pvcs); err != nil {
+	if err := r.updateClusterRoleLabelsOnPVCs(ctx, resources.instances, resources.pvcs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pvcs: %w", err)
 	}
 
