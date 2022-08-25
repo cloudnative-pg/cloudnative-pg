@@ -228,7 +228,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Get the replication status
-	instancesStatus := r.getStatusFromInstances(ctx, resources.pods)
+	instancesStatus := r.getStatusFromInstances(ctx, resources.instances)
 
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {
@@ -381,7 +381,7 @@ func (r *ClusterReconciler) reconcileResources(
 	contextLogger, ctx := log.SetupLogger(ctx)
 
 	// Update the labels for the -rw service to work correctly
-	if err := r.updateRoleLabelsOnPods(ctx, cluster, resources.pods); err != nil {
+	if err := r.updateRoleLabelsOnPods(ctx, cluster, resources.instances); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pods: %w", err)
 	}
 
@@ -390,12 +390,12 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// Update any modified/new labels coming from the cluster resource
-	if err := r.updateClusterLabelsOnPods(ctx, cluster, resources.pods); err != nil {
+	if err := r.updateClusterLabelsOnPods(ctx, cluster, resources.instances); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update cluster labels on pods: %w", err)
 	}
 
 	// Update any modified/new annotations coming from the cluster resource
-	if err := r.updateClusterAnnotationsOnPods(ctx, cluster, resources.pods); err != nil {
+	if err := r.updateClusterAnnotationsOnPods(ctx, cluster, resources.instances); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update annotations on pods: %w", err)
 	}
 
@@ -425,7 +425,7 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
-	if !resources.allPodsAreActive() {
+	if !resources.allInstancesAreActive() {
 		contextLogger.Debug("A managed resource is currently being created or deleted. Waiting")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
@@ -443,7 +443,7 @@ func (r *ClusterReconciler) reconcileResources(
 		return res, err
 	}
 
-	if len(resources.pods.Items) > 0 && resources.noPodsAreAlive() {
+	if len(resources.instances.Items) > 0 && resources.noInstanceIsAlive() {
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx, cluster, apiv1.PhaseUnrecoverable,
 			"No pods are active, the cluster needs manual intervention ")
 	}
@@ -470,12 +470,12 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 	contextLogger := log.FromContext(ctx)
 	deletedPods := false
 
-	for idx := range resources.pods.Items {
-		if utils.IsPodEvicted(resources.pods.Items[idx]) {
+	for idx := range resources.instances.Items {
+		if utils.IsPodEvicted(resources.instances.Items[idx]) {
 			contextLogger.Warning("Deleting evicted pod",
-				"pod", resources.pods.Items[idx].Name,
-				"podStatus", resources.pods.Items[idx].Status)
-			if err := r.Delete(ctx, &resources.pods.Items[idx]); err != nil {
+				"pod", resources.instances.Items[idx].Name,
+				"podStatus", resources.instances.Items[idx].Status)
+			if err := r.Delete(ctx, &resources.instances.Items[idx]); err != nil {
 				if apierrs.IsConflict(err) {
 					return &ctrl.Result{Requeue: true}, nil
 				}
@@ -484,7 +484,7 @@ func (r *ClusterReconciler) deleteEvictedPods(ctx context.Context, cluster *apiv
 			deletedPods = true
 			r.Recorder.Eventf(cluster, "Normal", "DeletePod",
 				"Deleted evicted Pod %v",
-				resources.pods.Items[idx].Name)
+				resources.instances.Items[idx].Name)
 		}
 	}
 	if deletedPods {
