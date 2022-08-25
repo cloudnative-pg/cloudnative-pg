@@ -460,7 +460,7 @@ def format_test_summary(summary):
 
     overview_section = {
         "title": "Overview",
-        "header": ["failed", "out of", ""],
+        "header": ["", "failed", "out of"],
         "rows": [
             ["test combinations", "total_failed", "total_run"],
             ["unique tests", "unique_failed", "unique_run"],
@@ -474,6 +474,7 @@ def format_test_summary(summary):
     format_overview(overview, overview_section)
 
     if summary["total_failed"] == 0:
+        print()
         print(
             "No failures, no failure stats shown. "
             "It's not easy being green."
