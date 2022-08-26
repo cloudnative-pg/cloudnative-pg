@@ -574,9 +574,9 @@ func (r *ClusterReconciler) updateClusterRoleLabelsOnPVCs(
 				continue
 			}
 
-			pvcPatch := client.MergeFrom(pvc.DeepCopy())
+			origPvc := pvc.DeepCopy()
 			pvc.Labels[specs.ClusterRoleLabelName] = podRole
-			if err := r.Client.Patch(ctx, &pvc, pvcPatch); err != nil {
+			if err := r.Client.Patch(ctx, &pvc, client.MergeFrom(origPvc)); err != nil {
 				return err
 			}
 		}
