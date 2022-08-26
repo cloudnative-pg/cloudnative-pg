@@ -277,7 +277,7 @@ var _ = Describe("Rolling updates", func() {
 		// The PVC get reused, so they should have the same UID
 		By("checking that the PVCs are the same", func() {
 			AssertChangedPvcUID(namespace, clusterName, originalPVCUID, clusterInstances)
-			assertPvcHasLabels(namespace, clusterName)
+			AssertPvcHasLabels(namespace, clusterName)
 		})
 		// The operator should upgrade the primary last and the primary role
 		// should go to our new TargetPrimary.
