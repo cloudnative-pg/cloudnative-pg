@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 /*
-The manager command is the main entrypoint of CloudnativePG operator.
+The manager command is the main entrypoint of CloudNativePG operator.
 */
 package main
 
