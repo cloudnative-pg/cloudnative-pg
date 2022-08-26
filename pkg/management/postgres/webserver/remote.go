@@ -157,6 +157,8 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		// Unfortunately this point, if everything is right, will not be reached.
 		// At this stage we are running the new version of the instance manager
 		// and not the old one.
+		// This is also the reason why we don't need to reset the
+		// `ws.instance.InstanceManagerIsUpgrading` variable.
 		_, _ = fmt.Fprint(w, "OK")
 	}
 }
