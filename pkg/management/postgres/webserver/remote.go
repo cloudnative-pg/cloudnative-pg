@@ -150,6 +150,7 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		err := upgrade.FromReader(cancelFunc, exitedCondition, ws.typedClient, ws.instance, r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			ws.instance.InstanceManagerIsUpgrading.Store(false)
 			return
 		}
 
