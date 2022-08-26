@@ -53,9 +53,11 @@ import (
 )
 
 const (
-	// RetryTimeout retry time when client api call or kubectl cli request get failed
+	// RetryTimeout retry timeout (in seconds) when a client api call or kubectl cli request get failed
 	RetryTimeout = 60
-	// PollingTime polling between retry
+	// RetryAttempts maximum number of attempts when it fails in `retry`. Mainly used in `RunUncheckedRetry`
+	RetryAttempts = 5
+	// PollingTime polling interval (in seconds) between retries
 	PollingTime = 5
 )
 

@@ -144,7 +144,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture
 				return testUtils.CountFilesOnMinio(namespace, minioClientName, latestWALPath)
-			}, 60).Should(BeEquivalentTo(1),
+			}, RetryTimeout).Should(BeEquivalentTo(1),
 				fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath))
 		})
 
@@ -189,14 +189,22 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				standby,
 				walRestoreCommand+" "+walFile1+" "+PgWalPath+"/"+walFile1))
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
-			Expect(testUtils.TestFileExist(namespace, standby, PgWalPath, walFile1)).To(Equal(true),
-				"#1 wal is in the output location")
-			Expect(testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile2)).To(Equal(true),
-				"#2 wal is in the spool directory")
-			Expect(testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile3)).To(Equal(true),
-				"#3 wal is in the spool directory")
-			Expect(testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream")).
-				To(Equal(false), "end-of-wal-stream flag is unset")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile1) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"#1 wal is in the output location")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile2) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"#2 wal is in the spool directory")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile3) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"#3 wal is in the spool directory")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(false),
+					"end-of-wal-stream flag is unset")
 		})
 
 		// Invoke the wal-restore command through exec requesting the #2 file.
@@ -210,12 +218,18 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				standby,
 				walRestoreCommand+" "+walFile2+" "+PgWalPath+"/"+walFile2))
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
-			Expect(testUtils.TestFileExist(namespace, standby, PgWalPath, walFile2)).To(Equal(true),
-				"#2 wal is in the output location")
-			Expect(testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile3)).To(Equal(true),
-				"#3 wal is in the spool directory")
-			Expect(testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream")).
-				To(Equal(false), "end-of-wal-stream flag is unset")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile2) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"#2 wal is in the output location")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile3) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"#3 wal is in the spool directory")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(false),
+					"end-of-wal-stream flag is unset")
 		})
 
 		// Invoke the wal-restore command through exec requesting the #3 file.
@@ -229,10 +243,14 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				standby,
 				walRestoreCommand+" "+walFile3+" "+PgWalPath+"/"+walFile3))
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
-			Expect(testUtils.TestFileExist(namespace, standby, PgWalPath, walFile3)).To(Equal(true),
-				"#3 wal is in the output location")
-			Expect(testUtils.TestDirectoryEmpty(namespace, standby, SpoolDirectory)).To(Equal(true),
-				"spool directory is empty, end-of-wal-stream flag is unset")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile3) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"#3 wal is in the output location")
+			Eventually(func() bool { return testUtils.TestDirectoryEmpty(namespace, standby, SpoolDirectory) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"spool directory is empty, end-of-wal-stream flag is unset")
 		})
 
 		// Invoke the wal-restore command through exec requesting the #4 file.
@@ -246,12 +264,18 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				standby,
 				walRestoreCommand+" "+walFile4+" "+PgWalPath+"/"+walFile4))
 			Expect(err).ToNot(HaveOccurred())
-			Expect(testUtils.TestFileExist(namespace, standby, PgWalPath, walFile4)).To(Equal(true),
-				"#4 wal is in the output location")
-			Expect(testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile5)).To(Equal(true),
-				"#5 wal is in the spool directory")
-			Expect(testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream")).
-				To(Equal(true), "end-of-wal-stream flag is set for #6 wal is not present")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile4) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"#4 wal is in the output location")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, walFile5) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"#5 wal is in the spool directory")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"end-of-wal-stream flag is set for #6 wal is not present")
 		})
 
 		// Generate a new wal file; the archive also contains WAL #6.
@@ -271,12 +295,18 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				standby,
 				walRestoreCommand+" "+walFile5+" "+PgWalPath+"/"+walFile5))
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
-			Expect(testUtils.TestFileExist(namespace, standby, PgWalPath, walFile5)).To(Equal(true),
-				"#5 wal is in the output location")
-			Expect(testUtils.TestFileExist(namespace, standby, SpoolDirectory, "00000001*")).To(Equal(false),
-				"no wal files exist in the spool directory")
-			Expect(testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream")).
-				To(Equal(true), "end-of-wal-stream flag is still there")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile5) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"#5 wal is in the output location")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "00000001*") }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(false),
+					"no wal files exist in the spool directory")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"end-of-wal-stream flag is still there")
 		})
 
 		// Invoke the wal-restore command through exec requesting the #6 file.
@@ -290,10 +320,14 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				walRestoreCommand+" "+walFile6+" "+PgWalPath+"/"+walFile6))
 			Expect(err).To(HaveOccurred(),
 				"exit code should 1 since #6 wal is not in the output location or spool directory and flag is set")
-			Expect(testUtils.TestFileExist(namespace, standby, PgWalPath, walFile6)).ToNot(Equal(true),
-				"#6 wal is not in the output location")
-			Expect(testUtils.TestDirectoryEmpty(namespace, standby, SpoolDirectory)).To(Equal(true),
-				"spool directory is empty, end-of-wal-stream flag is unset")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile6) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(false),
+					"#6 wal is not in the output location")
+			Eventually(func() bool { return testUtils.TestDirectoryEmpty(namespace, standby, SpoolDirectory) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"spool directory is empty, end-of-wal-stream flag is unset")
 		})
 
 		// Invoke the wal-restore command through exec requesting the #6 file again.
@@ -307,12 +341,18 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				standby,
 				walRestoreCommand+" "+walFile6+" "+PgWalPath+"/"+walFile6))
 			Expect(err).ToNot(HaveOccurred(), "exit code should be 0")
-			Expect(testUtils.TestFileExist(namespace, standby, PgWalPath, walFile6)).To(Equal(true),
-				"#6 wal is in the output location")
-			Expect(testUtils.TestFileExist(namespace, standby, SpoolDirectory, "00000001*")).ToNot(Equal(true),
-				"no wals in the spool directory")
-			Expect(testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream")).
-				To(Equal(true), "end-of-wal-stream flag is set for #7 and #8 wal is not present")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, PgWalPath, walFile6) }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"#6 wal is in the output location")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "00000001*") }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(false),
+					"no wals in the spool directory")
+			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
+				WithTimeout(RetryTimeout).
+				Should(Equal(true),
+					"end-of-wal-stream flag is set for #7 and #8 wal is not present")
 		})
 	})
 })

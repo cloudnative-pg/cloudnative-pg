@@ -49,7 +49,7 @@ func ForgeArchiveWalOnMinio(namespace, clusterName, miniClientPodName, existingW
 func TestFileExist(namespace, podName, directoryPath, fileName string) bool {
 	filePath := directoryPath + "/" + fileName
 	testFileExistCommand := "test -f " + filePath
-	_, _, err := RunUncheckedRetry(fmt.Sprintf(
+	_, _, err := RunUnchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		namespace,
 		podName,
@@ -61,7 +61,7 @@ func TestFileExist(namespace, podName, directoryPath, fileName string) bool {
 // TestDirectoryEmpty tests if a directory `directoryPath` exists on pod `podName` in namespace `namespace`
 func TestDirectoryEmpty(namespace, podName, directoryPath string) bool {
 	testDirectoryEmptyCommand := "test \"$(ls -A" + directoryPath + ")\""
-	_, _, err := RunUncheckedRetry(fmt.Sprintf(
+	_, _, err := RunUnchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		namespace,
 		podName,
