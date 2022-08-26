@@ -552,6 +552,39 @@ func (r *ClusterReconciler) updateRoleLabelsOnPods(
 	return nil
 }
 
+// updateClusterRoleLabelsOnPVCs ensures that the PVCs have the correct cluster role label set
+func (r *ClusterReconciler) updateClusterRoleLabelsOnPVCs(
+	ctx context.Context,
+	pods corev1.PodList,
+	pvcs corev1.PersistentVolumeClaimList,
+) error {
+	for _, pod := range pods.Items {
+		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
+		if !podHasRole {
+			continue
+		}
+
+		for _, pvc := range specs.FilterInstancePVCs(pvcs.Items, pod.Spec) {
+			pvc := pvc
+			// this is needed, because on older versions pvc.labels could be nil
+			if pvc.Labels == nil {
+				pvc.Labels = map[string]string{}
+			}
+			if pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] == podRole {
+				continue
+			}
+
+			origPvc := pvc.DeepCopy()
+			pvc.Labels[specs.ClusterRoleLabelName] = podRole
+			if err := r.Client.Patch(ctx, &pvc, client.MergeFrom(origPvc)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 // getSacrificialPod get the Pod who is supposed to be deleted
 // when the cluster is scaled down
 func getSacrificialInstance(podList []corev1.Pod) *corev1.Pod {
