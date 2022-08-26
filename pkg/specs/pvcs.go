@@ -124,6 +124,27 @@ func CreatePVC(
 	return result, nil
 }
 
+// FilterInstancePVCs returns all the corev1.PersistentVolumeClaim that are used inside the podSpec
+func FilterInstancePVCs(
+	pvcs []corev1.PersistentVolumeClaim,
+	instanceSpec corev1.PodSpec,
+) []corev1.PersistentVolumeClaim {
+	var instancePVCs []corev1.PersistentVolumeClaim
+	for _, volume := range instanceSpec.Volumes {
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+
+		for _, pvc := range pvcs {
+			if volume.PersistentVolumeClaim.ClaimName == pvc.Name {
+				instancePVCs = append(instancePVCs, pvc)
+			}
+		}
+	}
+
+	return instancePVCs
+}
+
 // DetectPVCs fill the list with the PVCs which are dangling, given that
 // PVC are usually named after Pods
 // nolint: gocognit
