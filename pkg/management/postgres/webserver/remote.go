@@ -142,7 +142,7 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		}
 
 		// No need to do anything if we are already upgrading
-		if ws.instance.InstanceManagerIsUpgrading {
+		if !ws.instance.InstanceManagerIsUpgrading.CompareAndSwap(false, true) {
 			http.Error(w, "instance manager is already upgrading", http.StatusTeapot)
 			return
 		}

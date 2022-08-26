@@ -152,7 +152,7 @@ type Instance struct {
 	instanceCommandChan chan InstanceCommand
 
 	// InstanceManagerIsUpgrading tells if there is an instance manager upgrade in process
-	InstanceManagerIsUpgrading bool
+	InstanceManagerIsUpgrading atomic.Bool
 
 	// PgRewindIsRunning tells if there is a `pg_rewind` process running
 	PgRewindIsRunning bool

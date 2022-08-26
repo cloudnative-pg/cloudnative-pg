@@ -53,12 +53,10 @@ func FromReader(
 	instance *postgres.Instance,
 	r io.Reader,
 ) error {
-	// Mark this instance manager as upgrading
-	instance.InstanceManagerIsUpgrading = true
 	defer func() {
 		// Something didn't work if we reach this point, as this process
 		// should have already been replaced by a new one with the new binary
-		instance.InstanceManagerIsUpgrading = false
+		instance.InstanceManagerIsUpgrading.Store(false)
 	}()
 
 	// Read the new instance manager version
