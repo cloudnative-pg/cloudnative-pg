@@ -709,17 +709,32 @@ jobs:
       - name: Download all artifacts to the directory
         uses: actions/download-artifact@v3
         with:
-          name: testartifacts-local
           path: test-artifacts
+
+      - name: Flatten all artifacts onto directory
+        # The download-artifact action, since we did not give it a name,
+        # downloads all artifacts and creates a new folder for each.
+        # In this step we bring all the JSONs to a single folder
+        run: mv test-artifacts/*/*.json test-artifacts
+
+      - name: Display the structure of the artifact folder
+        run: ls -R test-artifacts
+
+      - name: Install Summarize dependencies
+        run: |
+          pip install prettytable
 
       - name: Compute the E2E test summary
         run: |
-          python .github/summarize-test-results.py --dir test-artifacts >> $GITHUB_STEP_SUMMARY
+          python .github/summarize_test_results.py --dir test-artifacts >> $GITHUB_STEP_SUMMARY
 
-  # Adds the 'ok-to-merge' label to workflows that have run successfully and
-  # have adequate test and matrix coverage.
-  # This label is a prerequisite to be able to merge a PR.
-  # Also see to 'require-labels.yml'
+      - name: Delete the downloaded files
+        run: rm -rf test-artifacts
+
+# Adds the 'ok-to-merge' label to workflows that have run successfully and
+# have adequate test and matrix coverage.
+# This label is a prerequisite to be able to merge a PR.
+# Also see to 'require-labels.yml'
   ok-to-merge:
     name: Label the PR as "ok to merge"
     needs:
