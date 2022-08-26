@@ -34,11 +34,9 @@ import (
 )
 
 const (
-	fixturesDir = "./fixtures"
-	// RetryTimeout retry time when client api call or kubectl cli request get failed
-	RetryTimeout = 60
-	// PollingTime polling between retry
-	PollingTime = 5
+	fixturesDir  = "./fixtures"
+	RetryTimeout = utils.RetryTimeout
+	PollingTime  = utils.PollingTime
 )
 
 var (
