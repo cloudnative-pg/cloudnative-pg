@@ -40,7 +40,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logicalimport"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
-	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
@@ -320,12 +320,29 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 
 	instance := info.GetInstance()
 
-	majorVersion, err := postgresutils.GetMajorVersion(instance.PgData)
+	postgresVersion, err := cluster.GetPostgresqlVersion()
 	if err != nil {
-		return fmt.Errorf("while reading major version: %w", err)
+		return fmt.Errorf("while reading the PostgreSQL version: %w", err)
 	}
 
-	if majorVersion >= 12 {
+	configurationInfo := postgres.ConfigurationInfo{
+		Settings:                         postgres.CnpgConfigurationSettings,
+		MajorVersion:                     postgresVersion,
+		UserSettings:                     cluster.Spec.PostgresConfiguration.Parameters,
+		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
+		IsReplicaCluster:                 cluster.IsReplica(),
+		IncludingSharedPreloadLibraries:  true,
+		PreserveFixedSettingsFromUser:    true,
+	}
+	postgresConfiguration := postgres.CreatePostgresqlConfiguration(configurationInfo)
+
+	sharedPreloadLibraries := postgresConfiguration.GetConfigurationParameters()[postgres.SharedPreloadLibraries]
+	if sharedPreloadLibraries != "" {
+		libsConfig := fmt.Sprintf("%s='%s'", postgres.SharedPreloadLibraries, sharedPreloadLibraries)
+		instance.StartupOptions = append(instance.StartupOptions, libsConfig)
+	}
+
+	if postgresVersion >= 120000 {
 		primaryConnInfo := buildPrimaryConnInfo(info.ClusterName, info.PodName)
 		_, err = configurePostgresAutoConfFile(info.PgData, primaryConnInfo)
 		if err != nil {

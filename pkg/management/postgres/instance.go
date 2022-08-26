@@ -295,7 +295,7 @@ func (instance *Instance) Startup() error {
 		options = append(options, "-o", "-c "+opt)
 	}
 
-	log.Info("Starting up instance", "pgdata", instance.PgData)
+	log.Info("Starting up instance", "pgdata", instance.PgData, "options", options)
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
 	pgCtlCmd.Env = instance.Env
