@@ -69,7 +69,7 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 		for i := range pvcs.Items {
 			pvcs.Items[i].OwnerReferences = removeOwnerReference(pvcs.Items[i].OwnerReferences, clusterName)
 			pvcs.Items[i].Annotations["cnpg.io/pvcStatus"] = "detached"
-			pvcs.Items[i].Labels[utils.InstanceLabelName] = instanceName
+			pvcs.Items[i].Labels[utils.InstanceNameLabelName] = instanceName
 			err = plugin.Client.Update(ctx, &pvcs.Items[i])
 			if err != nil {
 				return fmt.Errorf("error updating metadata for persistent volume claim %s: %v",
@@ -97,7 +97,7 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 func deletePVCsMatchingLabel(ctx context.Context, instanceName string) error {
 	var pvcs v1.PersistentVolumeClaimList
 	err := plugin.Client.List(ctx, &pvcs, client.InNamespace(plugin.Namespace),
-		client.MatchingLabels{utils.InstanceLabelName: instanceName})
+		client.MatchingLabels{utils.InstanceNameLabelName: instanceName})
 	if err != nil {
 		return fmt.Errorf("error getting pvcs for instance %s: %v", instanceName, err)
 	}
