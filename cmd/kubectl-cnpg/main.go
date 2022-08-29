@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/*
+kubectl-cnp is a plugin to manage your CloudNativePG clusters
+*/
 package main
 
 import (
