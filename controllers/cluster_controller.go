@@ -783,7 +783,7 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		podOwnerKey, func(rawObj client.Object) []string {
 			pod := rawObj.(*corev1.Pod)
 
-			if ownerName, ok := isOwnedByCluster(pod); ok {
+			if ownerName, ok := IsOwnedByCluster(pod); ok {
 				return []string{ownerName}
 			}
 
@@ -833,7 +833,7 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		pvcOwnerKey, func(rawObj client.Object) []string {
 			persistentVolumeClaim := rawObj.(*corev1.PersistentVolumeClaim)
 
-			if ownerName, ok := isOwnedByCluster(persistentVolumeClaim); ok {
+			if ownerName, ok := IsOwnedByCluster(persistentVolumeClaim); ok {
 				return []string{ownerName}
 			}
 
@@ -865,7 +865,7 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		jobOwnerKey, func(rawObj client.Object) []string {
 			job := rawObj.(*batchv1.Job)
 
-			if ownerName, ok := isOwnedByCluster(job); ok {
+			if ownerName, ok := IsOwnedByCluster(job); ok {
 				return []string{ownerName}
 			}
 
@@ -873,9 +873,9 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 		})
 }
 
-// isOwnedByCluster checks that an object is owned by a Cluster and returns
+// IsOwnedByCluster checks that an object is owned by a Cluster and returns
 // the owner name
-func isOwnedByCluster(obj client.Object) (string, bool) {
+func IsOwnedByCluster(obj client.Object) (string, bool) {
 	owner := metav1.GetControllerOf(obj)
 	if owner == nil {
 		return "", false
@@ -1050,7 +1050,7 @@ func (r *ClusterReconciler) mapNodeToClusters(ctx context.Context) handler.MapFu
 		var requests []reconcile.Request
 		// build requests for nodes the pods are running on
 		for idx := range childPods.Items {
-			if cluster, ok := isOwnedByCluster(&childPods.Items[idx]); ok {
+			if cluster, ok := IsOwnedByCluster(&childPods.Items[idx]); ok {
 				requests = append(requests,
 					reconcile.Request{
 						NamespacedName: types.NamespacedName{

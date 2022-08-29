@@ -42,6 +42,9 @@ const (
 
 	// PVCStatusReady is the annotation value for PVC ready status
 	PVCStatusReady = "ready"
+
+	// PVCStatusDetached is the annotation value for PVC detached status
+	PVCStatusDetached = "detached"
 )
 
 // ErrorInvalidSize is raised when the size specified by the

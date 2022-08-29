@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -48,16 +49,15 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 
 	if keepPVC {
 		// we remove the ownership from the pvcs if present
-		for _, pvc := range pvcs {
-			pvc := pvc
-			if !isOwnedByCluster(clusterName, pvc.OwnerReferences) {
+		for i := range pvcs {
+			if _, isOwned := controllers.IsOwnedByCluster(&pvcs[i]); !isOwned {
 				continue
 			}
 
-			pvc.OwnerReferences = removeOwnerReference(pvc.OwnerReferences, clusterName)
-			pvc.Annotations["cnpg.io/pvcStatus"] = "detached"
-			pvc.Labels[utils.InstanceNameLabelName] = instanceName
-			err = plugin.Client.Update(ctx, &pvc)
+			pvcs[i].OwnerReferences = removeOwnerReference(pvcs[i].OwnerReferences, clusterName)
+			pvcs[i].Annotations[specs.PVCStatusAnnotationName] = specs.PVCStatusDetached
+			pvcs[i].Labels[utils.InstanceNameLabelName] = instanceName
+			err = plugin.Client.Update(ctx, &pvcs[i])
 			if err != nil {
 				return fmt.Errorf("error updating metadata for persistent volume claim %s: %v",
 					clusterName, err)
@@ -66,19 +66,24 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 		return nil
 	}
 
-	for _, pvc := range pvcs {
-		pvc := pvc
-		if pvc.Labels == nil {
-			pvc.Labels = map[string]string{}
+	for i := range pvcs {
+		if pvcs[i].Labels == nil {
+			pvcs[i].Labels = map[string]string{}
 		}
-		if !isOwnedByCluster(clusterName, pvc.OwnerReferences) &&
-			pvc.Labels[utils.InstanceNameLabelName] != instanceName {
+
+		_, isOwned := controllers.IsOwnedByCluster(&pvcs[i])
+		// if it is requested for deletion and it is owned by the cluster, we delete it. If it is not owned by the cluster
+		// but it does have the instance label and the detached annotation then we can still delete it
+		// We will only skip the iteration and not delete the pvc if it is not owned by the cluster and it does not have
+		// the annotation and label
+		if !isOwned && (pvcs[i].Annotations[specs.PVCStatusAnnotationName] != specs.PVCStatusDetached ||
+			pvcs[i].Labels[utils.InstanceNameLabelName] != instanceName) {
 			continue
 		}
 
-		err = plugin.Client.Delete(ctx, &pvc)
+		err = plugin.Client.Delete(ctx, &pvcs[i])
 		if err != nil {
-			return fmt.Errorf("error deleting pvc %s: %v", pvc.Name, err)
+			return fmt.Errorf("error deleting pvc %s: %v", pvcs[i].Name, err)
 		}
 	}
 
@@ -99,7 +104,7 @@ func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) e
 		return err
 	}
 
-	if !isOwnedByCluster(clusterName, pod.OwnerReferences) {
+	if _, isOwned := controllers.IsOwnedByCluster(&pod); !isOwned {
 		return fmt.Errorf("instance %s is not owned by cluster %s", pod.Name, clusterName)
 	}
 
@@ -159,6 +164,7 @@ func getPVC(ctx context.Context, name string) (*corev1.PersistentVolumeClaim, er
 	return &pvc, nil
 }
 
+// removeOwnerReference removes the owner reference to the cluster
 func removeOwnerReference(references []metav1.OwnerReference, clusterName string) []metav1.OwnerReference {
 	for i := range references {
 		if references[i].Name == clusterName && references[i].Kind == "Cluster" {
@@ -167,15 +173,4 @@ func removeOwnerReference(references []metav1.OwnerReference, clusterName string
 		}
 	}
 	return references
-}
-
-// isOwnedByCluster returns true if the owner reference is owned by the cluster
-func isOwnedByCluster(clusterName string, ownerReferences []metav1.OwnerReference) bool {
-	// TODO: there should be an existing function for this perhaps that we could reuse, remove hardcoded string
-	for _, ownerReference := range ownerReferences {
-		if ownerReference.Name == clusterName && ownerReference.APIVersion == "postgresql.cnpg.io/v1" {
-			return true
-		}
-	}
-	return false
 }
