@@ -21,8 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
@@ -42,6 +42,8 @@ func NewRemoteWebServer(
 	instance *postgres.Instance,
 	cancelFunc context.CancelFunc,
 	exitedConditions concurrency.MultipleExecuted,
+	readTimeout int64,
+	readHeaderTimeout int64,
 ) (*Webserver, error) {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
@@ -59,13 +61,22 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathUpdate,
 		endpoints.updateInstanceManager(cancelFunc, exitedConditions))
 
+	rTimeout := DefaultReadTimeout
+	if readTimeout != 0 {
+		rTimeout = time.Duration(readTimeout) * time.Second
+	}
+
+	rHeaderTimeout := DefaultReadHeaderTimeout
+	if readHeaderTimeout != 0 {
+		rTimeout = time.Duration(readHeaderTimeout) * time.Second
+	}
+
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),
 		Handler:           serveMux,
-		ReadTimeout:       DefaultReadTimeout,
-		ReadHeaderTimeout: DefaultReadHeaderTimeout,
+		ReadTimeout:       rTimeout,
+		ReadHeaderTimeout: rHeaderTimeout,
 	}
-
 	return NewWebServer(instance, server), nil
 }
 

@@ -29,3 +29,6 @@ tests/e2e/out/
 
 # Spellcheck dictionary
 dictionary.dic
+
+# go vendor/
+vendor/

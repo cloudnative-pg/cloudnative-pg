@@ -84,6 +84,14 @@ type Data struct {
 	// MonitoringQueriesSecret is the name of the secret in the operator namespace which contain
 	// the monitoring queries. The queries will be read from the data key: "queries".
 	MonitoringQueriesSecret string `json:"monitoringQueriesSecret" env:"MONITORING_QUERIES_SECRET"`
+
+	// WebserverReadTimeout is used as `ReadTimeout` for Webserver
+	// Default value is 20 (seconds)
+	WebserverReadTimeout string `json:"webserverReadTimeout" env:"WEBSERVER_READ_TIMEOUT"`
+
+	// WebserverReadHeaderTimeout is used as `ReadHeaderTimeout` for Webserver
+	// Default value is 3 (seconds)
+	WebserverReadHeaderTimeout string `json:"webserverReadHeaderTimeout" env:"WEBSERVER_READ_HEADER_TIMEOUT"`
 }
 
 // Current is the configuration used by the operator

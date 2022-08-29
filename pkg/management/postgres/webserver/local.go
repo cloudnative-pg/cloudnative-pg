@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,7 +43,7 @@ type localWebserverEndpoints struct {
 }
 
 // NewLocalWebServer returns a webserver that allows connection only from localhost
-func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
+func NewLocalWebServer(instance *postgres.Instance, readTimeout int64, readHeaderTimeout int64) (*Webserver, error) {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return nil, fmt.Errorf("creating controller-runtine client: %v", err)
@@ -62,11 +63,21 @@ func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
 	serveMux.HandleFunc(url.PathCache, endpoints.serveCache)
 	serveMux.HandleFunc(url.PathPgBackup, endpoints.requestBackup)
 
+	rTimeout := DefaultReadTimeout
+
+	if readTimeout != 0 {
+		rTimeout = time.Duration(readTimeout) * time.Second
+	}
+
+	rHeaderTimeout := DefaultReadHeaderTimeout
+	if readHeaderTimeout != 0 {
+		rTimeout = time.Duration(readHeaderTimeout) * time.Second
+	}
 	server := &http.Server{
 		Addr:              fmt.Sprintf("localhost:%d", url.LocalPort),
 		Handler:           serveMux,
-		ReadHeaderTimeout: DefaultReadTimeout,
-		ReadTimeout:       DefaultReadTimeout,
+		ReadHeaderTimeout: rHeaderTimeout,
+		ReadTimeout:       rTimeout,
 	}
 
 	webserver := NewWebServer(instance, server)

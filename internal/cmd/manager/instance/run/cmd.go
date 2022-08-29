@@ -19,19 +19,20 @@ package run
 
 import (
 	"context"
-	"os"
-	"path/filepath"
-
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
+	"os"
+	"path/filepath"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"strconv"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
@@ -186,7 +187,17 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	// which will imply the deletion of the child onlineUpgradeCtx too, again, terminating all the Runnables.
 	onlineUpgradeCtx, onlineUpgradeCancelFunc := context.WithCancel(postgresLifecycleManager.GetGlobalContext())
 	defer onlineUpgradeCancelFunc()
-	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions)
+
+	readTimeout, err := strconv.ParseInt(configuration.Current.WebserverReadTimeout, 10, 64)
+	if err != nil {
+		setupLog.Error(err, "unable to covert WebserverReadTimeout to int64")
+	}
+	readHeaderTimeout, err := strconv.ParseInt(configuration.Current.WebserverReadHeaderTimeout, 10, 64)
+	if err != nil {
+		setupLog.Error(err, "unable to covert WebserverReadHeaderTimeout to int64")
+	}
+	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions,
+		readTimeout, readHeaderTimeout)
 	if err != nil {
 		return err
 	}
@@ -194,8 +205,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		setupLog.Error(err, "unable to add remote webserver runnable")
 		return err
 	}
-
-	localSrv, err := webserver.NewLocalWebServer(instance)
+	localSrv, err := webserver.NewLocalWebServer(instance, readTimeout, readHeaderTimeout)
 	if err != nil {
 		return err
 	}
