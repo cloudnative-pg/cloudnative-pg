@@ -16,7 +16,6 @@ linters:
   enable:
     - asciicheck
     - bodyclose
-    - deadcode
     - depguard
     - dogsled
     - dupl
@@ -51,7 +50,6 @@ linters:
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
-    - structcheck
     - stylecheck
     - thelper
     - tparallel
@@ -59,7 +57,6 @@ linters:
     - unconvert
     - unparam
     - unused
-    - varcheck
     - wastedassign
     - whitespace
 
@@ -92,10 +89,13 @@ linters:
   # - wsl
 
   # deprecated:
+  # - deadcode
   # - golint
   # - interfacer
   # - maligned
   # - scopelint
+  # - structcheck
+  # - varcheck
 
 run:
   skip-files: "zz_generated.*"
