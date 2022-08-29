@@ -21,56 +21,43 @@ import (
 	"context"
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // Destroy implements the destroy subcommand
 func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) error {
-	// Check if the Pod exist
-	var pod v1.Pod
 	instanceName := fmt.Sprintf("%s-%s", clusterName, instanceID)
 
-	err := plugin.Client.Get(ctx, client.ObjectKey{
-		Namespace: plugin.Namespace,
-		Name:      instanceName,
-	}, &pod)
-
-	var volumes []v1.Volume
-	if err != nil {
-		if keepPVC {
-			return fmt.Errorf("instance %s not found in namespace %s", instanceName, plugin.Namespace)
-		}
-		return deletePVCsMatchingLabel(ctx, instanceName)
+	if err := ensurePodIsDeleted(ctx, instanceName, clusterName); err != nil {
+		return fmt.Errorf("error deleting instance %s: %v", instanceName, err)
 	}
-	volumes = pod.Spec.Volumes
 
-	// for the pod to be deleted it must either be owned by the cluster
-	if isOwnedByCluster(clusterName, pod.OwnerReferences) {
-		// Delete the Pod
-		err = plugin.Client.Delete(ctx, &pod)
-		if err != nil {
-			return fmt.Errorf("error deleting instance %s: %v", instanceName, err)
-		}
-	} else {
-		return fmt.Errorf("instance %s is not owned by cluster %s", instanceName, clusterName)
+	pvcs, err := getExpectedPVCs(ctx, clusterName, instanceName)
+	if err != nil {
+		return err
 	}
 
 	if keepPVC {
-		// get the pvc and remove the owner reference
-		pvcs, err := getPVCSOwnedByInstance(ctx, volumes, clusterName)
-		if err != nil {
-			return err
-		}
-		for i := range pvcs.Items {
-			pvcs.Items[i].OwnerReferences = removeOwnerReference(pvcs.Items[i].OwnerReferences, clusterName)
-			pvcs.Items[i].Annotations["cnpg.io/pvcStatus"] = "detached"
-			pvcs.Items[i].Labels[utils.InstanceNameLabelName] = instanceName
-			err = plugin.Client.Update(ctx, &pvcs.Items[i])
+		// we remove the ownership from the pvcs if present
+		for _, pvc := range pvcs {
+			pvc := pvc
+			if !isOwnedByCluster(clusterName, pvc.OwnerReferences) {
+				continue
+			}
+
+			pvc.OwnerReferences = removeOwnerReference(pvc.OwnerReferences, clusterName)
+			pvc.Annotations["cnpg.io/pvcStatus"] = "detached"
+			pvc.Labels[utils.InstanceNameLabelName] = instanceName
+			err = plugin.Client.Update(ctx, &pvc)
 			if err != nil {
 				return fmt.Errorf("error updating metadata for persistent volume claim %s: %v",
 					clusterName, err)
@@ -78,36 +65,98 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 		}
 		return nil
 	}
-	// we delete every volume attached to the pod that is owned by the cluster
-	pvcs, err := getPVCSOwnedByInstance(ctx, volumes, clusterName)
-	if err != nil {
-		return err
-	}
-	for i := range pvcs.Items {
-		err = plugin.Client.Delete(ctx, &pvcs.Items[i])
+
+	for _, pvc := range pvcs {
+		pvc := pvc
+		if pvc.Labels == nil {
+			pvc.Labels = map[string]string{}
+		}
+		if !isOwnedByCluster(clusterName, pvc.OwnerReferences) &&
+			pvc.Labels[utils.InstanceNameLabelName] != instanceName {
+			continue
+		}
+
+		err = plugin.Client.Delete(ctx, &pvc)
 		if err != nil {
-			return fmt.Errorf("error deleting pvc %s: %v",
-				volumes[i].PersistentVolumeClaim.ClaimName, err)
+			return fmt.Errorf("error deleting pvc %s: %v", pvc.Name, err)
 		}
 	}
 
 	return nil
 }
 
-func deletePVCsMatchingLabel(ctx context.Context, instanceName string) error {
-	var pvcs v1.PersistentVolumeClaimList
-	err := plugin.Client.List(ctx, &pvcs, client.InNamespace(plugin.Namespace),
-		client.MatchingLabels{utils.InstanceNameLabelName: instanceName})
+func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) error {
+	// Check if the Pod exist
+	var pod corev1.Pod
+	err := plugin.Client.Get(ctx, client.ObjectKey{
+		Namespace: plugin.Namespace,
+		Name:      instanceName,
+	}, &pod)
+	if apierrs.IsNotFound(err) {
+		return nil
+	}
 	if err != nil {
-		return fmt.Errorf("error getting pvcs for instance %s: %v", instanceName, err)
+		return err
 	}
-	for i := range pvcs.Items {
-		err = plugin.Client.Delete(ctx, &pvcs.Items[i])
-		if err != nil {
-			fmt.Printf("error deleting pvc %s: %v", pvcs.Items[i].Name, err)
-		}
+
+	if !isOwnedByCluster(clusterName, pod.OwnerReferences) {
+		return fmt.Errorf("instance %s is not owned by cluster %s", pod.Name, clusterName)
 	}
-	return nil
+
+	return plugin.Client.Delete(ctx, &pod)
+}
+
+func getExpectedPVCs(
+	ctx context.Context,
+	clusterName string,
+	instanceName string,
+) ([]corev1.PersistentVolumeClaim, error) {
+	var cluster apiv1.Cluster
+	if err := plugin.Client.Get(
+		ctx,
+		types.NamespacedName{
+			Name:      clusterName,
+			Namespace: plugin.Namespace,
+		},
+		&cluster,
+	); err != nil {
+		return nil, err
+	}
+
+	var pvcs []corev1.PersistentVolumeClaim
+
+	pgDataName := specs.GetPVCName(cluster, instanceName, utils.PVCRolePgData)
+	pgData, err := getPVC(ctx, pgDataName)
+	if err != nil {
+		return nil, err
+	}
+	if pgData != nil {
+		pvcs = append(pvcs, *pgData)
+	}
+
+	pgWalName := specs.GetPVCName(cluster, instanceName, utils.PVCRolePgWal)
+	pgWal, err := getPVC(ctx, pgWalName)
+	if err != nil {
+		return nil, err
+	}
+	if pgWal != nil {
+		pvcs = append(pvcs, *pgWal)
+	}
+
+	return pvcs, nil
+}
+
+// getPVC returns the pvc if found or any error that isn't apierrs.IsNotFound
+func getPVC(ctx context.Context, name string) (*corev1.PersistentVolumeClaim, error) {
+	var pvc corev1.PersistentVolumeClaim
+	err := plugin.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: plugin.Namespace}, &pvc)
+	if apierrs.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &pvc, nil
 }
 
 func removeOwnerReference(references []metav1.OwnerReference, clusterName string) []metav1.OwnerReference {
@@ -120,37 +169,11 @@ func removeOwnerReference(references []metav1.OwnerReference, clusterName string
 	return references
 }
 
-// getPVCSOwnedByInstance returns a list of pvcs that are owned by the instance
-func getPVCSOwnedByInstance(ctx context.Context, volumes []v1.Volume, clusterName string) (v1.PersistentVolumeClaimList,
-	error,
-) {
-	var pvcs v1.PersistentVolumeClaimList
-	for i := range volumes {
-		if volumes[i].PersistentVolumeClaim == nil {
-			continue
-		}
-
-		var pvc v1.PersistentVolumeClaim
-		err := plugin.Client.Get(ctx, client.ObjectKey{
-			Namespace: plugin.Namespace,
-			Name:      volumes[i].PersistentVolumeClaim.ClaimName,
-		}, &pvc)
-		if err != nil {
-			return v1.PersistentVolumeClaimList{},
-				fmt.Errorf("error getting pvc %s: %v", volumes[i].PersistentVolumeClaim.ClaimName, err)
-		}
-
-		if isOwnedByCluster(clusterName, pvc.OwnerReferences) {
-			pvcs.Items = append(pvcs.Items, pvc)
-		}
-	}
-	return pvcs, nil
-}
-
 // isOwnedByCluster returns true if the owner reference is owned by the cluster
 func isOwnedByCluster(clusterName string, ownerReferences []metav1.OwnerReference) bool {
+	// TODO: there should be an existing function for this perhaps that we could reuse, remove hardcoded string
 	for _, ownerReference := range ownerReferences {
-		if ownerReference.Name == clusterName {
+		if ownerReference.Name == clusterName && ownerReference.APIVersion == "postgresql.cnpg.io/v1" {
 			return true
 		}
 	}
