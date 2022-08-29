@@ -343,15 +343,15 @@ def format_by_test(summary, structure):
         )
         table.add_row(
             [
+                bucket,
                 summary["by_test"]["failed"][bucket],
-                summary["by_test"]["failed"],
+                summary["by_test"]["total"][bucket],
                 failed_k8s,
                 failed_pg,
-                bucket,
             ]
         )
 
-    print()
+    print(table)
 
 
 def format_duration(duration):
@@ -393,11 +393,11 @@ def format_test_failures(summary):
         "title": "Failures by test",
         "anchor": "by_test",
         "header": [
+            "test",
             "failed runs",
             "total runs",
             "failed K8s",
             "failed PG",
-            "test",
         ],
     }
 
@@ -406,7 +406,7 @@ def format_test_failures(summary):
     by_matrix_section = {
         "title": "Failures by matrix branch",
         "anchor": "by_matrix",
-        "header": ["failed tests", "total tests", "matrix branch"],
+        "header": ["matrix branch", "failed tests", "total tests"],
     }
 
     format_bucket_table(summary["by_matrix"], by_matrix_section)
@@ -414,7 +414,7 @@ def format_test_failures(summary):
     by_k8s_section = {
         "title": "Failures by kubernetes version",
         "anchor": "by_k8s",
-        "header": ["failed tests", "total tests", "kubernetes version"],
+        "header": ["kubernetes version", "failed tests", "total tests"],
     }
 
     format_bucket_table(summary["by_k8s"], by_k8s_section)
@@ -422,7 +422,7 @@ def format_test_failures(summary):
     by_postgres_section = {
         "title": "Failures by postgres version",
         "anchor": "by_postgres",
-        "header": ["failed tests", "total tests", "postgres version"],
+        "header": ["postgres version", "failed tests", "total tests"],
     }
 
     format_bucket_table(summary["by_postgres"], by_postgres_section)
@@ -430,7 +430,7 @@ def format_test_failures(summary):
     by_platform_section = {
         "title": "Failures by platform",
         "anchor": "by_platform",
-        "header": ["failed tests", "total tests", "platform"],
+        "header": ["platform", "failed tests", "total tests"],
     }
 
     format_bucket_table(summary["by_platform"], by_platform_section)
