@@ -21,15 +21,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
-
+// nolint
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+// nolint
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type remoteWebserverEndpoints struct {
