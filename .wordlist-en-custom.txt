@@ -242,6 +242,8 @@ RedHat
 RedHat's
 ReplicaClusterConfiguration
 ReplicaSet
+ReplicationSlotsConfiguration
+ReplicationSlotsHAConfiguration
 ReplicationTLSSecret
 ResizingPVC
 ResourceRequirements
