@@ -450,6 +450,7 @@ def format_test_summary(summary):
         print(
             "**Index**: [timing table](#user-content-timing) | "
             + "[by test](#user-content-by_test) | "
+            + "[by matrix](#user-content-by_matrix) | "
             + "[by k8s](#user-content-by_k8s) | "
             + "[by postgres](#user-content-by_postgres) | "
             + "[by platform](#user-content-by_platform)"
