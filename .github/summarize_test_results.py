@@ -281,7 +281,7 @@ def format_overview(summary, structure):
     table.set_style(MARKDOWN)
 
     for row in structure["rows"]:
-        table.add_row([row[0], summary[row[1]], summary[row[2]]])
+        table.add_row([summary[row[1]], summary[row[2]], row[0]])
     print(table)
 
 
@@ -310,7 +310,7 @@ def format_bucket_table(buckets, structure):
 
     for bucket in sorted_by_fail:
         table.add_row(
-            [bucket, buckets["failed"][bucket], buckets["total"][bucket]]
+            [buckets["failed"][bucket], buckets["total"][bucket], bucket]
         )
 
     print(table)
@@ -343,11 +343,11 @@ def format_by_test(summary, structure):
         )
         table.add_row(
             [
-                bucket,
                 summary["by_test"]["failed"][bucket],
                 summary["by_test"]["total"][bucket],
                 failed_k8s,
                 failed_pg,
+                bucket,
             ]
         )
 
@@ -393,11 +393,11 @@ def format_test_failures(summary):
         "title": "Failures by test",
         "anchor": "by_test",
         "header": [
-            "test",
             "failed runs",
             "total runs",
             "failed K8s",
             "failed PG",
+            "test",
         ],
     }
 
@@ -406,7 +406,7 @@ def format_test_failures(summary):
     by_matrix_section = {
         "title": "Failures by matrix branch",
         "anchor": "by_matrix",
-        "header": ["matrix branch", "failed tests", "total tests"],
+        "header": ["failed tests", "total tests", "matrix branch"],
     }
 
     format_bucket_table(summary["by_matrix"], by_matrix_section)
@@ -414,7 +414,7 @@ def format_test_failures(summary):
     by_k8s_section = {
         "title": "Failures by kubernetes version",
         "anchor": "by_k8s",
-        "header": ["kubernetes version", "failed tests", "total tests"],
+        "header": ["failed tests", "total tests", "kubernetes version"],
     }
 
     format_bucket_table(summary["by_k8s"], by_k8s_section)
@@ -422,7 +422,7 @@ def format_test_failures(summary):
     by_postgres_section = {
         "title": "Failures by postgres version",
         "anchor": "by_postgres",
-        "header": ["postgres version", "failed tests", "total tests"],
+        "header": ["failed tests", "total tests", "postgres version"],
     }
 
     format_bucket_table(summary["by_postgres"], by_postgres_section)
@@ -430,7 +430,7 @@ def format_test_failures(summary):
     by_platform_section = {
         "title": "Failures by platform",
         "anchor": "by_platform",
-        "header": ["platform", "failed tests", "total tests"],
+        "header": ["failed tests", "total tests", "platform"],
     }
 
     format_bucket_table(summary["by_platform"], by_platform_section)
@@ -461,7 +461,7 @@ def format_test_summary(summary):
 
     overview_section = {
         "title": "Overview",
-        "header": ["", "failed", "out of"],
+        "header": ["failed", "out of", ""],
         "rows": [
             ["test combinations", "total_failed", "total_run"],
             ["unique tests", "unique_failed", "unique_run"],
