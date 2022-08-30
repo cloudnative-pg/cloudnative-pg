@@ -42,6 +42,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+
+	// this is needed to correctly open the sql connection with the pgx driver
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 const (
@@ -558,7 +561,7 @@ func (instance *Instance) WaitForPrimaryAvailable() error {
 	log.Info("Waiting for the new primary to be available",
 		"primaryConnInfo", primaryConnInfo)
 
-	db, err := sql.Open("postgres", primaryConnInfo)
+	db, err := sql.Open("pgx", primaryConnInfo)
 	if err != nil {
 		return err
 	}
