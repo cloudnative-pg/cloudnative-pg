@@ -28,7 +28,7 @@ import (
 	"path"
 	"sort"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v4"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -191,7 +191,7 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	if !existsRole {
 		_, err = dbSuperUser.Exec(fmt.Sprintf(
 			"CREATE ROLE %v LOGIN",
-			pq.QuoteIdentifier(info.ApplicationUser)))
+			pgx.Identifier{info.ApplicationUser}.Sanitize()))
 		if err != nil {
 			return err
 		}
@@ -228,8 +228,8 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return nil
 	}
 	_, err = dbSuperUser.Exec(fmt.Sprintf("CREATE DATABASE %v OWNER %v",
-		pq.QuoteIdentifier(info.ApplicationDatabase),
-		pq.QuoteIdentifier(info.ApplicationUser)))
+		pgx.Identifier{info.ApplicationDatabase}.Sanitize(),
+		pgx.Identifier{info.ApplicationUser}.Sanitize()))
 	if err != nil {
 		return fmt.Errorf("could not create ApplicationDatabase: %w", err)
 	}
