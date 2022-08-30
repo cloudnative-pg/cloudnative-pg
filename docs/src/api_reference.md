@@ -69,6 +69,8 @@ Below you will find a description of the defined resources:
 - [PostgresConfiguration](#PostgresConfiguration)
 - [RecoveryTarget](#RecoveryTarget)
 - [ReplicaClusterConfiguration](#ReplicaClusterConfiguration)
+- [ReplicationSlotsConfiguration](#ReplicationSlotsConfiguration)
+- [ReplicationSlotsHAConfiguration](#ReplicationSlotsHAConfiguration)
 - [RollingUpdateStatus](#RollingUpdateStatus)
 - [S3Credentials](#S3Credentials)
 - [ScheduledBackup](#ScheduledBackup)
@@ -355,6 +357,7 @@ Name                  | Description                                             
 `minSyncReplicas      ` | Minimum number of instances required in synchronous replication with the primary. Undefined or 0 allow writes to complete when no standby is available.                                                                                                                                                                                                                                                                 | int                                                                                                                             
 `maxSyncReplicas      ` | The target value for the synchronous replication quorum, that can be decreased if the number of ready standbys is lower than this. Undefined or 0 disable synchronous replication.                                                                                                                                                                                                                                      | int                                                                                                                             
 `postgresql           ` | Configuration of the PostgreSQL server                                                                                                                                                                                                                                                                                                                                                                                  | [PostgresConfiguration](#PostgresConfiguration)                                                                                 
+`replicationSlots     ` | Replication slots management configuration                                                                                                                                                                                                                                                                                                                                                                              | [*ReplicationSlotsConfiguration](#ReplicationSlotsConfiguration)                                                                
 `bootstrap            ` | Instructions to bootstrap this cluster                                                                                                                                                                                                                                                                                                                                                                                  | [*BootstrapConfiguration](#BootstrapConfiguration)                                                                              
 `replica              ` | Replica cluster configuration                                                                                                                                                                                                                                                                                                                                                                                           | [*ReplicaClusterConfiguration](#ReplicaClusterConfiguration)                                                                    
 `superuserSecret      ` | The secret containing the superuser password. If not defined a new secret will be created with a randomly generated password                                                                                                                                                                                                                                                                                            | [*LocalObjectReference](#LocalObjectReference)                                                                                  
@@ -794,6 +797,28 @@ Name    | Description                                                           
 `enabled` | If replica mode is enabled, this cluster will be a replica of an existing cluster. Replica cluster can be created from a recovery object store or via streaming through pg_basebackup. Refer to the Replication page of the documentation for more information. - *mandatory*  | bool  
 `source ` | The name of the external cluster which is the replication origin                                                                                                                                                                                                - *mandatory*  | string
 
+<a id='ReplicationSlotsConfiguration'></a>
+
+## ReplicationSlotsConfiguration
+
+ReplicationSlotsConfiguration encapsulates the configuration of replication slots
+
+Name             | Description                                                                                   | Type                                                                
+---------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------
+`highAvailability` | Replication slots for high availability configuration                                         | [*ReplicationSlotsHAConfiguration](#ReplicationSlotsHAConfiguration)
+`updateInterval  ` | Standby will update the status of the local replication slots every `updateInterval` seconds. | int                                                                 
+
+<a id='ReplicationSlotsHAConfiguration'></a>
+
+## ReplicationSlotsHAConfiguration
+
+ReplicationSlotsHAConfiguration encapsulates the configuration of replication slots for high availability
+
+Name       | Description                                                                                                                                                                                                                                                  | Type  
+---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------
+`enabled   ` | If replication slots for high availability are enabled, the operator will automatically manage replication slots on the primary and designated primary instances and use them in the standby replication connections. This can only be set at creation time. - *mandatory*  | bool  
+`slotPrefix` | Prefix for replication slots managed by the operator for HA. This can only be set at creation time.                                                                                                                                                          | string
+
 <a id='RollingUpdateStatus'></a>
 
 ## RollingUpdateStatus
@@ -936,7 +961,7 @@ In future synchronous replica election restriction by name will be supported.
 
 Name                   | Description                                                                                                    | Type    
 ---------------------- | -------------------------------------------------------------------------------------------------------------- | --------
-`enabled               ` | This flag enabled the constraints for sync replicas                                                            - *mandatory*  | bool    
+`enabled               ` | This flag enables the constraints for sync replicas                                                            - *mandatory*  | bool    
 `nodeLabelsAntiAffinity` | A list of node labels values to extract and compare to evaluate if the pods reside in the same topology or not | []string
 
 <a id='Topology'></a>
