@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/*
+The manager command is the main entrypoint of CloudNativePG operator.
+*/
 package main
 
 import (
