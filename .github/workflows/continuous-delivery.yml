@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - 'main'
+  # A pull request (from this repository or a forked one) which is labelled
   pull_request_target:
     types: [labeled]
   # Manually or triggered by another workflow
@@ -161,9 +162,10 @@ jobs:
       - duplicate_runs
       - change-triage
     # Run unit tests only if the operator or the Go codebase have changed
-    # AND EITHER
-    # The slash command ('/test' or '/test-cnp') was issued in the PR comment
-    # OR the PR is labeled with 'ready to test :elephant:'
+    # AND
+    # EITHER The slash command ('/test' or '/ready-to-test') is issued in the comment of the PR which is labeled with
+    #        'ready to test :elephant:'
+    # OR     it's on main branch
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       (
