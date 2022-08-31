@@ -314,6 +314,11 @@ ones directly set by PgBouncer:
 - [`server_reset_query_always`](https://www.pgbouncer.org/config.html#server_reset_query_always)
 - [`server_round_robin`](https://www.pgbouncer.org/config.html#server_round_robin)
 - [`stats_period`](https://www.pgbouncer.org/config.html#stats_period)
+- [`tcp_keepalive`](https://www.pgbouncer.org/config.html#tcp_keepalive)
+- [`tcp_keepcnt`](https://www.pgbouncer.org/config.html#tcp_keepcnt)
+- [`tcp_keepidle`](https://www.pgbouncer.org/config.html#tcp_keepidle)
+- [`tcp_keepintvl`](https://www.pgbouncer.org/config.html#tcp_keepintvl)
+- [`tcp_user_timeout`](https://www.pgbouncer.org/config.html#tcp_user_timeout)
 - [`verbose`](https://www.pgbouncer.org/config.html#verbose)
 
 Customizations of the PgBouncer configuration are written
