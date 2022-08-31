@@ -146,19 +146,19 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 			http.Error(w, "instance manager is already upgrading", http.StatusTeapot)
 			return
 		}
+		// If we get here, the InstanceManagerIsUpgrading flag was set and
+		// we will perform the upgrade. Ensure we unset the flag in the end
+		defer ws.instance.InstanceManagerIsUpgrading.Store(false)
 
 		err := upgrade.FromReader(cancelFunc, exitedCondition, ws.typedClient, ws.instance, r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			ws.instance.InstanceManagerIsUpgrading.Store(false)
 			return
 		}
 
 		// Unfortunately this point, if everything is right, will not be reached.
 		// At this stage we are running the new version of the instance manager
 		// and not the old one.
-		// This is also the reason why we don't need to reset the
-		// `ws.instance.InstanceManagerIsUpgrading` variable.
 		_, _ = fmt.Fprint(w, "OK")
 	}
 }
