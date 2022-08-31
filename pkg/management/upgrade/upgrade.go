@@ -75,23 +75,14 @@ func FromReader(
 	if err != nil {
 		return fmt.Errorf("while reading new instance manager binary: %w", err)
 	}
-
 	// Validate the hash of this instance manager
-	var binaryValid bool
-	binaryValid, err = validateInstanceManagerHash(typedClient, instance, newHash)
-	if err != nil {
+	if err := validateInstanceManagerHash(typedClient, instance.ClusterName, instance.Namespace, newHash); err != nil {
 		return fmt.Errorf("while validating instance manager binary: %w", err)
-	}
-	if !binaryValid {
-		log.Warning("Received invalid version of the instance manager",
-			"hashCode", newHash,
-			"name", updatedInstanceManager.Name())
-		return ErrorInvalidInstanceManagerBinary
 	}
 
 	log.Info("Received new version of the instance manager",
 		"hashCode", newHash,
-		"name", updatedInstanceManager.Name())
+		"temporaryName", updatedInstanceManager.Name())
 
 	// Grant the executable bit to the new file
 	err = os.Chmod(updatedInstanceManager.Name(), 0o755) // #nosec
@@ -127,19 +118,20 @@ func FromReader(
 
 // downloadAndCloseInstanceManagerBinary updates the binary of the new version of
 // the instance manager, returning the new hash when it's done
-func downloadAndCloseInstanceManagerBinary(targetFile *os.File, r io.Reader) (string, error) {
+func downloadAndCloseInstanceManagerBinary(dst *os.File, src io.Reader) (string, error) {
 	var err error
 
 	// Get the binary stream from the request and store is inside our temporary folder
 	defer func() {
-		errClose := targetFile.Close()
+		errClose := dst.Close()
 		if err == nil {
 			err = errClose
 		}
 	}()
 
+	// we calculate the instanceManager hash while copying the contents from the reader
 	encoder := sha256.New()
-	_, err = io.Copy(targetFile, io.TeeReader(r, encoder))
+	_, err = io.Copy(dst, io.TeeReader(src, encoder))
 	if err != nil {
 		return "", err
 	}
@@ -151,20 +143,28 @@ func downloadAndCloseInstanceManagerBinary(targetFile *os.File, r io.Reader) (st
 // within the passed hash code with the one listed in the cluster status.
 // It returns true if everything is fine, false otherwise
 func validateInstanceManagerHash(
-	typedClient client.Client, instance *postgres.Instance, hashCode string,
-) (bool, error) {
+	typedClient client.Client,
+	clusterName string,
+	namespace string,
+	hashCode string,
+) error {
 	var cluster apiv1.Cluster
 
 	ctx := context.Background()
-	err := typedClient.Get(ctx, client.ObjectKey{
-		Namespace: instance.Namespace,
-		Name:      instance.ClusterName,
-	}, &cluster)
-	if err != nil {
-		return false, err
+	if err := typedClient.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      clusterName,
+	}, &cluster); err != nil {
+		return err
 	}
 
-	return cluster.Status.OperatorHash == hashCode, nil
+	if cluster.Status.OperatorHash != hashCode {
+		log.Warning("Received invalid version of the instance manager",
+			"hashCode", hashCode)
+		return ErrorInvalidInstanceManagerBinary
+	}
+
+	return nil
 }
 
 // reloadInstanceManager gracefully stops the log collection process and then
