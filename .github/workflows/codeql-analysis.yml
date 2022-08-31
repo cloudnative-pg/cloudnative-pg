@@ -31,9 +31,27 @@ on:
     - cron: '24 0 * * 5'
 
 jobs:
+  duplicate_runs:
+    runs-on: ubuntu-20.04
+    name: Skip duplicate runs
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v4.0.0
+        with:
+          concurrent_skipping: 'same_content'
+          skip_after_successful_duplicate: 'true'
+          do_not_skip: '["pull_request_target", "workflow_dispatch", "schedule"]'
+
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    needs:
+      - duplicate_runs
+    # Run Go linter only if Go code has changed
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true'
     permissions:
       actions: read
       contents: read
