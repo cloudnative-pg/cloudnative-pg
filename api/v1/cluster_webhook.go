@@ -1127,9 +1127,37 @@ func (r *Cluster) validateStorageChange(old *Cluster) field.ErrorList {
 }
 
 func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
+	if old.Spec.WalStorage == nil && r.Spec.WalStorage == nil {
+		return nil
+	}
+
 	var result field.ErrorList
 
-	if !reflect.DeepEqual(old.Spec.WalStorage, r.Spec.WalStorage) {
+	if old.Spec.WalStorage == nil && r.Spec.WalStorage != nil {
+		return append(result,
+			field.Invalid(
+				field.NewPath("spec", "walStorage"),
+				r.Spec.WalStorage,
+				"walStorage can only be set at cluster creation"),
+		)
+	}
+
+	if old.Spec.WalStorage != nil && r.Spec.WalStorage == nil {
+		return append(result,
+			field.Invalid(
+				field.NewPath("spec", "walStorage"),
+				r.Spec.WalStorage,
+				"walStorage cannot be disabled once the cluster is created"),
+		)
+	}
+
+	// We need to make sure that only the size of the volume can change
+	oldNormalized := old.Spec.WalStorage.DeepCopy()
+	oldNormalized.Size = ""
+	newNormalized := r.Spec.WalStorage.DeepCopy()
+	newNormalized.Size = ""
+
+	if !reflect.DeepEqual(oldNormalized, newNormalized) {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "walStorage"),
 			r.Spec.WalStorage,
@@ -1137,7 +1165,10 @@ func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
 		)
 	}
 
-	return result
+	// we validate the size change
+	storageErrs := validateStorageConfigurationChange("walStorage", *old.Spec.WalStorage, *r.Spec.WalStorage)
+
+	return append(result, storageErrs...)
 }
 
 // validateStorageConfigurationChange generates an error list by comparing two StorageConfiguration
