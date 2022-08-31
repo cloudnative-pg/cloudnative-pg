@@ -92,7 +92,7 @@ func isOwnedByClusterOrSatisfiesPredicate(
 	object client.Object,
 	predicate func(client.Object) bool,
 ) bool {
-	_, owned := isOwnedByCluster(object)
+	_, owned := IsOwnedByCluster(object)
 	return owned || predicate(object)
 }
 

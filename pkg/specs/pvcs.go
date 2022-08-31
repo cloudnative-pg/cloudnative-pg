@@ -42,6 +42,9 @@ const (
 
 	// PVCStatusReady is the annotation value for PVC ready status
 	PVCStatusReady = "ready"
+
+	// PVCStatusDetached is the annotation value for PVC detached status
+	PVCStatusDetached = "detached"
 )
 
 // ErrorInvalidSize is raised when the size specified by the
@@ -73,10 +76,7 @@ func CreatePVC(
 	role utils.PVCRole,
 ) (*corev1.PersistentVolumeClaim, error) {
 	instanceName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
-	pvcName := instanceName
-	if role == utils.PVCRolePgWal {
-		pvcName += cluster.GetWalArchiveVolumeSuffix()
-	}
+	pvcName := GetPVCName(cluster, instanceName, role)
 
 	result := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -122,6 +122,15 @@ func CreatePVC(
 	}
 
 	return result, nil
+}
+
+// GetPVCName builds the name for a given PVC of the instance
+func GetPVCName(cluster apiv1.Cluster, instanceName string, role utils.PVCRole) string {
+	pvcName := instanceName
+	if role == utils.PVCRolePgWal {
+		pvcName += cluster.GetWalArchiveVolumeSuffix()
+	}
+	return pvcName
 }
 
 // FilterInstancePVCs returns all the corev1.PersistentVolumeClaim that are used inside the podSpec

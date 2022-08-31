@@ -200,7 +200,7 @@ func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluste
 			return err
 		}
 
-		if _, owned := isOwnedByCluster(&secret); owned {
+		if _, owned := IsOwnedByCluster(&secret); owned {
 			return r.Delete(ctx, &secret)
 		}
 	}

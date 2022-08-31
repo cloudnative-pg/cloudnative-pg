@@ -27,6 +27,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
@@ -53,15 +54,16 @@ func main() {
 
 	configFlags.AddFlags(rootCmd.PersistentFlags())
 
-	rootCmd.AddCommand(status.NewCmd())
-	rootCmd.AddCommand(promote.NewCmd())
 	rootCmd.AddCommand(certificate.NewCmd())
+	rootCmd.AddCommand(destroy.NewCmd())
 	rootCmd.AddCommand(fence.NewCmd())
-	rootCmd.AddCommand(restart.NewCmd())
-	rootCmd.AddCommand(reload.NewCmd())
-	rootCmd.AddCommand(versions.NewCmd())
 	rootCmd.AddCommand(maintenance.NewCmd())
+	rootCmd.AddCommand(promote.NewCmd())
+	rootCmd.AddCommand(reload.NewCmd())
 	rootCmd.AddCommand(report.NewCmd())
+	rootCmd.AddCommand(restart.NewCmd())
+	rootCmd.AddCommand(status.NewCmd())
+	rootCmd.AddCommand(versions.NewCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
