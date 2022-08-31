@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -43,9 +45,7 @@ type localWebserverEndpoints struct {
 }
 
 // NewLocalWebServer returns a webserver that allows connection only from localhost
-func NewLocalWebServer(instance *postgres.Instance, webserverReadTimeout int32,
-	webserverReadHeaderTimeout int32,
-) (*Webserver, error) {
+func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return nil, fmt.Errorf("creating controller-runtine client: %v", err)
@@ -65,15 +65,15 @@ func NewLocalWebServer(instance *postgres.Instance, webserverReadTimeout int32,
 	serveMux.HandleFunc(url.PathCache, endpoints.serveCache)
 	serveMux.HandleFunc(url.PathPgBackup, endpoints.requestBackup)
 
-	rTimeout := time.Duration(webserverReadTimeout) * time.Second
-	rHeaderTimeout := time.Duration(webserverReadHeaderTimeout) * time.Second
+	rTimeout := time.Duration(configuration.Current.GetWebserverReadTimeout()) * time.Second
+	rHeaderTimeout := time.Duration(configuration.Current.GetWebserverReadHeaderTimeout()) * time.Second
+
 	server := &http.Server{
 		Addr:              fmt.Sprintf("localhost:%d", url.LocalPort),
 		Handler:           serveMux,
 		ReadHeaderTimeout: rHeaderTimeout,
 		ReadTimeout:       rTimeout,
 	}
-
 	webserver := NewWebServer(instance, server)
 
 	return webserver, nil

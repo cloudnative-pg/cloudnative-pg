@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -114,6 +116,14 @@ func createEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []core
 		{
 			Name:  "PGHOST",
 			Value: postgres.SocketDirectory,
+		},
+		{
+			Name:  "WEBSERVER_READ_TIMEOUT",
+			Value: strconv.Itoa(configuration.Current.GetWebserverReadTimeout()),
+		},
+		{
+			Name:  "WEBSERVER_READ_HEADER_TIMEOUT",
+			Value: strconv.Itoa(configuration.Current.GetWebserverReadHeaderTimeout()),
 		},
 	}
 

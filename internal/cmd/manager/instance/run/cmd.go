@@ -22,6 +22,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -119,6 +121,8 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
+	configuration.Current = configuration.NewConfiguration()
+
 	metricsServer, err := metricserver.New(instance)
 	if err != nil {
 		return err
@@ -187,21 +191,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	onlineUpgradeCtx, onlineUpgradeCancelFunc := context.WithCancel(postgresLifecycleManager.GetGlobalContext())
 	defer onlineUpgradeCancelFunc()
 
-	var cluster apiv1.Cluster
-	newClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
-	if err != nil {
-		setupLog.Error(err, "fail to setup k8s client")
-	}
-
-	err = newClient.Get(ctx, client.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName}, &cluster)
-	if err != nil {
-		setupLog.Error(err, "fail to request cluster")
-	}
-
-	webserverReadTimeout := cluster.Spec.WebserverReadTimeout
-	webserverReadHeaderTimeout := cluster.Spec.WebserverReadHeaderTimeout
-	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions,
-		webserverReadTimeout, webserverReadHeaderTimeout)
+	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions)
 	if err != nil {
 		return err
 	}
@@ -209,7 +199,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		setupLog.Error(err, "unable to add remote webserver runnable")
 		return err
 	}
-	localSrv, err := webserver.NewLocalWebServer(instance, webserverReadTimeout, webserverReadHeaderTimeout)
+	localSrv, err := webserver.NewLocalWebServer(instance)
 	if err != nil {
 		return err
 	}

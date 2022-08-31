@@ -90,7 +90,6 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 			} else {
 				sliceValue = valueField.Interface().([]string)
 			}
-
 		default:
 			value = valueField.String()
 		}
@@ -113,6 +112,14 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 				continue
 			}
 			reflect.ValueOf(target).Elem().FieldByName(field.Name).SetBool(boolValue)
+		case reflect.Int:
+			valueInt, err := strconv.ParseInt(value, 10, 32)
+			if err != nil {
+				configparserLog.Debug("Can't parse string into integer",
+					"field", field.Name, "value", value)
+				continue
+			}
+			reflect.ValueOf(target).Elem().FieldByName(field.Name).SetInt(valueInt)
 		case reflect.String:
 			reflect.ValueOf(target).Elem().FieldByName(field.Name).SetString(value)
 		case reflect.Slice:

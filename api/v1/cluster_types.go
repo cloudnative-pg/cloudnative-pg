@@ -249,15 +249,7 @@ type ClusterSpec struct {
 	// The instances' log level, one of the following values: error, warning, info (default), debug, trace
 	// +kubebuilder:default:=info
 	// +kubebuilder:validation:Enum:=error;warning;info;debug;trace
-
 	LogLevel string `json:"logLevel,omitempty"`
-	// The time in seconds is used as `ReadTimeout` for Webserver
-	// Default value is 20 (seconds)
-	WebserverReadTimeout int32 `json:"webserverReadTimeout,omitempty"`
-
-	// The time in seconds is used as `ReadHeaderTimeout` for Webserver
-	// Default value is 3 (seconds)
-	WebserverReadHeaderTimeout int32 `json:"webserverReadHeaderTimeout,omitempty"`
 }
 
 const (

@@ -20,7 +20,6 @@ package configuration
 
 import (
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configparser"
@@ -32,6 +31,14 @@ var configurationLog = log.WithName("configuration")
 
 // DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
 const DefaultOperatorPullSecretName = "cnpg-pull-secret" // #nosec
+
+// DefaultWebserverReadTimeout is the default timeout to read a request from the internal
+// webserver
+const DefaultWebserverReadTimeout = 20
+
+// DefaultWebserverReadHeaderTimeout is the default timeout to read the headers in the
+// internal webserver
+const DefaultWebserverReadHeaderTimeout = 3
 
 // Data is the struct containing the configuration of the operator.
 // Usually the operator code will use the "Current" configuration.
@@ -88,11 +95,11 @@ type Data struct {
 
 	// WebserverReadTimeout is used as `ReadTimeout` for Webserver
 	// Default value is 20 (seconds)
-	WebserverReadTimeout string `json:"webserverReadTimeout" env:"WEBSERVER_READ_TIMEOUT"`
+	WebserverReadTimeout int `json:"webserverReadTimeout" env:"WEBSERVER_READ_TIMEOUT"`
 
 	// WebserverReadHeaderTimeout is used as `ReadHeaderTimeout` for Webserver
 	// Default value is 3 (seconds)
-	WebserverReadHeaderTimeout string `json:"webserverReadHeaderTimeout" env:"WEBSERVER_READ_HEADER_TIMEOUT"`
+	WebserverReadHeaderTimeout int `json:"webserverReadHeaderTimeout" env:"WEBSERVER_READ_HEADER_TIMEOUT"`
 }
 
 // Current is the configuration used by the operator
@@ -172,30 +179,18 @@ func evaluateGlobPatterns(patterns []string, value string) (result bool) {
 	return
 }
 
-// GetWebserverReadTimeout parse `WebserverReadTimeout` to int32
-func (config *Data) GetWebserverReadTimeout() int32 {
-	if config.WebserverReadTimeout != "" {
-		i, err := strconv.ParseInt(config.WebserverReadTimeout, 10, 32)
-		if err != nil {
-			configurationLog.Info(
-				"unable to parse WebserverReadTimeout to int32, return the default value instead: " + err.Error())
-			return 20
-		}
-		return int32(i)
+// GetWebserverReadTimeout parse `WebserverReadTimeout` to int
+func (config *Data) GetWebserverReadTimeout() int {
+	if config.WebserverReadTimeout == 0 {
+		config.WebserverReadTimeout = DefaultWebserverReadTimeout
 	}
-	return 20
+	return config.WebserverReadTimeout
 }
 
 // GetWebserverReadHeaderTimeout parse `WebserverReadHeaderTimeout` to int32
-func (config *Data) GetWebserverReadHeaderTimeout() int32 {
-	if config.WebserverReadTimeout != "" {
-		i, err := strconv.ParseInt(config.WebserverReadHeaderTimeout, 10, 32)
-		if err != nil {
-			configurationLog.Info(
-				"unable to parse WebserverReadHeaderTimeout to int32, return the default value instead: " + err.Error())
-			return 3
-		}
-		return int32(i)
+func (config *Data) GetWebserverReadHeaderTimeout() int {
+	if config.WebserverReadHeaderTimeout == 0 {
+		config.WebserverReadHeaderTimeout = DefaultWebserverReadHeaderTimeout
 	}
-	return 3
+	return config.WebserverReadHeaderTimeout
 }

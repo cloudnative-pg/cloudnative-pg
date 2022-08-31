@@ -173,6 +173,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		contextLogger.Warning("Disable reconciliation loop annotation set, skipping the reconciliation.")
 		return ctrl.Result{}, nil
 	}
+	configuration.Current = configuration.NewConfiguration()
 
 	// IMPORTANT: the following call will delete conditions using
 	// invalid condition reasons.
