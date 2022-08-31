@@ -20,6 +20,7 @@ package configuration
 
 import (
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configparser"
@@ -169,4 +170,32 @@ func evaluateGlobPatterns(patterns []string, value string) (result bool) {
 	}
 
 	return
+}
+
+// GetWebserverReadTimeout parse `WebserverReadTimeout` to int32
+func (config *Data) GetWebserverReadTimeout() int32 {
+	if config.WebserverReadTimeout != "" {
+		i, err := strconv.ParseInt(config.WebserverReadTimeout, 10, 32)
+		if err != nil {
+			configurationLog.Info(
+				"unable to parse WebserverReadTimeout to int32, return the default value instead: " + err.Error())
+			return 20
+		}
+		return int32(i)
+	}
+	return 20
+}
+
+// GetWebserverReadHeaderTimeout parse `WebserverReadHeaderTimeout` to int32
+func (config *Data) GetWebserverReadHeaderTimeout() int32 {
+	if config.WebserverReadTimeout != "" {
+		i, err := strconv.ParseInt(config.WebserverReadHeaderTimeout, 10, 32)
+		if err != nil {
+			configurationLog.Info(
+				"unable to parse WebserverReadHeaderTimeout to int32, return the default value instead: " + err.Error())
+			return 3
+		}
+		return int32(i)
+	}
+	return 3
 }

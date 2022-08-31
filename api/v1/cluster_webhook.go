@@ -134,6 +134,14 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	if !r.Spec.Monitoring.AreDefaultQueriesDisabled() {
 		r.defaultMonitoringQueries(configuration.Current)
 	}
+
+	// set default value of `WEBSERVER_READ_TIMEOUT`, `WEBSERVER_READ_HEADER_TIMEOUT`
+	if r.Spec.WebserverReadTimeout == 0 {
+		r.Spec.WebserverReadTimeout = configuration.Current.GetWebserverReadTimeout()
+	}
+	if r.Spec.WebserverReadHeaderTimeout == 0 {
+		r.Spec.WebserverReadHeaderTimeout = configuration.Current.GetWebserverReadHeaderTimeout()
+	}
 }
 
 // defaultMonitoringQueries adds the default monitoring queries configMap

@@ -21,15 +21,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
-// nolint
+	"time" // nolint
+	// nolint
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
-// nolint
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url" // nolint
+	// nolint
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -43,8 +43,8 @@ func NewRemoteWebServer(
 	instance *postgres.Instance,
 	cancelFunc context.CancelFunc,
 	exitedConditions concurrency.MultipleExecuted,
-	readTimeout int64,
-	readHeaderTimeout int64,
+	webserverReadTimeout int32,
+	webserverReadHeaderTimeout int32,
 ) (*Webserver, error) {
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
@@ -62,15 +62,8 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathUpdate,
 		endpoints.updateInstanceManager(cancelFunc, exitedConditions))
 
-	rTimeout := DefaultReadTimeout
-	if readTimeout != 0 {
-		rTimeout = time.Duration(readTimeout) * time.Second
-	}
-
-	rHeaderTimeout := DefaultReadHeaderTimeout
-	if readHeaderTimeout != 0 {
-		rTimeout = time.Duration(readHeaderTimeout) * time.Second
-	}
+	rTimeout := time.Duration(webserverReadTimeout) * time.Second
+	rHeaderTimeout := time.Duration(webserverReadHeaderTimeout) * time.Second
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),

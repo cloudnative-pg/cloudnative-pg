@@ -20,12 +20,10 @@ package run
 import (
 	"context"
 	"os"
-	"path/filepath"
-	"strconv"
-// nolint
+	"path/filepath" // nolint
+	// nolint
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -188,16 +186,21 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	onlineUpgradeCtx, onlineUpgradeCancelFunc := context.WithCancel(postgresLifecycleManager.GetGlobalContext())
 	defer onlineUpgradeCancelFunc()
 
-	readTimeout, err := strconv.ParseInt(configuration.Current.WebserverReadTimeout, 10, 64)
+	var cluster apiv1.Cluster
+	newClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
 	if err != nil {
-		setupLog.Error(err, "unable to covert WebserverReadTimeout to int64")
+		setupLog.Error(err, "fail to setup k8s client")
 	}
-	readHeaderTimeout, err := strconv.ParseInt(configuration.Current.WebserverReadHeaderTimeout, 10, 64)
+
+	err = newClient.Get(ctx, client.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName}, &cluster)
 	if err != nil {
-		setupLog.Error(err, "unable to covert WebserverReadHeaderTimeout to int64")
+		setupLog.Error(err, "fail to request cluster")
 	}
+
+	webserverReadTimeout := cluster.Spec.WebserverReadTimeout
+	webserverReadHeaderTimeout := cluster.Spec.WebserverReadHeaderTimeout
 	remoteSrv, err := webserver.NewRemoteWebServer(instance, onlineUpgradeCancelFunc, exitedConditions,
-		readTimeout, readHeaderTimeout)
+		webserverReadTimeout, webserverReadHeaderTimeout)
 	if err != nil {
 		return err
 	}
@@ -205,7 +208,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		setupLog.Error(err, "unable to add remote webserver runnable")
 		return err
 	}
-	localSrv, err := webserver.NewLocalWebServer(instance, readTimeout, readHeaderTimeout)
+	localSrv, err := webserver.NewLocalWebServer(instance, webserverReadTimeout, webserverReadHeaderTimeout)
 	if err != nil {
 		return err
 	}
