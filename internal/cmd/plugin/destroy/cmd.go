@@ -37,8 +37,8 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	promoteCmd.Flags().BoolP("keep-pvc", "d", false,
-		"Delete the PVC associated with the instance")
+	promoteCmd.Flags().BoolP("keep-pvc", "k", false,
+		"Keep the PVC but detach it from instance")
 
 	return promoteCmd
 }
