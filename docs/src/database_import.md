@@ -219,8 +219,6 @@ There are a few things you need to be aware of when using the `monolith` type:
   ["The `externalClusters` section"](bootstrap.md#the-externalclusters-section))
 - Traffic must be allowed between the Kubernetes cluster and the
   `externalCluster` during the operation
-- You need to specify `sslmode: disable` in the `connectionParameters` section
-  if you need to connect to a PostgreSQL instance without SSL
 - Connection to the source database must be granted with the specified user
   that needs to run `pg_dump` and retrieve roles information (*superuser* is
   OK)
