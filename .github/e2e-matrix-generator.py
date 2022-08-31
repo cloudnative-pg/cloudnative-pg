@@ -52,6 +52,8 @@ class MajorVersionList(dict):
 
     @property
     def latest(self):
+        if "beta" in self[self.versions[0]][0]:
+            return self.get(self.versions[1])
         return self.get(self.versions[0])
 
     @property
@@ -61,14 +63,12 @@ class MajorVersionList(dict):
 
 # Kubernetes versions to use during the tests
 # Based on the images available at https://hub.docker.com/r/kindest/node/tags
+# and the supported releases https://kubernetes.io/releases/
 K8S = VersionList(
     [
-        "v1.24.2",
+        "v1.24.3",
         "v1.23.6",
         "v1.22.9",
-        "v1.21.12",
-        "v1.20.15",
-        "v1.19.16",
     ]
 )
 
@@ -113,6 +113,21 @@ def build_push_include_local():
         E2EJob(K8S.latest, POSTGRES.latest),
         E2EJob(K8S.oldest, POSTGRES.oldest),
     }
+
+
+def build_pull_request_target_include_local():
+    result = build_push_include_local()
+    # Iterate over K8S versions
+    for k8s_version in K8S:
+        result |= {
+            E2EJob(k8s_version, POSTGRES.latest),
+        }
+
+    # Iterate over PostgreSQL versions
+    for postgres_version in POSTGRES.values():
+        result |= {E2EJob(K8S.latest, postgres_version)}
+
+    return result
 
 
 def build_pull_request_include_local():
@@ -189,7 +204,7 @@ ENGINE_MODES = {
     "local": {
         "push": build_push_include_local,
         "pull_request": build_pull_request_include_local,
-        "pull_request_target": build_main_include_local,
+        "pull_request_target": build_pull_request_target_include_local,
         "main": build_main_include_local,
         "schedule": build_schedule_include_local,
     },
