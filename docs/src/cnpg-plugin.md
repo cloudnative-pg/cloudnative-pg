@@ -539,3 +539,10 @@ Archive:  report_cluster_example_<TIMESTAMP>.zip
 The `kubectl cnpg destroy` command helps to remove an instance and all PVCs associated with that instance.
 
 It accepts an optional flag, `--keep-pvc`, which if specified will not remove the PVCs and will instead remove all `metadata.ownerReferences` that were set by the instance. Additionally, the PVCs will have their `cnpg.io/pvcStatus` label value changed from `ready` to `detached` to signify that they are no longer in use.
+Running again the command without the `--keep-pvc` flag will remove the detached PVCs.
+
+Usage:
+`kubectl cnpg destroy [CLUSTER_NAME] [INSTANCE_ID]`
+
+Example:
+`kubectl cnpg destroy cluster-example 2`

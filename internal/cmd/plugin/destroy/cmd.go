@@ -25,8 +25,8 @@ import (
 // NewCmd create the new "promote" subcommand
 func NewCmd() *cobra.Command {
 	promoteCmd := &cobra.Command{
-		Use:   "destroy [cluster] [instance_id]",
-		Short: "Destroy the instance named [cluster]-[node] and the associated PVC",
+		Use:   "destroy [CLUSTER_NAME] [INSTANCE_ID]",
+		Short: "Destroy the instance named [CLUSTER_NAME] and [INSTANCE_ID] with the associated PVC",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()

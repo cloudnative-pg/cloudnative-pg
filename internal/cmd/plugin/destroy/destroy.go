@@ -76,14 +76,11 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 		// but it does have the instance label and the detached annotation then we can still delete it
 		// We will only skip the iteration and not delete the pvc if it is not owned by the cluster, and it does not have
 		// the annotation or label
-		if !isOwned && (pvcs[i].Annotations[specs.PVCStatusAnnotationName] != specs.PVCStatusDetached ||
-			pvcs[i].Labels[utils.InstanceNameLabelName] != instanceName) {
-			continue
-		}
-
-		err = plugin.Client.Delete(ctx, &pvcs[i])
-		if err != nil {
-			return fmt.Errorf("error deleting pvc %s: %v", pvcs[i].Name, err)
+		if isOwned || (pvcs[i].Annotations[specs.PVCStatusAnnotationName] == specs.PVCStatusDetached &&
+			pvcs[i].Labels[utils.InstanceNameLabelName] == instanceName) {
+			if err = plugin.Client.Delete(ctx, &pvcs[i]); err != nil {
+				return fmt.Errorf("error deleting pvc %s: %v", pvcs[i].Name, err)
+			}
 		}
 	}
 
