@@ -131,7 +131,7 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		return result, err
 	}
 
-	result.IsInstanceManagerUpgrading = instance.InstanceManagerIsUpgrading
+	result.IsInstanceManagerUpgrading = instance.InstanceManagerIsUpgrading.Load()
 
 	return result, nil
 }
