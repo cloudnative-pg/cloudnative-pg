@@ -87,11 +87,11 @@ def track_time_taken(test_results, test_times):
     """
     name = test_results["name"]
     if (
-        test_results["start_time"] == "0001-01-01T00:00:00Z"
-        or test_results["start_time"] == "0001-01-01T00:00:00Z"
+            # ignore nullish datetime
+            test_results["start_time"] == "0001-01-01T00:00:00Z"
+            or test_results["end_time"] == "0001-01-01T00:00:00Z"
     ):
         return
-
     # chop off the nanoseconds part, which is too much for
     # Python `fromisoformat`
     start_frags = test_results["start_time"].split(".")
