@@ -142,10 +142,13 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		}
 
 		// No need to do anything if we are already upgrading
-		if ws.instance.InstanceManagerIsUpgrading {
+		if !ws.instance.InstanceManagerIsUpgrading.CompareAndSwap(false, true) {
 			http.Error(w, "instance manager is already upgrading", http.StatusTeapot)
 			return
 		}
+		// If we get here, the InstanceManagerIsUpgrading flag was set and
+		// we will perform the upgrade. Ensure we unset the flag in the end
+		defer ws.instance.InstanceManagerIsUpgrading.Store(false)
 
 		err := upgrade.FromReader(cancelFunc, exitedCondition, ws.typedClient, ws.instance, r.Body)
 		if err != nil {

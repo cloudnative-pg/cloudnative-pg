@@ -108,7 +108,7 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				// stop delay. We are doing that because we are not going to receive
 				// a SIGKILL by the Kubelet, which is not informed about what's
 				// happening.
-				if i.instance.InstanceManagerIsUpgrading {
+				if i.instance.InstanceManagerIsUpgrading.Load() {
 					log.Info("Context has been cancelled, but an instance manager online upgrade is in progress, " +
 						"will just exit")
 					return nil
