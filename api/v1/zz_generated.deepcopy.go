@@ -696,6 +696,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.UnusablePVC != nil {
+		in, out := &in.UnusablePVC, &out.UnusablePVC
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	in.SecretsResourceVersion.DeepCopyInto(&out.SecretsResourceVersion)
 	in.ConfigMapResourceVersion.DeepCopyInto(&out.ConfigMapResourceVersion)
 	in.Certificates.DeepCopyInto(&out.Certificates)
