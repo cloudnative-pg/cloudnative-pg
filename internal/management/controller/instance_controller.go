@@ -157,7 +157,7 @@ func (r *InstanceReconciler) Reconcile(
 	// Reconcile replication slots
 	if err = r.reconcileReplicationSlots(ctx, cluster); err != nil {
 		contextLogger.Error(err, "while reconciling replication slot")
-		return reconcile.Result{}, err
+		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
 	restarted, err := r.reconcilePrimary(ctx, cluster)
@@ -1263,6 +1263,11 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(cluster *apiv1.Clus
 }
 
 func (r *InstanceReconciler) reconcileReplicationSlots(ctx context.Context, cluster *apiv1.Cluster) error {
+	if cluster.Spec.ReplicationSlots == nil ||
+		cluster.Spec.ReplicationSlots.HighAvailability == nil {
+		return nil
+	}
+
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
 		return err
@@ -1275,11 +1280,6 @@ func (r *InstanceReconciler) reconcileReplicationSlots(ctx context.Context, clus
 }
 
 func (r *InstanceReconciler) reconcilePrimaryReplicationSlots(ctx context.Context, cluster *apiv1.Cluster) error {
-	if cluster.Spec.ReplicationSlots == nil ||
-		cluster.Spec.ReplicationSlots.HighAvailability == nil {
-		return nil
-	}
-
 	if !cluster.Spec.ReplicationSlots.HighAvailability.Enabled {
 		return r.dropPrimaryReplicationSlots(ctx, cluster)
 	}

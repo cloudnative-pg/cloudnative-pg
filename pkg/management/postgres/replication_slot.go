@@ -127,8 +127,8 @@ func (instance *Instance) CreateReplicationSlot(slotName string) error {
 		return err
 	}
 
-	row := superUserDB.QueryRow("SELECT * FROM pg_create_physical_replication_slot($1)", slotName)
-	if row.Err() != nil {
+	_, err = superUserDB.Exec("SELECT pg_create_physical_replication_slot($1)", slotName)
+	if err != nil {
 		return err
 	}
 
