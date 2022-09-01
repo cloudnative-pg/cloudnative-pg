@@ -425,6 +425,9 @@ type ClusterStatus struct {
 
 	// Conditions for cluster object
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// List of instance names in the cluster
+	InstanceNames []string `json:"instanceNames,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -1949,17 +1952,6 @@ func (cluster Cluster) IsReplica() bool {
 	return cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.Enabled
 }
 
-// InstanceNames returns the list of all the instance names in the cluster
-func (cluster Cluster) InstanceNames() []string {
-	// TODO: this only works with no pg_wal extra volumes
-	result := make([]string, 0, cluster.Status.PVCCount)
-	result = append(result, cluster.Status.HealthyPVC...)
-	result = append(result, cluster.Status.ResizingPVC...)
-	result = append(result, cluster.Status.DanglingPVC...)
-	result = append(result, cluster.Status.InitializingPVC...)
-	return result
-}
-
 var slotNameNegativeRegex = regexp.MustCompile("[^a-z0-9_]+")
 
 // GetSlotNameFromInstanceName return the slot name starting from the instance name
@@ -1998,7 +1990,7 @@ func (cluster Cluster) GetInstanceNameFromSlotName(slotName string) string {
 
 	targetName := strings.TrimPrefix(slotName, slotPrefix)
 
-	for _, instanceName := range cluster.InstanceNames() {
+	for _, instanceName := range cluster.Status.InstanceNames {
 		sanitizedName := slotNameNegativeRegex.ReplaceAllString(strings.ToLower(instanceName), "_")
 		if targetName == sanitizedName {
 			return instanceName

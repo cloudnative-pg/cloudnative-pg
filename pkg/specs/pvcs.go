@@ -53,6 +53,9 @@ var ErrorInvalidSize = fmt.Errorf("invalid storage size")
 
 // PVCUsageStatus is the status of the PVC we generated
 type PVCUsageStatus struct {
+	// List of available instances detected from pvcs
+	InstanceNames []string
+
 	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
 	Initializing []string
 
@@ -182,6 +185,10 @@ pvcLoop:
 			result.Resizing = append(result.Resizing, pvc.Name)
 		}
 
+		if pvc.Labels[utils.PvcRoleLabelName] == string(utils.PVCRolePgData) {
+			result.InstanceNames = append(result.InstanceNames, pvc.Name)
+		}
+
 		// Find a Pod corresponding to this PVC
 		for idx := range podList {
 			if IsPodSpecUsingPVC(podList[idx].Spec, pvc.Name) {
@@ -204,6 +211,12 @@ pvcLoop:
 		if pvc.Annotations[PVCStatusAnnotationName] != PVCStatusReady {
 			// This PVC has not a Job nor a Pod using it, but it is not marked as PVCStatusReady
 			// we need to ignore it here
+
+			// Remove it from the instance names list
+			// TODO: this is ugly and needs some refactor
+			if result.InstanceNames[len(result.InstanceNames)-1] == pvc.Name {
+				result.InstanceNames = result.InstanceNames[:len(result.InstanceNames)-1]
+			}
 			continue
 		}
 

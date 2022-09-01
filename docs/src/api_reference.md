@@ -418,6 +418,7 @@ Name                      | Description                                         
 `onlineUpdateEnabled      ` | OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster                                                                                                      | bool                                                       
 `azurePVCUpdateEnabled    ` | AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster                                                                                                  | bool                                                       
 `conditions               ` | Conditions for cluster object                                                                                                                                                      | []metav1.Condition                                         
+`instanceNames            ` | List of instance names in the cluster                                                                                                                                              | []string                                                   
 
 <a id='ConfigMapKeySelector'></a>
 

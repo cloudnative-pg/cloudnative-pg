@@ -2689,6 +2689,11 @@ spec:
                 items:
                   type: string
                 type: array
+              instanceNames:
+                description: List of instance names in the cluster
+                items:
+                  type: string
+                type: array
               instances:
                 description: Total number of instances in the cluster
                 type: integer

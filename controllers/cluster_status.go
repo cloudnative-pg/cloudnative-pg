@@ -267,6 +267,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 		resources.jobs.Items,
 		resources.pvcs.Items,
 	)
+	cluster.Status.InstanceNames = pvcClassification.InstanceNames
 	cluster.Status.DanglingPVC = pvcClassification.Dangling
 	cluster.Status.HealthyPVC = pvcClassification.Healthy
 	cluster.Status.InitializingPVC = pvcClassification.Initializing

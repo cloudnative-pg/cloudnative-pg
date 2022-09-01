@@ -648,7 +648,7 @@ func (r *ClusterReconciler) ReconcilePods(ctx context.Context, cluster *apiv1.Cl
 
 	// Stop acting here if there are non-ready Pods
 	// In the rest of the function we are sure that
-	// cluster.Status.Instances == cluster.Spec.Instances and
+	// cluster.Status.InstanceNames == cluster.Spec.InstanceNames and
 	// we don't need to modify the cluster topology
 	if cluster.Status.ReadyInstances != cluster.Status.Instances ||
 		cluster.Status.ReadyInstances != len(instancesStatus.Items) ||

@@ -1295,13 +1295,14 @@ func (r *InstanceReconciler) reconcilePrimaryReplicationSlots(ctx context.Contex
 	var verifiedSlots postgresManagement.ReplicationSlotList
 
 	// Add every slot that is missing
-	for _, instanceName := range cluster.InstanceNames() {
+	for _, instanceName := range cluster.Status.InstanceNames {
 		if instanceName == cluster.Status.CurrentPrimary {
 			continue
 		}
 
 		if slot := currentSlots.GetSlotByInstanceName(instanceName); slot != nil {
 			verifiedSlots.Items = append(verifiedSlots.Items, *slot)
+			continue
 		}
 
 		slotName := cluster.GetSlotNameFromInstanceName(instanceName)
