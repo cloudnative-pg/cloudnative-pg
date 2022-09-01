@@ -87,11 +87,11 @@ def track_time_taken(test_results, test_times):
     """
     name = test_results["name"]
     if (
-        test_results["start_time"] == "0001-01-01T00:00:00Z"
-        or test_results["start_time"] == "0001-01-01T00:00:00Z"
+            # ignore nullish datetime
+            test_results["start_time"] == "0001-01-01T00:00:00Z"
+            or test_results["end_time"] == "0001-01-01T00:00:00Z"
     ):
         return
-
     # chop off the nanoseconds part, which is too much for
     # Python `fromisoformat`
     start_frags = test_results["start_time"].split(".")
@@ -281,7 +281,7 @@ def format_overview(summary, structure):
     table.set_style(MARKDOWN)
 
     for row in structure["rows"]:
-        table.add_row([row[0], summary[row[1]], summary[row[2]]])
+        table.add_row([summary[row[1]], summary[row[2]], row[0]])
     print(table)
 
 
@@ -310,7 +310,7 @@ def format_bucket_table(buckets, structure):
 
     for bucket in sorted_by_fail:
         table.add_row(
-            [bucket, buckets["failed"][bucket], buckets["total"][bucket]]
+            [buckets["failed"][bucket], buckets["total"][bucket], bucket]
         )
 
     print(table)
@@ -344,14 +344,14 @@ def format_by_test(summary, structure):
         table.add_row(
             [
                 summary["by_test"]["failed"][bucket],
-                summary["by_test"]["failed"],
+                summary["by_test"]["total"][bucket],
                 failed_k8s,
                 failed_pg,
                 bucket,
             ]
         )
 
-    print()
+    print(table)
 
 
 def format_duration(duration):
@@ -450,6 +450,7 @@ def format_test_summary(summary):
         print(
             "**Index**: [timing table](#user-content-timing) | "
             + "[by test](#user-content-by_test) | "
+            + "[by matrix](#user-content-by_matrix) | "
             + "[by k8s](#user-content-by_k8s) | "
             + "[by postgres](#user-content-by_postgres) | "
             + "[by platform](#user-content-by_platform)"
@@ -460,7 +461,7 @@ def format_test_summary(summary):
 
     overview_section = {
         "title": "Overview",
-        "header": ["", "failed", "out of"],
+        "header": ["failed", "out of", ""],
         "rows": [
             ["test combinations", "total_failed", "total_run"],
             ["unique tests", "unique_failed", "unique_run"],
