@@ -141,7 +141,7 @@ func downloadAndCloseInstanceManagerBinary(dst *os.File, src io.Reader) (string,
 
 // validateInstanceManagerHash compares the new version of the instance manager
 // within the passed hash code with the one listed in the cluster status.
-// It returns true if everything is fine, false otherwise
+// It returns any errors during execution, or nil if the hash is fine
 func validateInstanceManagerHash(
 	typedClient client.Client,
 	clusterName string,
