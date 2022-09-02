@@ -26,9 +26,10 @@ import (
 type SlotType string
 
 // SlotTypePhysical represents the physical replication slot
-const SlotTypePhysical = "physical"
+const SlotTypePhysical SlotType = "physical"
 
-// ReplicationSlot represent the unit of a replication slot
+// ReplicationSlot represents a single replication slot
+// TODO - can the name be empty?
 type ReplicationSlot struct {
 	InstanceName string   `json:"instanceName,omitempty"`
 	SlotName     string   `json:"slotName,omitempty"`
@@ -36,13 +37,13 @@ type ReplicationSlot struct {
 	Active       bool     `json:"active"`
 }
 
-// ReplicationSlotList contains a list of replication slot
+// ReplicationSlotList contains a list of replication slots
 type ReplicationSlotList struct {
 	Items []ReplicationSlot
 }
 
-// GetSlotBySlotName returns a slot searching by slot name
-func (rs *ReplicationSlotList) GetSlotBySlotName(slotName string) *ReplicationSlot {
+// GetSlotByName returns a slot searching by slot name
+func (rs *ReplicationSlotList) GetSlotByName(slotName string) *ReplicationSlot {
 	if rs == nil || len(rs.Items) == 0 {
 		return nil
 	}
@@ -71,7 +72,7 @@ func (rs *ReplicationSlotList) GetSlotByInstanceName(instanceName string) *Repli
 	return nil
 }
 
-// GetCurrentHAReplicationSlots retrieve the list of high availability replication slots
+// GetCurrentHAReplicationSlots retrieves the list of high availability replication slots
 func (instance *Instance) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (*ReplicationSlotList, error) {
 	if cluster.Spec.ReplicationSlots == nil ||
 		cluster.Spec.ReplicationSlots.HighAvailability == nil {
@@ -86,7 +87,7 @@ func (instance *Instance) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (
 	var replicationSlots ReplicationSlotList
 
 	rows, err := superUserDB.Query(
-		`SELECT slot_name, slot_type, active FROM pg_replication_slots 
+		`SELECT slot_name, slot_type, active FROM pg_replication_slots
             WHERE NOT temporary AND slot_name ^@ $1 AND slot_name != $2`,
 		cluster.Spec.ReplicationSlots.HighAvailability.GetSlotPrefix(),
 		cluster.GetSlotNameFromInstanceName(instance.PodName),
@@ -97,10 +98,6 @@ func (instance *Instance) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (
 	defer func() {
 		_ = rows.Close()
 	}()
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-
 	for rows.Next() {
 		var slot ReplicationSlot
 		err := rows.Scan(
@@ -115,6 +112,10 @@ func (instance *Instance) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (
 		slot.InstanceName = cluster.GetInstanceNameFromSlotName(slot.SlotName)
 
 		replicationSlots.Items = append(replicationSlots.Items, slot)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
 	}
 
 	return &replicationSlots, nil

@@ -141,6 +141,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
+	// TODO: another place where we pass the cluster just to get the slot name
 	return info.ConfigureInstanceAfterRestore(cluster, env)
 }
 

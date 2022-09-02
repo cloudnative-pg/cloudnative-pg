@@ -1957,8 +1957,8 @@ func (cluster Cluster) IsReplica() bool {
 
 var slotNameNegativeRegex = regexp.MustCompile("[^a-z0-9_]+")
 
-// GetSlotNameFromInstanceName return the slot name starting from the instance name
-// This function returns an empty string if High Availability Replication Slots are disabled
+// GetSlotNameFromInstanceName returns the slot name, given the instance name.
+// It returns an empty string if High Availability Replication Slots are disabled
 func (cluster Cluster) GetSlotNameFromInstanceName(instanceName string) string {
 	if cluster.Spec.ReplicationSlots == nil ||
 		cluster.Spec.ReplicationSlots.HighAvailability == nil ||
@@ -1977,8 +1977,8 @@ func (cluster Cluster) GetSlotNameFromInstanceName(instanceName string) string {
 	return slotName
 }
 
-// GetInstanceNameFromSlotName return the instance name starting from the slot name
-// This function return an empty string if is not able to match the given name to any instance
+// GetInstanceNameFromSlotName returns the instance name, given the slot name
+// It returns an empty string if is not able to match the given name to any instance
 func (cluster Cluster) GetInstanceNameFromSlotName(slotName string) string {
 	if cluster.Spec.ReplicationSlots == nil ||
 		cluster.Spec.ReplicationSlots.HighAvailability == nil {

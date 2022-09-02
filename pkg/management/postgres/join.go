@@ -75,6 +75,7 @@ func ClonePgData(connectionString, targetPgData, walDir string) error {
 }
 
 // Join creates a new instance joined to an existing PostgreSQL cluster
+// TODO - could we add the slot name to the InitInfo so we can keep Join()?
 func (info InitInfo) Join(cluster *apiv1.Cluster) error {
 	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
 

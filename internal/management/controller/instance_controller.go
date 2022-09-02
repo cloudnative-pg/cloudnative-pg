@@ -157,7 +157,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	// Reconcile replication slots
 	if err = r.reconcileReplicationSlots(ctx, cluster); err != nil {
-		contextLogger.Error(err, "while reconciling replication slot")
+		contextLogger.Error(err, "while reconciling replication slots")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
@@ -1281,6 +1281,8 @@ func (r *InstanceReconciler) reconcileReplicationSlots(ctx context.Context, clus
 }
 
 func (r *InstanceReconciler) reconcilePrimaryReplicationSlots(ctx context.Context, cluster *apiv1.Cluster) error {
+	// if the replication slots feature was deactivated, ensure any existing
+	// replication slots get cleaned up
 	if !cluster.Spec.ReplicationSlots.HighAvailability.Enabled {
 		return r.dropPrimaryReplicationSlots(ctx, cluster)
 	}
@@ -1320,7 +1322,7 @@ func (r *InstanceReconciler) reconcilePrimaryReplicationSlots(ctx context.Contex
 
 	// Delete every slot we do not expect
 	for _, slot := range currentSlots.Items {
-		if verifiedSlots.GetSlotBySlotName(slot.SlotName) == nil {
+		if verifiedSlots.GetSlotByName(slot.SlotName) == nil {
 			// Avoid deleting active slots.
 			// It would trow an error on Postgres side.
 			if slot.Active {
