@@ -44,6 +44,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
+	// this is needed to correctly open the sql connection with the pgx driver
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 // We wait up to 10 minutes to have a WAL archived correctly
@@ -177,7 +180,7 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 // waitForWalArchiveWorking retry until the wal archiving is working or the timeout occur
 func waitForWalArchiveWorking() error {
 	db, err := sql.Open(
-		"postgres",
+		"pgx",
 		fmt.Sprintf("host=%s port=%v dbname=postgres user=postgres sslmode=disable",
 			GetSocketDir(),
 			GetServerPort()),
