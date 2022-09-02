@@ -221,7 +221,8 @@ instancesLoop:
 			}
 		}
 
-		// If we have more PVC than expected, the extra PVCs are unusable
+		// If we have PVCs that we don't expect, these PVCs need to
+		// be classified as unusable
 		for _, pvcName := range pvcNames {
 			if !slices.Contains(expectedPVCs, pvcName) {
 				result.Unusable = append(result.Unusable, pvcName)
