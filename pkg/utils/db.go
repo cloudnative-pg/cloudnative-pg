@@ -30,8 +30,14 @@ func NewSimpleDBConnection(connectionString string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// The simple query protocol is needed since we're going to use
+	// this function to connect to the PgBouncer administrative
+	// interface, which doesn't support the extended one.
 	conf.PreferSimpleProtocol = true
-	// this is required, do not remove.
+
+	// This is required by pgx when using the simple protocol during
+	// the sanitization of the strings. Do not remove.
 	conf.RuntimeParams["client_encoding"] = "UTF8"
 
 	return sql.Open("pgx", stdlib.RegisterConnConfig(conf))
