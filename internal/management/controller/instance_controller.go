@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1195,7 +1196,7 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string,
 	}
 
 	_, err = tx.Exec(fmt.Sprintf("ALTER ROLE %v WITH PASSWORD %v",
-		pq.QuoteIdentifier(username),
+		pgx.Identifier{username}.Sanitize(),
 		pq.QuoteLiteral(password)))
 	if err == nil {
 		r.secretVersions[secret.Name] = secret.ResourceVersion

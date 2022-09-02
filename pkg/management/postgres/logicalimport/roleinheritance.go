@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v4"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
@@ -64,14 +64,14 @@ func (rs *roleInheritanceManager) importRoleInheritance(ctx context.Context, ris
 
 	for _, inheritance := range ris {
 		query := fmt.Sprintf("GRANT %s TO %s ",
-			pq.QuoteIdentifier(inheritance.RoleID),
-			pq.QuoteIdentifier(inheritance.Member))
+			pgx.Identifier{inheritance.RoleID}.Sanitize(),
+			pgx.Identifier{inheritance.Member}.Sanitize())
 		if inheritance.AdminOption {
 			query += "WITH ADMIN OPTION "
 		}
 		if inheritance.Grantor != nil {
 			query += fmt.Sprintf("GRANTED BY %s",
-				pq.QuoteIdentifier(*inheritance.Grantor))
+				pgx.Identifier{*inheritance.Grantor}.Sanitize())
 		}
 
 		contextLogger.Info("executing role inheritance query", "query", query)

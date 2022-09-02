@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/blang/semver"
+	"github.com/jackc/pgx/v4"
 	"github.com/lib/pq"
 	"k8s.io/utils/strings/slices"
 
@@ -95,7 +96,7 @@ func (rs *roleManager) importRoles(ctx context.Context, roles []Role) error {
 }
 
 func (rs *roleManager) createSQLStatement(role Role) string {
-	query := fmt.Sprintf("CREATE ROLE %s WITH ", pq.QuoteIdentifier(role.Rolname))
+	query := fmt.Sprintf("CREATE ROLE %s WITH ", pgx.Identifier{role.Rolname}.Sanitize())
 
 	if role.Rolcreatedb {
 		query += "CREATEDB "
