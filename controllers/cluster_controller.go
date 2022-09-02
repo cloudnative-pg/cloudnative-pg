@@ -363,12 +363,21 @@ func (r *ClusterReconciler) reconcileResources(
 ) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 
+	// TODO: refactor how we handle label and annotation reconciliation.
+	// TODO: We should generate a fake pod containing the expected labels and annotations and compare it to the living pod
+
 	// Update the labels for the -rw service to work correctly
 	if err := r.updateRoleLabelsOnPods(ctx, cluster, resources.instances); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pods: %w", err)
 	}
 
-	if err := r.updateClusterRoleLabelsOnPVCs(ctx, resources.instances, resources.pvcs); err != nil {
+	// updated any labels that are coming from the operator
+	if err := r.updateOperatorLabelsOnInstances(ctx, resources.instances); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot update instance labels on pods: %w", err)
+	}
+
+	// updated any labels that are coming from the operator
+	if err := r.updateOperatorLabelsOnPVC(ctx, resources.instances, resources.pvcs); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot update role labels on pvcs: %w", err)
 	}
 
