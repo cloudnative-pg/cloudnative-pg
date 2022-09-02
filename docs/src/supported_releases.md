@@ -65,9 +65,10 @@ Git tags for versions are prepended with `v`.
 
 | Version         | Currently Supported  | Release Date      | End of Life              | Supported Kubernetes Versions | Tested, but not supported |
 |-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|
-| main            | No, development only |                   |                          |                               |                           |
-| 1.15.x          | Yes                  | April 21, 2022    | October 15, 2022         | 1.21, 1.22, 1.23              | 1.19, 1.20, 1.24          |
+| 1.17.x          | Yes                  | September 6, 2022 | ~ February 10, 2023      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          |
 | 1.16.x          | Yes                  | July 7, 2022      | ~ December 10, 2022      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          |
+| 1.15.x          | Yes                  | April 21, 2022    | October 6, 2022          | 1.21, 1.22, 1.23              | 1.19, 1.20, 1.24          |
+| main            | No, development only |                   |                          |                               |                           |
 
 The list of supported Kubernetes versions in the above table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
@@ -77,12 +78,12 @@ Kubernetes distribution, like Red Hat OpenShift (this might change in the
 future. If it did change, that would be reflected in an official policy written
 by the CloudNativePG maintainers).
 
-## Upcoming release
+## Upcoming releases
 
 | Version         | Release Date       | End of Life              | Supported Kubernetes Versions |
 |-----------------|--------------------|--------------------------|-------------------------------|
-| 1.17.0          | September 15, 2022 | ~ February 10, 2023      | 1.22, 1.23, 1.24              |
-| 1.18.0          | November 10, 2022  | 1 month after 1.20       |                               |
+| 1.18.0          | October 25, 2022   | 1 month after 1.20       | 1.23, 1.24, 1.25              |
+| 1.19.0          | October 25, 2022   | 1 month after 1.21       |                               |
 
 !!! Note
     Dates in the future are uncertain and might change. This applies to Kubernetes versions too.
