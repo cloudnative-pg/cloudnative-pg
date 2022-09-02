@@ -21,6 +21,11 @@ package pool
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
+	// this is needed to correctly open the sql connection with the pgx driver
+	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
 // ConnectionPool is a repository of DB connections, pointing to the same instance
@@ -70,9 +75,7 @@ func (pool *ConnectionPool) ShutdownConnections() {
 // Unix domain socket to a database with a certain name
 func (pool *ConnectionPool) newConnection(dbname string) (*sql.DB, error) {
 	dsn := pool.GetDsn(dbname)
-	db, err := sql.Open(
-		"postgres",
-		dsn)
+	db, err := utils.NewSimpleDBConnection(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create connection connectionMap: %w", err)
 	}

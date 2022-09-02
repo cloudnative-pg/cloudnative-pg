@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v4"
 	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -186,7 +186,7 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 		return err
 	}
 
-	if _, err = db.Exec(fmt.Sprintf("ALTER USER %s SUPERUSER", pq.QuoteIdentifier(owner))); err != nil {
+	if _, err = db.Exec(fmt.Sprintf("ALTER USER %s SUPERUSER", pgx.Identifier{owner}.Sanitize())); err != nil {
 		return err
 	}
 
@@ -220,7 +220,7 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 
 	contextLogger.Info("removing superuser permission from owner user",
 		"owner", owner)
-	if _, err = db.Exec(fmt.Sprintf("ALTER USER %s NOSUPERUSER", pq.QuoteIdentifier(owner))); err != nil {
+	if _, err = db.Exec(fmt.Sprintf("ALTER USER %s NOSUPERUSER", pgx.Identifier{owner}.Sanitize())); err != nil {
 		return err
 	}
 
@@ -330,7 +330,7 @@ func (ds *databaseSnapshotter) dropExtensionsFromDatabase(
 		}
 
 		contextLogger.Info("dropping extension from target database", "extName", extName)
-		if _, err = db.Exec(fmt.Sprintf("DROP EXTENSION %s", pq.QuoteIdentifier(extName))); err != nil {
+		if _, err = db.Exec(fmt.Sprintf("DROP EXTENSION %s", pgx.Identifier{extName}.Sanitize())); err != nil {
 			contextLogger.Info("cannot drop extension (this is normal for system extensions)",
 				"extName", extName, "error", err)
 		}

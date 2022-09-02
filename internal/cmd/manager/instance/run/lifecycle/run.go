@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v4"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
@@ -30,6 +30,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
+
+var identifierStreamingReplicationUser = pgx.Identifier{apiv1.StreamingReplicationUser}.Sanitize()
 
 // runPostgresAndWait runs a goroutine which will run, configure and run Postgres itself,
 // returning any error via the returned channel
@@ -152,7 +154,7 @@ func configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
 		if err == sql.ErrNoRows {
 			_, err = tx.Exec(fmt.Sprintf(
 				"CREATE USER %v REPLICATION",
-				pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
+				identifierStreamingReplicationUser))
 			if err != nil {
 				return false, fmt.Errorf("CREATE USER %v error: %w", apiv1.StreamingReplicationUser, err)
 			}
@@ -164,7 +166,7 @@ func configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
 	if !hasLoginRight || !hasReplicationRight {
 		_, err = tx.Exec(fmt.Sprintf(
 			"ALTER USER %v LOGIN REPLICATION",
-			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
+			identifierStreamingReplicationUser))
 		if err != nil {
 			return false, fmt.Errorf("ALTER USER %v error: %w", apiv1.StreamingReplicationUser, err)
 		}
@@ -180,7 +182,7 @@ func configurePgRewindPrivileges(majorVersion int, hasSuperuser bool, tx *sql.Tx
 		if !hasSuperuser {
 			_, err := tx.Exec(fmt.Sprintf(
 				"ALTER USER %v SUPERUSER",
-				pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
+				identifierStreamingReplicationUser))
 			if err != nil {
 				return fmt.Errorf("ALTER USER %v error: %w", apiv1.StreamingReplicationUser, err)
 			}
@@ -208,28 +210,28 @@ func configurePgRewindPrivileges(majorVersion int, hasSuperuser bool, tx *sql.Tx
 	if !hasPgRewindPrivileges {
 		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_ls_dir(text, boolean, boolean) TO %v",
-			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
+			identifierStreamingReplicationUser))
 		if err != nil {
 			return fmt.Errorf("while granting pgrewind privileges: %w", err)
 		}
 
 		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_stat_file(text, boolean) TO %v",
-			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
+			identifierStreamingReplicationUser))
 		if err != nil {
 			return fmt.Errorf("while granting pgrewind privileges: %w", err)
 		}
 
 		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_read_binary_file(text) TO %v",
-			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
+			identifierStreamingReplicationUser))
 		if err != nil {
 			return fmt.Errorf("while granting pgrewind privileges: %w", err)
 		}
 
 		_, err = tx.Exec(fmt.Sprintf(
 			"GRANT EXECUTE ON function pg_catalog.pg_read_binary_file(text, bigint, bigint, boolean) TO %v",
-			pq.QuoteIdentifier(apiv1.StreamingReplicationUser)))
+			identifierStreamingReplicationUser))
 		if err != nil {
 			return fmt.Errorf("while granting pgrewind privileges: %w", err)
 		}
