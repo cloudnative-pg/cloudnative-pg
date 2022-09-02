@@ -34,11 +34,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
+// UploadFolder is the folder where the new version of the instance manager
+// will be uploaded
+const UploadFolder = "/controller"
+
 // InstanceManagerPath is the location of the instance manager executable
 const InstanceManagerPath = "/controller/manager"
-
-// InstanceManagerPathTemp is the temporary file used during the upgrade of the instance manager executable
-const InstanceManagerPathTemp = InstanceManagerPath + ".new"
 
 // ErrorInvalidInstanceManagerBinary is raised when upgrading to an instance manager
 // which has not the correct hash
@@ -53,25 +54,44 @@ func FromReader(
 	instance *postgres.Instance,
 	r io.Reader,
 ) error {
+	// Create a temporary file to host the new instance manager binary
+	updatedInstanceManager, err := os.CreateTemp(UploadFolder, "manager_*.new")
+	if err != nil {
+		return fmt.Errorf(
+			"while creating a temporary file to host the new version of the instance manager: %w", err)
+	}
+	defer func() {
+		// This code is executed only if the instance manager has not been updated, and
+		// this is the only condition we have a temporary file to remove
+		removeError := os.Remove(updatedInstanceManager.Name())
+		if removeError != nil {
+			log.Warning("Error while removing temporary instance manager upload file",
+				"name", updatedInstanceManager.Name(), "err", err)
+		}
+	}()
+
 	// Read the new instance manager version
-	newHash, err := updateInstanceManagerBinary(r)
+	newHash, err := downloadAndCloseInstanceManagerBinary(updatedInstanceManager, r)
 	if err != nil {
 		return fmt.Errorf("while reading new instance manager binary: %w", err)
 	}
-	log.Info("Received new version of the instance manager", "hashCode", newHash)
-
 	// Validate the hash of this instance manager
-	var binaryValid bool
-	binaryValid, err = validateInstanceManagerHash(typedClient, instance, newHash)
-	if err != nil {
+	if err := validateInstanceManagerHash(typedClient, instance.ClusterName, instance.Namespace, newHash); err != nil {
 		return fmt.Errorf("while validating instance manager binary: %w", err)
 	}
-	if !binaryValid {
-		return ErrorInvalidInstanceManagerBinary
+
+	log.Info("Received new version of the instance manager",
+		"hashCode", newHash,
+		"temporaryName", updatedInstanceManager.Name())
+
+	// Grant the executable bit to the new file
+	err = os.Chmod(updatedInstanceManager.Name(), 0o755) // #nosec
+	if err != nil {
+		return fmt.Errorf("while granting the executable bit to the instance manager binary: %w", err)
 	}
 
 	// Replace the new instance manager with the new one
-	if err := os.Rename(InstanceManagerPathTemp, InstanceManagerPath); err != nil {
+	if err := os.Rename(updatedInstanceManager.Name(), InstanceManagerPath); err != nil {
 		return fmt.Errorf("while replacing instance manager binary: %w", err)
 	}
 
@@ -82,9 +102,11 @@ func FromReader(
 	// manager will not kill it if InstanceManagerIsUpgrading is set to true.
 	cancelFunc()
 	log.Info("Waiting for log goroutines to exit before proceeding")
+
 	// We have to wait for all the necessary component to exit gracefully first
 	exitedCondition.Wait()
 	log.Info("All log goroutines exited, will reload the instance manager")
+
 	// Now we are actually ready to reload the instance manager
 	err = reloadInstanceManager()
 	if err != nil {
@@ -94,28 +116,22 @@ func FromReader(
 	return nil
 }
 
-// updateInstanceManagerBinary updates the binary of the new version of
+// downloadAndCloseInstanceManagerBinary updates the binary of the new version of
 // the instance manager, returning the new hash when it's done
-func updateInstanceManagerBinary(r io.Reader) (string, error) {
+func downloadAndCloseInstanceManagerBinary(dst *os.File, src io.Reader) (string, error) {
 	var err error
-	var newInstanceManager *os.File
 
 	// Get the binary stream from the request and store is inside our temporary folder
-	newInstanceManager, err = os.OpenFile(
-		InstanceManagerPathTemp, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o755) // #nosec
-	if err != nil {
-		return "", err
-	}
-
 	defer func() {
-		errClose := newInstanceManager.Close()
+		errClose := dst.Close()
 		if err == nil {
 			err = errClose
 		}
 	}()
 
+	// we calculate the instanceManager hash while copying the contents from the reader
 	encoder := sha256.New()
-	_, err = io.Copy(newInstanceManager, io.TeeReader(r, encoder))
+	_, err = io.Copy(dst, io.TeeReader(src, encoder))
 	if err != nil {
 		return "", err
 	}
@@ -125,22 +141,30 @@ func updateInstanceManagerBinary(r io.Reader) (string, error) {
 
 // validateInstanceManagerHash compares the new version of the instance manager
 // within the passed hash code with the one listed in the cluster status.
-// It returns true if everything is fine, false otherwise
+// It returns any errors during execution, or nil if the hash is fine
 func validateInstanceManagerHash(
-	typedClient client.Client, instance *postgres.Instance, hashCode string,
-) (bool, error) {
+	typedClient client.Client,
+	clusterName string,
+	namespace string,
+	hashCode string,
+) error {
 	var cluster apiv1.Cluster
 
 	ctx := context.Background()
-	err := typedClient.Get(ctx, client.ObjectKey{
-		Namespace: instance.Namespace,
-		Name:      instance.ClusterName,
-	}, &cluster)
-	if err != nil {
-		return false, err
+	if err := typedClient.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      clusterName,
+	}, &cluster); err != nil {
+		return err
 	}
 
-	return cluster.Status.OperatorHash == hashCode, nil
+	if cluster.Status.OperatorHash != hashCode {
+		log.Warning("Received invalid version of the instance manager",
+			"hashCode", hashCode)
+		return ErrorInvalidInstanceManagerBinary
+	}
+
+	return nil
 }
 
 // reloadInstanceManager gracefully stops the log collection process and then
