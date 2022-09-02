@@ -552,31 +552,71 @@ func (r *ClusterReconciler) updateRoleLabelsOnPods(
 	return nil
 }
 
-// updateClusterRoleLabelsOnPVCs ensures that the PVCs have the correct cluster role label set
-func (r *ClusterReconciler) updateClusterRoleLabelsOnPVCs(
+// updateOperatorLabelsOnInstances ensures that the instances have the correct labels
+func (r *ClusterReconciler) updateOperatorLabelsOnInstances(
 	ctx context.Context,
-	pods corev1.PodList,
-	pvcs corev1.PersistentVolumeClaimList,
+	instances corev1.PodList,
 ) error {
-	for _, pod := range pods.Items {
-		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
-		if !podHasRole {
+	for i := range instances.Items {
+		instance := &instances.Items[i]
+		if instance.Labels == nil {
+			instance.Labels = map[string]string{}
+		}
+		var modified bool
+		origInstance := instance.DeepCopy()
+
+		if instance.Labels[utils.InstanceNameLabelName] != instance.Name {
+			instance.Labels[utils.InstanceNameLabelName] = instance.Name
+			modified = true
+		}
+
+		if instance.Labels[utils.PodRoleLabelName] != string(utils.PodRoleInstance) {
+			instance.Labels[utils.PodRoleLabelName] = string(utils.PodRoleInstance)
+			modified = true
+		}
+		if !modified {
 			continue
 		}
 
-		for _, pvc := range specs.FilterInstancePVCs(pvcs.Items, pod.Spec) {
-			pvc := pvc
+		if err := r.Client.Patch(ctx, instance, client.MergeFrom(origInstance)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// updateOperatorLabelsOnPVC ensures that the PVCs have the correct labels
+func (r *ClusterReconciler) updateOperatorLabelsOnPVC(
+	ctx context.Context,
+	instances corev1.PodList,
+	pvcs corev1.PersistentVolumeClaimList,
+) error {
+	for _, pod := range instances.Items {
+		podRole, podHasRole := pod.ObjectMeta.Labels[specs.ClusterRoleLabelName]
+
+		instancePVCs := specs.FilterInstancePVCs(pvcs.Items, pod.Spec)
+		for i := range instancePVCs {
+			pvc := &instancePVCs[i]
+			var modified bool
 			// this is needed, because on older versions pvc.labels could be nil
 			if pvc.Labels == nil {
 				pvc.Labels = map[string]string{}
 			}
-			if pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] == podRole {
-				continue
-			}
 
 			origPvc := pvc.DeepCopy()
-			pvc.Labels[specs.ClusterRoleLabelName] = podRole
-			if err := r.Client.Patch(ctx, &pvc, client.MergeFrom(origPvc)); err != nil {
+			if podHasRole && pvc.ObjectMeta.Labels[specs.ClusterRoleLabelName] != podRole {
+				pvc.Labels[specs.ClusterRoleLabelName] = podRole
+				modified = true
+			}
+			if pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] != pod.Name {
+				pvc.ObjectMeta.Labels[utils.InstanceNameLabelName] = pod.Name
+				modified = true
+			}
+			if !modified {
+				continue
+			}
+			if err := r.Client.Patch(ctx, pvc, client.MergeFrom(origPvc)); err != nil {
 				return err
 			}
 		}
