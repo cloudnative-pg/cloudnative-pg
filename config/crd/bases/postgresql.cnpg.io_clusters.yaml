@@ -2806,6 +2806,12 @@ spec:
                       replica election in case of failures
                     type: boolean
                 type: object
+              unusablePVC:
+                description: List of all the PVCs that are unusable because another
+                  PVC is missing
+                items:
+                  type: string
+                type: array
               writeService:
                 description: Current write pod
                 type: string
