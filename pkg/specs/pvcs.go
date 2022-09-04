@@ -288,6 +288,7 @@ instancesLoop:
 				)
 				// Remove it from the instance names list
 				// TODO: this is ugly and needs some refactor
+				// TODO: possible segfault if we get here without having added InstanceNames
 				if result.InstanceNames[len(result.InstanceNames)-1] == pvc.Name {
 					result.InstanceNames = result.InstanceNames[:len(result.InstanceNames)-1]
 				}

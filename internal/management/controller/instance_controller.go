@@ -1280,6 +1280,14 @@ func (r *InstanceReconciler) reconcileReplicationSlots(ctx context.Context, clus
 	return r.reconcileStandbyReplicationSlots(ctx, cluster)
 }
 
+// replicationSlotManager abstracts the operations that need to be sent to
+// the database instance for the management of Replication Slots
+type replicationSlotManager interface {
+	GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (*postgresManagement.ReplicationSlotList, error)
+	CreateReplicationSlot(slotName string) error
+	DeleteReplicationSlot(slotName string) error
+}
+
 func (r *InstanceReconciler) reconcilePrimaryReplicationSlots(ctx context.Context, cluster *apiv1.Cluster) error {
 	// if the replication slots feature was deactivated, ensure any existing
 	// replication slots get cleaned up
@@ -1290,12 +1298,12 @@ func (r *InstanceReconciler) reconcilePrimaryReplicationSlots(ctx context.Contex
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Debug("Updating primary HA replication slots")
 
-	currentSlots, err := r.instance.GetCurrentHAReplicationSlots(cluster)
+	currentSlots, err := r.slotManager.GetCurrentHAReplicationSlots(cluster)
 	if err != nil {
 		return err
 	}
 
-	var verifiedSlots postgresManagement.ReplicationSlotList
+	slotInCluster := make(map[postgresManagement.ReplicationSlot]bool)
 
 	// Add every slot that is missing
 	for _, instanceName := range cluster.Status.InstanceNames {
@@ -1304,32 +1312,32 @@ func (r *InstanceReconciler) reconcilePrimaryReplicationSlots(ctx context.Contex
 		}
 
 		if slot := currentSlots.GetSlotByInstanceName(instanceName); slot != nil {
-			verifiedSlots.Items = append(verifiedSlots.Items, *slot)
+			slotInCluster[*slot] = true
 			continue
 		}
 
+		// at this point, the cluster instance does not have a replication slot
 		slotName := cluster.GetSlotNameFromInstanceName(instanceName)
-		if err := r.instance.CreateReplicationSlot(slotName); err != nil {
+		if err := r.slotManager.CreateReplicationSlot(slotName); err != nil {
 			return fmt.Errorf("updating primary HA replication slots: %w", err)
 		}
-		verifiedSlots.Items = append(verifiedSlots.Items,
-			postgresManagement.ReplicationSlot{
-				InstanceName: instanceName,
-				SlotName:     slotName,
-				Type:         postgresManagement.SlotTypePhysical,
-			})
+		slotInCluster[postgresManagement.ReplicationSlot{
+			InstanceName: instanceName,
+			SlotName:     slotName,
+			Type:         postgresManagement.SlotTypePhysical,
+		}] = true
 	}
 
-	// Delete every slot we do not expect
+	// Delete any replication slots in the Database that are not from a cluster instance
 	for _, slot := range currentSlots.Items {
-		if verifiedSlots.GetSlotByName(slot.SlotName) == nil {
+		if !slotInCluster[slot] {
 			// Avoid deleting active slots.
 			// It would trow an error on Postgres side.
 			if slot.Active {
 				continue
 			}
 
-			if err := r.instance.DeleteReplicationSlot(slot.SlotName); err != nil {
+			if err := r.slotManager.DeleteReplicationSlot(slot.SlotName); err != nil {
 				return fmt.Errorf("failure deleting replication slot %q: %w", slot.SlotName, err)
 			}
 		}
@@ -1352,13 +1360,13 @@ func (r *InstanceReconciler) reconcileStandbyReplicationSlots(ctx context.Contex
 	// TODO: better logic must go here, for now we drop every slot that matches
 	// as you can find on a former primary
 
-	replicationSlots, err := r.instance.GetCurrentHAReplicationSlots(cluster)
+	replicationSlots, err := r.slotManager.GetCurrentHAReplicationSlots(cluster)
 	if err != nil {
 		return err
 	}
 
 	for _, slot := range replicationSlots.Items {
-		if err := r.instance.DeleteReplicationSlot(slot.SlotName); err != nil {
+		if err := r.slotManager.DeleteReplicationSlot(slot.SlotName); err != nil {
 			// Avoid deleting active slots.
 			// It would trow an error on Postgres side.
 			if slot.Active {
