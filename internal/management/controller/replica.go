@@ -60,7 +60,7 @@ func (r *InstanceReconciler) refreshReplicaConfiguration(
 
 func (r *InstanceReconciler) writeReplicaConfigurationForReplica(cluster *apiv1.Cluster) (changed bool, err error) {
 	slotName := cluster.GetSlotNameFromInstanceName(r.instance.PodName)
-	return postgres.UpdateReplicaConfiguration(r.instance.PgData, r.instance.ClusterName, r.instance.PodName, slotName)
+	return postgres.UpdateReplicaConfiguration(r.instance.PgData, r.instance.GetPrimaryConnInfo(), slotName)
 }
 
 func (r *InstanceReconciler) writeReplicaConfigurationForDesignatedPrimary(
@@ -84,5 +84,5 @@ func (r *InstanceReconciler) writeReplicaConfigurationForDesignatedPrimary(
 	}
 
 	slotName := cluster.GetSlotNameFromInstanceName(r.instance.PodName)
-	return postgres.UpdateReplicaConfigurationForPrimary(r.instance.PgData, connectionString, slotName)
+	return postgres.UpdateReplicaConfiguration(r.instance.PgData, connectionString, slotName)
 }
