@@ -1281,7 +1281,8 @@ func (r *InstanceReconciler) reconcileReplicationSlots(ctx context.Context, clus
 }
 
 // replicationSlotManager abstracts the operations that need to be sent to
-// the database instance for the management of Replication Slots
+// the database instance for the management of Replication Slots.
+// This is so we can unit test the reconciliation logic vs. fake implementation
 type replicationSlotManager interface {
 	GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (*postgresManagement.ReplicationSlotList, error)
 	CreateReplicationSlot(slotName string) error

@@ -148,7 +148,5 @@ func (env *CloneInfo) configureInstanceAsNewPrimary(cluster *apiv1.Cluster) erro
 	// In the future, when we will support recovering WALs in the
 	// designated primary from an object store, we'll need to use
 	// the environment variables of the recovery object store.
-	// TODO. Here too, this would improve if the SlotName became a part of
-	// the InitInfo
 	return env.info.ConfigureInstanceAfterRestore(cluster, nil)
 }

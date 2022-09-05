@@ -63,6 +63,22 @@ func (fk fakeReplicationSlotManager) DeleteReplicationSlot(slotName string) erro
 	return nil
 }
 
+func makeClusterWithInstanceNames(instanceNames []string) apiv1.Cluster {
+	return apiv1.Cluster{
+		Spec: apiv1.ClusterSpec{
+			ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
+				HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+					Enabled:    true,
+					SlotPrefix: slotPrefix,
+				},
+			},
+		},
+		Status: apiv1.ClusterStatus{
+			InstanceNames: instanceNames,
+		},
+	}
+}
+
 var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 	It("can create a new replication slot for a new cluster instance", func() {
 		fakeSlotManager := fakeReplicationSlotManager{
@@ -76,19 +92,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 			slotManager: fakeSlotManager,
 		}
 
-		cluster := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
-					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled:    true,
-						SlotPrefix: slotPrefix,
-					},
-				},
-			},
-			Status: apiv1.ClusterStatus{
-				InstanceNames: []string{"instance1", "instance2", "instance3"},
-			},
-		}
+		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2", "instance3"})
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeTrue())
@@ -115,18 +119,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 			slotManager: fakeSlotManager,
 		}
 
-		cluster := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
-					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: true,
-					},
-				},
-			},
-			Status: apiv1.ClusterStatus{
-				InstanceNames: []string{"instance1", "instance2"},
-			},
-		}
+		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"})
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 
@@ -149,18 +142,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 			slotManager: fakeSlotManager,
 		}
 
-		cluster := apiv1.Cluster{
-			Spec: apiv1.ClusterSpec{
-				ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
-					HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-						Enabled: true,
-					},
-				},
-			},
-			Status: apiv1.ClusterStatus{
-				InstanceNames: []string{"instance1", "instance2"},
-			},
-		}
+		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"})
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 

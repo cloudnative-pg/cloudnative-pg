@@ -30,73 +30,72 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+func makePVC(clusterName, serial string, isReady bool) corev1.PersistentVolumeClaim {
+	annotations := map[string]string{
+		ClusterSerialAnnotationName: serial,
+	}
+	if isReady {
+		annotations[PVCStatusAnnotationName] = PVCStatusReady
+	}
+	return corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterName + "-" + serial,
+			Labels: map[string]string{
+				utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+			},
+			Annotations: annotations,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Phase: corev1.ClaimBound,
+		},
+	}
+}
+
+func makePod(clusterName, serial string) corev1.Pod {
+	return corev1.Pod{
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: clusterName + "-" + serial,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func makeJob(clusterName, serial string) batchv1.Job {
+	return batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{
+						{
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: clusterName + "-" + serial,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 var _ = Describe("PVC detection", func() {
 	It("will list PVCs with Jobs or Pods or which are Ready", func() {
 		clusterName := "myCluster"
 		pvcs := []corev1.PersistentVolumeClaim{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: clusterName + "-1",
-					Labels: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
-					},
-					Annotations: map[string]string{
-						PVCStatusAnnotationName:     PVCStatusReady,
-						ClusterSerialAnnotationName: "1",
-					},
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{},
-				Status: corev1.PersistentVolumeClaimStatus{
-					Phase: corev1.ClaimBound,
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: clusterName + "-2",
-					Labels: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
-					},
-					Annotations: map[string]string{
-						PVCStatusAnnotationName:     PVCStatusReady,
-						ClusterSerialAnnotationName: "2",
-					},
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{},
-				Status: corev1.PersistentVolumeClaimStatus{
-					Phase: corev1.ClaimBound,
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: clusterName + "-3",
-					Labels: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
-					},
-					Annotations: map[string]string{
-						ClusterSerialAnnotationName: "3",
-					},
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{},
-				Status: corev1.PersistentVolumeClaimStatus{
-					Phase: corev1.ClaimBound,
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: clusterName + "-4",
-					Labels: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
-					},
-					Annotations: map[string]string{
-						PVCStatusAnnotationName:     PVCStatusReady,
-						ClusterSerialAnnotationName: "4",
-					},
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{},
-				Status: corev1.PersistentVolumeClaimStatus{
-					Phase: corev1.ClaimBound,
-				},
-			},
+			makePVC(clusterName, "1", true),
+			makePVC(clusterName, "2", true),
+			makePVC(clusterName, "3", false),
+			makePVC(clusterName, "4", true),
 		}
 		pvcUsage := DetectPVCs(
 			context.TODO(),
@@ -105,40 +104,8 @@ var _ = Describe("PVC detection", func() {
 					Name: clusterName,
 				},
 			},
-			[]corev1.Pod{
-				{
-					Spec: corev1.PodSpec{
-						Volumes: []corev1.Volume{
-							{
-								VolumeSource: corev1.VolumeSource{
-									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-										ClaimName: clusterName + "-1",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			[]batchv1.Job{
-				{
-					Spec: batchv1.JobSpec{
-						Template: corev1.PodTemplateSpec{
-							Spec: corev1.PodSpec{
-								Volumes: []corev1.Volume{
-									{
-										VolumeSource: corev1.VolumeSource{
-											PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-												ClaimName: clusterName + "-2",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			[]corev1.Pod{makePod(clusterName, "1")},
+			[]batchv1.Job{makeJob(clusterName, "2")},
 			pvcs,
 		)
 		Expect(pvcUsage.InstanceNames).ShouldNot(BeEmpty())
