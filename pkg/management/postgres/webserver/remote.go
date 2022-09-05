@@ -62,8 +62,8 @@ func NewRemoteWebServer(
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),
 		Handler:           serveMux,
-		ReadTimeout:       DefaultReadTimeout,
-		ReadHeaderTimeout: DefaultReadHeaderTimeout,
+		ReadTimeout:       InstanceManagerDefaultReadTimeout,
+		ReadHeaderTimeout: InstanceManagerDefaultReadHeaderTimeout,
 	}
 
 	return NewWebServer(instance, server), nil

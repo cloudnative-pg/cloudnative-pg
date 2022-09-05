@@ -65,8 +65,8 @@ func ListenAndServe() error {
 	server = &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.PgBouncerMetricsPort),
 		Handler:           serveMux,
-		ReadTimeout:       webserver.DefaultReadTimeout,
-		ReadHeaderTimeout: webserver.DefaultReadHeaderTimeout,
+		ReadTimeout:       webserver.InstanceManagerDefaultReadTimeout,
+		ReadHeaderTimeout: webserver.InstanceManagerDefaultReadHeaderTimeout,
 	}
 	err := server.ListenAndServe()
 

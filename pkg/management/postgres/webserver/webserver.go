@@ -26,9 +26,14 @@ import (
 )
 
 const (
-	// DefaultReadTimeout is the default value to be used by the webservers
+	// InstanceManagerDefaultReadTimeout is the default value to be used by the webservers of the instance manager
+	InstanceManagerDefaultReadTimeout = 300 * time.Second
+	// InstanceManagerDefaultReadHeaderTimeout is the default value to be used by the webservers of the instance manager
+	InstanceManagerDefaultReadHeaderTimeout = 30 * time.Second
+
+	// DefaultReadTimeout is the default value to be used by the other webservers
 	DefaultReadTimeout = 20 * time.Second
-	// DefaultReadHeaderTimeout is the default value to be used by the webservers
+	// DefaultReadHeaderTimeout is the default value to be used by the other webservers
 	DefaultReadHeaderTimeout = 3 * time.Second
 )
 

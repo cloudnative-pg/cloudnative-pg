@@ -65,8 +65,8 @@ func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
 	server := &http.Server{
 		Addr:              fmt.Sprintf("localhost:%d", url.LocalPort),
 		Handler:           serveMux,
-		ReadHeaderTimeout: DefaultReadTimeout,
-		ReadTimeout:       DefaultReadTimeout,
+		ReadHeaderTimeout: InstanceManagerDefaultReadTimeout,
+		ReadTimeout:       InstanceManagerDefaultReadTimeout,
 	}
 
 	webserver := NewWebServer(instance, server)
