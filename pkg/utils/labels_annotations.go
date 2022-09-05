@@ -32,9 +32,6 @@ const (
 	// JobRoleLabelName is the name of the label containing the purpose of the executed job
 	JobRoleLabelName = "cnpg.io/jobRole"
 
-	// PvcRoleLabelName is the name of the label containing the purpose of the pvc
-	PvcRoleLabelName = "cnpg.io/pvcRole"
-
 	// PodRoleLabelName is the name of the label containing the podRole value
 	PodRoleLabelName = "cnpg.io/podRole"
 

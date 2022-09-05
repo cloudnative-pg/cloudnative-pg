@@ -17,7 +17,6 @@ limitations under the License.
 package utils
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -27,19 +26,4 @@ func GetStorageAllowExpansion(defaultStorageClass string, env *TestingEnvironmen
 	storageClass := &storagev1.StorageClass{}
 	err := GetObject(env, client.ObjectKey{Name: defaultStorageClass}, storageClass)
 	return storageClass.AllowVolumeExpansion, err
-}
-
-// PvcHasLabels returns true if a PVC contains a given map of labels
-func PvcHasLabels(
-	pvc corev1.PersistentVolumeClaim,
-	labels map[string]string,
-) bool {
-	pvcLabels := pvc.Labels
-	for k, v := range labels {
-		val, ok := pvcLabels[k]
-		if !ok || (v != val) {
-			return false
-		}
-	}
-	return true
 }

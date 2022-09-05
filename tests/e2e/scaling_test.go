@@ -62,7 +62,6 @@ var _ = Describe("Cluster scale up and down", func() {
 			timeout := 300
 			AssertClusterIsReady(namespace, clusterName, timeout, env)
 		})
-		AssertPvcHasLabels(namespace, clusterName)
 
 		// Remove a node from the cluster and verify the cluster has one
 		// element less
