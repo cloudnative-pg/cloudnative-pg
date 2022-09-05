@@ -241,10 +241,19 @@ instancesLoop:
 		// Any extra PVC is already in the Unusable list
 		pvcNames = expectedPVCs
 
+		isAnyPvcUnusable := false
 		for _, pvc := range pvcs {
-			if pvc.Labels[utils.PvcRoleLabelName] == string(utils.PVCRolePgData) {
-				result.InstanceNames = append(result.InstanceNames, pvc.Name)
+			// We ignore any PVC that is not expected
+			if !slices.Contains(expectedPVCs, pvc.Name) {
+				continue
 			}
+			if pvc.Annotations[PVCStatusAnnotationName] != PVCStatusReady {
+				isAnyPvcUnusable = true
+			}
+		}
+
+		if !isAnyPvcUnusable {
+			result.InstanceNames = append(result.InstanceNames, instanceName)
 		}
 
 		// Search for a Pod corresponding to this instance.
@@ -271,33 +280,23 @@ instancesLoop:
 			}
 		}
 
-		// At this point the PVCs are dangling, so we need to check if some of them has
-		// a PVC status annotation marking it as non-ready.
-		// In that case, all the instance PVCs are unusable
-		for _, pvc := range pvcs {
-			// We ignore any PVC that is not expected
-			if !slices.Contains(expectedPVCs, pvc.Name) {
-				continue
+		if isAnyPvcUnusable {
+			// This PVC has not a Job nor a Pod using it, but it is not marked as PVCStatusReady
+			// we need to ignore this instance and treat all the instance PVCs as unusable
+			result.Unusable = append(result.Unusable, pvcNames...)
+			contextLogger.Warning("found PVC that is not annotated as ready",
+				"pvcName", pvc.Name,
+				"instance", instanceName,
+				"expectedPVCs", expectedPVCs,
+				"foundPVCs", pvcNames,
+			)
+			// Remove it from the instance names list
+			// TODO: this is ugly and needs some refactor
+			// TODO: possible segfault if we get here without having added InstanceNames
+			if result.InstanceNames[len(result.InstanceNames)-1] == pvc.Name {
+				result.InstanceNames = result.InstanceNames[:len(result.InstanceNames)-1]
 			}
-
-			if pvc.Annotations[PVCStatusAnnotationName] != PVCStatusReady {
-				// This PVC has not a Job nor a Pod using it, but it is not marked as PVCStatusReady
-				// we need to ignore this instance and treat all the instance PVCs as unusable
-				result.Unusable = append(result.Unusable, pvcNames...)
-				contextLogger.Warning("found PVC that is not annotated as ready",
-					"pvcName", pvc.Name,
-					"instance", instanceName,
-					"expectedPVCs", expectedPVCs,
-					"foundPVCs", pvcNames,
-				)
-				// Remove it from the instance names list
-				// TODO: this is ugly and needs some refactor
-				// TODO: possible segfault if we get here without having added InstanceNames
-				if result.InstanceNames[len(result.InstanceNames)-1] == pvc.Name {
-					result.InstanceNames = result.InstanceNames[:len(result.InstanceNames)-1]
-				}
-				continue instancesLoop
-			}
+			continue instancesLoop
 		}
 
 		// These PVCs have not a Job nor a Pod using them, they are dangling
