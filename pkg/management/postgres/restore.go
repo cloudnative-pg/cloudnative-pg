@@ -129,7 +129,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		}
 
 		// TODO: Using a replication slot on replica cluster is not supported (yet?)
-		_, err = UpdateReplicaConfigurationForPrimary(info.PgData, connectionString, "")
+		_, err = UpdateReplicaConfiguration(info.PgData, connectionString, "")
 		return err
 	}
 
@@ -602,7 +602,7 @@ func (info InitInfo) ConfigureInstanceAfterRestore(cluster *apiv1.Cluster, env [
 	}
 
 	if majorVersion >= 12 {
-		primaryConnInfo := buildPrimaryConnInfo(info.ClusterName, info.PodName)
+		primaryConnInfo := info.GetPrimaryConnInfo()
 		slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
 		_, err = configurePostgresAutoConfFile(info.PgData, primaryConnInfo, slotName)
 		if err != nil {
@@ -624,6 +624,11 @@ func (info InitInfo) ConfigureInstanceAfterRestore(cluster *apiv1.Cluster, env [
 
 		return nil
 	})
+}
+
+// GetPrimaryConnInfo returns the DSN to reach the primary
+func (info InitInfo) GetPrimaryConnInfo() string {
+	return buildPrimaryConnInfo(info.ClusterName+"-rw", info.PodName)
 }
 
 func (info *InitInfo) checkBackupDestination(

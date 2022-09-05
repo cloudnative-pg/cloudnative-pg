@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -546,15 +547,16 @@ type ReplicationSlotsConfiguration struct {
 	// Standby will update the status of the local replication slots
 	// every `updateInterval` seconds (default 30).
 	//+kubebuilder:default:=30
+	//+kubebuilder:validation:Minimum=0
 	UpdateInterval int `json:"updateInterval,omitempty"`
 }
 
 // GetUpdateInterval returns the update interval, defaulting to DefaultReplicationSlotsUpdateInterval if empty
-func (r *ReplicationSlotsConfiguration) GetUpdateInterval() int {
-	if r == nil || r.UpdateInterval == 0 {
+func (r *ReplicationSlotsConfiguration) GetUpdateInterval() time.Duration {
+	if r == nil || r.UpdateInterval <= 0 {
 		return DefaultReplicationSlotsUpdateInterval
 	}
-	return r.UpdateInterval
+	return time.Duration(r.UpdateInterval) * time.Second
 }
 
 // ReplicationSlotsHAConfiguration encapsulates the configuration
@@ -591,6 +593,24 @@ func (r *ReplicationSlotsHAConfiguration) GetSlotPrefix() string {
 		return DefaultReplicationSlotsHASlotPrefix
 	}
 	return r.SlotPrefix
+}
+
+// GetSlotNameFromInstanceName returns the slot name, given the instance name.
+// It returns an empty string if High Availability Replication Slots are disabled
+func (r *ReplicationSlotsHAConfiguration) GetSlotNameFromInstanceName(instanceName string) string {
+	if r == nil || !r.Enabled {
+		return ""
+	}
+
+	sanitizedName := slotNameNegativeRegex.ReplaceAllString(strings.ToLower(instanceName), "_")
+
+	slotName := fmt.Sprintf(
+		"%s%s",
+		r.GetSlotPrefix(),
+		sanitizedName,
+	)
+
+	return slotName
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to
@@ -1975,15 +1995,7 @@ func (cluster Cluster) GetSlotNameFromInstanceName(instanceName string) string {
 		return ""
 	}
 
-	sanitizedName := slotNameNegativeRegex.ReplaceAllString(strings.ToLower(instanceName), "_")
-
-	slotName := fmt.Sprintf(
-		"%s%s",
-		cluster.Spec.ReplicationSlots.HighAvailability.GetSlotPrefix(),
-		sanitizedName,
-	)
-
-	return slotName
+	return cluster.Spec.ReplicationSlots.HighAvailability.GetSlotNameFromInstanceName(instanceName)
 }
 
 // GetInstanceNameFromSlotName returns the instance name, given the slot name

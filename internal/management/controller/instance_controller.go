@@ -155,6 +155,8 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
+	r.reconcileSlotReplicator(cluster)
+
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
 		return ctrl.Result{}, err
@@ -221,6 +223,14 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *InstanceReconciler) reconcileSlotReplicator(cluster *apiv1.Cluster) {
+	if cluster.Status.TargetPrimary == r.instance.PodName {
+		r.instance.ConfigureSlotReplicator(nil)
+	} else {
+		r.instance.ConfigureSlotReplicator(cluster.Spec.ReplicationSlots)
+	}
 }
 
 func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(

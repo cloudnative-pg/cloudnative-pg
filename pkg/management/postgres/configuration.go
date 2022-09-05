@@ -180,15 +180,8 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 }
 
 // UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version
-// of PostgreSQL
-func UpdateReplicaConfiguration(pgData, clusterName, podName, slotName string) (changed bool, err error) {
-	primaryConnInfo := buildPrimaryConnInfo(clusterName+"-rw", podName)
-	return UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, slotName)
-}
-
-// UpdateReplicaConfigurationForPrimary updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
-func UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
+func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	major, err := postgresutils.GetMajorVersion(pgData)
 	if err != nil {
 		return false, err
