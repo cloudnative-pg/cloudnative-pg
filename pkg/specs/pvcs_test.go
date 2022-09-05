@@ -41,6 +41,7 @@ var _ = Describe("PVC detection", func() {
 						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 					Annotations: map[string]string{
+						PVCStatusAnnotationName:     PVCStatusReady,
 						ClusterSerialAnnotationName: "1",
 					},
 				},
@@ -56,6 +57,7 @@ var _ = Describe("PVC detection", func() {
 						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 					Annotations: map[string]string{
+						PVCStatusAnnotationName:     PVCStatusReady,
 						ClusterSerialAnnotationName: "2",
 					},
 				},

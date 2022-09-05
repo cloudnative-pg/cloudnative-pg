@@ -285,17 +285,11 @@ instancesLoop:
 			// we need to ignore this instance and treat all the instance PVCs as unusable
 			result.Unusable = append(result.Unusable, pvcNames...)
 			contextLogger.Warning("found PVC that is not annotated as ready",
-				"pvcName", pvc.Name,
+				"pvcNames", pvcNames,
 				"instance", instanceName,
 				"expectedPVCs", expectedPVCs,
 				"foundPVCs", pvcNames,
 			)
-			// Remove it from the instance names list
-			// TODO: this is ugly and needs some refactor
-			// TODO: possible segfault if we get here without having added InstanceNames
-			if result.InstanceNames[len(result.InstanceNames)-1] == pvc.Name {
-				result.InstanceNames = result.InstanceNames[:len(result.InstanceNames)-1]
-			}
 			continue instancesLoop
 		}
 
