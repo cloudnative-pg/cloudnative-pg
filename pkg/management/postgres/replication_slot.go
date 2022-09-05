@@ -42,21 +42,6 @@ type ReplicationSlotList struct {
 	Items []ReplicationSlot
 }
 
-// GetSlotByName returns a slot searching by slot name
-func (rs *ReplicationSlotList) GetSlotByName(slotName string) *ReplicationSlot {
-	if rs == nil || len(rs.Items) == 0 {
-		return nil
-	}
-
-	for k, v := range rs.Items {
-		if v.SlotName == slotName {
-			return &rs.Items[k]
-		}
-	}
-
-	return nil
-}
-
 // GetSlotByInstanceName returns a slot searching by instance name
 func (rs *ReplicationSlotList) GetSlotByInstanceName(instanceName string) *ReplicationSlot {
 	if rs == nil || len(rs.Items) == 0 {
