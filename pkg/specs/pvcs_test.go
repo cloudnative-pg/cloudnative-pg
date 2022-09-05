@@ -32,51 +32,62 @@ import (
 
 var _ = Describe("PVC detection", func() {
 	It("will list PVCs with Jobs or Pods or which are Ready", func() {
+		clusterName := "myCluster"
 		pvcs := []corev1.PersistentVolumeClaim{
 			{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "pvcForPod",
-					Labels: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
-					},
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{},
-				Status: corev1.PersistentVolumeClaimStatus{
-					Phase: corev1.ClaimBound,
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pvcForJob",
-					Labels: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
-					},
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{},
-				Status: corev1.PersistentVolumeClaimStatus{
-					Phase: corev1.ClaimBound,
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "orphanUnreadyPvc",
-					Labels: map[string]string{
-						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
-					},
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{},
-				Status: corev1.PersistentVolumeClaimStatus{
-					Phase: corev1.ClaimBound,
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "readyPvc",
+					Name: clusterName + "-1",
 					Labels: map[string]string{
 						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
 					},
 					Annotations: map[string]string{
-						PVCStatusAnnotationName: PVCStatusReady,
+						ClusterSerialAnnotationName: "1",
+					},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterName + "-2",
+					Labels: map[string]string{
+						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+					},
+					Annotations: map[string]string{
+						ClusterSerialAnnotationName: "2",
+					},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterName + "-3",
+					Labels: map[string]string{
+						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+					},
+					Annotations: map[string]string{
+						ClusterSerialAnnotationName: "3",
+					},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterName + "-4",
+					Labels: map[string]string{
+						utils.PvcRoleLabelName: string(utils.PVCRolePgData),
+					},
+					Annotations: map[string]string{
+						PVCStatusAnnotationName:     PVCStatusReady,
+						ClusterSerialAnnotationName: "4",
 					},
 				},
 				Spec: corev1.PersistentVolumeClaimSpec{},
@@ -87,7 +98,11 @@ var _ = Describe("PVC detection", func() {
 		}
 		pvcUsage := DetectPVCs(
 			context.TODO(),
-			&apiv1.Cluster{},
+			&apiv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterName,
+				},
+			},
 			[]corev1.Pod{
 				{
 					Spec: corev1.PodSpec{
@@ -95,7 +110,7 @@ var _ = Describe("PVC detection", func() {
 							{
 								VolumeSource: corev1.VolumeSource{
 									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-										ClaimName: "pvcForPod",
+										ClaimName: clusterName + "-1",
 									},
 								},
 							},
@@ -112,7 +127,7 @@ var _ = Describe("PVC detection", func() {
 									{
 										VolumeSource: corev1.VolumeSource{
 											PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-												ClaimName: "pvcForJob",
+												ClaimName: clusterName + "-2",
 											},
 										},
 									},
@@ -126,6 +141,7 @@ var _ = Describe("PVC detection", func() {
 		)
 		Expect(pvcUsage.InstanceNames).ShouldNot(BeEmpty())
 		Expect(pvcUsage.InstanceNames).Should(HaveLen(3))
-		Expect(pvcUsage.InstanceNames).Should(ContainElements("pvcForPod", "pvcForJob", "readyPvc"))
+		// the PVC clusterName+"-3" is not ready, and has no Job nor Pod
+		Expect(pvcUsage.InstanceNames).Should(ConsistOf(clusterName+"-1", clusterName+"-2", clusterName+"-4"))
 	})
 })
