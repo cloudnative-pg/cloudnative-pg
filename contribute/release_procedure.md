@@ -42,6 +42,18 @@ Sometimes, bug fixes might originate in the release branch as well.
 Release notes for patch/security versions are maintained in the release branch
 directly.
 
+### Creating a new release branch
+
+A new release branch is created starting from the most updated commit in the
+trunk by a maintainer:
+
+```bash
+git checkout main
+git pull --rebase
+git checkout -b release-X.Y
+git push --set-upstream origin release-X.Y
+```
+
 ## Planning the release
 
 One or two weeks before the release, you should start planning the following
@@ -67,6 +79,10 @@ activities:
 
 Once the code in the release branch is stable and ready to be released, you can
 proceed with the supervised process.
+
+**IMPORTANT:** You need to operator on an existing release branch. If you are
+releasing a new minor version, you must first create a release branch as
+explained above.
 
 As a maintainer, you need to repeat this process for each of the supported
 releases of CloudNativePG:
