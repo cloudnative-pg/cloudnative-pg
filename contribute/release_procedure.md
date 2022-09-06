@@ -80,9 +80,10 @@ activities:
 Once the code in the release branch is stable and ready to be released, you can
 proceed with the supervised process.
 
-**IMPORTANT:** You need to operator on an existing release branch. If you are
-releasing a new minor version, you must first create a release branch as
-explained above.
+**IMPORTANT:** You need to operate on an existing release branch. If you are
+releasing a new minor version, you must create the new release branch
+immediately before proceeding with the instructions below. In order to create
+a new release branch, see "Creating a new release branch" above.
 
 As a maintainer, you need to repeat this process for each of the supported
 releases of CloudNativePG:
@@ -96,6 +97,8 @@ releases of CloudNativePG:
    complete successfully.
 5. Perform manual smoke tests to verify that installation instructions work on
    your workstation using `kind`
+6. Merge the new release commit on `main` with `git merge --ff-only release-X.Y`
+   followed by `git push`
 
 ## Helm chart release:
 
