@@ -12,7 +12,7 @@ spec:
 
   postgresql:
     parameters:
-      shared_buffers: '64MB'
+      shared_buffers: '32MB'
       max_connections: '15'
       log_checkpoints: 'on'
       log_lock_waits: 'on'
@@ -53,7 +53,7 @@ spec:
 
   resources:
     requests:
-      memory: "256Mi"
+      memory: "128Mi"
       cpu: "0.1"
     limits:
       memory: "1Gi"
