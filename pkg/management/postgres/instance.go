@@ -26,7 +26,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/blang/semver"
@@ -37,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/compatibility"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
@@ -428,9 +428,8 @@ func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 
 	postgresCmd := exec.Command(postgresName, options...) // #nosec
 	postgresCmd.Env = instance.Env
-	postgresCmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
+	compatibility.AddInstanceRunCommands(postgresCmd)
+
 	streamingCmd, err := execlog.RunStreamingNoWait(postgresCmd, postgresName)
 	if err != nil {
 		return nil, err

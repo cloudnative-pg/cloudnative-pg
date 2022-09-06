@@ -1,6 +1,3 @@
-//go:build windows
-// +build windows
-
 /*
 Copyright The CloudNativePG Contributors
 
@@ -17,12 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package compatibility provides a layer to cross-compile with other OS than Linux
+// Package compatibility provides a layer to cross-compile with OS other than Linux
 package compatibility
-
-import "fmt"
-
-// CreateFifo fakes function for cross-compiling compatibility
-func CreateFifo(fileName string) error {
-	panic(fmt.Sprintf("function CreateFifo() should not be used in Windows"))
-}
