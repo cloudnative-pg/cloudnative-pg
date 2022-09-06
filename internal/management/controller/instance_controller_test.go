@@ -87,10 +87,6 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 				{name: slotPrefix + "instance2"}: true,
 			},
 		}
-		reconciler := &InstanceReconciler{
-			instance:    postgresManagement.NewInstance(),
-			slotManager: fakeSlotManager,
-		}
 
 		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2", "instance3"})
 
@@ -98,7 +94,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance2"}]).To(BeTrue())
 
-		err := reconciler.reconcileReplicationSlots(context.TODO(), &cluster)
+		err := reconcileReplicationSlots(context.TODO(), fakeSlotManager, true, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeTrue())
@@ -114,16 +110,12 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 				{name: slotPrefix + "instance3"}: true,
 			},
 		}
-		reconciler := &InstanceReconciler{
-			instance:    postgresManagement.NewInstance(),
-			slotManager: fakeSlotManager,
-		}
 
 		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"})
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 
-		err := reconciler.reconcileReplicationSlots(context.TODO(), &cluster)
+		err := reconcileReplicationSlots(context.TODO(), fakeSlotManager, true, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeFalse())
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
@@ -137,16 +129,12 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 				{name: slotPrefix + "instance3", active: true}: true,
 			},
 		}
-		reconciler := &InstanceReconciler{
-			instance:    postgresManagement.NewInstance(),
-			slotManager: fakeSlotManager,
-		}
 
 		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"})
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 
-		err := reconciler.reconcileReplicationSlots(context.TODO(), &cluster)
+		err := reconcileReplicationSlots(context.TODO(), fakeSlotManager, true, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: slotPrefix + "instance3", active: true}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
