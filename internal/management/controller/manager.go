@@ -40,10 +40,6 @@ type InstanceReconciler struct {
 	client   ctrl.Client
 	instance *postgres.Instance
 
-	// the slotManager helps make the replication slot reconciliation testable
-	// In "normal" non-test use, it is the same as the `instance`
-	slotManager replicationSlotManager
-
 	secretVersions  map[string]string
 	extensionStatus map[string]bool
 
@@ -60,7 +56,6 @@ func NewInstanceReconciler(
 ) *InstanceReconciler {
 	return &InstanceReconciler{
 		instance:              instance,
-		slotManager:           instance,
 		client:                client,
 		secretVersions:        make(map[string]string),
 		extensionStatus:       make(map[string]bool),

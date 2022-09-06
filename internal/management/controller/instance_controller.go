@@ -160,7 +160,7 @@ func (r *InstanceReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 	// Reconcile replication slots
-	if err = reconcileReplicationSlots(ctx, r.slotManager, isPrimary, cluster); err != nil {
+	if err = reconcileReplicationSlots(ctx, r.instance, isPrimary, cluster); err != nil {
 		contextLogger.Error(err, "while reconciling replication slots")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
