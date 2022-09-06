@@ -65,8 +65,8 @@ Git tags for versions are prepended with `v`.
 
 | Version         | Currently Supported  | Release Date      | End of Life              | Supported Kubernetes Versions | Tested, but not supported |
 |-----------------|----------------------|-------------------|--------------------------|-------------------------------|---------------------------|
-| 1.17.x          | Yes                  | September 6, 2022 | ~ February 10, 2023      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          |
-| 1.16.x          | Yes                  | July 7, 2022      | ~ December 10, 2022      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          |
+| 1.17.x          | Yes                  | September 6, 2022 | ~ February 12, 2023      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          |
+| 1.16.x          | Yes                  | July 7, 2022      | ~ November 25, 2022      | 1.22, 1.23, 1.24              | 1.19, 1.20, 1.21          |
 | 1.15.x          | Yes                  | April 21, 2022    | October 6, 2022          | 1.21, 1.22, 1.23              | 1.19, 1.20, 1.24          |
 | main            | No, development only |                   |                          |                               |                           |
 
