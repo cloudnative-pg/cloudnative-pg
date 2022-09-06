@@ -97,8 +97,8 @@ releases of CloudNativePG:
    complete successfully.
 5. Perform manual smoke tests to verify that installation instructions work on
    your workstation using `kind`
-6. Merge the new release commit on `main` with `git merge --ff-only release-X.Y`
-   followed by `git push`
+6. In case of a new minor release, merge the new release commit on `main` with
+   `git merge --ff-only release-X.Y` followed by `git push`
 
 ## Helm chart release:
 
