@@ -12,9 +12,10 @@ spec:
 
   postgresql:
     parameters:
-      shared_buffers: 256MB
-      log_checkpoints: "on"
-      log_lock_waits: "on"
+      shared_buffers: '32MB'
+      max_connections: '15'
+      log_checkpoints: 'on'
+      log_lock_waits: 'on'
       log_min_duration_statement: '1000'
       log_statement: 'ddl'
       log_temp_files: '1024'
@@ -52,11 +53,11 @@ spec:
 
   resources:
     requests:
-      memory: "512Mi"
+      memory: "128Mi"
       cpu: "0.1"
     limits:
       memory: "1Gi"
-      cpu: "2"
+      cpu: "0.5"
 
   affinity:
     enablePodAntiAffinity: true
