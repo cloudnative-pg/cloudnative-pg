@@ -91,18 +91,8 @@ func GetRepSlotsOnPod(namespace, podName string, env *TestingEnvironment) ([]str
 
 // GetRepSlotsLsnOnPod returns a slice containing the current restart_lsn values of each
 // replication slot present in a given pod
-func GetRepSlotsLsnOnPod(namespace, clusterName, podName string, env *TestingEnvironment) ([]string, error) {
-	namespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      podName,
-	}
-	targetPod := &corev1.Pod{}
-	err := env.Client.Get(env.Ctx, namespacedName, targetPod)
-	if err != nil {
-		return nil, err
-	}
-
-	slots, err := GetExpectedRepSlotsOnPod(namespace, clusterName, podName, env)
+func GetRepSlotsLsnOnPod(namespace, clusterName string, pod corev1.Pod, env *TestingEnvironment) ([]string, error) {
+	slots, err := GetExpectedRepSlotsOnPod(namespace, clusterName, pod.GetName(), env)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +101,7 @@ func GetRepSlotsLsnOnPod(namespace, clusterName, podName string, env *TestingEnv
 	for _, slot := range slots {
 		query := fmt.Sprintf("SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = '%v'",
 			slot)
-		restartLsn, _, err := RunQueryFromPod(targetPod, PGLocalSocketDir,
+		restartLsn, _, err := RunQueryFromPod(&pod, PGLocalSocketDir,
 			"app", "postgres", "''", query, env)
 		if err != nil {
 			return nil, err

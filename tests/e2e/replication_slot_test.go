@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = FDescribe("Replication Slot", func() {
+var _ = Describe("Replication Slot", func() {
 	const (
 		namespace   = "replication-slot-e2e"
 		sampleFile  = fixturesDir + "/replication_slot/cluster-pg-replication-slot.yaml.template"
@@ -47,7 +47,7 @@ var _ = FDescribe("Replication Slot", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("manage Replication slots for HA", func() {
+	It("can manage Replication slots for HA", func() {
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
@@ -58,18 +58,21 @@ var _ = FDescribe("Replication Slot", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Checking Primary HA Slots exist and are active", func() {
-			AssertRepSlotsOnPod(namespace, clusterName, oldPrimaryPod.Name)
+			AssertRepSlotsOnPod(namespace, clusterName, *oldPrimaryPod)
 		})
+
 		By("Checking Standbys HA Slots exist", func() {
 			replicaPods, err := env.GetClusterReplicas(namespace, clusterName)
 			Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
 			for _, pod := range replicaPods.Items {
-				AssertRepSlotsOnPod(namespace, clusterName, pod.Name)
+				AssertRepSlotsOnPod(namespace, clusterName, pod)
 			}
 		})
+
 		By("Checking all the slots restart_lsn's are aligned", func() {
 			AssertClusterRepSlotsAligned(namespace, clusterName)
 		})
+
 		By("Creating test data to advance streaming replication", func() {
 			tableName := "data"
 			AssertCreateTestData(namespace, clusterName, tableName)
@@ -81,6 +84,7 @@ var _ = FDescribe("Replication Slot", func() {
 			Expect(err).ToNot(HaveOccurred())
 			_ = switchWalAndGetLatestArchive(namespace, oldPrimaryPod.Name)
 		})
+
 		By("Deleting the primary pod", func() {
 			zero := int64(0)
 			timeout := 120
@@ -91,11 +95,12 @@ var _ = FDescribe("Replication Slot", func() {
 			Expect(err).ToNot(HaveOccurred())
 			AssertClusterIsReady(namespace, clusterName, timeout, env)
 		})
+
 		By("Checking that all the slots exist and are aligned", func() {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range podList.Items {
-				AssertRepSlotsOnPod(namespace, clusterName, pod.Name)
+				AssertRepSlotsOnPod(namespace, clusterName, pod)
 			}
 			AssertClusterRepSlotsAligned(namespace, clusterName)
 		})
