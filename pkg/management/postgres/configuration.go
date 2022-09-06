@@ -181,12 +181,7 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 
 // UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL
-func UpdateReplicaConfiguration(
-	pgData string,
-	clusterName string,
-	podName string,
-	slotName string,
-) (changed bool, err error) {
+func UpdateReplicaConfiguration(pgData, clusterName, podName, slotName string) (changed bool, err error) {
 	primaryConnInfo := buildPrimaryConnInfo(clusterName+"-rw", podName)
 	return UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, slotName)
 }
@@ -212,7 +207,7 @@ func UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, slotName stri
 
 // configureRecoveryConfFile configures replication in the recovery.conf file
 // for PostgreSQL 11 and earlier
-func configureRecoveryConfFile(pgData string, primaryConnInfo string) (changed bool, err error) {
+func configureRecoveryConfFile(pgData, primaryConnInfo string) (changed bool, err error) {
 	targetFile := path.Join(pgData, "recovery.conf")
 
 	options := map[string]string{
