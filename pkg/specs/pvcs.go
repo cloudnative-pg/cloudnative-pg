@@ -255,14 +255,12 @@ instancesLoop:
 		if !isAnyPvcUnusable {
 			result.InstanceNames = append(result.InstanceNames, instanceName)
 		}
-
 		// Search for a Pod corresponding to this instance.
 		// If found, all the PVCs are Healthy
 		for idx := range podList {
 			if IsPodSpecUsingPVCs(podList[idx].Spec, pvcNames...) {
 				// We found a Pod using this PVCs so this
 				// PVCs are not dangling
-				// TODO: this marks ALL the PVC's attached as healthy … ?
 				result.Healthy = append(result.Healthy, pvcNames...)
 				continue instancesLoop
 			}
@@ -274,7 +272,6 @@ instancesLoop:
 			if IsPodSpecUsingPVCs(jobList[idx].Spec.Template.Spec, pvcNames...) {
 				// We have found a Job corresponding to this PVCs, so we
 				// are initializing them or the initialization has just completed
-				// TODO: this marks ALL the PVC's attached as initializing … ?
 				result.Initializing = append(result.Initializing, pvcNames...)
 				continue instancesLoop
 			}
