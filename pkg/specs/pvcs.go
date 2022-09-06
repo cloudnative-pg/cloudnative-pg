@@ -66,6 +66,9 @@ type PVCUsageStatus struct {
 
 	// List of PVCs that are used (they have a corresponding Pod)
 	Healthy []string
+
+	// List of PVCs that are unusable (they are part of an incomplete group)
+	Unusable []string
 }
 
 // CreatePVC create spec of a PVC, given its name and the storage configuration
@@ -166,8 +169,11 @@ func DetectPVCs(
 ) (result PVCUsageStatus) {
 	contextLogger := log.FromContext(ctx)
 
-pvcLoop:
+	// First we iterate over all the PVCs building the instances map.
+	// It contains the PVCSs grouped by instance serial
+	instances := make(map[int][]corev1.PersistentVolumeClaim)
 	for _, pvc := range pvcList {
+		// Ignore PVCs that is in the wrong state
 		if pvc.Status.Phase != corev1.ClaimPending &&
 			pvc.Status.Phase != corev1.ClaimBound {
 			continue
@@ -178,84 +184,124 @@ pvcLoop:
 			continue
 		}
 
+		// Detect the instance serial number.
+		// If it returns an error the PVC is ill-formed and we ignore it
+		serial, err := GetNodeSerial(pvc.ObjectMeta)
+		if err != nil {
+			continue
+		}
+		instances[serial] = append(instances[serial], pvc)
+
+		// Given that we are iterating over the PVCs
+		// we take the chance to build the list of resizing PVCs
 		if isResizing(pvc) {
 			result.Resizing = append(result.Resizing, pvc.Name)
 		}
+	}
 
-		// Find a Pod corresponding to this PVC
+	// For every instance we have we validate the list of PVCs
+	// and detect if there is an attached Pod or Job
+instancesLoop:
+	for serial, pvcs := range instances {
+		instanceName := fmt.Sprintf("%s-%v", cluster.Name, serial)
+		expectedPVCs := getExpectedInstancePVCNames(cluster, instanceName)
+		pvcNames := getNamesFromPVCList(pvcs)
+
+		// If we have less PVCs that the expected number, all the instance PVCs are unusable
+		if len(expectedPVCs) > len(pvcNames) {
+			result.Unusable = append(result.Unusable, pvcNames...)
+			continue instancesLoop
+		}
+
+		// If some PVC is missing, all the instance PVCs are unusable
+		for _, expectedPVC := range expectedPVCs {
+			if !slices.Contains(pvcNames, expectedPVC) {
+				result.Unusable = append(result.Unusable, pvcNames...)
+				continue instancesLoop
+			}
+		}
+
+		// If we have PVCs that we don't expect, these PVCs need to
+		// be classified as unusable
+		for _, pvcName := range pvcNames {
+			if !slices.Contains(expectedPVCs, pvcName) {
+				result.Unusable = append(result.Unusable, pvcName)
+				contextLogger.Warning("found more PVC than those expected",
+					"instance", instanceName,
+					"expectedPVCs", expectedPVCs,
+					"foundPVCs", pvcNames,
+				)
+			}
+		}
+
+		// From this point we only consider expected PVCs.
+		// Any extra PVC is already in the Unusable list
+		pvcNames = expectedPVCs
+
+		// Search for a Pod corresponding to this instance.
+		// If found, all the PVCs are Healthy
 		for idx := range podList {
-			if IsPodSpecUsingPVC(podList[idx].Spec, pvc.Name) {
-				// We found a Pod using this PVC so this
-				// PVC is not dangling
-				result.Healthy = append(result.Healthy, pvc.Name)
-				continue pvcLoop
+			if IsPodSpecUsingPVCs(podList[idx].Spec, pvcNames...) {
+				// We found a Pod using this PVCs so this
+				// PVCs are not dangling
+				result.Healthy = append(result.Healthy, pvcNames...)
+				continue instancesLoop
 			}
 		}
 
+		// Search for a Job corresponding to this instance.
+		// If found, all the PVCs are Initializing
 		for idx := range jobList {
-			if IsPodSpecUsingPVC(jobList[idx].Spec.Template.Spec, pvc.Name) {
-				// We have found a Job corresponding to this PVC, so we
-				// are initializing it or the initialization is just completed
-				result.Initializing = append(result.Initializing, pvc.Name)
-				continue pvcLoop
+			if IsPodSpecUsingPVCs(jobList[idx].Spec.Template.Spec, pvcNames...) {
+				// We have found a Job corresponding to this PVCs, so we
+				// are initializing them or the initialization has just completed
+				result.Initializing = append(result.Initializing, pvcNames...)
+				continue instancesLoop
 			}
 		}
 
-		if pvc.Annotations[PVCStatusAnnotationName] != PVCStatusReady {
-			// This PVC has not a Job nor a Pod using it, but it is not marked as PVCStatusReady
-			// we need to ignore it here
-			continue
-		}
+		// At this point the PVCs are dangling, so we need to check if some of them has
+		// a PVC status annotation marking it as non-ready.
+		// In that case, all the instance PVCs are unusable
+		for _, pvc := range pvcs {
+			// We ignore any PVC that is not expected
+			if !slices.Contains(expectedPVCs, pvc.Name) {
+				continue
+			}
 
-		// This PVC has not a Job nor a Pod using it, it's dangling
-		result.Dangling = append(result.Dangling, pvc.Name)
-	}
-
-	if !cluster.ShouldCreateWalArchiveVolume() {
-		return result
-	}
-
-	for _, instance := range getInstancesPods(podList) {
-		expectedPVCs := getExpectedInstancePVCNames(cluster, instance.Name)
-		var indexOfFoundPVCs []int
-
-		for idx, pvcName := range result.Healthy {
-			if slices.Contains(expectedPVCs, pvcName) {
-				indexOfFoundPVCs = append(indexOfFoundPVCs, idx)
+			if pvc.Annotations[PVCStatusAnnotationName] != PVCStatusReady {
+				// This PVC has not a Job nor a Pod using it, but it is not marked as PVCStatusReady
+				// we need to ignore this instance and treat all the instance PVCs as unusable
+				result.Unusable = append(result.Unusable, pvcNames...)
+				contextLogger.Warning("found PVC that is not annotated as ready",
+					"pvcName", pvc.Name,
+					"instance", instanceName,
+					"expectedPVCs", expectedPVCs,
+					"foundPVCs", pvcNames,
+				)
+				continue instancesLoop
 			}
 		}
 
-		switch {
-		case len(expectedPVCs) > len(indexOfFoundPVCs):
-			// we lost some pvc null them all
-			for _, index := range indexOfFoundPVCs {
-				result.Dangling = append(result.Dangling, result.Healthy[index])
-				result.Healthy = removeElementByIndex(result.Healthy, index)
-			}
-		case len(indexOfFoundPVCs) > len(expectedPVCs):
-			contextLogger.Warning("found more PVC than those expected",
-				"instance", instance,
-				"expectedPVCs", expectedPVCs,
-				"foundPVCs", indexOfFoundPVCs,
-			)
-		}
+		// These PVCs have not a Job nor a Pod using them, they are dangling
+		result.Dangling = append(result.Dangling, pvcNames...)
 	}
 
 	return result
 }
 
-func removeElementByIndex[T any](slice []T, index int) []T {
-	return append(slice[:index], slice[index+1:]...)
-}
-
-// IsPodSpecUsingPVC checks if the given pod spec is using the pvc
-func IsPodSpecUsingPVC(podSpec corev1.PodSpec, pvcName string) bool {
-	for _, volume := range podSpec.Volumes {
-		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvcName {
-			return true
+// IsPodSpecUsingPVCs checks if the given pod spec is using the PVCs
+func IsPodSpecUsingPVCs(podSpec corev1.PodSpec, pvcNames ...string) bool {
+external:
+	for _, pvcName := range pvcNames {
+		for _, volume := range podSpec.Volumes {
+			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvcName {
+				continue external
+			}
 		}
+		return false
 	}
-	return false
+	return true
 }
 
 // isResizing returns true if PersistentVolumeClaimResizing condition is present
@@ -275,19 +321,6 @@ func DoesPVCBelongToInstance(cluster *apiv1.Cluster, instanceName, resourceName 
 	return slices.Contains(expectedInstancePVCs, resourceName)
 }
 
-// getInstancesPods filters a list of pods and returns only the CNPG instances pods
-func getInstancesPods(pods []corev1.Pod) []corev1.Pod {
-	var instancesName []corev1.Pod
-	for _, pod := range pods {
-		_, ok := pod.Labels[ClusterRoleLabelName]
-		if ok {
-			instancesName = append(instancesName, pod)
-		}
-	}
-
-	return instancesName
-}
-
 // getExpectedInstancePVCNames gets all the PVC names for a given instance
 func getExpectedInstancePVCNames(cluster *apiv1.Cluster, instanceName string) []string {
 	names := []string{instanceName}
@@ -297,4 +330,13 @@ func getExpectedInstancePVCNames(cluster *apiv1.Cluster, instanceName string) []
 	}
 
 	return names
+}
+
+// getNamesFromPVCList returns a list of PVC names extracted from a list of PVCs
+func getNamesFromPVCList(pvcs []corev1.PersistentVolumeClaim) []string {
+	pvcNames := make([]string, len(pvcs))
+	for i, pvc := range pvcs {
+		pvcNames[i] = pvc.Name
+	}
+	return pvcNames
 }

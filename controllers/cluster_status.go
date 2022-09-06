@@ -271,6 +271,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster.Status.HealthyPVC = pvcClassification.Healthy
 	cluster.Status.InitializingPVC = pvcClassification.Initializing
 	cluster.Status.ResizingPVC = pvcClassification.Resizing
+	cluster.Status.UnusablePVC = pvcClassification.Unusable
 
 	// From now on, we'll consider only Active pods: those Pods
 	// that will possibly work. Let's forget about the failed ones

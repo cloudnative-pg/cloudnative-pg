@@ -40,5 +40,10 @@ func NewSimpleDBConnection(connectionString string) (*sql.DB, error) {
 	// the sanitization of the strings. Do not remove.
 	conf.RuntimeParams["client_encoding"] = "UTF8"
 
+	// Set the default datestyle in the connection helps to keep
+	// a standard date format for the operator to manage the dates
+	// when it's needed
+	conf.RuntimeParams["datestyle"] = "ISO"
+
 	return sql.Open("pgx", stdlib.RegisterConnConfig(conf))
 }

@@ -367,6 +367,9 @@ type ClusterStatus struct {
 	// List of all the PVCs not dangling nor initializing
 	HealthyPVC []string `json:"healthyPVC,omitempty"`
 
+	// List of all the PVCs that are unusable because another PVC is missing
+	UnusablePVC []string `json:"unusablePVC,omitempty"`
+
 	// Current write pod
 	WriteService string `json:"writeService,omitempty"`
 

@@ -398,7 +398,7 @@ func (instance *Instance) Reload() error {
 
 // Run this instance returning an OS process needed
 // to control the instance execution
-func (instance Instance) Run() (*execlog.StreamingCmd, error) {
+func (instance *Instance) Run() (*execlog.StreamingCmd, error) {
 	process, err := instance.CheckForExistingPostmaster(postgresName)
 	if err != nil {
 		return nil, err
@@ -441,7 +441,7 @@ func (instance Instance) Run() (*execlog.StreamingCmd, error) {
 
 // WithActiveInstance execute the internal function while this
 // PostgreSQL instance is running
-func (instance Instance) WithActiveInstance(inner func() error) error {
+func (instance *Instance) WithActiveInstance(inner func() error) error {
 	// Start the CSV logpipe to redirect log to stdout
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	csvPipe := logpipe.NewLogPipe()
