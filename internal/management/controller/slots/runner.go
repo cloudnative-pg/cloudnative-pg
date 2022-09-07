@@ -81,6 +81,11 @@ func (sr *Replicator) Start(ctx context.Context) error {
 
 			primaryPool := sr.instance.PrimaryConnectionPool()
 			localPool := sr.instance.ConnectionPool()
+			contextLog.Trace("Synchronizing",
+				"primary", primaryPool.GetDsn("postgres"),
+				"local", localPool.GetDsn("postgres"),
+				"podName", sr.instance.PodName,
+				"config", config)
 			primaryDB, err := primaryPool.Connection("postgres")
 			if err != nil {
 				contextLog.Error(err, "synchronizing replication slots")
@@ -117,15 +122,19 @@ func synchronizeReplicationSlots(
 	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
 ) error {
+	contextLog := log.FromContext(ctx).WithName("synchronizeReplicationSlots")
+
 	slotsInPrimary, err := primarySlotManager.getSlotsStatus(ctx, podName, config)
 	if err != nil {
 		return fmt.Errorf("getting replication slot status from primary: %v", err)
 	}
+	contextLog.Trace("primary slot status", "slotsInPrimary", slotsInPrimary)
 
 	slotsInLocal, err := localSlotManager.getSlotsStatus(ctx, podName, config)
 	if err != nil {
 		return fmt.Errorf("getting replication slot status from local: %v", err)
 	}
+	contextLog.Trace("local slot status", "slotsInLocal", slotsInLocal)
 
 	for _, slot := range slotsInPrimary.Items {
 		if !slotsInLocal.Has(slot.Name) {
