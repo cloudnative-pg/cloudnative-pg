@@ -16,10 +16,10 @@ package e2e
 import (
 	"fmt"
 
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

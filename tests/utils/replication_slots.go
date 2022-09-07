@@ -81,10 +81,7 @@ func GetRepSlotsOnPod(namespace, podName string, env *TestingEnvironment) ([]str
 		return nil, err
 	}
 
-	var slots []string
-	for _, slot := range strings.Split(strings.TrimSpace(stdout), "\n") {
-		slots = append(slots, slot)
-	}
+	slots := strings.Split(strings.TrimSpace(stdout), "\n")
 	sort.Strings(slots)
 	return slots, err
 }
