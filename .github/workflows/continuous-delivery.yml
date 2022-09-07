@@ -398,7 +398,7 @@ jobs:
           # Set env to indicate whether to build kubectl-cnpg in `Run GoReleaser`
           BUILD_PLUGIN_ARG=""
           if [[ ${{ github.event_name == 'schedule' || github.event.inputs.build_plugin }} ]];then
-            BUILD_PLUGIN_ARG="kubectl-cnpg"
+            BUILD_PLUGIN_ARG="--id kubectl-cnpg"
           fi
           echo BUILD_PLUGIN_ARG=${BUILD_PLUGIN_ARG} >> $GITHUB_ENV
       -
