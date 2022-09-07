@@ -83,7 +83,7 @@ proceed with the supervised process.
 **IMPORTANT:** You need to operate on an existing release branch. If you are
 releasing a new minor version, you must create the new release branch
 immediately before proceeding with the instructions below. In order to create
-a new release branch, see "Creating a new release branch" above.
+a new release branch, see "Creating a new release branch from main" above.
 
 As a maintainer, you need to repeat this process for each of the supported
 releases of CloudNativePG:
