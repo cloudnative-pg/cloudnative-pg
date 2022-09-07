@@ -42,7 +42,7 @@ Sometimes, bug fixes might originate in the release branch as well.
 Release notes for patch/security versions are maintained in the release branch
 directly.
 
-### Creating a new release branch
+### Creating a new release branch from main
 
 A new release branch is created starting from the most updated commit in the
 trunk by a maintainer:
