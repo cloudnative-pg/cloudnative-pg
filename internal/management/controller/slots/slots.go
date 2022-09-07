@@ -21,6 +21,7 @@ import (
 	"database/sql"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // ReplicationSlot represents a single replication slot
@@ -118,6 +119,8 @@ func (sm dbSlotManager) getSlotsStatus(
 }
 
 func (sm dbSlotManager) updateSlot(ctx context.Context, slot ReplicationSlot) error {
+	contextLog := log.FromContext(ctx).WithName("updateSlot")
+	contextLog.Trace("Invoked", "slot", slot)
 	if slot.RestartLSN == "" {
 		return nil
 	}
@@ -127,12 +130,16 @@ func (sm dbSlotManager) updateSlot(ctx context.Context, slot ReplicationSlot) er
 }
 
 func (sm dbSlotManager) createSlot(ctx context.Context, slot ReplicationSlot) error {
+	contextLog := log.FromContext(ctx).WithName("createSlot")
+	contextLog.Trace("Invoked", "slot", slot)
 	_, err := sm.db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
 		slot.Name, slot.RestartLSN != "")
 	return err
 }
 
 func (sm dbSlotManager) dropSlot(ctx context.Context, slot ReplicationSlot) error {
+	contextLog := log.FromContext(ctx).WithName("dropSlot")
+	contextLog.Trace("Invoked", "slot", slot)
 	if slot.Active {
 		return nil
 	}

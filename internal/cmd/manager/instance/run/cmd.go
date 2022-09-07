@@ -179,6 +179,10 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
+	setupLog.Trace("slots.NewReplicator",
+		"primary", instance.PrimaryConnectionPool().GetDsn("postgres"),
+		"local", instance.ConnectionPool().GetDsn("postgres"),
+		"podName", instance.PodName)
 	slotReplicator := slots.NewReplicator(instance)
 	if err = mgr.Add(slotReplicator); err != nil {
 		setupLog.Error(err, "unable to create slot slotReplicator")
