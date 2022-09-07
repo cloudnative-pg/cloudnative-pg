@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
 // AllClusterPodsHaveLabels verifies if the labels defined in a map are included
@@ -114,46 +115,38 @@ func ClusterHasAnnotations(
 	return true
 }
 
-// DumpOperatorLogs dump the operator logs if operator restarted
+// DumpOperatorLogs dump the operator logs. If the operator was restarted it
+// gets the PREVIOUS logs
 func (env TestingEnvironment) DumpOperatorLogs() error {
 	pod, err := env.GetOperatorPod()
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	podName := pod.Name
-	var cmd string
 
 	filename := "out/operator_report_" + pod.Name + ".log"
 	f, err := os.Create(filepath.Clean(filename))
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
 	defer func() {
-		_ = f.Close()
+		syncErr := f.Sync()
+		if err == nil && syncErr != nil {
+			err = syncErr
+		}
+		closeErr := f.Close()
+		if err == nil && closeErr != nil {
+			err = closeErr
+		}
 	}()
 
+	_, _ = fmt.Fprintf(f, "Dumping operator pod %v log\n", pod.Name)
+	err = logs.StreamPodLogs(env.Ctx, pod, OperatorPodRestarted(pod), f)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	w := bufio.NewWriter(f)
-
-	if OperatorPodRestarted(pod) {
-		cmd = fmt.Sprintf("kubectl -n postgresql-operator-system logs -p %v", podName)
-	} else {
-		cmd = fmt.Sprintf("kubectl -n postgresql-operator-system logs %v", podName)
-	}
-	stdout, _, err := Run(cmd)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	_, _ = fmt.Fprintf(w, "Dumping operator pod %v log\n", pod.Name)
-	_, _ = fmt.Fprintln(w, stdout)
-	err = w.Flush()
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	_ = f.Sync()
 
 	return nil
 }
