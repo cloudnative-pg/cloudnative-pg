@@ -102,7 +102,7 @@ func updateSlots(ctx context.Context, db *sql.DB, primaryStatus, localStatus Rep
 				return err
 			}
 		}
-		err := updsteSlot(ctx, db, slot)
+		err := updateSlot(ctx, db, slot)
 		if err != nil {
 			return err
 		}
@@ -118,7 +118,7 @@ func updateSlots(ctx context.Context, db *sql.DB, primaryStatus, localStatus Rep
 	return nil
 }
 
-func updsteSlot(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
+func updateSlot(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
 	if slot.RestartLSN == "" {
 		return nil
 	}
