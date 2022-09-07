@@ -21,6 +21,10 @@ on:
       test_level:
         description: 'Test level (0-4)'
         required: false
+      build_plugin:
+        type: boolean
+        default: false
+        description: Include kubectl-cnpg plugin building
   # scheduled
   schedule:
     - cron:  '0 1 * * *'
@@ -390,17 +394,35 @@ jobs:
         run: |
           echo GOPATH=$(go env GOPATH) >> $GITHUB_ENV
           echo PWD=$(pwd) >> $GITHUB_ENV
+          
+          # Set env to indicate whether to build kubectl-cnpg in `Run GoReleaser`
+          BUILD_PLUGIN_ARG=""
+          if [[ ${{ github.event_name == 'schedule' || github.event.inputs.build_plugin }} ]];then
+            BUILD_PLUGIN_ARG="kubectl-cnpg"
+          fi
+          echo BUILD_PLUGIN_ARG=${BUILD_PLUGIN_ARG} >> $GITHUB_ENV
       -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3
         with:
           distribution: goreleaser
           version: latest
-          args: build --skip-validate --rm-dist --id manager
+          args: build --skip-validate --rm-dist --id manager ${{ env.BUILD_PLUGIN_ARG }}
         env:
           DATE: ${{ steps.build-meta.outputs.date }}
           COMMIT: ${{ steps.build-meta.outputs.commit }}
           VERSION: ${{ steps.build-meta.outputs.version }}
+      # Send Slack notification once build including plugin kubectl-cnpg fails
+      -
+        name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        if: ${{ failure() &&  env.BUILD_PLUGIN_ARG != '' }}
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
+          SLACK_USERNAME: cnpg-bot
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: The build including plugin `kubectl-cnpg` failed!
       -
         name: Docker meta
         id: docker-meta
