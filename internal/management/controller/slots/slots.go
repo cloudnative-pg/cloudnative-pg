@@ -51,13 +51,36 @@ func (sl ReplicationSlotList) Has(name string) bool {
 	return sl.Get(name) != nil
 }
 
-func getSlotsStatus(
+// slotManager abstracts the operations that need to be sent to
+// the database instance for the management of Replication Slots
+type slotManager interface {
+	getSlotsStatus(
+		ctx context.Context,
+		podName string,
+		config *apiv1.ReplicationSlotsConfiguration,
+	) (ReplicationSlotList, error)
+	updateSlot(ctx context.Context, slot ReplicationSlot) error
+	createSlot(ctx context.Context, slot ReplicationSlot) error
+	dropSlot(ctx context.Context, slot ReplicationSlot) error
+}
+
+// dbSlotManager is a slotManager for a database instance
+type dbSlotManager struct {
+	db *sql.DB
+}
+
+func getDBSlotManager(db *sql.DB) slotManager {
+	return dbSlotManager{
+		db: db,
+	}
+}
+
+func (sm dbSlotManager) getSlotsStatus(
 	ctx context.Context,
-	db *sql.DB,
 	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
 ) (ReplicationSlotList, error) {
-	rows, err := db.QueryContext(
+	rows, err := sm.db.QueryContext(
 		ctx,
 		`SELECT slot_name, slot_type, active, restart_lsn FROM pg_replication_slots
             WHERE NOT temporary AND slot_name ^@ $1 AND slot_name != $2 AND slot_type = 'physical'`,
@@ -94,49 +117,25 @@ func getSlotsStatus(
 	return status, nil
 }
 
-func updateSlots(ctx context.Context, db *sql.DB, primaryStatus, localStatus ReplicationSlotList) error {
-	for _, slot := range primaryStatus.Items {
-		if !localStatus.Has(slot.Name) {
-			err := createSlot(ctx, db, slot)
-			if err != nil {
-				return err
-			}
-		}
-		err := updateSlot(ctx, db, slot)
-		if err != nil {
-			return err
-		}
-	}
-	for _, slot := range localStatus.Items {
-		if !primaryStatus.Has(slot.Name) {
-			err := dropSlot(ctx, db, slot)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func updateSlot(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
+func (sm dbSlotManager) updateSlot(ctx context.Context, slot ReplicationSlot) error {
 	if slot.RestartLSN == "" {
 		return nil
 	}
 
-	_, err := db.ExecContext(ctx, "SELECT pg_replication_slot_advance($1, $2)", slot.Name, slot.RestartLSN)
+	_, err := sm.db.ExecContext(ctx, "SELECT pg_replication_slot_advance($1, $2)", slot.Name, slot.RestartLSN)
 	return err
 }
 
-func createSlot(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
-	_, err := db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
+func (sm dbSlotManager) createSlot(ctx context.Context, slot ReplicationSlot) error {
+	_, err := sm.db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
 		slot.Name, slot.RestartLSN != "")
 	return err
 }
 
-func dropSlot(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
+func (sm dbSlotManager) dropSlot(ctx context.Context, slot ReplicationSlot) error {
 	if slot.Active {
 		return nil
 	}
-	_, err := db.ExecContext(ctx, "SELECT pg_drop_replication_slot($1)", slot.Name)
+	_, err := sm.db.ExecContext(ctx, "SELECT pg_drop_replication_slot($1)", slot.Name)
 	return err
 }

@@ -24,7 +24,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
 
 // A Replicator is a runner that keeps replication slots in sync between the primary and this replica
@@ -50,7 +49,7 @@ func (sr *Replicator) Start(ctx context.Context) error {
 
 		defer func() {
 			ticker.Stop()
-			contextLog.Info("Terminated")
+			contextLog.Info("Terminated slot Replicator loop")
 		}()
 		defer func() {
 			if r := recover(); r != nil {
@@ -80,10 +79,28 @@ func (sr *Replicator) Start(ctx context.Context) error {
 				updateInterval = newUpdateInterval
 			}
 
-			err := synchronizeReplicationSlots(
+			primaryPool := sr.instance.PrimaryConnectionPool()
+			localPool := sr.instance.ConnectionPool()
+			contextLog.Trace("Synchronizing",
+				"primary", primaryPool.GetDsn("postgres"),
+				"local", localPool.GetDsn("postgres"),
+				"podName", sr.instance.PodName,
+				"config", config)
+			primaryDB, err := primaryPool.Connection("postgres")
+			if err != nil {
+				contextLog.Error(err, "synchronizing replication slots")
+				continue
+			}
+
+			localDB, err := localPool.Connection("postgres")
+			if err != nil {
+				contextLog.Error(err, "synchronizing replication slots")
+				continue
+			}
+			err = synchronizeReplicationSlots(
 				ctx,
-				sr.instance.PrimaryConnectionPool(),
-				sr.instance.ConnectionPool(),
+				getDBSlotManager(primaryDB),
+				getDBSlotManager(localDB),
 				sr.instance.PodName,
 				config,
 			)
@@ -97,35 +114,44 @@ func (sr *Replicator) Start(ctx context.Context) error {
 	return nil
 }
 
+// synchronizeReplicationSlots aligns the slots in the local instance with those in the primary
 func synchronizeReplicationSlots(
 	ctx context.Context,
-	primaryPool *pool.ConnectionPool,
-	localPool *pool.ConnectionPool,
+	primarySlotManager slotManager,
+	localSlotManager slotManager,
 	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
 ) error {
-	primaryDB, err := primaryPool.Connection("postgres")
-	if err != nil {
-		return err
-	}
-
-	localDB, err := localPool.Connection("postgres")
-	if err != nil {
-		return err
-	}
-
-	primaryStatus, err := getSlotsStatus(ctx, primaryDB, podName, config)
+	slotsInPrimary, err := primarySlotManager.getSlotsStatus(ctx, podName, config)
 	if err != nil {
 		return fmt.Errorf("getting replication slot status from primary: %v", err)
 	}
 
-	localStatus, err := getSlotsStatus(ctx, localDB, podName, config)
+	slotsInLocal, err := localSlotManager.getSlotsStatus(ctx, podName, config)
 	if err != nil {
-		return fmt.Errorf("getting replication slot status from primary: %v", err)
+		return fmt.Errorf("getting replication slot status from local: %v", err)
 	}
-	err = updateSlots(ctx, localDB, primaryStatus, localStatus)
-	if err != nil {
-		return fmt.Errorf("updateing replication slots: %v", err)
+
+	for _, slot := range slotsInPrimary.Items {
+		if !slotsInLocal.Has(slot.Name) {
+			err := localSlotManager.createSlot(ctx, slot)
+			if err != nil {
+				return err
+			}
+		}
+		err := localSlotManager.updateSlot(ctx, slot)
+		if err != nil {
+			return err
+		}
 	}
+	for _, slot := range slotsInLocal.Items {
+		if !slotsInPrimary.Has(slot.Name) {
+			err := localSlotManager.dropSlot(ctx, slot)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
