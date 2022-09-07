@@ -2,6 +2,7 @@
 
 History of user-visible changes for CloudNativePG, classified for each minor release.
 
+- [CloudNativePG 1.17](release_notes/v1.17.md)
 - [CloudNativePG 1.16](release_notes/v1.16.md)
 - [CloudNativePG 1.15](release_notes/v1.15.md)
 
