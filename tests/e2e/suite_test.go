@@ -45,6 +45,7 @@ var (
 	expectedOperatorPodName string
 	operatorPodWasRenamed   bool
 	operatorWasRestarted    bool
+	operatorLogDumped       bool
 )
 
 var _ = BeforeSuite(func() {
@@ -113,6 +114,12 @@ var _ = AfterEach(func() {
 	}
 	wasRestarted := utils.OperatorPodRestarted(operatorPod)
 	if wasRestarted {
+		if !operatorLogDumped {
+			err := env.DumpOperatorLogs()
+			if err == nil {
+				operatorLogDumped = true
+			}
+		}
 		operatorWasRestarted = true
 		Fail("operator was restarted")
 	}

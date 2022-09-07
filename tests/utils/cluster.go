@@ -114,9 +114,56 @@ func ClusterHasAnnotations(
 	return true
 }
 
+// DumpOperatorLogs dump the operator logs if operator restarted
+func (env TestingEnvironment) DumpOperatorLogs() error {
+	pod, err := env.GetOperatorPod()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	podName := pod.Name
+	var cmd string
+
+	filename := "out/operator_report_" + pod.Name + ".log"
+	f, err := os.Create(filepath.Clean(filename))
+	defer func() {
+		_ = f.Close()
+	}()
+
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	w := bufio.NewWriter(f)
+
+	if OperatorPodRestarted(pod) {
+		cmd = fmt.Sprintf("kubectl -n postgresql-operator-system logs -p %v", podName)
+	} else {
+		cmd = fmt.Sprintf("kubectl -n postgresql-operator-system logs %v", podName)
+	}
+	stdout, _, err := Run(cmd)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	_, _ = fmt.Fprintf(w, "Dumping operator pod %v log\n", pod.Name)
+	_, _ = fmt.Fprintln(w, stdout)
+	err = w.Flush()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	_ = f.Sync()
+
+	return nil
+}
+
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
 func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename string) {
 	f, err := os.Create(filepath.Clean(filename))
+	defer func() {
+		_ = f.Close()
+	}()
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -201,7 +248,6 @@ func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename st
 		return
 	}
 	_ = f.Sync()
-	_ = f.Close()
 }
 
 // GetCluster gets a cluster given name and namespace
