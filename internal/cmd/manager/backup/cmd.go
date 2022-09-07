@@ -29,7 +29,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
 
-// NewCmd create a new cobra command
+// NewCmd create a new cobra command ...
 func NewCmd() *cobra.Command {
 	cmd := cobra.Command{
 		Use: "backup [backup_name]",
