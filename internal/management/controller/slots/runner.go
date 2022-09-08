@@ -81,11 +81,6 @@ func (sr *Replicator) Start(ctx context.Context) error {
 
 			primaryPool := sr.instance.PrimaryConnectionPool()
 			localPool := sr.instance.ConnectionPool()
-			contextLog.Trace("Synchronizing",
-				"primary", primaryPool.GetDsn("postgres"),
-				"local", localPool.GetDsn("postgres"),
-				"podName", sr.instance.PodName,
-				"config", config)
 			primaryDB, err := primaryPool.Connection("postgres")
 			if err != nil {
 				contextLog.Error(err, "synchronizing replication slots")

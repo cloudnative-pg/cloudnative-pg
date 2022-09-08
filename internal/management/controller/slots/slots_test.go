@@ -18,6 +18,7 @@ package slots
 
 import (
 	"context"
+	"fmt"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -62,16 +63,19 @@ type fakeSlot struct {
 }
 
 type fakeSlotManager struct {
-	slots map[fakeSlot]bool
+	slots        map[string]fakeSlot
+	slotsUpdated int
+	slotsCreated int
+	slotsDeleted int
 }
 
-func (sm fakeSlotManager) getSlotsStatus(
+func (sm *fakeSlotManager) getSlotsStatus(
 	ctx context.Context,
 	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
 ) (ReplicationSlotList, error) {
 	var slotList ReplicationSlotList
-	for slot := range sm.slots {
+	for _, slot := range sm.slots {
 		if slot.name != podName {
 			slotList.Items = append(slotList.Items, ReplicationSlot{
 				Name:       slot.name,
@@ -84,16 +88,33 @@ func (sm fakeSlotManager) getSlotsStatus(
 	return slotList, nil
 }
 
-func (sm fakeSlotManager) updateSlot(ctx context.Context, slot ReplicationSlot) error {
-	sm.slots[fakeSlot{name: slot.Name, restartLSN: slot.RestartLSN}] = true
+func (sm *fakeSlotManager) updateSlot(ctx context.Context, slot ReplicationSlot) error {
+	localSlot, found := sm.slots[slot.Name]
+	if !found {
+		return fmt.Errorf("while updating slot: Slot %s not found", slot.Name)
+	}
+	if localSlot.restartLSN != slot.RestartLSN {
+		sm.slots[slot.Name] = fakeSlot{name: slot.Name, restartLSN: slot.RestartLSN}
+		sm.slotsUpdated++
+	}
 	return nil
 }
 
-func (sm fakeSlotManager) createSlot(ctx context.Context, slot ReplicationSlot) error {
+func (sm *fakeSlotManager) createSlot(ctx context.Context, slot ReplicationSlot) error {
+	if _, found := sm.slots[slot.Name]; found {
+		return fmt.Errorf("while creating slot: Slot %s already exists", slot.Name)
+	}
+	sm.slots[slot.Name] = fakeSlot{name: slot.Name, restartLSN: slot.RestartLSN}
+	sm.slotsCreated++
 	return nil
 }
 
-func (sm fakeSlotManager) dropSlot(ctx context.Context, slot ReplicationSlot) error {
+func (sm *fakeSlotManager) dropSlot(ctx context.Context, slot ReplicationSlot) error {
+	if _, found := sm.slots[slot.Name]; !found {
+		return fmt.Errorf("while deleting slot: Slot %s not found", slot.Name)
+	}
+	delete(sm.slots, slot.Name)
+	sm.slotsDeleted++
 	return nil
 }
 
@@ -103,15 +124,15 @@ var _ = Describe("Slot synchronization", func() {
 	pod3 := "cluster-3"
 	pod4 := "cluster-4"
 
-	primary := fakeSlotManager{
-		slots: map[fakeSlot]bool{
-			{name: localPodName, restartLSN: "0/301C4D8"}: true,
-			{name: pod3, restartLSN: "0/302C4D8"}:         true,
-			{name: pod4, restartLSN: "0/303C4D8"}:         true,
+	primary := &fakeSlotManager{
+		slots: map[string]fakeSlot{
+			localPodName: {name: localPodName, restartLSN: "0/301C4D8"},
+			pod3:         {name: pod3, restartLSN: "0/302C4D8"},
+			pod4:         {name: pod4, restartLSN: "0/303C4D8"},
 		},
 	}
-	local := fakeSlotManager{
-		slots: map[fakeSlot]bool{},
+	local := &fakeSlotManager{
+		slots: map[string]fakeSlot{},
 	}
 	config := apiv1.ReplicationSlotsConfiguration{
 		HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
@@ -131,9 +152,38 @@ var _ = Describe("Slot synchronization", func() {
 		localSlotsAfter, err := local.getSlotsStatus(ctx, localPodName, &config)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(localSlotsAfter.Items).Should(HaveLen(2))
-		Expect(localSlotsAfter.Has(pod3))
-		Expect(localSlotsAfter.Has(pod4))
+		Expect(localSlotsAfter.Has(pod3)).To(BeTrue())
+		Expect(localSlotsAfter.Has(pod4)).To(BeTrue())
+		Expect(local.slotsCreated).To(Equal(2))
 	})
-	// It("can update slots in local when ReplayLSN in primary advanced", func() {})
-	// It("can drop slots in local when they are no longer in primary", func() {})
+	It("can update slots in local when ReplayLSN in primary advanced", func() {
+		// advance slot3 in primary
+		newLSN := "0/308C4D8"
+		err := primary.updateSlot(ctx, ReplicationSlot{Name: pod3, RestartLSN: newLSN})
+		Expect(err).ShouldNot(HaveOccurred())
+
+		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		localSlotsAfter, err := local.getSlotsStatus(ctx, localPodName, &config)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(localSlotsAfter.Items).Should(HaveLen(2))
+		Expect(localSlotsAfter.Has(pod3)).To(BeTrue())
+		slot := localSlotsAfter.Get(pod3)
+		Expect(slot.RestartLSN).To(Equal(newLSN))
+		Expect(local.slotsUpdated).To(Equal(1))
+	})
+	It("can drop slots in local when they are no longer in primary", func() {
+		err := primary.dropSlot(ctx, ReplicationSlot{Name: pod4})
+		Expect(err).ShouldNot(HaveOccurred())
+
+		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		localSlotsAfter, err := local.getSlotsStatus(ctx, localPodName, &config)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(localSlotsAfter.Items).Should(HaveLen(1))
+		Expect(localSlotsAfter.Has(pod3)).To(BeTrue())
+		Expect(local.slotsDeleted).To(Equal(1))
+	})
 })
