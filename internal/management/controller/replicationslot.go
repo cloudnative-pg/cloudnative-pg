@@ -21,15 +21,15 @@ import (
 	"fmt"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	postgresManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 // replicationSlotManager abstracts the operations that need to be sent to
 // the database instance for the management of Replication Slots.
 // This is so we can unit test the reconciliation logic vs. fake implementation
 type replicationSlotManager interface {
-	GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (*postgresManagement.ReplicationSlotList, error)
+	GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (*slots.ReplicationSlotList, error)
 	CreateReplicationSlot(slotName string) error
 	DeleteReplicationSlot(slotName string) error
 }
@@ -70,7 +70,7 @@ func reconcilePrimaryReplicationSlots(
 		return err
 	}
 
-	slotInCluster := make(map[postgresManagement.ReplicationSlot]bool)
+	slotInCluster := make(map[slots.ReplicationSlot]bool)
 
 	// Add every slot that is missing
 	for _, instanceName := range cluster.Status.InstanceNames {
@@ -88,9 +88,9 @@ func reconcilePrimaryReplicationSlots(
 		if err := manager.CreateReplicationSlot(slotName); err != nil {
 			return fmt.Errorf("updating primary HA replication slots: %w", err)
 		}
-		slotInCluster[postgresManagement.ReplicationSlot{
+		slotInCluster[slots.ReplicationSlot{
 			SlotName: slotName,
-			Type:     postgresManagement.SlotTypePhysical,
+			Type:     slots.SlotTypePhysical,
 		}] = true
 	}
 
@@ -114,10 +114,10 @@ func reconcilePrimaryReplicationSlots(
 
 // getSlotByInstanceName returns a slot searching by instance name
 func getSlotByInstanceName(
-	rs *postgresManagement.ReplicationSlotList,
+	rs *slots.ReplicationSlotList,
 	instanceName string,
 	cluster *apiv1.Cluster,
-) *postgresManagement.ReplicationSlot {
+) *slots.ReplicationSlot {
 	if rs == nil || len(rs.Items) == 0 {
 		return nil
 	}

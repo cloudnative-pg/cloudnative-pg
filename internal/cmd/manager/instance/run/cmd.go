@@ -36,7 +36,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/runner"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -183,7 +183,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		"primary", instance.PrimaryConnectionPool().GetDsn("postgres"),
 		"local", instance.ConnectionPool().GetDsn("postgres"),
 		"podName", instance.PodName)
-	slotReplicator := slots.NewReplicator(instance)
+	slotReplicator := runner.NewReplicator(instance)
 	if err = mgr.Add(slotReplicator); err != nil {
 		setupLog.Error(err, "unable to create slot slotReplicator")
 		return err

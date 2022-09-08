@@ -20,7 +20,7 @@ import (
 	"context"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	postgresManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,13 +38,13 @@ type fakeReplicationSlotManager struct {
 const slotPrefix = "_cnpg_"
 
 func (fk fakeReplicationSlotManager) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (
-	*postgresManagement.ReplicationSlotList, error,
+	*slots.ReplicationSlotList, error,
 ) {
-	var slotList postgresManagement.ReplicationSlotList
+	var slotList slots.ReplicationSlotList
 	for slot := range fk.replicationSlots {
-		slotList.Items = append(slotList.Items, postgresManagement.ReplicationSlot{
+		slotList.Items = append(slotList.Items, slots.ReplicationSlot{
 			SlotName: slot.name,
-			Type:     postgresManagement.SlotTypePhysical,
+			Type:     slots.SlotTypePhysical,
 			Active:   slot.active,
 		})
 	}
