@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"strings"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	postgresManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -44,10 +43,9 @@ func (fk fakeReplicationSlotManager) GetCurrentHAReplicationSlots(cluster *apiv1
 	var slotList postgresManagement.ReplicationSlotList
 	for slot := range fk.replicationSlots {
 		slotList.Items = append(slotList.Items, postgresManagement.ReplicationSlot{
-			InstanceName: strings.TrimPrefix(slot.name, slotPrefix),
-			SlotName:     slot.name,
-			Type:         postgresManagement.SlotTypePhysical,
-			Active:       slot.active,
+			SlotName: slot.name,
+			Type:     postgresManagement.SlotTypePhysical,
+			Active:   slot.active,
 		})
 	}
 	return &slotList, nil
