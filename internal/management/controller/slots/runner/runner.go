@@ -18,6 +18,7 @@ package runner
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -87,21 +88,19 @@ func (sr *Replicator) Start(ctx context.Context) error {
 				"local", localPool.GetDsn("postgres"),
 				"podName", sr.instance.PodName,
 				"config", config)
-			primaryDB, err := primaryPool.Connection("postgres")
-			if err != nil {
-				contextLog.Error(err, "synchronizing replication slots")
-				continue
+
+			primaryDBFactory := func() (*sql.DB, error) {
+				return primaryPool.Connection("postgres")
 			}
 
-			localDB, err := localPool.Connection("postgres")
-			if err != nil {
-				contextLog.Error(err, "synchronizing replication slots")
-				continue
+			localDBFactory := func() (*sql.DB, error) {
+				return localPool.Connection("postgres")
 			}
-			err = synchronizeReplicationSlots(
+
+			err := synchronizeReplicationSlots(
 				ctx,
-				slots.GetPostgresManager(primaryDB),
-				slots.GetPostgresManager(localDB),
+				slots.NewPostgresManager(primaryDBFactory),
+				slots.NewPostgresManager(localDBFactory),
 				sr.instance.PodName,
 				config,
 			)
