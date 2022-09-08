@@ -23,7 +23,7 @@ import (
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -99,8 +99,8 @@ func (sr *Replicator) Start(ctx context.Context) error {
 
 			err := synchronizeReplicationSlots(
 				ctx,
-				slots.NewPostgresManager(primaryDBFactory),
-				slots.NewPostgresManager(localDBFactory),
+				infrastructure.NewPostgresManager(primaryDBFactory),
+				infrastructure.NewPostgresManager(localDBFactory),
 				sr.instance.PodName,
 				config,
 			)
@@ -117,8 +117,8 @@ func (sr *Replicator) Start(ctx context.Context) error {
 // synchronizeReplicationSlots aligns the slots in the local instance with those in the primary
 func synchronizeReplicationSlots(
 	ctx context.Context,
-	primarySlotManager slots.Manager,
-	localSlotManager slots.Manager,
+	primarySlotManager infrastructure.Manager,
+	localSlotManager infrastructure.Manager,
 	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
 ) error {

@@ -1,81 +1,13 @@
-/*
-Copyright The CloudNativePG Contributors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package slots
+package infrastructure
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
-
-// SlotType represents the type of replication slot
-type SlotType string
-
-// SlotTypePhysical represents the physical replication slot
-const SlotTypePhysical SlotType = "physical"
-
-// ReplicationSlot represents a single replication slot
-type ReplicationSlot struct {
-	SlotName   string   `json:"slotName,omitempty"`
-	Type       SlotType `json:"type,omitempty"`
-	Active     bool     `json:"active"`
-	RestartLSN string   `json:"restartLSN,omitempty"`
-}
-
-// ReplicationSlotList contains a list of replication slots
-type ReplicationSlotList struct {
-	Items []ReplicationSlot
-}
-
-// Get returns the ReplicationSlot with the required name if present in the ReplicationSlotList
-func (sl ReplicationSlotList) Get(name string) *ReplicationSlot {
-	for i := range sl.Items {
-		if sl.Items[i].SlotName == name {
-			return &sl.Items[i]
-		}
-	}
-	return nil
-}
-
-// Has returns true is a ReplicationSlot with the required name if present in the ReplicationSlotList
-func (sl ReplicationSlotList) Has(name string) bool {
-	return sl.Get(name) != nil
-}
-
-// Manager abstracts the operations that need to be sent to
-// the database instance for the management of Replication Slots
-type Manager interface {
-	// List the available replication slots
-	List(
-		ctx context.Context,
-		podName string,
-		config *apiv1.ReplicationSlotsConfiguration,
-	) (ReplicationSlotList, error)
-	// Update the replication slot
-	Update(ctx context.Context, slot ReplicationSlot) error
-	// Create the replication slot
-	Create(ctx context.Context, slot ReplicationSlot) error
-	// Delete the replication slot
-	Delete(ctx context.Context, slot ReplicationSlot) error
-	GetCurrentHAReplicationSlots(instanceName string, cluster *apiv1.Cluster) (*ReplicationSlotList, error)
-}
 
 type connectionFactory func() (*sql.DB, error)
 
@@ -95,7 +27,7 @@ func NewPostgresManager(factory connectionFactory) Manager {
 func (sm PostgresManager) List(
 	ctx context.Context,
 	podName string,
-	config *apiv1.ReplicationSlotsConfiguration,
+	config *v1.ReplicationSlotsConfiguration,
 ) (ReplicationSlotList, error) {
 	db, err := sm.connFactory()
 	if err != nil {
@@ -190,7 +122,7 @@ func (sm PostgresManager) Delete(ctx context.Context, slot ReplicationSlot) erro
 // GetCurrentHAReplicationSlots retrieves the list of high availability replication slots
 func (sm PostgresManager) GetCurrentHAReplicationSlots(
 	instanceName string,
-	cluster *apiv1.Cluster,
+	cluster *v1.Cluster,
 ) (*ReplicationSlotList, error) {
 	if cluster.Spec.ReplicationSlots == nil ||
 		cluster.Spec.ReplicationSlots.HighAvailability == nil {

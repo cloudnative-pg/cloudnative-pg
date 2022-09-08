@@ -14,5 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package slots contains infrastructure to manage replication slots
-package slots
+package runner
+
+import (
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+func TestWatches(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	RunSpecs(t, "Internal Management Slots Runner Test Suite")
+}

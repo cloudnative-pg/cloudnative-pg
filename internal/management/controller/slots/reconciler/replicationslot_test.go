@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package reconciler
 
 import (
 	"context"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -40,29 +40,29 @@ const slotPrefix = "_cnpg_"
 func (fk fakeReplicationSlotManager) GetCurrentHAReplicationSlots(
 	instanceName string,
 	cluster *apiv1.Cluster,
-) (*slots.ReplicationSlotList, error) {
-	var slotList slots.ReplicationSlotList
+) (*infrastructure.ReplicationSlotList, error) {
+	var slotList infrastructure.ReplicationSlotList
 	for slot := range fk.replicationSlots {
-		slotList.Items = append(slotList.Items, slots.ReplicationSlot{
+		slotList.Items = append(slotList.Items, infrastructure.ReplicationSlot{
 			SlotName: slot.name,
-			Type:     slots.SlotTypePhysical,
+			Type:     infrastructure.SlotTypePhysical,
 			Active:   slot.active,
 		})
 	}
 	return &slotList, nil
 }
 
-func (fk fakeReplicationSlotManager) Create(ctx context.Context, slot slots.ReplicationSlot) error {
+func (fk fakeReplicationSlotManager) Create(ctx context.Context, slot infrastructure.ReplicationSlot) error {
 	fk.replicationSlots[fakeSlot{name: slot.SlotName}] = true
 	return nil
 }
 
-func (fk fakeReplicationSlotManager) Delete(ctx context.Context, slot slots.ReplicationSlot) error {
+func (fk fakeReplicationSlotManager) Delete(ctx context.Context, slot infrastructure.ReplicationSlot) error {
 	delete(fk.replicationSlots, fakeSlot{name: slot.SlotName})
 	return nil
 }
 
-func (fk fakeReplicationSlotManager) Update(ctx context.Context, slot slots.ReplicationSlot) error {
+func (fk fakeReplicationSlotManager) Update(ctx context.Context, slot infrastructure.ReplicationSlot) error {
 	return nil
 }
 
@@ -70,11 +70,11 @@ func (fk fakeReplicationSlotManager) List(
 	ctx context.Context,
 	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
-) (slots.ReplicationSlotList, error) {
-	var slotList slots.ReplicationSlotList
+) (infrastructure.ReplicationSlotList, error) {
+	var slotList infrastructure.ReplicationSlotList
 	for slot, active := range fk.replicationSlots {
 		if slot.name != podName {
-			slotList.Items = append(slotList.Items, slots.ReplicationSlot{
+			slotList.Items = append(slotList.Items, infrastructure.ReplicationSlot{
 				SlotName:   slot.name,
 				RestartLSN: "",
 				Type:       "physical",
@@ -118,7 +118,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance2"}]).To(BeTrue())
 
-		err := reconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
+		err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeFalse())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeTrue())
@@ -139,7 +139,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 
-		err := reconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
+		err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeFalse())
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(1))
@@ -158,7 +158,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 
-		err := reconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
+		err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: slotPrefix + "instance3", active: true}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
