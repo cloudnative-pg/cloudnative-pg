@@ -121,7 +121,8 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 	}
 
 	if cluster.IsReplica() {
-		_, err = postgres.UpdateReplicaConfigurationForPrimary(env.info.PgData, connectionString)
+		// TODO: Using a replication slot on replica cluster is not supported (yet?)
+		_, err = postgres.UpdateReplicaConfigurationForPrimary(env.info.PgData, connectionString, "")
 		return err
 	}
 
@@ -147,5 +148,5 @@ func (env *CloneInfo) configureInstanceAsNewPrimary(cluster *apiv1.Cluster) erro
 	// In the future, when we will support recovering WALs in the
 	// designated primary from an object store, we'll need to use
 	// the environment variables of the recovery object store.
-	return env.info.ConfigureInstanceAfterRestore(nil)
+	return env.info.ConfigureInstanceAfterRestore(cluster, nil)
 }

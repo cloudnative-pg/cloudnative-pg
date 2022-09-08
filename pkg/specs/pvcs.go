@@ -53,6 +53,9 @@ var ErrorInvalidSize = fmt.Errorf("invalid storage size")
 
 // PVCUsageStatus is the status of the PVC we generated
 type PVCUsageStatus struct {
+	// List of available instances detected from pvcs
+	InstanceNames []string
+
 	// List of PVCs that are being initialized (they have a corresponding Job but not a corresponding Pod)
 	Initializing []string
 
@@ -238,6 +241,20 @@ instancesLoop:
 		// Any extra PVC is already in the Unusable list
 		pvcNames = expectedPVCs
 
+		isAnyPvcUnusable := false
+		for _, pvc := range pvcs {
+			// We ignore any PVC that is not expected
+			if !slices.Contains(expectedPVCs, pvc.Name) {
+				continue
+			}
+			if pvc.Annotations[PVCStatusAnnotationName] != PVCStatusReady {
+				isAnyPvcUnusable = true
+			}
+		}
+
+		if !isAnyPvcUnusable {
+			result.InstanceNames = append(result.InstanceNames, instanceName)
+		}
 		// Search for a Pod corresponding to this instance.
 		// If found, all the PVCs are Healthy
 		for idx := range podList {
@@ -260,27 +277,17 @@ instancesLoop:
 			}
 		}
 
-		// At this point the PVCs are dangling, so we need to check if some of them has
-		// a PVC status annotation marking it as non-ready.
-		// In that case, all the instance PVCs are unusable
-		for _, pvc := range pvcs {
-			// We ignore any PVC that is not expected
-			if !slices.Contains(expectedPVCs, pvc.Name) {
-				continue
-			}
-
-			if pvc.Annotations[PVCStatusAnnotationName] != PVCStatusReady {
-				// This PVC has not a Job nor a Pod using it, but it is not marked as PVCStatusReady
-				// we need to ignore this instance and treat all the instance PVCs as unusable
-				result.Unusable = append(result.Unusable, pvcNames...)
-				contextLogger.Warning("found PVC that is not annotated as ready",
-					"pvcName", pvc.Name,
-					"instance", instanceName,
-					"expectedPVCs", expectedPVCs,
-					"foundPVCs", pvcNames,
-				)
-				continue instancesLoop
-			}
+		if isAnyPvcUnusable {
+			// This PVC has not a Job nor a Pod using it, but it is not marked as PVCStatusReady
+			// we need to ignore this instance and treat all the instance PVCs as unusable
+			result.Unusable = append(result.Unusable, pvcNames...)
+			contextLogger.Warning("found PVC that is not annotated as ready",
+				"pvcNames", pvcNames,
+				"instance", instanceName,
+				"expectedPVCs", expectedPVCs,
+				"foundPVCs", pvcNames,
+			)
+			continue instancesLoop
 		}
 
 		// These PVCs have not a Job nor a Pod using them, they are dangling
