@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package slots contains infrastructure to manage replication slots
-package slots
+// Package runner contains the runner that replicates slots from the primary to the replicas
+package runner
