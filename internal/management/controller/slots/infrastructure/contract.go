@@ -19,7 +19,7 @@ package infrastructure
 import (
 	"context"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // Manager abstracts the operations that need to be sent to
@@ -29,7 +29,7 @@ type Manager interface {
 	List(
 		ctx context.Context,
 		podName string,
-		config *v1.ReplicationSlotsConfiguration,
+		config *apiv1.ReplicationSlotsConfiguration,
 	) (ReplicationSlotList, error)
 	// Update the replication slot
 	Update(ctx context.Context, slot ReplicationSlot) error
@@ -37,5 +37,5 @@ type Manager interface {
 	Create(ctx context.Context, slot ReplicationSlot) error
 	// Delete the replication slot
 	Delete(ctx context.Context, slot ReplicationSlot) error
-	GetCurrentHAReplicationSlots(instanceName string, cluster *v1.Cluster) (*ReplicationSlotList, error)
+	GetCurrentHAReplicationSlots(instanceName string, cluster *apiv1.Cluster) (*ReplicationSlotList, error)
 }

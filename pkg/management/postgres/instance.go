@@ -576,8 +576,7 @@ func (instance *Instance) IsPrimary() (bool, error) {
 
 // Demote demotes an existing PostgreSQL instance
 func (instance *Instance) Demote(cluster *apiv1.Cluster) error {
-	log.Info("Demoting instance",
-		"pgpdata", instance.PgData)
+	log.Info("Demoting instance", "pgpdata", instance.PgData)
 	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
 	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
 	return err
