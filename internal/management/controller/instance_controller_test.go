@@ -37,9 +37,10 @@ type fakeReplicationSlotManager struct {
 
 const slotPrefix = "_cnpg_"
 
-func (fk fakeReplicationSlotManager) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (
-	*slots.ReplicationSlotList, error,
-) {
+func (fk fakeReplicationSlotManager) GetCurrentHAReplicationSlots(
+	instanceName string,
+	cluster *apiv1.Cluster,
+) (*slots.ReplicationSlotList, error) {
 	var slotList slots.ReplicationSlotList
 	for slot := range fk.replicationSlots {
 		slotList.Items = append(slotList.Items, slots.ReplicationSlot{
@@ -51,14 +52,37 @@ func (fk fakeReplicationSlotManager) GetCurrentHAReplicationSlots(cluster *apiv1
 	return &slotList, nil
 }
 
-func (fk fakeReplicationSlotManager) CreateReplicationSlot(slotName string) error {
-	fk.replicationSlots[fakeSlot{name: slotName}] = true
+func (fk fakeReplicationSlotManager) Create(ctx context.Context, slot slots.ReplicationSlot) error {
+	fk.replicationSlots[fakeSlot{name: slot.SlotName}] = true
 	return nil
 }
 
-func (fk fakeReplicationSlotManager) DeleteReplicationSlot(slotName string) error {
-	delete(fk.replicationSlots, fakeSlot{name: slotName})
+func (fk fakeReplicationSlotManager) Delete(ctx context.Context, slot slots.ReplicationSlot) error {
+	delete(fk.replicationSlots, fakeSlot{name: slot.SlotName})
 	return nil
+}
+
+func (fk fakeReplicationSlotManager) Update(ctx context.Context, slot slots.ReplicationSlot) error {
+	return nil
+}
+
+func (fk fakeReplicationSlotManager) List(
+	ctx context.Context,
+	podName string,
+	config *apiv1.ReplicationSlotsConfiguration,
+) (slots.ReplicationSlotList, error) {
+	var slotList slots.ReplicationSlotList
+	for slot, active := range fk.replicationSlots {
+		if slot.name != podName {
+			slotList.Items = append(slotList.Items, slots.ReplicationSlot{
+				SlotName:   slot.name,
+				RestartLSN: "",
+				Type:       "physical",
+				Active:     active,
+			})
+		}
+	}
+	return slotList, nil
 }
 
 func makeClusterWithInstanceNames(instanceNames []string) apiv1.Cluster {
@@ -92,7 +116,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance2"}]).To(BeTrue())
 
-		err := reconcileReplicationSlots(context.TODO(), fakeSlotManager, true, &cluster)
+		err := reconcileReplicationSlots(context.TODO(), "instance1", true, fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeTrue())
@@ -113,7 +137,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 
-		err := reconcileReplicationSlots(context.TODO(), fakeSlotManager, true, &cluster)
+		err := reconcileReplicationSlots(context.TODO(), "instance1", true, fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeFalse())
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
@@ -132,7 +156,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 
-		err := reconcileReplicationSlots(context.TODO(), fakeSlotManager, true, &cluster)
+		err := reconcileReplicationSlots(context.TODO(), "instance1", true, fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: slotPrefix + "instance3", active: true}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))

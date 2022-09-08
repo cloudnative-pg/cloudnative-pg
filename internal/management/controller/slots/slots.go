@@ -19,6 +19,7 @@ package slots
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -73,17 +74,20 @@ type Manager interface {
 	Create(ctx context.Context, slot ReplicationSlot) error
 	// Delete the replication slot
 	Delete(ctx context.Context, slot ReplicationSlot) error
+	GetCurrentHAReplicationSlots(instanceName string, cluster *apiv1.Cluster) (*ReplicationSlotList, error)
 }
+
+type connectionFactory func() (*sql.DB, error)
 
 // PostgresManager is a Manager for a database instance
 type PostgresManager struct {
-	db *sql.DB
+	connFactory connectionFactory
 }
 
-// GetPostgresManager returns an implementation of Manager for postgres
-func GetPostgresManager(db *sql.DB) Manager {
+// NewPostgresManager returns an implementation of Manager for postgres
+func NewPostgresManager(factory connectionFactory) Manager {
 	return PostgresManager{
-		db: db,
+		connFactory: factory,
 	}
 }
 
@@ -93,7 +97,12 @@ func (sm PostgresManager) List(
 	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
 ) (ReplicationSlotList, error) {
-	rows, err := sm.db.QueryContext(
+	db, err := sm.connFactory()
+	if err != nil {
+		return ReplicationSlotList{}, err
+	}
+
+	rows, err := db.QueryContext(
 		ctx,
 		`SELECT slot_name, slot_type, active, restart_lsn FROM pg_replication_slots
             WHERE NOT temporary AND slot_name ^@ $1 AND slot_name != $2 AND slot_type = 'physical'`,
@@ -137,8 +146,12 @@ func (sm PostgresManager) Update(ctx context.Context, slot ReplicationSlot) erro
 	if slot.RestartLSN == "" {
 		return nil
 	}
+	db, err := sm.connFactory()
+	if err != nil {
+		return err
+	}
 
-	_, err := sm.db.ExecContext(ctx, "SELECT pg_replication_slot_advance($1, $2)", slot.SlotName, slot.RestartLSN)
+	_, err = db.ExecContext(ctx, "SELECT pg_replication_slot_advance($1, $2)", slot.SlotName, slot.RestartLSN)
 	return err
 }
 
@@ -146,7 +159,13 @@ func (sm PostgresManager) Update(ctx context.Context, slot ReplicationSlot) erro
 func (sm PostgresManager) Create(ctx context.Context, slot ReplicationSlot) error {
 	contextLog := log.FromContext(ctx).WithName("createSlot")
 	contextLog.Trace("Invoked", "slot", slot)
-	_, err := sm.db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
+
+	db, err := sm.connFactory()
+	if err != nil {
+		return err
+	}
+
+	_, err = db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
 		slot.SlotName, slot.RestartLSN != "")
 	return err
 }
@@ -158,6 +177,62 @@ func (sm PostgresManager) Delete(ctx context.Context, slot ReplicationSlot) erro
 	if slot.Active {
 		return nil
 	}
-	_, err := sm.db.ExecContext(ctx, "SELECT pg_drop_replication_slot($1)", slot.SlotName)
+
+	db, err := sm.connFactory()
+	if err != nil {
+		return err
+	}
+
+	_, err = db.ExecContext(ctx, "SELECT pg_drop_replication_slot($1)", slot.SlotName)
 	return err
+}
+
+// GetCurrentHAReplicationSlots retrieves the list of high availability replication slots
+func (sm PostgresManager) GetCurrentHAReplicationSlots(
+	instanceName string,
+	cluster *apiv1.Cluster,
+) (*ReplicationSlotList, error) {
+	if cluster.Spec.ReplicationSlots == nil ||
+		cluster.Spec.ReplicationSlots.HighAvailability == nil {
+		return nil, fmt.Errorf("unexpected HA replication slots configuration")
+	}
+
+	db, err := sm.connFactory()
+	if err != nil {
+		return nil, err
+	}
+
+	var replicationSlots ReplicationSlotList
+
+	rows, err := db.Query(
+		`SELECT slot_name, slot_type, active FROM pg_replication_slots
+            WHERE NOT temporary AND slot_name ^@ $1 AND slot_name != $2`,
+		cluster.Spec.ReplicationSlots.HighAvailability.GetSlotPrefix(),
+		cluster.GetSlotNameFromInstanceName(instanceName),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+	for rows.Next() {
+		var slot ReplicationSlot
+		err := rows.Scan(
+			&slot.SlotName,
+			&slot.Type,
+			&slot.Active,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		replicationSlots.Items = append(replicationSlots.Items, slot)
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return &replicationSlots, nil
 }

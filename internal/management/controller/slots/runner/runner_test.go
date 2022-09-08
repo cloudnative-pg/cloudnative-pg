@@ -89,6 +89,21 @@ func (sm *fakeSlotManager) List(
 	return slotList, nil
 }
 
+func (sm *fakeSlotManager) GetCurrentHAReplicationSlots(
+	instanceName string,
+	cluster *apiv1.Cluster,
+) (*slots.ReplicationSlotList, error) {
+	var slotList slots.ReplicationSlotList
+	for _, slot := range sm.slots {
+		slotList.Items = append(slotList.Items, slots.ReplicationSlot{
+			SlotName: slot.name,
+			Type:     slots.SlotTypePhysical,
+			Active:   true,
+		})
+	}
+	return &slotList, nil
+}
+
 func (sm *fakeSlotManager) Update(ctx context.Context, slot slots.ReplicationSlot) error {
 	localSlot, found := sm.slots[slot.SlotName]
 	if !found {

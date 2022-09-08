@@ -38,6 +38,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
@@ -162,7 +163,8 @@ func (r *InstanceReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 	// Reconcile replication slots
-	if err = reconcileReplicationSlots(ctx, r.instance, isPrimary, cluster); err != nil {
+	slotManager := slots.NewPostgresManager(r.instance.GetSuperUserDB)
+	if err = reconcileReplicationSlots(ctx, r.instance.PodName, isPrimary, slotManager, cluster); err != nil {
 		contextLogger.Error(err, "while reconciling replication slots")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
