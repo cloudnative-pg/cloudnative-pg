@@ -25,5 +25,5 @@ import (
 
 func TestReconciler(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Reconciler Suite")
+	RunSpecs(t, "Internal Management Controller Slots Reconciler Suite")
 }

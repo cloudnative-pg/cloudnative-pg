@@ -27,37 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func newSlot(name string) infrastructure.ReplicationSlot {
-	return infrastructure.ReplicationSlot{SlotName: name}
-}
-
-var _ = Describe("ReplicationSlotList", func() {
-	It("has a working Has method", func() {
-		slot1 := newSlot("slot1")
-		slot2 := newSlot("slot2")
-		list := infrastructure.ReplicationSlotList{Items: []infrastructure.ReplicationSlot{slot1, slot2}}
-
-		Expect(list.Has("slot1")).To(BeTrue())
-		Expect(list.Has("slot2")).To(BeTrue())
-		Expect(list.Has("slot3")).ToNot(BeTrue())
-	})
-	It("has a working Get method", func() {
-		slot1 := newSlot("slot1")
-		slot2 := newSlot("slot2")
-		list := infrastructure.ReplicationSlotList{Items: []infrastructure.ReplicationSlot{slot1, slot2}}
-
-		Expect(list.Get("slot1")).To(BeEquivalentTo(&slot1))
-		Expect(list.Get("slot2")).To(BeEquivalentTo(&slot2))
-		Expect(list.Get("slot3")).To(BeNil())
-	})
-	It("works as expected when the list is empty", func() {
-		var list infrastructure.ReplicationSlotList
-
-		Expect(list.Get("slot1")).To(BeNil())
-		Expect(list.Has("slot1")).ToNot(BeTrue())
-	})
-})
-
 type fakeSlot struct {
 	name       string
 	restartLSN string

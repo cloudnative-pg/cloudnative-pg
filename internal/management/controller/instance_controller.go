@@ -225,7 +225,7 @@ func (r *InstanceReconciler) Reconcile(
 }
 
 func (r *InstanceReconciler) configureSlotReplicator(cluster *apiv1.Cluster) {
-	if cluster.Status.TargetPrimary == r.instance.PodName {
+	if cluster.Status.CurrentPrimary == r.instance.PodName || cluster.Status.TargetPrimary == r.instance.PodName {
 		r.instance.ConfigureSlotReplicator(nil)
 	} else {
 		r.instance.ConfigureSlotReplicator(cluster.Spec.ReplicationSlots)
