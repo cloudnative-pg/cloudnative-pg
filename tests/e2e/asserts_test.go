@@ -2469,3 +2469,58 @@ func AssertPvcHasLabels(
 		}, 300, 5).Should(Succeed())
 	})
 }
+
+// AssertRepSlotsOnPod checks if all the required replication slot exists in a given pod.
+// In case we are targeting the primary, it will also check if the slot is active.
+// Last we check that obsolete slots (post management operations) are correctly deleted
+// and that only the required slots exist in the target pod.
+func AssertRepSlotsOnPod(
+	namespace,
+	clusterName string,
+	pod corev1.Pod,
+) {
+	expectedSlots, err := testsUtils.GetExpectedRepSlotsOnPod(namespace, clusterName, pod.GetName(), env)
+	Expect(err).ToNot(HaveOccurred())
+
+	for _, slot := range expectedSlots {
+		query := fmt.Sprintf(
+			"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
+				"WHERE slot_name = '%v' "+
+				"AND temporary = 'f' AND slot_type = 'physical')", slot)
+		if specs.IsPodPrimary(pod) {
+			query = fmt.Sprintf(
+				"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
+					"WHERE slot_name = '%v' AND active = 't' "+
+					"AND temporary = 'f' AND slot_type = 'physical')", slot)
+		}
+		Eventually(func() (string, error) {
+			stdout, _, err := testsUtils.RunQueryFromPod(&pod, testsUtils.PGLocalSocketDir,
+				"app", "postgres", "''", query, env)
+			return strings.TrimSpace(stdout), err
+		}, RetryTimeout).Should(BeEquivalentTo("t"))
+	}
+
+	Eventually(func() ([]string, error) {
+		currentSlots, err := testsUtils.GetRepSlotsOnPod(namespace, pod.GetName(), env)
+		return currentSlots, err
+	}, RetryTimeout).Should(BeEquivalentTo(expectedSlots))
+}
+
+// AssertClusterRepSlotsAligned will compare all the replication slot restart_lsn
+// in a cluster. The assertion will succeed if they are all equivalent.
+func AssertClusterRepSlotsAligned(
+	namespace,
+	clusterName string,
+) {
+	podList, err := env.GetClusterPodList(namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() bool {
+		var lsnList []string
+		for _, pod := range podList.Items {
+			out, err := testsUtils.GetRepSlotsLsnOnPod(namespace, clusterName, pod, env)
+			Expect(err).ToNot(HaveOccurred())
+			lsnList = append(lsnList, out...)
+		}
+		return testsUtils.CompareLsn(lsnList)
+	}, 60).Should(BeEquivalentTo(true))
+}
