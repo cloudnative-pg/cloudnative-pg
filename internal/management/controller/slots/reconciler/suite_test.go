@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package slots
+package reconciler
 
 import (
 	"testing"
@@ -23,8 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestWatches(t *testing.T) {
+func TestReconciler(t *testing.T) {
 	RegisterFailHandler(Fail)
-
-	RunSpecs(t, "Internal Management Controller Slots Test Suite")
+	RunSpecs(t, "Reconciler Suite")
 }

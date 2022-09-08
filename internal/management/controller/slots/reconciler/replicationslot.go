@@ -14,21 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package reconciler
 
 import (
 	"context"
 	"fmt"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-func reconcileReplicationSlots(
+// ReconcileReplicationSlots reconciles the replication slots of a given instance
+func ReconcileReplicationSlots(
 	ctx context.Context,
 	instanceName string,
-	manager slots.Manager,
+	manager infrastructure.Manager,
 	cluster *apiv1.Cluster,
 ) error {
 	if cluster.Spec.ReplicationSlots == nil ||
@@ -45,7 +46,7 @@ func reconcileReplicationSlots(
 func reconcilePrimaryReplicationSlots(
 	ctx context.Context,
 	instanceName string,
-	manager slots.Manager,
+	manager infrastructure.Manager,
 	cluster *apiv1.Cluster,
 ) error {
 	// if the replication slots feature was deactivated, ensure any existing
@@ -62,7 +63,7 @@ func reconcilePrimaryReplicationSlots(
 		return err
 	}
 
-	slotInCluster := make(map[slots.ReplicationSlot]bool)
+	slotInCluster := make(map[infrastructure.ReplicationSlot]bool)
 
 	// Add every slot that is missing
 	for _, instanceName := range cluster.Status.InstanceNames {
@@ -77,12 +78,12 @@ func reconcilePrimaryReplicationSlots(
 
 		// at this point, the cluster instance does not have a replication slot
 		slotName := cluster.GetSlotNameFromInstanceName(instanceName)
-		if err := manager.Create(ctx, slots.ReplicationSlot{SlotName: slotName}); err != nil {
+		if err := manager.Create(ctx, infrastructure.ReplicationSlot{SlotName: slotName}); err != nil {
 			return fmt.Errorf("updating primary HA replication slots: %w", err)
 		}
-		slotInCluster[slots.ReplicationSlot{
+		slotInCluster[infrastructure.ReplicationSlot{
 			SlotName: slotName,
-			Type:     slots.SlotTypePhysical,
+			Type:     infrastructure.SlotTypePhysical,
 		}] = true
 	}
 
@@ -106,10 +107,10 @@ func reconcilePrimaryReplicationSlots(
 
 // getSlotByInstanceName returns a slot searching by instance name
 func getSlotByInstanceName(
-	rs *slots.ReplicationSlotList,
+	rs *infrastructure.ReplicationSlotList,
 	instanceName string,
 	cluster *apiv1.Cluster,
-) *slots.ReplicationSlot {
+) *infrastructure.ReplicationSlot {
 	if rs == nil || len(rs.Items) == 0 {
 		return nil
 	}
@@ -133,7 +134,7 @@ func dropPrimaryReplicationSlots(ctx context.Context, cluster *apiv1.Cluster) er
 func reconcileStandbyReplicationSlots(
 	ctx context.Context,
 	instanceName string,
-	manager slots.Manager,
+	manager infrastructure.Manager,
 	cluster *apiv1.Cluster,
 ) error {
 	contextLogger := log.FromContext(ctx)
