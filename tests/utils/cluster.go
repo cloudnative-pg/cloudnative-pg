@@ -243,6 +243,22 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 	return &corev1.Pod{}, err
 }
 
+// GetClusterReplicas gets a slice containing all the replica pods of a cluster
+func (env TestingEnvironment) GetClusterReplicas(namespace string, clusterName string) (*corev1.PodList, error) {
+	podList := &corev1.PodList{}
+	err := GetObjectList(&env, podList, client.InNamespace(namespace),
+		client.MatchingLabels{"postgresql": clusterName, "role": "replica"},
+	)
+	if err != nil {
+		return podList, err
+	}
+	if len(podList.Items) > 0 {
+		return podList, nil
+	}
+	err = fmt.Errorf("no replicas found")
+	return podList, err
+}
+
 // ScaleClusterSize scales a cluster to the requested size
 func (env TestingEnvironment) ScaleClusterSize(namespace, clusterName string, newClusterSize int) error {
 	cluster, err := env.GetCluster(namespace, clusterName)
