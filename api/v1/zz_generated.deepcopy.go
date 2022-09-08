@@ -578,8 +578,8 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.PostgresConfiguration.DeepCopyInto(&out.PostgresConfiguration)
-	if in.ReplicationSlotsConfiguration != nil {
-		in, out := &in.ReplicationSlotsConfiguration, &out.ReplicationSlotsConfiguration
+	if in.ReplicationSlots != nil {
+		in, out := &in.ReplicationSlots, &out.ReplicationSlots
 		*out = new(ReplicationSlotsConfiguration)
 		(*in).DeepCopyInto(*out)
 	}
@@ -720,6 +720,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.InstanceNames != nil {
+		in, out := &in.InstanceNames, &out.InstanceNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 }
 

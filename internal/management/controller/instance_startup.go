@@ -250,6 +250,6 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(
 		}
 
 		// Now I can demote myself
-		return r.instance.Demote()
+		return r.instance.Demote(cluster)
 	}
 }

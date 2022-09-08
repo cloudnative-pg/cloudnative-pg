@@ -419,6 +419,7 @@ Name                      | Description                                         
 `onlineUpdateEnabled      ` | OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster                                                                                                      | bool                                                       
 `azurePVCUpdateEnabled    ` | AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster                                                                                                  | bool                                                       
 `conditions               ` | Conditions for cluster object                                                                                                                                                      | []metav1.Condition                                         
+`instanceNames            ` | List of instance names in the cluster                                                                                                                                              | []string                                                   
 
 <a id='ConfigMapKeySelector'></a>
 
@@ -818,7 +819,7 @@ ReplicationSlotsHAConfiguration encapsulates the configuration of replication sl
 Name       | Description                                                                                                                                                                                                                                                  | Type  
 ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------
 `enabled   ` | If replication slots for high availability are enabled, the operator will automatically manage replication slots on the primary and designated primary instances and use them in the standby replication connections. This can only be set at creation time. - *mandatory*  | bool  
-`slotPrefix` | Prefix for replication slots managed by the operator for HA. This can only be set at creation time.                                                                                                                                                          | string
+`slotPrefix` | Prefix for replication slots managed by the operator for HA. It may only contain lower case letters, numbers, and the underscore character. This can only be set at creation time.                                                                           | string
 
 <a id='RollingUpdateStatus'></a>
 

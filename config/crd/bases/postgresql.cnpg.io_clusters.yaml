@@ -2061,7 +2061,10 @@ spec:
                       slotPrefix:
                         default: _cnpg_
                         description: Prefix for replication slots managed by the operator
-                          for HA. This can only be set at creation time.
+                          for HA. It may only contain lower case letters, numbers,
+                          and the underscore character. This can only be set at creation
+                          time.
+                        pattern: ^[0-9a-z_]*$
                         type: string
                     type: object
                   updateInterval:
@@ -2683,6 +2686,11 @@ spec:
               initializingPVC:
                 description: List of all the PVCs that are being initialized by this
                   cluster
+                items:
+                  type: string
+                type: array
+              instanceNames:
+                description: List of instance names in the cluster
                 items:
                   type: string
                 type: array
