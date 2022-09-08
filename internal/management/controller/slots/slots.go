@@ -24,12 +24,18 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
+// SlotType represents the type of replication slot
+type SlotType string
+
+// SlotTypePhysical represents the physical replication slot
+const SlotTypePhysical SlotType = "physical"
+
 // ReplicationSlot represents a single replication slot
 type ReplicationSlot struct {
-	Name       string `json:"slotName,omitempty"`
-	Type       string `json:"type,omitempty"`
-	Active     bool   `json:"active"`
-	RestartLSN string `json:"restartLSN,omitempty"`
+	SlotName   string   `json:"slotName,omitempty"`
+	Type       SlotType `json:"type,omitempty"`
+	Active     bool     `json:"active"`
+	RestartLSN string   `json:"restartLSN,omitempty"`
 }
 
 // ReplicationSlotList contains a list of replication slots
@@ -40,7 +46,7 @@ type ReplicationSlotList struct {
 // Get returns the ReplicationSlot with the required name if present in the ReplicationSlotList
 func (sl ReplicationSlotList) Get(name string) *ReplicationSlot {
 	for i := range sl.Items {
-		if sl.Items[i].Name == name {
+		if sl.Items[i].SlotName == name {
 			return &sl.Items[i]
 		}
 	}
@@ -74,7 +80,8 @@ type PostgresManager struct {
 	db *sql.DB
 }
 
-func getDBSlotManager(db *sql.DB) Manager {
+// GetPostgresManager returns an implementation of Manager for postgres
+func GetPostgresManager(db *sql.DB) Manager {
 	return PostgresManager{
 		db: db,
 	}
@@ -104,7 +111,7 @@ func (sm PostgresManager) List(
 	for rows.Next() {
 		var slot ReplicationSlot
 		err := rows.Scan(
-			&slot.Name,
+			&slot.SlotName,
 			&slot.Type,
 			&slot.Active,
 			&slot.RestartLSN,
@@ -131,7 +138,7 @@ func (sm PostgresManager) Update(ctx context.Context, slot ReplicationSlot) erro
 		return nil
 	}
 
-	_, err := sm.db.ExecContext(ctx, "SELECT pg_replication_slot_advance($1, $2)", slot.Name, slot.RestartLSN)
+	_, err := sm.db.ExecContext(ctx, "SELECT pg_replication_slot_advance($1, $2)", slot.SlotName, slot.RestartLSN)
 	return err
 }
 
@@ -140,7 +147,7 @@ func (sm PostgresManager) Create(ctx context.Context, slot ReplicationSlot) erro
 	contextLog := log.FromContext(ctx).WithName("createSlot")
 	contextLog.Trace("Invoked", "slot", slot)
 	_, err := sm.db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
-		slot.Name, slot.RestartLSN != "")
+		slot.SlotName, slot.RestartLSN != "")
 	return err
 }
 
@@ -151,6 +158,6 @@ func (sm PostgresManager) Delete(ctx context.Context, slot ReplicationSlot) erro
 	if slot.Active {
 		return nil
 	}
-	_, err := sm.db.ExecContext(ctx, "SELECT pg_drop_replication_slot($1)", slot.Name)
+	_, err := sm.db.ExecContext(ctx, "SELECT pg_drop_replication_slot($1)", slot.SlotName)
 	return err
 }

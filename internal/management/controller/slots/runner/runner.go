@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package slots
+package runner
 
 import (
 	"context"
@@ -22,6 +22,7 @@ import (
 	"time"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -99,8 +100,8 @@ func (sr *Replicator) Start(ctx context.Context) error {
 			}
 			err = synchronizeReplicationSlots(
 				ctx,
-				getDBSlotManager(primaryDB),
-				getDBSlotManager(localDB),
+				slots.GetPostgresManager(primaryDB),
+				slots.GetPostgresManager(localDB),
 				sr.instance.PodName,
 				config,
 			)
@@ -117,8 +118,8 @@ func (sr *Replicator) Start(ctx context.Context) error {
 // synchronizeReplicationSlots aligns the slots in the local instance with those in the primary
 func synchronizeReplicationSlots(
 	ctx context.Context,
-	primarySlotManager Manager,
-	localSlotManager Manager,
+	primarySlotManager slots.Manager,
+	localSlotManager slots.Manager,
 	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
 ) error {
@@ -137,7 +138,7 @@ func synchronizeReplicationSlots(
 	contextLog.Trace("local slot status", "slotsInLocal", slotsInLocal)
 
 	for _, slot := range slotsInPrimary.Items {
-		if !slotsInLocal.Has(slot.Name) {
+		if !slotsInLocal.Has(slot.SlotName) {
 			err := localSlotManager.Create(ctx, slot)
 			if err != nil {
 				return err
@@ -149,7 +150,7 @@ func synchronizeReplicationSlots(
 		}
 	}
 	for _, slot := range slotsInLocal.Items {
-		if !slotsInPrimary.Has(slot.Name) {
+		if !slotsInPrimary.Has(slot.SlotName) {
 			err := localSlotManager.Delete(ctx, slot)
 			if err != nil {
 				return err

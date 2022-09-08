@@ -20,29 +20,11 @@ import (
 	"fmt"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots"
 )
 
-// SlotType represents the type of replication slot
-type SlotType string
-
-// SlotTypePhysical represents the physical replication slot
-const SlotTypePhysical SlotType = "physical"
-
-// ReplicationSlot represents a single replication slot
-// TODO - can the name be empty?
-type ReplicationSlot struct {
-	SlotName string   `json:"slotName,omitempty"`
-	Type     SlotType `json:"type,omitempty"`
-	Active   bool     `json:"active"`
-}
-
-// ReplicationSlotList contains a list of replication slots
-type ReplicationSlotList struct {
-	Items []ReplicationSlot
-}
-
 // GetCurrentHAReplicationSlots retrieves the list of high availability replication slots
-func (instance *Instance) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (*ReplicationSlotList, error) {
+func (instance *Instance) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (*slots.ReplicationSlotList, error) {
 	if cluster.Spec.ReplicationSlots == nil ||
 		cluster.Spec.ReplicationSlots.HighAvailability == nil {
 		return nil, fmt.Errorf("unexpected HA replication slots configuration")
@@ -53,7 +35,7 @@ func (instance *Instance) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (
 		return nil, err
 	}
 
-	var replicationSlots ReplicationSlotList
+	var replicationSlots slots.ReplicationSlotList
 
 	rows, err := superUserDB.Query(
 		`SELECT slot_name, slot_type, active FROM pg_replication_slots
@@ -68,7 +50,7 @@ func (instance *Instance) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (
 		_ = rows.Close()
 	}()
 	for rows.Next() {
-		var slot ReplicationSlot
+		var slot slots.ReplicationSlot
 		err := rows.Scan(
 			&slot.SlotName,
 			&slot.Type,

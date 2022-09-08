@@ -14,27 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package slots
+package runner
 
 import (
 	"context"
 	"fmt"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-func newSlot(name string) ReplicationSlot {
-	return ReplicationSlot{Name: name}
+func newSlot(name string) slots.ReplicationSlot {
+	return slots.ReplicationSlot{SlotName: name}
 }
 
 var _ = Describe("ReplicationSlotList", func() {
 	It("has a working Has method", func() {
 		slot1 := newSlot("slot1")
 		slot2 := newSlot("slot2")
-		list := ReplicationSlotList{Items: []ReplicationSlot{slot1, slot2}}
+		list := slots.ReplicationSlotList{Items: []slots.ReplicationSlot{slot1, slot2}}
 
 		Expect(list.Has("slot1")).To(BeTrue())
 		Expect(list.Has("slot2")).To(BeTrue())
@@ -43,14 +44,14 @@ var _ = Describe("ReplicationSlotList", func() {
 	It("has a working Get method", func() {
 		slot1 := newSlot("slot1")
 		slot2 := newSlot("slot2")
-		list := ReplicationSlotList{Items: []ReplicationSlot{slot1, slot2}}
+		list := slots.ReplicationSlotList{Items: []slots.ReplicationSlot{slot1, slot2}}
 
 		Expect(list.Get("slot1")).To(BeEquivalentTo(&slot1))
 		Expect(list.Get("slot2")).To(BeEquivalentTo(&slot2))
 		Expect(list.Get("slot3")).To(BeNil())
 	})
 	It("works as expected when the list is empty", func() {
-		var list ReplicationSlotList
+		var list slots.ReplicationSlotList
 
 		Expect(list.Get("slot1")).To(BeNil())
 		Expect(list.Has("slot1")).ToNot(BeTrue())
@@ -73,12 +74,12 @@ func (sm *fakeSlotManager) List(
 	ctx context.Context,
 	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
-) (ReplicationSlotList, error) {
-	var slotList ReplicationSlotList
+) (slots.ReplicationSlotList, error) {
+	var slotList slots.ReplicationSlotList
 	for _, slot := range sm.slots {
 		if slot.name != podName {
-			slotList.Items = append(slotList.Items, ReplicationSlot{
-				Name:       slot.name,
+			slotList.Items = append(slotList.Items, slots.ReplicationSlot{
+				SlotName:   slot.name,
 				RestartLSN: slot.restartLSN,
 				Type:       "physical",
 				Active:     true,
@@ -88,32 +89,32 @@ func (sm *fakeSlotManager) List(
 	return slotList, nil
 }
 
-func (sm *fakeSlotManager) Update(ctx context.Context, slot ReplicationSlot) error {
-	localSlot, found := sm.slots[slot.Name]
+func (sm *fakeSlotManager) Update(ctx context.Context, slot slots.ReplicationSlot) error {
+	localSlot, found := sm.slots[slot.SlotName]
 	if !found {
-		return fmt.Errorf("while updating slot: Slot %s not found", slot.Name)
+		return fmt.Errorf("while updating slot: Slot %s not found", slot.SlotName)
 	}
 	if localSlot.restartLSN != slot.RestartLSN {
-		sm.slots[slot.Name] = fakeSlot{name: slot.Name, restartLSN: slot.RestartLSN}
+		sm.slots[slot.SlotName] = fakeSlot{name: slot.SlotName, restartLSN: slot.RestartLSN}
 		sm.slotsUpdated++
 	}
 	return nil
 }
 
-func (sm *fakeSlotManager) Create(ctx context.Context, slot ReplicationSlot) error {
-	if _, found := sm.slots[slot.Name]; found {
-		return fmt.Errorf("while creating slot: Slot %s already exists", slot.Name)
+func (sm *fakeSlotManager) Create(ctx context.Context, slot slots.ReplicationSlot) error {
+	if _, found := sm.slots[slot.SlotName]; found {
+		return fmt.Errorf("while creating slot: Slot %s already exists", slot.SlotName)
 	}
-	sm.slots[slot.Name] = fakeSlot{name: slot.Name, restartLSN: slot.RestartLSN}
+	sm.slots[slot.SlotName] = fakeSlot{name: slot.SlotName, restartLSN: slot.RestartLSN}
 	sm.slotsCreated++
 	return nil
 }
 
-func (sm *fakeSlotManager) Delete(ctx context.Context, slot ReplicationSlot) error {
-	if _, found := sm.slots[slot.Name]; !found {
-		return fmt.Errorf("while deleting slot: Slot %s not found", slot.Name)
+func (sm *fakeSlotManager) Delete(ctx context.Context, slot slots.ReplicationSlot) error {
+	if _, found := sm.slots[slot.SlotName]; !found {
+		return fmt.Errorf("while deleting slot: Slot %s not found", slot.SlotName)
 	}
-	delete(sm.slots, slot.Name)
+	delete(sm.slots, slot.SlotName)
 	sm.slotsDeleted++
 	return nil
 }
@@ -159,7 +160,7 @@ var _ = Describe("Slot synchronization", func() {
 	It("can update slots in local when ReplayLSN in primary advanced", func() {
 		// advance slot3 in primary
 		newLSN := "0/308C4D8"
-		err := primary.Update(ctx, ReplicationSlot{Name: pod3, RestartLSN: newLSN})
+		err := primary.Update(ctx, slots.ReplicationSlot{SlotName: pod3, RestartLSN: newLSN})
 		Expect(err).ShouldNot(HaveOccurred())
 
 		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
@@ -174,7 +175,7 @@ var _ = Describe("Slot synchronization", func() {
 		Expect(local.slotsUpdated).To(Equal(1))
 	})
 	It("can drop slots in local when they are no longer in primary", func() {
-		err := primary.Delete(ctx, ReplicationSlot{Name: pod4})
+		err := primary.Delete(ctx, slots.ReplicationSlot{SlotName: pod4})
 		Expect(err).ShouldNot(HaveOccurred())
 
 		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
