@@ -85,7 +85,7 @@ func (fk fakeReplicationSlotManager) List(
 	return slotList, nil
 }
 
-func makeClusterWithInstanceNames(instanceNames []string) apiv1.Cluster {
+func makeClusterWithInstanceNames(instanceNames []string, primary string) apiv1.Cluster {
 	return apiv1.Cluster{
 		Spec: apiv1.ClusterSpec{
 			ReplicationSlots: &apiv1.ReplicationSlotsConfiguration{
@@ -96,7 +96,9 @@ func makeClusterWithInstanceNames(instanceNames []string) apiv1.Cluster {
 			},
 		},
 		Status: apiv1.ClusterStatus{
-			InstanceNames: instanceNames,
+			InstanceNames:  instanceNames,
+			CurrentPrimary: primary,
+			TargetPrimary:  primary,
 		},
 	}
 }
@@ -110,18 +112,18 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 			},
 		}
 
-		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2", "instance3"})
+		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2", "instance3"}, "instance1")
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance2"}]).To(BeTrue())
 
-		err := reconcileReplicationSlots(context.TODO(), "instance1", true, fakeSlotManager, &cluster)
+		err := reconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
+		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeFalse())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeTrue())
-		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance2"}]).To(BeTrue())
-		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
+		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
 	})
 
 	It("can delete an inactive replication slot that is not in the cluster", func() {
@@ -133,14 +135,14 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 			},
 		}
 
-		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"})
+		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"}, "instance1")
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 
-		err := reconcileReplicationSlots(context.TODO(), "instance1", true, fakeSlotManager, &cluster)
+		err := reconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeFalse())
-		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
+		Expect(fakeSlotManager.replicationSlots).To(HaveLen(1))
 	})
 
 	It("will not delete an active replication slot that is not in the cluster", func() {
@@ -152,13 +154,13 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 			},
 		}
 
-		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"})
+		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"}, "instance1")
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 
-		err := reconcileReplicationSlots(context.TODO(), "instance1", true, fakeSlotManager, &cluster)
+		err := reconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: slotPrefix + "instance3", active: true}]).To(BeTrue())
-		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
+		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
 	})
 })
