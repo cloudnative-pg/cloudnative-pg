@@ -158,13 +158,9 @@ func (r *InstanceReconciler) Reconcile(
 
 	r.configureSlotReplicator(cluster)
 
-	isPrimary, err := r.instance.IsPrimary()
-	if err != nil {
-		return ctrl.Result{}, err
-	}
 	// Reconcile replication slots
 	slotManager := slots.NewPostgresManager(r.instance.GetSuperUserDB)
-	if err = reconcileReplicationSlots(ctx, r.instance.PodName, isPrimary, slotManager, cluster); err != nil {
+	if err = reconcileReplicationSlots(ctx, r.instance.PodName, slotManager, cluster); err != nil {
 		contextLogger.Error(err, "while reconciling replication slots")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}

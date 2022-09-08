@@ -28,7 +28,6 @@ import (
 func reconcileReplicationSlots(
 	ctx context.Context,
 	instanceName string,
-	isPrimary bool,
 	manager slots.Manager,
 	cluster *apiv1.Cluster,
 ) error {
@@ -37,7 +36,7 @@ func reconcileReplicationSlots(
 		return nil
 	}
 
-	if isPrimary {
+	if cluster.Status.CurrentPrimary == instanceName || cluster.Status.TargetPrimary == instanceName {
 		return reconcilePrimaryReplicationSlots(ctx, instanceName, manager, cluster)
 	}
 	return reconcileStandbyReplicationSlots(ctx, instanceName, manager, cluster)
