@@ -52,31 +52,36 @@ func (sl ReplicationSlotList) Has(name string) bool {
 	return sl.Get(name) != nil
 }
 
-// slotManager abstracts the operations that need to be sent to
+// Manager abstracts the operations that need to be sent to
 // the database instance for the management of Replication Slots
-type slotManager interface {
-	getSlotsStatus(
+type Manager interface {
+	// List the available replication slots
+	List(
 		ctx context.Context,
 		podName string,
 		config *apiv1.ReplicationSlotsConfiguration,
 	) (ReplicationSlotList, error)
-	updateSlot(ctx context.Context, slot ReplicationSlot) error
-	createSlot(ctx context.Context, slot ReplicationSlot) error
-	dropSlot(ctx context.Context, slot ReplicationSlot) error
+	// Update the replication slot
+	Update(ctx context.Context, slot ReplicationSlot) error
+	// Create the replication slot
+	Create(ctx context.Context, slot ReplicationSlot) error
+	// Delete the replication slot
+	Delete(ctx context.Context, slot ReplicationSlot) error
 }
 
-// dbSlotManager is a slotManager for a database instance
-type dbSlotManager struct {
+// PostgresManager is a Manager for a database instance
+type PostgresManager struct {
 	db *sql.DB
 }
 
-func getDBSlotManager(db *sql.DB) slotManager {
-	return dbSlotManager{
+func getDBSlotManager(db *sql.DB) Manager {
+	return PostgresManager{
 		db: db,
 	}
 }
 
-func (sm dbSlotManager) getSlotsStatus(
+// List the available replication slots
+func (sm PostgresManager) List(
 	ctx context.Context,
 	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
@@ -118,7 +123,8 @@ func (sm dbSlotManager) getSlotsStatus(
 	return status, nil
 }
 
-func (sm dbSlotManager) updateSlot(ctx context.Context, slot ReplicationSlot) error {
+// Update the replication slot
+func (sm PostgresManager) Update(ctx context.Context, slot ReplicationSlot) error {
 	contextLog := log.FromContext(ctx).WithName("updateSlot")
 	contextLog.Trace("Invoked", "slot", slot)
 	if slot.RestartLSN == "" {
@@ -129,7 +135,8 @@ func (sm dbSlotManager) updateSlot(ctx context.Context, slot ReplicationSlot) er
 	return err
 }
 
-func (sm dbSlotManager) createSlot(ctx context.Context, slot ReplicationSlot) error {
+// Create the replication slot
+func (sm PostgresManager) Create(ctx context.Context, slot ReplicationSlot) error {
 	contextLog := log.FromContext(ctx).WithName("createSlot")
 	contextLog.Trace("Invoked", "slot", slot)
 	_, err := sm.db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
@@ -137,7 +144,8 @@ func (sm dbSlotManager) createSlot(ctx context.Context, slot ReplicationSlot) er
 	return err
 }
 
-func (sm dbSlotManager) dropSlot(ctx context.Context, slot ReplicationSlot) error {
+// Delete the replication slot
+func (sm PostgresManager) Delete(ctx context.Context, slot ReplicationSlot) error {
 	contextLog := log.FromContext(ctx).WithName("dropSlot")
 	contextLog.Trace("Invoked", "slot", slot)
 	if slot.Active {

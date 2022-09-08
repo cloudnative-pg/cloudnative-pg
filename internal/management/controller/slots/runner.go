@@ -117,20 +117,20 @@ func (sr *Replicator) Start(ctx context.Context) error {
 // synchronizeReplicationSlots aligns the slots in the local instance with those in the primary
 func synchronizeReplicationSlots(
 	ctx context.Context,
-	primarySlotManager slotManager,
-	localSlotManager slotManager,
+	primarySlotManager Manager,
+	localSlotManager Manager,
 	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
 ) error {
 	contextLog := log.FromContext(ctx).WithName("synchronizeReplicationSlots")
 
-	slotsInPrimary, err := primarySlotManager.getSlotsStatus(ctx, podName, config)
+	slotsInPrimary, err := primarySlotManager.List(ctx, podName, config)
 	if err != nil {
 		return fmt.Errorf("getting replication slot status from primary: %v", err)
 	}
 	contextLog.Trace("primary slot status", "slotsInPrimary", slotsInPrimary)
 
-	slotsInLocal, err := localSlotManager.getSlotsStatus(ctx, podName, config)
+	slotsInLocal, err := localSlotManager.List(ctx, podName, config)
 	if err != nil {
 		return fmt.Errorf("getting replication slot status from local: %v", err)
 	}
@@ -138,19 +138,19 @@ func synchronizeReplicationSlots(
 
 	for _, slot := range slotsInPrimary.Items {
 		if !slotsInLocal.Has(slot.Name) {
-			err := localSlotManager.createSlot(ctx, slot)
+			err := localSlotManager.Create(ctx, slot)
 			if err != nil {
 				return err
 			}
 		}
-		err := localSlotManager.updateSlot(ctx, slot)
+		err := localSlotManager.Update(ctx, slot)
 		if err != nil {
 			return err
 		}
 	}
 	for _, slot := range slotsInLocal.Items {
 		if !slotsInPrimary.Has(slot.Name) {
-			err := localSlotManager.dropSlot(ctx, slot)
+			err := localSlotManager.Delete(ctx, slot)
 			if err != nil {
 				return err
 			}
