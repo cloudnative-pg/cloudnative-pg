@@ -78,7 +78,7 @@ func reconcilePrimaryReplicationSlots(
 			continue
 		}
 
-		if slot := currentSlots.GetSlotByInstanceName(instanceName); slot != nil {
+		if slot := getSlotByInstanceName(currentSlots, instanceName, cluster); slot != nil {
 			slotInCluster[*slot] = true
 			continue
 		}
@@ -89,9 +89,8 @@ func reconcilePrimaryReplicationSlots(
 			return fmt.Errorf("updating primary HA replication slots: %w", err)
 		}
 		slotInCluster[postgresManagement.ReplicationSlot{
-			InstanceName: instanceName,
-			SlotName:     slotName,
-			Type:         postgresManagement.SlotTypePhysical,
+			SlotName: slotName,
+			Type:     postgresManagement.SlotTypePhysical,
 		}] = true
 	}
 
@@ -107,6 +106,25 @@ func reconcilePrimaryReplicationSlots(
 			if err := manager.DeleteReplicationSlot(slot.SlotName); err != nil {
 				return fmt.Errorf("failure deleting replication slot %q: %w", slot.SlotName, err)
 			}
+		}
+	}
+
+	return nil
+}
+
+// getSlotByInstanceName returns a slot searching by instance name
+func getSlotByInstanceName(
+	rs *postgresManagement.ReplicationSlotList,
+	instanceName string,
+	cluster *apiv1.Cluster,
+) *postgresManagement.ReplicationSlot {
+	if rs == nil || len(rs.Items) == 0 {
+		return nil
+	}
+
+	for k, slot := range rs.Items {
+		if cluster.GetInstanceNameFromSlotName(slot.SlotName) == instanceName {
+			return &rs.Items[k]
 		}
 	}
 

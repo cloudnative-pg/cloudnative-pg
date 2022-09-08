@@ -31,30 +31,14 @@ const SlotTypePhysical SlotType = "physical"
 // ReplicationSlot represents a single replication slot
 // TODO - can the name be empty?
 type ReplicationSlot struct {
-	InstanceName string   `json:"instanceName,omitempty"`
-	SlotName     string   `json:"slotName,omitempty"`
-	Type         SlotType `json:"type,omitempty"`
-	Active       bool     `json:"active"`
+	SlotName string   `json:"slotName,omitempty"`
+	Type     SlotType `json:"type,omitempty"`
+	Active   bool     `json:"active"`
 }
 
 // ReplicationSlotList contains a list of replication slots
 type ReplicationSlotList struct {
 	Items []ReplicationSlot
-}
-
-// GetSlotByInstanceName returns a slot searching by instance name
-func (rs *ReplicationSlotList) GetSlotByInstanceName(instanceName string) *ReplicationSlot {
-	if rs == nil || len(rs.Items) == 0 {
-		return nil
-	}
-
-	for k, v := range rs.Items {
-		if v.InstanceName == instanceName {
-			return &rs.Items[k]
-		}
-	}
-
-	return nil
 }
 
 // GetCurrentHAReplicationSlots retrieves the list of high availability replication slots
@@ -93,8 +77,6 @@ func (instance *Instance) GetCurrentHAReplicationSlots(cluster *apiv1.Cluster) (
 		if err != nil {
 			return nil, err
 		}
-
-		slot.InstanceName = cluster.GetInstanceNameFromSlotName(slot.SlotName)
 
 		replicationSlots.Items = append(replicationSlots.Items, slot)
 	}
