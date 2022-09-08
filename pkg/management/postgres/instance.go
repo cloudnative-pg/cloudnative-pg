@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -543,12 +544,12 @@ func (instance *Instance) IsPrimary() (bool, error) {
 	return true, nil
 }
 
-// Demote demote an existing PostgreSQL instance
-func (instance *Instance) Demote() error {
+// Demote demotes an existing PostgreSQL instance
+func (instance *Instance) Demote(cluster *apiv1.Cluster) error {
 	log.Info("Demoting instance",
 		"pgpdata", instance.PgData)
-
-	_, err := UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName)
+	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
+	_, err := UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName, slotName)
 	return err
 }
 
