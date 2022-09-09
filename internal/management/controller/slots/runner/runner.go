@@ -18,7 +18,6 @@ package runner
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -83,24 +82,10 @@ func (sr *Replicator) Start(ctx context.Context) error {
 
 			primaryPool := sr.instance.PrimaryConnectionPool()
 			localPool := sr.instance.ConnectionPool()
-			contextLog.Trace("Synchronizing",
-				"primary", primaryPool.GetDsn("postgres"),
-				"local", localPool.GetDsn("postgres"),
-				"podName", sr.instance.PodName,
-				"config", config)
-
-			primaryDBFactory := func() (*sql.DB, error) {
-				return primaryPool.Connection("postgres")
-			}
-
-			localDBFactory := func() (*sql.DB, error) {
-				return localPool.Connection("postgres")
-			}
-
 			err := synchronizeReplicationSlots(
 				ctx,
-				infrastructure.NewPostgresManager(primaryDBFactory),
-				infrastructure.NewPostgresManager(localDBFactory),
+				infrastructure.NewPostgresManager(primaryPool),
+				infrastructure.NewPostgresManager(localPool),
 				sr.instance.PodName,
 				config,
 			)
@@ -123,6 +108,11 @@ func synchronizeReplicationSlots(
 	config *apiv1.ReplicationSlotsConfiguration,
 ) error {
 	contextLog := log.FromContext(ctx).WithName("synchronizeReplicationSlots")
+	contextLog.Trace("Invoked",
+		"primary", primarySlotManager,
+		"local", localSlotManager,
+		"podName", podName,
+		"config", config)
 
 	slotsInPrimary, err := primarySlotManager.List(ctx, podName, config)
 	if err != nil {
