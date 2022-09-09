@@ -339,7 +339,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 // removeConditionsWithInvalidReason will remove every condition which is not valid
 // anymore from the K8s API point-of-view
 func (r *ClusterReconciler) removeConditionsWithInvalidReason(ctx context.Context, cluster *apiv1.Cluster) error {
-	conditions := make([]metav1.Condition, 0, len(cluster.Status.Conditions))
+	conditions := make([]apiv1.ClusterCondition, 0, len(cluster.Status.Conditions))
 	for _, entry := range cluster.Status.Conditions {
 		if utils.IsConditionReasonValid(entry.Reason) {
 			conditions = append(conditions, entry)
