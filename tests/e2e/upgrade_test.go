@@ -399,7 +399,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr
-			}, 30).Should(BeEquivalentTo(1))
+			}, 60).Should(BeEquivalentTo(1))
 		})
 
 		By("uploading a backup on minio", func() {
@@ -427,7 +427,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 					countBackupsScript))
 				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
 				return value, err, atoiErr
-			}, 30).Should(BeEquivalentTo(1))
+			}, 60).Should(BeEquivalentTo(1))
 		})
 
 		By("creating a ScheduledBackup", func() {
