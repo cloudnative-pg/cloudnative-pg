@@ -20,7 +20,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -184,12 +184,12 @@ var _ = Describe("cluster_create unit tests", func() {
 			expectResourceExistsWithDefaultClient(
 				pdbPrimaryName,
 				namespace,
-				&policyv1beta1.PodDisruptionBudget{},
+				&policyv1.PodDisruptionBudget{},
 			)
 			expectResourceExistsWithDefaultClient(
 				pdbReplicaName,
 				namespace,
-				&policyv1beta1.PodDisruptionBudget{},
+				&policyv1.PodDisruptionBudget{},
 			)
 		})
 
@@ -209,7 +209,7 @@ var _ = Describe("cluster_create unit tests", func() {
 			expectResourceDoesntExistWithDefaultClient(
 				pdbReplicaName,
 				namespace,
-				&policyv1beta1.PodDisruptionBudget{},
+				&policyv1.PodDisruptionBudget{},
 			)
 		})
 
@@ -226,12 +226,12 @@ var _ = Describe("cluster_create unit tests", func() {
 			expectResourceDoesntExistWithDefaultClient(
 				pdbPrimaryName,
 				namespace,
-				&policyv1beta1.PodDisruptionBudget{},
+				&policyv1.PodDisruptionBudget{},
 			)
 			expectResourceDoesntExistWithDefaultClient(
 				pdbReplicaName,
 				namespace,
-				&policyv1beta1.PodDisruptionBudget{},
+				&policyv1.PodDisruptionBudget{},
 			)
 		})
 	})
