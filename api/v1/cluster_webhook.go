@@ -337,6 +337,7 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 	allErrs = append(allErrs, r.validateWalStorageChange(old)...)
 	allErrs = append(allErrs, r.validateReplicaModeChange(old)...)
 	allErrs = append(allErrs, r.validateUnixPermissionIdentifierChange(old)...)
+	allErrs = append(allErrs, r.validateReplicationSlotsChange(old)...)
 	return allErrs
 }
 
@@ -1533,6 +1534,33 @@ func (r *Cluster) validateRecoveryAndBackupTarget() field.ErrorList {
 	}
 
 	return allErrors
+}
+
+func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {
+	newReplicationSlots := r.Spec.ReplicationSlots
+	if newReplicationSlots == nil ||
+		newReplicationSlots.HighAvailability == nil ||
+		!newReplicationSlots.HighAvailability.Enabled {
+		return nil
+	}
+	oldReplicationSlots := old.Spec.ReplicationSlots
+	if oldReplicationSlots == nil ||
+		oldReplicationSlots.HighAvailability == nil ||
+		!oldReplicationSlots.HighAvailability.Enabled {
+		return nil
+	}
+	var errs field.ErrorList
+
+	if oldReplicationSlots.HighAvailability.SlotPrefix != newReplicationSlots.HighAvailability.SlotPrefix {
+		errs = append(errs,
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots", "highAvailability", "slotPrefix"),
+				newReplicationSlots.HighAvailability.SlotPrefix,
+				"Cannot change replication slot prefix while HighAvailability is enabled"),
+		)
+	}
+
+	return errs
 }
 
 // validateAzureCredentials checks and validates the azure credentials
