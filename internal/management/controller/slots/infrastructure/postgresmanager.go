@@ -25,18 +25,26 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-type connectionFactory func() (*sql.DB, error)
+// pooler is an internal interface to pass a connection pooler to NewPostgresManager
+type pooler interface {
+	Connection(dbname string) (*sql.DB, error)
+	GetDsn(dbname string) string
+}
 
 // PostgresManager is a Manager for a database instance
 type PostgresManager struct {
-	connFactory connectionFactory
+	pool pooler
 }
 
 // NewPostgresManager returns an implementation of Manager for postgres
-func NewPostgresManager(factory connectionFactory) Manager {
+func NewPostgresManager(pool pooler) Manager {
 	return PostgresManager{
-		connFactory: factory,
+		pool: pool,
 	}
+}
+
+func (sm PostgresManager) String() string {
+	return sm.pool.GetDsn("postgres")
 }
 
 // List the available replication slots
@@ -45,7 +53,7 @@ func (sm PostgresManager) List(
 	podName string,
 	config *v1.ReplicationSlotsConfiguration,
 ) (ReplicationSlotList, error) {
-	db, err := sm.connFactory()
+	db, err := sm.pool.Connection("postgres")
 	if err != nil {
 		return ReplicationSlotList{}, err
 	}
@@ -94,7 +102,7 @@ func (sm PostgresManager) Update(ctx context.Context, slot ReplicationSlot) erro
 	if slot.RestartLSN == "" {
 		return nil
 	}
-	db, err := sm.connFactory()
+	db, err := sm.pool.Connection("postgres")
 	if err != nil {
 		return err
 	}
@@ -108,7 +116,7 @@ func (sm PostgresManager) Create(ctx context.Context, slot ReplicationSlot) erro
 	contextLog := log.FromContext(ctx).WithName("createSlot")
 	contextLog.Trace("Invoked", "slot", slot)
 
-	db, err := sm.connFactory()
+	db, err := sm.pool.Connection("postgres")
 	if err != nil {
 		return err
 	}
@@ -126,7 +134,7 @@ func (sm PostgresManager) Delete(ctx context.Context, slot ReplicationSlot) erro
 		return nil
 	}
 
-	db, err := sm.connFactory()
+	db, err := sm.pool.Connection("postgres")
 	if err != nil {
 		return err
 	}
@@ -145,7 +153,7 @@ func (sm PostgresManager) GetCurrentHAReplicationSlots(
 		return nil, fmt.Errorf("unexpected HA replication slots configuration")
 	}
 
-	db, err := sm.connFactory()
+	db, err := sm.pool.Connection("postgres")
 	if err != nil {
 		return nil, err
 	}
