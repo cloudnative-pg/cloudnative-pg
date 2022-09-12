@@ -228,6 +228,12 @@ func (r *InstanceReconciler) Reconcile(
 }
 
 func (r *InstanceReconciler) configureSlotReplicator(cluster *apiv1.Cluster) {
+	// If PostgreSQL is older than 11 never start the SlotReplicator
+	psqlVersion, err := cluster.GetPostgresqlVersion()
+	if err != nil || psqlVersion < 110000 {
+		r.instance.ConfigureSlotReplicator(nil)
+	}
+
 	if cluster.Status.CurrentPrimary == r.instance.PodName || cluster.Status.TargetPrimary == r.instance.PodName {
 		r.instance.ConfigureSlotReplicator(nil)
 	} else {

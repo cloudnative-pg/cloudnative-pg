@@ -292,6 +292,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateBackupConfiguration,
 		r.validateConfiguration,
 		r.validateLDAP,
+		r.validateReplicationSlots,
 	}
 
 	for _, validate := range validations {
@@ -1534,6 +1535,33 @@ func (r *Cluster) validateRecoveryAndBackupTarget() field.ErrorList {
 	}
 
 	return allErrors
+}
+
+func (r *Cluster) validateReplicationSlots() field.ErrorList {
+	replicationSlots := r.Spec.ReplicationSlots
+	if replicationSlots == nil ||
+		replicationSlots.HighAvailability == nil ||
+		!replicationSlots.HighAvailability.Enabled {
+		return nil
+	}
+
+	psqlVersion, err := r.GetPostgresqlVersion()
+	if err != nil {
+		// The validation error will be already raised by the
+		// validateImageName function
+		return nil
+	}
+
+	if psqlVersion >= 110000 {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Invalid(
+			field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
+			replicationSlots.HighAvailability.Enabled,
+			"Cannot enable replication slot high availability. It requires PostgreSQL 11 or above"),
+	}
 }
 
 func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {
