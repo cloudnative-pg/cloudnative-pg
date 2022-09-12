@@ -60,7 +60,7 @@ func (sm PostgresManager) List(
 
 	rows, err := db.QueryContext(
 		ctx,
-		`SELECT slot_name, slot_type, active, restart_lsn FROM pg_replication_slots
+		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') FROM pg_replication_slots
             WHERE NOT temporary AND slot_name ^@ $1 AND slot_name != $2 AND slot_type = 'physical'`,
 		config.HighAvailability.GetSlotPrefix(),
 		config.HighAvailability.GetSlotNameFromInstanceName(podName),
