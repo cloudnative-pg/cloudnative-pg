@@ -51,7 +51,7 @@ func reconcilePrimaryReplicationSlots(
 	// if the replication slots feature was deactivated, ensure any existing
 	// replication slots get cleaned up
 	if !cluster.Spec.ReplicationSlots.HighAvailability.Enabled {
-		return dropPrimaryReplicationSlots(ctx, cluster)
+		return dropPrimaryReplicationSlots(ctx, manager, cluster)
 	}
 
 	contextLogger := log.FromContext(ctx)
@@ -108,9 +108,31 @@ func reconcilePrimaryReplicationSlots(
 	return nil
 }
 
-func dropPrimaryReplicationSlots(ctx context.Context, cluster *apiv1.Cluster) error {
+func dropPrimaryReplicationSlots(
+	ctx context.Context,
+	manager infrastructure.Manager,
+	cluster *apiv1.Cluster,
+) error {
 	contextLogger := log.FromContext(ctx)
-	contextLogger.Debug("UNINPLEMENTED drop standby HA replication slots")
-	// TODO: implement the logic to remove all the slots
+
+	// we fetch all replication slots
+	slots, err := manager.List(ctx, cluster.Spec.ReplicationSlots)
+	if err != nil {
+		return err
+	}
+
+	for _, slot := range slots.Items {
+		if slot.Active {
+			contextLogger.Trace("Skipping deletion of replication slot because it is active",
+				"slot", slot)
+			continue
+		}
+		contextLogger.Trace("Attempt to delete replication slot",
+			"slot", slot)
+		if err := manager.Delete(ctx, slot); err != nil {
+			return fmt.Errorf("while disabling standby HA replication slots: %w", err)
+		}
+	}
+
 	return nil
 }
