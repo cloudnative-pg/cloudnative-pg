@@ -148,13 +148,14 @@ func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool) ([]string, erro
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
 func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename string) {
 	f, err := os.Create(filepath.Clean(filename))
-	defer func() {
-		_ = f.Close()
-	}()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	defer func() {
+		_ = f.Sync()
+		_ = f.Close()
+	}()
 	w := bufio.NewWriter(f)
 	clusterList := &apiv1.ClusterList{}
 	_ = GetObjectList(&env, clusterList, client.InNamespace(namespace))
@@ -234,7 +235,6 @@ func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename st
 		fmt.Println(err)
 		return
 	}
-	_ = f.Sync()
 }
 
 // GetCluster gets a cluster given name and namespace
