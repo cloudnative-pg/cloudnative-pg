@@ -20,45 +20,18 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
-	"io"
 	"path/filepath"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
 const jobMatcherLabel = "job-name"
-
-// streamPodLogs streams the pod logs via REST to an io.Writer
-// in JSON-lines format
-//
-// NOTE: streaming to a writer is advantageous, as logs may take up a lot of
-// memory and blow up RAM if read/written in full to a buffer
-func streamPodLogs(ctx context.Context, pod corev1.Pod, writer io.Writer) (err error) {
-	pods := kubernetes.NewForConfigOrDie(plugin.Config).CoreV1().Pods(pod.Namespace)
-	logsRequest := pods.GetLogs(pod.Name, &corev1.PodLogOptions{})
-	logStream, err := logsRequest.Stream(ctx)
-	if err != nil {
-		return fmt.Errorf("could not stream the logs: %w", err)
-	}
-	defer func() {
-		innerErr := logStream.Close()
-		if err == nil && innerErr != nil {
-			err = innerErr
-		}
-	}()
-
-	_, err = io.Copy(writer, logStream)
-	if err != nil {
-		err = fmt.Errorf("could not send logs to writer: %w", err)
-	}
-	return err
-}
 
 // streamPodLogsToZip streams the pod logs to a new section in the ZIP
 func streamPodLogsToZip(ctx context.Context, pods []corev1.Pod,
@@ -76,7 +49,7 @@ func streamPodLogsToZip(ctx context.Context, pods []corev1.Pod,
 		if zipperErr != nil {
 			return fmt.Errorf("could not add '%s' to zip: %w", path, zipperErr)
 		}
-		if err := streamPodLogs(ctx, pod, writer); err != nil {
+		if err := logs.StreamPodLogs(ctx, pod, false, writer); err != nil {
 			return err
 		}
 	}
@@ -112,7 +85,7 @@ func streamClusterLogsToZip(ctx context.Context, clusterName, namespace string,
 				filepath.Join(logsdir, pod.Name), err)
 		}
 
-		err = streamPodLogs(ctx, pod, writer)
+		err = logs.StreamPodLogs(ctx, pod, false, writer)
 		if err != nil {
 			return err
 		}
@@ -159,7 +132,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 					filepath.Join(logsdir, pod.Name), err)
 			}
 
-			err = streamPodLogs(ctx, pod, writer)
+			err = logs.StreamPodLogs(ctx, pod, false, writer)
 			if err != nil {
 				return err
 			}

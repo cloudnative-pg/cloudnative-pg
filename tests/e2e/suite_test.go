@@ -106,7 +106,6 @@ var _ = AfterEach(func() {
 	}
 	operatorPod, err := env.GetOperatorPod()
 	Expect(err).ToNot(HaveOccurred())
-
 	wasRenamed := utils.OperatorPodRenamed(operatorPod, expectedOperatorPodName)
 	if wasRenamed {
 		operatorPodWasRenamed = true
@@ -115,9 +114,21 @@ var _ = AfterEach(func() {
 	wasRestarted := utils.OperatorPodRestarted(operatorPod)
 	if wasRestarted {
 		if !operatorLogDumped {
-			err := env.DumpOperatorLogs()
+			// get the PREVIOUS operator logs
+			lines, err := env.DumpOperatorLogs(wasRestarted)
 			if err == nil {
 				operatorLogDumped = true
+				// print out a sample of the last logs
+				rangeBegin := len(lines) - 5
+				if rangeBegin < 0 {
+					rangeBegin = 0
+				}
+				GinkgoWriter.Println("DUMPING previous operator log:")
+				for _, line := range lines[rangeBegin:] {
+					GinkgoWriter.Println(line)
+				}
+			} else {
+				GinkgoWriter.Printf("Failed getting the latest operator logs: %v\n", err)
 			}
 		}
 		operatorWasRestarted = true

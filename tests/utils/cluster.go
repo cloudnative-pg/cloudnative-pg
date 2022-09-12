@@ -115,20 +115,20 @@ func ClusterHasAnnotations(
 	return true
 }
 
-// DumpOperatorLogs dump the operator logs. If the operator was restarted it
-// gets the PREVIOUS logs
-func (env TestingEnvironment) DumpOperatorLogs() error {
+// DumpOperatorLogs dumps the operator logs to a file, and returns the log lines
+// as a slice.
+func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool) ([]string, error) {
 	pod, err := env.GetOperatorPod()
 	if err != nil {
 		fmt.Println(err)
-		return err
+		return nil, err
 	}
 
 	filename := "out/operator_report_" + pod.Name + ".log"
 	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		fmt.Println(err)
-		return err
+		return nil, err
 	}
 	defer func() {
 		syncErr := f.Sync()
@@ -142,13 +142,7 @@ func (env TestingEnvironment) DumpOperatorLogs() error {
 	}()
 
 	_, _ = fmt.Fprintf(f, "Dumping operator pod %v log\n", pod.Name)
-	err = logs.StreamPodLogs(env.Ctx, pod, OperatorPodRestarted(pod), f)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	return nil
+	return logs.GetPodLogs(env.Ctx, pod, getPrevious, f)
 }
 
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
