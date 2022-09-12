@@ -79,6 +79,16 @@ hostssl replication streaming_replica all cert
     to the ["Certificates" section](certificates.md#client-streaming_replica-certificate)
     in the documentation.
 
+By default, the operator manages replication slots for all the replicas in the
+HA cluster, ensuring that WAL files required by each standby is retained on
+the primary's storage, even after a failover or switchover even.
+
+!!! Seealso "Replication slots for High Availability"
+    For details on how CloudNativePG automatically manages replication slots for the
+    High Availability replicas, please refer to the
+    ["Replication slots for High Availability" section](#replication-slots-for-high-availability)
+    below.
+
 ### Continuous backup integration
 
 In case continuous backup is configured in the cluster, CloudNativePG
@@ -186,3 +196,14 @@ spec:
 As you can imagine, the availability zone is just an example, but you could
 customize this behavior based on other labels that describe the node, such
 as storage, CPU, or memory.
+
+## Replication slots for High Availability
+
+Replication slots are a native PostgreSQL feature introduced in 9.4 that
+provide an automated way to ensure that the primary does not remove WAL
+segments until they have been received by all the attached standbys, and that
+the primary does not remove rows which could cause a recovery conflict even
+when the standby is (temporarily) disconnected.
+
+This feature is available for PostgreSQL 11 or higher.
+
