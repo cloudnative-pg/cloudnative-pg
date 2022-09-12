@@ -805,10 +805,10 @@ Name    | Description                                                           
 
 ReplicationSlotsConfiguration encapsulates the configuration of replication slots
 
-Name             | Description                                                                                                 | Type                                                                
----------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------
-`highAvailability` | Replication slots for high availability configuration                                                       | [*ReplicationSlotsHAConfiguration](#ReplicationSlotsHAConfiguration)
-`updateInterval  ` | Standby will update the status of the local replication slots every `updateInterval` seconds (default 300). | int                                                                 
+Name             | Description                                                                                                | Type                                                                
+---------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------
+`highAvailability` | Replication slots for high availability configuration                                                      | [*ReplicationSlotsHAConfiguration](#ReplicationSlotsHAConfiguration)
+`updateInterval  ` | Standby will update the status of the local replication slots every `updateInterval` seconds (default 30). | int                                                                 
 
 <a id='ReplicationSlotsHAConfiguration'></a>
 
