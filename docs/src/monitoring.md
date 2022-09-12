@@ -361,8 +361,9 @@ data:
             description: "Number of streaming replicas connected to the instance"
 ```
 
-A list of basic monitoring queries can be found in the [`cnpg-basic-monitoring.yaml` file](
-./samples/cnpg-basic-monitoring.yaml).
+A list of basic monitoring queries can be found in the
+[`default-monitoring.yaml` file](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/config/manager/default-monitoring.yaml)
+that is already installed in your CloudNativePG deployment (see ["Default set of metrics"](#default-set-of-metrics)).
 
 #### Example of a user defined metric running on multiple databases
 
