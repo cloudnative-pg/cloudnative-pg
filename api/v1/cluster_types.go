@@ -532,7 +532,7 @@ type ReplicaClusterConfiguration struct {
 }
 
 // DefaultReplicationSlotsUpdateInterval is the default in seconds for the replication slots update interval
-const DefaultReplicationSlotsUpdateInterval = 300
+const DefaultReplicationSlotsUpdateInterval = 30
 
 // DefaultReplicationSlotsHASlotPrefix is the default prefix for names of replication slots used for HA.
 const DefaultReplicationSlotsHASlotPrefix = "_cnpg_"
@@ -544,8 +544,8 @@ type ReplicationSlotsConfiguration struct {
 	HighAvailability *ReplicationSlotsHAConfiguration `json:"highAvailability,omitempty"`
 
 	// Standby will update the status of the local replication slots
-	// every `updateInterval` seconds (default 300).
-	//+kubebuilder:default:=300
+	// every `updateInterval` seconds (default 30).
+	//+kubebuilder:default:=30
 	UpdateInterval int `json:"updateInterval,omitempty"`
 }
 
