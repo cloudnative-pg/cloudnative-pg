@@ -805,21 +805,21 @@ Name    | Description                                                           
 
 ReplicationSlotsConfiguration encapsulates the configuration of replication slots
 
-Name             | Description                                                                                   | Type                                                                
----------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------
-`highAvailability` | Replication slots for high availability configuration                                         | [*ReplicationSlotsHAConfiguration](#ReplicationSlotsHAConfiguration)
-`updateInterval  ` | Standby will update the status of the local replication slots every `updateInterval` seconds. | int                                                                 
+Name             | Description                                                                                                 | Type                                                                
+---------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------
+`highAvailability` | Replication slots for high availability configuration                                                       | [*ReplicationSlotsHAConfiguration](#ReplicationSlotsHAConfiguration)
+`updateInterval  ` | Standby will update the status of the local replication slots every `updateInterval` seconds (default 300). | int                                                                 
 
 <a id='ReplicationSlotsHAConfiguration'></a>
 
 ## ReplicationSlotsHAConfiguration
 
-ReplicationSlotsHAConfiguration encapsulates the configuration of replication slots for high availability
+ReplicationSlotsHAConfiguration encapsulates the configuration of the replication slots that are automatically managed by the operator to control the streaming replication connections with the standby instances for high availability (HA) purposes. Replication slots are a PostgreSQL feature that makes sure that PostgreSQL automatically keeps WAL files in the primary when a streaming client (in this specific case a replica that is part of the HA cluster) gets disconnected.
 
-Name       | Description                                                                                                                                                                                                                                                  | Type  
----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------
-`enabled   ` | If replication slots for high availability are enabled, the operator will automatically manage replication slots on the primary and designated primary instances and use them in the standby replication connections. This can only be set at creation time. - *mandatory*  | bool  
-`slotPrefix` | Prefix for replication slots managed by the operator for HA. It may only contain lower case letters, numbers, and the underscore character. This can only be set at creation time.                                                                           | string
+Name       | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Type  
+---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------
+`enabled   ` | If enabled, the operator will automatically manage replication slots on the primary instance and use them in streaming replication connections with all the standby instances that are part of the HA cluster. If disabled (default), the operator will not take advantage of replication slots in streaming connections with the replicas. This feature also controls replication slots in replica cluster, from the designated primary to its cascading replicas. This can only be set at creation time. - *mandatory*  | bool  
+`slotPrefix` | Prefix for replication slots managed by the operator for HA. It may only contain lower case letters, numbers, and the underscore character. This can only be set at creation time. By default set to `_cnpg_`.                                                                                                                                                                                                                                                                                             | string
 
 <a id='RollingUpdateStatus'></a>
 
