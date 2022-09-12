@@ -528,6 +528,7 @@ gzip
 hba
 hdr
 healthz
+highAvailability
 historyTags
 horikyota
 hostPort
@@ -749,6 +750,7 @@ recoverytarget
 recv
 redhat
 relatime
+replicationSlots
 replicationTLSSecret
 repmgr
 reportNonRedacted

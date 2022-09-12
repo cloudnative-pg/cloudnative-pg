@@ -199,11 +199,106 @@ as storage, CPU, or memory.
 
 ## Replication slots for High Availability
 
-Replication slots are a native PostgreSQL feature introduced in 9.4 that
-provide an automated way to ensure that the primary does not remove WAL
-segments until they have been received by all the attached standbys, and that
-the primary does not remove rows which could cause a recovery conflict even
-when the standby is (temporarily) disconnected.
+[Replication slots](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION-SLOTS)
+are a native PostgreSQL feature introduced in 9.4 that provide an automated way
+to ensure that the primary does not remove WAL segments until they have been
+received by all the attached streaming replication clients, and that the primary
+does not remove rows which could cause a recovery conflict even when the
+standby is (temporarily) disconnected.
 
-This feature is available for PostgreSQL 11 or higher.
+A replication slot exists solely on the instance that created it. It is not
+replicated by PostgreSQL on the standby servers. As a result, after a failover
+or a switchover, the new primary does not know anything about it, creating
+issues to the streaming replication clients that were connected to the old
+primary and have lost their slot.
 
+CloudNativePG fills this gap, by introducing the concept of cluster managed
+replication slots, starting with high availability ones. This feature
+automatically manages physical replication slots for each hot standby replica
+in the High Availability cluster, both in the primary and in the standby.
+
+For this reason, in CloudNativePG we use the terms:
+
+- **Primary HA slot**: a physical replication slot whose lifecycle is entirely
+  managed by the current primary of the cluster, and whose purpose is to map to
+  a specific standby in streaming replication. Such a slot lives on the primary
+  only.
+- **Standby HA slot**: a physical replication slot for a standby whose
+  lifecycle is entirely managed by another standby in the cluster, based on the
+  content of the `pg_replication_slots` view in the primary and updated at regular
+  intervals using `pg_replication_slot_advance()`.
+
+This feature, introduced in CloudNativePG 1.18, is automatically enabled by
+default. For details, please refer to the
+["replicationSlots" section in the API reference](api_reference.md#ReplicationSlotsConfiguration).
+Here follows a brief description of the main options:
+
+`.spec.replicationSlots.highAvailability.enabled`
+: if true, the feature is enabled (this is the default behavior)
+
+`.spec.replicationSlots.highAvailability.slotPrefix`
+: the prefix to be used to identify replication slots reserved to the operator
+  for this feature (default: `_cnpg_`)
+
+`.spec.replicationSlots.updateInterval`
+: how often the standby synchronizes the position of the local copy of the
+  standby with the one on the current primary, expressed in seconds (default: 30)
+
+!!! Important
+    This capability requires PostgreSQL 11 or higher, as it relies on the
+    [`pg_replication_slot_advance()` administration function](https://www.postgresql.org/docs/current/functions-admin.html)
+    to directly manipulate the position of a replication slot.
+
+Although it is not recommended, if you desire a different behavior, you can
+customize the above options.
+
+For example, the following manifest disables the option in the
+`cluster-example` cluster.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  # Disable replication slots for HA in the cluster
+  replicationSlots:
+    highAvailability:
+      enabled: false
+
+  storage:
+    size: 1Gi
+```
+
+The above could happen on a new cluster, or even on an existing one (in case
+you need to regain disk space and temporarily remove all the primary and
+standby replication slots in the cluster).
+
+Replication slots must be carefully monitored in your infrastructure. By default,
+we provide the `pg_replication_slots` metric in our Prometheus exporter with
+key information such as the name of the slot, the type, whether it is active,
+the lag from the primary.
+
+!!! Seealso "Monitoring"
+    Please refer to the ["Monitoring" section](monitoring.md) for details on
+    how to monitor a CloudNativePG deployment.
+
+You can also control the frequency for which a standby queries the
+`pg_replication_slots` view on the primary and updates the local copy of
+another standby's slot, like in this example:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  # Reduce the frequency of standby HA slots updates to to once every 5 minutes
+  replicationSlots:
+    updateInterval: 300
+
+  storage:
+    size: 1Gi
+```
