@@ -83,12 +83,19 @@ wal_receiver_timeout = '5s'
     It is your duty to plan for WAL segments retention in your PostgreSQL
     cluster and properly configure either `wal_keep_size` or `wal_keep_segments`,
     depending on the server version, based on the expected and observed workloads.
-    Until CloudNativePG supports replication slots, and if you don't have
-    continuous backup in place, this is the only way at the moment that protects
-    from the case of a standby falling out of sync and returning error messages like:
+    Alternatively, if the only consumers of your WAL files are the replicas
+    that participate in the High Availability cluster, you can take advantage of
+    the automated mechanism that CloudNativePG implements to maintain replication
+    slots at the cluster level and enable the `replicationSlots.highAvailability`
+    option (for more information, please refer to the ["Replication" section](replication.md).
+    Otherwise, if you don't have continuous backup in place, configuring
+    `wal_keep_size` or `wal_keep_segments` is the only way at the moment that
+    protects from the case of a standby falling out of sync and returning error
+    messages like:
     `"could not receive data from WAL stream: ERROR: requested WAL segment ************************ has already been removed"`.
-    This will require you to dedicate a part of your `PGDATA` to keep older
-    WAL segments for streaming replication purposes.
+    This will require you to dedicate a part of your `PGDATA`, or the volume
+    dedicated to storing WAL files, to keep older WAL segments for streaming
+    replication purposes.
 
 The following parameters are **fixed** and exclusively controlled by the operator:
 
