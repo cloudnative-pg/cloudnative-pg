@@ -71,6 +71,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
   and `pg_stat_statements`
 * Support for Local Persistent Volumes with PVC templates
 * Reuse of Persistent Volumes storage in Pods
+* Separate volume for WAL files
 * Rolling updates for PostgreSQL minor versions
 * In-place or rolling updates for operator upgrades
 * TLS connections and client certificate authentication
@@ -86,6 +87,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * PostgreSQL deployments across multiple Kubernetes
   clusters, enabling private, public, hybrid, and multi-cloud architectures
 * Support for Synchronous Replicas
+* Support for physical replication slots at the High Availability cluster cluster
 * Connection pooling with PgBouncer
 * Support for node affinity via `nodeSelector`
 * Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)

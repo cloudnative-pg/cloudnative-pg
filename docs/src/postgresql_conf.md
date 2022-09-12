@@ -87,7 +87,8 @@ wal_receiver_timeout = '5s'
     that participate in the High Availability cluster, you can take advantage of
     the automated mechanism that CloudNativePG implements to maintain replication
     slots at the cluster level and enable the `replicationSlots.highAvailability`
-    option (for more information, please refer to the ["Replication" section](replication.md).
+    option (for more information, please refer to the
+    ["Replication" section](replication.md#replication-slots-for-high-availability).
     Otherwise, if you don't have continuous backup in place, configuring
     `wal_keep_size` or `wal_keep_segments` is the only way at the moment that
     protects from the case of a standby falling out of sync and returning error
