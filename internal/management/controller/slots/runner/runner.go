@@ -70,6 +70,7 @@ func (sr *Replicator) Start(ctx context.Context) error {
 			// the process will resume through the wakeUp channel if necessary
 			if config == nil || config.HighAvailability == nil || !config.HighAvailability.Enabled {
 				ticker.Stop()
+				updateInterval = 0
 				continue
 			}
 
