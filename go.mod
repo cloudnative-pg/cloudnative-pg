@@ -26,7 +26,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/thoas/go-funk v0.9.2
 	go.uber.org/atomic v1.10.0
-	go.uber.org/zap v1.22.0
+	go.uber.org/zap v1.23.0
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.24.4
