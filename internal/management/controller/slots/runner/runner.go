@@ -133,6 +133,9 @@ func synchronizeReplicationSlots(
 		if slot.SlotName == mySlotName {
 			continue
 		}
+		if slot.RestartLSN == "" {
+			continue
+		}
 		if !slotsInLocal.Has(slot.SlotName) {
 			err := localSlotManager.Create(ctx, slot)
 			if err != nil {
