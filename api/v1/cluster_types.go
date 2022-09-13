@@ -1998,32 +1998,6 @@ func (cluster Cluster) GetSlotNameFromInstanceName(instanceName string) string {
 	return cluster.Spec.ReplicationSlots.HighAvailability.GetSlotNameFromInstanceName(instanceName)
 }
 
-// GetInstanceNameFromSlotName returns the instance name, given the slot name
-// It returns an empty string if is not able to match the given name to any instance
-func (cluster Cluster) GetInstanceNameFromSlotName(slotName string) string {
-	if cluster.Spec.ReplicationSlots == nil ||
-		cluster.Spec.ReplicationSlots.HighAvailability == nil {
-		return ""
-	}
-
-	slotPrefix := cluster.Spec.ReplicationSlots.HighAvailability.GetSlotPrefix()
-
-	if !strings.HasPrefix(slotName, slotPrefix) {
-		return ""
-	}
-
-	targetName := strings.TrimPrefix(slotName, slotPrefix)
-
-	for _, instanceName := range cluster.Status.InstanceNames {
-		sanitizedName := slotNameNegativeRegex.ReplaceAllString(strings.ToLower(instanceName), "_")
-		if targetName == sanitizedName {
-			return instanceName
-		}
-	}
-
-	return ""
-}
-
 // GetBarmanEndpointCAForReplicaCluster checks if this is a replica cluster which needs barman endpoint CA
 func (cluster Cluster) GetBarmanEndpointCAForReplicaCluster() *SecretKeySelector {
 	if !cluster.IsReplica() {

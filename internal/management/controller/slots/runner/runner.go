@@ -114,19 +114,24 @@ func synchronizeReplicationSlots(
 		"podName", podName,
 		"config", config)
 
-	slotsInPrimary, err := primarySlotManager.List(ctx, podName, config)
+	slotsInPrimary, err := primarySlotManager.List(ctx, config)
 	if err != nil {
 		return fmt.Errorf("getting replication slot status from primary: %v", err)
 	}
 	contextLog.Trace("primary slot status", "slotsInPrimary", slotsInPrimary)
 
-	slotsInLocal, err := localSlotManager.List(ctx, podName, config)
+	slotsInLocal, err := localSlotManager.List(ctx, config)
 	if err != nil {
 		return fmt.Errorf("getting replication slot status from local: %v", err)
 	}
 	contextLog.Trace("local slot status", "slotsInLocal", slotsInLocal)
 
+	mySlotName := config.HighAvailability.GetSlotNameFromInstanceName(podName)
+
 	for _, slot := range slotsInPrimary.Items {
+		if slot.SlotName == mySlotName {
+			continue
+		}
 		if !slotsInLocal.Has(slot.SlotName) {
 			err := localSlotManager.Create(ctx, slot)
 			if err != nil {
@@ -139,7 +144,7 @@ func synchronizeReplicationSlots(
 		}
 	}
 	for _, slot := range slotsInLocal.Items {
-		if !slotsInPrimary.Has(slot.SlotName) {
+		if !slotsInPrimary.Has(slot.SlotName) || slot.SlotName == mySlotName {
 			err := localSlotManager.Delete(ctx, slot)
 			if err != nil {
 				return err

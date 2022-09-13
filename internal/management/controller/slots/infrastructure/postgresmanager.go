@@ -19,7 +19,6 @@ package infrastructure
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -50,7 +49,6 @@ func (sm PostgresManager) String() string {
 // List the available replication slots
 func (sm PostgresManager) List(
 	ctx context.Context,
-	podName string,
 	config *v1.ReplicationSlotsConfiguration,
 ) (ReplicationSlotList, error) {
 	db, err := sm.pool.Connection("postgres")
@@ -60,10 +58,9 @@ func (sm PostgresManager) List(
 
 	rows, err := db.QueryContext(
 		ctx,
-		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::text, '') as restart_lsn FROM pg_replication_slots
-            WHERE NOT temporary AND slot_name ^@ $1 AND slot_name != $2 AND slot_type = 'physical'`,
+		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn FROM pg_replication_slots
+            WHERE NOT temporary AND slot_name ^@ $1 AND slot_type = 'physical'`,
 		config.HighAvailability.GetSlotPrefix(),
-		config.HighAvailability.GetSlotNameFromInstanceName(podName),
 	)
 	if err != nil {
 		return ReplicationSlotList{}, err
@@ -141,54 +138,4 @@ func (sm PostgresManager) Delete(ctx context.Context, slot ReplicationSlot) erro
 
 	_, err = db.ExecContext(ctx, "SELECT pg_drop_replication_slot($1)", slot.SlotName)
 	return err
-}
-
-// GetCurrentHAReplicationSlots retrieves the list of high availability replication slots
-func (sm PostgresManager) GetCurrentHAReplicationSlots(
-	instanceName string,
-	cluster *v1.Cluster,
-) (*ReplicationSlotList, error) {
-	if cluster.Spec.ReplicationSlots == nil ||
-		cluster.Spec.ReplicationSlots.HighAvailability == nil {
-		return nil, fmt.Errorf("unexpected HA replication slots configuration")
-	}
-
-	db, err := sm.pool.Connection("postgres")
-	if err != nil {
-		return nil, err
-	}
-
-	var replicationSlots ReplicationSlotList
-
-	rows, err := db.Query(
-		`SELECT slot_name, slot_type, active FROM pg_replication_slots
-            WHERE NOT temporary AND slot_name ^@ $1 AND slot_name != $2`,
-		cluster.Spec.ReplicationSlots.HighAvailability.GetSlotPrefix(),
-		cluster.GetSlotNameFromInstanceName(instanceName),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-	for rows.Next() {
-		var slot ReplicationSlot
-		err := rows.Scan(
-			&slot.SlotName,
-			&slot.Type,
-			&slot.Active,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		replicationSlots.Items = append(replicationSlots.Items, slot)
-	}
-
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-
-	return &replicationSlots, nil
 }
