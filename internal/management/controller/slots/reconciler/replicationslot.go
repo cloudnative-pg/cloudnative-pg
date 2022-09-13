@@ -19,6 +19,9 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
@@ -31,35 +34,36 @@ func ReconcileReplicationSlots(
 	instanceName string,
 	manager infrastructure.Manager,
 	cluster *apiv1.Cluster,
-) error {
+) (reconcile.Result, error) {
 	if cluster.Spec.ReplicationSlots == nil ||
 		cluster.Spec.ReplicationSlots.HighAvailability == nil {
-		return nil
+		return reconcile.Result{}, nil
+	}
+
+	// if the replication slots feature was deactivated, ensure any existing
+	// replication slots get cleaned up
+	if !cluster.Spec.ReplicationSlots.HighAvailability.Enabled {
+		return dropReplicationSlots(ctx, manager, cluster)
 	}
 
 	if cluster.Status.CurrentPrimary == instanceName || cluster.Status.TargetPrimary == instanceName {
 		return reconcilePrimaryReplicationSlots(ctx, manager, cluster)
 	}
-	return nil
+
+	return reconcile.Result{}, nil
 }
 
 func reconcilePrimaryReplicationSlots(
 	ctx context.Context,
 	manager infrastructure.Manager,
 	cluster *apiv1.Cluster,
-) error {
-	// if the replication slots feature was deactivated, ensure any existing
-	// replication slots get cleaned up
-	if !cluster.Spec.ReplicationSlots.HighAvailability.Enabled {
-		return dropPrimaryReplicationSlots(ctx, manager, cluster)
-	}
-
+) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Debug("Updating primary HA replication slots")
 
 	currentSlots, err := manager.List(ctx, cluster.Spec.ReplicationSlots)
 	if err != nil {
-		return err
+		return reconcile.Result{}, fmt.Errorf("reconciling primary replication slots: %w", err)
 	}
 
 	expectedSlots := make(map[string]bool)
@@ -79,7 +83,7 @@ func reconcilePrimaryReplicationSlots(
 
 		// at this point, the cluster instance does not have a replication slot
 		if err := manager.Create(ctx, infrastructure.ReplicationSlot{SlotName: slotName}); err != nil {
-			return fmt.Errorf("updating primary HA replication slots: %w", err)
+			return reconcile.Result{}, fmt.Errorf("creating primary HA replication slots: %w", err)
 		}
 	}
 
@@ -88,6 +92,7 @@ func reconcilePrimaryReplicationSlots(
 		"expectedSlots", expectedSlots)
 
 	// Delete any replication slots in the instance that is not from an existing cluster instance
+	needToReschedule := false
 	for _, slot := range currentSlots.Items {
 		if !expectedSlots[slot.SlotName] {
 			// Avoid deleting active slots.
@@ -95,44 +100,54 @@ func reconcilePrimaryReplicationSlots(
 			if slot.Active {
 				contextLogger.Trace("Skipping deletion of replication slot because it is active",
 					"slot", slot)
-				continue
+				needToReschedule = true
 			}
 			contextLogger.Trace("Attempt to delete replication slot",
 				"slot", slot)
 			if err := manager.Delete(ctx, slot); err != nil {
-				return fmt.Errorf("failure deleting replication slot %q: %w", slot.SlotName, err)
+				return reconcile.Result{}, fmt.Errorf("failure deleting replication slot %q: %w", slot.SlotName, err)
 			}
 		}
 	}
 
-	return nil
+	if needToReschedule {
+		return reconcile.Result{RequeueAfter: time.Second}, nil
+	}
+
+	return reconcile.Result{}, nil
 }
 
-func dropPrimaryReplicationSlots(
+func dropReplicationSlots(
 	ctx context.Context,
 	manager infrastructure.Manager,
 	cluster *apiv1.Cluster,
-) error {
+) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	// we fetch all replication slots
 	slots, err := manager.List(ctx, cluster.Spec.ReplicationSlots)
 	if err != nil {
-		return err
+		return reconcile.Result{}, err
 	}
 
+	needToReschedule := false
 	for _, slot := range slots.Items {
 		if slot.Active {
 			contextLogger.Trace("Skipping deletion of replication slot because it is active",
 				"slot", slot)
+			needToReschedule = true
 			continue
 		}
 		contextLogger.Trace("Attempt to delete replication slot",
 			"slot", slot)
 		if err := manager.Delete(ctx, slot); err != nil {
-			return fmt.Errorf("while disabling standby HA replication slots: %w", err)
+			return reconcile.Result{}, fmt.Errorf("while disabling standby HA replication slots: %w", err)
 		}
 	}
 
-	return nil
+	if needToReschedule {
+		return reconcile.Result{RequeueAfter: time.Second}, nil
+	}
+
+	return reconcile.Result{}, nil
 }

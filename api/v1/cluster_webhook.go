@@ -1550,15 +1550,15 @@ func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {
 	// when disabling we should check that the prefix it's not removed, and it doesn't change to
 	// properly execute the cleanup logic
 	if newReplicationSlots == nil || newReplicationSlots.HighAvailability == nil {
-		path := []string{"replicationSlots"}
+		path := field.NewPath("spec", "replicationSlots")
 		if newReplicationSlots != nil {
-			path = append(path, "highAvailability")
+			path = path.Child("highAvailability")
 		}
 		errs = append(errs,
 			field.Invalid(
-				field.NewPath("spec", path...),
+				path,
 				nil,
-				fmt.Sprintf("Cannot remove %v section while highAvailability is enabled", path[len(path)-1])),
+				fmt.Sprintf("Cannot remove %v section while highAvailability is enabled", path)),
 		)
 	} else if oldReplicationSlots.HighAvailability.SlotPrefix != newReplicationSlots.HighAvailability.SlotPrefix {
 		errs = append(errs,

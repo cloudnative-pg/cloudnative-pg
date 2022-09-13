@@ -100,7 +100,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance2"}]).To(BeTrue())
 
-		err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
+		_, err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeFalse())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeTrue())
@@ -121,7 +121,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 
-		err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
+		_, err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeFalse())
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(1))
@@ -140,7 +140,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
 
-		err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
+		_, err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: slotPrefix + "instance3", active: true}]).To(BeTrue())
 		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
