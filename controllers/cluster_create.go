@@ -26,7 +26,7 @@ import (
 	"github.com/sethvargo/go-password/password"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -313,13 +313,13 @@ func (r *ClusterReconciler) createPostgresServices(ctx context.Context, cluster 
 func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	pdb *v1beta1.PodDisruptionBudget,
+	pdb *policyv1.PodDisruptionBudget,
 ) error {
 	if pdb == nil {
 		return nil
 	}
 
-	var oldPdb v1beta1.PodDisruptionBudget
+	var oldPdb policyv1.PodDisruptionBudget
 
 	if err := r.Get(ctx, client.ObjectKey{Name: pdb.Name, Namespace: pdb.Namespace}, &oldPdb); err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -373,7 +373,7 @@ func (r *ClusterReconciler) deletePodDisruptionBudget(
 	key types.NamespacedName,
 ) error {
 	// If we have a PDB, we need to delete it
-	var targetPdb v1beta1.PodDisruptionBudget
+	var targetPdb policyv1.PodDisruptionBudget
 	err := r.Get(ctx, key, &targetPdb)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {

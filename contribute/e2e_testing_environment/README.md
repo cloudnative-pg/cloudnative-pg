@@ -58,7 +58,7 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 |--------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
 | -r\|--registry                       | Enable local registry. (Env: `ENABLE_REGISTRY`)                                                                               |
 | -e\|--engine <CLUSTER_ENGINE>        | Use the provided ENGINE to run the cluster. Available options are 'kind' and 'k3d'. Default 'kind'. (Env: `CLUSTER_ENGINE`)   |
-| -k\|--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.24.2`). (Env: `K8S_VERSION`)                                   |
+| -k\|--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.25.0`). (Env: `K8S_VERSION`)                                   |
 | -n\|--nodes <NODES>                  | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
 
 
@@ -160,7 +160,7 @@ the following ones can be defined:
   Default: `false`
 * `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
   the tests. Only useful if specified with `PRESERVE_CLUSTER=true`
-* `K8S_VERSION`: the version of K8s to run. Default: `v1.24.2`
+* `K8S_VERSION`: the version of K8s to run. Default: `v1.25.0`
 * `KIND_VERSION`: the version of `kind`. Defaults to the latest release
 * `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
   false to get the image from a registry. Default: `false`

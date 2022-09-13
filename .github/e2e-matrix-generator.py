@@ -66,9 +66,10 @@ class MajorVersionList(dict):
 # and the supported releases https://kubernetes.io/releases/
 K8S = VersionList(
     [
-        "v1.24.3",
-        "v1.23.6",
-        "v1.22.9",
+        "v1.25.0",
+        "v1.24.4",
+        "v1.23.10",
+        "v1.22.13",
     ]
 )
 

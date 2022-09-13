@@ -122,14 +122,19 @@ func (c *multiNamespaceCache) IndexField(
 
 // Methods for multiNamespaceCache to conform to the client.Reader interface.
 
-func (c *multiNamespaceCache) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+func (c *multiNamespaceCache) Get(
+	ctx context.Context,
+	key client.ObjectKey,
+	obj client.Object,
+	opts ...client.GetOption,
+) error {
 	// If the object we are looking for is in one of the watched namespaces just use
 	// the multi-cache, otherwise we can use the global one
 	if key.Namespace != "" && c.namespaces.Has(key.Namespace) {
 		return c.multiCache.Get(ctx, key, obj)
 	}
 
-	return c.externalCache.Get(ctx, key, obj)
+	return c.externalCache.Get(ctx, key, obj, opts...)
 }
 
 func (c *multiNamespaceCache) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
