@@ -79,8 +79,8 @@ hostssl replication streaming_replica all cert
     to the ["Certificates" section](certificates.md#client-streaming_replica-certificate)
     in the documentation.
 
-By default, the operator manages replication slots for all the replicas in the
-HA cluster, ensuring that WAL files required by each standby is retained on
+If desired, the operator manages replication slots for all the replicas in the
+HA cluster, ensuring that WAL files required by each standby are retained on
 the primary's storage, even after a failover or switchover even.
 
 !!! Seealso "Replication slots for High Availability"
@@ -213,7 +213,7 @@ issues to the streaming replication clients that were connected to the old
 primary and have lost their slot.
 
 CloudNativePG fills this gap, by introducing the concept of cluster managed
-replication slots, starting with high availability ones. This feature
+replication slots, starting with high availability ones. If enabled, this feature
 automatically manages physical replication slots for each hot standby replica
 in the High Availability cluster, both in the primary and in the standby.
 
@@ -228,8 +228,8 @@ For this reason, in CloudNativePG we use the terms:
   content of the `pg_replication_slots` view in the primary and updated at regular
   intervals using `pg_replication_slot_advance()`.
 
-This feature, introduced in CloudNativePG 1.18, is automatically enabled by
-default. For details, please refer to the
+This feature, introduced in CloudNativePG 1.18, can be enabled via configuration.
+For details, please refer to the
 ["replicationSlots" section in the API reference](api_reference.md#ReplicationSlotsConfiguration).
 Here follows a brief description of the main options:
 
@@ -252,7 +252,7 @@ Here follows a brief description of the main options:
 Although it is not recommended, if you desire a different behavior, you can
 customize the above options.
 
-For example, the following manifest disables the option in the
+For example, the following manifest enables the option in the
 `cluster-example` cluster.
 
 ```yaml
@@ -262,10 +262,10 @@ metadata:
   name: cluster-example
 spec:
   instances: 3
-  # Disable replication slots for HA in the cluster
+  # Enable replication slots for HA in the cluster
   replicationSlots:
     highAvailability:
-      enabled: false
+      enabled: true
 
   storage:
     size: 1Gi
@@ -297,6 +297,8 @@ spec:
   instances: 3
   # Reduce the frequency of standby HA slots updates to to once every 5 minutes
   replicationSlots:
+    highAvailability:
+      enabled: true
     updateInterval: 300
 
   storage:
