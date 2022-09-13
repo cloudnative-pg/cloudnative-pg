@@ -37,21 +37,6 @@ type fakeReplicationSlotManager struct {
 
 const slotPrefix = "_cnpg_"
 
-func (fk fakeReplicationSlotManager) GetCurrentHAReplicationSlots(
-	instanceName string,
-	cluster *apiv1.Cluster,
-) (*infrastructure.ReplicationSlotList, error) {
-	var slotList infrastructure.ReplicationSlotList
-	for slot := range fk.replicationSlots {
-		slotList.Items = append(slotList.Items, infrastructure.ReplicationSlot{
-			SlotName: slot.name,
-			Type:     infrastructure.SlotTypePhysical,
-			Active:   slot.active,
-		})
-	}
-	return &slotList, nil
-}
-
 func (fk fakeReplicationSlotManager) Create(ctx context.Context, slot infrastructure.ReplicationSlot) error {
 	fk.replicationSlots[fakeSlot{name: slot.SlotName}] = true
 	return nil
@@ -68,19 +53,16 @@ func (fk fakeReplicationSlotManager) Update(ctx context.Context, slot infrastruc
 
 func (fk fakeReplicationSlotManager) List(
 	ctx context.Context,
-	podName string,
 	config *apiv1.ReplicationSlotsConfiguration,
 ) (infrastructure.ReplicationSlotList, error) {
 	var slotList infrastructure.ReplicationSlotList
-	for slot, active := range fk.replicationSlots {
-		if slot.name != podName {
-			slotList.Items = append(slotList.Items, infrastructure.ReplicationSlot{
-				SlotName:   slot.name,
-				RestartLSN: "",
-				Type:       "physical",
-				Active:     active,
-			})
-		}
+	for slot := range fk.replicationSlots {
+		slotList.Items = append(slotList.Items, infrastructure.ReplicationSlot{
+			SlotName:   slot.name,
+			RestartLSN: "",
+			Type:       "physical",
+			Active:     slot.active,
+		})
 	}
 	return slotList, nil
 }

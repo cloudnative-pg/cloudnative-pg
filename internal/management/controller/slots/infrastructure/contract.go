@@ -26,16 +26,11 @@ import (
 // the database instance for the management of Replication Slots
 type Manager interface {
 	// List the available replication slots
-	List(
-		ctx context.Context,
-		podName string,
-		config *apiv1.ReplicationSlotsConfiguration,
-	) (ReplicationSlotList, error)
+	List(ctx context.Context, config *apiv1.ReplicationSlotsConfiguration) (ReplicationSlotList, error)
 	// Update the replication slot
 	Update(ctx context.Context, slot ReplicationSlot) error
 	// Create the replication slot
 	Create(ctx context.Context, slot ReplicationSlot) error
 	// Delete the replication slot
 	Delete(ctx context.Context, slot ReplicationSlot) error
-	GetCurrentHAReplicationSlots(instanceName string, cluster *apiv1.Cluster) (*ReplicationSlotList, error)
 }
