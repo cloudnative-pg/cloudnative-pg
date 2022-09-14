@@ -83,15 +83,18 @@ wal_receiver_timeout = '5s'
     It is your duty to plan for WAL segments retention in your PostgreSQL
     cluster and properly configure either `wal_keep_size` or `wal_keep_segments`,
     depending on the server version, based on the expected and observed workloads.
+
     Alternatively, if the only streaming replication clients are the replica instances
-    running in the High Availability cluster, you can take advantage of
-    the automated mechanism that CloudNativePG implements to maintain replication
-    slots at the cluster level and enable the `replicationSlots.highAvailability`
-    option (for more information, please refer to the
-    ["Replication" section](replication.md#replication-slots-for-high-availability).
-    Otherwise, if you don't have continuous backup in place, configuring
-    `wal_keep_size` or `wal_keep_segments` is the only way at the moment that
-    protects from the case of a standby falling out of sync and returning error
+    running in the High Availability cluster, you can take advantage of the
+    replication slots feature, which adds support for replication slots at the
+    cluster level. You can enable the feature with the
+    `replicationSlots.highAvailability` option (for more information, please refer to the
+    ["Replication" section](replication.md#replication-slots-for-high-availability).)
+
+    Without replication slots nor continuous backups in place, configuring
+    `wal_keep_size` or `wal_keep_segments` is the only way to
+    protect standbys from falling out of sync.
+    If a standby did fall out ouf sync it would produce error
     messages like:
     `"could not receive data from WAL stream: ERROR: requested WAL segment ************************ has already been removed"`.
     This will require you to dedicate a part of your `PGDATA`, or the volume
