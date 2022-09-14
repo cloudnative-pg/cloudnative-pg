@@ -83,8 +83,8 @@ wal_receiver_timeout = '5s'
     It is your duty to plan for WAL segments retention in your PostgreSQL
     cluster and properly configure either `wal_keep_size` or `wal_keep_segments`,
     depending on the server version, based on the expected and observed workloads.
-    Alternatively, if the only consumers of your WAL files are the replicas
-    that participate in the High Availability cluster, you can take advantage of
+    Alternatively, if the only streaming replication clients are the replica instances
+    running in the High Availability cluster, you can take advantage of
     the automated mechanism that CloudNativePG implements to maintain replication
     slots at the cluster level and enable the `replicationSlots.highAvailability`
     option (for more information, please refer to the

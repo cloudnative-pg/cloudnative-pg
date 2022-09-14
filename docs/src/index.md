@@ -87,7 +87,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * PostgreSQL deployments across multiple Kubernetes
   clusters, enabling private, public, hybrid, and multi-cloud architectures
 * Support for Synchronous Replicas
-* Support for physical replication slots at the High Availability cluster cluster
+* Support for HA physical replication slots at cluster level
 * Connection pooling with PgBouncer
 * Support for node affinity via `nodeSelector`
 * Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)
