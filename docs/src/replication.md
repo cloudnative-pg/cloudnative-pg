@@ -81,7 +81,7 @@ hostssl replication streaming_replica all cert
 
 If desired, the operator manages replication slots for all the replicas in the
 HA cluster, ensuring that WAL files required by each standby are retained on
-the primary's storage, even after a failover or switchover even.
+the primary's storage, even after a failover or switchover.
 
 !!! Seealso "Replication slots for High Availability"
     For details on how CloudNativePG automatically manages replication slots for the
@@ -200,27 +200,27 @@ as storage, CPU, or memory.
 ## Replication slots for High Availability
 
 [Replication slots](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION-SLOTS)
-are a native PostgreSQL feature introduced in 9.4 that provide an automated way
-to ensure that the primary does not remove WAL segments until they have been
-received by all the attached streaming replication clients, and that the primary
+are a native PostgreSQL feature introduced in 9.4 that provides an automated way
+to ensure that the primary does not remove WAL segments until all the attached
+streaming replication clients have received them, and that the primary
 does not remove rows which could cause a recovery conflict even when the
 standby is (temporarily) disconnected.
 
-A replication slot exists solely on the instance that created it. It is not
-replicated by PostgreSQL on the standby servers. As a result, after a failover
+A replication slot exists solely on the instance that created it, and PostgreSQL
+does not replicate it on the standby servers. As a result, after a failover
 or a switchover, the new primary does not know anything about it, creating
 issues to the streaming replication clients that were connected to the old
 primary and have lost their slot.
 
-CloudNativePG fills this gap, by introducing the concept of cluster managed
-replication slots, starting with high availability ones. If enabled, this feature
+CloudNativePG fills this gap by introducing the concept of cluster-managed
+replication slots, starting with high availability ones. This feature
 automatically manages physical replication slots for each hot standby replica
-in the High Availability cluster, both in the primary and in the standby.
+in the High Availability cluster, both in the primary and the standby.
 
-For this reason, in CloudNativePG we use the terms:
+For this reason, in CloudNativePG, we use the terms:
 
 - **Primary HA slot**: a physical replication slot whose lifecycle is entirely
-  managed by the current primary of the cluster, and whose purpose is to map to
+  managed by the current primary of the cluster and whose purpose is to map to
   a specific standby in streaming replication. Such a slot lives on the primary
   only.
 - **Standby HA slot**: a physical replication slot for a standby whose
@@ -237,7 +237,7 @@ Here follows a brief description of the main options:
 : if true, the feature is enabled (this is the default behavior)
 
 `.spec.replicationSlots.highAvailability.slotPrefix`
-: the prefix to be used to identify replication slots reserved to the operator
+: the prefix that identifies replication slots managed from the operator
   for this feature (default: `_cnpg_`)
 
 `.spec.replicationSlots.updateInterval`
@@ -270,10 +270,6 @@ spec:
   storage:
     size: 1Gi
 ```
-
-The above could happen on a new cluster, or even on an existing one (in case
-you need to regain disk space and temporarily remove all the primary and
-standby replication slots in the cluster).
 
 Replication slots must be carefully monitored in your infrastructure. By default,
 we provide the `pg_replication_slots` metric in our Prometheus exporter with
