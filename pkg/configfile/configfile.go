@@ -31,14 +31,27 @@ import (
 )
 
 // UpdatePostgresConfigurationFile search and replace options in a Postgres configuration file.
+// If any managedOptions is passed, it will be removed unless present in the options map.
 // If the configuration file doesn't exist, it will be written.
-func UpdatePostgresConfigurationFile(fileName string, options map[string]string) (changed bool, err error) {
+func UpdatePostgresConfigurationFile(
+	fileName string,
+	options map[string]string,
+	managedOptions ...string,
+) (changed bool, err error) {
 	rawCurrentContent, err := fileutils.ReadFile(fileName)
 	if err != nil {
 		return false, fmt.Errorf("error while reading content of %v: %w", fileName, err)
 	}
 
-	updatedContent, err := UpdateConfigurationContents(string(rawCurrentContent), options)
+	updatedContent := string(rawCurrentContent)
+
+	for _, option := range managedOptions {
+		if _, hasOption := options[option]; !hasOption {
+			updatedContent = RemoveOptionFromConfigurationContents(updatedContent, option)
+		}
+	}
+
+	updatedContent, err = UpdateConfigurationContents(updatedContent, options)
 	if err != nil {
 		return false, fmt.Errorf("error while updating configuration from %v: %w", fileName, err)
 	}

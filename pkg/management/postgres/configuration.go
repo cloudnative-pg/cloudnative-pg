@@ -188,7 +188,7 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 	}
 
 	if major < 12 {
-		return configureRecoveryConfFile(pgData, primaryConnInfo)
+		return configureRecoveryConfFile(pgData, primaryConnInfo, slotName)
 	}
 
 	if err := createStandbySignal(pgData); err != nil {
@@ -200,7 +200,7 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 
 // configureRecoveryConfFile configures replication in the recovery.conf file
 // for PostgreSQL 11 and earlier
-func configureRecoveryConfFile(pgData, primaryConnInfo string) (changed bool, err error) {
+func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, "recovery.conf")
 
 	options := map[string]string{
@@ -211,11 +211,20 @@ func configureRecoveryConfFile(pgData, primaryConnInfo string) (changed bool, er
 		"recovery_target_timeline": "latest",
 	}
 
+	if slotName != "" {
+		options["primary_slot_name"] = slotName
+	}
+
 	if primaryConnInfo != "" {
 		options["primary_conninfo"] = primaryConnInfo
 	}
 
-	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
+	changed, err = configfile.UpdatePostgresConfigurationFile(
+		targetFile,
+		options,
+		"primary_slot_name",
+		"primary_conninfo",
+	)
 	if err != nil {
 		return false, err
 	}
