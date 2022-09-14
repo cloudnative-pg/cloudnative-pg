@@ -42,6 +42,7 @@ jobs:
           static-args: |
             test_level=4
             depth=push
+            plugin=false
 
       - name: Add "ok to merge" label to CNPG PR
         uses: actions-ecosystem/action-add-labels@v1.1.3
