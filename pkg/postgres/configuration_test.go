@@ -158,7 +158,7 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 		libraries := strings.Split(config.GetConfig(SharedPreloadLibraries), ",")
 		Expect(len(info.AdditionalSharedPreloadLibraries)).To(BeNumerically(">", len(libraries)))
 		Expect(libraries).Should(SatisfyAll(
-			ContainElements("some_library", "another_library")), Not(ContainElement("")))
+			ContainElements("some_library", "another_library"), Not(ContainElement(""))))
 	})
 
 	When("we are using synchronous replication", func() {
