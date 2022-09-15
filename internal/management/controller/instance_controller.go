@@ -38,6 +38,8 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/reconciler"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
@@ -155,14 +157,16 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
-	isPrimary, err := r.instance.IsPrimary()
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	r.configureSlotReplicator(cluster)
+
 	// Reconcile replication slots
-	if err = reconcileReplicationSlots(ctx, r.instance, isPrimary, cluster); err != nil {
-		contextLogger.Error(err, "while reconciling replication slots")
-		return reconcile.Result{RequeueAfter: time.Second}, nil
+	if result, err := reconciler.ReconcileReplicationSlots(
+		ctx,
+		r.instance.PodName,
+		infrastructure.NewPostgresManager(r.instance.ConnectionPool()),
+		cluster,
+	); err != nil || !result.IsZero() {
+		return result, err
 	}
 
 	restarted, err := r.reconcilePrimary(ctx, cluster)
@@ -221,6 +225,20 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *InstanceReconciler) configureSlotReplicator(cluster *apiv1.Cluster) {
+	// If PostgreSQL is older than 11 never start the SlotReplicator
+	psqlVersion, err := cluster.GetPostgresqlVersion()
+	if err != nil || psqlVersion < 110000 {
+		r.instance.ConfigureSlotReplicator(nil)
+	}
+
+	if cluster.Status.CurrentPrimary == r.instance.PodName || cluster.Status.TargetPrimary == r.instance.PodName {
+		r.instance.ConfigureSlotReplicator(nil)
+	} else {
+		r.instance.ConfigureSlotReplicator(cluster.Spec.ReplicationSlots)
+	}
 }
 
 func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(

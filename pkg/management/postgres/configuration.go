@@ -180,22 +180,15 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 }
 
 // UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version
-// of PostgreSQL
-func UpdateReplicaConfiguration(pgData, clusterName, podName, slotName string) (changed bool, err error) {
-	primaryConnInfo := buildPrimaryConnInfo(clusterName+"-rw", podName)
-	return UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, slotName)
-}
-
-// UpdateReplicaConfigurationForPrimary updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
-func UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
+func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	major, err := postgresutils.GetMajorVersion(pgData)
 	if err != nil {
 		return false, err
 	}
 
 	if major < 12 {
-		return configureRecoveryConfFile(pgData, primaryConnInfo)
+		return configureRecoveryConfFile(pgData, primaryConnInfo, slotName)
 	}
 
 	if err := createStandbySignal(pgData); err != nil {
@@ -207,7 +200,7 @@ func UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo, slotName stri
 
 // configureRecoveryConfFile configures replication in the recovery.conf file
 // for PostgreSQL 11 and earlier
-func configureRecoveryConfFile(pgData, primaryConnInfo string) (changed bool, err error) {
+func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, "recovery.conf")
 
 	options := map[string]string{
@@ -218,11 +211,20 @@ func configureRecoveryConfFile(pgData, primaryConnInfo string) (changed bool, er
 		"recovery_target_timeline": "latest",
 	}
 
+	if slotName != "" {
+		options["primary_slot_name"] = slotName
+	}
+
 	if primaryConnInfo != "" {
 		options["primary_conninfo"] = primaryConnInfo
 	}
 
-	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
+	changed, err = configfile.UpdatePostgresConfigurationFile(
+		targetFile,
+		options,
+		"primary_slot_name",
+		"primary_conninfo",
+	)
 	if err != nil {
 		return false, err
 	}

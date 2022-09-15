@@ -78,7 +78,6 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 
 		assertFileExists(signalPath, "standby.signal")
 		assertFileExists(postgresAutoConf, "postgresql.auto.conf")
-		// TODO: check the content of primary_slot_name
 	})
 
 	It("should correctly restore pg_control from the pg_control.old file", func() {

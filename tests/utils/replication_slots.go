@@ -76,7 +76,7 @@ func GetRepSlotsOnPod(namespace, podName string, env *TestingEnvironment) ([]str
 
 	stdout, _, err := RunQueryFromPod(targetPod, PGLocalSocketDir,
 		"app", "postgres", "''",
-		"SELECT slot_name FROM pg_replication_slots", env)
+		"SELECT slot_name FROM pg_replication_slots  WHERE temporary = 'f' AND slot_type = 'physical'", env)
 	if err != nil {
 		return nil, err
 	}

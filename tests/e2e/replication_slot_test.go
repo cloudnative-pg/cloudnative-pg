@@ -15,6 +15,8 @@ package e2e
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -48,9 +50,19 @@ var _ = Describe("Replication Slot", func() {
 	})
 
 	It("can manage Replication slots for HA", func() {
+		AssertCreateNamespace(namespace, env)
+
+		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+			By("refusing to create a cluster for Postgres version < 11", func() {
+				err := CreateResourcesFromFileWithError(namespace, sampleFile)
+				Expect(err).Should(HaveOccurred())
+				Expect(err.Error()).Should(ContainSubstring("Cannot enable replication " +
+					"slot high availability. It requires PostgreSQL 11 or above"))
+			})
+			return
+		}
+
 		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		// Gather the current primary
