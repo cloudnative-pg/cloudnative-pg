@@ -27,11 +27,15 @@ import (
 // e.g. "2006-01-02T15:04:05Z07:00" --> "2006-01-02 15:04:05.000000Z07:00"
 // If the conversion fails, the input timestamp is returned as it is.
 func ConvertToPostgresFormat(timestamp string) string {
-	parsedTimestamp, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		return timestamp
+	if t, err := time.Parse(metav1.RFC3339Micro, timestamp); err == nil {
+		return t.Format("2006-01-02 15:04:05.000000Z07:00")
 	}
-	return parsedTimestamp.Format("2006-01-02 15:04:05.000000Z07:00")
+
+	if t, err := time.Parse(time.RFC3339, timestamp); err == nil {
+		return t.Format("2006-01-02 15:04:05.000000Z07:00")
+	}
+
+	return timestamp
 }
 
 // GetCurrentTimestamp returns the current timestamp as a string in RFC3339Micro format
