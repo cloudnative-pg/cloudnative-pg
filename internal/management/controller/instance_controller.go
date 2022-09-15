@@ -1001,10 +1001,15 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	if cluster.Status.CurrentPrimary != r.instance.PodName {
 		cluster.Status.CurrentPrimary = r.instance.PodName
 		cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
-		err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
-		if err != nil {
+
+		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
 			return restarted, err
 		}
+
+		if err := r.instance.DropConnections(); err != nil {
+			return restarted, err
+		}
+
 		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
 		return restarted, nil
 	}

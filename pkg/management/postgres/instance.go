@@ -924,3 +924,22 @@ func (instance *Instance) waitForInstanceRestarted(after time.Time) error {
 		return nil
 	})
 }
+
+// DropConnections drops all the connections of backend_type 'client backend'
+func (instance *Instance) DropConnections() error {
+	conn, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+
+	if _, err := conn.Exec(
+		`SELECT pg_terminate_backend(pid)
+			   FROM pg_stat_activity
+			   WHERE pid <> pg_backend_pid()
+			     AND backend_type = 'client backend';`,
+	); err != nil {
+		return fmt.Errorf("while dropping connections: %w", err)
+	}
+
+	return nil
+}
