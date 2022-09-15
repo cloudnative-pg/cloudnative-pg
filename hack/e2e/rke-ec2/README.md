@@ -57,11 +57,11 @@ Use a specific K8s version:
 
 ```
 Select a compatible k8s version from the ones listed under the
-terraform-provider-rke release being currently used (v1.2.3 as now):
-https://github.com/rancher/terraform-provider-rke/releases/tag/v1.2.3.
+terraform-provider-rke release being currently used (v1.3.3 as now):
+https://github.com/rancher/terraform-provider-rke/releases/tag/v1.3.3.
 
 # Export the version
-export TF_VAR_k8s_version=v1.19.10-rancher1-1
+export TF_VAR_k8s_version=v1.24.2-rancher1-1
 ```
 
 # AWS Resources

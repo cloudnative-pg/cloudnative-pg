@@ -15,7 +15,7 @@ variable "docker_install_url" {
 }
 
 variable "k8s_version" {
-  default = "v1.20.6-rancher1-1"
+  default = "v1.24.2-rancher1-1"
 }
 
 variable "cluster_name" {
