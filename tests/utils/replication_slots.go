@@ -80,10 +80,14 @@ func GetRepSlotsOnPod(namespace, podName string, env *TestingEnvironment) ([]str
 	if err != nil {
 		return nil, err
 	}
-
-	slots := strings.Split(strings.TrimSpace(stdout), "\n")
-	sort.Strings(slots)
-	return slots, err
+	var slots []string
+	// To avoid list with space entry when stdout value is empty
+	// then just skip split and return empty list.
+	if !(stdout == "") {
+		slots = strings.Split(strings.TrimSpace(stdout), "\n")
+		sort.Strings(slots)
+	}
+	return slots, nil
 }
 
 // GetRepSlotsLsnOnPod returns a slice containing the current restart_lsn values of each

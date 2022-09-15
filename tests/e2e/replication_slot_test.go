@@ -29,11 +29,11 @@ import (
 
 var _ = Describe("Replication Slot", func() {
 	const (
-		namespace   = "replication-slot-e2e"
-		sampleFile  = fixturesDir + "/replication_slot/cluster-pg-replication-slot.yaml.template"
-		clusterName = "cluster-pg-replication-slot"
-		level       = tests.High
+		sampleFile            = fixturesDir + "/replication_slot/cluster-pg-replication-slot.yaml.template"
+		sampleFileWithDisable = fixturesDir + "/replication_slot/cluster-pg-replication-slot-disable.yaml.template"
+		level                 = tests.High
 	)
+	var namespace, clusterName string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -50,6 +50,8 @@ var _ = Describe("Replication Slot", func() {
 	})
 
 	It("can manage Replication slots for HA", func() {
+		namespace = "replication-slot-e2e"
+		clusterName = "cluster-pg-replication-slot"
 		AssertCreateNamespace(namespace, env)
 
 		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
@@ -115,6 +117,92 @@ var _ = Describe("Replication Slot", func() {
 				AssertRepSlotsOnPod(namespace, clusterName, pod)
 			}
 			AssertClusterRepSlotsAligned(namespace, clusterName)
+		})
+	})
+
+	It("replication slots can manage on disable/enable", func() {
+		namespace = "replication-slot-disable-e2e"
+		clusterName = "cluster-pg-replication-slot-disable"
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, clusterName, sampleFileWithDisable, env)
+
+		By("verifying replication slots are not exists on cluster pods", func() {
+			pods, err := env.GetClusterPodList(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			for _, pod := range pods.Items {
+				Eventually(func() (int, error) {
+					slotOnPod, err := testsUtils.GetRepSlotsOnPod(namespace, pod.GetName(), env)
+					if err != nil {
+						return -1, err
+					}
+					return len(slotOnPod), nil
+				}, 60).Should(BeEquivalentTo(0))
+			}
+		})
+
+		By("enabling replication slot on cluster", func() {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			originalCluster := cluster.DeepCopy()
+			cluster.Spec.ReplicationSlots.HighAvailability.Enabled = true
+			err = env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(originalCluster))
+			Expect(err).ToNot(HaveOccurred())
+
+			// replication slot should be true
+			Consistently(func() (bool, error) {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				if err != nil {
+					return false, err
+				}
+				return cluster.Spec.ReplicationSlots.HighAvailability.Enabled, nil
+			}, 10, 2).Should(BeTrue())
+		})
+
+		By("checking Primary HA slots exist and are active", func() {
+			oldPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			AssertRepSlotsOnPod(namespace, clusterName, *oldPrimaryPod)
+		})
+
+		By("checking standbys HA slots exist", func() {
+			replicaPods, err := env.GetClusterReplicas(namespace, clusterName)
+			Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
+			for _, pod := range replicaPods.Items {
+				AssertRepSlotsOnPod(namespace, clusterName, pod)
+			}
+		})
+
+		By("checking all the slots restart_lsn's are aligned", func() {
+			AssertClusterRepSlotsAligned(namespace, clusterName)
+		})
+
+		By("disabling replication slot from running cluster", func() {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			originalCluster := cluster.DeepCopy()
+			cluster.Spec.ReplicationSlots.HighAvailability.Enabled = false
+			err = env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(originalCluster))
+			Expect(err).ToNot(HaveOccurred())
+
+			// check that, replication slot will disable
+			cluster, err = env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(cluster.Spec.ReplicationSlots.HighAvailability.Enabled).Should(BeFalse())
+		})
+
+		By("verifying slots has removed from cluster pods", func() {
+			pods, err := env.GetClusterPodList(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			for _, pod := range pods.Items {
+				Eventually(func() (int, error) {
+					slotOnPod, err := testsUtils.GetRepSlotsOnPod(namespace, pod.GetName(), env)
+					if err != nil {
+						return -1, err
+					}
+					return len(slotOnPod), nil
+				}, 90, 2).Should(BeEquivalentTo(0))
+			}
 		})
 	})
 })
