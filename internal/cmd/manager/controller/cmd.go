@@ -17,29 +17,50 @@ limitations under the License.
 package controller
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 )
 
 // NewCmd create a new cobra command
 func NewCmd() *cobra.Command {
 	var metricsAddr string
-	var enableLeaderElection bool
+	var leaderElectionEnable bool
 	var configMapName string
 	var secretName string
 	var port int
 	var pprofHTTPServer bool
+	var leaderLeaseDuration int
+	var leaderRenewDeadline int
 
 	cmd := cobra.Command{
 		Use: "controller [flags]",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return RunController(metricsAddr, configMapName, secretName, enableLeaderElection, pprofHTTPServer, port)
+			return RunController(
+				metricsAddr,
+				configMapName,
+				secretName,
+				leaderElectionConfiguration{
+					enable:        leaderElectionEnable,
+					leaseDuration: time.Duration(leaderLeaseDuration) * time.Second,
+					renewDeadline: time.Duration(leaderRenewDeadline) * time.Second,
+				},
+				pprofHTTPServer,
+				port,
+			)
 		},
 	}
 
 	cmd.Flags().StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	cmd.Flags().BoolVar(&enableLeaderElection, "leader-elect", false,
+
+	cmd.Flags().BoolVar(&leaderElectionEnable, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"If enabled, this will ensure there is only one active controller manager.")
+	cmd.Flags().IntVar(&leaderLeaseDuration, "leader-lease-duration", 15,
+		"the leader lease duration expressed in seconds")
+	cmd.Flags().IntVar(&leaderRenewDeadline, "leader-renew-deadline", 10,
+		"the leader renew deadline expressed in seconds")
+
 	cmd.Flags().StringVar(&configMapName, "config-map-name", "", "The name of the ConfigMap containing "+
 		"the operator configuration")
 	cmd.Flags().StringVar(&secretName, "secret-name", "", "The name of the Secret containing "+

@@ -94,6 +94,13 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+// leaderElectionConfiguration contains the leader parameters that will be passed to controllerruntime.Options.
+type leaderElectionConfiguration struct {
+	enable        bool
+	leaseDuration time.Duration
+	renewDeadline time.Duration
+}
+
 // RunController is the main procedure of the operator, and is used as the
 // controller-manager of the operator and as the controller of a certain
 // PostgreSQL instance.
@@ -104,7 +111,7 @@ func RunController(
 	metricsAddr,
 	configMapName,
 	secretName string,
-	enableLeaderElection,
+	leaderConfig leaderElectionConfiguration,
 	pprofDebug bool,
 	port int,
 ) error {
@@ -122,7 +129,9 @@ func RunController(
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		Port:               port,
-		LeaderElection:     enableLeaderElection,
+		LeaderElection:     leaderConfig.enable,
+		LeaseDuration:      &leaderConfig.leaseDuration,
+		RenewDeadline:      &leaderConfig.renewDeadline,
 		LeaderElectionID:   LeaderElectionID,
 		CertDir:            defaultWebhookCertDir,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
