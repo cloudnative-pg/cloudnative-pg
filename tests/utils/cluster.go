@@ -292,9 +292,13 @@ func (env TestingEnvironment) ScaleClusterSize(namespace, clusterName string, ne
 	return nil
 }
 
-// ClusterResourcesDump dump the cluster information as string
-func ClusterResourcesDump(namespace, clusterName string, env *TestingEnvironment) func() string {
+// ClusterResourcePrinter is a function that returns a string containing a summary of the cluster resources
+type ClusterResourcePrinter = func() string
+
+// NewClusterResourcePrinter returns a function that fetches and then prints a summary of the cluster resources
+func NewClusterResourcePrinter(namespace, clusterName string, env *TestingEnvironment) ClusterResourcePrinter {
 	return func() string {
+		// TODO: use tabby instead of strings?
 		line := "------------------------\n\n"
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
