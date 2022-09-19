@@ -115,16 +115,13 @@ var _ = AfterEach(func() {
 	if wasRestarted {
 		if !operatorLogDumped {
 			// get the PREVIOUS operator logs
-			lines, err := env.DumpOperatorLogs(wasRestarted)
+			requestedLineLength := 10
+			lines, err := env.DumpOperatorLogs(wasRestarted, requestedLineLength)
 			if err == nil {
 				operatorLogDumped = true
-				// print out a sample of the last logs
-				rangeBegin := len(lines) - 5
-				if rangeBegin < 0 {
-					rangeBegin = 0
-				}
+				// print out a sample of the last `requestedLineLength` lines of logs
 				GinkgoWriter.Println("DUMPING previous operator log:")
-				for _, line := range lines[rangeBegin:] {
+				for _, line := range lines {
 					GinkgoWriter.Println(line)
 				}
 			} else {

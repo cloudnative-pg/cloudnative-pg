@@ -117,7 +117,7 @@ func ClusterHasAnnotations(
 
 // DumpOperatorLogs dumps the operator logs to a file, and returns the log lines
 // as a slice.
-func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool) ([]string, error) {
+func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool, requestedLineLength int) ([]string, error) {
 	pod, err := env.GetOperatorPod()
 	if err != nil {
 		fmt.Println(err)
@@ -142,7 +142,7 @@ func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool) ([]string, erro
 	}()
 
 	_, _ = fmt.Fprintf(f, "Dumping operator pod %v log\n", pod.Name)
-	return logs.GetPodLogs(env.Ctx, pod, getPrevious, f)
+	return logs.GetPodLogs(env.Ctx, pod, getPrevious, f, requestedLineLength)
 }
 
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
