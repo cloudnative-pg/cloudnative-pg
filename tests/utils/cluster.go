@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
@@ -289,4 +290,62 @@ func (env TestingEnvironment) ScaleClusterSize(namespace, clusterName string, ne
 		return err
 	}
 	return nil
+}
+
+// ClusterResourcesDump dump the cluster information as string
+func ClusterResourcesDump(namespace, clusterName string, env *TestingEnvironment) func() string {
+	return func() string {
+		line := "------------------------\n\n"
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
+		cluster := &apiv1.Cluster{}
+
+		err := GetObject(env, namespacedName, cluster)
+		if err != nil {
+			return fmt.Sprintf("Error while Getting Object %v", err)
+		}
+
+		clusterDump := "Dumping more cluster information for analysis after failure \n\n"
+
+		clusterDump += "Cluster information:\n"
+		clusterDump += line
+		clusterDump += fmt.Sprintf("Spec.Instances: %d \nWal storage: %v \n",
+			cluster.Spec.Instances,
+			cluster.ShouldCreateWalArchiveVolume())
+
+		clusterDump += fmt.Sprintf("Cluster phase: %s \nPhase reason: %s \n"+
+			"Cluster target primary: %s \nCluster current primary: %s \n\n",
+			cluster.Status.Phase,
+			cluster.Status.PhaseReason,
+			cluster.Status.TargetPrimary,
+			cluster.Status.CurrentPrimary)
+
+		clusterDump += "Cluster Pods information: \n"
+		clusterDump += line
+		podList, _ := env.GetClusterPodList(cluster.GetNamespace(), cluster.GetName())
+		clusterDump += fmt.Sprintf("Ready pod: %d \n", utils.CountReadyPods(podList.Items))
+		for _, pod := range podList.Items {
+			clusterDump += fmt.Sprintf("Pod name: %s \nPod phase: %s \n", pod.Name, pod.Status.Phase)
+			if cluster.Status.InstancesReportedState != nil {
+				if instanceReportState, ok := cluster.Status.InstancesReportedState[apiv1.PodName(pod.Name)]; ok {
+					clusterDump += fmt.Sprintf("Is Primary: %v \nTimeLineID: %d \n\n",
+						instanceReportState.IsPrimary, instanceReportState.TimeLineID)
+				}
+			} else {
+				clusterDump += "InstanceReportState not exit \n\n"
+			}
+		}
+
+		clusterDump += "Cluster PVC information: \n"
+		clusterDump += line
+		clusterDump += fmt.Sprintf("Available PVCCount: %d \n", cluster.Status.PVCCount)
+		clusterDump += fmt.Sprintf("Dump all pvc under namespace %s \n\n", cluster.GetNamespace())
+		pvcList, _ := env.GetPVCList(cluster.GetNamespace())
+		for _, pvc := range pvcList.Items {
+			clusterDump += fmt.Sprintf("Pvc name: %s \nPvc phase: %s \n\n", pvc.Name, pvc.Status.Phase)
+		}
+		return clusterDump
+	}
 }
