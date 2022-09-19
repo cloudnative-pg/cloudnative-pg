@@ -201,5 +201,6 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 		AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
 
 		AssertWritesResumedBeforeTimeout(namespace, clusterName, maxSwitchoverTime)
+		AssertRepSlotsAreExistsAndAligned(namespace, clusterName)
 	})
 })

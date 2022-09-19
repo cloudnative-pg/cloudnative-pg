@@ -26,7 +26,7 @@ import (
 var _ = Describe("Switchover", func() {
 	const (
 		namespace   = "switchover-e2e"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		sampleFile  = fixturesDir + "/base/cluster-storage-class-with-repl-slots.yaml.template"
 		clusterName = "postgresql-storage-class"
 		level       = tests.Medium
 	)
@@ -52,5 +52,6 @@ var _ = Describe("Switchover", func() {
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		AssertSwitchover(namespace, clusterName, env)
 		AssertPvcHasLabels(namespace, clusterName)
+		AssertRepSlotsAreExistsAndAligned(namespace, clusterName)
 	})
 })

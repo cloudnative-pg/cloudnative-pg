@@ -96,6 +96,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 			namespace = "primary-failover-time"
 			clusterName = "cluster-fast-failover"
 			AssertFastFailOver(namespace, sampleFile, clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
+			AssertRepSlotsAreExistsAndAligned(namespace, clusterName)
 		})
 	})
 

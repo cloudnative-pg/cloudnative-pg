@@ -29,7 +29,7 @@ import (
 var _ = Describe("Cluster scale up and down", func() {
 	const (
 		namespace   = "cluster-scale-e2e-storage-class"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		sampleFile  = fixturesDir + "/base/cluster-storage-class-with-repl-slots.yaml.template"
 		clusterName = "postgresql-storage-class"
 		level       = tests.Lowest
 	)
@@ -54,6 +54,7 @@ var _ = Describe("Cluster scale up and down", func() {
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
+		AssertRepSlotsAreExistsAndAligned(clusterName, namespace)
 		// Add a node to the cluster and verify the cluster has one more
 		// element
 		By("adding an instance to the cluster", func() {
@@ -63,6 +64,7 @@ var _ = Describe("Cluster scale up and down", func() {
 			AssertClusterIsReady(namespace, clusterName, timeout, env)
 		})
 		AssertPvcHasLabels(namespace, clusterName)
+		AssertRepSlotsAreExistsAndAligned(clusterName, namespace)
 
 		// Remove a node from the cluster and verify the cluster has one
 		// element less
@@ -72,5 +74,6 @@ var _ = Describe("Cluster scale up and down", func() {
 			timeout := 60
 			AssertClusterIsReady(namespace, clusterName, timeout, env)
 		})
+		AssertRepSlotsAreExistsAndAligned(clusterName, namespace)
 	})
 })

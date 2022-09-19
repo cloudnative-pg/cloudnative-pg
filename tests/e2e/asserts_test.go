@@ -2560,3 +2560,14 @@ func AssertClusterRepSlotsAligned(
 		return testsUtils.CompareLsn(lsnList)
 	}, 300).Should(BeEquivalentTo(true))
 }
+
+func AssertRepSlotsAreExistsAndAligned(namespace, clusterName string) {
+	By("Checking that all the slots exist and are aligned", func() {
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		for _, pod := range podList.Items {
+			AssertRepSlotsOnPod(namespace, clusterName, pod)
+		}
+		AssertClusterRepSlotsAligned(namespace, clusterName)
+	})
+}
