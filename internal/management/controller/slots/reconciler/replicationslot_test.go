@@ -60,7 +60,7 @@ func (fk fakeReplicationSlotManager) List(
 		slotList.Items = append(slotList.Items, infrastructure.ReplicationSlot{
 			SlotName:   slot.name,
 			RestartLSN: "",
-			Type:       "physical",
+			Type:       infrastructure.SlotTypePhysical,
 			Active:     slot.active,
 		})
 	}

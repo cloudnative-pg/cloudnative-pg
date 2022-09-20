@@ -52,11 +52,6 @@ func (sr *Replicator) Start(ctx context.Context) error {
 			ticker.Stop()
 			contextLog.Info("Terminated slot Replicator loop")
 		}()
-		defer func() {
-			if r := recover(); r != nil {
-				contextLog.Warning("Recovered from a panic", "value", r)
-			}
-		}()
 
 		for {
 			select {
@@ -83,23 +78,36 @@ func (sr *Replicator) Start(ctx context.Context) error {
 				updateInterval = newUpdateInterval
 			}
 
-			primaryPool := sr.instance.PrimaryConnectionPool()
-			localPool := sr.instance.ConnectionPool()
-			err := synchronizeReplicationSlots(
-				ctx,
-				infrastructure.NewPostgresManager(primaryPool),
-				infrastructure.NewPostgresManager(localPool),
-				sr.instance.PodName,
-				config,
-			)
+			err := sr.reconcile(ctx, config)
 			if err != nil {
-				contextLog.Error(err, "synchronizing replication slots")
+				contextLog.Warning("synchronizing replication slots", "err", err)
 				continue
 			}
 		}
 	}()
 	<-ctx.Done()
 	return nil
+}
+
+func (sr *Replicator) reconcile(ctx context.Context, config *apiv1.ReplicationSlotsConfiguration) error {
+	var err error
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("recovered from a panic: %s", r)
+		}
+	}()
+
+	primaryPool := sr.instance.PrimaryConnectionPool()
+	localPool := sr.instance.ConnectionPool()
+	err = synchronizeReplicationSlots(
+		ctx,
+		infrastructure.NewPostgresManager(primaryPool),
+		infrastructure.NewPostgresManager(localPool),
+		sr.instance.PodName,
+		config,
+	)
+	return err
 }
 
 // synchronizeReplicationSlots aligns the slots in the local instance with those in the primary

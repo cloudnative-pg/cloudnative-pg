@@ -547,7 +547,7 @@ type ReplicationSlotsConfiguration struct {
 	// Standby will update the status of the local replication slots
 	// every `updateInterval` seconds (default 30).
 	//+kubebuilder:default:=30
-	//+kubebuilder:validation:Minimum=0
+	//+kubebuilder:validation:Minimum=1
 	UpdateInterval int `json:"updateInterval,omitempty"`
 }
 
@@ -602,15 +602,14 @@ func (r *ReplicationSlotsHAConfiguration) GetSlotNameFromInstanceName(instanceNa
 		return ""
 	}
 
-	sanitizedName := slotNameNegativeRegex.ReplaceAllString(strings.ToLower(instanceName), "_")
-
 	slotName := fmt.Sprintf(
 		"%s%s",
 		r.GetSlotPrefix(),
-		sanitizedName,
+		instanceName,
 	)
+	sanitizedName := slotNameNegativeRegex.ReplaceAllString(strings.ToLower(slotName), "_")
 
-	return slotName
+	return sanitizedName
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to

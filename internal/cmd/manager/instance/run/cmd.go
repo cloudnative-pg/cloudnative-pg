@@ -181,7 +181,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 
 	slotReplicator := runner.NewReplicator(instance)
 	if err = mgr.Add(slotReplicator); err != nil {
-		setupLog.Error(err, "unable to create slot slotReplicator")
+		setupLog.Error(err, "unable to create slot replicator")
 		return err
 	}
 

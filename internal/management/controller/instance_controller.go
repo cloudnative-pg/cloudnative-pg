@@ -159,7 +159,6 @@ func (r *InstanceReconciler) Reconcile(
 
 	r.configureSlotReplicator(cluster)
 
-	// Reconcile replication slots
 	if result, err := reconciler.ReconcileReplicationSlots(
 		ctx,
 		r.instance.PodName,
