@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
 // AllClusterPodsHaveLabels verifies if the labels defined in a map are included
@@ -114,6 +115,36 @@ func ClusterHasAnnotations(
 	return true
 }
 
+// DumpOperatorLogs dumps the operator logs to a file, and returns the log lines
+// as a slice.
+func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool, requestedLineLength int) ([]string, error) {
+	pod, err := env.GetOperatorPod()
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	filename := "out/operator_report_" + pod.Name + ".log"
+	f, err := os.Create(filepath.Clean(filename))
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	defer func() {
+		syncErr := f.Sync()
+		if err == nil && syncErr != nil {
+			err = syncErr
+		}
+		closeErr := f.Close()
+		if err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
+
+	_, _ = fmt.Fprintf(f, "Dumping operator pod %v log\n", pod.Name)
+	return logs.GetPodLogs(env.Ctx, pod, getPrevious, f, requestedLineLength)
+}
+
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
 func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename string) {
 	f, err := os.Create(filepath.Clean(filename))
@@ -121,6 +152,10 @@ func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename st
 		fmt.Println(err)
 		return
 	}
+	defer func() {
+		_ = f.Sync()
+		_ = f.Close()
+	}()
 	w := bufio.NewWriter(f)
 	clusterList := &apiv1.ClusterList{}
 	_ = GetObjectList(&env, clusterList, client.InNamespace(namespace))
@@ -200,8 +235,6 @@ func (env TestingEnvironment) DumpNamespaceObjects(namespace string, filename st
 		fmt.Println(err)
 		return
 	}
-	_ = f.Sync()
-	_ = f.Close()
 }
 
 // GetCluster gets a cluster given name and namespace
