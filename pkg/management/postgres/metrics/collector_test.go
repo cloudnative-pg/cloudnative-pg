@@ -108,5 +108,45 @@ var _ = Describe("QueryCollector tests", func() {
 			Expect(desc).To(ContainSubstring("TEST_NAMESPACE_TEST_COLUMN"))
 			Expect(desc).To(ContainSubstring("TEST_VARIABLE"))
 		})
+
+		Context("fetch label testing", func() {
+			It("should correctly fetch the mapped labels", func() {
+				qc := QueryCollector{
+					columnMapping: map[string]MetricMap{
+						"LABEL_ENABLED": {
+							Label: true,
+						},
+						"LABEL_NOT_ENABLED": {
+							Label: false,
+						},
+					},
+				}
+				labels, success := qc.collectLabels(
+					[]string{"LABEL_ENABLED", "LABEL_NOT_ENABLED"},
+					[]interface{}{"SHOULD_FETCH", "SHOULD_NOT_FETCH"},
+				)
+				Expect(success).To(BeTrue())
+				Expect(labels).To(HaveLen(1))
+				Expect(labels).To(ContainElements("SHOULD_FETCH"))
+			})
+
+			It("should report success false when the fetched data conversion is not supported", func() {
+				qc := QueryCollector{
+					columnMapping: map[string]MetricMap{
+						"LABEL_ENABLED": {
+							Label: true,
+						},
+					},
+				}
+				labels, success := qc.collectLabels(
+					[]string{"LABEL_ENABLED"},
+					// int is not supported
+					[]interface{}{234},
+				)
+
+				Expect(success).To(BeFalse())
+				Expect(labels).To(BeZero())
+			})
+		})
 	})
 })
