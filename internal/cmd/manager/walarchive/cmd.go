@@ -345,14 +345,14 @@ func buildArchiveCondition(err error) *apiv1.ClusterCondition {
 		return &apiv1.ClusterCondition{
 			Type:    apiv1.ConditionContinuousArchiving,
 			Status:  apiv1.ConditionFalse,
-			Reason:  "Continuous Archiving is Failing",
+			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 			Message: err.Error(),
 		}
 	}
 	return &apiv1.ClusterCondition{
 		Type:    apiv1.ConditionContinuousArchiving,
 		Status:  apiv1.ConditionTrue,
-		Reason:  "Continuous Archiving is Working",
+		Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
 		Message: "",
 	}
 }
