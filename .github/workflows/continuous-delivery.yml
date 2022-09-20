@@ -790,7 +790,7 @@ jobs:
         run: |
           pr_number=$(gh pr view --json number -q .number 2>/dev/null || : )
           echo "::set-output name=pr_number::${pr_number}"
-          ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null || : | grep "ok to merge")
+          ok_label=$((gh pr view --json labels -q ".labels.[].name" 2>/dev/null || :) | grep "ok to merge")
           echo "::set-output name=ok_label::${ok_label}"
       -
         name: Label the PR as "ok to merge"
@@ -825,7 +825,7 @@ jobs:
         run: |
           pr_number=$(gh pr view --json number -q .number 2>/dev/null || : )
           echo "::set-output name=pr_number::${pr_number}"
-          ok_label=$(gh pr view --json labels -q ".labels.[].name" 2>/dev/null || : | grep "ok to merge")
+          ok_label=$((gh pr view --json labels -q ".labels.[].name" 2>/dev/null || :) | grep "ok to merge")
           echo "::set-output name=ok_label::${ok_label}"
       - name: Remove "ok to merge" label from PR
         if: |
