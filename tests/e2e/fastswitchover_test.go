@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -36,13 +37,15 @@ import (
 
 var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func() {
 	const (
-		namespace   = "primary-switchover-time"
-		sampleFile  = fixturesDir + "/fastswitchover/cluster-fast-switchover.yaml.template"
-		webTestFile = fixturesDir + "/fastswitchover/webtest.yaml"
-		webTestJob  = fixturesDir + "/fastswitchover/apache-benchmark-webtest.yaml"
-		clusterName = "cluster-fast-switchover"
-		level       = tests.Highest
+		namespace                     = "primary-switchover-time"
+		sampleFileWithReplSlotsEnable = fixturesDir + "/fastswitchover/cluster-fast-switchover-with-repl-slots.yaml.template"
+		sampleFileWithoutReplSlots    = fixturesDir + "/fastswitchover/cluster-fast-switchover.yaml.template"
+		webTestFile                   = fixturesDir + "/fastswitchover/webtest.yaml"
+		webTestJob                    = fixturesDir + "/fastswitchover/apache-benchmark-webtest.yaml"
+		clusterName                   = "cluster-fast-switchover"
+		level                         = tests.Highest
 	)
+	sampleFile := sampleFileWithReplSlotsEnable
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -73,6 +76,11 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 		Expect(err).ToNot(HaveOccurred())
 
 		var oldPrimary, targetPrimary string
+
+		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+			// Cluster file without replication slot since it requires PostgreSQL 11 or above
+			sampleFile = sampleFileWithoutReplSlots
+		}
 
 		By(fmt.Sprintf("having a %v namespace", namespace), func() {
 			// Creating a namespace should be quick

@@ -21,6 +21,11 @@ spec:
       database: app
       owner: app
 
+  replicationSlots:
+    updateInterval: 10
+    highAvailability:
+      enabled: true
+      slotPrefix: _cnpg_
 
   # Example of rolling update strategy:
   # - unsupervised: automated update of the primary once all

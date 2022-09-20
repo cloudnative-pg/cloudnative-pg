@@ -18,6 +18,8 @@ package e2e
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
@@ -27,13 +29,15 @@ import (
 
 var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() {
 	const (
-		sampleFile             = fixturesDir + "/fastfailover/cluster-fast-failover.yaml.template"
-		sampleFileSyncReplicas = fixturesDir + "/fastfailover/cluster-syncreplicas-fast-failover.yaml.template"
-		webTestFile            = fixturesDir + "/fastfailover/webtest.yaml"
-		webTestSyncReplicas    = fixturesDir + "/fastfailover/webtest-syncreplicas.yaml"
-		webTestJob             = fixturesDir + "/fastfailover/apache-benchmark-webtest.yaml"
-		level                  = tests.Highest
+		sampleFileWithoutReplSlots    = fixturesDir + "/fastfailover/cluster-fast-failover.yaml.template"
+		sampleFileWithReplSlotsEnable = fixturesDir + "/fastfailover/cluster-fast-failover-with-repl-slots.yaml.template"
+		sampleFileSyncReplicas        = fixturesDir + "/fastfailover/cluster-syncreplicas-fast-failover.yaml.template"
+		webTestFile                   = fixturesDir + "/fastfailover/webtest.yaml"
+		webTestSyncReplicas           = fixturesDir + "/fastfailover/webtest-syncreplicas.yaml"
+		webTestJob                    = fixturesDir + "/fastfailover/apache-benchmark-webtest.yaml"
+		level                         = tests.Highest
 	)
+	sampleFile := sampleFileWithReplSlotsEnable
 	var (
 		namespace       string
 		clusterName     string
@@ -87,6 +91,10 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 	})
 
 	Context("with async replicas cluster", func() {
+		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+			// Cluster file without replication slot since it requires PostgreSQL 11 or above
+			sampleFile = sampleFileWithoutReplSlots
+		}
 		// Confirm that a standby closely following the primary doesn't need more
 		// than 10 seconds to be promoted and be able to start inserting records.
 		// We test this setting up an application pointing to the rw service,

@@ -2,7 +2,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-fast-switchover
+  name: cluster-fast-failover
 spec:
   instances: 3
 
@@ -15,12 +15,16 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
-      wal_receiver_timeout: '2s'
   bootstrap:
     initdb:
       database: app
       owner: app
 
+  replicationSlots:
+    updateInterval: 10
+    highAvailability:
+      enabled: true
+      slotPrefix: _cnpg_
 
   # Example of rolling update strategy:
   # - unsupervised: automated update of the primary once all

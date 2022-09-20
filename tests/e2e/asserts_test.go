@@ -2562,7 +2562,13 @@ func AssertClusterRepSlotsAligned(
 }
 
 func AssertRepSlotsAreExistsAndAligned(namespace, clusterName string) {
-	By("Checking that all the slots exist and are aligned", func() {
+	// Replication slot high availability requires PostgreSQL 11 or above
+	if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+		GinkgoWriter.Printf("Ignoring replication slots verification for postgres 10")
+		return
+	}
+
+	By("verifying all replication slots exist and are aligned", func() {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
@@ -2570,4 +2576,31 @@ func AssertRepSlotsAreExistsAndAligned(namespace, clusterName string) {
 		}
 		AssertClusterRepSlotsAligned(namespace, clusterName)
 	})
+}
+
+// AssertClusterRollingRestart restart given cluster
+func AssertClusterRollingRestart(namespace, clusterName string) {
+	By(fmt.Sprintf("restarting cluster %v", clusterName), func() {
+		cluster, err := env.GetCluster(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		clusterRestarted := cluster.DeepCopy()
+		if clusterRestarted.Annotations == nil {
+			clusterRestarted.Annotations = make(map[string]string)
+		}
+		clusterRestarted.Annotations[specs.ClusterRestartAnnotationName] = time.Now().Format(time.RFC3339)
+		clusterRestarted.ManagedFields = nil
+		err = env.Client.Patch(env.Ctx, clusterRestarted, ctrlclient.MergeFrom(cluster))
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By("waiting for cluster goes to upgrading state", func() {
+		// waiting for cluster phase goes to "Upgrading cluster" after restart the cluster.
+		Eventually(func() bool {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			return cluster.Status.Phase == apiv1.PhaseUpgrade
+		}, 120, 3).Should(BeTrue())
+	})
+	// wait for cluster phase goes to "Cluster in healthy state"
+	AssertClusterIsReady(namespace, clusterName, 300, env)
 }

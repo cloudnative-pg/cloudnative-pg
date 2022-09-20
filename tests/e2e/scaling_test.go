@@ -18,6 +18,8 @@ package e2e
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -28,11 +30,13 @@ import (
 
 var _ = Describe("Cluster scale up and down", func() {
 	const (
-		namespace   = "cluster-scale-e2e-storage-class"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class-with-repl-slots.yaml.template"
-		clusterName = "postgresql-storage-class"
-		level       = tests.Lowest
+		namespace                     = "cluster-scale-e2e-storage-class"
+		sampleFileWithoutReplSlots    = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		sampleFileWithReplSlotsEnable = fixturesDir + "/base/cluster-storage-class-with-repl-slots.yaml.template"
+		clusterName                   = "postgresql-storage-class"
+		level                         = tests.Lowest
 	)
+	sampleFile := sampleFileWithReplSlotsEnable
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -49,6 +53,11 @@ var _ = Describe("Cluster scale up and down", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 	It("can scale the cluster size", func() {
+		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+			// Cluster file without replication slot since it requires PostgreSQL 11 or above
+			sampleFile = sampleFileWithoutReplSlots
+		}
+
 		// Create a cluster in a namespace we'll delete after the test
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())

@@ -29,9 +29,9 @@ import (
 
 var _ = Describe("Replication Slot", func() {
 	const (
-		sampleFile            = fixturesDir + "/replication_slot/cluster-pg-replication-slot.yaml.template"
-		sampleFileWithDisable = fixturesDir + "/replication_slot/cluster-pg-replication-slot-disable.yaml.template"
-		level                 = tests.High
+		sampleFileWithRSEnable  = fixturesDir + "/replication_slot/cluster-pg-replication-slot.yaml.template"
+		sampleFileWithRSDisable = fixturesDir + "/replication_slot/cluster-pg-replication-slot-disable.yaml.template"
+		level                   = tests.High
 	)
 	var namespace, clusterName string
 	BeforeEach(func() {
@@ -56,7 +56,7 @@ var _ = Describe("Replication Slot", func() {
 
 		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
 			By("refusing to create a cluster for Postgres version < 11", func() {
-				err := CreateResourcesFromFileWithError(namespace, sampleFile)
+				err := CreateResourcesFromFileWithError(namespace, sampleFileWithRSEnable)
 				Expect(err).Should(HaveOccurred())
 				Expect(err.Error()).Should(ContainSubstring("Cannot enable replication " +
 					"slot high availability. It requires PostgreSQL 11 or above"))
@@ -65,7 +65,7 @@ var _ = Describe("Replication Slot", func() {
 		}
 
 		// Create a cluster in a namespace we'll delete after the test
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		AssertCreateCluster(namespace, clusterName, sampleFileWithRSEnable, env)
 
 		// Gather the current primary
 		oldPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
@@ -125,28 +125,14 @@ var _ = Describe("Replication Slot", func() {
 		clusterName = "cluster-pg-replication-slot-disable"
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFileWithDisable, env)
-
-		By("verifying replication slots are not exists on cluster pods", func() {
-			pods, err := env.GetClusterPodList(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			for _, pod := range pods.Items {
-				Eventually(func() (int, error) {
-					slotOnPod, err := testsUtils.GetRepSlotsOnPod(namespace, pod.GetName(), env)
-					if err != nil {
-						return -1, err
-					}
-					return len(slotOnPod), nil
-				}, 60).Should(BeEquivalentTo(0))
-			}
-		})
+		AssertCreateCluster(namespace, clusterName, sampleFileWithRSDisable, env)
 
 		By("enabling replication slot on cluster", func() {
 			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			originalCluster := cluster.DeepCopy()
-			cluster.Spec.ReplicationSlots.HighAvailability.Enabled = true
-			err = env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(originalCluster))
+			clusterEnableRepSlot := cluster.DeepCopy()
+			clusterEnableRepSlot.Spec.ReplicationSlots.HighAvailability.Enabled = true
+			err = env.Client.Patch(env.Ctx, clusterEnableRepSlot, ctrlclient.MergeFrom(cluster))
 			Expect(err).ToNot(HaveOccurred())
 
 			// replication slot should be true
@@ -159,10 +145,17 @@ var _ = Describe("Replication Slot", func() {
 			}, 10, 2).Should(BeTrue())
 		})
 
+		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":11") {
+			// We need to take into account the fact that on PostgreSQL 11
+			// it is required to rolling restart the cluster to
+			// enable or disable the feature once the cluster is created.
+			AssertClusterRollingRestart(namespace, clusterName)
+		}
+
 		By("checking Primary HA slots exist and are active", func() {
-			oldPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertRepSlotsOnPod(namespace, clusterName, *oldPrimaryPod)
+			AssertRepSlotsOnPod(namespace, clusterName, *primaryPod)
 		})
 
 		By("checking standbys HA slots exist", func() {
@@ -180,9 +173,9 @@ var _ = Describe("Replication Slot", func() {
 		By("disabling replication slot from running cluster", func() {
 			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			originalCluster := cluster.DeepCopy()
-			cluster.Spec.ReplicationSlots.HighAvailability.Enabled = false
-			err = env.Client.Patch(env.Ctx, cluster, ctrlclient.MergeFrom(originalCluster))
+			clusterDisableReplSlot := cluster.DeepCopy()
+			clusterDisableReplSlot.Spec.ReplicationSlots.HighAvailability.Enabled = false
+			err = env.Client.Patch(env.Ctx, clusterDisableReplSlot, ctrlclient.MergeFrom(cluster))
 			Expect(err).ToNot(HaveOccurred())
 
 			// check that, replication slot will disable
@@ -190,6 +183,13 @@ var _ = Describe("Replication Slot", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cluster.Spec.ReplicationSlots.HighAvailability.Enabled).Should(BeFalse())
 		})
+
+		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":11") {
+			// We need to take into account the fact that on PostgreSQL 11
+			// it is required to rolling restart the cluster to
+			// enable or disable the feature once the cluster is created.
+			AssertClusterRollingRestart(namespace, clusterName)
+		}
 
 		By("verifying slots has removed from cluster pods", func() {
 			pods, err := env.GetClusterPodList(namespace, clusterName)

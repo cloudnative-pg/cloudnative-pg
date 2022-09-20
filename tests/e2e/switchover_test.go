@@ -17,6 +17,9 @@ limitations under the License.
 package e2e
 
 import (
+	"os"
+	"strings"
+
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -25,11 +28,14 @@ import (
 
 var _ = Describe("Switchover", func() {
 	const (
-		namespace   = "switchover-e2e"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class-with-repl-slots.yaml.template"
-		clusterName = "postgresql-storage-class"
-		level       = tests.Medium
+		namespace                     = "switchover-e2e"
+		sampleFileWithoutReplSlots    = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		sampleFileWithReplSlotsEnable = fixturesDir + "/base/cluster-storage-class-with-repl-slots.yaml.template"
+		clusterName                   = "postgresql-storage-class"
+		level                         = tests.Medium
 	)
+
+	sampleFile := sampleFileWithReplSlotsEnable
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -49,6 +55,10 @@ var _ = Describe("Switchover", func() {
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 
+		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+			// Cluster file without replication slot since it requires PostgreSQL 11 or above
+			sampleFile = sampleFileWithoutReplSlots
+		}
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		AssertSwitchover(namespace, clusterName, env)
 		AssertPvcHasLabels(namespace, clusterName)
