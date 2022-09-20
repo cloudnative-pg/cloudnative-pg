@@ -18,11 +18,14 @@ package utils
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/tabwriter"
 
+	"github.com/cheynewallace/tabby"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -298,58 +301,64 @@ type ClusterResourcePrinter = func() string
 // NewClusterResourcePrinter returns a function that fetches and then prints a summary of the cluster resources
 func NewClusterResourcePrinter(namespace, clusterName string, env *TestingEnvironment) ClusterResourcePrinter {
 	return func() string {
-		// TODO: use tabby instead of strings?
-		line := "------------------------\n\n"
 		namespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      clusterName,
 		}
 		cluster := &apiv1.Cluster{}
-
 		err := GetObject(env, namespacedName, cluster)
 		if err != nil {
 			return fmt.Sprintf("Error while Getting Object %v", err)
 		}
 
-		clusterDump := "Dumping more cluster information for analysis after failure \n\n"
+		buffer := &bytes.Buffer{}
+		w := tabwriter.NewWriter(buffer, 0, 0, 4, ' ', 0)
+		clusterInfo := tabby.NewCustom(w)
+		clusterInfo.AddLine("Timeout while waiting for cluster ready, dumping more cluster information for analysis...")
+		clusterInfo.AddLine()
+		clusterInfo.AddLine()
+		clusterInfo.AddLine("Cluster information:")
+		clusterInfo.AddHeader("Items", "Values")
+		clusterInfo.AddLine("Spec.Instances", cluster.Spec.Instances)
+		clusterInfo.AddLine("Wal storage", cluster.ShouldCreateWalArchiveVolume())
+		clusterInfo.AddLine("Cluster phase", cluster.Status.Phase)
+		clusterInfo.AddLine("Phase reason", cluster.Status.PhaseReason)
+		clusterInfo.AddLine("Cluster target primary", cluster.Status.TargetPrimary)
+		clusterInfo.AddLine("Cluster current primary", cluster.Status.CurrentPrimary)
+		clusterInfo.AddLine()
 
-		clusterDump += "Cluster information:\n"
-		clusterDump += line
-		clusterDump += fmt.Sprintf("Spec.Instances: %d \nWal storage: %v \n",
-			cluster.Spec.Instances,
-			cluster.ShouldCreateWalArchiveVolume())
-
-		clusterDump += fmt.Sprintf("Cluster phase: %s \nPhase reason: %s \n"+
-			"Cluster target primary: %s \nCluster current primary: %s \n\n",
-			cluster.Status.Phase,
-			cluster.Status.PhaseReason,
-			cluster.Status.TargetPrimary,
-			cluster.Status.CurrentPrimary)
-
-		clusterDump += "Cluster Pods information: \n"
-		clusterDump += line
 		podList, _ := env.GetClusterPodList(cluster.GetNamespace(), cluster.GetName())
-		clusterDump += fmt.Sprintf("Ready pod: %d \n", utils.CountReadyPods(podList.Items))
+
+		clusterInfo.AddLine("Cluster Pods information:")
+		clusterInfo.AddLine("Ready pod number: ", utils.CountReadyPods(podList.Items))
+		clusterInfo.AddLine()
+		clusterInfo.AddHeader("Items", "Values")
 		for _, pod := range podList.Items {
-			clusterDump += fmt.Sprintf("Pod name: %s \nPod phase: %s \n", pod.Name, pod.Status.Phase)
+			clusterInfo.AddLine("Pod name", pod.Name)
+			clusterInfo.AddLine("Pod phase", pod.Status.Phase)
 			if cluster.Status.InstancesReportedState != nil {
 				if instanceReportState, ok := cluster.Status.InstancesReportedState[apiv1.PodName(pod.Name)]; ok {
-					clusterDump += fmt.Sprintf("Is Primary: %v \nTimeLineID: %d \n\n",
-						instanceReportState.IsPrimary, instanceReportState.TimeLineID)
+					clusterInfo.AddLine("Is Primary", instanceReportState.IsPrimary)
+					clusterInfo.AddLine("TimeLineID", instanceReportState.TimeLineID)
+					clusterInfo.AddLine("---", "---")
 				}
 			} else {
-				clusterDump += "InstanceReportState not exit \n\n"
+				clusterInfo.AddLine("InstanceReportState not exit", "")
 			}
 		}
 
-		clusterDump += "Cluster PVC information: \n"
-		clusterDump += line
-		clusterDump += fmt.Sprintf("Available PVCCount: %d \n", cluster.Status.PVCCount)
-		clusterDump += fmt.Sprintf("Dump all pvc under namespace %s \n\n", cluster.GetNamespace())
 		pvcList, _ := env.GetPVCList(cluster.GetNamespace())
+		clusterInfo.AddLine()
+		clusterInfo.AddLine("Cluster PVC information: (dumping all pvc under the namespace)")
+		clusterInfo.AddLine("Available PVCCount", cluster.Status.PVCCount)
+		clusterInfo.AddLine()
+		clusterInfo.AddHeader("Items", "Values")
 		for _, pvc := range pvcList.Items {
-			clusterDump += fmt.Sprintf("Pvc name: %s \nPvc phase: %s \n\n", pvc.Name, pvc.Status.Phase)
+			clusterInfo.AddLine("PVC name", pvc.Name)
+			clusterInfo.AddLine("PVC phase", pvc.Status.Phase)
+			clusterInfo.AddLine("---", "---")
 		}
-		return clusterDump
+		clusterInfo.Print()
+		return buffer.String()
 	}
 }
