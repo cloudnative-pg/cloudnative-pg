@@ -481,14 +481,14 @@ func BuildBackupCondition(err error) *apiv1.ClusterCondition {
 		return &apiv1.ClusterCondition{
 			Type:    apiv1.ConditionBackup,
 			Status:  apiv1.ConditionFalse,
-			Reason:  "Last backup failed",
+			Reason:  string(apiv1.ConditionReasonLastBackupFailed),
 			Message: err.Error(),
 		}
 	}
 	return &apiv1.ClusterCondition{
 		Type:    apiv1.ConditionBackup,
 		Status:  apiv1.ConditionTrue,
-		Reason:  "Last backup succeeded",
+		Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
 		Message: "",
 	}
 }
