@@ -69,6 +69,11 @@ func DefaultWebapp(namespace string, name string, rootCASecretName string, tlsSe
 							MountPath: "/etc/secrets/tls",
 						},
 					},
+					SecurityContext: &corev1.SecurityContext{
+						RunAsNonRoot:             boolPtr(false),
+						AllowPrivilegeEscalation: boolPtr(false),
+						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+					},
 				},
 			},
 		},
