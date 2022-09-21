@@ -114,6 +114,7 @@ GPL
 GUC
 GUCs
 Gabriele
+GaugeVec
 Gi
 Golang
 GolangCI
@@ -441,6 +442,7 @@ cryptographic
 csvlog
 csvs
 ctl
+curlimages
 currentPrimary
 customQueriesConfigMap
 customQueriesSecret
