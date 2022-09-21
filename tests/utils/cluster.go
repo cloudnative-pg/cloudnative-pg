@@ -18,16 +18,20 @@ package utils
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/tabwriter"
 
+	"github.com/cheynewallace/tabby"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
@@ -274,4 +278,92 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 	}
 	err = fmt.Errorf("no primary found")
 	return &corev1.Pod{}, err
+}
+
+// GetClusterReplicas gets a slice containing all the replica pods of a cluster
+func (env TestingEnvironment) GetClusterReplicas(namespace string, clusterName string) (*corev1.PodList, error) {
+	podList := &corev1.PodList{}
+	err := GetObjectList(&env, podList, client.InNamespace(namespace),
+		client.MatchingLabels{"postgresql": clusterName, "role": "replica"},
+	)
+	if err != nil {
+		return podList, err
+	}
+	if len(podList.Items) > 0 {
+		return podList, nil
+	}
+	err = fmt.Errorf("no replicas found")
+	return podList, err
+}
+
+// ScaleClusterSize scales a cluster to the requested size
+func (env TestingEnvironment) ScaleClusterSize(namespace, clusterName string, newClusterSize int) error {
+	cluster, err := env.GetCluster(namespace, clusterName)
+	if err != nil {
+		return err
+	}
+	originalCluster := cluster.DeepCopy()
+	cluster.Spec.Instances = newClusterSize
+	err = env.Client.Patch(env.Ctx, cluster, client.MergeFrom(originalCluster))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// ClusterResourcePrinter is a function that returns a string containing a summary of the cluster resources
+type ClusterResourcePrinter = func() string
+
+// NewClusterResourcePrinter returns a function that fetches and then prints a summary of the cluster resources
+func NewClusterResourcePrinter(namespace, clusterName string, env *TestingEnvironment) ClusterResourcePrinter {
+	return func() string {
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      clusterName,
+		}
+		cluster := &v1.Cluster{}
+		err := GetObject(env, namespacedName, cluster)
+		if err != nil {
+			return fmt.Sprintf("Error while Getting Object %v", err)
+		}
+
+		buffer := &bytes.Buffer{}
+		w := tabwriter.NewWriter(buffer, 0, 0, 4, ' ', 0)
+		clusterInfo := tabby.NewCustom(w)
+		clusterInfo.AddLine("Timeout while waiting for cluster ready, dumping more cluster information for analysis...")
+		clusterInfo.AddLine()
+		clusterInfo.AddLine()
+		clusterInfo.AddLine("Cluster information:")
+		clusterInfo.AddHeader("Items", "Values")
+		clusterInfo.AddLine("Spec.Instances", cluster.Spec.Instances)
+		clusterInfo.AddLine("Cluster phase", cluster.Status.Phase)
+		clusterInfo.AddLine("Phase reason", cluster.Status.PhaseReason)
+		clusterInfo.AddLine("Cluster target primary", cluster.Status.TargetPrimary)
+		clusterInfo.AddLine("Cluster current primary", cluster.Status.CurrentPrimary)
+		clusterInfo.AddLine()
+
+		podList, _ := env.GetClusterPodList(cluster.GetNamespace(), cluster.GetName())
+
+		clusterInfo.AddLine("Cluster Pods information:")
+		clusterInfo.AddLine("Ready pod number: ", utils.CountReadyPods(podList.Items))
+		clusterInfo.AddLine()
+		clusterInfo.AddHeader("Items", "Values")
+		for _, pod := range podList.Items {
+			clusterInfo.AddLine("Pod name", pod.Name)
+			clusterInfo.AddLine("Pod phase", pod.Status.Phase)
+		}
+
+		pvcList, _ := env.GetPVCList(cluster.GetNamespace())
+		clusterInfo.AddLine()
+		clusterInfo.AddLine("Cluster PVC information: (dumping all pvc under the namespace)")
+		clusterInfo.AddLine("Available PVCCount", cluster.Status.PVCCount)
+		clusterInfo.AddLine()
+		clusterInfo.AddHeader("Items", "Values")
+		for _, pvc := range pvcList.Items {
+			clusterInfo.AddLine("PVC name", pvc.Name)
+			clusterInfo.AddLine("PVC phase", pvc.Status.Phase)
+			clusterInfo.AddLine("---", "---")
+		}
+		return buffer.String()
+	}
 }
