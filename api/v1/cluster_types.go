@@ -19,6 +19,9 @@ package v1
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -156,6 +159,9 @@ type ClusterSpec struct {
 	// Configuration of the PostgreSQL server
 	// +optional
 	PostgresConfiguration PostgresConfiguration `json:"postgresql,omitempty"`
+
+	// Replication slots management configuration
+	ReplicationSlots *ReplicationSlotsConfiguration `json:"replicationSlots,omitempty"`
 
 	// Instructions to bootstrap this cluster
 	// +optional
@@ -423,6 +429,9 @@ type ClusterStatus struct {
 
 	// Conditions for cluster object
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// List of instance names in the cluster
+	InstanceNames []string `json:"instanceNames,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -521,6 +530,86 @@ type ReplicaClusterConfiguration struct {
 	// The name of the external cluster which is the replication origin
 	// +kubebuilder:validation:MinLength=1
 	Source string `json:"source"`
+}
+
+// DefaultReplicationSlotsUpdateInterval is the default in seconds for the replication slots update interval
+const DefaultReplicationSlotsUpdateInterval = 30
+
+// DefaultReplicationSlotsHASlotPrefix is the default prefix for names of replication slots used for HA.
+const DefaultReplicationSlotsHASlotPrefix = "_cnpg_"
+
+// ReplicationSlotsConfiguration encapsulates the configuration
+// of replication slots
+type ReplicationSlotsConfiguration struct {
+	// Replication slots for high availability configuration
+	HighAvailability *ReplicationSlotsHAConfiguration `json:"highAvailability,omitempty"`
+
+	// Standby will update the status of the local replication slots
+	// every `updateInterval` seconds (default 30).
+	//+kubebuilder:default:=30
+	//+kubebuilder:validation:Minimum=1
+	UpdateInterval int `json:"updateInterval,omitempty"`
+}
+
+// GetUpdateInterval returns the update interval, defaulting to DefaultReplicationSlotsUpdateInterval if empty
+func (r *ReplicationSlotsConfiguration) GetUpdateInterval() time.Duration {
+	if r == nil || r.UpdateInterval <= 0 {
+		return DefaultReplicationSlotsUpdateInterval
+	}
+	return time.Duration(r.UpdateInterval) * time.Second
+}
+
+// ReplicationSlotsHAConfiguration encapsulates the configuration
+// of the replication slots that are automatically managed by
+// the operator to control the streaming replication connections
+// with the standby instances for high availability (HA) purposes.
+// Replication slots are a PostgreSQL feature that makes sure
+// that PostgreSQL automatically keeps WAL files in the primary
+// when a streaming client (in this specific case a replica that
+// is part of the HA cluster) gets disconnected.
+type ReplicationSlotsHAConfiguration struct {
+	// If enabled, the operator will automatically manage replication slots
+	// on the primary instance and use them in streaming replication
+	// connections with all the standby instances that are part of the HA
+	// cluster. If disabled (default), the operator will not take advantage
+	// of replication slots in streaming connections with the replicas.
+	// This feature also controls replication slots in replica cluster,
+	// from the designated primary to its cascading replicas. This can only
+	// be set at creation time.
+	// +optional
+	Enabled bool `json:"enabled"`
+
+	// Prefix for replication slots managed by the operator for HA.
+	// It may only contain lower case letters, numbers, and the underscore character.
+	// This can only be set at creation time. By default set to `_cnpg_`.
+	//+kubebuilder:default:=_cnpg_
+	//+kubebuilder:validation:Pattern=^[0-9a-z_]*$
+	SlotPrefix string `json:"slotPrefix,omitempty"`
+}
+
+// GetSlotPrefix returns the HA slot prefix, defaulting to DefaultReplicationSlotsHASlotPrefix if empty
+func (r *ReplicationSlotsHAConfiguration) GetSlotPrefix() string {
+	if r == nil || r.SlotPrefix == "" {
+		return DefaultReplicationSlotsHASlotPrefix
+	}
+	return r.SlotPrefix
+}
+
+// GetSlotNameFromInstanceName returns the slot name, given the instance name.
+// It returns an empty string if High Availability Replication Slots are disabled
+func (r *ReplicationSlotsHAConfiguration) GetSlotNameFromInstanceName(instanceName string) string {
+	if r == nil || !r.Enabled {
+		return ""
+	}
+
+	slotName := fmt.Sprintf(
+		"%s%s",
+		r.GetSlotPrefix(),
+		instanceName,
+	)
+	sanitizedName := slotNameNegativeRegex.ReplaceAllString(strings.ToLower(slotName), "_")
+
+	return sanitizedName
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to
@@ -999,7 +1088,7 @@ type StorageConfiguration struct {
 //
 // In future synchronous replica election restriction by name will be supported.
 type SyncReplicaElectionConstraints struct {
-	// This flag enabled the constraints for sync replicas
+	// This flag enables the constraints for sync replicas
 	Enabled bool `json:"enabled"`
 
 	// A list of node labels values to extract and compare to evaluate if the pods reside in the same topology or not
@@ -1892,6 +1981,20 @@ func (cluster Cluster) ExternalCluster(name string) (ExternalCluster, bool) {
 // IsReplica checks if this is a replica cluster or not
 func (cluster Cluster) IsReplica() bool {
 	return cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.Enabled
+}
+
+var slotNameNegativeRegex = regexp.MustCompile("[^a-z0-9_]+")
+
+// GetSlotNameFromInstanceName returns the slot name, given the instance name.
+// It returns an empty string if High Availability Replication Slots are disabled
+func (cluster Cluster) GetSlotNameFromInstanceName(instanceName string) string {
+	if cluster.Spec.ReplicationSlots == nil ||
+		cluster.Spec.ReplicationSlots.HighAvailability == nil ||
+		!cluster.Spec.ReplicationSlots.HighAvailability.Enabled {
+		return ""
+	}
+
+	return cluster.Spec.ReplicationSlots.HighAvailability.GetSlotNameFromInstanceName(instanceName)
 }
 
 // GetBarmanEndpointCAForReplicaCluster checks if this is a replica cluster which needs barman endpoint CA

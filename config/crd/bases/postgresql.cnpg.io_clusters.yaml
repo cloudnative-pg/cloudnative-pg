@@ -1995,7 +1995,7 @@ spec:
                       set up.
                     properties:
                       enabled:
-                        description: This flag enabled the constraints for sync replicas
+                        description: This flag enables the constraints for sync replicas
                         type: boolean
                       nodeLabelsAntiAffinity:
                         description: A list of node labels values to extract and compare
@@ -2044,6 +2044,39 @@ spec:
                     type: string
                 required:
                 - source
+                type: object
+              replicationSlots:
+                description: Replication slots management configuration
+                properties:
+                  highAvailability:
+                    description: Replication slots for high availability configuration
+                    properties:
+                      enabled:
+                        description: If enabled, the operator will automatically manage
+                          replication slots on the primary instance and use them in
+                          streaming replication connections with all the standby instances
+                          that are part of the HA cluster. If disabled (default),
+                          the operator will not take advantage of replication slots
+                          in streaming connections with the replicas. This feature
+                          also controls replication slots in replica cluster, from
+                          the designated primary to its cascading replicas. This can
+                          only be set at creation time.
+                        type: boolean
+                      slotPrefix:
+                        default: _cnpg_
+                        description: Prefix for replication slots managed by the operator
+                          for HA. It may only contain lower case letters, numbers,
+                          and the underscore character. This can only be set at creation
+                          time. By default set to `_cnpg_`.
+                        pattern: ^[0-9a-z_]*$
+                        type: string
+                    type: object
+                  updateInterval:
+                    default: 30
+                    description: Standby will update the status of the local replication
+                      slots every `updateInterval` seconds (default 30).
+                    minimum: 1
+                    type: integer
                 type: object
               resources:
                 description: Resources requirements of every generated Pod. Please
@@ -2658,6 +2691,11 @@ spec:
               initializingPVC:
                 description: List of all the PVCs that are being initialized by this
                   cluster
+                items:
+                  type: string
+                type: array
+              instanceNames:
+                description: List of instance names in the cluster
                 items:
                   type: string
                 type: array

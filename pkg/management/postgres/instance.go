@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -129,6 +130,9 @@ type Instance struct {
 	// Pool of DB connections pointing to every used database
 	pool *pool.ConnectionPool
 
+	// Pool of DB connections pointing to primary instance
+	primaryPool *pool.ConnectionPool
+
 	// The namespace of the k8s object representing this cluster
 	Namespace string
 
@@ -174,6 +178,9 @@ type Instance struct {
 	// fenced specifies whether fencing is on for the instance
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
+
+	// slotsReplicatorChan is used to send replication slot configuration to the slot replicator
+	slotsReplicatorChan chan *apiv1.ReplicationSlotsConfiguration
 }
 
 // IsFenced checks whether the instance is marked as fenced
@@ -209,6 +216,18 @@ func (instance *Instance) SetMightBeUnavailable(enabled bool) {
 	instance.mightBeUnavailable.Store(enabled)
 }
 
+// ConfigureSlotReplicator sends the configuration to the slot replicator
+func (instance *Instance) ConfigureSlotReplicator(config *apiv1.ReplicationSlotsConfiguration) {
+	go func() {
+		instance.slotsReplicatorChan <- config
+	}()
+}
+
+// SlotReplicatorChan returns the communication channel to the slot replicator
+func (instance *Instance) SlotReplicatorChan() <-chan *apiv1.ReplicationSlotsConfiguration {
+	return instance.slotsReplicatorChan
+}
+
 // InstanceCommand are commands for the goroutine managing postgres
 type InstanceCommand string
 
@@ -235,6 +254,7 @@ func NewInstance() *Instance {
 	return &Instance{
 		SocketDirectory:     postgres.SocketDirectory,
 		instanceCommandChan: make(chan InstanceCommand),
+		slotsReplicatorChan: make(chan *apiv1.ReplicationSlotsConfiguration),
 	}
 }
 
@@ -312,10 +332,12 @@ func (instance *Instance) Startup() error {
 
 // ShutdownConnections tears down database connections
 func (instance *Instance) ShutdownConnections() {
-	if instance.pool == nil {
-		return
+	if instance.pool != nil {
+		instance.pool.ShutdownConnections()
 	}
-	instance.pool.ShutdownConnections()
+	if instance.primaryPool != nil {
+		instance.primaryPool.ShutdownConnections()
+	}
 }
 
 // Shutdown shuts down a PostgreSQL instance which was previously started
@@ -519,6 +541,15 @@ func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
 	return instance.pool
 }
 
+// PrimaryConnectionPool gets or initializes the primary connection pool for this instance
+func (instance *Instance) PrimaryConnectionPool() *pool.ConnectionPool {
+	if instance.primaryPool == nil {
+		instance.primaryPool = pool.NewConnectionPool(instance.GetPrimaryConnInfo())
+	}
+
+	return instance.primaryPool
+}
+
 // IsPrimary check if the data directory belongs to a primary server or to a
 // secondary one by looking for a "standby.signal" file inside the data
 // directory. IMPORTANT: this method also works when the instance is not
@@ -543,19 +574,17 @@ func (instance *Instance) IsPrimary() (bool, error) {
 	return true, nil
 }
 
-// Demote demote an existing PostgreSQL instance
-func (instance *Instance) Demote() error {
-	log.Info("Demoting instance",
-		"pgpdata", instance.PgData)
-
-	_, err := UpdateReplicaConfiguration(instance.PgData, instance.ClusterName, instance.PodName)
+// Demote demotes an existing PostgreSQL instance
+func (instance *Instance) Demote(cluster *apiv1.Cluster) error {
+	log.Info("Demoting instance", "pgpdata", instance.PgData)
+	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
+	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
 	return err
 }
 
 // WaitForPrimaryAvailable waits until we can connect to the primary
 func (instance *Instance) WaitForPrimaryAvailable() error {
-	primaryConnInfo := buildPrimaryConnInfo(
-		instance.ClusterName+"-rw", instance.PodName) + " dbname=postgres connect_timeout=5"
+	primaryConnInfo := instance.GetPrimaryConnInfo() + " dbname=postgres connect_timeout=5"
 
 	log.Info("Waiting for the new primary to be available",
 		"primaryConnInfo", primaryConnInfo)
@@ -724,7 +753,7 @@ func (instance *Instance) Rewind(postgresMajorVersion int) error {
 
 	instance.LogPgControldata("before pg_rewind")
 
-	primaryConnInfo := buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
+	primaryConnInfo := instance.GetPrimaryConnInfo()
 	options := []string{
 		"-P",
 		"--source-server", primaryConnInfo + " dbname=postgres",
@@ -919,4 +948,9 @@ func (instance *Instance) DropConnections() error {
 	}
 
 	return nil
+}
+
+// GetPrimaryConnInfo returns the DSN to reach the primary
+func (instance *Instance) GetPrimaryConnInfo() string {
+	return buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
 }

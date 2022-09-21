@@ -795,3 +795,51 @@ var _ = Describe("Barman credentials", func() {
 		}.ArePopulated()).To(BeTrue())
 	})
 })
+
+var _ = Describe("Replication slots names for instances", func() {
+	It("returns an empty name when no replication slots are configured", func() {
+		cluster := Cluster{}
+		Expect(cluster.GetSlotNameFromInstanceName("cluster-example-1")).To(BeEmpty())
+
+		cluster = Cluster{
+			Spec: ClusterSpec{
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: nil,
+					UpdateInterval:   0,
+				},
+			},
+		}
+		Expect(cluster.GetSlotNameFromInstanceName("cluster-example-1")).To(BeEmpty())
+	})
+
+	It("returns the name of the slot for an instance when they are configured", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled: true,
+					},
+					UpdateInterval: 0,
+				},
+			},
+		}
+		Expect(cluster.GetSlotNameFromInstanceName("cluster-example-1")).To(Equal(
+			"_cnpg_cluster_example_1"))
+	})
+
+	It("sanitizes the name of replication slots", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled:    true,
+						SlotPrefix: "%232'test_",
+					},
+					UpdateInterval: 0,
+				},
+			},
+		}
+		Expect(cluster.GetSlotNameFromInstanceName("cluster-example-1")).To(Equal(
+			"_232_test_cluster_example_1"))
+	})
+})

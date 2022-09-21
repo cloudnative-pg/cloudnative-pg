@@ -36,6 +36,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run/lifecycle"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/runner"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -175,6 +176,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 
 	if err = mgr.Add(lifecycle.NewPostgresOrphansReaper(instance)); err != nil {
 		setupLog.Error(err, "unable to create zombie reaper")
+		return err
+	}
+
+	slotReplicator := runner.NewReplicator(instance)
+	if err = mgr.Add(slotReplicator); err != nil {
+		setupLog.Error(err, "unable to create slot replicator")
 		return err
 	}
 

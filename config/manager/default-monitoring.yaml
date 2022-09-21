@@ -129,6 +129,32 @@ data:
             usage: "GAUGE"
             description: "Number of streaming replicas connected to the instance"
 
+    pg_replication_slots:
+      query: |
+        SELECT slot_name,
+          slot_type,
+          database,
+          active,
+          pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), restart_lsn)
+        FROM pg_catalog.pg_replication_slots
+        WHERE NOT temporary
+      metrics:
+        - slot_name:
+            usage: "LABEL"
+            description: "Name of the replication slot"
+        - slot_type:
+            usage: "LABEL"
+            description: "Type of the replication slot"
+        - database:
+            usage: "LABEL"
+            description: "Name of the database"
+        - active:
+            usage: "GAUGE"
+            description: "Flag indicating whether the slot is active"
+        - pg_wal_lsn_diff:
+            usage: "GAUGE"
+            description: "Replication lag in bytes"
+
     pg_stat_archiver:
       query: |
         SELECT archived_count

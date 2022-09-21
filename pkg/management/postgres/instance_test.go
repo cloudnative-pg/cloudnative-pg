@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
@@ -72,7 +73,7 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 	})
 
 	It("should properly demote a primary", func() {
-		err := instance.Demote()
+		err := instance.Demote(&apiv1.Cluster{})
 		Expect(err).ToNot(HaveOccurred())
 
 		assertFileExists(signalPath, "standby.signal")

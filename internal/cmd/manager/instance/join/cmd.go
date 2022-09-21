@@ -113,7 +113,7 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 
 	reconciler.RefreshSecrets(ctx, &cluster)
 
-	err = info.Join()
+	err = info.Join(&cluster)
 	if err != nil {
 		log.Error(err, "Error joining node")
 		return err

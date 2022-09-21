@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os/exec"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -74,7 +75,7 @@ func ClonePgData(connectionString, targetPgData, walDir string) error {
 }
 
 // Join creates a new instance joined to an existing PostgreSQL cluster
-func (info InitInfo) Join() error {
+func (info InitInfo) Join(cluster *apiv1.Cluster) error {
 	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
 
 	err := ClonePgData(primaryConnInfo, info.PgData, info.PgWal)
@@ -82,6 +83,7 @@ func (info InitInfo) Join() error {
 		return err
 	}
 
-	_, err = UpdateReplicaConfiguration(info.PgData, info.ClusterName, info.PodName)
+	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
+	_, err = UpdateReplicaConfiguration(info.PgData, info.GetPrimaryConnInfo(), slotName)
 	return err
 }
