@@ -243,6 +243,8 @@ RedHat
 RedHat's
 ReplicaClusterConfiguration
 ReplicaSet
+ReplicationSlotsConfiguration
+ReplicationSlotsHAConfiguration
 ReplicationTLSSecret
 ResizingPVC
 ResourceRequirements
@@ -528,6 +530,7 @@ gzip
 hba
 hdr
 healthz
+highAvailability
 historyTags
 horikyota
 hostPort
@@ -749,6 +752,7 @@ recoverytarget
 recv
 redhat
 relatime
+replicationSlots
 replicationTLSSecret
 repmgr
 reportNonRedacted

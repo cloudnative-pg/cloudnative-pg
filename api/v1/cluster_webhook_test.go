@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -2338,5 +2339,119 @@ var _ = Describe("validation of imports", func() {
 
 		result := cluster.validateImport()
 		Expect(result).To(BeEmpty())
+	})
+})
+
+var _ = Describe("validation of replication slots configuration", func() {
+	It("prevents using replication slots on PostgreSQL 10 and older", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: "ghcr.io/cloudnative-pg/postgresql:10.5",
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled: true,
+					},
+					UpdateInterval: 0,
+				},
+			},
+		}
+		cluster.Default()
+
+		result := cluster.validateReplicationSlots()
+		Expect(result).To(HaveLen(1))
+	})
+
+	It("can be enabled on the default PostgreSQL image", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled: true,
+					},
+					UpdateInterval: 0,
+				},
+			},
+		}
+		cluster.Default()
+
+		result := cluster.validateReplicationSlots()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("allows enabling replication slots on the fly", func() {
+		oldCluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+			},
+		}
+		oldCluster.Default()
+
+		newCluster := oldCluster.DeepCopy()
+		newCluster.Spec.ReplicationSlots = &ReplicationSlotsConfiguration{
+			HighAvailability: &ReplicationSlotsHAConfiguration{
+				Enabled:    true,
+				SlotPrefix: "_test_",
+			},
+		}
+
+		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(BeEmpty())
+	})
+
+	It("prevents changing the slot prefix while replication slots are enabled", func() {
+		oldCluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled:    true,
+						SlotPrefix: "_test_",
+					},
+				},
+			},
+		}
+		oldCluster.Default()
+
+		newCluster := oldCluster.DeepCopy()
+		newCluster.Spec.ReplicationSlots.HighAvailability.SlotPrefix = "_toast_"
+		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(HaveLen(1))
+	})
+
+	It("prevents removing the replication slot section when replication slots are enabled", func() {
+		oldCluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled:    true,
+						SlotPrefix: "_test_",
+					},
+				},
+			},
+		}
+		oldCluster.Default()
+
+		newCluster := oldCluster.DeepCopy()
+		newCluster.Spec.ReplicationSlots = nil
+		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(HaveLen(1))
+	})
+
+	It("allows disabling the replication slots", func() {
+		oldCluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled:    true,
+						SlotPrefix: "_test_",
+					},
+				},
+			},
+		}
+		oldCluster.Default()
+
+		newCluster := oldCluster.DeepCopy()
+		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = false
+		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(BeEmpty())
 	})
 })

@@ -292,6 +292,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateBackupConfiguration,
 		r.validateConfiguration,
 		r.validateLDAP,
+		r.validateReplicationSlots,
 	}
 
 	for _, validate := range validations {
@@ -337,6 +338,7 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 	allErrs = append(allErrs, r.validateWalStorageChange(old)...)
 	allErrs = append(allErrs, r.validateReplicaModeChange(old)...)
 	allErrs = append(allErrs, r.validateUnixPermissionIdentifierChange(old)...)
+	allErrs = append(allErrs, r.validateReplicationSlotsChange(old)...)
 	return allErrs
 }
 
@@ -1533,6 +1535,69 @@ func (r *Cluster) validateRecoveryAndBackupTarget() field.ErrorList {
 	}
 
 	return allErrors
+}
+
+func (r *Cluster) validateReplicationSlots() field.ErrorList {
+	replicationSlots := r.Spec.ReplicationSlots
+	if replicationSlots == nil ||
+		replicationSlots.HighAvailability == nil ||
+		!replicationSlots.HighAvailability.Enabled {
+		return nil
+	}
+
+	psqlVersion, err := r.GetPostgresqlVersion()
+	if err != nil {
+		// The validation error will be already raised by the
+		// validateImageName function
+		return nil
+	}
+
+	if psqlVersion >= 110000 {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Invalid(
+			field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
+			replicationSlots.HighAvailability.Enabled,
+			"Cannot enable replication slot high availability. It requires PostgreSQL 11 or above"),
+	}
+}
+
+func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {
+	newReplicationSlots := r.Spec.ReplicationSlots
+	oldReplicationSlots := old.Spec.ReplicationSlots
+
+	if oldReplicationSlots == nil || oldReplicationSlots.HighAvailability == nil ||
+		!oldReplicationSlots.HighAvailability.Enabled {
+		return nil
+	}
+
+	var errs field.ErrorList
+
+	// when disabling we should check that the prefix it's not removed, and it doesn't change to
+	// properly execute the cleanup logic
+	if newReplicationSlots == nil || newReplicationSlots.HighAvailability == nil {
+		path := field.NewPath("spec", "replicationSlots")
+		if newReplicationSlots != nil {
+			path = path.Child("highAvailability")
+		}
+		errs = append(errs,
+			field.Invalid(
+				path,
+				nil,
+				fmt.Sprintf("Cannot remove %v section while highAvailability is enabled", path)),
+		)
+	} else if oldReplicationSlots.HighAvailability.SlotPrefix != newReplicationSlots.HighAvailability.SlotPrefix {
+		errs = append(errs,
+			field.Invalid(
+				field.NewPath("spec", "replicationSlots", "highAvailability", "slotPrefix"),
+				newReplicationSlots.HighAvailability.SlotPrefix,
+				"Cannot change replication slot prefix while highAvailability is enabled"),
+		)
+	}
+
+	return errs
 }
 
 // validateAzureCredentials checks and validates the azure credentials

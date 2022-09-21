@@ -103,9 +103,13 @@ production.
 The operator automatically detects replicas in a cluster
 through a single parameter called `instances`. If set to `1`, the cluster
 comprises a single primary PostgreSQL instance with no replica. If higher
-than `1`, the operator manages `instances -1` replicas, including high
-availability through automated failover and rolling updates through
+than `1`, the operator manages `instances -1` replicas, including High
+Availability (HA) through automated failover and rolling updates through
 switchover operations.
+CloudNativePG automatically manages replication slots for all the replicas
+in the HA cluster, with an implementation that is inspired by the previously
+proposed patch for PostgreSQL called
+["Failover slots"](https://wiki.postgresql.org/wiki/Failover_slots).
 
 ### Database configuration
 

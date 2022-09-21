@@ -172,6 +172,28 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 	})
 }
 
+// AssertCreateNamespace creates and waits for the namespace
+func AssertCreateNamespace(namespace string, env *testsUtils.TestingEnvironment) {
+	By(fmt.Sprintf("creating the %v namespace", namespace), func() {
+		err := env.CreateNamespace(namespace)
+		Expect(err).ToNot(HaveOccurred())
+	})
+	By(fmt.Sprintf("having the %v namespace", namespace), func() {
+		// Creating a namespace should be quick
+		timeout := 20
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      namespace,
+		}
+
+		Eventually(func() (string, error) {
+			namespaceResource := &corev1.Namespace{}
+			err := env.Client.Get(env.Ctx, namespacedName, namespaceResource)
+			return namespaceResource.GetName(), err
+		}, timeout).Should(BeEquivalentTo(namespace))
+	})
+}
+
 // AssertCreateCluster creates the cluster and verifies that the ready pods
 // correspond to the number of Instances in the cluster spec.
 // Important: this is not equivalent to "kubectl apply", and is not able
@@ -2468,4 +2490,72 @@ func AssertPvcHasLabels(
 			}
 		}, 300, 5).Should(Succeed())
 	})
+}
+
+// AssertRepSlotsOnPod checks if all the required replication slot exists in a given pod,
+// and that obsolete slots are correctly deleted (post management operations).
+// In case we are targeting the primary, it will also check if the slot is active.
+func AssertRepSlotsOnPod(
+	namespace,
+	clusterName string,
+	pod corev1.Pod,
+) {
+	expectedSlots, err := testsUtils.GetExpectedRepSlotsOnPod(namespace, clusterName, pod.GetName(), env)
+	Expect(err).ToNot(HaveOccurred())
+
+	Eventually(func() ([]string, error) {
+		currentSlots, err := testsUtils.GetRepSlotsOnPod(namespace, pod.GetName(), env)
+		return currentSlots, err
+	}, 300).Should(BeEquivalentTo(expectedSlots),
+		fmt.Sprintf(
+			"List of expected replication slots on %v pod %v",
+			pod.Labels["role"],
+			pod.GetName()))
+
+	for _, slot := range expectedSlots {
+		query := fmt.Sprintf(
+			"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
+				"WHERE slot_name = '%v' AND active = 'f' "+
+				"AND temporary = 'f' AND slot_type = 'physical')", slot)
+		description := fmt.Sprintf(
+			"On %v pod %v, expect replication slot %v to exist and be inactive",
+			pod.Labels["role"],
+			pod.GetName(),
+			slot)
+		if specs.IsPodPrimary(pod) {
+			query = fmt.Sprintf(
+				"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
+					"WHERE slot_name = '%v' AND active = 't' "+
+					"AND temporary = 'f' AND slot_type = 'physical')", slot)
+			description = fmt.Sprintf(
+				"On %v pod %v, expect replication slot %v to exist and be active",
+				pod.Labels["role"],
+				pod.GetName(),
+				slot)
+		}
+		Eventually(func() (string, error) {
+			stdout, _, err := testsUtils.RunQueryFromPod(&pod, testsUtils.PGLocalSocketDir,
+				"app", "postgres", "''", query, env)
+			return strings.TrimSpace(stdout), err
+		}, 300).Should(BeEquivalentTo("t"), description)
+	}
+}
+
+// AssertClusterRepSlotsAligned will compare all the replication slot restart_lsn
+// in a cluster. The assertion will succeed if they are all equivalent.
+func AssertClusterRepSlotsAligned(
+	namespace,
+	clusterName string,
+) {
+	podList, err := env.GetClusterPodList(namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() bool {
+		var lsnList []string
+		for _, pod := range podList.Items {
+			out, err := testsUtils.GetRepSlotsLsnOnPod(namespace, clusterName, pod, env)
+			Expect(err).ToNot(HaveOccurred())
+			lsnList = append(lsnList, out...)
+		}
+		return testsUtils.CompareLsn(lsnList)
+	}, 300).Should(BeEquivalentTo(true))
 }

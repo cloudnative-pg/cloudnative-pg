@@ -180,34 +180,27 @@ func buildLDAPConfigString(cluster *apiv1.Cluster, ldapBindPassword string) stri
 }
 
 // UpdateReplicaConfiguration updates the postgresql.auto.conf or recovery.conf file for the proper version
-// of PostgreSQL
-func UpdateReplicaConfiguration(pgData string, clusterName string, podName string) (changed bool, err error) {
-	primaryConnInfo := buildPrimaryConnInfo(clusterName+"-rw", podName)
-	return UpdateReplicaConfigurationForPrimary(pgData, primaryConnInfo)
-}
-
-// UpdateReplicaConfigurationForPrimary updates the postgresql.auto.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
-func UpdateReplicaConfigurationForPrimary(pgData string, primaryConnInfo string) (changed bool, err error) {
+func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	major, err := postgresutils.GetMajorVersion(pgData)
 	if err != nil {
 		return false, err
 	}
 
 	if major < 12 {
-		return configureRecoveryConfFile(pgData, primaryConnInfo)
+		return configureRecoveryConfFile(pgData, primaryConnInfo, slotName)
 	}
 
 	if err := createStandbySignal(pgData); err != nil {
 		return false, err
 	}
 
-	return configurePostgresAutoConfFile(pgData, primaryConnInfo)
+	return configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName)
 }
 
 // configureRecoveryConfFile configures replication in the recovery.conf file
 // for PostgreSQL 11 and earlier
-func configureRecoveryConfFile(pgData string, primaryConnInfo string) (changed bool, err error) {
+func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, "recovery.conf")
 
 	options := map[string]string{
@@ -218,11 +211,20 @@ func configureRecoveryConfFile(pgData string, primaryConnInfo string) (changed b
 		"recovery_target_timeline": "latest",
 	}
 
+	if slotName != "" {
+		options["primary_slot_name"] = slotName
+	}
+
 	if primaryConnInfo != "" {
 		options["primary_conninfo"] = primaryConnInfo
 	}
 
-	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
+	changed, err = configfile.UpdatePostgresConfigurationFile(
+		targetFile,
+		options,
+		"primary_slot_name",
+		"primary_conninfo",
+	)
 	if err != nil {
 		return false, err
 	}
@@ -233,9 +235,9 @@ func configureRecoveryConfFile(pgData string, primaryConnInfo string) (changed b
 	return changed, nil
 }
 
-// configurePostgresAutoConfFile configures replication a in the postgresql.auto.conf file
+// configurePostgresAutoConfFile configures replication in the postgresql.auto.conf file
 // for PostgreSQL 12 and newer
-func configurePostgresAutoConfFile(pgData string, primaryConnInfo string) (changed bool, err error) {
+func configurePostgresAutoConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, "postgresql.auto.conf")
 
 	options := map[string]string{
@@ -243,6 +245,7 @@ func configurePostgresAutoConfFile(pgData string, primaryConnInfo string) (chang
 			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
 			postgres.LogPath, postgres.LogFileName),
 		"recovery_target_timeline": "latest",
+		"primary_slot_name":        slotName,
 	}
 
 	if primaryConnInfo != "" {
