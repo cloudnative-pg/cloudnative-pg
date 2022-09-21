@@ -358,7 +358,6 @@ func NewClusterResourcePrinter(namespace, clusterName string, env *TestingEnviro
 			clusterInfo.AddLine("PVC phase", pvc.Status.Phase)
 			clusterInfo.AddLine("---", "---")
 		}
-		clusterInfo.Print()
 		return buffer.String()
 	}
 }
