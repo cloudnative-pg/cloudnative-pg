@@ -246,10 +246,11 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 				err = env.Client.Get(env.Ctx, namespacedName, cluster)
 				return cluster.Status.Phase, err
 			}
-			return fmt.Sprintf("spec Instances: %d, ready pods: %d",
+			return fmt.Sprintf("Ready pod is not as expected. Spec Instances: %d, ready pods: %d \n",
 				cluster.Spec.Instances,
 				utils.CountReadyPods(podList.Items)), nil
-		}, timeout, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy))
+		}, timeout, 2).Should(BeEquivalentTo(apiv1.PhaseHealthy), testsUtils.NewClusterResourcePrinter(namespace,
+			clusterName, env))
 	})
 }
 
