@@ -135,3 +135,8 @@ func GetObject(env *TestingEnvironment, objectKey client.ObjectKey, object clien
 	)
 	return err
 }
+
+// boolPtr takes a bool and returns a pointer to that value
+func boolPtr(value bool) *bool {
+	return &value
+}

@@ -138,6 +138,11 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 							MountPath: "/etc/ssl/certs",
 						},
 					},
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: boolPtr(false),
+						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						RunAsNonRoot:             boolPtr(false),
+					},
 				},
 			},
 			Volumes: []corev1.Volume{
