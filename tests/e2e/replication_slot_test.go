@@ -38,6 +38,10 @@ var _ = Describe("Replication Slot", func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
+		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+			Skip("This test is not run on PostgreSQL 10, replication slot " +
+				"high availability requires PostgreSQL 11 or above")
+		}
 	})
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
@@ -53,16 +57,6 @@ var _ = Describe("Replication Slot", func() {
 		namespace = "replication-slot-e2e"
 		clusterName = "cluster-pg-replication-slot"
 		AssertCreateNamespace(namespace, env)
-
-		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
-			By("refusing to create a cluster for Postgres version < 11", func() {
-				err := CreateResourcesFromFileWithError(namespace, sampleFileWithRSEnable)
-				Expect(err).Should(HaveOccurred())
-				Expect(err.Error()).Should(ContainSubstring("Cannot enable replication " +
-					"slot high availability. It requires PostgreSQL 11 or above"))
-			})
-			return
-		}
 
 		// Create a cluster in a namespace we'll delete after the test
 		AssertCreateCluster(namespace, clusterName, sampleFileWithRSEnable, env)
@@ -160,7 +154,9 @@ var _ = Describe("Replication Slot", func() {
 
 		By("checking standbys HA slots exist", func() {
 			replicaPods, err := env.GetClusterReplicas(namespace, clusterName)
-			Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
+			Eventually(func(g Gomega) {
+				g.Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
+			}, 90, 2).Should(Succeed())
 			for _, pod := range replicaPods.Items {
 				AssertRepSlotsOnPod(namespace, clusterName, pod)
 			}
