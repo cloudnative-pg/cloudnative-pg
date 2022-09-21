@@ -374,6 +374,10 @@ func NewClusterResourcePrinter(namespace, clusterName string, env *TestingEnviro
 			clusterInfo.AddLine("PVC phase", pvc.Status.Phase)
 			clusterInfo.AddLine("---", "---")
 		}
+
+		// do not remove, this is needed to ensure that the writer cache is always flushed.
+		clusterInfo.Print()
+
 		return buffer.String()
 	}
 }
