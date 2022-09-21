@@ -475,7 +475,15 @@ func (c QueryCollector) describe(ch chan<- *prometheus.Desc) {
 func (c QueryCollector) collectConstMetric(
 	mapping MetricMap, value interface{}, variableLabels []string, ch chan<- prometheus.Metric,
 ) {
-	floatData, ok := postgres.DBToFloat64(value)
+	if mapping.Conversion == nil {
+		log.Warning("Missing conversion while parsing value",
+			"namespace", c.namespace,
+			"value", value,
+			"mapping", mapping)
+		return
+	}
+
+	floatData, ok := mapping.Conversion(value)
 	if !ok {
 		log.Warning("Error while parsing value",
 			"namespace", c.namespace,
