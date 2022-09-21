@@ -235,7 +235,7 @@ For details, please refer to the
 Here follows a brief description of the main options:
 
 `.spec.replicationSlots.highAvailability.enabled`
-: if true, the feature is enabled (this is the default behavior)
+: if true, the feature is enabled (`false` is the default)
 
 `.spec.replicationSlots.highAvailability.slotPrefix`
 : the prefix that identifies replication slots managed by the operator
@@ -243,8 +243,8 @@ Here follows a brief description of the main options:
 
 `.spec.replicationSlots.updateInterval`
 : how often the standby synchronizes the position of the local copy of the
-  replication slots with the position on the current primary.
-  Expressed in seconds (default: 30)
+  replication slots with the position on the current primary, expressed in
+  seconds (default: 30)
 
 !!! Important
     This capability requires PostgreSQL 11 or higher, as it relies on the
@@ -254,7 +254,8 @@ Here follows a brief description of the main options:
 !!! Warning
     In PostgreSQL 11, enabling replication slots if initially disabled, or conversely
     disabling them if initially enabled, will require a rolling update of the
-    cluster.
+    cluster (due to the presence of the `recovery.conf` file that is only read
+    at startup).
 
 Although it is not recommended, if you desire a different behavior, you can
 customize the above options.
