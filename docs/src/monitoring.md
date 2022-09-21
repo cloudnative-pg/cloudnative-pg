@@ -15,15 +15,14 @@ more `ConfigMap` or `Secret` resources (see the
     [by default a set of predefined metrics](#default-set-of-metrics) in
     a `ConfigMap` called `default-monitoring`.
 
-Metrics can be accessed as follows:
-
-```shell
-curl http://<pod_ip>:9187/metrics
-```
+!!! Info
+    You can inspect the exported metrics by following the instructions in
+    the ["How to inspect the exported metrics"](#how-to-inspect-the-exported-metrics)
+    section below.
 
 All monitoring queries that are performed on PostgreSQL are:
 
-- transactionally atomic (one transaction per query)
+- atomic (one transaction per query)
 - executed with the `pg_monitor` role
 - executed with `application_name` set to `cnpg_metrics_exporter`
 - executed as user `postgres`
@@ -560,11 +559,10 @@ in CloudNativePG's exporter.
 The operator internally exposes [Prometheus](https://prometheus.io/) metrics
 via HTTP on port 8080, named `metrics`.
 
-Metrics can be accessed as follows:
-
-```shell
-curl http://<pod_ip>:8080/metrics
-```
+!!! Info
+    You can inspect the exported metrics by following the instructions in
+    the ["How to inspect the exported metrics"](#how-to-inspect-the-exported-metrics)
+    section below.
 
 Currently, the operator exposes default `kubebuilder` metrics, see
 [kubebuilder documentation](https://book.kubebuilder.io/reference/metrics.html) for more details.
@@ -588,3 +586,68 @@ spec:
   podMetricsEndpoints:
     - port: metrics
 ```
+
+## How to inspect the exported metrics
+
+In this section we provide some basic instructions on how to inspect
+the metrics exported by a specific PostgreSQL instance manager (primary
+or replica) or the operator, using a temporary pod running `curl` in
+the same namespace.
+
+!!! Note
+    In the example below we assume we are working in the default namespace,
+    alongside with the PostgreSQL cluster. Please feel free to adapt
+    this example to your use case, by applying basic Kubernetes knowledge.
+
+Create the `curl.yaml` file with this content:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl
+spec:
+  containers:
+  - name: curl
+    image: curlimages/curl:7.84.0
+    command: ['sleep', '3600']
+```
+
+Then create the pod:
+
+```shell
+kubectl apply -f curl.yaml
+```
+
+In case you want to inspect the metrics exported by an instance, you need
+to connect to port 9187 of the target pod. This is the generic command to be
+run (make sure you use the correct IP for the pod):
+
+```shell
+kubectl exec -ti curl -- curl -s <pod_ip>:9187/metrics
+```
+
+For example, if your PostgreSQL cluster is called `cluster-example` and
+you want to retrieve the exported metrics of the first pod in the cluster,
+you can run the following command to programmatically get the IP of
+that pod:
+
+```shell
+POD_IP=$(kubectl get pod cluster-example-1 --template '{{.status.podIP}}')
+```
+
+And then run:
+
+```shell
+kubectl exec -ti curl -- curl -s ${POD_IP}:9187/metrics
+```
+
+In case you want to access the metrics of the operator, you need to point
+to the pod where the operator is running, and use TCP port 8080 as target.
+
+At the end of the inspection, please make sure you delete the `curl` pod:
+
+```shell
+kubectl delete -f curl.yaml
+```
+
