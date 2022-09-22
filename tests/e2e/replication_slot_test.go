@@ -37,7 +37,7 @@ var _ = Describe("Replication Slot", func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 		if env.PostgresVersion == 10 {
-			Skip("This test is not run on PostgreSQL 10, replication slot " +
+			Skip("Test will be skipped for PostgreSQL 10, replication slot " +
 				"high availability requires PostgreSQL 11 or above")
 		}
 	})
