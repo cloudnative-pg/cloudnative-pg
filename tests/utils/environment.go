@@ -87,13 +87,14 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.Log = ctrl.Log.WithName("e2e")
 
 	// Fetching postgres image version.
-	postgresImage := os.Getenv("POSTGRES_IMG")
-	imageReference := utils.NewReference(postgresImage)
-	postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
-	if err != nil {
-		return nil, err
+	if postgresImage, exist := os.LookupEnv("POSTGRES_IMG"); exist {
+		imageReference := utils.NewReference(postgresImage)
+		postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
+		if err != nil {
+			return nil, err
+		}
+		env.PostgresVersion = postgresImageVersion / 10000
 	}
-	env.PostgresVersion = postgresImageVersion / 10000
 
 	env.Client, err = client.New(env.RestClientConfig, client.Options{Scheme: env.Scheme})
 	if err != nil {
