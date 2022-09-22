@@ -112,7 +112,7 @@ var _ = Describe("Replication Slot", func() {
 		})
 	})
 
-	It("replication slots can manage on disable/enable", func() {
+	It("replication slots can manage on disable and enable", func() {
 		namespace = "replication-slot-disable-e2e"
 		clusterName = "cluster-pg-replication-slot-disable"
 		err := env.CreateNamespace(namespace)
@@ -151,10 +151,12 @@ var _ = Describe("Replication Slot", func() {
 		})
 
 		By("checking standbys HA slots exist", func() {
-			replicaPods, err := env.GetClusterReplicas(namespace, clusterName)
 			Eventually(func(g Gomega) {
+				replicaPods, err := env.GetClusterReplicas(namespace, clusterName)
 				g.Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
 			}, 90, 2).Should(Succeed())
+			replicaPods, err := env.GetClusterReplicas(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range replicaPods.Items {
 				AssertRepSlotsOnPod(namespace, clusterName, pod)
 			}
