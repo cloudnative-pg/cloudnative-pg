@@ -15,8 +15,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
-	"strings"
 
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,7 +36,7 @@ var _ = Describe("Replication Slot", func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+		if env.PostgresVersion == 10 {
 			Skip("This test is not run on PostgreSQL 10, replication slot " +
 				"high availability requires PostgreSQL 11 or above")
 		}
@@ -139,7 +137,7 @@ var _ = Describe("Replication Slot", func() {
 			}, 10, 2).Should(BeTrue())
 		})
 
-		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":11") {
+		if env.PostgresVersion == 11 {
 			// We need to take into account the fact that on PostgreSQL 11
 			// it is required to rolling restart the cluster to
 			// enable or disable the feature once the cluster is created.
@@ -180,7 +178,7 @@ var _ = Describe("Replication Slot", func() {
 			Expect(cluster.Spec.ReplicationSlots.HighAvailability.Enabled).Should(BeFalse())
 		})
 
-		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":11") {
+		if env.PostgresVersion == 11 {
 			// We need to take into account the fact that on PostgreSQL 11
 			// it is required to rolling restart the cluster to
 			// enable or disable the feature once the cluster is created.

@@ -18,8 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -53,7 +51,7 @@ var _ = Describe("Cluster scale up and down", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 	It("can scale the cluster size", func() {
-		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+		if env.PostgresVersion == 10 {
 			// Cluster file without replication slot since it requires PostgreSQL 11 or above
 			sampleFile = sampleFileWithoutReplSlots
 		}

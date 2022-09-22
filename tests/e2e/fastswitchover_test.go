@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -77,7 +76,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 
 		var oldPrimary, targetPrimary string
 
-		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+		if env.PostgresVersion == 10 {
 			// Cluster file without replication slot since it requires PostgreSQL 11 or above
 			sampleFile = sampleFileWithoutReplSlots
 		}

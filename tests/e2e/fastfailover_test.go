@@ -18,8 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
@@ -91,7 +89,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 	})
 
 	Context("with async replicas cluster", func() {
-		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+		if env.PostgresVersion == 10 {
 			// Cluster file without replication slot since it requires PostgreSQL 11 or above
 			sampleFile = sampleFileWithoutReplSlots
 		}

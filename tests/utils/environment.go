@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -71,11 +72,13 @@ type TestingEnvironment struct {
 	Scheme             *runtime.Scheme
 	PreserveNamespaces []string
 	Log                logr.Logger
+	PostgresVersion    int
 }
 
 // NewTestingEnvironment creates the environment for testing
 func NewTestingEnvironment() (*TestingEnvironment, error) {
 	var env TestingEnvironment
+	var err error
 	env.RestClientConfig = ctrl.GetConfigOrDie()
 	env.Interface = kubernetes.NewForConfigOrDie(env.RestClientConfig)
 	env.APIExtensionClient = apiextensionsclientset.NewForConfigOrDie(env.RestClientConfig)
@@ -83,7 +86,15 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.Scheme = runtime.NewScheme()
 	env.Log = ctrl.Log.WithName("e2e")
 
-	var err error
+	// Fetching postgres image version.
+	postgresImage := os.Getenv("POSTGRES_IMG")
+	imageReference := utils.NewReference(postgresImage)
+	postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
+	if err != nil {
+		return nil, err
+	}
+	env.PostgresVersion = postgresImageVersion / 10000
+
 	env.Client, err = client.New(env.RestClientConfig, client.Options{Scheme: env.Scheme})
 	if err != nil {
 		return nil, err

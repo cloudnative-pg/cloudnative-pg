@@ -2563,7 +2563,7 @@ func AssertClusterRepSlotsAligned(
 
 func AssertRepSlotsAreExistsAndAligned(namespace, clusterName string) {
 	// Replication slot high availability requires PostgreSQL 11 or above
-	if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+	if env.PostgresVersion == 10 {
 		GinkgoWriter.Printf("Ignoring replication slots verification for postgres 10")
 		return
 	}

@@ -17,9 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"os"
-	"strings"
-
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -55,7 +52,7 @@ var _ = Describe("Switchover", func() {
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 
-		if strings.Contains(os.Getenv("POSTGRES_IMG"), ":10") {
+		if env.PostgresVersion == 10 {
 			// Cluster file without replication slot since it requires PostgreSQL 11 or above
 			sampleFile = sampleFileWithoutReplSlots
 		}

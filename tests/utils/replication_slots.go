@@ -83,7 +83,7 @@ func GetRepSlotsOnPod(namespace, podName string, env *TestingEnvironment) ([]str
 	var slots []string
 	// To avoid list with space entry when stdout value is empty
 	// then just skip split and return empty list.
-	if !(stdout == "") {
+	if stdout != "" {
 		slots = strings.Split(strings.TrimSpace(stdout), "\n")
 		sort.Strings(slots)
 	}
