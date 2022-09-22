@@ -89,16 +89,16 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 	})
 
 	Context("with async replicas cluster", func() {
-		if env.PostgresVersion == 10 {
-			// Cluster file without replication slot since it requires PostgreSQL 11 or above
-			sampleFile = sampleFileWithoutReplSlots
-		}
 		// Confirm that a standby closely following the primary doesn't need more
 		// than 10 seconds to be promoted and be able to start inserting records.
 		// We test this setting up an application pointing to the rw service,
 		// forcing a failover and measuring how much time passes between the
 		// last row written on timeline 1 and the first one on timeline 2.
 		It("can do a fast failover", func() {
+			if env.PostgresVersion == 10 {
+				// Cluster file without replication slot since it requires PostgreSQL 11 or above
+				sampleFile = sampleFileWithoutReplSlots
+			}
 			namespace = "primary-failover-time"
 			clusterName = "cluster-fast-failover"
 			AssertFastFailOver(namespace, sampleFile, clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
