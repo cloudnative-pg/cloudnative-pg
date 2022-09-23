@@ -251,6 +251,26 @@ TODO
 
 ## Database management
 
+**What will happen to all the Clusters when the Operator pod dies or is not
+available for amount of time?**
+
+The CNPG operator takes care of each features listed in the documentation.
+As such any self-healing capabilities or other automation are momentarily
+unavailable during the Operator pod's outage.
+
+However, assuming the PostgreSQL cluster is still up and running during the
+outage of the Operator, the database will continue to serve normal operations
+from the relative Kubernetes services. Moreover, the Instance Manager, which
+runs inside each PostgreSQL pod, will still work. Such an internal manager takes
+care, for example, of the continuous archiving of WAL files, in case the backup
+resource is correctly configured.
+
+To wrap up:
+-   an outage of the Operator does not necessarily mean a PostgreSQL
+    database's outage.
+-   it's like running the database without a database and a system
+    administrator: risky, but the app will still be served.
+
 **Why should I use PostgreSQL?**
 
 We believe that PostgreSQL is the equivalent in the database area of
