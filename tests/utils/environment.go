@@ -46,6 +46,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -86,15 +87,18 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.Scheme = runtime.NewScheme()
 	env.Log = ctrl.Log.WithName("e2e")
 
+	postgresImage := versions.DefaultImageName
+
 	// Fetching postgres image version.
-	if postgresImage, exist := os.LookupEnv("POSTGRES_IMG"); exist {
-		imageReference := utils.NewReference(postgresImage)
-		postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
-		if err != nil {
-			return nil, err
-		}
-		env.PostgresVersion = postgresImageVersion / 10000
+	if postgresImageFromUser, exist := os.LookupEnv("POSTGRES_IMG"); exist {
+		postgresImage = postgresImageFromUser
 	}
+	imageReference := utils.NewReference(postgresImage)
+	postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
+	if err != nil {
+		return nil, err
+	}
+	env.PostgresVersion = postgresImageVersion / 10000
 
 	env.Client, err = client.New(env.RestClientConfig, client.Options{Scheme: env.Scheme})
 	if err != nil {
