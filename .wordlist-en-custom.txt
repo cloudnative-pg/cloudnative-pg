@@ -132,6 +132,7 @@ Istio
 JSON
 Jihyuk
 Jitendra
+Krew
 Kumar
 LDAP
 LDAPBindAsAuth
