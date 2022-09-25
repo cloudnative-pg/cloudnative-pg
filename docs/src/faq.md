@@ -152,10 +152,30 @@ Our advice is for everyone that wants to fully exploit Cloud Native
 PostgreSQL to acquire the "Certified Kubernetes Administrator (CKA)"
 status from the CNCF certification program.
 
-<!--
 
 ## High availability
 
+**What happens to the PostgreSQL clusters when the operator pod dies or it is
+not available for a certain amount of time?**
+
+The CloudNativePG operator, among others, is responsible for self-healing
+capabilities. As such, they might not be available during the outage of the
+operator.
+
+However, assuming that the outage does not affect the nodes where PostgreSQL
+clusters are running, the database will continue to serve normal operations,
+through the relative Kubernetes services. Moreover, the [instance manager](instance_manager.md),
+which runs inside each PostgreSQL pod, will still work, making sure that the
+database server is up, including accessory services like logging, export of
+metrics, continuous archiving of WAL files, etc.
+
+To wrap up:
+
+-   an outage of the operator does not necessarily imply a PostgreSQL
+    database's outage;
+-   think about running a database without a DBA or system administrator.
+
+<!--
 What are the reasons behind CloudNativePG not relying on a failover
 management tool like Patroni, repmgr, or Stolon?
 
@@ -250,26 +270,6 @@ TODO
 -->
 
 ## Database management
-
-**What will happen to all the Clusters when the Operator pod dies or is not
-available for amount of time?**
-
-The CNPG operator takes care of each features listed in the documentation.
-As such any self-healing capabilities or other automation are momentarily
-unavailable during the Operator pod's outage.
-
-However, assuming the PostgreSQL cluster is still up and running during the
-outage of the Operator, the database will continue to serve normal operations
-from the relative Kubernetes services. Moreover, the Instance Manager, which
-runs inside each PostgreSQL pod, will still work. Such an internal manager takes
-care, for example, of the continuous archiving of WAL files, in case the backup
-resource is correctly configured.
-
-To wrap up:
--   an outage of the Operator does not necessarily mean a PostgreSQL
-    database's outage.
--   it's like running the database without a database and a system
-    administrator: risky, but the app will still be served.
 
 **Why should I use PostgreSQL?**
 
