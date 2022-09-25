@@ -28,6 +28,7 @@ BootstrapConfiguration
 BootstrapInitDB
 BootstrapPgBaseBackup
 BootstrapRecovery
+Burstable
 CIS
 CKA
 CN
@@ -140,6 +141,7 @@ LDAPScheme
 LPV
 LSN
 LTS
+LastBackupSucceeded
 Lifecycle
 Linode
 ListMeta
@@ -167,6 +169,7 @@ NodeMaintenanceWindow
 NodeSelector
 Noland
 O'Reilly
+OOM
 OU
 ObjectMeta
 OnlineUpdateEnabled
@@ -193,6 +196,7 @@ PgBouncerSecrets
 PgBouncerSecretsVersions
 PgBouncerSpec
 Philippe
+PoLA
 PodAffinity
 PodAntiAffinity
 PodAntiAffinityType
@@ -220,6 +224,7 @@ PostgresConfiguration
 PrimaryUpdateMethod
 PrimaryUpdateStrategy
 PullPolicy
+QoS
 Quaresima
 QuickStart
 RBAC
@@ -288,6 +293,7 @@ VOLNAME
 Valerio
 VirtualBox
 WAL
+WAL's
 WALBackupConfiguration
 WALs
 Wadle
@@ -309,6 +315,7 @@ alloc
 allocator
 allowPrivilegeEscalation
 allowVolumeExpansion
+amd
 angus
 api
 apiGroup
@@ -504,6 +511,7 @@ googleCredentials
 goroutines
 gosec
 gzip
+hashicorp
 hba
 hdr
 healthz
@@ -561,10 +569,12 @@ latn
 ldap
 ldapBindPassword
 ldapscheme
+le
 leonardoce
 li
 libpq
 lifecycle
+lifecycles
 linodeobjects
 linter
 linters
@@ -580,6 +590,7 @@ locktype
 lookups
 lsn
 lt
+macOS
 malcolm
 mallocs
 mario
@@ -637,6 +648,7 @@ olm
 openldap
 openshift
 operability
+operativity
 operatorframework
 operatorgorup
 operatorgroup
@@ -691,6 +703,7 @@ postgresImageName
 postgresUID
 postgresconfiguration
 postgresql
+ppc
 pprof
 pre
 preferredDuringSchedulingIgnoredDuringExecution
@@ -829,6 +842,7 @@ targetTLI
 targetTime
 targetXID
 tcp
+timeframes
 tls
 tmp
 tmpfs
@@ -850,6 +864,7 @@ usernamepassword
 usr
 utils
 valueFrom
+viceversa
 virtualized
 virtualxid
 volumeMode

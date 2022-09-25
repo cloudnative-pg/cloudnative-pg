@@ -367,13 +367,13 @@ default time-stamped filename is created for the zip file.
     namespace as the clusters.
     E.g. the default installation namespace is cnpg-system
 
-``` shell
+```shell
 kubectl cnpg report operator -n <namespace>
 ```
 
 results in
 
-``` shell
+```shell
 Successfully written report to "report_operator_<TIMESTAMP>.zip" (format: "yaml")
 ```
 
@@ -392,28 +392,28 @@ unzip reportRedacted.zip
 
 will result in:
 
-``` shell
+```shell
 Archive:  reportRedacted.zip
    creating: report_operator_<TIMESTAMP>/
    creating: report_operator_<TIMESTAMP>/manifests/
-  inflating: report_operator_<TIMESTAMP>/manifests/deployment.yaml  
-  inflating: report_operator_<TIMESTAMP>/manifests/operator-pod.yaml  
-  inflating: report_operator_<TIMESTAMP>/manifests/events.yaml  
-  inflating: report_operator_<TIMESTAMP>/manifests/validating-webhook-configuration.yaml  
-  inflating: report_operator_<TIMESTAMP>/manifests/mutating-webhook-configuration.yaml  
-  inflating: report_operator_<TIMESTAMP>/manifests/webhook-service.yaml  
+  inflating: report_operator_<TIMESTAMP>/manifests/deployment.yaml
+  inflating: report_operator_<TIMESTAMP>/manifests/operator-pod.yaml
+  inflating: report_operator_<TIMESTAMP>/manifests/events.yaml
+  inflating: report_operator_<TIMESTAMP>/manifests/validating-webhook-configuration.yaml
+  inflating: report_operator_<TIMESTAMP>/manifests/mutating-webhook-configuration.yaml
+  inflating: report_operator_<TIMESTAMP>/manifests/webhook-service.yaml
   inflating: report_operator_<TIMESTAMP>/manifests/cnpg-ca-secret.yaml
   inflating: report_operator_<TIMESTAMP>/manifests/cnpg-webhook-cert.yaml
 ```
 
 You can verify that the confidential information is REDACTED:
 
-``` shell
+```shell
 cd report_operator_<TIMESTAMP>/manifests/
 head cnpg-ca-secret.yaml
 ```
 
-``` yaml
+```yaml
 data:
   ca.crt: ""
   ca.key: ""
@@ -433,17 +433,17 @@ kubectl cnpg report operator -n <namespace> -f reportNonRedacted.zip -S
 
 You'll get a reminder that you're about to view confidential information:
 
-``` shell
+```shell
 WARNING: secret Redaction is OFF. Use it with caution
 Successfully written report to "reportNonRedacted.zip" (format: "yaml")
 ```
 
-``` shell
+```shell
 unzip reportNonRedacted.zip
 head cnpg-ca-secret.yaml
 ```
 
-``` yaml
+```yaml
 data:
   ca.crt: LS0tLS1CRUdJTiBD…
   ca.key: LS0tLS1CRUdJTiBF…
@@ -476,7 +476,7 @@ so the `-S` is disabled.
 
 Usage:
 
-``` shell
+```shell
 kubectl cnpg report cluster <clusterName> [flags]
 ```
 
@@ -484,17 +484,17 @@ Note that, unlike the `operator` sub-command, for the `cluster` sub-command you
 need to provide the cluster name, and very likely the namespace, unless the cluster
 is in the default one.
 
-``` shell
+```shell
 kubectl cnpg report cluster example -f report.zip -n example_namespace
 ```
 
 and then:
 
-``` shell
+```shell
 unzip report.zip
 ```
 
-``` shell
+```shell
 Archive:  report.zip
    creating: report_cluster_example_<TIMESTAMP>/
    creating: report_cluster_example_<TIMESTAMP>/manifests/
@@ -506,21 +506,21 @@ Archive:  report.zip
 
 Remember that you can use the `--logs` flag to add the pod and job logs to the ZIP.
 
-``` shell
+```shell
 kubectl cnpg report cluster example -n example_namespace --logs
 ```
 
 will result in:
 
-``` shell
+```shell
 Successfully written report to "report_cluster_example_<TIMESTAMP>.zip" (format: "yaml")
 ```
 
-``` shell
+```shell
 unzip report_cluster_<TIMESTAMP>.zip
 ```
 
-``` shell
+```shell
 Archive:  report_cluster_example_<TIMESTAMP>.zip
    creating: report_cluster_example_<TIMESTAMP>/
    creating: report_cluster_example_<TIMESTAMP>/manifests/
