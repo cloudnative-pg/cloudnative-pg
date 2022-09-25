@@ -94,7 +94,7 @@ wal_receiver_timeout = '5s'
     Without replication slots nor continuous backups in place, configuring
     `wal_keep_size` or `wal_keep_segments` is the only way to
     protect standbys from falling out of sync.
-    If a standby did fall out ouf sync it would produce error
+    If a standby did fall out of sync it would produce error
     messages like:
     `"could not receive data from WAL stream: ERROR: requested WAL segment ************************ has already been removed"`.
     This will require you to dedicate a part of your `PGDATA`, or the volume
