@@ -237,9 +237,9 @@ spec:
     size: 1Gi
 ```
 
-CloudNativePG supports another way to customize the behaviour of the
+CloudNativePG supports another way to customize the behavior of the
 `initdb` invocation, using the `options` subsection. However, given that there
-are options that can break the behaviour of the operator (such as `--auth` or
+are options that can break the behavior of the operator (such as `--auth` or
 `-d`), this technique is deprecated and will be removed from future versions of
 the API.
 
