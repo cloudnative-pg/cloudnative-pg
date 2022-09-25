@@ -4,12 +4,18 @@ CloudNativePG provides a plugin for `kubectl` to manage a cluster in Kubernetes.
 
 ## Install
 
-You can install the plugin in your system with:
+You can install the cnpg plugin system either running the provided install script:
 
 ```sh
 curl -sSfL \
   https://github.com/cloudnative-pg/cloudnative-pg/raw/main/hack/install-cnpg-plugin.sh | \
   sudo sh -s -- -b /usr/local/bin
+```
+
+Or, if you already have [Krew](https://krew.sigs.k8s.io/) installed, you can simply run:
+
+```sh
+kubectl krew install cnpg
 ```
 
 ### Supported Architectures
