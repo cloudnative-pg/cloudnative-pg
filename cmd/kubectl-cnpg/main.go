@@ -20,7 +20,6 @@ kubectl-cnp is a plugin to manage your CloudNativePG clusters
 package main
 
 import (
-	"context"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -30,6 +29,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/hibernate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/reload"
@@ -62,6 +62,7 @@ func main() {
 	rootCmd.AddCommand(certificate.NewCmd())
 	rootCmd.AddCommand(destroy.NewCmd())
 	rootCmd.AddCommand(fence.NewCmd())
+	rootCmd.AddCommand(hibernate.NewCmd())
 	rootCmd.AddCommand(maintenance.NewCmd())
 	rootCmd.AddCommand(promote.NewCmd())
 	rootCmd.AddCommand(reload.NewCmd())
@@ -70,7 +71,7 @@ func main() {
 	rootCmd.AddCommand(status.NewCmd())
 	rootCmd.AddCommand(versions.NewCmd())
 
-	if err := rootCmd.ExecuteContext(context.Background()); err != nil {
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }

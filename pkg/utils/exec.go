@@ -38,7 +38,7 @@ import (
 // a non existing container
 var ErrorContainerNotFound = fmt.Errorf("container not found")
 
-// ExecCommand executes arbitrary command inside the pod, and returns his result
+// ExecCommand executes a command inside the pod, and returns its result
 func ExecCommand(
 	ctx context.Context,
 	client kubernetes.Interface,
