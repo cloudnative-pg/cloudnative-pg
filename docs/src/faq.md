@@ -152,10 +152,30 @@ Our advice is for everyone that wants to fully exploit Cloud Native
 PostgreSQL to acquire the "Certified Kubernetes Administrator (CKA)"
 status from the CNCF certification program.
 
-<!--
 
 ## High availability
 
+**What happens to the PostgreSQL clusters when the operator pod dies or it is
+not available for a certain amount of time?**
+
+The CloudNativePG operator, among other things, is responsible for self-healing
+capabilities. As such, they might not be available during an outage of the
+operator.
+
+However, assuming that the outage does not affect the nodes where PostgreSQL
+clusters are running, the database will continue to serve normal operations,
+through the relevant Kubernetes services. Moreover, the [instance manager](instance_manager.md),
+which runs inside each PostgreSQL pod will still work, making sure that the
+database server is up, including accessory services like logging, export of
+metrics, continuous archiving of WAL files, etc.
+
+To summarize:
+
+an outage of the operator does not necessarily imply a PostgreSQL
+database outage; it's like running a database without a DBA or system
+administrator.
+
+<!--
 What are the reasons behind CloudNativePG not relying on a failover
 management tool like Patroni, repmgr, or Stolon?
 
