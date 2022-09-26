@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package manager contains the common behaviors of the manager subcommand
-package manager
+// Package hibernate implements the hibernation feature
+package hibernate
