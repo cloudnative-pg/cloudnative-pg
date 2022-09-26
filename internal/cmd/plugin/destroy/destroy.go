@@ -24,12 +24,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -42,7 +41,7 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 		return fmt.Errorf("error deleting instance %s: %v", instanceName, err)
 	}
 
-	pvcs, err := getExpectedPVCs(ctx, clusterName, instanceName)
+	pvcs, err := resources.GetInstancePVCs(ctx, clusterName, instanceName)
 	if err != nil {
 		return err
 	}
@@ -106,59 +105,6 @@ func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) e
 	}
 
 	return plugin.Client.Delete(ctx, &pod)
-}
-
-func getExpectedPVCs(
-	ctx context.Context,
-	clusterName string,
-	instanceName string,
-) ([]corev1.PersistentVolumeClaim, error) {
-	var cluster apiv1.Cluster
-	if err := plugin.Client.Get(
-		ctx,
-		types.NamespacedName{
-			Name:      clusterName,
-			Namespace: plugin.Namespace,
-		},
-		&cluster,
-	); err != nil {
-		return nil, err
-	}
-
-	var pvcs []corev1.PersistentVolumeClaim
-
-	pgDataName := specs.GetPVCName(cluster, instanceName, utils.PVCRolePgData)
-	pgData, err := getPVC(ctx, pgDataName)
-	if err != nil {
-		return nil, err
-	}
-	if pgData != nil {
-		pvcs = append(pvcs, *pgData)
-	}
-
-	pgWalName := specs.GetPVCName(cluster, instanceName, utils.PVCRolePgWal)
-	pgWal, err := getPVC(ctx, pgWalName)
-	if err != nil {
-		return nil, err
-	}
-	if pgWal != nil {
-		pvcs = append(pvcs, *pgWal)
-	}
-
-	return pvcs, nil
-}
-
-// getPVC returns the pvc if found or any error that isn't apierrs.IsNotFound
-func getPVC(ctx context.Context, name string) (*corev1.PersistentVolumeClaim, error) {
-	var pvc corev1.PersistentVolumeClaim
-	err := plugin.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: plugin.Namespace}, &pvc)
-	if apierrs.IsNotFound(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &pvc, nil
 }
 
 // removeOwnerReference removes the owner reference to the cluster
