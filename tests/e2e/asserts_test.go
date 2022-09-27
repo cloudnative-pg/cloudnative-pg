@@ -2571,9 +2571,43 @@ func AssertRepSlotsAreExistsAndAligned(namespace, clusterName string) {
 	By("verifying all replication slots exist and are aligned", func() {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		for _, pod := range podList.Items {
-			AssertRepSlotsOnPod(namespace, clusterName, pod)
-		}
+		Eventually(func(g Gomega) {
+			for _, pod := range podList.Items {
+				expectedSlots, err := testsUtils.GetExpectedRepSlotsOnPod(namespace, clusterName, pod.GetName(), env)
+				g.Expect(err).ToNot(HaveOccurred())
+				currentSlots, err := testsUtils.GetRepSlotsOnPod(namespace, pod.GetName(), env)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(expectedSlots).Should(BeEquivalentTo(currentSlots),
+					testsUtils.PrintRepSlotsOnPodsOnFailure(namespace, podList, env))
+				for _, slot := range expectedSlots {
+					query := fmt.Sprintf(
+						"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
+							"WHERE slot_name = '%v' AND active = 'f' "+
+							"AND temporary = 'f' AND slot_type = 'physical')", slot)
+					description := fmt.Sprintf(
+						"On %v pod %v, expect replication slot %v to exist and be inactive",
+						pod.Labels["role"],
+						pod.GetName(),
+						slot)
+					if specs.IsPodPrimary(pod) {
+						query = fmt.Sprintf(
+							"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
+								"WHERE slot_name = '%v' AND active = 't' "+
+								"AND temporary = 'f' AND slot_type = 'physical')", slot)
+						description = fmt.Sprintf(
+							"On %v pod %v, expect replication slot %v to exist and be active",
+							pod.Labels["role"],
+							pod.GetName(),
+							slot)
+					}
+					stdout, _, err := testsUtils.RunQueryFromPod(&pod, testsUtils.PGLocalSocketDir, // nolint
+						"app", "postgres", "''", query, env)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(strings.TrimSpace(stdout)).Should(BeEquivalentTo("t"), description,
+						testsUtils.PrintRepSlotsOnPodsOnFailure(namespace, podList, env))
+				}
+			}
+		}, 300, 2).Should(Succeed())
 		AssertClusterRepSlotsAligned(namespace, clusterName)
 	})
 }

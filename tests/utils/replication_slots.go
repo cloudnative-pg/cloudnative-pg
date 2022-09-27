@@ -27,6 +27,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
+// PrinterRepSlotsOnPodsOnFailure printing replications slots on failures
+type PrinterRepSlotsOnPodsOnFailure = func() string
+
 // CompareLsn returns true if all the LSN values inside a given list are the same
 func CompareLsn(lsnList []string) bool {
 	for _, lsn := range lsnList {
@@ -88,6 +91,24 @@ func GetRepSlotsOnPod(namespace, podName string, env *TestingEnvironment) ([]str
 		sort.Strings(slots)
 	}
 	return slots, nil
+}
+
+// PrintRepSlotsOnPodsOnFailure printing replications slots on failures
+func PrintRepSlotsOnPodsOnFailure(
+	namespace string,
+	podsList *corev1.PodList,
+	env *TestingEnvironment,
+) PrinterRepSlotsOnPodsOnFailure {
+	return func() string {
+		for _, pod := range podsList.Items {
+			slots, err := GetRepSlotsOnPod(namespace, pod.GetName(), env)
+			if err != nil {
+				fmt.Printf("facing error while get slots %v", err)
+			}
+			fmt.Printf("slot details after failure : %v on pod %v\n", slots, pod.GetName())
+		}
+		return ""
+	}
 }
 
 // GetRepSlotsLsnOnPod returns a slice containing the current restart_lsn values of each
