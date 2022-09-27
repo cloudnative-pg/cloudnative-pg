@@ -194,6 +194,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, err
 	}
 
+	// Ensure we reconcile the orphan resources if present when we reconcile for the first time a cluster
+	if err := r.reconcileRestoredCluster(ctx, cluster); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot reconcile restored Cluster: %w", err)
+	}
+
 	// Ensure we have the required global objects
 	if err := r.createPostgresClusterObjects(ctx, cluster); err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot create Cluster auxiliary objects: %w", err)

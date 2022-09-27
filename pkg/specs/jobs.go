@@ -212,7 +212,7 @@ func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
 // createPrimaryJob create a job that executes the provided command.
 // The role should describe the purpose of the executed job
 func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role string, initCommand []string) *batchv1.Job {
-	instanceName := fmt.Sprintf("%s-%v", cluster.Name, nodeSerial)
+	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := fmt.Sprintf("%s-%v-%s", cluster.Name, nodeSerial, role)
 
 	job := &batchv1.Job{
