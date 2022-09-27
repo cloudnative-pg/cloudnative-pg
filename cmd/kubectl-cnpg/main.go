@@ -20,11 +20,13 @@ kubectl-cnp is a plugin to manage your CloudNativePG clusters
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
@@ -41,6 +43,7 @@ import (
 )
 
 func main() {
+	managerFlags := &manager.Flags{}
 	configFlags := genericclioptions.NewConfigFlags(true)
 
 	rootCmd := &cobra.Command{
@@ -48,10 +51,12 @@ func main() {
 		Short:        "A plugin to manage your CloudNativePG clusters",
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			managerFlags.ConfigureLogging()
 			return plugin.CreateKubernetesClient(configFlags)
 		},
 	}
 
+	managerFlags.AddFlags(rootCmd.PersistentFlags())
 	configFlags.AddFlags(rootCmd.PersistentFlags())
 
 	rootCmd.AddCommand(certificate.NewCmd())
@@ -65,7 +70,7 @@ func main() {
 	rootCmd.AddCommand(status.NewCmd())
 	rootCmd.AddCommand(versions.NewCmd())
 
-	if err := rootCmd.Execute(); err != nil {
+	if err := rootCmd.ExecuteContext(context.Background()); err != nil {
 		os.Exit(1)
 	}
 }
