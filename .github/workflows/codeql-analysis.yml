@@ -34,6 +34,7 @@ jobs:
   duplicate_runs:
     runs-on: ubuntu-20.04
     name: Skip duplicate runs
+    continue-on-error: true
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
     steps:
