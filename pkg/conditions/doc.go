@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package manager contains the common behaviors of the manager subcommand
-package manager
+// Package conditions contains functions useful to update the conditions
+// on the resources managed by the operator
+package conditions

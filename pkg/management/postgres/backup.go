@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
@@ -317,7 +317,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 		Reason:  string(apiv1.ConditionBackupStarted),
 		Message: "New Backup starting up",
 	}
-	if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, &condition); condErr != nil {
+	if condErr := conditions.Update(ctx, b.Client, b.Cluster, &condition); condErr != nil {
 		b.Log.Error(condErr, "Error changing backup condition (backup started)")
 	}
 
@@ -343,7 +343,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 			Reason:  string(apiv1.ConditionReasonLastBackupFailed),
 			Message: err.Error(),
 		}
-		if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, &condition); condErr != nil {
+		if condErr := conditions.Update(ctx, b.Client, b.Cluster, &condition); condErr != nil {
 			b.Log.Error(condErr, "Error changing backup condition (backup failed)")
 		}
 		if err := UpdateBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
@@ -364,7 +364,7 @@ func (b *BackupCommand) run(ctx context.Context) {
 		Reason:  string(apiv1.ConditionReasonLastBackupSucceeded),
 		Message: "Backup has successful",
 	}
-	if condErr := manager.UpdateCondition(ctx, b.Client, b.Cluster, &condition); condErr != nil {
+	if condErr := conditions.Update(ctx, b.Client, b.Cluster, &condition); condErr != nil {
 		b.Log.Error(condErr, "Error changing backup condition (backup succeeded)")
 	}
 
