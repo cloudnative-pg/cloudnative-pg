@@ -39,7 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -235,7 +235,7 @@ func StartBackup(
 			Reason:  string(apiv1.ConditionReasonLastBackupFailed),
 			Message: err.Error(),
 		}
-		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
+		if errCond := conditions.Update(ctx, client, cluster, &condition); errCond != nil {
 			log.FromContext(ctx).Error(errCond, "Error while updating backup condition (backup failed)")
 		}
 		return postgres.UpdateBackupStatusAndRetry(ctx, client, backup)
