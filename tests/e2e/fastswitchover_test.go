@@ -36,15 +36,15 @@ import (
 
 var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func() {
 	const (
-		namespace                     = "primary-switchover-time"
-		sampleFileWithReplSlotsEnable = fixturesDir + "/fastswitchover/cluster-fast-switchover-with-repl-slots.yaml.template"
-		sampleFileWithoutReplSlots    = fixturesDir + "/fastswitchover/cluster-fast-switchover.yaml.template"
-		webTestFile                   = fixturesDir + "/fastswitchover/webtest.yaml"
-		webTestJob                    = fixturesDir + "/fastswitchover/apache-benchmark-webtest.yaml"
-		clusterName                   = "cluster-fast-switchover"
-		level                         = tests.Highest
+		namespace                 = "primary-switchover-time"
+		sampleFileWithRepSlots    = fixturesDir + "/fastswitchover/cluster-fast-switchover-with-repl-slots.yaml.template"
+		sampleFileWithoutRepSlots = fixturesDir + "/fastswitchover/cluster-fast-switchover.yaml.template"
+		webTestFile               = fixturesDir + "/fastswitchover/webtest.yaml"
+		webTestJob                = fixturesDir + "/fastswitchover/apache-benchmark-webtest.yaml"
+		clusterName               = "cluster-fast-switchover"
+		level                     = tests.Highest
 	)
-	sampleFile := sampleFileWithReplSlotsEnable
+	sampleFile := sampleFileWithRepSlots
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -78,7 +78,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 
 		if env.PostgresVersion == 10 {
 			// Cluster file without replication slot since it requires PostgreSQL 11 or above
-			sampleFile = sampleFileWithoutReplSlots
+			sampleFile = sampleFileWithoutRepSlots
 		}
 
 		By(fmt.Sprintf("having a %v namespace", namespace), func() {
@@ -208,6 +208,6 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 		AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
 
 		AssertWritesResumedBeforeTimeout(namespace, clusterName, maxSwitchoverTime)
-		AssertRepSlotsAreExistsAndAligned(namespace, clusterName)
+		AssertClusterRepSlots(namespace, clusterName)
 	})
 })

@@ -23,12 +23,57 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 // PrinterRepSlotsOnPodsOnFailure printing replications slots on failures
 type PrinterRepSlotsOnPodsOnFailure = func() string
+
+// PrintClusterRepSlotsOnFailure printing replications slots and its restart_lsn on failure
+func PrintClusterRepSlotsOnFailure(
+	namespace,
+	clusterName string,
+	env *TestingEnvironment,
+) PrinterRepSlotsOnPodsOnFailure {
+	return func() string {
+		podList, err := env.GetClusterPodList(namespace, clusterName)
+		if err != nil {
+			fmt.Printf("Couldn't retrieve the cluster's podlist: %v\n", err)
+			return ""
+		}
+		for _, pod := range podList.Items {
+			slots, err := GetRepSlotsOnPod(namespace, pod.GetName(), env)
+			if err != nil {
+				fmt.Printf("Couldn't retrieve slots for pod %v: %v\n", pod.GetName(), err)
+				return ""
+			}
+			if len(slots) == 0 {
+				fmt.Printf("No Replication slots have been found on %v pod %v\n",
+					pod.Labels["role"],
+					pod.GetName())
+				return ""
+			}
+			m := make(map[string]string)
+			for _, slot := range slots {
+				restartLsn, _, err := RunQueryFromPod(
+					&pod, PGLocalSocketDir,
+					"app",
+					"postgres",
+					"''",
+					fmt.Sprintf("SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = '%v'", slot),
+					env)
+				if err != nil {
+					fmt.Printf("Couldn't retrieve restart_lsn for slot %v: %v\n", slot, err)
+				}
+				m[slot] = strings.TrimSpace(restartLsn)
+			}
+			fmt.Printf("Replication slots on %v pod %v: %v\n", pod.Labels["role"], pod.GetName(), m)
+		}
+		return ""
+	}
+}
 
 // CompareLsn returns true if all the LSN values inside a given list are the same
 func CompareLsn(lsnList []string) bool {
@@ -93,24 +138,6 @@ func GetRepSlotsOnPod(namespace, podName string, env *TestingEnvironment) ([]str
 	return slots, nil
 }
 
-// PrintRepSlotsOnPodsOnFailure printing replications slots on failures
-func PrintRepSlotsOnPodsOnFailure(
-	namespace string,
-	podsList *corev1.PodList,
-	env *TestingEnvironment,
-) PrinterRepSlotsOnPodsOnFailure {
-	return func() string {
-		for _, pod := range podsList.Items {
-			slots, err := GetRepSlotsOnPod(namespace, pod.GetName(), env)
-			if err != nil {
-				fmt.Printf("facing error while get slots %v", err)
-			}
-			fmt.Printf("slot details after failure : %v on pod %v\n", slots, pod.GetName())
-		}
-		return ""
-	}
-}
-
 // GetRepSlotsLsnOnPod returns a slice containing the current restart_lsn values of each
 // replication slot present in a given pod
 func GetRepSlotsLsnOnPod(namespace, clusterName string, pod corev1.Pod, env *TestingEnvironment) ([]string, error) {
@@ -131,4 +158,18 @@ func GetRepSlotsLsnOnPod(namespace, clusterName string, pod corev1.Pod, env *Tes
 		lsnList = append(lsnList, strings.TrimSpace(restartLsn))
 	}
 	return lsnList, err
+}
+
+func ToggleRepSlots(namespace, clusterName string, status bool, env *TestingEnvironment) error {
+	cluster, err := env.GetCluster(namespace, clusterName)
+	if err != nil {
+		return err
+	}
+	clusterToggle := cluster.DeepCopy()
+	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = status
+	err = env.Client.Patch(env.Ctx, clusterToggle, ctrlclient.MergeFrom(cluster))
+	if err != nil {
+		return err
+	}
+	return nil
 }

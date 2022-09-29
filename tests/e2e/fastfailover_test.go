@@ -27,15 +27,15 @@ import (
 
 var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() {
 	const (
-		sampleFileWithoutReplSlots    = fixturesDir + "/fastfailover/cluster-fast-failover.yaml.template"
-		sampleFileWithReplSlotsEnable = fixturesDir + "/fastfailover/cluster-fast-failover-with-repl-slots.yaml.template"
-		sampleFileSyncReplicas        = fixturesDir + "/fastfailover/cluster-syncreplicas-fast-failover.yaml.template"
-		webTestFile                   = fixturesDir + "/fastfailover/webtest.yaml"
-		webTestSyncReplicas           = fixturesDir + "/fastfailover/webtest-syncreplicas.yaml"
-		webTestJob                    = fixturesDir + "/fastfailover/apache-benchmark-webtest.yaml"
-		level                         = tests.Highest
+		sampleFileWithoutRepSlots = fixturesDir + "/fastfailover/cluster-fast-failover.yaml.template"
+		sampleFileWithRepSlots    = fixturesDir + "/fastfailover/cluster-fast-failover-with-repl-slots.yaml.template"
+		sampleFileSyncReplicas    = fixturesDir + "/fastfailover/cluster-syncreplicas-fast-failover.yaml.template"
+		webTestFile               = fixturesDir + "/fastfailover/webtest.yaml"
+		webTestSyncReplicas       = fixturesDir + "/fastfailover/webtest-syncreplicas.yaml"
+		webTestJob                = fixturesDir + "/fastfailover/apache-benchmark-webtest.yaml"
+		level                     = tests.Highest
 	)
-	sampleFile := sampleFileWithReplSlotsEnable
+	sampleFile := sampleFileWithRepSlots
 	var (
 		namespace       string
 		clusterName     string
@@ -97,12 +97,12 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 		It("can do a fast failover", func() {
 			if env.PostgresVersion == 10 {
 				// Cluster file without replication slot since it requires PostgreSQL 11 or above
-				sampleFile = sampleFileWithoutReplSlots
+				sampleFile = sampleFileWithoutRepSlots
 			}
 			namespace = "primary-failover-time"
 			clusterName = "cluster-fast-failover"
 			AssertFastFailOver(namespace, sampleFile, clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
-			AssertRepSlotsAreExistsAndAligned(namespace, clusterName)
+			AssertClusterRepSlots(namespace, clusterName)
 		})
 	})
 

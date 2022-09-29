@@ -2501,6 +2501,12 @@ func AssertRepSlotsOnPod(
 	clusterName string,
 	pod corev1.Pod,
 ) {
+	// Replication slot high availability requires PostgreSQL 11 or above
+	if env.PostgresVersion == 10 {
+		GinkgoWriter.Printf("Ignoring replication slots verification for postgres 10")
+		return
+	}
+
 	expectedSlots, err := testsUtils.GetExpectedRepSlotsOnPod(namespace, clusterName, pod.GetName(), env)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -2508,37 +2514,25 @@ func AssertRepSlotsOnPod(
 		currentSlots, err := testsUtils.GetRepSlotsOnPod(namespace, pod.GetName(), env)
 		return currentSlots, err
 	}, 300).Should(BeEquivalentTo(expectedSlots),
-		fmt.Sprintf(
-			"List of expected replication slots on %v pod %v",
-			pod.Labels["role"],
-			pod.GetName()))
+		testsUtils.PrintClusterRepSlotsOnFailure(namespace, clusterName, env))
 
 	for _, slot := range expectedSlots {
 		query := fmt.Sprintf(
 			"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
 				"WHERE slot_name = '%v' AND active = 'f' "+
 				"AND temporary = 'f' AND slot_type = 'physical')", slot)
-		description := fmt.Sprintf(
-			"On %v pod %v, expect replication slot %v to exist and be inactive",
-			pod.Labels["role"],
-			pod.GetName(),
-			slot)
 		if specs.IsPodPrimary(pod) {
 			query = fmt.Sprintf(
 				"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
 					"WHERE slot_name = '%v' AND active = 't' "+
 					"AND temporary = 'f' AND slot_type = 'physical')", slot)
-			description = fmt.Sprintf(
-				"On %v pod %v, expect replication slot %v to exist and be active",
-				pod.Labels["role"],
-				pod.GetName(),
-				slot)
 		}
 		Eventually(func() (string, error) {
 			stdout, _, err := testsUtils.RunQueryFromPod(&pod, testsUtils.PGLocalSocketDir,
 				"app", "postgres", "''", query, env)
 			return strings.TrimSpace(stdout), err
-		}, 300).Should(BeEquivalentTo("t"), description)
+		}, 300).Should(BeEquivalentTo("t"),
+			testsUtils.PrintClusterRepSlotsOnFailure(namespace, clusterName, env))
 	}
 }
 
@@ -2548,6 +2542,12 @@ func AssertClusterRepSlotsAligned(
 	namespace,
 	clusterName string,
 ) {
+	// Replication slot high availability requires PostgreSQL 11 or above
+	if env.PostgresVersion == 10 {
+		GinkgoWriter.Printf("Ignoring replication slots verification for postgres 10")
+		return
+	}
+
 	podList, err := env.GetClusterPodList(namespace, clusterName)
 	Expect(err).ToNot(HaveOccurred())
 	Eventually(func() bool {
@@ -2558,56 +2558,19 @@ func AssertClusterRepSlotsAligned(
 			lsnList = append(lsnList, out...)
 		}
 		return testsUtils.CompareLsn(lsnList)
-	}, 300).Should(BeEquivalentTo(true))
+	}, 300).Should(BeEquivalentTo(true),
+		testsUtils.PrintClusterRepSlotsOnFailure(namespace, clusterName, env))
 }
 
-func AssertRepSlotsAreExistsAndAligned(namespace, clusterName string) {
-	// Replication slot high availability requires PostgreSQL 11 or above
-	if env.PostgresVersion == 10 {
-		GinkgoWriter.Printf("Ignoring replication slots verification for postgres 10")
-		return
-	}
-
-	By("verifying all replication slots exist and are aligned", func() {
+// AssertClusterRepSlots will verify if the replication slots of each pod
+// of the cluster exist and are aligned.
+func AssertClusterRepSlots(namespace, clusterName string) {
+	By("verifying all cluster's replication slots exist and are aligned", func() {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		Eventually(func(g Gomega) {
-			for _, pod := range podList.Items {
-				expectedSlots, err := testsUtils.GetExpectedRepSlotsOnPod(namespace, clusterName, pod.GetName(), env)
-				g.Expect(err).ToNot(HaveOccurred())
-				currentSlots, err := testsUtils.GetRepSlotsOnPod(namespace, pod.GetName(), env)
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(expectedSlots).Should(BeEquivalentTo(currentSlots),
-					testsUtils.PrintRepSlotsOnPodsOnFailure(namespace, podList, env))
-				for _, slot := range expectedSlots {
-					query := fmt.Sprintf(
-						"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
-							"WHERE slot_name = '%v' AND active = 'f' "+
-							"AND temporary = 'f' AND slot_type = 'physical')", slot)
-					description := fmt.Sprintf(
-						"On %v pod %v, expect replication slot %v to exist and be inactive",
-						pod.Labels["role"],
-						pod.GetName(),
-						slot)
-					if specs.IsPodPrimary(pod) {
-						query = fmt.Sprintf(
-							"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
-								"WHERE slot_name = '%v' AND active = 't' "+
-								"AND temporary = 'f' AND slot_type = 'physical')", slot)
-						description = fmt.Sprintf(
-							"On %v pod %v, expect replication slot %v to exist and be active",
-							pod.Labels["role"],
-							pod.GetName(),
-							slot)
-					}
-					stdout, _, err := testsUtils.RunQueryFromPod(&pod, testsUtils.PGLocalSocketDir, // nolint
-						"app", "postgres", "''", query, env)
-					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(strings.TrimSpace(stdout)).Should(BeEquivalentTo("t"), description,
-						testsUtils.PrintRepSlotsOnPodsOnFailure(namespace, podList, env))
-				}
-			}
-		}, 300, 2).Should(Succeed())
+		for _, pod := range podList.Items {
+			AssertRepSlotsOnPod(namespace, clusterName, pod)
+		}
 		AssertClusterRepSlotsAligned(namespace, clusterName)
 	})
 }
@@ -2627,14 +2590,12 @@ func AssertClusterRollingRestart(namespace, clusterName string) {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	By("waiting for cluster goes to upgrading state", func() {
-		// waiting for cluster phase goes to "Upgrading cluster" after restart the cluster.
-		Eventually(func() bool {
+	By("waiting for the cluster to end up in upgrading state", func() {
+		// waiting for cluster phase to end up in "Upgrading cluster" state after restarting the cluster.
+		Eventually(func() (bool, error) {
 			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			return cluster.Status.Phase == apiv1.PhaseUpgrade
+			return cluster.Status.Phase == apiv1.PhaseUpgrade, err
 		}, 120, 3).Should(BeTrue())
 	})
-	// wait for cluster phase goes to "Cluster in healthy state"
 	AssertClusterIsReady(namespace, clusterName, 300, env)
 }

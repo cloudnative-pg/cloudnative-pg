@@ -14,10 +14,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
-
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -27,11 +23,11 @@ import (
 
 var _ = Describe("Replication Slot", func() {
 	const (
-		sampleFileWithRSEnable  = fixturesDir + "/replication_slot/cluster-pg-replication-slot.yaml.template"
-		sampleFileWithRSDisable = fixturesDir + "/replication_slot/cluster-pg-replication-slot-disable.yaml.template"
-		level                   = tests.High
+		namespace   = "replication-slot-e2e"
+		clusterName = "cluster-pg-replication-slot"
+		sampleFile  = fixturesDir + "/replication_slot/cluster-pg-replication-slot-disable.yaml.template"
+		level       = tests.High
 	)
-	var namespace, clusterName string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -51,83 +47,16 @@ var _ = Describe("Replication Slot", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("can manage Replication slots for HA", func() {
-		namespace = "replication-slot-e2e"
-		clusterName = "cluster-pg-replication-slot"
-		AssertCreateNamespace(namespace, env)
-
-		// Create a cluster in a namespace we'll delete after the test
-		AssertCreateCluster(namespace, clusterName, sampleFileWithRSEnable, env)
-
-		// Gather the current primary
-		oldPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-
-		By("Checking Primary HA Slots exist and are active", func() {
-			AssertRepSlotsOnPod(namespace, clusterName, *oldPrimaryPod)
-		})
-
-		By("Checking Standbys HA Slots exist", func() {
-			replicaPods, err := env.GetClusterReplicas(namespace, clusterName)
-			Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
-			for _, pod := range replicaPods.Items {
-				AssertRepSlotsOnPod(namespace, clusterName, pod)
-			}
-		})
-
-		By("Checking all the slots restart_lsn's are aligned", func() {
-			AssertClusterRepSlotsAligned(namespace, clusterName)
-		})
-
-		By("Creating test data to advance streaming replication", func() {
-			tableName := "data"
-			AssertCreateTestData(namespace, clusterName, tableName)
-			// Generate some WAL load
-			query := fmt.Sprintf("INSERT INTO %v (SELECT generate_series(1,10000))",
-				tableName)
-			_, _, err = testsUtils.RunQueryFromPod(oldPrimaryPod, testsUtils.PGLocalSocketDir,
-				"app", "postgres", "''", query, env)
-			Expect(err).ToNot(HaveOccurred())
-			_ = switchWalAndGetLatestArchive(namespace, oldPrimaryPod.Name)
-		})
-
-		By("Deleting the primary pod", func() {
-			zero := int64(0)
-			timeout := 120
-			forceDelete := &ctrlclient.DeleteOptions{
-				GracePeriodSeconds: &zero,
-			}
-			err = env.DeletePod(namespace, oldPrimaryPod.Name, forceDelete)
-			Expect(err).ToNot(HaveOccurred())
-			AssertClusterIsReady(namespace, clusterName, timeout, env)
-		})
-
-		By("Checking that all the slots exist and are aligned", func() {
-			podList, err := env.GetClusterPodList(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			for _, pod := range podList.Items {
-				AssertRepSlotsOnPod(namespace, clusterName, pod)
-			}
-			AssertClusterRepSlotsAligned(namespace, clusterName)
-		})
-	})
-
-	It("replication slots can manage on disable and enable", func() {
-		namespace = "replication-slot-disable-e2e"
-		clusterName = "cluster-pg-replication-slot-disable"
+	It("Can enable and disable replication slots", func() {
 		err := env.CreateNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFileWithRSDisable, env)
+		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("enabling replication slot on cluster", func() {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			clusterEnableRepSlot := cluster.DeepCopy()
-			clusterEnableRepSlot.Spec.ReplicationSlots.HighAvailability.Enabled = true
-			err = env.Client.Patch(env.Ctx, clusterEnableRepSlot, ctrlclient.MergeFrom(cluster))
+			err := testsUtils.ToggleRepSlots(namespace, clusterName, true, env)
 			Expect(err).ToNot(HaveOccurred())
 
-			// replication slot should be true
+			// Replication slots should be Enabled
 			Consistently(func() (bool, error) {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				if err != nil {
@@ -151,12 +80,8 @@ var _ = Describe("Replication Slot", func() {
 		})
 
 		By("checking standbys HA slots exist", func() {
-			Eventually(func(g Gomega) {
-				replicaPods, err := env.GetClusterReplicas(namespace, clusterName)
-				g.Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
-			}, 90, 2).Should(Succeed())
 			replicaPods, err := env.GetClusterReplicas(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
 			for _, pod := range replicaPods.Items {
 				AssertRepSlotsOnPod(namespace, clusterName, pod)
 			}
@@ -167,17 +92,17 @@ var _ = Describe("Replication Slot", func() {
 		})
 
 		By("disabling replication slot from running cluster", func() {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			clusterDisableReplSlot := cluster.DeepCopy()
-			clusterDisableReplSlot.Spec.ReplicationSlots.HighAvailability.Enabled = false
-			err = env.Client.Patch(env.Ctx, clusterDisableReplSlot, ctrlclient.MergeFrom(cluster))
+			err := testsUtils.ToggleRepSlots(namespace, clusterName, false, env)
 			Expect(err).ToNot(HaveOccurred())
 
-			// check that, replication slot will disable
-			cluster, err = env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(cluster.Spec.ReplicationSlots.HighAvailability.Enabled).Should(BeFalse())
+			// Replication slots should be Disabled
+			Consistently(func() (bool, error) {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				if err != nil {
+					return false, err
+				}
+				return cluster.Spec.ReplicationSlots.HighAvailability.Enabled, nil
+			}, 10, 2).Should(BeFalse())
 		})
 
 		if env.PostgresVersion == 11 {
@@ -187,7 +112,7 @@ var _ = Describe("Replication Slot", func() {
 			AssertClusterRollingRestart(namespace, clusterName)
 		}
 
-		By("verifying slots has removed from cluster pods", func() {
+		By("verifying slots have been removed from the cluster's pods", func() {
 			pods, err := env.GetClusterPodList(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range pods.Items {

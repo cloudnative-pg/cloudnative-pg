@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-pg-replication-slot-disable
+  name: cluster-pg-replication-slot
 spec:
   instances: 3
 

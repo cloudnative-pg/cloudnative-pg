@@ -28,13 +28,13 @@ import (
 
 var _ = Describe("Cluster scale up and down", func() {
 	const (
-		namespace                     = "cluster-scale-e2e-storage-class"
-		sampleFileWithoutReplSlots    = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		sampleFileWithReplSlotsEnable = fixturesDir + "/base/cluster-storage-class-with-repl-slots.yaml.template"
-		clusterName                   = "postgresql-storage-class"
-		level                         = tests.Lowest
+		namespace                 = "cluster-scale-e2e-storage-class"
+		sampleFileWithoutRepSlots = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		sampleFileWithRepSlots    = fixturesDir + "/base/cluster-storage-class-with-rep-slots.yaml.template"
+		clusterName               = "postgresql-storage-class"
+		level                     = tests.Lowest
 	)
-	sampleFile := sampleFileWithReplSlotsEnable
+	sampleFile := sampleFileWithRepSlots
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -53,7 +53,7 @@ var _ = Describe("Cluster scale up and down", func() {
 	It("can scale the cluster size", func() {
 		if env.PostgresVersion == 10 {
 			// Cluster file without replication slot since it requires PostgreSQL 11 or above
-			sampleFile = sampleFileWithoutReplSlots
+			sampleFile = sampleFileWithoutRepSlots
 		}
 
 		// Create a cluster in a namespace we'll delete after the test
@@ -61,7 +61,7 @@ var _ = Describe("Cluster scale up and down", func() {
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
-		AssertRepSlotsAreExistsAndAligned(clusterName, namespace)
+		AssertClusterRepSlots(clusterName, namespace)
 		// Add a node to the cluster and verify the cluster has one more
 		// element
 		By("adding an instance to the cluster", func() {
@@ -71,7 +71,7 @@ var _ = Describe("Cluster scale up and down", func() {
 			AssertClusterIsReady(namespace, clusterName, timeout, env)
 		})
 		AssertPvcHasLabels(namespace, clusterName)
-		AssertRepSlotsAreExistsAndAligned(clusterName, namespace)
+		AssertClusterRepSlots(clusterName, namespace)
 
 		// Remove a node from the cluster and verify the cluster has one
 		// element less
@@ -81,6 +81,6 @@ var _ = Describe("Cluster scale up and down", func() {
 			timeout := 60
 			AssertClusterIsReady(namespace, clusterName, timeout, env)
 		})
-		AssertRepSlotsAreExistsAndAligned(clusterName, namespace)
+		AssertClusterRepSlots(clusterName, namespace)
 	})
 })
