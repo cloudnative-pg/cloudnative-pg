@@ -19,6 +19,7 @@ package utils
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 // DefaultWebapp returns a struct representing a
@@ -70,11 +71,15 @@ func DefaultWebapp(namespace string, name string, rootCASecretName string, tlsSe
 						},
 					},
 					SecurityContext: &corev1.SecurityContext{
-						RunAsNonRoot:             boolPtr(false),
-						AllowPrivilegeEscalation: boolPtr(false),
+						RunAsNonRoot:             pointer.Bool(true),
+						AllowPrivilegeEscalation: pointer.Bool(false),
 						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 					},
 				},
+			},
+			SecurityContext: &corev1.PodSecurityContext{
+				RunAsNonRoot:   pointer.Bool(true),
+				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 			},
 		},
 	}

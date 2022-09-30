@@ -19,6 +19,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"k8s.io/utils/pointer"
 	"os"
 	"strconv"
 	"strings"
@@ -186,7 +187,16 @@ func MinioDefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeCl
 								},
 								InitialDelaySeconds: 30,
 							},
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: pointer.Bool(false),
+								SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+								RunAsNonRoot:             pointer.Bool(true),
+							},
 						},
+					},
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot:   pointer.Bool(true),
+						SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 					},
 				},
 			},
