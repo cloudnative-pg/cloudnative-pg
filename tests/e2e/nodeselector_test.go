@@ -55,7 +55,7 @@ var _ = Describe("nodeSelector", func() {
 			// We create a namespace and verify it exists
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
 				err := env.CreateNamespace(namespace)
-				Expect(err).To(HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				// Creating a namespace should be quick
 				timeout := 20

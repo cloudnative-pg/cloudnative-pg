@@ -178,7 +178,7 @@ if __name__ == "__main__":
             os.makedirs(dir)
             print("Directory ", dir, " Created ")
 
-    # Check if report exists, to avoid workflow failed while create cluster
+    # If the ginkgo report file is not found, produce a "failed" artifact
     if not os.path.exists(args.file):
         print("Report ", args.file, " not found ")
         # we still want to get an entry in the E2E Dashboard for workflows that even
