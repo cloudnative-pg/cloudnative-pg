@@ -964,12 +964,14 @@ honnef.co/go/tools v0.0.1-2020.1.3/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9
 honnef.co/go/tools v0.0.1-2020.1.4/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9vFzvIQ3k=
 k8s.io/api v0.25.2 h1:v6G8RyFcwf0HR5jQGIAYlvtRNrxMJQG1xJzaSeVnIS8=
 k8s.io/api v0.25.2/go.mod h1:qP1Rn4sCVFwx/xIhe+we2cwBLTXNcheRyYXwajonhy0=
+k8s.io/apimachinery v0.25.2 h1:WbxfAjCx+AeN8Ilp9joWnyJ6xu9OMeS/fsfjK/5zaQs=
+k8s.io/apimachinery v0.25.2/go.mod h1:hqqA1X0bsgsxI6dXsJ4HnNTBOmJNxyPp8dw3u2fSHwA=
+k8s.io/cli-runtime v0.25.2 h1:XOx+SKRjBpYMLY/J292BHTkmyDffl/qOx3YSuFZkTuc=
+k8s.io/cli-runtime v0.25.2/go.mod h1:OQx3+/0st6x5YpkkJQlEWLC73V0wHsOFMC1/roxV8Oc=
 k8s.io/apiextensions-apiserver v0.25.2 h1:8uOQX17RE7XL02ngtnh3TgifY7EhekpK+/piwzQNnBo=
 k8s.io/apiextensions-apiserver v0.25.2/go.mod h1:iRwwRDlWPfaHhuBfQ0WMa5skdQfrE18QXJaJvIDLvE8=
 k8s.io/apimachinery v0.25.2 h1:WbxfAjCx+AeN8Ilp9joWnyJ6xu9OMeS/fsfjK/5zaQs=
 k8s.io/apimachinery v0.25.2/go.mod h1:hqqA1X0bsgsxI6dXsJ4HnNTBOmJNxyPp8dw3u2fSHwA=
-k8s.io/cli-runtime v0.25.1 h1:AtaruGux+ECpq2c0uWhYIpRlcI3aa8N7yTe6S2y72Fo=
-k8s.io/cli-runtime v0.25.1/go.mod h1:JSzAcqIK3JK7Ab/TY0PENKhmEg/HboNWK3VKiwsYB6E=
 k8s.io/client-go v0.25.2 h1:SUPp9p5CwM0yXGQrwYurw9LWz+YtMwhWd0GqOsSiefo=
 k8s.io/client-go v0.25.2/go.mod h1:i7cNU7N+yGQmJkewcRD2+Vuj4iz7b30kI8OcL3horQ4=
 k8s.io/component-base v0.25.2 h1:Nve/ZyHLUBHz1rqwkjXm/Re6IniNa5k7KgzxZpTfSQY=
