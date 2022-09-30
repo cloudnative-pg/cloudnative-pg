@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 // CurlClient returns the Pod definition for a curl client
@@ -37,10 +38,21 @@ func CurlClient(namespace string) corev1.Pod {
 					Name:    "curl",
 					Image:   "curlimages/curl:7.82.0",
 					Command: []string{"sleep", "3600"},
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: pointer.Bool(false),
+						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						// Curl image doesn't have a numeric user, so it cannot have RunAsNonRoot set to true
+						RunAsNonRoot: pointer.Bool(false),
+					},
 				},
 			},
 			DNSPolicy:     corev1.DNSClusterFirst,
 			RestartPolicy: corev1.RestartPolicyAlways,
+			SecurityContext: &corev1.PodSecurityContext{
+				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+				// Curl image doesn't have a numeric user, so it cannot have RunAsNonRoot set to true
+				RunAsNonRoot: pointer.Bool(false),
+			},
 		},
 	}
 	return curlPod
