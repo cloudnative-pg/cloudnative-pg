@@ -53,7 +53,7 @@ var _ = Describe("Replication Slot", func() {
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("enabling replication slot on cluster", func() {
-			err := testsUtils.ToggleRepSlots(namespace, clusterName, true, env)
+			err := testsUtils.ToggleReplicationSlots(namespace, clusterName, true, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Replication slots should be Enabled
@@ -92,7 +92,7 @@ var _ = Describe("Replication Slot", func() {
 		})
 
 		By("disabling replication slot from running cluster", func() {
-			err := testsUtils.ToggleRepSlots(namespace, clusterName, false, env)
+			err := testsUtils.ToggleReplicationSlots(namespace, clusterName, false, env)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Replication slots should be Disabled

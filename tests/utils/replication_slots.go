@@ -43,7 +43,7 @@ func PrintClusterRepSlotsOnFailure(
 			fmt.Printf("Couldn't retrieve the cluster's podlist: %v\n", err)
 			return ""
 		}
-		for _, pod := range podList.Items {
+		for i, pod := range podList.Items {
 			slots, err := GetRepSlotsOnPod(namespace, pod.GetName(), env)
 			if err != nil {
 				fmt.Printf("Couldn't retrieve slots for pod %v: %v\n", pod.GetName(), err)
@@ -58,7 +58,7 @@ func PrintClusterRepSlotsOnFailure(
 			m := make(map[string]string)
 			for _, slot := range slots {
 				restartLsn, _, err := RunQueryFromPod(
-					&pod, PGLocalSocketDir,
+					&podList.Items[i], PGLocalSocketDir,
 					"app",
 					"postgres",
 					"''",
@@ -160,13 +160,14 @@ func GetRepSlotsLsnOnPod(namespace, clusterName string, pod corev1.Pod, env *Tes
 	return lsnList, err
 }
 
-func ToggleRepSlots(namespace, clusterName string, status bool, env *TestingEnvironment) error {
+// ToggleReplicationSlots sets the HA Replication Slot feature on/off depending on `enable`
+func ToggleReplicationSlots(namespace, clusterName string, enable bool, env *TestingEnvironment) error {
 	cluster, err := env.GetCluster(namespace, clusterName)
 	if err != nil {
 		return err
 	}
 	clusterToggle := cluster.DeepCopy()
-	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = status
+	clusterToggle.Spec.ReplicationSlots.HighAvailability.Enabled = enable
 	err = env.Client.Patch(env.Ctx, clusterToggle, ctrlclient.MergeFrom(cluster))
 	if err != nil {
 		return err
