@@ -83,7 +83,10 @@ func AreSameLsn(lsnList []string) bool {
 
 // GetExpectedReplicationSlotsOnPod returns a slice of replication slot names which should be present
 // in a given pod
-func GetExpectedReplicationSlotsOnPod(namespace, clusterName, podName string, env *TestingEnvironment) ([]string, error) {
+func GetExpectedReplicationSlotsOnPod(
+	namespace, clusterName, podName string,
+	env *TestingEnvironment,
+) ([]string, error) {
 	podList, err := env.GetClusterPodList(namespace, clusterName)
 	if err != nil {
 		return nil, err
@@ -136,7 +139,11 @@ func GetReplicationSlotsOnPod(namespace, podName string, env *TestingEnvironment
 
 // GetReplicationSlotLsnsOnPod returns a slice containing the current restart_lsn values of each
 // replication slot present in a given pod
-func GetReplicationSlotLsnsOnPod(namespace, clusterName string, pod corev1.Pod, env *TestingEnvironment) ([]string, error) {
+func GetReplicationSlotLsnsOnPod(
+	namespace, clusterName string,
+	pod corev1.Pod,
+	env *TestingEnvironment,
+) ([]string, error) {
 	slots, err := GetExpectedReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
 	if err != nil {
 		return nil, err

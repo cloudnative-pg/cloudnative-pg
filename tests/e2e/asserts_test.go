@@ -2503,7 +2503,7 @@ func AssertReplicationSlotsOnPod(
 ) {
 	// Replication slot high availability requires PostgreSQL 11 or above
 	if env.PostgresVersion == 10 {
-		GinkgoWriter.Printf("Ignoring replication slots verification for postgres 10")
+		Skip("Ignoring replication slots verification for postgres 10")
 		return
 	}
 
