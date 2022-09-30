@@ -76,19 +76,19 @@ var _ = Describe("Replication Slot", func() {
 		By("checking Primary HA slots exist and are active", func() {
 			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertRepSlotsOnPod(namespace, clusterName, *primaryPod)
+			AssertReplicationSlotsOnPod(namespace, clusterName, *primaryPod)
 		})
 
 		By("checking standbys HA slots exist", func() {
 			replicaPods, err := env.GetClusterReplicas(namespace, clusterName)
 			Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
 			for _, pod := range replicaPods.Items {
-				AssertRepSlotsOnPod(namespace, clusterName, pod)
+				AssertReplicationSlotsOnPod(namespace, clusterName, pod)
 			}
 		})
 
 		By("checking all the slots restart_lsn's are aligned", func() {
-			AssertClusterRepSlotsAligned(namespace, clusterName)
+			AssertClusterReplicationSlotsAligned(namespace, clusterName)
 		})
 
 		By("disabling replication slot from running cluster", func() {
@@ -117,7 +117,7 @@ var _ = Describe("Replication Slot", func() {
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range pods.Items {
 				Eventually(func() (int, error) {
-					slotOnPod, err := testsUtils.GetRepSlotsOnPod(namespace, pod.GetName(), env)
+					slotOnPod, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env)
 					if err != nil {
 						return -1, err
 					}

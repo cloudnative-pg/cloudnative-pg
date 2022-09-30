@@ -2493,10 +2493,10 @@ func AssertPvcHasLabels(
 	})
 }
 
-// AssertRepSlotsOnPod checks if all the required replication slot exists in a given pod,
+// AssertReplicationSlotsOnPod checks that all the required replication slots exist in a given pod,
 // and that obsolete slots are correctly deleted (post management operations).
-// In case we are targeting the primary, it will also check if the slot is active.
-func AssertRepSlotsOnPod(
+// In the primary, it will also check if the slots are active.
+func AssertReplicationSlotsOnPod(
 	namespace,
 	clusterName string,
 	pod corev1.Pod,
@@ -2507,14 +2507,16 @@ func AssertRepSlotsOnPod(
 		return
 	}
 
-	expectedSlots, err := testsUtils.GetExpectedRepSlotsOnPod(namespace, clusterName, pod.GetName(), env)
+	expectedSlots, err := testsUtils.GetExpectedReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
 	Expect(err).ToNot(HaveOccurred())
 
 	Eventually(func() ([]string, error) {
-		currentSlots, err := testsUtils.GetRepSlotsOnPod(namespace, pod.GetName(), env)
+		currentSlots, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env)
 		return currentSlots, err
 	}, 300).Should(BeEquivalentTo(expectedSlots),
-		testsUtils.PrintClusterRepSlotsOnFailure(namespace, clusterName, env))
+		func() string {
+			return testsUtils.PrintReplicationSlots(namespace, clusterName, env)
+		})
 
 	for _, slot := range expectedSlots {
 		query := fmt.Sprintf(
@@ -2532,20 +2534,21 @@ func AssertRepSlotsOnPod(
 				"app", "postgres", "''", query, env)
 			return strings.TrimSpace(stdout), err
 		}, 300).Should(BeEquivalentTo("t"),
-			testsUtils.PrintClusterRepSlotsOnFailure(namespace, clusterName, env))
+			func() string {
+				return testsUtils.PrintReplicationSlots(namespace, clusterName, env)
+			})
 	}
 }
 
-// AssertClusterRepSlotsAligned will compare all the replication slot restart_lsn
+// AssertClusterReplicationSlotsAligned will compare all the replication slot restart_lsn
 // in a cluster. The assertion will succeed if they are all equivalent.
-func AssertClusterRepSlotsAligned(
+func AssertClusterReplicationSlotsAligned(
 	namespace,
 	clusterName string,
 ) {
 	// Replication slot high availability requires PostgreSQL 11 or above
 	if env.PostgresVersion == 10 {
-		GinkgoWriter.Printf("Ignoring replication slots verification for postgres 10")
-		return
+		Skip("Ignoring replication slots verification for postgres 10")
 	}
 
 	podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -2553,25 +2556,27 @@ func AssertClusterRepSlotsAligned(
 	Eventually(func() bool {
 		var lsnList []string
 		for _, pod := range podList.Items {
-			out, err := testsUtils.GetRepSlotsLsnOnPod(namespace, clusterName, pod, env)
+			out, err := testsUtils.GetReplicationSlotLsnsOnPod(namespace, clusterName, pod, env)
 			Expect(err).ToNot(HaveOccurred())
 			lsnList = append(lsnList, out...)
 		}
-		return testsUtils.CompareLsn(lsnList)
+		return testsUtils.AreSameLsn(lsnList)
 	}, 300).Should(BeEquivalentTo(true),
-		testsUtils.PrintClusterRepSlotsOnFailure(namespace, clusterName, env))
+		func() string {
+			return testsUtils.PrintReplicationSlots(namespace, clusterName, env)
+		})
 }
 
-// AssertClusterRepSlots will verify if the replication slots of each pod
+// AssertClusterReplicationSlots will verify if the replication slots of each pod
 // of the cluster exist and are aligned.
-func AssertClusterRepSlots(namespace, clusterName string) {
+func AssertClusterReplicationSlots(namespace, clusterName string) {
 	By("verifying all cluster's replication slots exist and are aligned", func() {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
-			AssertRepSlotsOnPod(namespace, clusterName, pod)
+			AssertReplicationSlotsOnPod(namespace, clusterName, pod)
 		}
-		AssertClusterRepSlotsAligned(namespace, clusterName)
+		AssertClusterReplicationSlotsAligned(namespace, clusterName)
 	})
 }
 

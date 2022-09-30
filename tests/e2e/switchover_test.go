@@ -59,6 +59,6 @@ var _ = Describe("Switchover", func() {
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		AssertSwitchover(namespace, clusterName, env)
 		AssertPvcHasLabels(namespace, clusterName)
-		AssertClusterRepSlots(namespace, clusterName)
+		AssertClusterReplicationSlots(namespace, clusterName)
 	})
 })

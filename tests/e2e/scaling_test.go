@@ -61,7 +61,7 @@ var _ = Describe("Cluster scale up and down", func() {
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
-		AssertClusterRepSlots(clusterName, namespace)
+		AssertClusterReplicationSlots(clusterName, namespace)
 		// Add a node to the cluster and verify the cluster has one more
 		// element
 		By("adding an instance to the cluster", func() {
@@ -71,7 +71,7 @@ var _ = Describe("Cluster scale up and down", func() {
 			AssertClusterIsReady(namespace, clusterName, timeout, env)
 		})
 		AssertPvcHasLabels(namespace, clusterName)
-		AssertClusterRepSlots(clusterName, namespace)
+		AssertClusterReplicationSlots(clusterName, namespace)
 
 		// Remove a node from the cluster and verify the cluster has one
 		// element less
@@ -81,6 +81,6 @@ var _ = Describe("Cluster scale up and down", func() {
 			timeout := 60
 			AssertClusterIsReady(namespace, clusterName, timeout, env)
 		})
-		AssertClusterRepSlots(clusterName, namespace)
+		AssertClusterReplicationSlots(clusterName, namespace)
 	})
 })
