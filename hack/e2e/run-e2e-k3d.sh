@@ -79,6 +79,8 @@ main() {
     "${HACK_DIR}/setup-cluster.sh" load
   fi
 
+  "${HACK_DIR}/setup-cluster.sh" load-helper-images
+
   RC=0
 
   # Run E2E tests
