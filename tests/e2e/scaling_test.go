@@ -46,7 +46,7 @@ var _ = Describe("Cluster scale up and down", func() {
 		}
 	})
 	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
+		err := env.DeleteNamespaceAndWait(namespace, 120)
 		Expect(err).ToNot(HaveOccurred())
 	})
 	Context("with HA Replication Slots", func() {

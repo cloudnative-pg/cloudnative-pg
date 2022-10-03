@@ -59,7 +59,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance), func(
 		}
 	})
 	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
+		err := env.DeleteNamespaceAndWait(namespace, 120)
 		Expect(err).ToNot(HaveOccurred())
 	})
 	// Confirm that a standby closely following the primary doesn't need more

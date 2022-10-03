@@ -83,7 +83,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 	})
 
 	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
+		err := env.DeleteNamespaceAndWait(namespace, 120)
 		Expect(err).ToNot(HaveOccurred())
 	})
 

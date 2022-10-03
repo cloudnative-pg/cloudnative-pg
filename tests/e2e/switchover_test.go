@@ -43,18 +43,18 @@ var _ = Describe("Switchover", func() {
 		}
 	})
 	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
+		err := env.DeleteNamespaceAndWait(namespace, 120)
 		Expect(err).ToNot(HaveOccurred())
 	})
 	Context("with HA Replication slots", func() {
 		It("reacts to switchover requests", func() {
+			if env.PostgresVersion == 10 {
+				Skip("replication slots not available for PostgreSQL 10 or older")
+			}
 			// Create a cluster in a namespace we'll delete after the test
 			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 
-			if env.PostgresVersion == 10 {
-				Skip("replication slots not available for PostgreSQL 10 or older")
-			}
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 			AssertSwitchover(namespace, clusterName, env)
 			AssertPvcHasLabels(namespace, clusterName)
