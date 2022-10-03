@@ -100,8 +100,8 @@ func GetExpectedReplicationSlotsOnPod(
 	var slots []string
 	for _, pod := range podList.Items {
 		if pod.Name != podName && !specs.IsPodPrimary(pod) {
-			repSlotName := cluster.GetSlotNameFromInstanceName(pod.Name)
-			slots = append(slots, repSlotName)
+			replicationSlotName := cluster.GetSlotNameFromInstanceName(pod.Name)
+			slots = append(slots, replicationSlotName)
 		}
 	}
 	sort.Strings(slots)

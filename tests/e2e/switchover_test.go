@@ -25,14 +25,13 @@ import (
 
 var _ = Describe("Switchover", func() {
 	const (
-		namespace                 = "switchover-e2e"
-		sampleFileWithoutRepSlots = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		sampleFileWithRepSlots    = fixturesDir + "/base/cluster-storage-class-with-rep-slots.yaml.template"
-		clusterName               = "postgresql-storage-class"
-		level                     = tests.Medium
+		namespace                         = "switchover-e2e"
+		sampleFileWithoutReplicationSlots = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		sampleFileWithReplicationSlots    = fixturesDir + "/base/cluster-storage-class-with-rep-slots.yaml.template"
+		clusterName                       = "postgresql-storage-class"
+		level                             = tests.Medium
 	)
 
-	sampleFile := sampleFileWithRepSlots
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -47,18 +46,30 @@ var _ = Describe("Switchover", func() {
 		err := env.DeleteNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	It("reacts to switchover requests", func() {
-		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
+	Context("with HA Replication slots", func() {
+		It("reacts to switchover requests", func() {
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
 
-		if env.PostgresVersion == 10 {
-			// Cluster file without replication slot since it requires PostgreSQL 11 or above
-			sampleFile = sampleFileWithoutRepSlots
-		}
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		AssertSwitchover(namespace, clusterName, env)
-		AssertPvcHasLabels(namespace, clusterName)
-		AssertClusterReplicationSlots(namespace, clusterName)
+			if env.PostgresVersion == 10 {
+				Skip("replication slots not available for PostgreSQL 10 or older")
+			}
+			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
+			AssertSwitchover(namespace, clusterName, env)
+			AssertPvcHasLabels(namespace, clusterName)
+			AssertClusterReplicationSlots(namespace, clusterName)
+		})
+	})
+	Context("without HA Replication slots", func() {
+		It("reacts to switchover requests", func() {
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
+			AssertSwitchover(namespace, clusterName, env)
+			AssertPvcHasLabels(namespace, clusterName)
+		})
 	})
 })

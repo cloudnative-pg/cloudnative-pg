@@ -28,13 +28,12 @@ import (
 
 var _ = Describe("Cluster scale up and down", func() {
 	const (
-		namespace                 = "cluster-scale-e2e-storage-class"
-		sampleFileWithoutRepSlots = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		sampleFileWithRepSlots    = fixturesDir + "/base/cluster-storage-class-with-rep-slots.yaml.template"
-		clusterName               = "postgresql-storage-class"
-		level                     = tests.Lowest
+		namespace                         = "cluster-scale-e2e-storage-class"
+		sampleFileWithoutReplicationSlots = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		sampleFileWithReplicationSlots    = fixturesDir + "/base/cluster-storage-class-with-rep-slots.yaml.template"
+		clusterName                       = "postgresql-storage-class"
+		level                             = tests.Lowest
 	)
-	sampleFile := sampleFileWithRepSlots
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -50,37 +49,66 @@ var _ = Describe("Cluster scale up and down", func() {
 		err := env.DeleteNamespace(namespace)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	It("can scale the cluster size", func() {
-		if env.PostgresVersion == 10 {
-			// Cluster file without replication slot since it requires PostgreSQL 11 or above
-			sampleFile = sampleFileWithoutRepSlots
-		}
+	Context("with HA Replication Slots", func() {
+		It("can scale the cluster size", func() {
+			if env.PostgresVersion == 10 {
+				Skip("replication slots are not available for PostgreSQL 10 or older")
+			}
 
-		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-
-		AssertClusterReplicationSlots(clusterName, namespace)
-		// Add a node to the cluster and verify the cluster has one more
-		// element
-		By("adding an instance to the cluster", func() {
-			_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
-			timeout := 300
-			AssertClusterIsReady(namespace, clusterName, timeout, env)
-		})
-		AssertPvcHasLabels(namespace, clusterName)
-		AssertClusterReplicationSlots(clusterName, namespace)
+			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 
-		// Remove a node from the cluster and verify the cluster has one
-		// element less
-		By("removing an instance from the cluster", func() {
-			_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
-			Expect(err).ToNot(HaveOccurred())
-			timeout := 60
-			AssertClusterIsReady(namespace, clusterName, timeout, env)
+			AssertClusterReplicationSlots(clusterName, namespace)
+			// Add a node to the cluster and verify the cluster has one more
+			// element
+			By("adding an instance to the cluster", func() {
+				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
+				Expect(err).ToNot(HaveOccurred())
+				timeout := 300
+				AssertClusterIsReady(namespace, clusterName, timeout, env)
+			})
+			AssertPvcHasLabels(namespace, clusterName)
+			AssertClusterReplicationSlots(clusterName, namespace)
+
+			// Remove a node from the cluster and verify the cluster has one
+			// element less
+			By("removing an instance from the cluster", func() {
+				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
+				Expect(err).ToNot(HaveOccurred())
+				timeout := 60
+				AssertClusterIsReady(namespace, clusterName, timeout, env)
+			})
+			AssertClusterReplicationSlots(clusterName, namespace)
 		})
-		AssertClusterReplicationSlots(clusterName, namespace)
+	})
+
+	Context("without HA Replication Slots", func() {
+		It("can scale the cluster size", func() {
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
+
+			// Add a node to the cluster and verify the cluster has one more
+			// element
+			By("adding an instance to the cluster", func() {
+				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
+				Expect(err).ToNot(HaveOccurred())
+				timeout := 300
+				AssertClusterIsReady(namespace, clusterName, timeout, env)
+			})
+			AssertPvcHasLabels(namespace, clusterName)
+
+			// Remove a node from the cluster and verify the cluster has one
+			// element less
+			By("removing an instance from the cluster", func() {
+				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
+				Expect(err).ToNot(HaveOccurred())
+				timeout := 60
+				AssertClusterIsReady(namespace, clusterName, timeout, env)
+			})
+		})
 	})
 })

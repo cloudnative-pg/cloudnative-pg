@@ -27,15 +27,14 @@ import (
 
 var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() {
 	const (
-		sampleFileWithoutRepSlots = fixturesDir + "/fastfailover/cluster-fast-failover.yaml.template"
-		sampleFileWithRepSlots    = fixturesDir + "/fastfailover/cluster-fast-failover-with-repl-slots.yaml.template"
-		sampleFileSyncReplicas    = fixturesDir + "/fastfailover/cluster-syncreplicas-fast-failover.yaml.template"
-		webTestFile               = fixturesDir + "/fastfailover/webtest.yaml"
-		webTestSyncReplicas       = fixturesDir + "/fastfailover/webtest-syncreplicas.yaml"
-		webTestJob                = fixturesDir + "/fastfailover/apache-benchmark-webtest.yaml"
-		level                     = tests.Highest
+		sampleFileWithoutReplicationSlots = fixturesDir + "/fastfailover/cluster-fast-failover.yaml.template"
+		sampleFileWithReplicationSlots    = fixturesDir + "/fastfailover/cluster-fast-failover-with-repl-slots.yaml.template"
+		sampleFileSyncReplicas            = fixturesDir + "/fastfailover/cluster-syncreplicas-fast-failover.yaml.template"
+		webTestFile                       = fixturesDir + "/fastfailover/webtest.yaml"
+		webTestSyncReplicas               = fixturesDir + "/fastfailover/webtest-syncreplicas.yaml"
+		webTestJob                        = fixturesDir + "/fastfailover/apache-benchmark-webtest.yaml"
+		level                             = tests.Highest
 	)
-	sampleFile := sampleFileWithRepSlots
 	var (
 		namespace       string
 		clusterName     string
@@ -95,13 +94,27 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance), func() 
 		// forcing a failover and measuring how much time passes between the
 		// last row written on timeline 1 and the first one on timeline 2.
 		It("can do a fast failover", func() {
+			namespace = "primary-failover-time"
+			clusterName = "cluster-fast-failover"
+			AssertFastFailOver(namespace, sampleFileWithoutReplicationSlots, clusterName,
+				webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
+		})
+	})
+
+	Context("with async replicas cluster and HA Replication Slots", func() {
+		// Confirm that a standby closely following the primary doesn't need more
+		// than 10 seconds to be promoted and be able to start inserting records.
+		// We test this setting up an application pointing to the rw service,
+		// forcing a failover and measuring how much time passes between the
+		// last row written on timeline 1 and the first one on timeline 2.
+		It("can do a fast failover", func() {
 			if env.PostgresVersion == 10 {
-				// Cluster file without replication slot since it requires PostgreSQL 11 or above
-				sampleFile = sampleFileWithoutRepSlots
+				Skip("replication slots not available in PostgreSQL 10 or older")
 			}
 			namespace = "primary-failover-time"
 			clusterName = "cluster-fast-failover"
-			AssertFastFailOver(namespace, sampleFile, clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
+			AssertFastFailOver(namespace, sampleFileWithReplicationSlots,
+				clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
 			AssertClusterReplicationSlots(namespace, clusterName)
 		})
 	})
