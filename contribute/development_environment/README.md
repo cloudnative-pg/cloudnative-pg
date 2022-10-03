@@ -187,5 +187,15 @@ Now that your system has been validated, you can tear down the local cluster wit
 make kind-cluster-destroy
 ```
 
+> **NOTE:** if you want to deploy an operator with the image that generated on our CI/CD maybe for the sake of testing, 
+> then you can find the specific workflow and then find the `operator-manifest.yaml` as one of the artifacts of the 
+> workflow, download it and move it to `dist/` directory under the repository you've cloned. Then you can use:
+>
+> ```sh
+>   make deploy
+> ```
+> to deploy the operator with the specific image generated on the pipeline.
+>
+
 Congratulations, you have a suitable development environment. You are now able
 to contribute your patches to CloudNativePG!
