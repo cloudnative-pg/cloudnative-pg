@@ -61,7 +61,7 @@ jobs:
           concurrent_skipping: 'same_content'
           skip_after_successful_duplicate: 'true'
           paths_ignore: '["README.md", "docs/**"]'
-          do_not_skip: '["pull_request_target", "workflow_dispatch", "schedule"]'
+          do_not_skip: '["pull_request", "workflow_dispatch", "schedule"]'
 
   # Classify codebase changes along 5 different dimensions based on the files
   # changed in the commit/PR, and create 5 different filters which are used in
