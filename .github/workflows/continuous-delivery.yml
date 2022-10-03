@@ -78,42 +78,42 @@ jobs:
       shell-script-changed: ${{ steps.filter.outputs.shell-script-changed }}
       go-code-changed: ${{ steps.filter.outputs.go-code-changed }}
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
-    - name: Check for changes
-      uses: dorny/paths-filter@v2.10.2
-      id: filter
-      # Remember to add new folders in the operator-changed filter if needed
-      with:
-        base: ${{ (github.event_name == 'schedule') && 'main' || '' }}
-        filters: |
-          docs-changed:
-            - '**/*.md'
-            - 'docs/**'
-            - '.wordlist-en-custom.txt'
-          operator-changed:
-            - 'api/**'
-            - 'cmd/**'
-            - 'config/**'
-            - 'controllers/**'
-            - 'internal/**'
-            - 'licenses/**'
-            - 'pkg/**'
-            - '.github/workflows/continuous-delivery.yml'
-            - '.goreleaser.yml'
-            - 'Dockerfile'
-            - 'Makefile'
-            - 'go.mod'
-            - 'go.sum'
-          test-changed:
-            - 'tests/**'
-            - 'hack/**'
-          shell-script-changed:
-            - '**/*.sh'
-          go-code-changed:
-            - '**/*.go'
-            - '.golangci.yml'
+      - name: Check for changes
+        uses: dorny/paths-filter@v2.10.2
+        id: filter
+        # Remember to add new folders in the operator-changed filter if needed
+        with:
+          base: ${{ (github.event_name == 'schedule') && 'main' || '' }}
+          filters: |
+            docs-changed:
+              - '**/*.md'
+              - 'docs/**'
+              - '.wordlist-en-custom.txt'
+            operator-changed:
+              - 'api/**'
+              - 'cmd/**'
+              - 'config/**'
+              - 'controllers/**'
+              - 'internal/**'
+              - 'licenses/**'
+              - 'pkg/**'
+              - '.github/workflows/continuous-delivery.yml'
+              - '.goreleaser.yml'
+              - 'Dockerfile'
+              - 'Makefile'
+              - 'go.mod'
+              - 'go.sum'
+            test-changed:
+              - 'tests/**'
+              - 'hack/**'
+            shell-script-changed:
+              - '**/*.sh'
+            go-code-changed:
+              - '**/*.go'
+              - '.golangci.yml'
 
   golangci:
     name: Run linters
@@ -154,13 +154,13 @@ jobs:
       needs.change-triage.outputs.shell-script-changed == 'true'
     runs-on: ubuntu-20.04
     env:
-        SHELLCHECK_OPTS: -a -S style
+      SHELLCHECK_OPTS: -a -S style
     steps:
-    -
-      uses: actions/checkout@v3
-    -
-      name: Run ShellCheck
-      uses: ludeeus/action-shellcheck@1.1.0
+      -
+        uses: actions/checkout@v3
+      -
+        name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@1.1.0
 
   tests:
     name: Run unit tests
@@ -251,25 +251,25 @@ jobs:
       )
     runs-on: ubuntu-20.04
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ env.GOLANG_VERSION }}
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
 
-    - name: Run make apidoc
-      run: |
-        make apidoc
+      - name: Run make apidoc
+        run: |
+          make apidoc
 
-    - name: Verify apidoc changes
-      run: |
-        apidoc_file_path='docs/src/api_reference.md'
-        if git status --porcelain $apidoc_file_path | grep '^ M'; then
-          echo "The API documentation doesn't reflect the current API. Please run make apidoc."
-          exit 1
-        fi
+      - name: Verify apidoc changes
+        run: |
+          apidoc_file_path='docs/src/api_reference.md'
+          if git status --porcelain $apidoc_file_path | grep '^ M'; then
+            echo "The API documentation doesn't reflect the current API. Please run make apidoc."
+            exit 1
+          fi
 
   crd:
     name: Verify CRD is up to date
@@ -374,8 +374,12 @@ jobs:
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0+dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/+dev\1/')
+          # shortened commit sha
           commit_short=$(git rev-parse --short "${commit_sha}")
-          
+          commit_message=$(git show -s --format=%B "${commit_sha}")
+          # get git user and email
+          author_name=$(git show -s --format='%an' "${commit_sha}")
+          author_email=$(git show -s --format='%ae' "${commit_sha}")
           # extract branch name
           if [ ${{ github.event_name }} != 'pull_request' ] && [ ${{ github.event_name }} != 'pull_request_target' ]
           then
@@ -390,6 +394,10 @@ jobs:
           echo "::set-output name=date::${commit_date}"
           echo "::set-output name=version::${commit_version}"
           echo "::set-output name=commit::${commit_short}"
+          echo "::set-output name=commit_sha::${commit_sha}"
+          echo "::set-output name=commit_msg::${commit_message}"
+          echo "::set-output name=author_name::${author_name}"
+          echo "::set-output name=author_email::${author_email}"
       -
         name: Set GoReleaser environment
         run: |
@@ -487,6 +495,73 @@ jobs:
           # TAGS could be separated by newlines or commas
           image=$(sed -n '1{s/,.*//; p}' <<< "$TAGS")
           echo "::set-output name=image::${image}"
+
+      -
+        name: Generate manifest for operator deployment
+        id: generate-manifest
+        run: |
+          make generate-manifest
+      -
+        name: Upload the operator manifest as artifact in workflow
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: operator-manifest.yaml
+          path: dist/operator-manifest.yaml
+          retention-days: 7
+
+      -
+        name: Replicate the artifact or not (to cloudnative-pg/artifacts repo)
+        id: replicate-or-not
+        run: |
+          branch_name=${{ steps.build-meta.outputs.branch_name }}
+          # TODO after review/testing, the `|| ${branch_name} == 'dev/771'` should be removed 
+          if [[ ${branch_name} == 'main' || ${branch_name} =~ 'release/' || ${branch_name} == 'dev/771' ]]; then
+            echo "::set-output name=replicate::true"
+          else
+            echo "::set-output name=replicate::false"
+          fi
+      -
+        name: Checkout artifact
+        uses: actions/checkout@v3
+        if: ${{ steps.replicate-or-not.outputs.replicate == 'true'}}
+        with:
+          repository: cloudnative-pg/artifacts
+          token: ${{ secrets.REPO_GHA_PAT }}
+          path: work
+          fetch-depth: 0
+      -
+        name: Configure git user
+        if: ${{ steps.replicate-or-not.outputs.replicate == 'true'}}
+        working-directory: work
+        run: |
+          git config user.email "${{ steps.build-meta.outputs.author_email }}"
+          git config user.name "${{ steps.build-meta.outputs.author_name }}"
+      -
+        name: Switch to or create the right branch
+        if: ${{ steps.replicate-or-not.outputs.replicate == 'true'}}
+        working-directory: work
+        run: |
+          git switch -C ${{ steps.build-meta.outputs.branch_name }}
+      -
+        name: Replicate the manifest and commit
+        if: ${{ steps.replicate-or-not.outputs.replicate == 'true'}}
+        working-directory: work
+        run: |
+          mkdir -p manifests
+          cp ../dist/operator-manifest.yaml manifests/
+          git add .
+          git commit -m "${{ steps.build-meta.outputs.commit_msg }}" -m "https://github.com/cloudnative-pg/cloudnative-pg/commit/${{ steps.build-meta.outputs.commit_sha }}"
+      -
+        name: Push changes
+        if: ${{ steps.replicate-or-not.outputs.replicate == 'true'}}
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.REPO_GHA_PAT }}
+          repository: cloudnative-pg/artifacts
+          directory: work
+          branch: ${{ steps.build-meta.outputs.branch_name }}
+          force: true
 
   generate-jobs:
     name: Generate jobs for E2E tests
@@ -646,6 +721,12 @@ jobs:
             sudo apt-get install -y gettext-base
             sudo hack/setup-cluster.sh prepare /usr/local/bin
       -
+        name: Download the operator manifest
+        uses: actions/download-artifact@v3
+        with:
+          name: operator-manifest.yaml
+          path: dist/operator-manifest.yaml
+      -
         name: Run Kind End-to-End tests
         run:
           make e2e-test-kind
@@ -761,10 +842,10 @@ jobs:
       - name: Delete the downloaded files
         run: rm -rf test-artifacts
 
-# Adds the 'ok-to-merge' label to workflows that have run successfully and
-# have adequate test and matrix coverage.
-# This label is a prerequisite to be able to merge a PR.
-# Also see to 'require-labels.yml'
+  # Adds the 'ok-to-merge' label to workflows that have run successfully and
+  # have adequate test and matrix coverage.
+  # This label is a prerequisite to be able to merge a PR.
+  # Also see to 'require-labels.yml'
   ok-to-merge:
     name: Label the PR as "ok to merge"
     needs:
@@ -796,8 +877,8 @@ jobs:
       -
         name: Label the PR as "ok to merge"
         if: |
-           steps.get_pr_number_and_labels.outputs.pr_number != '' &&
-           steps.get_pr_number_and_labels.outputs.ok_label == ''
+          steps.get_pr_number_and_labels.outputs.pr_number != '' &&
+          steps.get_pr_number_and_labels.outputs.ok_label == ''
         uses: actions-ecosystem/action-add-labels@v1.1.3
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
