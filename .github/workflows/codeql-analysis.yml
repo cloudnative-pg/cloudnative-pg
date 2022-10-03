@@ -39,7 +39,7 @@ jobs:
       should_skip: ${{ steps.skip_check.outputs.should_skip == 'true' && github.ref != 'refs/heads/main' }}
     steps:
       - id: skip_check
-        uses: fkirc/skip-duplicate-actions@v5.1.0
+        uses: fkirc/skip-duplicate-actions@v5.2.0
         with:
           concurrent_skipping: 'same_content'
           skip_after_successful_duplicate: 'true'
