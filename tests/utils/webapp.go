@@ -19,6 +19,7 @@ package utils
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 // DefaultWebapp returns a struct representing a
@@ -69,7 +70,16 @@ func DefaultWebapp(namespace string, name string, rootCASecretName string, tlsSe
 							MountPath: "/etc/secrets/tls",
 						},
 					},
+					SecurityContext: &corev1.SecurityContext{
+						RunAsNonRoot:             pointer.Bool(false),
+						AllowPrivilegeEscalation: pointer.Bool(false),
+						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+					},
 				},
+			},
+			SecurityContext: &corev1.PodSecurityContext{
+				RunAsNonRoot:   pointer.Bool(false),
+				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 			},
 		},
 	}
