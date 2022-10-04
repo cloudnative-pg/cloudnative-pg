@@ -55,6 +55,12 @@ const (
 
 	// ReconciliationDisabledValue it the value that stops the reconciliation loop
 	ReconciliationDisabledValue = "disabled"
+
+	// HibernateClusterManifestAnnotationName contains the hibernated cluster manifest
+	HibernateClusterManifestAnnotationName = "cnpg.io/hibernateClusterManifest"
+
+	// HibernatePgControlDataAnnotationName contains the pg_controldata output of the hibernated cluster
+	HibernatePgControlDataAnnotationName = "cnpg.io/hibernatePgControlData"
 )
 
 // PodRole describes the Role of a given pod

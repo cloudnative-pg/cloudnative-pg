@@ -33,9 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
@@ -176,7 +176,7 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 			Message: err.Error(),
 		}
-		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
+		if errCond := conditions.Update(ctx, client, cluster, &condition); errCond != nil {
 			log.Error(errCond, "Error updating wal archiving condition (wal archiving failed)")
 		}
 		return err
@@ -201,7 +201,7 @@ func run(ctx context.Context, podName string, args []string, client client.WithW
 		Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
 		Message: "Continuous archiving is working",
 	}
-	if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
+	if errCond := conditions.Update(ctx, client, cluster, &condition); errCond != nil {
 		log.Error(errCond, "Error while updating wal archiving condition (wal archiving succeeded)")
 	}
 	// We return only the first error to PostgreSQL, because the first error
@@ -366,7 +366,7 @@ func checkWalArchive(ctx context.Context,
 			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 			Message: err.Error(),
 		}
-		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
+		if errCond := conditions.Update(ctx, client, cluster, &condition); errCond != nil {
 			log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 		}
 		return err
@@ -385,7 +385,7 @@ func checkWalArchive(ctx context.Context,
 			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 			Message: err.Error(),
 		}
-		if errCond := manager.UpdateCondition(ctx, client, cluster, &condition); errCond != nil {
+		if errCond := conditions.Update(ctx, client, cluster, &condition); errCond != nil {
 			log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 		}
 		return err

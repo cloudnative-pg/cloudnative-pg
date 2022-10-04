@@ -23,13 +23,15 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Switchover", func() {
+var _ = Describe("Switchover", Serial, func() {
 	const (
-		namespace   = "switchover-e2e"
-		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
-		clusterName = "postgresql-storage-class"
-		level       = tests.Medium
+		namespace                         = "switchover-e2e"
+		sampleFileWithoutReplicationSlots = fixturesDir + "/base/cluster-storage-class.yaml.template"
+		sampleFileWithReplicationSlots    = fixturesDir + "/base/cluster-storage-class-with-rep-slots.yaml.template"
+		clusterName                       = "postgresql-storage-class"
+		level                             = tests.Medium
 	)
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -41,16 +43,33 @@ var _ = Describe("Switchover", func() {
 		}
 	})
 	AfterEach(func() {
-		err := env.DeleteNamespace(namespace)
+		err := env.DeleteNamespaceAndWait(namespace, 120)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	It("reacts to switchover requests", func() {
-		// Create a cluster in a namespace we'll delete after the test
-		err := env.CreateNamespace(namespace)
-		Expect(err).ToNot(HaveOccurred())
+	Context("with HA Replication slots", func() {
+		It("reacts to switchover requests", func() {
+			if env.PostgresVersion == 10 {
+				Skip("replication slots not available for PostgreSQL 10 or older")
+			}
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
 
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		AssertSwitchover(namespace, clusterName, env)
-		AssertPvcHasLabels(namespace, clusterName)
+			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
+			AssertSwitchover(namespace, clusterName, env)
+			AssertPvcHasLabels(namespace, clusterName)
+			AssertClusterReplicationSlots(namespace, clusterName)
+		})
+	})
+	Context("without HA Replication slots", func() {
+		It("reacts to switchover requests", func() {
+			// Create a cluster in a namespace we'll delete after the test
+			err := env.CreateNamespace(namespace)
+			Expect(err).ToNot(HaveOccurred())
+
+			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
+			AssertSwitchover(namespace, clusterName, env)
+			AssertPvcHasLabels(namespace, clusterName)
+		})
 	})
 })

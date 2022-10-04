@@ -436,6 +436,15 @@ that, until the fence is lifted, data on the pod is not modified by PostgreSQL
 and that the file system can be investigated for debugging and troubleshooting
 purposes.
 
+### Hibernation
+
+CloudNativePG supports [hibernation of a running PostgreSQL cluster](cnpg-plugin.md#cluster-hibernation)
+via the `cnpg` plugin. Hibernation shuts down all Postgres instances in the
+High Availability cluster, and keep a static copy of the PVCs of the primary
+that contain `PGDATA` and WALs. The plugin enables to exit the hibernation
+phase, by resuming the primary and then recreating all the replicas - where they
+exist.
+
 ### Reuse of Persistent Volumes storage in Pods
 
 When the operator needs to create a pod that has been deleted by the user or

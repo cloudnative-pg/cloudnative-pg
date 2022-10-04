@@ -38,9 +38,9 @@ var (
 	Client client.Client
 )
 
-// CreateKubernetesClient creates a k8s client to be used inside the kubectl-cnpg
+// SetupKubernetesClient creates a k8s client to be used inside the kubectl-cnpg
 // utility
-func CreateKubernetesClient(configFlags *genericclioptions.ConfigFlags) error {
+func SetupKubernetesClient(configFlags *genericclioptions.ConfigFlags) error {
 	var err error
 
 	kubeconfig := configFlags.ToRawKubeConfigLoader()

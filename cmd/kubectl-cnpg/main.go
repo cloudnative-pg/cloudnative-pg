@@ -29,6 +29,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/hibernate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/reload"
@@ -36,11 +37,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/restart"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/status"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 func main() {
+	logFlags := &log.Flags{}
 	configFlags := genericclioptions.NewConfigFlags(true)
 
 	rootCmd := &cobra.Command{
@@ -48,15 +51,18 @@ func main() {
 		Short:        "A plugin to manage your CloudNativePG clusters",
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return plugin.CreateKubernetesClient(configFlags)
+			logFlags.ConfigureLogging()
+			return plugin.SetupKubernetesClient(configFlags)
 		},
 	}
 
+	logFlags.AddFlags(rootCmd.PersistentFlags())
 	configFlags.AddFlags(rootCmd.PersistentFlags())
 
 	rootCmd.AddCommand(certificate.NewCmd())
 	rootCmd.AddCommand(destroy.NewCmd())
 	rootCmd.AddCommand(fence.NewCmd())
+	rootCmd.AddCommand(hibernate.NewCmd())
 	rootCmd.AddCommand(maintenance.NewCmd())
 	rootCmd.AddCommand(promote.NewCmd())
 	rootCmd.AddCommand(reload.NewCmd())

@@ -19,7 +19,6 @@ package status
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -30,11 +29,11 @@ import (
 	"github.com/logrusorgru/aurora/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -101,26 +100,12 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 
 	// Get the list of Pods created by this Cluster
 	var instancesStatus postgres.PostgresqlStatusList
-	var pods corev1.PodList
-	err = plugin.Client.List(ctx, &pods, client.InNamespace(plugin.Namespace))
+	managedPods, primaryPod, err := resources.GetInstancePods(ctx, clusterName)
 	if err != nil {
 		return nil, err
 	}
 
-	var managedPods []corev1.Pod
-	var primaryPod corev1.Pod
-	for idx := range pods.Items {
-		for _, owner := range pods.Items[idx].ObjectMeta.OwnerReferences {
-			if owner.Kind == apiv1.ClusterKind && owner.Name == clusterName {
-				managedPods = append(managedPods, pods.Items[idx])
-				if specs.IsPodPrimary(pods.Items[idx]) {
-					primaryPod = pods.Items[idx]
-				}
-			}
-		}
-	}
-
-	instancesStatus = extractInstancesStatus(
+	instancesStatus = resources.ExtractInstancesStatus(
 		ctx,
 		plugin.Config,
 		managedPods,
@@ -516,58 +501,4 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 	}
 
 	return "Unknown"
-}
-
-func extractInstancesStatus(
-	ctx context.Context,
-	config *rest.Config,
-	filteredPods []corev1.Pod,
-	postgresContainerName string,
-) postgres.PostgresqlStatusList {
-	var result postgres.PostgresqlStatusList
-
-	for idx := range filteredPods {
-		instanceStatus := getReplicaStatusFromPodViaExec(
-			ctx, config, filteredPods[idx], postgresContainerName)
-		instanceStatus.IsReady = utils.IsPodReady(filteredPods[idx])
-		result.Items = append(result.Items, instanceStatus)
-	}
-
-	return result
-}
-
-func getReplicaStatusFromPodViaExec(
-	ctx context.Context,
-	config *rest.Config,
-	pod corev1.Pod,
-	postgresContainerName string,
-) postgres.PostgresqlStatus {
-	result := postgres.PostgresqlStatus{
-		Pod: pod,
-	}
-
-	timeout := time.Second * 2
-	clientInterface := kubernetes.NewForConfigOrDie(config)
-	stdout, _, err := utils.ExecCommand(
-		ctx,
-		clientInterface,
-		config,
-		pod,
-		postgresContainerName,
-		&timeout,
-		"/controller/manager", "instance", "status")
-	if err != nil {
-		result.Pod = pod
-		result.Error = fmt.Errorf("pod not available")
-		return result
-	}
-
-	err = json.Unmarshal([]byte(stdout), &result)
-	if err != nil {
-		result.Pod = pod
-		result.Error = fmt.Errorf("can't parse pod output")
-		return result
-	}
-
-	return result
 }
