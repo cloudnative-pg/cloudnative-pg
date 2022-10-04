@@ -30,6 +30,7 @@ import (
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -37,95 +38,102 @@ import (
 // errNoHibernatedPVCsFound indicates that no PVCs were found. This is also used by the status command
 var errNoHibernatedPVCsFound = fmt.Errorf("no hibernated PVCs to reactivate found")
 
-func hibernateOff(ctx context.Context, clusterName string) error {
-	fmt.Println("cluster reactivation starting")
-	if err := ensureClusterDoesNotExist(ctx, clusterName); err != nil {
+// offCommand represent the `hibernate off` command
+type offCommand struct {
+	ctx         context.Context
+	clusterName string
+}
+
+// newOffCommand creates a new `hibernate off` command
+func newOffCommand(ctx context.Context, clusterName string) *offCommand {
+	contextLogger := log.FromContext(ctx).WithValues(
+		"clusterName", clusterName)
+
+	return &offCommand{
+		ctx:         log.IntoContext(ctx, contextLogger),
+		clusterName: clusterName,
+	}
+}
+
+// execute executes the `hibernate off` command
+func (off *offCommand) execute() error {
+	off.printAdvancement("cluster reactivation starting")
+
+	// Ensuring the cluster doesn't exist
+	if err := off.ensureClusterDoesNotExistStep(); err != nil {
 		return err
 	}
 
-	pvcGroup, err := getHibernatedPVCGroup(ctx, clusterName)
+	// Get the list of PVC from which we need to resume this cluster
+	pvcGroup, err := off.getHibernatedPVCGroupStep()
 	if err != nil {
 		return err
 	}
 
-	if err := recreateClusterFromHibernatedPVC(ctx, pvcGroup[0]); err != nil {
+	// Ensure the list of PVCs we have is correct
+	if err := off.ensurePVCsArePartOfAPVCGroupStep(pvcGroup); err != nil {
 		return err
 	}
 
-	fmt.Println("cluster reactivation completed")
+	// We recreate the cluster resource from the first PVC of the group,
+	// and don't care of which PVC we select because we annotate
+	// each PVC of a group with the same data.
+	pvc := pvcGroup[0]
+
+	// We get the original cluster resource from the annotation
+	clusterFromPVC, err := off.getClusterFromPVCAnnotationStep(pvc)
+	if err != nil {
+		return err
+	}
+
+	// And recreate it into the Kubernetes cluster
+	if err := off.createClusterWithoutRuntimeDataStep(clusterFromPVC); err != nil {
+		return err
+	}
+
+	off.printAdvancement("cluster reactivation completed")
+
 	return nil
 }
 
-func recreateClusterFromHibernatedPVC(ctx context.Context, pvc corev1.PersistentVolumeClaim) error {
-	clusterFromPVC, err := getClusterFromPVCAnnotation(pvc)
-	if err != nil {
+// ensureClusterDoesNotExistStep checks if this cluster exist or not, ensuring
+// that it is not present
+func (off *offCommand) ensureClusterDoesNotExistStep() error {
+	var cluster v1.Cluster
+	err := plugin.Client.Get(
+		off.ctx,
+		types.NamespacedName{Name: off.clusterName, Namespace: plugin.Namespace},
+		&cluster,
+	)
+	if err == nil {
+		return fmt.Errorf("cluster already exist, cannot proceed with reactivation")
+	}
+	if !apierrs.IsNotFound(err) {
 		return err
 	}
-
-	return createClusterWithoutRuntimeData(ctx, clusterFromPVC)
+	return nil
 }
 
-func getHibernatedPVCGroup(ctx context.Context, clusterName string) ([]corev1.PersistentVolumeClaim, error) {
-	pvcs, err := getClusterPVCs(ctx, clusterName)
-	if err != nil {
-		return nil, err
-	}
-	if len(pvcs) == 0 {
-		return nil, errNoHibernatedPVCsFound
-	}
-	if err := ensurePVCsArePartOfAPVCGroup(pvcs); err != nil {
-		return nil, err
-	}
-
-	return pvcs, nil
-}
-
-func getClusterPVCs(ctx context.Context, clusterName string) ([]corev1.PersistentVolumeClaim, error) {
+// getHibernatedPVCGroupStep gets the PVC group resulting from the hibernation process
+func (off *offCommand) getHibernatedPVCGroupStep() ([]corev1.PersistentVolumeClaim, error) {
+	// Get the list of PVCs belonging to this group
 	var pvcList corev1.PersistentVolumeClaimList
 	if err := plugin.Client.List(
-		ctx,
+		off.ctx,
 		&pvcList,
-		client.MatchingLabels{utils.ClusterLabelName: clusterName},
+		client.MatchingLabels{utils.ClusterLabelName: off.clusterName},
 	); err != nil {
 		return nil, err
+	}
+	if len(pvcList.Items) == 0 {
+		return nil, errNoHibernatedPVCsFound
 	}
 
 	return pvcList.Items, nil
 }
 
-func createClusterWithoutRuntimeData(ctx context.Context, clusterFromPVC v1.Cluster) error {
-	cluster := clusterFromPVC.DeepCopy()
-	// remove any runtime kubernetes metadata
-	cluster.ObjectMeta.ResourceVersion = ""
-	cluster.ObjectMeta.ManagedFields = nil
-	cluster.ObjectMeta.UID = ""
-	cluster.ObjectMeta.Generation = 0
-	cluster.ObjectMeta.CreationTimestamp = metav1.Time{}
-	// remove cluster status
-	cluster.Status = v1.ClusterStatus{}
-
-	// remove any runtime kubernetes annotations
-	delete(cluster.Annotations, corev1.LastAppliedConfigAnnotation)
-
-	// remove the cluster fencing
-	delete(cluster.Annotations, utils.FencedInstanceAnnotation)
-
-	// create cluster
-	return plugin.Client.Create(ctx, cluster)
-
-}
-
-func getClusterFromPVCAnnotation(pvc corev1.PersistentVolumeClaim) (v1.Cluster, error) {
-	var clusterFromPVC v1.Cluster
-	// get the cluster manifest
-	clusterJSON := pvc.Annotations[utils.HibernateClusterManifestAnnotationName]
-	if err := json.Unmarshal([]byte(clusterJSON), &clusterFromPVC); err != nil {
-		return v1.Cluster{}, err
-	}
-	return clusterFromPVC, nil
-}
-
-func ensurePVCsArePartOfAPVCGroup(pvcs []corev1.PersistentVolumeClaim) error {
+// ensurePVCsArePartOfAPVCGroupStep check if the passed PVCs are really part of the same group
+func (off *offCommand) ensurePVCsArePartOfAPVCGroupStep(pvcs []corev1.PersistentVolumeClaim) error {
 	// ensure all the pvcs belong to the same node serial and are hibernated
 	var nodeSerial []string
 	for _, pvc := range pvcs {
@@ -150,22 +158,41 @@ func ensurePVCsArePartOfAPVCGroup(pvcs []corev1.PersistentVolumeClaim) error {
 	return nil
 }
 
-func ensureClusterDoesNotExist(ctx context.Context, clusterName string) error {
-	var cluster v1.Cluster
-	err := plugin.Client.Get(
-		ctx,
-		types.NamespacedName{Name: clusterName, Namespace: plugin.Namespace},
-		&cluster,
-	)
-	if err == nil {
-		return fmt.Errorf("cluster already exist, cannot proceed with reactivation")
+// getClusterFromPVCAnnotationStep reads the original cluster resource from the chosen PVC
+func (off *offCommand) getClusterFromPVCAnnotationStep(pvc corev1.PersistentVolumeClaim) (v1.Cluster, error) {
+	var clusterFromPVC v1.Cluster
+	// get the cluster manifest
+	clusterJSON := pvc.Annotations[utils.HibernateClusterManifestAnnotationName]
+	if err := json.Unmarshal([]byte(clusterJSON), &clusterFromPVC); err != nil {
+		return v1.Cluster{}, err
 	}
-	if !apierrs.IsNotFound(err) {
-		return err
-	}
-	return nil
+	return clusterFromPVC, nil
 }
 
+// createClusterWithoutRuntimeDataStep recreate the original cluster back into Kubernetes
+func (off *offCommand) createClusterWithoutRuntimeDataStep(clusterFromPVC v1.Cluster) error {
+	cluster := clusterFromPVC.DeepCopy()
+	// remove any runtime kubernetes metadata
+	cluster.ObjectMeta.ResourceVersion = ""
+	cluster.ObjectMeta.ManagedFields = nil
+	cluster.ObjectMeta.UID = ""
+	cluster.ObjectMeta.Generation = 0
+	cluster.ObjectMeta.CreationTimestamp = metav1.Time{}
+	// remove cluster status
+	cluster.Status = v1.ClusterStatus{}
+
+	// remove any runtime kubernetes annotations
+	delete(cluster.Annotations, corev1.LastAppliedConfigAnnotation)
+
+	// remove the cluster fencing
+	delete(cluster.Annotations, utils.FencedInstanceAnnotation)
+
+	// create cluster
+	return plugin.Client.Create(off.ctx, cluster)
+}
+
+// ensureAnnotationsExists returns an error if the passed PVC is annotated with all the
+// passed annotations names
 func ensureAnnotationsExists(volume corev1.PersistentVolumeClaim, annotationNames ...string) error {
 	for _, annotationName := range annotationNames {
 		if _, ok := volume.Annotations[annotationName]; !ok {
@@ -174,4 +201,8 @@ func ensureAnnotationsExists(volume corev1.PersistentVolumeClaim, annotationName
 	}
 
 	return nil
+}
+
+func (off *offCommand) printAdvancement(msg string) {
+	fmt.Println(msg)
 }

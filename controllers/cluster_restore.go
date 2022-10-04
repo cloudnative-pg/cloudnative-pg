@@ -31,29 +31,35 @@ import (
 // reconcileRestoredCluster ensures that we own again any orphan resources when cluster gets reconciled for
 // the first time
 func (r *ClusterReconciler) reconcileRestoredCluster(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	// No need to check this on a cluster which has been already deployed
 	if cluster.Status.LatestGeneratedNode != 0 {
 		return nil
 	}
+
+	// Get the list of PVCs belonging to this cluster but not owned by it
 	pvcs, err := getOrphanPVCs(ctx, r.Client, cluster)
 	if err != nil {
 		return err
 	}
-
-	contextLogger := log.FromContext(ctx)
 	if len(pvcs) == 0 {
 		contextLogger.Info("no orphan PVCs found, skipping the restored cluster reconciliation")
 		return nil
 	}
 
-	contextLogger.Debug("found orphan pvcs, trying to restore the cluster")
+	contextLogger.Info("found orphan pvcs, trying to restore the cluster", "pvcs", pvcs)
+
 	highestSerial, primarySerial, err := getNodeSerialsFromPVCs(pvcs)
 	if err != nil {
 		return err
 	}
+
 	if primarySerial == 0 {
 		contextLogger.Info("no primary serial found, assigning the highest serial as the primary")
 		primarySerial = highestSerial
 	}
+
 	contextLogger.Debug("proceeding to restore the cluster status")
 	if err := restoreClusterStatus(ctx, r.Client, cluster, highestSerial, primarySerial); err != nil {
 		return err
@@ -74,7 +80,6 @@ func restoreClusterStatus(
 	clusterOrig := cluster.DeepCopy()
 	cluster.Status.LatestGeneratedNode = latestNodeSerial
 	cluster.Status.TargetPrimary = specs.GetInstanceName(cluster.Name, targetPrimaryNodeSerial)
-
 	return c.Status().Patch(ctx, cluster, client.MergeFrom(clusterOrig))
 }
 
@@ -94,7 +99,7 @@ func getOrphanPVCs(
 		return nil, err
 	}
 
-	var orphanPVCs []corev1.PersistentVolumeClaim // nolint
+	orphanPVCs := make([]corev1.PersistentVolumeClaim, 0, len(pvcList.Items)) // nolint
 	for _, pvc := range pvcList.Items {
 		if len(pvc.OwnerReferences) != 0 {
 			contextLogger.Warning("skipping pvc because it has owner metadata",
