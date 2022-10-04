@@ -117,7 +117,9 @@ func createEnvVarPostgresContainer(cluster apiv1.Cluster, podName string) []core
 		},
 	}
 
-	return envVar
+	proxiedEnvVar := cluster.SetEnvProxies(envVar)
+
+	return proxiedEnvVar
 }
 
 // createPostgresContainers create the PostgreSQL containers that are

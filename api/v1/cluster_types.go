@@ -1527,6 +1527,30 @@ func (cluster *Cluster) GetImageName() string {
 	return configuration.Current.PostgresImageName
 }
 
+// SetEnvProxies to pass proxies defined for operator to clusters
+func (cluster *Cluster) SetEnvProxies(envvar []corev1.EnvVar) []corev1.EnvVar {
+
+	if configuration.Current.EnvHttpProxy != "" {
+		envvar = append(envvar, corev1.EnvVar{
+			Name:  "HTTP_PROXY",
+			Value: configuration.Current.EnvHttpProxy,
+		})
+	}
+	if configuration.Current.EnvHttpsProxy != "" {
+		envvar = append(envvar, corev1.EnvVar{
+			Name:  "HTTPS_PROXY",
+			Value: configuration.Current.EnvHttpProxy,
+		})
+	}
+	if configuration.Current.EnvNoProxy != "" {
+		envvar = append(envvar, corev1.EnvVar{
+			Name:  "NO_PROXY",
+			Value: configuration.Current.EnvNoProxy,
+		})
+	}
+	return envvar
+}
+
 // GetPostgresqlVersion gets the PostgreSQL image version detecting it from the
 // image name.
 // Example:

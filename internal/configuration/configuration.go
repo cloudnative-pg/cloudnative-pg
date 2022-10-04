@@ -47,6 +47,11 @@ type Data struct {
 	// EnablePodDebugging enable debugging mode in new generated pods
 	EnablePodDebugging bool `json:"enablePodDebugging" env:"POD_DEBUG"`
 
+	// Proxies variable
+	EnvHttpProxy  string `env:"HTTP_PROXY"`
+	EnvHttpsProxy string `env:"HTTPS_PROXY"`
+	EnvNoProxy    string `env:"NO_PROXY"`
+
 	// OperatorNamespace is the namespace where the operator is installed
 	OperatorNamespace string `json:"operatorNamespace" env:"OPERATOR_NAMESPACE"`
 
