@@ -147,6 +147,11 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 							MountPath: "/azurite",
 						},
 					},
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: pointer.Bool(false),
+						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						RunAsNonRoot:             pointer.Bool(false),
+					},
 				},
 			},
 			Volumes: []corev1.Volume{
@@ -170,6 +175,10 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 						EmptyDir: &corev1.EmptyDirVolumeSource{},
 					},
 				},
+			},
+			SecurityContext: &corev1.PodSecurityContext{
+				RunAsNonRoot:   pointer.Bool(false),
+				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 			},
 		},
 	}
