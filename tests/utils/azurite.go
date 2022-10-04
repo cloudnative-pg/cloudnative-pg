@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 )
@@ -138,6 +139,11 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 							MountPath: "/etc/ssl/certs",
 						},
 					},
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: pointer.Bool(false),
+						SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+						RunAsNonRoot:             pointer.Bool(false),
+					},
 				},
 			},
 			Volumes: []corev1.Volume{
@@ -155,6 +161,10 @@ func getAzuriteClientPod(namespace string) corev1.Pod {
 						},
 					},
 				},
+			},
+			SecurityContext: &corev1.PodSecurityContext{
+				RunAsNonRoot:   pointer.Bool(false),
+				SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
 			},
 		},
 	}
