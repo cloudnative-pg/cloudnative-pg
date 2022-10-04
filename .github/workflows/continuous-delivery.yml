@@ -495,7 +495,6 @@ jobs:
           # TAGS could be separated by newlines or commas
           image=$(sed -n '1{s/,.*//; p}' <<< "$TAGS")
           echo "::set-output name=image::${image}"
-
       -
         name: Generate manifest for operator deployment
         id: generate-manifest
@@ -509,13 +508,12 @@ jobs:
           name: operator-manifest.yaml
           path: dist/operator-manifest.yaml
           retention-days: 7
-
       -
         name: Replicate the artifact or not (to cloudnative-pg/artifacts repo)
         id: replicate-or-not
         run: |
           branch_name=${{ steps.build-meta.outputs.branch_name }}
-          # TODO after review/testing, the `|| ${branch_name} == 'dev/771'` should be removed 
+          # TODO after review/testing, the `|| ${branch_name} == 'dev/771'` should be removed
           if [[ ${branch_name} == 'main' || ${branch_name} =~ 'release/' || ${branch_name} == 'dev/771' ]]; then
             echo "::set-output name=replicate::true"
           else
@@ -720,12 +718,6 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y gettext-base
             sudo hack/setup-cluster.sh prepare /usr/local/bin
-      -
-        name: Download the operator manifest
-        uses: actions/download-artifact@v3
-        with:
-          name: operator-manifest.yaml
-          path: dist/operator-manifest.yaml
       -
         name: Run Kind End-to-End tests
         run:

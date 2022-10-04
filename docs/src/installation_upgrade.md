@@ -16,9 +16,8 @@ kubectl apply -f \
 ```
 
 > **NOTE:** if you want to play with some trial features that haven't yet been release officially, we now have the [cloudnative-pg/artifacts](https://github.com/cloudnative-pg/artifacts)
-> provided for persisting the pre-release operator manifests per branches (currently, we support `main` and `release/*` 
-> branches). You can either go to the repository and download the manifest YAML file per a branch and then apply it to 
-> install the operator or use the instruction as follows:
+> provided for persisting the pre-release operator manifests per branches (currently, we support `main` and `release/*`
+> branches). You can use the following instruction to install a snapshot operator:
 >
 > ```sh
 > curl -sSfL \
